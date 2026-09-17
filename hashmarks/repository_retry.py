@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import time
-from typing import Callable, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from .file_store import UnstableFileError
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 _TRANSIENT_RETRY_DELAYS = (0.0, 0.005, 0.01, 0.02, 0.04, 0.08, 0.16, 0.25)
 _TRANSIENT_RUNTIME_MESSAGES = (

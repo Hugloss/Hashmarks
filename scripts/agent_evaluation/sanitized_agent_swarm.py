@@ -42,7 +42,9 @@ def _load_public(path: Path) -> list[dict[str, str]]:
 def _guard(repo: Path, public_path: Path, secret_path: Path) -> None:
     repo = repo.resolve()
     if (repo / "benchmarks" / "agent_tasks.json").exists():
-        raise RuntimeError("worker repository contains benchmarks/agent_tasks.json answer key")
+        raise RuntimeError(
+            "worker repository contains benchmarks/agent_tasks.json answer key"
+        )
     if _inside(secret_path, repo):
         raise RuntimeError("SECRET grader file must live outside worker repository")
     if _inside(public_path, repo):
@@ -51,7 +53,9 @@ def _guard(repo: Path, public_path: Path, secret_path: Path) -> None:
         raise RuntimeError("PUBLIC task manifest must live outside worker repository")
 
 
-def _trace_task(codemap: CodeMap, task: dict[str, str], trace_dir: Path) -> dict[str, Any]:
+def _trace_task(
+    codemap: CodeMap, task: dict[str, str], trace_dir: Path
+) -> dict[str, Any]:
     started = time.perf_counter()
     action = codemap.task_action_map(task["query"], limit=20)
     row = {
@@ -70,7 +74,14 @@ def _trace_task(codemap: CodeMap, task: dict[str, str], trace_dir: Path) -> dict
     return row
 
 
-def run(repo: Path, public_path: Path, secret_path: Path, output: Path, trace_dir: Path, workers: int = 8) -> dict[str, Any]:
+def run(
+    repo: Path,
+    public_path: Path,
+    secret_path: Path,
+    output: Path,
+    trace_dir: Path,
+    workers: int = 8,
+) -> dict[str, Any]:
     _guard(repo, public_path, secret_path)
     public = _load_public(public_path)
 
@@ -82,25 +93,32 @@ def run(repo: Path, public_path: Path, secret_path: Path, output: Path, trace_di
         sync_ms = (time.perf_counter() - sync_started) * 1000.0
         frozen: list[dict[str, Any]] = []
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = [pool.submit(_trace_task, codemap, task, trace_dir) for task in public]
+            futures = [
+                pool.submit(_trace_task, codemap, task, trace_dir) for task in public
+            ]
             for future in as_completed(futures):
                 frozen.append(future.result())
 
     frozen.sort(key=lambda row: row["task"]["id"])
     # SECRET is intentionally opened only after all worker traces are frozen.
     secret_rows = json.loads(secret_path.read_text())["tasks"]
-    expected = {str(row["id"]): set(map(str, row.get("expected_files") or [])) for row in secret_rows}
+    expected = {
+        str(row["id"]): set(map(str, row.get("expected_files") or []))
+        for row in secret_rows
+    }
     scored = []
     for row in frozen:
         exp = expected[row["task"]["id"]]
         canonical = row["canonical"]
-        scored.append({
-            **row,
-            "correct_edit": row["edit_target"] in exp,
-            "top5_any_expected": bool(exp.intersection(canonical[:5])),
-            "top20_all_expected": exp.issubset(set(canonical[:20])),
-            "verification_found": bool(row["verification_target"]),
-        })
+        scored.append(
+            {
+                **row,
+                "correct_edit": row["edit_target"] in exp,
+                "top5_any_expected": bool(exp.intersection(canonical[:5])),
+                "top20_all_expected": exp.issubset(set(canonical[:20])),
+                "verification_found": bool(row["verification_target"]),
+            }
+        )
     n = len(scored)
     result = {
         "schema": SCHEMA,
@@ -138,8 +156,15 @@ def main() -> None:
     parser.add_argument("--trace-dir", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=8)
     args = parser.parse_args()
-    result = run(args.repo, args.public, args.secret, args.output, args.trace_dir, workers=args.workers)
-    print(json.dumps(result["summary"], indent=2, sort_keys=True))
+    result = run(
+        args.repo,
+        args.public,
+        args.secret,
+        args.output,
+        args.trace_dir,
+        workers=args.workers,
+    )
+    print(json.dumps(result["summary"], indent=2, sort_keys=True))  # noqa: T201 - intentional command output
 
 
 if __name__ == "__main__":

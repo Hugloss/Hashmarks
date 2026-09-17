@@ -3,16 +3,21 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from pathlib import Path
-from typing import Mapping
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from ._version import __version__
 from .qualification_units import (
     native_qualification_handoff as current_native_qualification_handoff,
+)
+from .qualification_units import (
     validate_native_qualification_handoff,
 )
 from .test_shards import repository_content_identity
 from .validation_inputs import require_mapping_for_validation
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 PROMOTION_GATE_SCHEMA = "hashmarks.promotion-gate.v2"
 PROMOTION_RECEIPT_SCHEMA = "hashmarks.external-promotion-receipt.v2"
@@ -50,7 +55,9 @@ _RELEASE_RE = re.compile(r"^(\d+)(?:\.(\d+))?(?:\.(\d+))?")
 
 
 def _canonical_bytes(value: Mapping[str, object]) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
 
 
 def _identity(domain: str, value: Mapping[str, object]) -> str:
@@ -105,8 +112,16 @@ def native_ruff_promotion_gate(root: Path) -> dict[str, object]:
 
 def _receipt_shape_reasons(receipt: Mapping[str, object]) -> list[str]:
     required = {
-        "schema", "producer", "repository_identity", "gate_identity",
-        "tool", "rules", "command", "evidence", "result", "result_authority",
+        "schema",
+        "producer",
+        "repository_identity",
+        "gate_identity",
+        "tool",
+        "rules",
+        "command",
+        "evidence",
+        "result",
+        "result_authority",
     }
     reasons: list[str] = []
     if set(receipt) != required:
@@ -143,9 +158,18 @@ def _receipt_shape_reasons(receipt: Mapping[str, object]) -> list[str]:
 
 def _gate_shape_reasons(gate: Mapping[str, object]) -> list[str]:
     required = {
-        "schema", "producer", "repository_identity", "gate", "tool", "rules",
-        "command", "expected_result", "promotion_authority", "execution_authority",
-        "result_authority", "gate_identity",
+        "schema",
+        "producer",
+        "repository_identity",
+        "gate",
+        "tool",
+        "rules",
+        "command",
+        "expected_result",
+        "promotion_authority",
+        "execution_authority",
+        "result_authority",
+        "gate_identity",
     }
     reasons: list[str] = []
     if set(gate) != required:
@@ -155,7 +179,9 @@ def _gate_shape_reasons(gate: Mapping[str, object]) -> list[str]:
     if gate.get("producer") != {"name": "hashmarks", "version": __version__}:
         reasons.append("invalid-gate-producer")
     repository_identity = gate.get("repository_identity")
-    if not isinstance(repository_identity, str) or not _REPOSITORY_IDENTITY.fullmatch(repository_identity):
+    if not isinstance(repository_identity, str) or not _REPOSITORY_IDENTITY.fullmatch(
+        repository_identity
+    ):
         reasons.append("invalid-gate-repository-identity")
     if gate.get("gate") != "ruff-diagnostic":
         reasons.append("invalid-gate-name")
@@ -199,7 +225,10 @@ def _receipt_evidence_reasons(receipt: Mapping[str, object]) -> list[str]:
         reasons.append("nonzero-exit-code")
     tool = receipt.get("tool")
     tool_version = tool.get("version") if isinstance(tool, Mapping) else None
-    if not isinstance(tool_version, str) or evidence.get("tool_version_output") != f"ruff {tool_version}":
+    if (
+        not isinstance(tool_version, str)
+        or evidence.get("tool_version_output") != f"ruff {tool_version}"
+    ):
         reasons.append("tool-version-output-mismatch")
     output_sha256 = evidence.get("output_sha256")
     if (
@@ -223,15 +252,15 @@ def _receipt_binding_reasons(
         ("command", "command-mismatch"),
     )
     reasons = [
-        reason
-        for field, reason in checks
-        if receipt.get(field) != gate.get(field)
+        reason for field, reason in checks if receipt.get(field) != gate.get(field)
     ]
     gate_tool = gate.get("tool")
     receipt_tool = receipt.get("tool")
-    if not isinstance(gate_tool, Mapping) or not isinstance(receipt_tool, Mapping):
-        reasons.append("tool-identity-mismatch")
-    elif gate_tool.get("name") != receipt_tool.get("name"):
+    if (
+        not isinstance(gate_tool, Mapping)
+        or not isinstance(receipt_tool, Mapping)
+        or gate_tool.get("name") != receipt_tool.get("name")
+    ):
         reasons.append("tool-identity-mismatch")
     return reasons
 
@@ -240,8 +269,12 @@ def validate_external_promotion_receipt(
     gate: Mapping[str, object],
     receipt: Mapping[str, object],
 ) -> dict[str, object]:
-    gate, gate_root_reasons = require_mapping_for_validation(gate, reason="invalid-gate")
-    receipt, receipt_root_reasons = require_mapping_for_validation(receipt, reason="invalid-receipt")
+    gate, gate_root_reasons = require_mapping_for_validation(
+        gate, reason="invalid-gate"
+    )
+    receipt, receipt_root_reasons = require_mapping_for_validation(
+        receipt, reason="invalid-receipt"
+    )
     reasons = [
         *gate_root_reasons,
         *receipt_root_reasons,
@@ -255,7 +288,6 @@ def validate_external_promotion_receipt(
         "reasons": list(dict.fromkeys(reasons)),
         "authority": "validation-only",
     }
-
 
 
 def _qualification_handoff_state(
@@ -302,14 +334,18 @@ def promotion_manifest(
         "reasons": ["missing-native-ruff-receipt"],
     }
     if native_ruff_receipt is not None:
-        checked = validate_external_promotion_receipt(ruff_diagnostic, native_ruff_receipt)
+        checked = validate_external_promotion_receipt(
+            ruff_diagnostic, native_ruff_receipt
+        )
         receipt_state = {
             "present": True,
             "valid": checked["valid"],
             "reasons": checked["reasons"],
         }
 
-    qualification_state = _qualification_handoff_state(root, native_qualification_handoff)
+    qualification_state = _qualification_handoff_state(
+        root, native_qualification_handoff
+    )
     payload: dict[str, object] = {
         "schema": PROMOTION_MANIFEST_SCHEMA,
         "producer": {"name": "hashmarks", "version": __version__},

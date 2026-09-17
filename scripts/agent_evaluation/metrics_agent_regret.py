@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+
 try:
     from scripts._module_loader import import_sibling
 except ModuleNotFoundError:  # direct script execution
@@ -13,9 +14,23 @@ from typing import Any
 
 EVIDENCE_SCHEMA = "hashmarks.agent-retrieval-evidence.v1"
 REPORT_SCHEMA = "hashmarks.agent-retrieval-regret-report.v2"
-DISCOVERY_KINDS = {"file_read", "hashmarks_source", "hashmarks_context", "hashmarks_find", "repository_search", "grep"}
+DISCOVERY_KINDS = {
+    "file_read",
+    "hashmarks_source",
+    "hashmarks_context",
+    "hashmarks_find",
+    "repository_search",
+    "grep",
+}
 READ_KINDS = {"file_read", "hashmarks_source"}
-SEARCH_KINDS = {"grep", "glob", "repository_search", "hashmarks_find", "hashmarks_grep", "hashmarks_context"}
+SEARCH_KINDS = {
+    "grep",
+    "glob",
+    "repository_search",
+    "hashmarks_find",
+    "hashmarks_grep",
+    "hashmarks_context",
+}
 
 
 def _load_trace_module() -> Any:
@@ -46,14 +61,21 @@ def load_evidence(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != EVIDENCE_SCHEMA:
         raise ValueError(f"unsupported retrieval evidence schema: {path}")
-    for field in ("task_id", "task_revision", "repository_identity", "evidence_authority_identity"):
+    for field in (
+        "task_id",
+        "task_revision",
+        "repository_identity",
+        "evidence_authority_identity",
+    ):
         _nonempty(value.get(field), field, path)
     required = value.get("required_paths")
     if not isinstance(required, list) or not required:
         raise ValueError(f"required_paths must be a non-empty list: {path}")
     normalized: list[str] = []
     for item in required:
-        text = _relative_path(_nonempty(item, "required_path", path), "required_path", path)
+        text = _relative_path(
+            _nonempty(item, "required_path", path), "required_path", path
+        )
         normalized.append(text)
     if len(set(normalized)) != len(normalized):
         raise ValueError(f"required_paths contains duplicates: {path}")
@@ -89,7 +111,9 @@ def analyze(trace_path: Path, evidence_path: Path) -> dict[str, Any]:
     evidence = load_evidence(evidence_path)
     for field in ("task_id", "task_revision", "repository_identity"):
         if trace.get(field) != evidence[field]:
-            raise ValueError(f"trace/evidence {field} mismatch: expected {evidence[field]!r}, got {trace.get(field)!r}")
+            raise ValueError(
+                f"trace/evidence {field} mismatch: expected {evidence[field]!r}, got {trace.get(field)!r}"
+            )
 
     required = set(evidence["required_paths"])
     discovered: set[str] = set()
@@ -125,26 +149,40 @@ def analyze(trace_path: Path, evidence_path: Path) -> dict[str, Any]:
         if isinstance(started_at_ns, int) and navigation_start_ns is None:
             navigation_start_ns = started_at_ns
         if isinstance(finished_at_ns, int):
-            navigation_finish_ns = max(navigation_finish_ns or finished_at_ns, finished_at_ns)
+            navigation_finish_ns = max(
+                navigation_finish_ns or finished_at_ns, finished_at_ns
+            )
         if kind in SEARCH_KINDS:
             query = event.get("query")
             if isinstance(query, str) and query.strip():
                 normalized_query = " ".join(query.lower().split())
                 if query_counter[normalized_query] > 0:
                     duplicate_query_tokens += tokens
-                    repeated_queries.append({"query": normalized_query, "event_index": index, "estimated_tokens": tokens})
+                    repeated_queries.append(
+                        {
+                            "query": normalized_query,
+                            "event_index": index,
+                            "estimated_tokens": tokens,
+                        }
+                    )
                 query_counter[normalized_query] += 1
         if kind in READ_KINDS:
             for path in paths:
                 if read_counter[path] > 0:
                     duplicate_read_tokens += tokens
-                    repeated_reads.append({"path": path, "event_index": index, "estimated_tokens": tokens})
+                    repeated_reads.append(
+                        {"path": path, "event_index": index, "estimated_tokens": tokens}
+                    )
                 read_counter[path] += 1
             if not any(path in required for path in paths):
                 irrelevant_reads += 1
                 irrelevant_read_tokens += tokens
 
-        new_required = sorted((set(paths) & required) - discovered) if kind in DISCOVERY_KINDS else []
+        new_required = (
+            sorted((set(paths) & required) - discovered)
+            if kind in DISCOVERY_KINDS
+            else []
+        )
         if new_required:
             if first_index is None:
                 first_index = index
@@ -152,7 +190,13 @@ def analyze(trace_path: Path, evidence_path: Path) -> dict[str, Any]:
                 if isinstance(started_at_ns, int):
                     first_evidence_started_ns = started_at_ns
             for path in new_required:
-                required_discovery_order.append({"path": path, "event_index": index, "tokens_before_discovery": cumulative_tokens})
+                required_discovery_order.append(
+                    {
+                        "path": path,
+                        "event_index": index,
+                        "tokens_before_discovery": cumulative_tokens,
+                    }
+                )
             discovered.update(new_required)
             if discovered == required and all_index is None:
                 all_index = index
@@ -193,12 +237,20 @@ def analyze(trace_path: Path, evidence_path: Path) -> dict[str, Any]:
             "missing_required_paths": missing,
             "tokens_before_first_required_evidence": first_tokens,
             "events_before_first_required_evidence": first_index,
-            "searches_before_first_required_evidence": searches_before if first_index is not None else None,
-            "reads_before_first_required_evidence": reads_before if first_index is not None else None,
+            "searches_before_first_required_evidence": searches_before
+            if first_index is not None
+            else None,
+            "reads_before_first_required_evidence": reads_before
+            if first_index is not None
+            else None,
             "tokens_before_all_required_evidence": all_tokens,
             "events_before_all_required_evidence": all_index,
-            "searches_before_all_required_evidence": searches_before_all if all_index is not None else None,
-            "reads_before_all_required_evidence": reads_before_all if all_index is not None else None,
+            "searches_before_all_required_evidence": searches_before_all
+            if all_index is not None
+            else None,
+            "reads_before_all_required_evidence": reads_before_all
+            if all_index is not None
+            else None,
             "duplicate_queries": duplicate_queries,
             "duplicate_query_estimated_tokens": duplicate_query_tokens,
             "duplicate_reads": duplicate_reads,
@@ -207,15 +259,18 @@ def analyze(trace_path: Path, evidence_path: Path) -> dict[str, Any]:
             "irrelevant_read_estimated_tokens": irrelevant_read_tokens,
             "total_estimated_exploration_tokens": cumulative_tokens,
             "navigation_ms_before_first_required_evidence": (
-                None if navigation_start_ns is None or first_evidence_started_ns is None
+                None
+                if navigation_start_ns is None or first_evidence_started_ns is None
                 else (first_evidence_started_ns - navigation_start_ns) / 1_000_000.0
             ),
             "navigation_ms_before_all_required_evidence": (
-                None if navigation_start_ns is None or all_evidence_started_ns is None
+                None
+                if navigation_start_ns is None or all_evidence_started_ns is None
                 else (all_evidence_started_ns - navigation_start_ns) / 1_000_000.0
             ),
             "total_navigation_ms": (
-                None if navigation_start_ns is None or navigation_finish_ns is None
+                None
+                if navigation_start_ns is None or navigation_finish_ns is None
                 else (navigation_finish_ns - navigation_start_ns) / 1_000_000.0
             ),
         },
@@ -235,13 +290,22 @@ def compare(baseline: dict[str, Any], hashmarks: dict[str, Any]) -> dict[str, An
     b = baseline["summary"]
     h = hashmarks["summary"]
     if not b["required_evidence_complete"] or not h["required_evidence_complete"]:
-        raise ValueError("regret comparison requires complete required evidence in both modes")
+        raise ValueError(
+            "regret comparison requires complete required evidence in both modes"
+        )
     metric_keys = (
-        "tokens_before_first_required_evidence", "searches_before_first_required_evidence",
-        "reads_before_first_required_evidence", "tokens_before_all_required_evidence",
-        "searches_before_all_required_evidence", "reads_before_all_required_evidence",
-        "duplicate_queries", "duplicate_query_estimated_tokens", "duplicate_reads",
-        "duplicate_read_estimated_tokens", "irrelevant_reads", "irrelevant_read_estimated_tokens",
+        "tokens_before_first_required_evidence",
+        "searches_before_first_required_evidence",
+        "reads_before_first_required_evidence",
+        "tokens_before_all_required_evidence",
+        "searches_before_all_required_evidence",
+        "reads_before_all_required_evidence",
+        "duplicate_queries",
+        "duplicate_query_estimated_tokens",
+        "duplicate_reads",
+        "duplicate_read_estimated_tokens",
+        "irrelevant_reads",
+        "irrelevant_read_estimated_tokens",
     )
     reductions = {key + "_reduction": int(b[key]) - int(h[key]) for key in metric_keys}
     return {
@@ -254,7 +318,9 @@ def compare(baseline: dict[str, Any], hashmarks: dict[str, Any]) -> dict[str, An
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Measure agent retrieval regret against independently defined required evidence")
+    parser = argparse.ArgumentParser(
+        description="Measure agent retrieval regret against independently defined required evidence"
+    )
     parser.add_argument("trace", type=Path)
     parser.add_argument("evidence", type=Path)
     parser.add_argument("--output", type=Path)
@@ -264,7 +330,7 @@ def main() -> None:
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)
+    print(rendered)  # noqa: T201 - intentional command output
 
 
 if __name__ == "__main__":

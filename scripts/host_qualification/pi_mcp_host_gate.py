@@ -13,7 +13,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from mcp_host_gate_common import (
+from mcp_host_gate_common import (  # noqa: E402 - import follows standalone script path setup
     HostGateEnvironmentBlocked,
     HostGateError,
     build_installed_wheel,
@@ -56,7 +56,7 @@ def _prompt() -> str:
     return (
         "Hashmarks 1.0 Pi host qualification. Use only the Pi MCP proxy tool named mcp. "
         "First call mcp with tool='hashmarks_repository_context' and args={\"max_areas\":8}. "
-        "Then call mcp with tool='hashmarks_find' and args={\"query\":\"flare041\",\"limit\":5}. "
+        'Then call mcp with tool=\'hashmarks_find\' and args={"query":"flare041","limit":5}. '
         "Do not call any other tool. Reply exactly PI_HASHMARKS_HOST_GATE_COMPLETE after both calls."
     )
 
@@ -133,14 +133,16 @@ def _adapter_installed(pi: str, project_root: Path) -> bool:
         [pi, "list"],
         cwd=project_root,
         text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         timeout=60,
         check=False,
     )
     if result.returncode != 0:
         return False
-    lines = [line.strip().lower() for line in f"{result.stdout}\n{result.stderr}".splitlines()]
+    lines = [
+        line.strip().lower()
+        for line in f"{result.stdout}\n{result.stderr}".splitlines()
+    ]
     return any("pi-mcp-adapter" in line for line in lines)
 
 
@@ -188,8 +190,7 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
             argv,
             cwd=repo,
             text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             timeout=900,
             check=False,
         )
@@ -220,7 +221,9 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Qualify the installed Hashmarks MCP wheel through Pi + pi-mcp-adapter.")
+    parser = argparse.ArgumentParser(
+        description="Qualify the installed Hashmarks MCP wheel through Pi + pi-mcp-adapter."
+    )
     parser.add_argument("--model", required=True)
     parser.add_argument("--python", default="3.14")
     parser.add_argument("--uv", default="uv")
@@ -252,10 +255,12 @@ def main(argv: list[str] | None = None) -> int:
     else:
         code = 0
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
-    receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"HASHMARKS PI MCP HOST GATE: {receipt['status']}\nreceipt: {receipt_path}")
+    receipt_path.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(f"HASHMARKS PI MCP HOST GATE: {receipt['status']}\nreceipt: {receipt_path}")  # noqa: T201 - intentional command output
     if receipt["status"] != "PASS" and receipt.get("error"):
-        print(receipt["error"])
+        print(receipt["error"])  # noqa: T201 - intentional command output
     return code
 
 

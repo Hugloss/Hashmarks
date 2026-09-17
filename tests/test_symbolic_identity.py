@@ -29,8 +29,7 @@ def test_decision_packet_exposes_nomination_without_ranking_authority(tmp_path) 
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "widget.py").write_text(
-        "def normalize_widget(value):\n"
-        "    return value.strip().lower()\n"
+        "def normalize_widget(value):\n    return value.strip().lower()\n"
     )
     (tmp_path / "tests" / "test_widget.py").write_text(
         "from src.widget import normalize_widget\n"
@@ -48,10 +47,7 @@ def test_decision_packet_exposes_nomination_without_ranking_authority(tmp_path) 
     nomination = packet["symbolic_nomination"]
     assert "normalize_widget" in nomination["terms"]
     assert nomination["status"] in {"resolved", "ambiguous"}
-    assert any(
-        row["name"] == "normalize_widget"
-        for row in nomination["candidates"]
-    )
+    assert any(row["name"] == "normalize_widget" for row in nomination["candidates"])
     assert nomination["authority"] == "nomination-only"
     assert nomination["ranking_effect"] == "none"
     assert packet["ranking_effect"] == "none"

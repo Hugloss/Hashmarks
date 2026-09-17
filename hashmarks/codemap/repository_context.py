@@ -1,53 +1,85 @@
 from __future__ import annotations
 
-from .decision_session import decision_scoped
 import time
 from dataclasses import replace
+from typing import TYPE_CHECKING, cast
 
-from ..paths import normalize_relative_path
-from .model import EvidenceVisibility, ContextDisclosure, ContextItem, ContextPack, SearchHit
+from hashmarks.paths import normalize_relative_path
+
+from .decision_session import decision_scoped
+from .model import (
+    ContextDisclosure,
+    ContextItem,
+    ContextPack,
+    EvidenceVisibility,
+    SearchHit,
+)
 from .python_ast import estimate_tokens
 from .query_primitives import _TASK_EVIDENCE_FAMILIES, _TASK_GOVERNANCE_CUES, _WORD_RE
 from .query_router import route_query
 
+if TYPE_CHECKING:
+    from .engine import CodeMap
+
 
 class ContextPlanningMixin:
     def _resolve_edge(self, edge: dict) -> dict:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         value = dict(edge)
         target = str(value.get("target", ""))
-        resolved_paths = self._resolve_import_paths(str(value.get("path", "")), target) if value.get("kind") == "import" else []
+        resolved_paths = (
+            self._resolve_import_paths(str(value.get("path", "")), target)
+            if value.get("kind") == "import"
+            else []
+        )
         short = target.rsplit(".", 1)[-1]
         resolved_symbols = [
-            {"path": row["path"], "qualname": row["qualname"], "signature": row["signature"]}
+            {
+                "path": row["path"],
+                "qualname": row["qualname"],
+                "signature": row["signature"],
+            }
             for row in self.store.symbols_named(short, limit=8)
-            if EvidenceVisibility(str(row["evidence_visibility"])) is not EvidenceVisibility.DENY
+            if EvidenceVisibility(str(row["evidence_visibility"]))
+            is not EvidenceVisibility.DENY
         ]
         value["resolved_paths"] = resolved_paths
         value["resolved_symbols"] = resolved_symbols
         return value
 
-
     def deps(self, query: str) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         self._ensure_map_ready()
         matches = self.store.symbol(query)
         if matches:
             visible_matches = [
-                match for match in matches
-                if EvidenceVisibility(str(match["evidence_visibility"])) is not EvidenceVisibility.DENY
+                match
+                for match in matches
+                if EvidenceVisibility(str(match["evidence_visibility"]))
+                is not EvidenceVisibility.DENY
             ]
             edge_map = self._session_edges_from_many(
-                [(str(match["path"]), str(match["qualname"])) for match in visible_matches],
+                [
+                    (str(match["path"]), str(match["qualname"]))
+                    for match in visible_matches
+                ],
                 limit_per_seed=100,
             )
             rows = [
                 row
                 for match in visible_matches
-                for row in edge_map.get((str(match["path"]), str(match["qualname"])), ())
+                for row in edge_map.get(
+                    (str(match["path"]), str(match["qualname"])), ()
+                )
             ]
             native_rows = [
                 row
                 for match in visible_matches
-                for row in self._fresh_native_edges_from(str(match["path"]), str(match["qualname"]))
+                for row in self._fresh_native_edges_from(
+                    str(match["path"]), str(match["qualname"])
+                )
             ]
             return {
                 "schema": "hashmarks.deps.v1",
@@ -72,21 +104,38 @@ class ContextPlanningMixin:
             "native_file_edges": self._fresh_native_file_edges_from(rel),
         }
 
-
     def refs(self, query: str) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         self._ensure_map_ready()
-        rows = [row for row in self.store.refs(query) if EvidenceVisibility(str(row["evidence_visibility"])) is not EvidenceVisibility.DENY]
-        native_rows = self._fresh_native_refs(query)
-        native_file_rows = self._session_file_rows(str(row["path"]) for row in native_rows)
-        native = [
-            row for row in native_rows
-            if (mapped := native_file_rows.get(str(row["path"]))) is not None
-            and EvidenceVisibility(str(mapped["evidence_visibility"])) is not EvidenceVisibility.DENY
+        rows = [
+            row
+            for row in self.store.refs(query)
+            if EvidenceVisibility(str(row["evidence_visibility"]))
+            is not EvidenceVisibility.DENY
         ]
-        return {"schema": "hashmarks.refs.v1", "query": query, **self._query_freshness_fields(), "references": rows, "native_references": native}
-
+        native_rows = self._fresh_native_refs(query)
+        native_file_rows = self._session_file_rows(
+            str(row["path"]) for row in native_rows
+        )
+        native = [
+            row
+            for row in native_rows
+            if (mapped := native_file_rows.get(str(row["path"]))) is not None
+            and EvidenceVisibility(str(mapped["evidence_visibility"]))
+            is not EvidenceVisibility.DENY
+        ]
+        return {
+            "schema": "hashmarks.refs.v1",
+            "query": query,
+            **self._query_freshness_fields(),
+            "references": rows,
+            "native_references": native,
+        }
 
     def orient(self, *, max_areas: int = 12) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         self._ensure_map_ready()
         stats = self.store.stats()
         areas = list(self.store.top_level_counts().items())[:max_areas]
@@ -109,25 +158,35 @@ class ContextPlanningMixin:
             "guidance": "Use find/outline/symbol/deps before reading full files.",
         }
 
-
-    def _source_slice(self, path: str, start: int, end: int, *, qualname: str | None = None) -> str:
+    def _source_slice(
+        self, path: str, start: int, end: int, *, qualname: str | None = None
+    ) -> str:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         self._ensure_path_current(path)
         row = self._session_file_row(path)
         if row is None:
             raise FileNotFoundError(path)
         visibility = EvidenceVisibility(str(row["evidence_visibility"]))
         if visibility is not EvidenceVisibility.SOURCE:
-            raise PermissionError(f"source body is not visible under the evidence policy: {path}")
+            raise PermissionError(
+                f"source body is not visible under the evidence policy: {path}"
+            )
         if qualname is not None:
             current = self.store.symbol_at(path, qualname)
             if current is not None:
                 start = int(current["start_line"])
                 end = int(current["end_line"])
-        lines = (self.workspace / path).read_text(encoding="utf-8", errors="replace").splitlines()
+        lines = (
+            (self.workspace / path)
+            .read_text(encoding="utf-8", errors="replace")
+            .splitlines()
+        )
         return "\n".join(lines[start - 1 : end])
 
-
     def _context_freshness_warnings(self, stale: bool | None) -> tuple[str, ...]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if stale is not None:
             return ()
         last_sync_raw = self.store.meta("last_sync_unix", "") or ""
@@ -144,7 +203,6 @@ class ContextPlanningMixin:
             "CodeMap has indexed state, but filesystem continuity is not proven; run `hashmarks map sync` for a fresh checkpoint or keep `hashmarks map watch` active for continuous freshness",
         )
 
-
     def _context_action(
         self,
         *,
@@ -155,6 +213,8 @@ class ContextPlanningMixin:
         generation: int,
         hits: tuple[SearchHit, ...],
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         return {
             "schema": "hashmarks.context-action.v1",
             "retrieval_protocol": "hashmarks.progressive-context.v0.10.14",
@@ -180,16 +240,16 @@ class ContextPlanningMixin:
             ],
         }
 
-
     @staticmethod
-    def _context_payload(items: tuple[ContextItem, ...], *, estimated_tokens: int, confidence: str) -> dict[str, object]:
+    def _context_payload(
+        items: tuple[ContextItem, ...], *, estimated_tokens: int, confidence: str
+    ) -> dict[str, object]:
         return {
             "schema": "hashmarks.context-payload.v1",
             "estimated_tokens": estimated_tokens,
             "confidence": confidence,
             "items": [item.as_dict() for item in items],
         }
-
 
     def task_context_plan(
         self,
@@ -203,6 +263,8 @@ class ContextPlanningMixin:
         This is advisory policy over existing retrieval/disclosure primitives. It
         does not alter ``context()`` defaults or canonical ``find_task()`` ranking.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if min_budget < 128:
             raise ValueError("min_budget must be at least 128")
         if max_budget < min_budget:
@@ -211,7 +273,9 @@ class ContextPlanningMixin:
         route = route_query(views["base"])
         words = {value.lower() for value in _WORD_RE.findall(task)}
         governance = bool(words & _TASK_GOVERNANCE_CUES)
-        evidence_family = any(bool(words & cues) for cues, _values in _TASK_EVIDENCE_FAMILIES)
+        evidence_family = any(
+            bool(words & cues) for cues, _values in _TASK_EVIDENCE_FAMILIES
+        )
         base_by_intent = {
             "identifier": 768,
             "path": 704,
@@ -236,7 +300,11 @@ class ContextPlanningMixin:
         elif route.intent.value in {"relationship", "structural", "test", "config"}:
             disclosure = ContextDisclosure.EVIDENCE.value
         else:
-            disclosure = ContextDisclosure.EVIDENCE.value if governance or evidence_family else ContextDisclosure.OUTLINE.value
+            disclosure = (
+                ContextDisclosure.EVIDENCE.value
+                if governance or evidence_family
+                else ContextDisclosure.OUTLINE.value
+            )
         return {
             "schema": "hashmarks.task-context-plan.v1",
             "task": task,
@@ -249,7 +317,6 @@ class ContextPlanningMixin:
             "ranking_effect": "none",
         }
 
-
     def task_context(
         self,
         task: str,
@@ -259,15 +326,18 @@ class ContextPlanningMixin:
     ) -> ContextPack:
         """Build context using a deterministic adaptive plan unless overridden."""
         plan = self.task_context_plan(task)
-        budget = int(plan["token_budget"]) if token_budget is None else int(token_budget)
-        level: ContextDisclosure | str = str(plan["disclosure"]) if disclosure is None else disclosure
+        budget = (
+            int(plan["token_budget"]) if token_budget is None else int(token_budget)
+        )
+        level: ContextDisclosure | str = (
+            str(plan["disclosure"]) if disclosure is None else disclosure
+        )
         return self.context(
             str(plan["query"]),
             token_budget=budget,
             limit=int(plan["limit"]),
             disclosure=level,
         )
-
 
     @decision_scoped
     def context(
@@ -278,13 +348,21 @@ class ContextPlanningMixin:
         limit: int = 30,
         disclosure: ContextDisclosure | str = ContextDisclosure.SOURCE,
     ) -> ContextPack:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if token_budget < 128:
             raise ValueError("token budget must be at least 128")
         try:
-            level = disclosure if isinstance(disclosure, ContextDisclosure) else ContextDisclosure(disclosure)
+            level = (
+                disclosure
+                if isinstance(disclosure, ContextDisclosure)
+                else ContextDisclosure(disclosure)
+            )
         except ValueError as exc:
             allowed = ", ".join(value.value for value in ContextDisclosure)
-            raise ValueError(f"invalid context disclosure {disclosure!r}; expected one of: {allowed}") from exc
+            raise ValueError(
+                f"invalid context disclosure {disclosure!r}; expected one of: {allowed}"
+            ) from exc
         self._ensure_map_ready()
         generation, _identity_generation, stale = self._generation_status()
         key = (
@@ -300,7 +378,9 @@ class ContextPlanningMixin:
         # Structural context can share an ephemeral computation when continuity
         # is unknown. Exact source sharing requires positive freshness, matching
         # the persistent CAS boundary. Known-stale requests never share.
-        share_allowed = stale is False or (stale is None and level is not ContextDisclosure.SOURCE)
+        share_allowed = stale is False or (
+            stale is None and level is not ContextDisclosure.SOURCE
+        )
         if not share_allowed:
             return self._context_impl(
                 query, token_budget=token_budget, limit=limit, disclosure=level
@@ -312,7 +392,6 @@ class ContextPlanningMixin:
             ),
         )
         return replace(pack, shared_flight=True) if shared else pack
-
 
     def _context_cached_pack(
         self,
@@ -326,6 +405,8 @@ class ContextPlanningMixin:
         identity_generation: int,
         stale: bool | None,
     ) -> ContextPack | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         cached = self.context_cache.get(action)
         if cached is None:
             return None
@@ -341,15 +422,21 @@ class ContextPlanningMixin:
                 symbol=None if item.get("symbol") is None else str(item["symbol"]),
                 reason=None if item.get("reason") is None else str(item["reason"]),
             )
-            for item in raw_items if isinstance(item, dict)
+            for item in raw_items
+            if isinstance(item, dict)
         )
         return ContextPack(
-            query=query, budget=token_budget, disclosure=level,
+            query=query,
+            budget=token_budget,
+            disclosure=level,
             estimated_tokens=int(cached.payload.get("estimated_tokens", 0)),
             confidence=str(cached.payload.get("confidence", confidence)),
-            abstained=False, generation=generation,
-            identity_generation=identity_generation, stale=stale,
-            cache_hit=True, context_action_hash=cached.action_hash,
+            abstained=False,
+            generation=generation,
+            identity_generation=identity_generation,
+            stale=stale,
+            cache_hit=True,
+            context_action_hash=cached.action_hash,
             context_result_digest=cached.result_digest.as_key(),
             items=cached_items,
             warnings=self._context_freshness_warnings(stale),
@@ -373,14 +460,16 @@ class ContextPlanningMixin:
             if tokens <= 0 or used + tokens > token_budget:
                 continue
             seen.add(key)
-            items.append(ContextItem(
-                path=hit.path,
-                representation="candidate",
-                content=label,
-                estimated_tokens=tokens,
-                symbol=hit.qualname,
-                reason=f"ranked orientation candidate; relevance {hit.score:.1f}",
-            ))
+            items.append(
+                ContextItem(
+                    path=hit.path,
+                    representation="candidate",
+                    content=label,
+                    estimated_tokens=tokens,
+                    symbol=hit.qualname,
+                    reason=f"ranked orientation candidate; relevance {hit.score:.1f}",
+                )
+            )
             used += tokens
         return items, used
 
@@ -389,7 +478,14 @@ class ContextPlanningMixin:
         hits: tuple[SearchHit, ...],
         *,
         token_budget: int,
-    ) -> tuple[list[ContextItem], int, set[tuple[str, str | None]], dict[tuple[str, str | None], int]]:
+    ) -> tuple[
+        list[ContextItem],
+        int,
+        set[tuple[str, str | None]],
+        dict[tuple[str, str | None], int],
+    ]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         items: list[ContextItem] = []
         used = 0
         seen: set[tuple[str, str | None]] = set()
@@ -398,7 +494,9 @@ class ContextPlanningMixin:
             key = (hit.path, hit.qualname)
             if key in seen:
                 continue
-            if hit.qualname is None and any(existing_path == hit.path for existing_path, _ in seen):
+            if hit.qualname is None and any(
+                existing_path == hit.path for existing_path, _ in seen
+            ):
                 continue
             if hit.qualname is not None and hit.signature is not None:
                 content = hit.signature
@@ -406,7 +504,11 @@ class ContextPlanningMixin:
                 symbol = hit.qualname
             else:
                 row = self.store.outline(hit.path)
-                if row is None or EvidenceVisibility(str(row["evidence_visibility"])) is EvidenceVisibility.DENY:
+                if (
+                    row is None
+                    or EvidenceVisibility(str(row["evidence_visibility"]))
+                    is EvidenceVisibility.DENY
+                ):
                     continue
                 content = str(row["outline"] or hit.path)
                 representation = "outline"
@@ -416,14 +518,16 @@ class ContextPlanningMixin:
                 continue
             seen.add(key)
             item_index[key] = len(items)
-            items.append(ContextItem(
-                path=hit.path,
-                representation=representation,
-                content=content,
-                estimated_tokens=tokens,
-                symbol=symbol,
-                reason=f"structural orientation; ranked relevance {hit.score:.1f}",
-            ))
+            items.append(
+                ContextItem(
+                    path=hit.path,
+                    representation=representation,
+                    content=content,
+                    estimated_tokens=tokens,
+                    symbol=symbol,
+                    reason=f"structural orientation; ranked relevance {hit.score:.1f}",
+                )
+            )
             used += tokens
         return items, used, seen, item_index
 
@@ -437,6 +541,8 @@ class ContextPlanningMixin:
         item_index: dict[tuple[str, str | None], int],
         token_budget: int,
     ) -> int:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         evidence_hits = [hit for hit in hits[:4] if hit.qualname is not None]
         evidence_edge_map = self._session_edges_from_many(
             [(hit.path, str(hit.qualname)) for hit in evidence_hits], limit_per_seed=12
@@ -444,7 +550,9 @@ class ContextPlanningMixin:
         edge_rows = [
             (hit, raw_edge)
             for hit in evidence_hits
-            for raw_edge in evidence_edge_map.get((hit.path, str(hit.qualname)), ())[:12]
+            for raw_edge in evidence_edge_map.get((hit.path, str(hit.qualname)), ())[
+                :12
+            ]
         ]
         dependency_shorts = [
             str(raw_edge.get("target", "")).rsplit(".", 1)[-1]
@@ -471,7 +579,10 @@ class ContextPlanningMixin:
             target = str(raw_edge.get("target", ""))
             short = target.rsplit(".", 1)[-1].lower()
             for dep in deps_by_short.get(short, ()):
-                if EvidenceVisibility(str(dep["evidence_visibility"])) is EvidenceVisibility.DENY:
+                if (
+                    EvidenceVisibility(str(dep["evidence_visibility"]))
+                    is EvidenceVisibility.DENY
+                ):
                     continue
                 dep_key = (str(dep["path"]), str(dep["qualname"]))
                 if dep_key in seen:
@@ -482,14 +593,16 @@ class ContextPlanningMixin:
                     continue
                 seen.add(dep_key)
                 item_index[dep_key] = len(items)
-                items.append(ContextItem(
-                    path=str(dep["path"]),
-                    representation="signature",
-                    content=content,
-                    estimated_tokens=tokens,
-                    symbol=str(dep["qualname"]),
-                    reason=f"{raw_edge.get('kind')} dependency of {hit.qualname}",
-                ))
+                items.append(
+                    ContextItem(
+                        path=str(dep["path"]),
+                        representation="signature",
+                        content=content,
+                        estimated_tokens=tokens,
+                        symbol=str(dep["qualname"]),
+                        reason=f"{raw_edge.get('kind')} dependency of {hit.qualname}",
+                    )
+                )
                 used += tokens
                 break
         return used
@@ -504,10 +617,13 @@ class ContextPlanningMixin:
         item_index: dict[tuple[str, str | None], int],
         token_budget: int,
     ) -> int:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         query_tokens = {value.lower() for value in _WORD_RE.findall(query)}
         wants_tests = bool(query_tokens & {"test", "tests", "testing", "spec", "specs"})
         upgrade_hits = [
-            hit for hit in hits
+            hit
+            for hit in hits
             if hit.qualname is not None
             and hit.signature is not None
             and hit.evidence_visibility is EvidenceVisibility.SOURCE
@@ -516,7 +632,13 @@ class ContextPlanningMixin:
             and hit.score >= 45
             and ((not self._is_test_path(hit.path)) or wants_tests)
         ]
-        upgrade_hits.sort(key=lambda hit: (self._is_test_path(hit.path) and not wants_tests, -hit.score, hit.path))
+        upgrade_hits.sort(
+            key=lambda hit: (
+                self._is_test_path(hit.path) and not wants_tests,
+                -hit.score,
+                hit.path,
+            )
+        )
         upgrades = 0
         for hit in upgrade_hits:
             if upgrades >= 4:
@@ -527,12 +649,18 @@ class ContextPlanningMixin:
                 continue
             current = items[index]
             try:
-                body = self._source_slice(hit.path, hit.start_line, hit.end_line, qualname=hit.qualname)
+                body = self._source_slice(
+                    hit.path, hit.start_line, hit.end_line, qualname=hit.qualname
+                )
             except (OSError, PermissionError):
                 continue
             body_tokens = estimate_tokens(body)
             delta = body_tokens - current.estimated_tokens
-            if not body or body_tokens <= current.estimated_tokens or used + delta > token_budget:
+            if (
+                not body
+                or body_tokens <= current.estimated_tokens
+                or used + delta > token_budget
+            ):
                 continue
             items[index] = ContextItem(
                 path=hit.path,
@@ -555,52 +683,93 @@ class ContextPlanningMixin:
         disclosure: ContextDisclosure | str = ContextDisclosure.SOURCE,
     ) -> ContextPack:
         """Build one bounded context projection from a shared evidence base."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if token_budget < 128:
             raise ValueError("token budget must be at least 128")
         try:
-            level = disclosure if isinstance(disclosure, ContextDisclosure) else ContextDisclosure(disclosure)
+            level = (
+                disclosure
+                if isinstance(disclosure, ContextDisclosure)
+                else ContextDisclosure(disclosure)
+            )
         except ValueError as exc:
             allowed = ", ".join(value.value for value in ContextDisclosure)
-            raise ValueError(f"invalid context disclosure {disclosure!r}; expected one of: {allowed}") from exc
+            raise ValueError(
+                f"invalid context disclosure {disclosure!r}; expected one of: {allowed}"
+            ) from exc
 
         hits = self.find(query, limit=limit)
         best = hits[0].score if hits else 0.0
-        confidence = "high" if best >= 70 else "medium" if best >= 30 else "insufficient"
+        confidence = (
+            "high" if best >= 70 else "medium" if best >= 30 else "insufficient"
+        )
         generation, identity_generation, stale = self._generation_status()
         if confidence == "insufficient":
             return ContextPack(
-                query=query, budget=token_budget, disclosure=level, estimated_tokens=0,
-                confidence=confidence, abstained=True, generation=generation,
-                identity_generation=identity_generation, stale=stale,
-                warnings=("retrieval confidence insufficient; fall back to repository search",),
+                query=query,
+                budget=token_budget,
+                disclosure=level,
+                estimated_tokens=0,
+                confidence=confidence,
+                abstained=True,
+                generation=generation,
+                identity_generation=identity_generation,
+                stale=stale,
+                warnings=(
+                    "retrieval confidence insufficient; fall back to repository search",
+                ),
             )
 
         action = self._context_action(
-            query=query, token_budget=token_budget, limit=limit, level=level,
-            generation=generation, hits=hits,
+            query=query,
+            token_budget=token_budget,
+            limit=limit,
+            level=level,
+            generation=generation,
+            hits=hits,
         )
-        cache_allowed = stale is False or (stale is None and level is not ContextDisclosure.SOURCE)
+        cache_allowed = stale is False or (
+            stale is None and level is not ContextDisclosure.SOURCE
+        )
         if cache_allowed:
             cached_pack = self._context_cached_pack(
-                action=action, query=query, token_budget=token_budget, level=level,
-                confidence=confidence, generation=generation,
-                identity_generation=identity_generation, stale=stale,
+                action=action,
+                query=query,
+                token_budget=token_budget,
+                level=level,
+                confidence=confidence,
+                generation=generation,
+                identity_generation=identity_generation,
+                stale=stale,
             )
             if cached_pack is not None:
                 return cached_pack
 
         if level is ContextDisclosure.ORIENT:
-            items, used = self._context_orientation_items(hits, token_budget=token_budget)
+            items, used = self._context_orientation_items(
+                hits, token_budget=token_budget
+            )
         else:
-            items, used, seen, item_index = self._context_outline_items(hits, token_budget=token_budget)
+            items, used, seen, item_index = self._context_outline_items(
+                hits, token_budget=token_budget
+            )
             if level in {ContextDisclosure.EVIDENCE, ContextDisclosure.SOURCE}:
                 used = self._context_add_dependency_evidence(
-                    hits, items=items, used=used, seen=seen, item_index=item_index,
+                    hits,
+                    items=items,
+                    used=used,
+                    seen=seen,
+                    item_index=item_index,
                     token_budget=token_budget,
                 )
             if level is ContextDisclosure.SOURCE:
                 used = self._context_upgrade_source_items(
-                    hits, query=query, items=items, used=used, item_index=item_index,
+                    hits,
+                    query=query,
+                    items=items,
+                    used=used,
+                    item_index=item_index,
                     token_budget=token_budget,
                 )
 
@@ -611,7 +780,9 @@ class ContextPlanningMixin:
         if cache_allowed:
             stored = self.context_cache.put(
                 action,
-                self._context_payload(context_items, estimated_tokens=used, confidence=confidence),
+                self._context_payload(
+                    context_items, estimated_tokens=used, confidence=confidence
+                ),
             )
             action_hash = stored.action_hash
             result_digest = stored.result_digest.as_key()

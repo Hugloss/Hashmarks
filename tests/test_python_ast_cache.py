@@ -7,7 +7,11 @@ from hashmarks.python_ast_cache import ast_cache_info, clear_ast_cache, read_pyt
 
 
 def _function_names(tree: ast.Module) -> list[str]:
-    return [node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    return [
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
 
 
 def test_python_ast_cache_reuses_unchanged_snapshot(tmp_path: Path) -> None:
@@ -53,7 +57,9 @@ def test_python_ast_cache_preserves_source_and_filename(tmp_path: Path) -> None:
         raise AssertionError("invalid Python must still fail closed with SyntaxError")
 
 
-def test_python_ast_cache_observes_same_size_rewrite_with_restored_mtime(tmp_path: Path) -> None:
+def test_python_ast_cache_observes_same_size_rewrite_with_restored_mtime(
+    tmp_path: Path,
+) -> None:
     clear_ast_cache()
     source = tmp_path / "sample.py"
     source.write_text("def alpha():\n    return 1\n", encoding="utf-8")
@@ -63,6 +69,7 @@ def test_python_ast_cache_observes_same_size_rewrite_with_restored_mtime(tmp_pat
     source.write_text("def bravo():\n    return 2\n", encoding="utf-8")
     assert source.stat().st_size == original_stat.st_size
     import os
+
     os.utime(source, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
     second = read_python_ast(source)
 
@@ -70,7 +77,9 @@ def test_python_ast_cache_observes_same_size_rewrite_with_restored_mtime(tmp_pat
     assert _function_names(second.tree) == ["bravo"]
 
 
-def test_python_ast_cache_observes_atomic_replace_with_same_size_and_mtime(tmp_path: Path) -> None:
+def test_python_ast_cache_observes_atomic_replace_with_same_size_and_mtime(
+    tmp_path: Path,
+) -> None:
     clear_ast_cache()
     source = tmp_path / "sample.py"
     replacement = tmp_path / "replacement.py"
@@ -81,6 +90,7 @@ def test_python_ast_cache_observes_atomic_replace_with_same_size_and_mtime(tmp_p
     replacement.write_text("def bravo():\n    return 2\n", encoding="utf-8")
     assert replacement.stat().st_size == original_stat.st_size
     import os
+
     os.utime(replacement, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
     os.replace(replacement, source)
     second = read_python_ast(source)
@@ -90,7 +100,9 @@ def test_python_ast_cache_observes_atomic_replace_with_same_size_and_mtime(tmp_p
     assert _function_names(second.tree) == ["bravo"]
 
 
-def test_python_ast_cache_retries_when_source_changes_during_read(tmp_path: Path, monkeypatch) -> None:
+def test_python_ast_cache_retries_when_source_changes_during_read(
+    tmp_path: Path, monkeypatch
+) -> None:
     clear_ast_cache()
     source = tmp_path / "sample.py"
     source.write_text("def alpha():\n    return 1\n", encoding="utf-8")
@@ -112,7 +124,9 @@ def test_python_ast_cache_retries_when_source_changes_during_read(tmp_path: Path
     assert _function_names(snapshot.tree) == ["bravo"]
 
 
-def test_python_ast_cache_does_not_serve_stale_tree_when_current_source_is_invalid(tmp_path: Path) -> None:
+def test_python_ast_cache_does_not_serve_stale_tree_when_current_source_is_invalid(
+    tmp_path: Path,
+) -> None:
     clear_ast_cache()
     source = tmp_path / "sample.py"
     source.write_text("def alpha():\n    return 1\n", encoding="utf-8")
@@ -125,7 +139,9 @@ def test_python_ast_cache_does_not_serve_stale_tree_when_current_source_is_inval
     except SyntaxError:
         pass
     else:
-        raise AssertionError("current invalid source must raise SyntaxError instead of serving cached AST")
+        raise AssertionError(
+            "current invalid source must raise SyntaxError instead of serving cached AST"
+        )
 
 
 def test_python_ast_cache_observes_rapid_rewrite(tmp_path: Path) -> None:

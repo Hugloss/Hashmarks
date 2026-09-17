@@ -44,9 +44,19 @@ Boundary decision: ADMIT / SPLIT / REJECT
 
 ## Development setup
 
+Prepare the local development environment:
+
 ```bash
 make init
 ```
+
+Install the lightweight Git pre-commit hook once per clone:
+
+```bash
+make hooks-install
+```
+
+The commit hook performs fast file hygiene: whitespace/end-of-file checks, YAML/TOML/merge-conflict checks, large-file protection, Ruff fixes, and Ruff formatting. It uses the same project Ruff dependency and `pyproject.toml` configuration as CI. Type checking, tests, and qualification remain explicit checks.
 
 Run the normal bounded development check:
 
@@ -61,6 +71,10 @@ make compile
 make test
 make test-shard-plan
 make test-shard TEST_SHARD=0
+make ruff
+make lint-debt
+make typecheck
+make precommit
 ```
 
 For native full-suite qualification:
@@ -85,6 +99,7 @@ Hosted diagnostics never mutate the native release contract. They exclude extern
 - Incremental/cached behavior should be compared against a fresh reconciled/cold oracle for semantic authority.
 - Unknown or incomplete evidence should fail closed rather than being coerced into stronger authority.
 - Benchmarks measure behavior; they do not automatically authorize product expansion.
+- Avoid tests that only prove duplicated tool-policy plumbing. Prefer one project-owned configuration plus tests of real Hashmarks behavior.
 
 ## Documentation
 
@@ -104,6 +119,8 @@ A focused pull request should explain:
 
 Avoid unrelated refactors in the same change unless they are required to make ownership clearer.
 
-## Qualification-tool compatibility
+## Development-tool policy
 
-The compatibility envelope for pytest and Ruff is documented in [`docs/qualification/TOOL_COMPATIBILITY.md`](../docs/qualification/TOOL_COMPATIBILITY.md). Widening a range requires boundary-version proof; it must not be done as an incidental dependency update.
+`pyproject.toml` is the authority for development-tool dependencies and configuration. We do not maintain separate CI lanes whose only purpose is proving pytest, Ruff, or uv version envelopes. Python-version tests exercise the supported runtime, and MCP interop tests exercise a real product integration boundary.
+
+`make hooks-install` installs the Git pre-commit hook. The hook owns only fast commit-time hygiene; `make ruff`, `make typecheck`, `make lint-debt`, and test/qualification targets remain separate so commit-time editing does not become qualification authority. Retained benchmark fixture repositories remain excluded from live-repository formatting and linting.

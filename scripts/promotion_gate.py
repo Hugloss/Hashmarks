@@ -40,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
         native_qualification_handoff=handoff,
         native_ruff_receipt=receipt,
     )
-    print(json.dumps(manifest, indent=2, sort_keys=True))
+    print(json.dumps(manifest, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
     return 0 if manifest["manifest_valid"] else 3
 
 

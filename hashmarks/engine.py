@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING
 
 from .directory_store import DirectoryDigestStore
 from .file_store import FileDigestStore
 from .inputs import InputManifest
-from .schema import IDENTITY_SCHEMA
-from .snapshot import Snapshot
-from .specs import InputValue, validate_input_values
 from .merkle import MerkleTree
 from .observation import ChangeTracker
 from .paths import canonical_host_path
+from .schema import IDENTITY_SCHEMA
+from .snapshot import Snapshot
+from .specs import InputValue, validate_input_values
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 class IdentityEngine:
@@ -73,7 +76,6 @@ class IdentityEngine:
             require_matches=require_matches,
         )
 
-
     def manifest_specs(
         self,
         inputs: Iterable[InputValue],
@@ -81,7 +83,9 @@ class IdentityEngine:
         require_matches: bool = True,
     ) -> InputManifest:
         return self.manifest(
-            validate_input_values(self.workspace, inputs, require_matches=require_matches),
+            validate_input_values(
+                self.workspace, inputs, require_matches=require_matches
+            ),
             require_matches=require_matches,
         )
 
@@ -152,4 +156,3 @@ class IdentityEngine:
             change_tracker=self.changes,
             exclude_relative_paths=exclude_relative,
         )
-

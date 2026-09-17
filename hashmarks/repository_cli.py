@@ -3,14 +3,21 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Callable, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from .errors import RepositoryCliError
-from .repository_retry import is_transient_repository_race, retry_transient_repository_race
+from .repository_retry import (
+    is_transient_repository_race,
+    retry_transient_repository_race,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def _print(value) -> None:
-    print(json.dumps(value, indent=2, sort_keys=True))
+    print(json.dumps(value, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+
 
 _T = TypeVar("_T")
 _REPOSITORY_USER_ERRORS = (KeyError, PermissionError, ValueError, FileNotFoundError)
@@ -51,22 +58,38 @@ def _codemap(args):
     from .codemap import CodeMap
 
     return CodeMap(args.workspace, state_dir=args.state_dir)
+
+
 def _map_sync(args) -> int:
     result = _call_codemap(args, lambda codemap: codemap.sync(args.path or None))
     _print(result.as_dict())
     return 0
+
+
 def _map_findings(args) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.repository_findings(args.path or None))
+    value = _call_codemap(
+        args, lambda codemap: codemap.repository_findings(args.path or None)
+    )
     _print(value)
     return 0
+
+
 def _map_import_ownership(args) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.import_ownership_findings(args.path or None))
+    value = _call_codemap(
+        args, lambda codemap: codemap.import_ownership_findings(args.path or None)
+    )
     _print(value)
     return 0
+
+
 def _map_concurrency_risk(args) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.concurrency_risk_findings(args.path or None))
+    value = _call_codemap(
+        args, lambda codemap: codemap.concurrency_risk_findings(args.path or None)
+    )
     _print(value)
     return 0
+
+
 def _map_verification_ownership(args) -> int:
     value = _call_codemap(
         args,
@@ -76,132 +99,208 @@ def _map_verification_ownership(args) -> int:
     )
     _print(value)
     return 0
+
+
 def _map_repository_ownership(args) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.repository_ownership_graph(args.path or None))
+    value = _call_codemap(
+        args, lambda codemap: codemap.repository_ownership_graph(args.path or None)
+    )
     _print(value)
     return 0
+
+
 def _map_cache_ownership(args) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.cache_ownership_findings(args.path or None))
+    value = _call_codemap(
+        args, lambda codemap: codemap.cache_ownership_findings(args.path or None)
+    )
     _print(value)
     return 0
+
+
 def _map_cache_invalidation_ownership(args) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.cache_invalidation_ownership_graph(args.path or None))
+    value = _call_codemap(
+        args,
+        lambda codemap: codemap.cache_invalidation_ownership_graph(args.path or None),
+    )
     _print(value)
     return 0
+
+
 def _map_clean(args) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.clean(shared_artifacts=args.shared_artifacts))
+    value = _call_codemap(
+        args, lambda codemap: codemap.clean(shared_artifacts=args.shared_artifacts)
+    )
     _print(value)
     return 0
+
+
 def _map_watch(args) -> int:
     def on_update(result, paths):
-        _print({
-            "event": "codemap_update",
-            "paths": list(paths),
-            "result": result.as_dict(),
-        })
+        _print(
+            {
+                "event": "codemap_update",
+                "paths": list(paths),
+                "result": result.as_dict(),
+            }
+        )
         sys.stdout.flush()
 
     with _codemap(args) as codemap:
         codemap.watch_forever(debounce_seconds=args.debounce, on_update=on_update)
     return 0
+
+
 def _map_status(args) -> int:
     value = _call_codemap(args, lambda codemap: codemap.status())
     _print(value)
     return 0
+
+
 def _map_enrich(args) -> int:
-    value = _call_codemap(args, lambda codemap: codemap.enrich_projects(args.provider or None))
+    value = _call_codemap(
+        args, lambda codemap: codemap.enrich_projects(args.provider or None)
+    )
     _print(value)
     return 0
+
+
 def _map_projects(args) -> int:
     value = _call_codemap(args, lambda codemap: codemap.projects())
     _print(value)
     return 0
+
+
 def _map_import_scip(args) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.import_scip(args.path), extra_errors=(RuntimeError,)
+        args,
+        lambda codemap: codemap.import_scip(args.path),
+        extra_errors=(RuntimeError,),
     )
     _print(value)
     return 0
+
+
 def _map_orient(args) -> int:
     value = _call_codemap(args, lambda codemap: codemap.orient())
     _print(value)
     return 0
+
+
 def _outline(args) -> int:
     value = _call_codemap(args, lambda codemap: codemap.outline(args.path))
     _print(value)
     return 0
+
+
 def _find_code(args) -> int:
     hits, status = _call_codemap(
-        args, lambda codemap: (codemap.find(args.query, limit=args.limit), codemap.status())
+        args,
+        lambda codemap: (codemap.find(args.query, limit=args.limit), codemap.status()),
     )
-    _print({
-        "schema": "hashmarks.find.v1",
-        "query": args.query,
-        "generation": status["generation"],
-        "stale": status["daemon_generation_changed"],
-        "hits": [hit.as_dict() for hit in hits],
-    })
+    _print(
+        {
+            "schema": "hashmarks.find.v1",
+            "query": args.query,
+            "generation": status["generation"],
+            "stale": status["daemon_generation_changed"],
+            "hits": [hit.as_dict() for hit in hits],
+        }
+    )
     return 0
+
+
 def _grep_code(args) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.grep(args.query, limit=args.limit, context_lines=args.context)
+        args,
+        lambda codemap: codemap.grep(
+            args.query, limit=args.limit, context_lines=args.context
+        ),
     )
     _print(value)
     return 0
+
+
 def _structural_code(args) -> int:
     value = _call_codemap(
-        args, lambda codemap: codemap.structural(args.pattern, language=args.lang, limit=args.limit)
+        args,
+        lambda codemap: codemap.structural(
+            args.pattern, language=args.lang, limit=args.limit
+        ),
     )
     _print(value)
     return 0
+
+
 def _symbol_code(args) -> int:
     value = _call_codemap(args, lambda codemap: codemap.symbol(args.query))
     _print(value)
     return 0
+
+
 def _source_code(args) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.source(args.query, token_budget=args.budget)
     )
     _print(value)
     return 0
+
+
 def _deps_code(args) -> int:
     value = _call_codemap(args, lambda codemap: codemap.deps(args.query))
     _print(value)
     return 0
+
+
 def _refs_code(args) -> int:
     value = _call_codemap(args, lambda codemap: codemap.refs(args.query))
     _print(value)
     return 0
+
+
 def _affected_code(args) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.affected(args.query, max_depth=args.max_depth)
     )
     _print(value)
     return 0
+
+
 def _tests_code(args) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.tests(args.query, max_depth=args.max_depth)
     )
     _print(value)
     return 0
+
+
 def _context_code(args) -> int:
     value = _call_codemap(
         args,
         lambda codemap: codemap.context(
-            args.query, token_budget=args.budget, limit=args.limit, disclosure=args.level
+            args.query,
+            token_budget=args.budget,
+            limit=args.limit,
+            disclosure=args.level,
         ),
     )
     _print(value.as_dict())
     return 0
+
+
 def _task_evidence_code(args) -> int:
     value = _call_codemap(
         args,
         lambda codemap: codemap.task_evidence(
-            args.task, token_budget=args.budget, limit=args.limit, per_role=args.per_role
+            args.task,
+            token_budget=args.budget,
+            limit=args.limit,
+            per_role=args.per_role,
         ),
     )
     _print(value)
     return 0
+
+
 def _verification_relevance_code(args) -> int:
     value = _call_codemap(
         args,
@@ -211,51 +310,74 @@ def _verification_relevance_code(args) -> int:
     )
     _print(value)
     return 0
+
+
 def _change_impact_code(args) -> int:
     value = _call_codemap(
         args,
         lambda codemap: codemap.task_change_impact(
-            args.task, args.changed, limit=args.limit, per_role=args.per_role,
-            impact_limit_per_surface=args.impact_limit, max_depth=args.max_depth,
+            args.task,
+            args.changed,
+            limit=args.limit,
+            per_role=args.per_role,
+            impact_limit_per_surface=args.impact_limit,
+            max_depth=args.max_depth,
             project_impact_limit=args.project_impact_limit,
             project_impact_encoding=args.project_impact_encoding,
         ),
     )
     _print(value)
     return 0
+
+
 def _post_change_code(args) -> int:
     previous = _read_json_object(args.previous_evidence, option="--previous-evidence")
     value = _call_codemap(
         args,
         lambda codemap: codemap.task_post_change_delta(
-            args.task, args.changed, previous_evidence=previous, token_budget=args.budget,
-            limit=args.limit, per_role=args.per_role,
+            args.task,
+            args.changed,
+            previous_evidence=previous,
+            token_budget=args.budget,
+            limit=args.limit,
+            per_role=args.per_role,
         ),
     )
     _print(value)
     return 0
+
+
 def _add_map_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     map_cmd = sub.add_parser("map", help="derived repository CodeMap")
     add_common_arguments(map_cmd, inherited=True)
     map_cmd.set_defaults(func=_map_orient)
     map_sub = map_cmd.add_subparsers(dest="map_command", required=False)
-    map_sync = map_sub.add_parser("sync", help="index repository structure; use --path for incremental updates")
+    map_sync = map_sub.add_parser(
+        "sync", help="index repository structure; use --path for incremental updates"
+    )
     add_common_arguments(map_sync, inherited=True)
-    map_sync.add_argument("--path", action="append", help="changed path to reindex; repeatable")
+    map_sync.add_argument(
+        "--path", action="append", help="changed path to reindex; repeatable"
+    )
     map_sync.set_defaults(func=_map_sync)
     map_status = map_sub.add_parser("status", help="show CodeMap generation/staleness")
     add_common_arguments(map_status, inherited=True)
     map_status.set_defaults(func=_map_status)
     _add_map_ownership_cli(map_sub, add_common_arguments=add_common_arguments)
     _add_map_enrichment_cli(map_sub, add_common_arguments=add_common_arguments)
-def _add_map_ownership_cli(map_sub, *, add_common_arguments: Callable[..., None]) -> None:
+
+
+def _add_map_ownership_cli(
+    map_sub, *, add_common_arguments: Callable[..., None]
+) -> None:
     map_findings = map_sub.add_parser(
         "findings",
         help="project actionable repository-analysis findings from existing analyzers",
     )
     add_common_arguments(map_findings, inherited=True)
     map_findings.add_argument(
-        "--path", action="append",
+        "--path",
+        action="append",
         help="workspace-relative path scope; repeatable (default: analyzer-nominated repository candidates)",
     )
     map_findings.set_defaults(func=_map_findings)
@@ -265,7 +387,8 @@ def _add_map_ownership_cli(map_sub, *, add_common_arguments: Callable[..., None]
     )
     add_common_arguments(map_import_ownership, inherited=True)
     map_import_ownership.add_argument(
-        "--path", action="append",
+        "--path",
+        action="append",
         help="workspace-relative Python path to inspect; repeatable (default: CodeMap-nominated candidates)",
     )
     map_import_ownership.set_defaults(func=_map_import_ownership)
@@ -275,7 +398,8 @@ def _add_map_ownership_cli(map_sub, *, add_common_arguments: Callable[..., None]
     )
     add_common_arguments(map_cache_ownership, inherited=True)
     map_cache_ownership.add_argument(
-        "--path", action="append",
+        "--path",
+        action="append",
         help="workspace-relative Python path to inspect; repeatable (default: CodeMap-nominated candidates)",
     )
     map_cache_ownership.set_defaults(func=_map_cache_ownership)
@@ -285,7 +409,8 @@ def _add_map_ownership_cli(map_sub, *, add_common_arguments: Callable[..., None]
     )
     add_common_arguments(map_cache_invalidation, inherited=True)
     map_cache_invalidation.add_argument(
-        "--path", action="append",
+        "--path",
+        action="append",
         help="workspace-relative Python invalidator path to inspect; repeatable (default: all indexed Python)",
     )
     map_cache_invalidation.set_defaults(func=_map_cache_invalidation_ownership)
@@ -294,20 +419,34 @@ def _add_map_ownership_cli(map_sub, *, add_common_arguments: Callable[..., None]
         help="compose repository owner/reader/cache/import authority evidence",
     )
     add_common_arguments(map_authority_ownership, inherited=True)
-    map_authority_ownership.add_argument("--path", action="append", help="workspace-relative path scope; repeatable")
+    map_authority_ownership.add_argument(
+        "--path", action="append", help="workspace-relative path scope; repeatable"
+    )
     map_authority_ownership.set_defaults(func=_map_repository_ownership)
-    map_concurrency_risk = map_sub.add_parser("concurrency-risk", help="nominate static read-modify-write concurrency risks")
+    map_concurrency_risk = map_sub.add_parser(
+        "concurrency-risk", help="nominate static read-modify-write concurrency risks"
+    )
     add_common_arguments(map_concurrency_risk, inherited=True)
-    map_concurrency_risk.add_argument("--path", action="append", help="workspace-relative Python path; repeatable")
+    map_concurrency_risk.add_argument(
+        "--path", action="append", help="workspace-relative Python path; repeatable"
+    )
     map_concurrency_risk.set_defaults(func=_map_concurrency_risk)
-    map_verification_ownership = map_sub.add_parser("verification-ownership", help="map task-local verification evidence owners")
+    map_verification_ownership = map_sub.add_parser(
+        "verification-ownership", help="map task-local verification evidence owners"
+    )
     add_common_arguments(map_verification_ownership, inherited=True)
     map_verification_ownership.add_argument("task")
     map_verification_ownership.add_argument("--limit", type=int, default=20)
     map_verification_ownership.add_argument("--candidate-limit", type=int, default=8)
     map_verification_ownership.set_defaults(func=_map_verification_ownership)
-def _add_map_enrichment_cli(map_sub, *, add_common_arguments: Callable[..., None]) -> None:
-    map_enrich = map_sub.add_parser("enrich", help="collect slower/native package graph evidence explicitly")
+
+
+def _add_map_enrichment_cli(
+    map_sub, *, add_common_arguments: Callable[..., None]
+) -> None:
+    map_enrich = map_sub.add_parser(
+        "enrich", help="collect slower/native package graph evidence explicitly"
+    )
     add_common_arguments(map_enrich, inherited=True)
     map_enrich.add_argument(
         "--provider",
@@ -328,27 +467,42 @@ def _add_map_enrichment_cli(map_sub, *, add_common_arguments: Callable[..., None
         help="native/manifest evidence provider to run; repeatable",
     )
     map_enrich.set_defaults(func=_map_enrich)
-    map_projects = map_sub.add_parser("projects", help="show retained native/manifest package graph")
+    map_projects = map_sub.add_parser(
+        "projects", help="show retained native/manifest package graph"
+    )
     add_common_arguments(map_projects, inherited=True)
     map_projects.set_defaults(func=_map_projects)
-    map_scip = map_sub.add_parser("import-scip", help="import an existing SCIP index/JSON as native code-intelligence evidence")
+    map_scip = map_sub.add_parser(
+        "import-scip",
+        help="import an existing SCIP index/JSON as native code-intelligence evidence",
+    )
     add_common_arguments(map_scip, inherited=True)
     map_scip.add_argument("path")
     map_scip.set_defaults(func=_map_import_scip)
     map_clean = map_sub.add_parser("clean", help="clear workspace CodeMap state")
     add_common_arguments(map_clean, inherited=True)
-    map_clean.add_argument("--shared-artifacts", action="store_true", help="also purge content-addressed worktree-shared parse artifacts")
+    map_clean.add_argument(
+        "--shared-artifacts",
+        action="store_true",
+        help="also purge content-addressed worktree-shared parse artifacts",
+    )
     map_clean.set_defaults(func=_map_clean)
-    map_watch = map_sub.add_parser("watch", help="maintain CodeMap from filesystem changes in a separate process")
+    map_watch = map_sub.add_parser(
+        "watch", help="maintain CodeMap from filesystem changes in a separate process"
+    )
     add_common_arguments(map_watch, inherited=True)
     map_watch.add_argument("--debounce", type=float, default=0.05)
     map_watch.set_defaults(func=_map_watch)
+
+
 def _add_navigation_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     orient = sub.add_parser("orient", help="compact repository capsule")
     add_common_arguments(orient, inherited=True)
     orient.set_defaults(func=_map_orient)
 
-    outline = sub.add_parser("outline", help="show structure/signatures without full implementation bodies")
+    outline = sub.add_parser(
+        "outline", help="show structure/signatures without full implementation bodies"
+    )
     add_common_arguments(outline, inherited=True)
     outline.add_argument("path")
     outline.set_defaults(func=_outline)
@@ -359,14 +513,22 @@ def _add_navigation_cli(sub, *, add_common_arguments: Callable[..., None]) -> No
     find_code.add_argument("--limit", type=int, default=20)
     find_code.set_defaults(func=_find_code)
 
-    grep_code = sub.add_parser("grep", help="persistent lexical grep narrowed by CodeMap")
+    grep_code = sub.add_parser(
+        "grep", help="persistent lexical grep narrowed by CodeMap"
+    )
     add_common_arguments(grep_code, inherited=True)
     grep_code.add_argument("query")
     grep_code.add_argument("--limit", type=int, default=50)
-    grep_code.add_argument("--context", type=int, default=0, help="source context lines around each match")
+    grep_code.add_argument(
+        "--context", type=int, default=0, help="source context lines around each match"
+    )
     grep_code.set_defaults(func=_grep_code)
+
+
 def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
-    structural_code = sub.add_parser("structural", help="optional syntax-aware search via local ast-grep")
+    structural_code = sub.add_parser(
+        "structural", help="optional syntax-aware search via local ast-grep"
+    )
     add_common_arguments(structural_code, inherited=True)
     structural_code.add_argument("pattern")
     structural_code.add_argument("--lang")
@@ -378,7 +540,9 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     symbol_code.add_argument("query")
     symbol_code.set_defaults(func=_symbol_code)
 
-    source_code = sub.add_parser("source", help="return one exact symbol body under an explicit token budget")
+    source_code = sub.add_parser(
+        "source", help="return one exact symbol body under an explicit token budget"
+    )
     add_common_arguments(source_code, inherited=True)
     source_code.add_argument("query", help="symbol name or path::qualname")
     source_code.add_argument("--budget", type=int, default=4000)
@@ -389,24 +553,34 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     deps_code.add_argument("query")
     deps_code.set_defaults(func=_deps_code)
 
-    refs_code = sub.add_parser("refs", help="show static references/calls to a symbol name")
+    refs_code = sub.add_parser(
+        "refs", help="show static references/calls to a symbol name"
+    )
     add_common_arguments(refs_code, inherited=True)
     refs_code.add_argument("query")
     refs_code.set_defaults(func=_refs_code)
 
-    affected_code = sub.add_parser("affected", help="show reverse file dependents from the CodeMap graph")
+    affected_code = sub.add_parser(
+        "affected", help="show reverse file dependents from the CodeMap graph"
+    )
     add_common_arguments(affected_code, inherited=True)
     affected_code.add_argument("query")
     affected_code.add_argument("--max-depth", type=int, default=12)
     affected_code.set_defaults(func=_affected_code)
 
-    tests_code = sub.add_parser("tests", help="show structurally related tests from reverse dependencies")
+    tests_code = sub.add_parser(
+        "tests", help="show structurally related tests from reverse dependencies"
+    )
     add_common_arguments(tests_code, inherited=True)
     tests_code.add_argument("query")
     tests_code.add_argument("--max-depth", type=int, default=12)
     tests_code.set_defaults(func=_tests_code)
+
+
 def _add_context_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
-    context_code = sub.add_parser("context", help="build a token-budgeted repository context pack")
+    context_code = sub.add_parser(
+        "context", help="build a token-budgeted repository context pack"
+    )
     add_common_arguments(context_code, inherited=True)
     context_code.add_argument("query")
     context_code.add_argument("--budget", type=int, default=4000)
@@ -418,6 +592,8 @@ def _add_context_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
         help="progressive disclosure level; source preserves the pre-0.10.12 behavior",
     )
     context_code.set_defaults(func=_context_code)
+
+
 def _add_task_evidence_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     task_evidence = sub.add_parser(
         "task-evidence",
@@ -425,7 +601,12 @@ def _add_task_evidence_cli(sub, *, add_common_arguments: Callable[..., None]) ->
     )
     add_common_arguments(task_evidence, inherited=True)
     task_evidence.add_argument("task")
-    task_evidence.add_argument("--budget", type=int, default=1536, help="maximum estimated tokens of source evidence")
+    task_evidence.add_argument(
+        "--budget",
+        type=int,
+        default=1536,
+        help="maximum estimated tokens of source evidence",
+    )
     task_evidence.add_argument("--limit", type=int, default=20)
     task_evidence.add_argument("--per-role", type=int, default=3)
     task_evidence.set_defaults(func=_task_evidence_code)
@@ -448,13 +629,29 @@ def _add_change_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     )
     add_common_arguments(change_impact, inherited=True)
     change_impact.add_argument("task")
-    change_impact.add_argument("--changed", action="append", required=True, help="repository-relative changed path; repeatable")
+    change_impact.add_argument(
+        "--changed",
+        action="append",
+        required=True,
+        help="repository-relative changed path; repeatable",
+    )
     change_impact.add_argument("--limit", type=int, default=20)
     change_impact.add_argument("--per-role", type=int, default=3)
-    change_impact.add_argument("--impact-limit", type=int, default=6, help="maximum affected paths per surface")
+    change_impact.add_argument(
+        "--impact-limit", type=int, default=6, help="maximum affected paths per surface"
+    )
     change_impact.add_argument("--max-depth", type=int, default=4)
-    change_impact.add_argument("--project-impact-limit", type=int, help="independent maximum affected-project provenance rows")
-    change_impact.add_argument("--project-impact-encoding", choices=("verbose", "compact"), default="verbose", help="project provenance transport encoding")
+    change_impact.add_argument(
+        "--project-impact-limit",
+        type=int,
+        help="independent maximum affected-project provenance rows",
+    )
+    change_impact.add_argument(
+        "--project-impact-encoding",
+        choices=("verbose", "compact"),
+        default="verbose",
+        help="project provenance transport encoding",
+    )
     change_impact.set_defaults(func=_change_impact_code)
 
     post_change = sub.add_parser(
@@ -463,8 +660,17 @@ def _add_change_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     )
     add_common_arguments(post_change, inherited=True)
     post_change.add_argument("task")
-    post_change.add_argument("--changed", action="append", required=True, help="repository-relative changed path; repeatable")
-    post_change.add_argument("--previous-evidence", required=True, help="JSON file containing the exact prior task-evidence packet")
+    post_change.add_argument(
+        "--changed",
+        action="append",
+        required=True,
+        help="repository-relative changed path; repeatable",
+    )
+    post_change.add_argument(
+        "--previous-evidence",
+        required=True,
+        help="JSON file containing the exact prior task-evidence packet",
+    )
     post_change.add_argument("--budget", type=int, default=1536)
     post_change.add_argument("--limit", type=int, default=20)
     post_change.add_argument("--per-role", type=int, default=3)

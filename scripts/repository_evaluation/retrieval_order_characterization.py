@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
-import tempfile
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -73,9 +72,7 @@ def _planner(codemap: CodeMap, *, limit: int) -> dict[str, list[str]]:
         FROM file_map WHERE lower(path) LIKE ? ORDER BY path LIMIT ?
     """
     with codemap.store._lock:  # evaluation-only introspection
-        symbol = codemap.store._db.execute(
-            symbol_sql, (q, q, q, q, limit)
-        ).fetchall()
+        symbol = codemap.store._db.execute(symbol_sql, (q, q, q, q, limit)).fetchall()
         files = codemap.store._db.execute(file_sql, (q, limit)).fetchall()
     return {
         "symbol": [str(row[3]) for row in symbol],
@@ -83,8 +80,12 @@ def _planner(codemap: CodeMap, *, limit: int) -> dict[str, list[str]]:
     }
 
 
-def _cold_run(root: Path, state: Path, *, broad_limit: int, find_limit: int) -> dict[str, Any]:
-    with CodeMap(root, state_dir=state, artifact_db=state / "artifacts.sqlite3") as codemap:
+def _cold_run(
+    root: Path, state: Path, *, broad_limit: int, find_limit: int
+) -> dict[str, Any]:
+    with CodeMap(
+        root, state_dir=state, artifact_db=state / "artifacts.sqlite3"
+    ) as codemap:
         codemap.sync()
         return {
             "content_identity": _content_identity(root),
@@ -115,15 +116,21 @@ def characterize_retrieval_order(
         )
 
         state = base / "state-history"
-        with CodeMap(root, state_dir=state, artifact_db=state / "artifacts.sqlite3") as codemap:
+        with CodeMap(
+            root, state_dir=state, artifact_db=state / "artifacts.sqlite3"
+        ) as codemap:
             codemap.sync()
             before_broad = _broad_rows(codemap, limit=broad_limit)
             before_find = _find_rows(codemap, limit=find_limit)
             if not before_broad:
-                raise RuntimeError("characterization query produced no broad candidates")
+                raise RuntimeError(
+                    "characterization query produced no broad candidates"
+                )
             target = before_broad[0][0]
             target_path = root / target
-            target_path.write_text("def unrelated_name():\n    return -1\n", encoding="utf-8")
+            target_path.write_text(
+                "def unrelated_name():\n    return -1\n", encoding="utf-8"
+            )
             codemap.sync([target])
             target_path.write_text(originals[target], encoding="utf-8")
             codemap.sync([target])

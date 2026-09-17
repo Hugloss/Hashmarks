@@ -62,7 +62,10 @@ def test_pruned_javascript_test_is_rejected_before_source_read(tmp_path: Path) -
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
-        with patch("pathlib.Path.read_text", side_effect=AssertionError("dependency source must not be read")):
+        with patch(
+            "pathlib.Path.read_text",
+            side_effect=AssertionError("dependency source must not be read"),
+        ):
             plan = codemap.verification_plan(rel)
         assert plan["available"] is False
         assert plan["reason"] == "path-outside-analysis-scope"

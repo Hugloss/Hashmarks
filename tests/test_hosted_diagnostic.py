@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-
 ROOT = Path(__file__).parents[1]
 SCRIPT = ROOT / "scripts" / "hosted_diagnostic.py"
 SPEC = importlib.util.spec_from_file_location("hosted_diagnostic", SCRIPT)
@@ -12,7 +11,9 @@ hosted = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(hosted)
 
 
-def test_marker_expression_keeps_mandatory_exclusions_when_extra_filter_is_added() -> None:
+def test_marker_expression_keeps_mandatory_exclusions_when_extra_filter_is_added() -> (
+    None
+):
     expression = hosted.marker_expression("not experimental")
     assert "not certification" in expression
     assert "not host_dns" in expression

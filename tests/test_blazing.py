@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import threading
 import time
-from pathlib import Path
-
+from typing import TYPE_CHECKING
 
 from hashmarks.client import IdentityClient
 from hashmarks.daemon import IdentityDaemon
@@ -11,6 +10,9 @@ from hashmarks.engine import IdentityEngine
 from hashmarks.file_store import FileDigestStore
 from hashmarks.inputs import InputManifest
 from hashmarks.merkle import MerkleTree
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class _FakeWatcher:
@@ -28,7 +30,9 @@ class _FakeWatcher:
         return True
 
 
-def test_manifest_hot_equality_cutoff_skips_all_file_metadata(tmp_path: Path, monkeypatch):
+def test_manifest_hot_equality_cutoff_skips_all_file_metadata(
+    tmp_path: Path, monkeypatch
+):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     paths = []
@@ -147,7 +151,9 @@ def test_engine_watcher_excludes_internal_state_path(tmp_path: Path):
     engine.close()
 
 
-def test_daemon_preserves_hot_manifest_state_across_clients(tmp_path: Path, monkeypatch):
+def test_daemon_preserves_hot_manifest_state_across_clients(
+    tmp_path: Path, monkeypatch
+):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     for i in range(50):
@@ -217,7 +223,9 @@ def test_parent_directory_modified_event_is_observer_noise():
     assert not should_ignore_observer_event(event_type="modified", is_directory=False)
 
 
-def test_strong_manifest_verify_detects_leaf_type_change_without_tracker(tmp_path: Path):
+def test_strong_manifest_verify_detects_leaf_type_change_without_tracker(
+    tmp_path: Path,
+):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     target = workspace / "item"

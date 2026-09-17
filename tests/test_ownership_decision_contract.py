@@ -11,11 +11,15 @@ def test_resolved_structural_owner_is_authoritative() -> None:
     trace = ownership_decision_trace(
         OwnershipDecisionState(
             edit={"path": "src/a.py", "canonical_rank": 1, "roles": ["edit"]},
-            competing=[{"path": "tests/test_a.py", "canonical_rank": 2, "roles": ["verify"]}],
+            competing=[
+                {"path": "tests/test_a.py", "canonical_rank": 2, "roles": ["verify"]}
+            ],
             structural_owner={
                 "selected": "src/a.py",
                 "via": "import",
-                "owner_path": [{"from": "tests/test_a.py", "to": "src/a.py", "relation": "import"}],
+                "owner_path": [
+                    {"from": "tests/test_a.py", "to": "src/a.py", "relation": "import"}
+                ],
             },
             ambiguous=False,
             ambiguity_reason="resolved-by-role",
@@ -25,7 +29,10 @@ def test_resolved_structural_owner_is_authoritative() -> None:
 
     assert trace["status"] == "resolved"
     assert trace["confidence"] == "high"
-    assert trace["candidates"][1]["rejection_reason"] == "verification-evidence-not-edit-authority"
+    assert (
+        trace["candidates"][1]["rejection_reason"]
+        == "verification-evidence-not-edit-authority"
+    )
     assert authority["safe_to_edit"] is True
     assert authority["authoritative_edit"] == "src/a.py"
 

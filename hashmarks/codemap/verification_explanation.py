@@ -1,18 +1,25 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, cast
+
+from hashmarks.paths import normalize_relative_path
+
 from .decision_session import diagnostic_producer
 
-from collections.abc import Mapping
-from pathlib import Path
+if TYPE_CHECKING:
+    from pathlib import Path
 
-from ..paths import normalize_relative_path
+    from .engine import CodeMap
 
 
 class VerificationExplanationMixin:
     """Bounded explanations over existing verification-selection semantics."""
 
     @staticmethod
-    def _verification_reason_facts(row: Mapping[str, object]) -> list[dict[str, object]]:
+    def _verification_reason_facts(
+        row: Mapping[str, object],
+    ) -> list[dict[str, object]]:
         facts: list[dict[str, object]] = []
         strength = str(row.get("reference_strength") or "none")
         if strength != "none":
@@ -41,8 +48,12 @@ class VerificationExplanationMixin:
         candidate_limit: int = 16,
     ) -> dict[str, object]:
         """Explain selection/non-selection without adding execution semantics."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         relevance = self.verification_relevance(
-            task, limit=limit, candidate_limit=candidate_limit,
+            task,
+            limit=limit,
+            candidate_limit=candidate_limit,
         )
         selected = relevance.get("selected")
         selected_row = selected if isinstance(selected, Mapping) else None
@@ -105,6 +116,7 @@ class VerificationExplanationMixin:
             "execution_effect": "none",
         }
         payload["explanation_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.verification-selection-explanation.v1", payload,
+            "hashmarks.verification-selection-explanation.v1",
+            payload,
         )
         return payload

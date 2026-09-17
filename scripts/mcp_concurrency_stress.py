@@ -1,3 +1,5 @@
+# Imports below follow the standalone script path bootstrap.
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -15,7 +17,9 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from hashmarks.mcp_surface import HashmarksMcpSurface
+from hashmarks.mcp_surface import (
+    HashmarksMcpSurface,
+)
 
 
 @dataclass
@@ -137,8 +141,12 @@ def _fixture(repo: Path, extra_files: int) -> None:
         )
 
 
-def _run_round(*, round_number: int, workers: int, calls: int, writes: int, extra_files: int) -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(prefix=f"hashmarks-mcp-concurrency-r{round_number}-") as tmp_text:
+def _run_round(
+    *, round_number: int, workers: int, calls: int, writes: int, extra_files: int
+) -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(
+        prefix=f"hashmarks-mcp-concurrency-r{round_number}-"
+    ) as tmp_text:
         tmp = Path(tmp_text)
         repo = tmp / "repo"
         state = tmp / "state"
@@ -183,7 +191,9 @@ def _run_round(*, round_number: int, workers: int, calls: int, writes: int, extr
 
         errors = [error for result in results for error in result.errors]
         building_payloads = sum(result.building_payloads for result in results)
-        generation_regressions = sum(result.generation_regressions for result in results)
+        generation_regressions = sum(
+            result.generation_regressions for result in results
+        )
         expected_calls = workers * calls
         successes = sum(result.successes for result in results)
         status = (
@@ -204,7 +214,9 @@ def _run_round(*, round_number: int, workers: int, calls: int, writes: int, extr
             "building_payloads": building_payloads,
             "generation_regressions": generation_regressions,
             "process_failures": process_failures,
-            "workers": [asdict(result) for result in sorted(results, key=lambda row: row.worker)],
+            "workers": [
+                asdict(result) for result in sorted(results, key=lambda row: row.worker)
+            ],
         }
 
 
@@ -214,13 +226,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--rounds", type=int, default=3)
     parser.add_argument("--workers", type=int, default=6)
-    parser.add_argument("--calls", type=int, default=80, help="calls per reader per round")
+    parser.add_argument(
+        "--calls", type=int, default=80, help="calls per reader per round"
+    )
     parser.add_argument("--writes", type=int, default=35)
     parser.add_argument("--extra-files", type=int, default=120)
     parser.add_argument("--receipt", default="dist/mcp-concurrency-stress.json")
     args = parser.parse_args(argv)
-    if min(args.rounds, args.workers, args.calls, args.writes) < 1 or args.extra_files < 0:
-        parser.error("rounds/workers/calls/writes must be >= 1 and extra-files must be >= 0")
+    if (
+        min(args.rounds, args.workers, args.calls, args.writes) < 1
+        or args.extra_files < 0
+    ):
+        parser.error(
+            "rounds/workers/calls/writes must be >= 1 and extra-files must be >= 0"
+        )
 
     started = time.monotonic()
     rounds = [
@@ -248,15 +267,19 @@ def main(argv: list[str] | None = None) -> int:
             "successful_calls": sum(row["successful_calls"] for row in rounds),
             "errors": sum(len(row["errors"]) for row in rounds),
             "building_payloads": sum(row["building_payloads"] for row in rounds),
-            "generation_regressions": sum(row["generation_regressions"] for row in rounds),
+            "generation_regressions": sum(
+                row["generation_regressions"] for row in rounds
+            ),
         },
         "duration_seconds": time.monotonic() - started,
         "round_results": rounds,
     }
     path = Path(args.receipt)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(
+    path.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(  # noqa: T201 - intentional command output
         "HASHMARKS MCP CONCURRENCY STRESS: " + receipt["status"] + "\n"
         f"calls: {receipt['totals']['successful_calls']}/{receipt['totals']['expected_calls']}\n"
         f"errors: {receipt['totals']['errors']}\n"

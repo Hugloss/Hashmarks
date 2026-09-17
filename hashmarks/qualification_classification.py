@@ -2,27 +2,37 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
-from typing import Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 CLASSIFICATION_SCHEMA = "hashmarks.qualification-classification.v1"
 POLICY_SCHEMA = "hashmarks.qualification-classification-policy.v1"
-ALLOWED_KINDS = frozenset({"release-correctness", "process-sensitive", "empirical-benchmark"})
+ALLOWED_KINDS = frozenset(
+    {"release-correctness", "process-sensitive", "empirical-benchmark"}
+)
 
 
 def _canonical_bytes(value: object) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
 
 
 def _identity(domain: str, value: object) -> str:
-    return "sha256:" + hashlib.sha256(
-        domain.encode() + b"\0" + _canonical_bytes(value)
-    ).hexdigest()
+    return (
+        "sha256:"
+        + hashlib.sha256(domain.encode() + b"\0" + _canonical_bytes(value)).hexdigest()
+    )
 
 
 def _validate_kind(value: object, *, context: str) -> None:
     if value not in ALLOWED_KINDS:
-        raise ValueError(f"invalid qualification classification kind in {context}: {value}")
+        raise ValueError(
+            f"invalid qualification classification kind in {context}: {value}"
+        )
 
 
 def _validate_override(row: object, seen: set[str]) -> None:
@@ -53,7 +63,9 @@ def _policy_lists(value: dict[str, object]) -> tuple[list[object], list[object]]
     overrides = value.get("node_overrides")
     rules = value.get("path_rules")
     if not isinstance(overrides, list) or not isinstance(rules, list) or not rules:
-        raise ValueError("qualification classification requires overrides and path rules")
+        raise ValueError(
+            "qualification classification requires overrides and path rules"
+        )
     return overrides, rules
 
 
@@ -61,7 +73,9 @@ def _validate_policy(value: object) -> dict[str, object]:
     if not isinstance(value, dict) or value.get("schema") != POLICY_SCHEMA:
         raise ValueError("invalid qualification classification policy")
     if value.get("unmatched_node_policy") != "fail-closed":
-        raise ValueError("qualification classification unmatched_node_policy must be fail-closed")
+        raise ValueError(
+            "qualification classification unmatched_node_policy must be fail-closed"
+        )
     overrides, rules = _policy_lists(value)
     seen_overrides: set[str] = set()
     for row in overrides:
@@ -72,7 +86,9 @@ def _validate_policy(value: object) -> dict[str, object]:
     try:
         _canonical_bytes(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError("qualification classification policy must be strict JSON-portable") from exc
+        raise ValueError(
+            "qualification classification policy must be strict JSON-portable"
+        ) from exc
     return value
 
 
@@ -92,7 +108,8 @@ def _path_rule_for_node(
 ) -> Mapping[str, object] | None:
     path = nodeid.split("::", 1)[0]
     matches = [
-        row for row in rules
+        row
+        for row in rules
         if isinstance(row, Mapping)
         and isinstance(row.get("path_prefix"), str)
         and path.startswith(str(row["path_prefix"]))
@@ -121,13 +138,19 @@ def classify_nodeids(root: Path, nodeids: Sequence[str]) -> dict[str, object]:
         if source is None:
             raise ValueError(f"unclassified qualification node: {nodeid}")
         is_override = override is not None
-        rows.append({
-            "nodeid": nodeid,
-            "kind": str(source["kind"]),
-            "preferred_granularity": str(source.get("preferred_granularity", "file")),
-            "classification_source": "node-override" if is_override else "repository-path-rule",
-            "reason": str(source.get("reason", "repository classification rule")),
-        })
+        rows.append(
+            {
+                "nodeid": nodeid,
+                "kind": str(source["kind"]),
+                "preferred_granularity": str(
+                    source.get("preferred_granularity", "file")
+                ),
+                "classification_source": "node-override"
+                if is_override
+                else "repository-path-rule",
+                "reason": str(source.get("reason", "repository classification rule")),
+            }
+        )
     payload: dict[str, object] = {
         "schema": CLASSIFICATION_SCHEMA,
         "repository_identity": repository_content_identity(root),
@@ -138,7 +161,9 @@ def classify_nodeids(root: Path, nodeids: Sequence[str]) -> dict[str, object]:
     return payload
 
 
-def classification_map(root: Path, nodeids: Sequence[str]) -> dict[str, dict[str, object]]:
+def classification_map(
+    root: Path, nodeids: Sequence[str]
+) -> dict[str, dict[str, object]]:
     artifact = classify_nodeids(root, nodeids)
     return {
         str(row["nodeid"]): dict(row)

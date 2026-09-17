@@ -15,7 +15,9 @@ def timed(fn):
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Benchmark an existing repository without generating files")
+    parser = argparse.ArgumentParser(
+        description="Benchmark an existing repository without generating files"
+    )
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--input", action="append", required=True)
     parser.add_argument("--mode", choices=("auto", "local", "daemon"), default="auto")
@@ -41,7 +43,7 @@ def main() -> None:
             },
             "identity_checks": {"hot_equals_first": last.hash == first.hash},
         }
-    print(json.dumps(result, indent=2, sort_keys=True))
+    print(json.dumps(result, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
 
 
 if __name__ == "__main__":

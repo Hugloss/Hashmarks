@@ -21,4 +21,3 @@ NO CHANGE; classification and ranking are not justified optimization targets.
 - scale selection correctness: **4/4**
 - unsafe regressions: **0**
 - 501-surface action sample: **293.26 ms**
-

@@ -17,8 +17,10 @@ def test_refs_many_high_frequency_symbol_keeps_deterministic_bounded_prefix(tmp_
         ordered = [(row["path"], row["line"]) for row in rows["shared.f"]]
         assert ordered == sorted(ordered)
         assert ordered[:4] == [
-            ("src/m0000.py", 1), ("src/m0000.py", 3),
-            ("src/m0001.py", 1), ("src/m0001.py", 3),
+            ("src/m0000.py", 1),
+            ("src/m0000.py", 3),
+            ("src/m0001.py", 1),
+            ("src/m0001.py", 3),
         ]
 
 
@@ -35,7 +37,9 @@ def test_paths_under_is_segment_safe_for_exact_and_descendant_ranges(tmp_path):
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         assert codemap.store.paths_under("src") == {
-            "src/a.py", "src/pkg/b.py", "src/å.py",
+            "src/a.py",
+            "src/pkg/b.py",
+            "src/å.py",
         }
         assert codemap.store.paths_under("src/a.py") == {"src/a.py"}
         assert codemap.store.paths_under("src2") == {"src2/not_child.py"}

@@ -38,7 +38,9 @@ def test_native_linux_watcher_observes_file_edit(tmp_path: Path):
                 break
             time.sleep(0.01)
         else:
-            raise AssertionError(f"inotify edit was not observed: {engine.changes.snapshot()}")
+            raise AssertionError(
+                f"inotify edit was not observed: {engine.changes.snapshot()}"
+            )
     finally:
         watcher.stop()
         engine.close()
@@ -84,16 +86,20 @@ def test_uv_lock_is_gitignored_local_prepared_state():
     project_root = Path(__file__).resolve().parents[1]
     ignore = (project_root / ".gitignore").read_text().splitlines()
     assert "uv.lock" in ignore
-    makefile = (project_root / "Makefile").read_text(encoding="utf-8").replace("$(UV)", "uv")
+    makefile = (
+        (project_root / "Makefile").read_text(encoding="utf-8").replace("$(UV)", "uv")
+    )
     init = makefile.split("init:\n", 1)[1].split("\nsetup:", 1)[0]
     assert "uv sync --group test" in init
     assert "--frozen" not in init
     assert "release source" not in init
 
+
 def test_daemon_request_barrier_observes_immediate_write(tmp_path: Path):
     if not sys.platform.startswith("linux"):
         pytest.skip("native inotify barrier is Linux-specific")
     import threading
+
     from hashmarks.client import IdentityClient
     from hashmarks.daemon import IdentityDaemon
 

@@ -23,10 +23,22 @@ def _write_repository_target(root: Path) -> None:
     (root / "pkg" / "helper.py").write_text("CACHE = {}\n", encoding="utf-8")
 
 
-def test_explicit_findings_do_not_read_pruned_dependency_implementation(tmp_path: Path) -> None:
+def test_explicit_findings_do_not_read_pruned_dependency_implementation(
+    tmp_path: Path,
+) -> None:
     _write_repository_target(tmp_path)
-    dependency = tmp_path / ".venv" / "lib" / "python3.13" / "site-packages" / "demo_dep" / "loader.py"
-    _write_dynamic_loader(dependency, root_expression="Path(__file__).resolve().parents[6]")
+    dependency = (
+        tmp_path
+        / ".venv"
+        / "lib"
+        / "python3.13"
+        / "site-packages"
+        / "demo_dep"
+        / "loader.py"
+    )
+    _write_dynamic_loader(
+        dependency, root_expression="Path(__file__).resolve().parents[6]"
+    )
     rel = dependency.relative_to(tmp_path).as_posix()
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
@@ -48,7 +60,9 @@ def test_explicit_findings_do_not_read_pruned_dependency_implementation(tmp_path
 def test_explicit_findings_respect_context_policy_index_denial(tmp_path: Path) -> None:
     _write_repository_target(tmp_path)
     private = tmp_path / "private" / "loader.py"
-    _write_dynamic_loader(private, root_expression="Path(__file__).resolve().parents[1]")
+    _write_dynamic_loader(
+        private, root_expression="Path(__file__).resolve().parents[1]"
+    )
     (tmp_path / ".hashmarks-context.toml").write_text(
         '[[rule]]\npattern = "private/**"\nindex = false\n',
         encoding="utf-8",

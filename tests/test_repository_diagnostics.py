@@ -14,8 +14,7 @@ def _repo(root: Path) -> None:
     (root / "src").mkdir()
     (root / "tests").mkdir()
     (root / "src" / "engine.py").write_text(
-        "def normalize_widget(value):\n"
-        "    return value.strip().lower()\n"
+        "def normalize_widget(value):\n    return value.strip().lower()\n"
     )
     (root / "tests" / "test_engine.py").write_text(
         "from src.engine import normalize_widget\n"
@@ -46,9 +45,7 @@ def test_shared_ast_propagation_audit_detects_direct_file_backed_parse(
         "    return ast.parse(source)\n"
     )
     (package / "python_ast_cache.py").write_text(
-        "import ast\n"
-        "def allowed(source):\n"
-        "    return ast.parse(source)\n"
+        "import ast\ndef allowed(source):\n    return ast.parse(source)\n"
     )
 
     result = shared_python_ast_propagation_audit(tmp_path)
@@ -107,8 +104,7 @@ def test_bounded_top_n_profile_preserves_prefix_semantics(tmp_path: Path) -> Non
     _repo(tmp_path)
     for index in range(30):
         (tmp_path / "src" / f"related_{index}.py").write_text(
-            f"def normalize_widget_{index}(value):\n"
-            "    return value.strip().lower()\n"
+            f"def normalize_widget_{index}(value):\n    return value.strip().lower()\n"
         )
 
     result = bounded_top_n_candidate_profile(
@@ -120,21 +116,19 @@ def test_bounded_top_n_profile_preserves_prefix_semantics(tmp_path: Path) -> Non
     assert result["all_bounds_respected"] is True
     assert result["prefix_semantics_equivalent"] is True
     assert [row["limit"] for row in result["profiles"]] == [3, 7, 12]
-    assert all(
-        row["result_count"] <= row["limit"]
-        for row in result["profiles"]
-    )
+    assert all(row["result_count"] <= row["limit"] for row in result["profiles"])
     assert result["availability"]["sort_operations"] is False
 
 
-def test_ownership_graph_economics_uses_authoritative_projection(tmp_path: Path) -> None:
+def test_ownership_graph_economics_uses_authoritative_projection(
+    tmp_path: Path,
+) -> None:
     from hashmarks.repository_diagnostics import ownership_graph_economics_receipt
 
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "helper.py").write_text(
-        "def normalize_widget(value):\n"
-        "    return value.strip().lower()\n"
+        "def normalize_widget(value):\n    return value.strip().lower()\n"
     )
     (tmp_path / "tests" / "test_helper.py").write_text(
         "from src.helper import normalize_widget\n"
@@ -186,7 +180,9 @@ def test_find_task_prefix_is_stable_through_agent_surface(tmp_path: Path) -> Non
         )
     state = tmp_path / "state"
     task = "consumer conformance producer identity qualified shared input"
-    with CodeMap(root, state_dir=state, artifact_db=state / "artifacts.sqlite3") as codemap:
+    with CodeMap(
+        root, state_dir=state, artifact_db=state / "artifacts.sqlite3"
+    ) as codemap:
         codemap.sync()
         five = [hit.path for hit in codemap.find_task(task, limit=5)]
         ten = [hit.path for hit in codemap.find_task(task, limit=10)]

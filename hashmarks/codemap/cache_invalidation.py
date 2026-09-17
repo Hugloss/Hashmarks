@@ -3,11 +3,15 @@
 This module parses repository Python only. It never imports repository modules,
 executes invalidators, clears cache state, or grants runtime mutation authority.
 """
+
 from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
 
 _INVALIDATION_METHODS = {"cache_clear", "clear", "invalidate", "invalidate_all"}
 
@@ -21,7 +25,9 @@ def _dotted(node: ast.AST) -> str | None:
     return None
 
 
-def _resolve_relative_module(current_package: str | None, module: str | None, level: int) -> str | None:
+def _resolve_relative_module(
+    current_package: str | None, module: str | None, level: int
+) -> str | None:
     if level == 0:
         return module
     if not current_package:
@@ -88,7 +94,9 @@ class _Visitor(ast.NodeVisitor):
         return ".".join(self.stack) if self.stack else "<module>"
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        module = _resolve_relative_module(self.current_package, node.module, int(node.level or 0))
+        module = _resolve_relative_module(
+            self.current_package, node.module, int(node.level or 0)
+        )
         if module:
             for alias in node.names:
                 if alias.name == "*":
@@ -159,7 +167,9 @@ class _Visitor(ast.NodeVisitor):
         # Inner local scopes can shadow module names. Module-scope assignments
         # define repository names, so they do not by themselves suppress a
         # proven current-module cache owner.
-        for aliases, shadowed in list(zip(self.scope_aliases, self.scope_shadowed))[:0:-1]:
+        for aliases, shadowed in list(
+            zip(self.scope_aliases, self.scope_shadowed, strict=False)
+        )[:0:-1]:
             while current in aliases and current not in seen:
                 seen.add(current)
                 current = aliases[current]
@@ -174,49 +184,60 @@ class _Visitor(ast.NodeVisitor):
     def _resolve_root_alias(self, name: str) -> str | None:
         return self._resolve_name_alias(name)
 
-    def _name_target(self,node:ast.Name)->tuple[str,str,str]|None:
-        name=self._resolve_name_alias(node.id)
+    def _name_target(self, node: ast.Name) -> tuple[str, str, str] | None:
+        name = self._resolve_name_alias(node.id)
         if name is None:
             return None
-        imported=self.symbol_imports.get(name)
+        imported = self.symbol_imports.get(name)
         if imported and imported in self.owner_keys:
-            return imported[0],imported[1],"qualified-symbol-import"
-        if self.current_module and (self.current_module,name) in self.owner_keys:
-            return self.current_module,name,"local-owner"
+            return imported[0], imported[1], "qualified-symbol-import"
+        if self.current_module and (self.current_module, name) in self.owner_keys:
+            return self.current_module, name, "local-owner"
         return None
 
-    def _qualified_target(self,node:ast.AST)->tuple[str,str,str]|None:
-        dotted=_dotted(node)
+    def _qualified_target(self, node: ast.AST) -> tuple[str, str, str] | None:
+        dotted = _dotted(node)
         if not dotted or "." not in dotted:
             return None
-        parts=dotted.split(".")
-        resolved_root=self._resolve_root_alias(parts[0])
+        parts = dotted.split(".")
+        resolved_root = self._resolve_root_alias(parts[0])
         if resolved_root is None:
             return None
-        parts[0]=resolved_root
-        prefix,owner=".".join(parts).rsplit(".",1)
-        module=self.module_imports.get(prefix,prefix if prefix in self.module_imports.values() else None)
-        if module and (module,owner) in self.owner_keys:
-            return module,owner,"qualified-module-import"
+        parts[0] = resolved_root
+        prefix, owner = ".".join(parts).rsplit(".", 1)
+        module = self.module_imports.get(
+            prefix, prefix if prefix in self.module_imports.values() else None
+        )
+        if module and (module, owner) in self.owner_keys:
+            return module, owner, "qualified-module-import"
         return None
 
-    def _target(self,node:ast.AST)->tuple[str,str,str]|None:
-        return self._name_target(node) if isinstance(node,ast.Name) else self._qualified_target(node)
+    def _target(self, node: ast.AST) -> tuple[str, str, str] | None:
+        return (
+            self._name_target(node)
+            if isinstance(node, ast.Name)
+            else self._qualified_target(node)
+        )
 
     def visit_Call(self, node: ast.Call) -> None:
-        if isinstance(node.func, ast.Attribute) and node.func.attr in _INVALIDATION_METHODS:
+        if (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr in _INVALIDATION_METHODS
+        ):
             target = self._target(node.func.value)
             if target:
                 module, owner, confidence = target
-                self.findings.append(CacheInvalidator(
-                    path=self.path,
-                    line=int(getattr(node, "lineno", 0) or 0),
-                    invalidator=self.current_owner,
-                    method=node.func.attr,
-                    target_module=module,
-                    target_owner=owner,
-                    confidence=confidence,
-                ))
+                self.findings.append(
+                    CacheInvalidator(
+                        path=self.path,
+                        line=int(getattr(node, "lineno", 0) or 0),
+                        invalidator=self.current_owner,
+                        method=node.func.attr,
+                        target_module=module,
+                        target_owner=owner,
+                        confidence=confidence,
+                    )
+                )
         self.generic_visit(node)
 
 
@@ -250,6 +271,13 @@ def analyze_python_cache_invalidators(
     # duplicate authority edges.
     unique: dict[tuple[object, ...], CacheInvalidator] = {}
     for item in visitor.findings:
-        key = (item.path, item.line, item.invalidator, item.method, item.target_module, item.target_owner)
+        key = (
+            item.path,
+            item.line,
+            item.invalidator,
+            item.method,
+            item.target_module,
+            item.target_owner,
+        )
         unique[key] = item
     return tuple(unique[key] for key in sorted(unique))

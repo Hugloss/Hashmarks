@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -15,6 +15,9 @@ from scripts.benchmark_shards_lib import (
     run_next,
     write_manifest,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _worker(path: Path) -> Path:
@@ -55,13 +58,16 @@ def test_resume_executes_one_atomic_shard_at_a_time(tmp_path: Path) -> None:
 def test_incomplete_shard_is_never_sealed(tmp_path: Path) -> None:
     worker = tmp_path / "bad.py"
     worker.write_text(
-        "import json,sys\n"
-        "json.dump([{'id':'only-one'}], open(sys.argv[3],'w'))\n"
+        "import json,sys\njson.dump([{'id':'only-one'}], open(sys.argv[3],'w'))\n"
     )
     out = tmp_path / "run"
     write_manifest(
         out,
-        create_manifest(total=3, shard_size=3, command=[sys.executable, str(worker), "{start}", "{end}", "{output}"]),
+        create_manifest(
+            total=3,
+            shard_size=3,
+            command=[sys.executable, str(worker), "{start}", "{end}", "{output}"],
+        ),
     )
     with pytest.raises(ValueError, match="row count mismatch"):
         run_next(out)
@@ -74,7 +80,11 @@ def test_merge_rejects_partial_coverage(tmp_path: Path) -> None:
     out = tmp_path / "run"
     write_manifest(
         out,
-        create_manifest(total=4, shard_size=2, command=[sys.executable, str(worker), "{start}", "{end}", "{output}"]),
+        create_manifest(
+            total=4,
+            shard_size=2,
+            command=[sys.executable, str(worker), "{start}", "{end}", "{output}"],
+        ),
     )
     run_next(out)
     with pytest.raises(ValueError, match="cannot merge incomplete benchmark"):
@@ -83,19 +93,26 @@ def test_merge_rejects_partial_coverage(tmp_path: Path) -> None:
 
 def test_manifest_is_immutable(tmp_path: Path) -> None:
     out = tmp_path / "run"
-    first = create_manifest(total=4, shard_size=2, command=["worker", "{start}", "{end}", "{output}"])
+    first = create_manifest(
+        total=4, shard_size=2, command=["worker", "{start}", "{end}", "{output}"]
+    )
     write_manifest(out, first)
-    second = create_manifest(total=4, shard_size=1, command=["worker", "{start}", "{end}", "{output}"])
+    second = create_manifest(
+        total=4, shard_size=1, command=["worker", "{start}", "{end}", "{output}"]
+    )
     with pytest.raises(ValueError, match="manifest differs"):
         write_manifest(out, second)
 
 
 def test_warmup_is_explicit_and_required(tmp_path: Path) -> None:
     from scripts.benchmark_shards_lib import run_warmup, warmup_complete
+
     worker = _worker(tmp_path / "worker.py")
     warm = tmp_path / "warm.py"
     marker = tmp_path / "did-warm"
-    warm.write_text(f"from pathlib import Path\nPath({str(marker)!r}).write_text('ok')\n")
+    warm.write_text(
+        f"from pathlib import Path\nPath({str(marker)!r}).write_text('ok')\n"
+    )
     out = tmp_path / "run"
     write_manifest(
         out,
@@ -118,6 +135,7 @@ def test_warmup_is_explicit_and_required(tmp_path: Path) -> None:
 
 def test_manifest_identity_binds_sealed_shards(tmp_path: Path) -> None:
     from scripts.benchmark_shards_lib import manifest_identity
+
     worker = _worker(tmp_path / "worker.py")
     out = tmp_path / "run"
     manifest = create_manifest(

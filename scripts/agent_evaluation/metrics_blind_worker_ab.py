@@ -1,10 +1,11 @@
+# Imports below follow the standalone script path bootstrap.
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,12 +16,16 @@ _REPO_ROOT = _SCRIPTS_DIR.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from hashmarks.codemap import CodeMap
+from hashmarks.codemap import (
+    CodeMap,
+)
 
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from .metrics_fresh_multi_repo import materialize_fixture
+from .metrics_fresh_multi_repo import (
+    materialize_fixture,
+)
 
 SCHEMA = "hashmarks.blind-worker-ab.v2"
 PROTOCOL_SCHEMA = "hashmarks.blind-worker-ab-protocol.v2"
@@ -34,7 +39,9 @@ def _sha256_bytes(value: bytes) -> str:
 
 
 def _identity(value: object) -> str:
-    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    payload = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
     return _sha256_bytes(payload)
 
 
@@ -50,7 +57,10 @@ def _load_corpus(path: Path) -> list[dict[str, Any]]:
 
 def _public_tasks(corpus: Path) -> list[dict[str, str]]:
     return [
-        {"id": str(row.get("id") or row.get("query") or "task"), "query": str(row.get("query") or "")}
+        {
+            "id": str(row.get("id") or row.get("query") or "task"),
+            "query": str(row.get("query") or ""),
+        }
         for row in _load_corpus(corpus)
     ]
 
@@ -89,20 +99,36 @@ def _grep_worker(workspace: Path, query: str, *, limit: int) -> list[dict[str, o
     return rows[:limit]
 
 
-def _hashmarks_worker(codemap: CodeMap, query: str, *, limit: int) -> list[dict[str, object]]:
+def _hashmarks_worker(
+    codemap: CodeMap, query: str, *, limit: int
+) -> list[dict[str, object]]:
     return [
-        {"path": hit.path, "score": hit.score, "kind": hit.kind, "name": hit.name, "qualname": hit.qualname}
+        {
+            "path": hit.path,
+            "score": hit.score,
+            "kind": hit.kind,
+            "name": hit.name,
+            "qualname": hit.qualname,
+        }
         for hit in codemap.find_task(query, limit=limit)
     ]
 
 
-def _entry_points_worker(codemap: CodeMap, query: str, *, limit: int) -> list[dict[str, object]]:
+def _entry_points_worker(
+    codemap: CodeMap, query: str, *, limit: int
+) -> list[dict[str, object]]:
     value = codemap.task_entry_points(query, limit=limit)
     ambiguity = value.get("ambiguity", {})
-    ambiguous = bool(ambiguity.get("ambiguous")) if isinstance(ambiguity, dict) else False
-    ambiguity_roles = list(ambiguity.get("explicit_roles", [])) if isinstance(ambiguity, dict) else []
+    ambiguous = (
+        bool(ambiguity.get("ambiguous")) if isinstance(ambiguity, dict) else False
+    )
+    ambiguity_roles = (
+        list(ambiguity.get("explicit_roles", [])) if isinstance(ambiguity, dict) else []
+    )
     canonical = value["canonical"]
-    canonical_by_path = {str(row.get("path") or ""): row for row in canonical if isinstance(row, dict)}
+    canonical_by_path = {
+        str(row.get("path") or ""): row for row in canonical if isinstance(row, dict)
+    }
     rows: list[dict[str, object]] = []
     seen: set[str] = set()
     for entry in value["recommended"]:
@@ -113,7 +139,17 @@ def _entry_points_worker(codemap: CodeMap, query: str, *, limit: int) -> list[di
             continue
         seen.add(path)
         base = canonical_by_path.get(path, {})
-        rows.append({"path": path, "score": base.get("score"), "kind": base.get("kind"), "worker_role": entry.get("role"), "canonical_rank": entry.get("canonical_rank"), "ambiguous": ambiguous, "ambiguity_roles": ambiguity_roles})
+        rows.append(
+            {
+                "path": path,
+                "score": base.get("score"),
+                "kind": base.get("kind"),
+                "worker_role": entry.get("role"),
+                "canonical_rank": entry.get("canonical_rank"),
+                "ambiguous": ambiguous,
+                "ambiguity_roles": ambiguity_roles,
+            }
+        )
     for row in canonical:
         if not isinstance(row, dict):
             continue
@@ -121,12 +157,24 @@ def _entry_points_worker(codemap: CodeMap, query: str, *, limit: int) -> list[di
         if not path or path in seen:
             continue
         seen.add(path)
-        rows.append({"path": path, "score": row.get("score"), "kind": row.get("kind"), "worker_role": "canonical-remainder", "ambiguous": ambiguous, "ambiguity_roles": ambiguity_roles})
+        rows.append(
+            {
+                "path": path,
+                "score": row.get("score"),
+                "kind": row.get("kind"),
+                "worker_role": "canonical-remainder",
+                "ambiguous": ambiguous,
+                "ambiguity_roles": ambiguity_roles,
+            }
+        )
         if len(rows) >= limit:
             break
     return rows[:limit]
 
-def _ambiguity_reviewer(codemap: CodeMap, query: str, *, limit: int) -> dict[str, object]:
+
+def _ambiguity_reviewer(
+    codemap: CodeMap, query: str, *, limit: int
+) -> dict[str, object]:
     """Independent reviewer: inspect task/repository evidence, never worker-A output or hidden answers."""
     value = codemap.task_entry_points(query, limit=limit)
     ambiguity = value.get("ambiguity", {})
@@ -136,11 +184,13 @@ def _ambiguity_reviewer(codemap: CodeMap, query: str, *, limit: int) -> dict[str
     for row in ambiguity.get("alternatives", []):
         if not isinstance(row, dict):
             continue
-        alternatives.append({
-            "role": row.get("role"),
-            "path": row.get("path"),
-            "canonical_rank": row.get("canonical_rank"),
-        })
+        alternatives.append(
+            {
+                "role": row.get("role"),
+                "path": row.get("path"),
+                "canonical_rank": row.get("canonical_rank"),
+            }
+        )
     return {
         "ambiguous": bool(ambiguity.get("ambiguous")),
         "reason": ambiguity.get("reason"),
@@ -148,7 +198,10 @@ def _ambiguity_reviewer(codemap: CodeMap, query: str, *, limit: int) -> dict[str
         "alternatives": alternatives,
     }
 
-def run_worker(*, strategy: str, workspace: Path, tasks_path: Path, output: Path, limit: int) -> None:
+
+def run_worker(
+    *, strategy: str, workspace: Path, tasks_path: Path, output: Path, limit: int
+) -> None:
     payload = json.loads(tasks_path.read_text(encoding="utf-8"))
     if payload.get("schema") != "hashmarks.blind-worker-tasks.v1":
         raise ValueError("unsupported blind worker input")
@@ -181,9 +234,15 @@ def run_worker(*, strategy: str, workspace: Path, tasks_path: Path, output: Path
         rows.append({"id": task_id, "query": query, "hits": hits})
     if codemap is not None:
         codemap.close()
-    rendered = {"schema": "hashmarks.blind-worker-output.v1", "strategy": strategy, "tasks": rows}
+    rendered = {
+        "schema": "hashmarks.blind-worker-output.v1",
+        "strategy": strategy,
+        "tasks": rows,
+    }
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(rendered, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.write_text(
+        json.dumps(rendered, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _inject_decoys(workspace: Path, tasks: list[dict[str, str]]) -> None:
@@ -212,15 +271,26 @@ def materialize_challenge(root: Path) -> list[tuple[str, Path, Path, Path]]:
         public_path = root / "blind-inputs" / f"{name}.json"
         public_path.parent.mkdir(parents=True, exist_ok=True)
         public_path.write_text(
-            json.dumps({"schema": "hashmarks.blind-worker-tasks.v1", "tasks": public}, indent=2, sort_keys=True) + "\n",
+            json.dumps(
+                {"schema": "hashmarks.blind-worker-tasks.v1", "tasks": public},
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
             encoding="utf-8",
         )
         result.append((name, workspace, corpus, public_path))
     return result
 
 
-def _score_strategy(tasks: list[dict[str, Any]], output: dict[str, Any]) -> dict[str, object]:
-    by_id = {str(row.get("id") or ""): row for row in output.get("tasks", []) if isinstance(row, dict)}
+def _score_strategy(
+    tasks: list[dict[str, Any]], output: dict[str, Any]
+) -> dict[str, object]:
+    by_id = {
+        str(row.get("id") or ""): row
+        for row in output.get("tasks", [])
+        if isinstance(row, dict)
+    }
     rows = []
     for task in tasks:
         task_id = str(task.get("id") or task.get("query") or "")
@@ -231,34 +301,43 @@ def _score_strategy(tasks: list[dict[str, Any]], output: dict[str, Any]) -> dict
         top1 = bool(expected.intersection(paths[:1]))
         top5 = bool(expected.intersection(paths[:5]))
         top20 = expected.issubset(set(paths[:20]))
-        first_expected_rank = next((idx + 1 for idx, path in enumerate(paths) if path in expected), None)
+        first_expected_rank = next(
+            (idx + 1 for idx, path in enumerate(paths) if path in expected), None
+        )
         first_hit_row = hits[0] if hits and isinstance(hits[0], dict) else {}
         ambiguous = bool(first_hit_row.get("ambiguous"))
         ambiguity_roles = list(first_hit_row.get("ambiguity_roles") or [])
-        rows.append({
-            "id": task_id,
-            "query": str(task.get("query") or ""),
-            "expected_files": sorted(expected),
-            "top1": top1,
-            "top5": top5,
-            "top20_all_expected": top20,
-            "first_expected_rank": first_expected_rank,
-            "first_hit": paths[0] if paths else None,
-            "ambiguous": ambiguous,
-            "ambiguity_roles": ambiguity_roles,
-        })
+        rows.append(
+            {
+                "id": task_id,
+                "query": str(task.get("query") or ""),
+                "expected_files": sorted(expected),
+                "top1": top1,
+                "top5": top5,
+                "top20_all_expected": top20,
+                "first_expected_rank": first_expected_rank,
+                "first_hit": paths[0] if paths else None,
+                "ambiguous": ambiguous,
+                "ambiguity_roles": ambiguity_roles,
+            }
+        )
     count = len(rows)
     return {
         "summary": {
             "tasks": count,
             "top1_rate": sum(bool(row["top1"]) for row in rows) / count,
             "top5_rate": sum(bool(row["top5"]) for row in rows) / count,
-            "top20_all_expected_rate": sum(bool(row["top20_all_expected"]) for row in rows) / count,
+            "top20_all_expected_rate": sum(
+                bool(row["top20_all_expected"]) for row in rows
+            )
+            / count,
             "failures_top1": sum(not bool(row["top1"]) for row in rows),
             "failures_top5": sum(not bool(row["top5"]) for row in rows),
             "failures_top20": sum(not bool(row["top20_all_expected"]) for row in rows),
             "ambiguous_tasks": sum(bool(row["ambiguous"]) for row in rows),
-            "top1_failures_flagged_ambiguous": sum((not bool(row["top1"])) and bool(row["ambiguous"]) for row in rows),
+            "top1_failures_flagged_ambiguous": sum(
+                (not bool(row["top1"])) and bool(row["ambiguous"]) for row in rows
+            ),
             "top1_failure_ambiguity_recall": (
                 sum((not bool(row["top1"])) and bool(row["ambiguous"]) for row in rows)
                 / max(1, sum(not bool(row["top1"]) for row in rows))
@@ -278,11 +357,30 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
             env = dict(__import__("os").environ)
             source_root = str(Path(__file__).resolve().parent.parent.parent)
             prior = env.get("PYTHONPATH")
-            env["PYTHONPATH"] = source_root if not prior else source_root + __import__("os").pathsep + prior
+            env["PYTHONPATH"] = (
+                source_root
+                if not prior
+                else source_root + __import__("os").pathsep + prior
+            )
             subprocess.run(
-                [sys.executable, "-m", "scripts.agent_evaluation.metrics_blind_worker_ab", "--worker", "--strategy", strategy,
-                 "--workspace", str(workspace), "--tasks", str(public_path), "--output", str(output), "--limit", str(limit)],
-                check=True, env=env,
+                [
+                    sys.executable,
+                    "-m",
+                    "scripts.agent_evaluation.metrics_blind_worker_ab",
+                    "--worker",
+                    "--strategy",
+                    strategy,
+                    "--workspace",
+                    str(workspace),
+                    "--tasks",
+                    str(public_path),
+                    "--output",
+                    str(output),
+                    "--limit",
+                    str(limit),
+                ],
+                check=True,
+                env=env,
             )
             outputs[strategy] = output
         # Hidden expectations are opened only after both workers have exited and
@@ -291,24 +389,29 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
         grep_output = json.loads(outputs["grep"].read_text(encoding="utf-8"))
         hashmarks_output = json.loads(outputs["hashmarks"].read_text(encoding="utf-8"))
         entry_output = json.loads(outputs["entry-points"].read_text(encoding="utf-8"))
-        reviewer_output = json.loads(outputs["ambiguity-reviewer"].read_text(encoding="utf-8"))
+        reviewer_output = json.loads(
+            outputs["ambiguity-reviewer"].read_text(encoding="utf-8")
+        )
         grep_score = _score_strategy(tasks, grep_output)
         hashmarks_score = _score_strategy(tasks, hashmarks_output)
         entry_score = _score_strategy(tasks, entry_output)
         reviewer_by_id = {
             str(row.get("id") or ""): row.get("review", {})
-            for row in reviewer_output.get("tasks", []) if isinstance(row, dict)
+            for row in reviewer_output.get("tasks", [])
+            if isinstance(row, dict)
         }
-        repo_reports.append({
-            "name": name,
-            "workspace": str(workspace),
-            "public_task_sha256": _sha256_bytes(public_path.read_bytes()),
-            "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
-            "grep": grep_score,
-            "hashmarks": hashmarks_score,
-            "entry_points": entry_score,
-            "ambiguity_reviewer": reviewer_by_id,
-        })
+        repo_reports.append(
+            {
+                "name": name,
+                "workspace": str(workspace),
+                "public_task_sha256": _sha256_bytes(public_path.read_bytes()),
+                "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
+                "grep": grep_score,
+                "hashmarks": hashmarks_score,
+                "entry_points": entry_score,
+                "ambiguity_reviewer": reviewer_by_id,
+            }
+        )
 
     def aggregate(strategy: str, key: str) -> float:
         values = []
@@ -320,17 +423,28 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
             values.extend([float(summary[key])] * int(summary["tasks"]))
         return sum(values) / len(values) if values else 0.0
 
-    total_tasks = sum(int(repo["hashmarks"]["summary"]["tasks"]) for repo in repo_reports)  # type: ignore[index]
+    total_tasks = sum(
+        int(repo["hashmarks"]["summary"]["tasks"]) for repo in repo_reports
+    )  # type: ignore[index]
     protocol = {
         "schema": PROTOCOL_SCHEMA,
         "family": CHALLENGE_FAMILY,
         "worker_isolation": "subprocess-per-repository-strategy",
         "worker_input_fields": ["id", "query"],
         "hidden_fields": ["expected_files", "expected_symbols"],
-        "strategies": ["grep", "hashmarks.find_task", "hashmarks.task_entry_points", "hashmarks.ambiguity_reviewer"],
+        "strategies": [
+            "grep",
+            "hashmarks.find_task",
+            "hashmarks.task_entry_points",
+            "hashmarks.ambiguity_reviewer",
+        ],
         "limit": limit,
         "repositories": [
-            {"name": repo["name"], "public_task_sha256": repo["public_task_sha256"], "hidden_corpus_sha256": repo["hidden_corpus_sha256"]}
+            {
+                "name": repo["name"],
+                "public_task_sha256": repo["public_task_sha256"],
+                "hidden_corpus_sha256": repo["hidden_corpus_sha256"],
+            }
             for repo in repo_reports
         ],
     }
@@ -361,14 +475,24 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
         for row in entry_tasks:
             if not isinstance(row, dict):
                 continue
-            review = reviews.get(str(row.get("id") or ""), {}) if isinstance(reviews, dict) else {}
-            warned = bool(review.get("ambiguous")) if isinstance(review, dict) else False
+            review = (
+                reviews.get(str(row.get("id") or ""), {})
+                if isinstance(reviews, dict)
+                else {}
+            )
+            warned = (
+                bool(review.get("ambiguous")) if isinstance(review, dict) else False
+            )
             failed = not bool(row.get("top1"))
-            reviewer_rows.append({"id": row.get("id"), "failed": failed, "warned": warned})
+            reviewer_rows.append(
+                {"id": row.get("id"), "failed": failed, "warned": warned}
+            )
     reviewer_failures = [row for row in reviewer_rows if row["failed"]]
     reviewer_successes = [row for row in reviewer_rows if not row["failed"]]
     reviewer_warnings = [row for row in reviewer_rows if row["warned"]]
-    reviewer_true_warnings = [row for row in reviewer_rows if row["warned"] and row["failed"]]
+    reviewer_true_warnings = [
+        row for row in reviewer_rows if row["warned"] and row["failed"]
+    ]
     return {
         "schema": SCHEMA,
         "protocol": protocol,
@@ -401,13 +525,20 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
             ),
             "reviewer_spawn": "independent-subprocess-per-repository",
             "reviewer_top1_failure_recall": (
-                len(reviewer_true_warnings) / len(reviewer_failures) if reviewer_failures else 1.0
+                len(reviewer_true_warnings) / len(reviewer_failures)
+                if reviewer_failures
+                else 1.0
             ),
             "reviewer_success_false_positive_rate": (
-                sum(row["warned"] for row in reviewer_successes) / len(reviewer_successes) if reviewer_successes else 0.0
+                sum(row["warned"] for row in reviewer_successes)
+                / len(reviewer_successes)
+                if reviewer_successes
+                else 0.0
             ),
             "reviewer_warning_precision": (
-                len(reviewer_true_warnings) / len(reviewer_warnings) if reviewer_warnings else 1.0
+                len(reviewer_true_warnings) / len(reviewer_warnings)
+                if reviewer_warnings
+                else 1.0
             ),
             "reviewer_warnings": len(reviewer_warnings),
         },
@@ -416,9 +547,14 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run answer-blind subprocess worker A/B localization benchmark")
+    parser = argparse.ArgumentParser(
+        description="Run answer-blind subprocess worker A/B localization benchmark"
+    )
     parser.add_argument("--worker", action="store_true")
-    parser.add_argument("--strategy", choices=["grep", "hashmarks", "entry-points", "ambiguity-reviewer"])
+    parser.add_argument(
+        "--strategy",
+        choices=["grep", "hashmarks", "entry-points", "ambiguity-reviewer"],
+    )
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--tasks", type=Path)
     parser.add_argument("--root", type=Path)
@@ -426,9 +562,20 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=20)
     args = parser.parse_args()
     if args.worker:
-        if args.strategy is None or args.workspace is None or args.tasks is None or args.output is None:
+        if (
+            args.strategy is None
+            or args.workspace is None
+            or args.tasks is None
+            or args.output is None
+        ):
             parser.error("worker mode requires --strategy --workspace --tasks --output")
-        run_worker(strategy=args.strategy, workspace=args.workspace, tasks_path=args.tasks, output=args.output, limit=args.limit)
+        run_worker(
+            strategy=args.strategy,
+            workspace=args.workspace,
+            tasks_path=args.tasks,
+            output=args.output,
+            limit=args.limit,
+        )
         return
     if args.root is None:
         parser.error("benchmark mode requires --root")
@@ -437,7 +584,7 @@ def main() -> None:
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)
+    print(rendered)  # noqa: T201 - intentional command output
 
 
 if __name__ == "__main__":

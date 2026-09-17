@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -38,7 +39,16 @@ def find_gradle(workspace: Path) -> str | None:
 def _manifest_candidates(workspace: Path, project_root: Path) -> tuple[str, ...]:
     values: list[str] = []
     for base, names in (
-        (workspace, ("settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts", "gradle.properties")),
+        (
+            workspace,
+            (
+                "settings.gradle",
+                "settings.gradle.kts",
+                "build.gradle",
+                "build.gradle.kts",
+                "gradle.properties",
+            ),
+        ),
         (project_root, ("build.gradle", "build.gradle.kts", "gradle.properties")),
         (workspace / "gradle", ("libs.versions.toml",)),
     ):
@@ -52,11 +62,18 @@ def _manifest_candidates(workspace: Path, project_root: Path) -> tuple[str, ...]
     return tuple(dict.fromkeys(values))
 
 
-def collect_gradle_projects(workspace: Path, *, executable: str | None = None, timeout: float = 60.0) -> GradleSnapshot:
+def collect_gradle_projects(
+    workspace: Path, *, executable: str | None = None, timeout: float = 60.0
+) -> GradleSnapshot:
     gradle = executable or find_gradle(workspace)
     if gradle is None:
-        return GradleSnapshot(None, warnings=("Gradle settings/build detected but gradle/gradlew is unavailable",))
-    script = r'''
+        return GradleSnapshot(
+            None,
+            warnings=(
+                "Gradle settings/build detected but gradle/gradlew is unavailable",
+            ),
+        )
+    script = r"""
 import groovy.json.JsonOutput
 
 gradle.projectsEvaluated {
@@ -80,42 +97,53 @@ gradle.projectsEvaluated {
     }
     println('__HASHMARKS_GRADLE_JSON__' + JsonOutput.toJson(rows))
 }
-'''.strip()
+""".strip()
     temp_path: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile("w", suffix=".gradle", prefix="hashmarks-", delete=False, encoding="utf-8") as handle:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".gradle", prefix="hashmarks-", delete=False, encoding="utf-8"
+        ) as handle:
             handle.write(script)
             temp_path = Path(handle.name)
         completed = subprocess.run(
             [gradle, "--no-daemon", "-q", "-I", str(temp_path), "help"],
             cwd=workspace,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=timeout,
             check=False,
             env=dict(os.environ),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return GradleSnapshot(gradle, warnings=(f"Gradle project report failed: {exc}",))
+        return GradleSnapshot(
+            gradle, warnings=(f"Gradle project report failed: {exc}",)
+        )
     finally:
         if temp_path is not None:
-            try:
+            with contextlib.suppress(OSError):
                 temp_path.unlink(missing_ok=True)
-            except OSError:
-                pass
     if completed.returncode != 0:
-        detail = completed.stderr.strip().splitlines()[-1] if completed.stderr.strip() else f"exit {completed.returncode}"
-        return GradleSnapshot(gradle, warnings=(f"Gradle project report failed: {detail}",))
+        detail = (
+            completed.stderr.strip().splitlines()[-1]
+            if completed.stderr.strip()
+            else f"exit {completed.returncode}"
+        )
+        return GradleSnapshot(
+            gradle, warnings=(f"Gradle project report failed: {detail}",)
+        )
     payload = None
     for line in completed.stdout.splitlines():
         if line.startswith(_MARKER):
             try:
-                payload = json.loads(line[len(_MARKER):])
+                payload = json.loads(line[len(_MARKER) :])
             except json.JSONDecodeError:
-                return GradleSnapshot(gradle, warnings=("Gradle project report returned invalid JSON",))
+                return GradleSnapshot(
+                    gradle, warnings=("Gradle project report returned invalid JSON",)
+                )
     if not isinstance(payload, list):
-        return GradleSnapshot(gradle, warnings=("Gradle project report marker was not emitted",))
+        return GradleSnapshot(
+            gradle, warnings=("Gradle project report marker was not emitted",)
+        )
     projects: list[GradleProjectData] = []
     for raw in payload:
         if not isinstance(raw, dict):
@@ -127,7 +155,22 @@ gradle.projectsEvaluated {
             continue
         path = str(raw.get("path") or ":")
         name = str(raw.get("name") or path.strip(":") or workspace.name)
-        deps = tuple(str(value) for value in raw.get("dependencies") or () if isinstance(value, str))
-        tasks = tuple(str(value) for value in raw.get("tasks") or () if isinstance(value, str))
-        projects.append(GradleProjectData(path, name, root, deps, tasks, _manifest_candidates(workspace, project_dir)))
+        deps = tuple(
+            str(value)
+            for value in raw.get("dependencies") or ()
+            if isinstance(value, str)
+        )
+        tasks = tuple(
+            str(value) for value in raw.get("tasks") or () if isinstance(value, str)
+        )
+        projects.append(
+            GradleProjectData(
+                path,
+                name,
+                root,
+                deps,
+                tasks,
+                _manifest_candidates(workspace, project_dir),
+            )
+        )
     return GradleSnapshot(gradle, tuple(projects))

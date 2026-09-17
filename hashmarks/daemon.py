@@ -1,21 +1,35 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import secrets
 import socket
 import socketserver
 import threading
-import secrets
-from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import TYPE_CHECKING, Any
 
 from .client import default_socket_path, default_state_dir
 from .engine import IdentityEngine
 from .inputs import InputManifest
 from .ipc_boundary import dispatch_json_request
-from .paths import canonical_host_path, has_glob, normalize_relative_path, normalize_relative_pattern
-from .schema import DAEMON_CAPABILITIES, DAEMON_PROTOCOL_VERSION, DAEMON_SEMANTICS, IDENTITY_SCHEMA
 from .observation import ObservationState
+from .paths import (
+    canonical_host_path,
+    has_glob,
+    normalize_relative_path,
+    normalize_relative_pattern,
+)
+from .schema import (
+    DAEMON_CAPABILITIES,
+    DAEMON_PROTOCOL_VERSION,
+    DAEMON_SEMANTICS,
+    IDENTITY_SCHEMA,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+    from pathlib import Path
 
 _PROTOCOL_VERSION = DAEMON_PROTOCOL_VERSION
 _MAX_REQUEST = 4 * 1024 * 1024
@@ -44,7 +58,9 @@ class _RequestHandler(socketserver.StreamRequestHandler):
         daemon: IdentityDaemon = self.server.identity_daemon  # type: ignore[attr-defined]
         raw = self.rfile.readline(_MAX_REQUEST + 1)
         if len(raw) > _MAX_REQUEST:
-            daemon._write_response(self.wfile, {"ok": False, "error": "request exceeded size limit"})
+            daemon._write_response(
+                self.wfile, {"ok": False, "error": "request exceeded size limit"}
+            )
             return
         response = dispatch_json_request(raw, daemon.dispatch)
         daemon._write_response(self.wfile, response)
@@ -98,10 +114,16 @@ class IdentityDaemon:
 
     @staticmethod
     def _write_response(stream, response: dict[str, Any]) -> None:
-        stream.write((json.dumps(response, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8"))
+        stream.write(
+            (json.dumps(response, separators=(",", ":"), sort_keys=True) + "\n").encode(
+                "utf-8"
+            )
+        )
         stream.flush()
 
-    def _manifest(self, patterns: Sequence[str], require_matches: bool) -> InputManifest:
+    def _manifest(
+        self, patterns: Sequence[str], require_matches: bool
+    ) -> InputManifest:
         normalized = tuple(normalize_relative_pattern(p) for p in patterns)
         # Exact file/directory declarations have stable membership semantics:
         # a directory node naturally absorbs new/deleted descendants. Glob
@@ -133,7 +155,9 @@ class IdentityDaemon:
                 except KeyError as exc:
                     raise KeyError(f"unknown registered manifest: {handle}") from exc
         patterns = request.get("patterns")
-        if not isinstance(patterns, list) or not all(isinstance(p, str) for p in patterns):
+        if not isinstance(patterns, list) or not all(
+            isinstance(p, str) for p in patterns
+        ):
             raise ValueError("patterns must be a list of strings")
         return self._manifest(patterns, bool(request.get("require_matches", True)))
 
@@ -149,13 +173,17 @@ class IdentityDaemon:
         paths = request.get("paths")
         if not isinstance(token, str) or token not in self._pending_manifests:
             raise KeyError("unknown pending manifest token")
-        if not isinstance(paths, list) or not all(isinstance(path, str) for path in paths):
+        if not isinstance(paths, list) or not all(
+            isinstance(path, str) for path in paths
+        ):
             raise ValueError("paths must be a list of strings")
         pending = self._pending_manifests[token]
         if len(pending) + len(paths) > _MAX_REGISTERED_MANIFEST_PATHS:
             self._pending_manifests.pop(token, None)
             raise ValueError("registered manifest exceeds path limit")
-        pending.extend(normalize_relative_path(path, allow_root=False) for path in paths)
+        pending.extend(
+            normalize_relative_path(path, allow_root=False) for path in paths
+        )
         return {"ok": True, "token": token, "received": len(pending)}
 
     def _manifest_commit(self, request: dict[str, Any]) -> dict[str, Any]:
@@ -169,12 +197,22 @@ class IdentityDaemon:
         manifest = InputManifest(tuple(sorted(set(pending))))
         existing = self._registered_manifests.get(manifest.fingerprint)
         if existing is not None:
-            self._registered_manifests[manifest.fingerprint] = (existing[0], existing[1] + 1)
+            self._registered_manifests[manifest.fingerprint] = (
+                existing[0],
+                existing[1] + 1,
+            )
         else:
             if len(self._registered_manifests) >= _MAX_REGISTERED_MANIFESTS:
-                raise RuntimeError("registered manifest handle limit reached; restart daemon or release handles")
-            if self._registered_manifest_paths + len(manifest.paths) > _MAX_TOTAL_REGISTERED_MANIFEST_PATHS:
-                raise RuntimeError("registered manifest path budget exhausted; restart daemon or release handles")
+                raise RuntimeError(
+                    "registered manifest handle limit reached; restart daemon or release handles"
+                )
+            if (
+                self._registered_manifest_paths + len(manifest.paths)
+                > _MAX_TOTAL_REGISTERED_MANIFEST_PATHS
+            ):
+                raise RuntimeError(
+                    "registered manifest path budget exhausted; restart daemon or release handles"
+                )
             self._registered_manifests[manifest.fingerprint] = (manifest, 1)
             self._registered_manifest_paths += len(manifest.paths)
         return {
@@ -192,7 +230,9 @@ class IdentityDaemon:
             return
         synchronize = getattr(watcher, "synchronize", None)
         if synchronize is None or not bool(synchronize()):
-            self.engine.mark_observer_unknown("watcher backend has no request-time observation barrier")
+            self.engine.mark_observer_unknown(
+                "watcher backend has no request-time observation barrier"
+            )
 
     def _status_response(self, _request: dict[str, Any]) -> dict[str, Any]:
         with self._request_lock:
@@ -210,9 +250,13 @@ class IdentityDaemon:
                 "observation": snapshot.state.value,
                 "generation": snapshot.generation,
                 "dirty_paths": len(snapshot.paths),
-                "watcher_backend": type(self._watcher).__name__ if self._watcher is not None else None,
+                "watcher_backend": type(self._watcher).__name__
+                if self._watcher is not None
+                else None,
                 "registered_manifests": len(self._registered_manifests),
-                "registered_manifest_references": sum(refs for _, refs in self._registered_manifests.values()),
+                "registered_manifest_references": sum(
+                    refs for _, refs in self._registered_manifests.values()
+                ),
                 "registered_manifest_paths": self._registered_manifest_paths,
                 "requests": self._request_count,
             }
@@ -244,7 +288,11 @@ class IdentityDaemon:
 
     def _stats_response(self, _request: dict[str, Any]) -> dict[str, Any]:
         with self._request_lock:
-            return {"ok": True, **self.engine.stats(), "daemon_requests": self._request_count}
+            return {
+                "ok": True,
+                **self.engine.stats(),
+                "daemon_requests": self._request_count,
+            }
 
     def _manifest_begin_response(self, _request: dict[str, Any]) -> dict[str, Any]:
         with self._request_lock:
@@ -313,10 +361,8 @@ class IdentityDaemon:
 
     def _prepare_socket(self) -> None:
         self.socket_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
+        with contextlib.suppress(OSError):
             os.chmod(self.socket_path.parent, 0o700)
-        except OSError:
-            pass
         if self.socket_path.exists() or self.socket_path.is_socket():
             probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             try:
@@ -325,7 +371,9 @@ class IdentityDaemon:
             except OSError:
                 self.socket_path.unlink(missing_ok=True)
             else:
-                raise RuntimeError(f"identity daemon already running at {self.socket_path}")
+                raise RuntimeError(
+                    f"identity daemon already running at {self.socket_path}"
+                )
             finally:
                 probe.close()
 

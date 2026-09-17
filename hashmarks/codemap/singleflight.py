@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass
-from typing import Callable, Generic, Hashable, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Hashable
 
 T = TypeVar("T")
 

@@ -4,7 +4,10 @@ import hashlib
 import json
 import shutil
 import string
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 SCHEMA = "hashmarks.large-impact-corpus.v1"
 KINDS = ("python", "typescript", "go", "polyglot")
@@ -50,7 +53,7 @@ def _noise_go(repo: Path, count: int) -> None:
         package = f"n{index // 20:05d}"
         _write(
             repo / f"noise/go/{package}/m{index:06d}.go",
-            f'package {package}\nfunc Helper{index}(value string) string {{ return value }}\n',
+            f"package {package}\nfunc Helper{index}(value string) string {{ return value }}\n",
         )
 
 
@@ -60,14 +63,17 @@ def _python_task(repo: Path, index: int, prefix: str = "Py") -> dict[str, str]:
     base = f"app/{namespace}"
     _write(repo / "app/__init__.py", "")
     _write(repo / f"{base}/__init__.py", "")
-    _write(repo / f"{base}/engine.py", f'def Resolve{token}(value: str) -> str:\n    return value + "-old"\n')
+    _write(
+        repo / f"{base}/engine.py",
+        f'def Resolve{token}(value: str) -> str:\n    return value + "-old"\n',
+    )
     _write(
         repo / f"{base}/service.py",
-        f'from .engine import Resolve{token}\n\ndef ServiceValue(value: str) -> str:\n    return Resolve{token}(value)\n',
+        f"from .engine import Resolve{token}\n\ndef ServiceValue(value: str) -> str:\n    return Resolve{token}(value)\n",
     )
     _write(
         repo / f"{base}/route.py",
-        f'from .service import ServiceValue\n\ndef Route{token}(value: str) -> str:\n    return ServiceValue(value)\n',
+        f"from .service import ServiceValue\n\ndef Route{token}(value: str) -> str:\n    return ServiceValue(value)\n",
     )
     verify = f"tests/test_{token.lower()}.py"
     _write(
@@ -87,7 +93,10 @@ def _typescript_task(repo: Path, index: int, prefix: str = "Ts") -> dict[str, st
     token = f"VelvetHarbor{prefix}{_word(index)}"
     namespace = f"{prefix.lower()}_{_word(index).lower()}"
     base = f"src/{namespace}"
-    _write(repo / f"{base}/engine.ts", f'export function Resolve{token}(value: string) {{ return value + "-old"; }}\n')
+    _write(
+        repo / f"{base}/engine.ts",
+        f'export function Resolve{token}(value: string) {{ return value + "-old"; }}\n',
+    )
     _write(
         repo / f"{base}/service.ts",
         f'import {{ Resolve{token} }} from "./engine.js";\nexport function ServiceValue(value: string) {{ return Resolve{token}(value); }}\n',
@@ -114,7 +123,10 @@ def _go_task(repo: Path, index: int, prefix: str = "Go") -> dict[str, str]:
     token = f"CobaltRidge{prefix}{_word(index)}"
     namespace = f"{prefix.lower()}{_word(index).lower()}"
     base = f"cases/{namespace}"
-    _write(repo / f"{base}/engine/engine.go", f'package engine\nfunc Resolve{token}(value string) string {{ return value + "-old" }}\n')
+    _write(
+        repo / f"{base}/engine/engine.go",
+        f'package engine\nfunc Resolve{token}(value string) string {{ return value + "-old" }}\n',
+    )
     _write(
         repo / f"{base}/service/service.go",
         f'package service\nimport "example.local/large/{base}/engine"\nfunc ServiceValue(value string) string {{ return engine.Resolve{token}(value) }}\n',
@@ -150,22 +162,31 @@ def generate(
         raise ValueError(f"unsupported kind: {kind}")
     if noise_files < 0 or tasks < 1:
         raise ValueError("noise_files must be >= 0 and tasks must be >= 1")
-    repo = repo.resolve(); public_path = public_path.resolve(); secret_path = secret_path.resolve()
+    repo = repo.resolve()
+    public_path = public_path.resolve()
+    secret_path = secret_path.resolve()
     for external in (public_path, secret_path):
         try:
             external.relative_to(repo)
         except ValueError:
             pass
         else:
-            raise ValueError("PUBLIC and SECRET corpus files must live outside the worker repository")
+            raise ValueError(
+                "PUBLIC and SECRET corpus files must live outside the worker repository"
+            )
     shutil.rmtree(repo, ignore_errors=True)
     repo.mkdir(parents=True)
 
     if kind in {"python", "polyglot"}:
-        _write(repo / "pyproject.toml", '[tool.pytest.ini_options]\ntestpaths=["tests"]\n')
+        _write(
+            repo / "pyproject.toml", '[tool.pytest.ini_options]\ntestpaths=["tests"]\n'
+        )
     if kind in {"typescript", "polyglot"}:
         _write(repo / "package.json", '{"type":"module"}\n')
-        _write(repo / "tsconfig.json", '{"compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext","target":"ES2022"},"include":["src/**/*.ts","tests/**/*.ts"]}\n')
+        _write(
+            repo / "tsconfig.json",
+            '{"compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext","target":"ES2022"},"include":["src/**/*.ts","tests/**/*.ts"]}\n',
+        )
     if kind in {"go", "polyglot"}:
         _write(repo / "go.mod", "module example.local/large\n\ngo 1.23\n")
 
@@ -181,19 +202,31 @@ def generate(
         rows = [_go_task(repo, index) for index in range(tasks)]
     else:
         each = noise_files // 3
-        _noise_python(repo, each); _noise_typescript(repo, each); _noise_go(repo, noise_files - (2 * each))
+        _noise_python(repo, each)
+        _noise_typescript(repo, each)
+        _noise_go(repo, noise_files - (2 * each))
         for index in range(tasks):
             maker = (_python_task, _typescript_task, _go_task)[index % 3]
             rows.append(maker(repo, index, "Mix"))
 
-    public = {"schema": SCHEMA, "tasks": [{"id": row["id"], "query": row["query"]} for row in rows]}
-    secret = {"schema": SCHEMA, "tasks": [
-        {key: value for key, value in row.items() if key != "query"}
-        for row in rows
-    ]}
-    public_path.parent.mkdir(parents=True, exist_ok=True); secret_path.parent.mkdir(parents=True, exist_ok=True)
-    public_path.write_text(json.dumps(public, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    secret_path.write_text(json.dumps(secret, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    public = {
+        "schema": SCHEMA,
+        "tasks": [{"id": row["id"], "query": row["query"]} for row in rows],
+    }
+    secret = {
+        "schema": SCHEMA,
+        "tasks": [
+            {key: value for key, value in row.items() if key != "query"} for row in rows
+        ],
+    }
+    public_path.parent.mkdir(parents=True, exist_ok=True)
+    secret_path.parent.mkdir(parents=True, exist_ok=True)
+    public_path.write_text(
+        json.dumps(public, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    secret_path.write_text(
+        json.dumps(secret, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return {
         "schema": "hashmarks.large-impact-corpus-manifest.v1",
         "kind": kind,

@@ -5,7 +5,14 @@ import hashlib
 import json
 from dataclasses import dataclass
 
-from .model import CODEMAP_SCHEMA, EdgeRecord, LexicalRecord, PYTHON_PARSER, ParsedArtifact, SymbolRecord
+from .model import (
+    CODEMAP_SCHEMA,
+    PYTHON_PARSER,
+    EdgeRecord,
+    LexicalRecord,
+    ParsedArtifact,
+    SymbolRecord,
+)
 
 
 def estimate_tokens(text: str) -> int:
@@ -52,7 +59,11 @@ def _string_annotation_targets(value: str) -> tuple[str, ...]:
         return _annotation_targets(ast.parse(value, mode="eval").body)
     except (SyntaxError, ValueError):
         stripped = value.strip()
-        return (stripped,) if stripped and all(part.isidentifier() for part in stripped.split(".")) else ()
+        return (
+            (stripped,)
+            if stripped and all(part.isidentifier() for part in stripped.split("."))
+            else ()
+        )
 
 
 def _iterable_annotation_targets(nodes) -> tuple[str, ...]:
@@ -76,7 +87,11 @@ def _annotation_targets(node: ast.AST | None) -> tuple[str, ...]:
     if node is None:
         return ()
     if isinstance(node, ast.Constant):
-        return _string_annotation_targets(node.value) if isinstance(node.value, str) else ()
+        return (
+            _string_annotation_targets(node.value)
+            if isinstance(node.value, str)
+            else ()
+        )
     target = _target_name(node)
     return (target,) if target is not None else _compound_annotation_targets(node)
 
@@ -94,40 +109,59 @@ class _Collector(ast.NodeVisitor):
     def current(self) -> str | None:
         return ".".join(self.stack) if self.stack else None
 
-    def _symbol_record(self,node,kind,qualname,signature,span)->SymbolRecord:
-        start,end=span
+    def _symbol_record(self, node, kind, qualname, signature, span) -> SymbolRecord:
+        start, end = span
         body = "\n".join(self.source.splitlines()[start - 1 : end])
         return SymbolRecord(
-            name=node.name,qualname=qualname,kind=kind,signature=signature,
-            start_line=start,end_line=end,signature_tokens=estimate_tokens(signature),
-            body_tokens=estimate_tokens(body),parent=self.current,
+            name=node.name,
+            qualname=qualname,
+            kind=kind,
+            signature=signature,
+            start_line=start,
+            end_line=end,
+            signature_tokens=estimate_tokens(signature),
+            body_tokens=estimate_tokens(body),
+            parent=self.current,
         )
 
-    def _function_annotation_edges(self,node,qualname,start)->None:
+    def _function_annotation_edges(self, node, qualname, start) -> None:
         for target in _annotation_targets(node.returns):
-            self.edges.append(EdgeRecord(qualname,"return-type",target,start,"annotation"))
-        positional=[*node.args.posonlyargs,*node.args.args,*node.args.kwonlyargs]
-        positional.extend(arg for arg in (node.args.vararg,node.args.kwarg) if arg is not None)
+            self.edges.append(
+                EdgeRecord(qualname, "return-type", target, start, "annotation")
+            )
+        positional = [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]
+        positional.extend(
+            arg for arg in (node.args.vararg, node.args.kwarg) if arg is not None
+        )
         for arg in positional:
-            line=int(getattr(arg,"lineno",start))
+            line = int(getattr(arg, "lineno", start))
             for target in _annotation_targets(arg.annotation):
-                self.edges.append(EdgeRecord(qualname,"parameter-type",target,line,"annotation"))
+                self.edges.append(
+                    EdgeRecord(qualname, "parameter-type", target, line, "annotation")
+                )
 
-    def _annotation_edges(self,node,qualname,start)->None:
-        if isinstance(node,ast.ClassDef):
+    def _annotation_edges(self, node, qualname, start) -> None:
+        if isinstance(node, ast.ClassDef):
             for base in node.bases:
                 for target in _annotation_targets(base):
-                    self.edges.append(EdgeRecord(qualname,"inherits",target,start,"annotation"))
+                    self.edges.append(
+                        EdgeRecord(qualname, "inherits", target, start, "annotation")
+                    )
         else:
-            self._function_annotation_edges(node,qualname,start)
+            self._function_annotation_edges(node, qualname, start)
 
-    def _symbol(self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef, kind: str) -> None:
-        parent=self.current
-        qualname=node.name if parent is None else f"{parent}.{node.name}"
-        signature=_signature(node)
-        start=int(getattr(node,"lineno",1)); end=int(getattr(node,"end_lineno",start))
-        self.symbols.append(self._symbol_record(node,kind,qualname,signature,(start,end)))
-        self._annotation_edges(node,qualname,start)
+    def _symbol(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef, kind: str
+    ) -> None:
+        parent = self.current
+        qualname = node.name if parent is None else f"{parent}.{node.name}"
+        signature = _signature(node)
+        start = int(getattr(node, "lineno", 1))
+        end = int(getattr(node, "end_lineno", start))
+        self.symbols.append(
+            self._symbol_record(node, kind, qualname, signature, (start, end))
+        )
+        self._annotation_edges(node, qualname, start)
         self.stack.append(node.name)
         self.generic_visit(node)
         self.stack.pop()
@@ -143,26 +177,41 @@ class _Collector(ast.NodeVisitor):
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
-            self.edges.append(EdgeRecord(self.current, "import", alias.name, int(node.lineno)))
+            self.edges.append(
+                EdgeRecord(self.current, "import", alias.name, int(node.lineno))
+            )
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         prefix = "." * int(node.level) + (node.module or "")
         for alias in node.names:
             target = f"{prefix}.{alias.name}" if prefix else alias.name
-            self.edges.append(EdgeRecord(self.current, "import", target, int(node.lineno)))
+            self.edges.append(
+                EdgeRecord(self.current, "import", target, int(node.lineno))
+            )
         self.generic_visit(node)
-
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         for target in _annotation_targets(node.annotation):
-            self.edges.append(EdgeRecord(self.current, "attribute-type", target, int(node.lineno), "annotation"))
+            self.edges.append(
+                EdgeRecord(
+                    self.current,
+                    "attribute-type",
+                    target,
+                    int(node.lineno),
+                    "annotation",
+                )
+            )
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
         target = _target_name(node.func)
         if target:
-            self.edges.append(EdgeRecord(self.current, "call", target, int(node.lineno), "static-name"))
+            self.edges.append(
+                EdgeRecord(
+                    self.current, "call", target, int(node.lineno), "static-name"
+                )
+            )
         self.generic_visit(node)
 
 
@@ -211,7 +260,9 @@ def lexical_records(source: str) -> tuple[LexicalRecord, ...]:
         tokens: set[str] = set()
         for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]{1,}", line):
             tokens.update(identifier_terms(token))
-        records.extend(LexicalRecord(token=token, line=line_no) for token in sorted(tokens))
+        records.extend(
+            LexicalRecord(token=token, line=line_no) for token in sorted(tokens)
+        )
     return tuple(records)
 
 
@@ -235,7 +286,9 @@ def parse_python(source: str, *, file_digest: str) -> ParsedArtifact:
     outline_lines: list[str] = []
     for symbol in collector.symbols:
         depth = symbol.qualname.count(".")
-        outline_lines.append(f"{'  ' * depth}{symbol.signature}  [{symbol.start_line}-{symbol.end_line}]")
+        outline_lines.append(
+            f"{'  ' * depth}{symbol.signature}  [{symbol.start_line}-{symbol.end_line}]"
+        )
     return ParsedArtifact(
         artifact_key=key,
         file_digest=file_digest,

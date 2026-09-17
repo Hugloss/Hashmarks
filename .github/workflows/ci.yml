@@ -44,52 +44,6 @@ jobs:
       - run: make test
       - run: make artifact-check ARTIFACT_PYTHON=${{ matrix.python }}
 
-  uv-minimum:
-    name: Minimum supported uv 0.10.0 / Python 3.14
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        with:
-          version: "0.10.0"
-          enable-cache: true
-      - run: uv python install 3.14
-      - run: uv sync --group test --python 3.14
-      - run: make test
-
-  pytest-compatibility:
-    name: ${{ matrix.label }} / Python ${{ matrix.python }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - python: "3.11"
-            pytest: "pytest==8.4.0"
-            label: "pytest minimum line"
-          - python: "3.14"
-            pytest: "pytest==8.4.0"
-            label: "pytest minimum line"
-          - python: "3.14"
-            pytest: "pytest>=8.4"
-            label: "pytest latest supported"
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        with:
-          enable-cache: true
-      - run: uv python install ${{ matrix.python }}
-      - run: uv venv --python ${{ matrix.python }} .venv-compat
-      - run: uv pip install --python .venv-compat/bin/python -e . "${{ matrix.pytest }}"
-      - run: .venv-compat/bin/python scripts/qualification_environment.py pytest
-      - run: .venv-compat/bin/python -m pytest -q
-
   mcp-interop:
     name: ${{ matrix.label }} / Python ${{ matrix.python }}
     runs-on: ubuntu-latest
@@ -125,18 +79,10 @@ jobs:
       - name: Smoke installed wheel through official MCP SDK
         run: .mcp-venv/bin/python -I scripts/mcp_installed_artifact_smoke.py --hashmarks "$PWD/.mcp-venv/bin/hashmarks"
 
-  ruff-compatibility:
-    name: ${{ matrix.label }} explicit rule contract
+  ruff:
+    name: Ruff
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - ruff: "ruff==0.12.0"
-            label: "Ruff minimum line"
-          - ruff: "ruff>=0.12"
-            label: "Ruff latest supported"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -144,7 +90,18 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
-      - run: uv venv .ruff-venv
-      - run: uv pip install --python .ruff-venv/bin/python "${{ matrix.ruff }}"
-      - run: PATH="$PWD/.ruff-venv/bin:$PATH" python3 scripts/qualification_environment.py ruff
-      - run: .ruff-venv/bin/ruff check .
+      - run: make ruff
+
+  precommit:
+    name: Pre-commit checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.11
+      - run: make precommit

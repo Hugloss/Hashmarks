@@ -3,13 +3,17 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING
 
 from hashmarks.client import default_runtime_dir
 from hashmarks.paths import canonical_host_path
 
 from .engine import CodeMap
-from .model import SearchHit
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from .model import SearchHit
 
 
 @dataclass(frozen=True)
@@ -49,7 +53,9 @@ class WorktreeOverlay:
         self.base = base
         self.worktree = canonical_host_path(worktree)
         if self.worktree == base.workspace:
-            raise ValueError("worktree overlay must use a workspace distinct from the canonical base")
+            raise ValueError(
+                "worktree overlay must use a workspace distinct from the canonical base"
+            )
         digest = hashlib.sha256(worker_id.encode("utf-8")).hexdigest()[:16]
         state_dir = default_runtime_dir(self.worktree) / f"codemap-overlay-{digest}"
         # Parsed artifacts are content-addressed and safe to share; mutable map
@@ -63,7 +69,7 @@ class WorktreeOverlay:
         self._changed: tuple[str, ...] = ()
         self._stats: OverlayStats | None = None
 
-    def __enter__(self) -> "WorktreeOverlay":
+    def __enter__(self) -> WorktreeOverlay:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -110,7 +116,11 @@ class WorktreeOverlay:
             raise RuntimeError("overlay has not been synced")
         changed = set(self._changed)
         overlay_hits = list(self.overlay.find_task(task, limit=limit))
-        base_hits = [hit for hit in self.base.find_task(task, limit=limit) if hit.path not in changed]
+        base_hits = [
+            hit
+            for hit in self.base.find_task(task, limit=limit)
+            if hit.path not in changed
+        ]
         result: list[SearchHit] = []
         seen: set[str] = set()
         # Worker-local changed evidence shadows canonical evidence for the same path.

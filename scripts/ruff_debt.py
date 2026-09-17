@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import ast
-from collections import Counter
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 if __package__ in {None, ""}:
@@ -40,7 +40,9 @@ class _FunctionBody(ast.NodeVisitor):
 def _complexity(nodes: list[ast.AST]) -> int:
     score = 1
     for node in nodes:
-        if isinstance(node, (ast.If, ast.For, ast.AsyncFor, ast.While, ast.IfExp, ast.Assert)):
+        if isinstance(
+            node, (ast.If, ast.For, ast.AsyncFor, ast.While, ast.IfExp, ast.Assert)
+        ):
             score += 1
         elif isinstance(node, ast.BoolOp):
             score += max(0, len(node.values) - 1)
@@ -48,22 +50,34 @@ def _complexity(nodes: list[ast.AST]) -> int:
             score += len(node.handlers)
         elif isinstance(node, ast.Match):
             score += len(node.cases)
-        elif isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+        elif isinstance(
+            node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+        ):
             score += sum(1 + len(generator.ifs) for generator in node.generators)
     return score
 
 
 def _branch_count(nodes: list[ast.AST]) -> int:
-    branch_types = (ast.If, ast.For, ast.AsyncFor, ast.While, ast.Try, ast.Match, ast.IfExp)
+    branch_types = (
+        ast.If,
+        ast.For,
+        ast.AsyncFor,
+        ast.While,
+        ast.Try,
+        ast.Match,
+        ast.IfExp,
+    )
     return sum(isinstance(item, branch_types) for item in nodes)
 
 
 def _assigned_count(nodes: list[ast.AST]) -> int:
-    return len({
-        item.id
-        for item in nodes
-        if isinstance(item, ast.Name) and isinstance(item.ctx, (ast.Store, ast.Del))
-    })
+    return len(
+        {
+            item.id
+            for item in nodes
+            if isinstance(item, ast.Name) and isinstance(item.ctx, (ast.Store, ast.Del))
+        }
+    )
 
 
 def _metrics(node: ast.FunctionDef | ast.AsyncFunctionDef) -> dict[str, int]:
@@ -74,10 +88,15 @@ def _metrics(node: ast.FunctionDef | ast.AsyncFunctionDef) -> dict[str, int]:
         "C901": _complexity(nodes),
         "PLR0911": sum(isinstance(item, ast.Return) for item in nodes),
         "PLR0912": _branch_count(nodes),
-        "PLR0913": len(node.args.args) + len(node.args.kwonlyargs) + len(node.args.posonlyargs),
+        "PLR0913": len(node.args.args)
+        + len(node.args.kwonlyargs)
+        + len(node.args.posonlyargs),
         "PLR0914": _assigned_count(nodes),
         "PLR0915": sum(isinstance(item, ast.stmt) for item in nodes) - 1,
-        "PLR0916": max((len(item.values) for item in nodes if isinstance(item, ast.BoolOp)), default=0),
+        "PLR0916": max(
+            (len(item.values) for item in nodes if isinstance(item, ast.BoolOp)),
+            default=0,
+        ),
     }
 
 
@@ -91,7 +110,9 @@ def inventory() -> list[dict[str, object]]:
                     continue
                 metrics = _metrics(node)
                 violations = {
-                    rule: value for rule, value in metrics.items() if value > LIMITS[rule]
+                    rule: value
+                    for rule, value in metrics.items()
+                    if value > LIMITS[rule]
                 }
                 if violations:
                     findings.append(
@@ -113,8 +134,12 @@ def _summary(findings: list[dict[str, object]]) -> dict[str, object]:
         row["functions"] += 1
         violations = dict(finding["violations"])
         row["rule_findings"] += len(violations)
-        row["excess"] += sum(int(value) - LIMITS[rule] for rule, value in violations.items())
-    roots = Counter(path.split("/", 1)[0] for path in files for _ in range(files[path]["functions"]))
+        row["excess"] += sum(
+            int(value) - LIMITS[rule] for rule, value in violations.items()
+        )
+    roots = Counter(
+        path.split("/", 1)[0] for path in files for _ in range(files[path]["functions"])
+    )
     return {
         "schema": "hashmarks.ruff-debt.v1",
         "limits": LIMITS,
@@ -130,7 +155,9 @@ def _summary(findings: list[dict[str, object]]) -> dict[str, object]:
     }
 
 
-def _baseline_failures(summary: dict[str, object], baseline: dict[str, object]) -> list[str]:
+def _baseline_failures(
+    summary: dict[str, object], baseline: dict[str, object]
+) -> list[str]:
     current_files = dict(summary["files"])
     baseline_files = dict(baseline["files"])
     failures: list[str] = []
@@ -140,15 +167,22 @@ def _baseline_failures(summary: dict[str, object], baseline: dict[str, object]) 
             failures.append(f"new debt file: {path} excess={current['excess']}")
             continue
         if current["excess"] > before["excess"]:
-            failures.append(f"debt increased: {path} {before['excess']} -> {current['excess']}")
+            failures.append(
+                f"debt increased: {path} {before['excess']} -> {current['excess']}"
+            )
     if int(summary["excess"]) > int(baseline["excess"]):
-        failures.append(f"total debt increased: {baseline['excess']} -> {summary['excess']}")
+        failures.append(
+            f"total debt increased: {baseline['excess']} -> {summary['excess']}"
+        )
     return failures
 
 
 def _parse_args():
     import argparse
-    parser = argparse.ArgumentParser(description="Conservative local mirror of the strict Ruff debt budget.")
+
+    parser = argparse.ArgumentParser(
+        description="Conservative local mirror of the strict Ruff debt budget."
+    )
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--summary-only", action="store_true")
     parser.add_argument("--write-baseline", type=Path)
@@ -158,7 +192,9 @@ def _parse_args():
 
 def _write_baseline(path: Path | None, summary: dict[str, object]) -> None:
     if path is not None:
-        path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        path.write_text(
+            json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
 
 
 def _report_baseline(args, summary: dict[str, object]) -> int | None:
@@ -167,23 +203,27 @@ def _report_baseline(args, summary: dict[str, object]) -> int | None:
     baseline = json.loads(args.baseline.read_text(encoding="utf-8"))
     failures = _baseline_failures(summary, baseline)
     if args.json:
-        print(json.dumps({"summary": summary, "failures": failures}, sort_keys=True))
+        print(json.dumps({"summary": summary, "failures": failures}, sort_keys=True))  # noqa: T201 - intentional command output
     else:
-        print(f"Ruff debt excess: {summary['excess']} (baseline {baseline['excess']})")
+        print(f"Ruff debt excess: {summary['excess']} (baseline {baseline['excess']})")  # noqa: T201 - intentional command output
         for failure in failures:
-            print(f"FAIL: {failure}")
+            print(f"FAIL: {failure}")  # noqa: T201 - intentional command output
     return 1 if failures else 0
 
 
-def _report_inventory(findings: list[dict[str, object]], summary: dict[str, object], as_json: bool) -> int:
+def _report_inventory(
+    findings: list[dict[str, object]], summary: dict[str, object], as_json: bool
+) -> int:
     if as_json:
-        print(json.dumps(summary, sort_keys=True))
+        print(json.dumps(summary, sort_keys=True))  # noqa: T201 - intentional command output
         return 1 if findings else 0
     keys = ("functions", "rule_findings", "excess", "by_root")
-    print(json.dumps({key: summary[key] for key in keys}, sort_keys=True))
+    print(json.dumps({key: summary[key] for key in keys}, sort_keys=True))  # noqa: T201 - intentional command output
     for finding in findings:
-        rules = ", ".join(f"{rule}={value}" for rule, value in finding["violations"].items())
-        print(f"{finding['path']}:{finding['line']}:{finding['function']}: {rules}")
+        rules = ", ".join(
+            f"{rule}={value}" for rule, value in finding["violations"].items()
+        )
+        print(f"{finding['path']}:{finding['line']}:{finding['function']}: {rules}")  # noqa: T201 - intentional command output
     return 1 if findings else 0
 
 
@@ -194,7 +234,7 @@ def main() -> int:
     _write_baseline(args.write_baseline, summary)
     if args.summary_only:
         keys = ("functions", "rule_findings", "excess", "by_root")
-        print(json.dumps({key: summary[key] for key in keys}, sort_keys=True))
+        print(json.dumps({key: summary[key] for key in keys}, sort_keys=True))  # noqa: T201 - intentional command output
         return 0
     baseline_result = _report_baseline(args, summary)
     if baseline_result is not None:

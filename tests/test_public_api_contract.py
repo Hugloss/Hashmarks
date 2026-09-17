@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashmarks
 
-
 EXPECTED_PUBLIC = {
     "__version__",
     "CodeMap",

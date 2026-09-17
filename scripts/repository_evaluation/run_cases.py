@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import sys
 import time
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -14,8 +14,13 @@ from benchmarks.research_receipts import evaluate_with_receipt, work_identity
 from hashmarks.codemap import CodeMap
 from hashmarks.producer_identity import native_producer_implementation_identity
 from hashmarks.test_shards import repository_content_identity
-
-from scripts.repository_evaluation.common import CASES_SCHEMA, RUN_SCHEMA, canonical_sha256, load_json, write_json
+from scripts.repository_evaluation.common import (
+    CASES_SCHEMA,
+    RUN_SCHEMA,
+    canonical_sha256,
+    load_json,
+    write_json,
+)
 
 
 def _repository_identity(codemap: CodeMap) -> str:
@@ -47,8 +52,13 @@ def _case_result(codemap: CodeMap, case: Mapping[str, object]) -> dict[str, Any]
     return {
         "task": task,
         "retrieval": [
-            {"path": hit.path, "name": hit.name, "qualname": hit.qualname,
-             "score": hit.score, "kind": hit.kind}
+            {
+                "path": hit.path,
+                "name": hit.name,
+                "qualname": hit.qualname,
+                "score": hit.score,
+                "kind": hit.kind,
+            }
             for hit in hits
         ],
         "action": action,
@@ -125,11 +135,13 @@ def run_cases(
             )
             reused += int(was_reused)
             created += int(not was_reused)
-            rows.append({
-                "id": case_id,
-                "receipt_reused": was_reused,
-                "result": result,
-            })
+            rows.append(
+                {
+                    "id": case_id,
+                    "receipt_reused": was_reused,
+                    "result": result,
+                }
+            )
 
     return {
         "schema": RUN_SCHEMA,

@@ -1,3 +1,5 @@
+# Imports below follow the standalone script path bootstrap.
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -13,8 +15,12 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from hashmarks.codemap import CodeMap
-from scripts.agent_evaluation.economics import verification_surface
+from hashmarks.codemap import (
+    CodeMap,
+)
+from scripts.agent_evaluation.economics import (
+    verification_surface,
+)
 
 SCHEMA = "hashmarks.agent-task-start-qualification.v1"
 
@@ -24,12 +30,18 @@ def _sha(path: Path) -> str:
 
 
 def _identity(value: object) -> str:
-    raw = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    raw = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode()
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
 def _packet_bytes(packet: dict[str, object]) -> int:
-    return len(json.dumps(packet, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
+    return len(
+        json.dumps(
+            packet, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+    )
 
 
 def run(
@@ -42,7 +54,11 @@ def run(
 ) -> dict[str, Any]:
     public = json.loads(public_path.read_text(encoding="utf-8"))
     tasks = public.get("tasks")
-    if not isinstance(tasks, list) or not tasks or any(set(row) != {"id", "query"} for row in tasks):
+    if (
+        not isinstance(tasks, list)
+        or not tasks
+        or any(set(row) != {"id", "query"} for row in tasks)
+    ):
         raise ValueError("PUBLIC tasks must contain exactly id/query")
     if token_budget < 1:
         raise ValueError("token_budget must be >= 1")
@@ -55,41 +71,56 @@ def run(
 
         for task in tasks:
             started = time.perf_counter()
-            packet = codemap.task_evidence(str(task["query"]), token_budget=token_budget)
+            packet = codemap.task_evidence(
+                str(task["query"]), token_budget=token_budget
+            )
             first_ms = (time.perf_counter() - started) * 1000.0
-            provenance = packet.get("provenance") if isinstance(packet.get("provenance"), dict) else {}
+            provenance = (
+                packet.get("provenance")
+                if isinstance(packet.get("provenance"), dict)
+                else {}
+            )
             edit_path = str(packet.get("edit") or "")
             file_row = codemap.store.file_row(edit_path) if edit_path else None
-            indexed_revision = str(file_row["file_digest"]) if file_row is not None else None
-            frozen.append({
-                "id": str(task["id"]),
-                "packet": packet,
-                "packet_bytes": _packet_bytes(packet),
-                "first_warm_ms": first_ms,
-                "provenance_complete": bool(
-                    provenance.get("why")
-                    and provenance.get("revision")
-                    and provenance.get("freshness") in {"proven", "stale", "unknown"}
-                ),
-                "revision_current": bool(indexed_revision and provenance.get("revision") == indexed_revision),
-                "freshness_state": str(provenance.get("freshness") or "missing"),
-                "selection_reason": str(provenance.get("why") or "missing"),
-            })
+            indexed_revision = (
+                str(file_row["file_digest"]) if file_row is not None else None
+            )
+            frozen.append(
+                {
+                    "id": str(task["id"]),
+                    "packet": packet,
+                    "packet_bytes": _packet_bytes(packet),
+                    "first_warm_ms": first_ms,
+                    "provenance_complete": bool(
+                        provenance.get("why")
+                        and provenance.get("revision")
+                        and provenance.get("freshness")
+                        in {"proven", "stale", "unknown"}
+                    ),
+                    "revision_current": bool(
+                        indexed_revision
+                        and provenance.get("revision") == indexed_revision
+                    ),
+                    "freshness_state": str(provenance.get("freshness") or "missing"),
+                    "selection_reason": str(provenance.get("why") or "missing"),
+                }
+            )
 
         # A second identical pass measures the long-lived service/cache fast path.
         # It runs before SECRET is opened and must not alter the frozen decisions.
         for row, task in zip(frozen, tasks, strict=True):
             started = time.perf_counter()
-            repeated = codemap.task_evidence(str(task["query"]), token_budget=token_budget)
+            repeated = codemap.task_evidence(
+                str(task["query"]), token_budget=token_budget
+            )
             row["cached_warm_ms"] = (time.perf_counter() - started) * 1000.0
             row["cached_packet_identity"] = _identity(repeated)
             row["packet_identity"] = _identity(row["packet"])
             row["stable"] = row["cached_packet_identity"] == row["packet_identity"]
 
-    frozen_identity = _identity([
-        {"id": row["id"], "packet_identity": row["packet_identity"]}
-        for row in frozen
-    ])
+    frozen_identity = _identity(
+        [{"id": row["id"], "packet_identity": row["packet_identity"]} for row in frozen]
+    )
 
     # SECRET is opened only after every first-pass and cached-pass packet is frozen.
     secret = json.loads(secret_path.read_text(encoding="utf-8"))
@@ -106,18 +137,26 @@ def run(
         edit_correct = str(packet.get("edit") or "") == str(truth["expected_edit_path"])
         verify = packet.get("verify")
         surface = verification_surface(verify if isinstance(verify, list) else ())
-        verify_correct = str(surface.get("surface") or "") == str(truth["expected_verify_path"])
+        verify_correct = str(surface.get("surface") or "") == str(
+            truth["expected_verify_path"]
+        )
         next_read = packet.get("next_read")
         if isinstance(next_read, dict) and next_read.get("reason"):
             next_read_reasons[str(next_read["reason"])] += 1
-        source_budget = packet.get("source_budget") if isinstance(packet.get("source_budget"), dict) else {}
+        source_budget = (
+            packet.get("source_budget")
+            if isinstance(packet.get("source_budget"), dict)
+            else {}
+        )
         graded = {
             "id": row["id"],
             "category": str(truth.get("category") or "unknown"),
             "status": str(packet.get("status") or "unsafe"),
             "edit_correct": edit_correct,
             "verify_correct": verify_correct,
-            "fully_correct": edit_correct and verify_correct and str(packet.get("status") or "") != "unsafe",
+            "fully_correct": edit_correct
+            and verify_correct
+            and str(packet.get("status") or "") != "unsafe",
             "source_complete": bool(source_budget.get("complete")),
             "packet_bytes": int(row["packet_bytes"]),
             "first_warm_ms": float(row["first_warm_ms"]),
@@ -147,9 +186,12 @@ def run(
         "freshness_states": dict(sorted(freshness_states.items())),
         "selection_reasons": dict(sorted(selection_reasons.items())),
         "visible_bytes": sum(int(row["packet_bytes"]) for row in results),
-        "visible_bytes_per_task": sum(int(row["packet_bytes"]) for row in results) / count,
-        "mean_first_warm_ms": sum(float(row["first_warm_ms"]) for row in results) / count,
-        "mean_cached_warm_ms": sum(float(row["cached_warm_ms"]) for row in results) / count,
+        "visible_bytes_per_task": sum(int(row["packet_bytes"]) for row in results)
+        / count,
+        "mean_first_warm_ms": sum(float(row["first_warm_ms"]) for row in results)
+        / count,
+        "mean_cached_warm_ms": sum(float(row["cached_warm_ms"]) for row in results)
+        / count,
         "sync_ms": sync_ms,
         "next_read_reasons": dict(sorted(next_read_reasons.items())),
     }
@@ -163,7 +205,12 @@ def run(
     }
     protocol = {
         "public_fields": ["id", "query"],
-        "secret_fields": ["expected_edit_path", "expected_verify_path", "expected_safe", "category"],
+        "secret_fields": [
+            "expected_edit_path",
+            "expected_verify_path",
+            "expected_safe",
+            "category",
+        ],
         "secret_join_after_two_frozen_passes": True,
         "source_budget_tokens": token_budget,
         "public_sha256": _sha(public_path),
@@ -181,7 +228,9 @@ def run(
         "results": results,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return payload
 
 
@@ -193,8 +242,16 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--token-budget", type=int, default=1536)
     args = parser.parse_args()
-    payload = run(args.repo, args.public, args.secret, args.output, token_budget=args.token_budget)
-    print(json.dumps({"summary": payload["summary"], "categories": payload["categories"]}, indent=2, sort_keys=True))
+    payload = run(
+        args.repo, args.public, args.secret, args.output, token_budget=args.token_budget
+    )
+    print(  # noqa: T201 - intentional command output
+        json.dumps(
+            {"summary": payload["summary"], "categories": payload["categories"]},
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":

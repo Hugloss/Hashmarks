@@ -13,7 +13,9 @@ SCHEMA = "hashmarks.release-artifact-manifest.v1"
 
 
 def _project(root: Path) -> dict[str, object]:
-    value = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    value = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]
     if not isinstance(value, dict):
         raise ValueError("[project] must be a table")
     return value
@@ -33,7 +35,9 @@ def _sha256(path: Path) -> str:
 
 def _wheel_metadata(path: Path) -> tuple[str, str]:
     with zipfile.ZipFile(path) as archive:
-        names = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
+        names = [
+            name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
+        ]
         if len(names) != 1:
             raise ValueError("wheel must contain exactly one METADATA file")
         message = email.message_from_bytes(archive.read(names[0]))
@@ -42,7 +46,9 @@ def _wheel_metadata(path: Path) -> tuple[str, str]:
 
 def _sdist_metadata(path: Path) -> tuple[str, str]:
     with tarfile.open(path, "r:gz") as archive:
-        candidates = [m for m in archive.getmembers() if m.name.endswith("/pyproject.toml")]
+        candidates = [
+            m for m in archive.getmembers() if m.name.endswith("/pyproject.toml")
+        ]
         if len(candidates) != 1:
             raise ValueError("sdist must contain exactly one pyproject.toml")
         stream = archive.extractfile(candidates[0])
@@ -72,7 +78,9 @@ def release_manifest(root: Path, dist: Path, *, tag: str) -> dict[str, object]:
     version = str(project["version"])
     expected_tag = f"v{version}"
     if tag != expected_tag:
-        raise ValueError(f"release tag mismatch: expected {expected_tag!r}, got {tag!r}")
+        raise ValueError(
+            f"release tag mismatch: expected {expected_tag!r}, got {tag!r}"
+        )
 
     expected_wheel = f"{name.replace('-', '_')}-{version}-py3-none-any.whl"
     expected_sdist = f"{name}-{version}.tar.gz"
@@ -106,10 +114,12 @@ def release_manifest(root: Path, dist: Path, *, tag: str) -> dict[str, object]:
         "distributions": rows,
         "publication_authority": "external",
     }
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    payload["manifest_identity"] = "sha256:" + hashlib.sha256(
-        SCHEMA.encode() + b"\0" + canonical
-    ).hexdigest()
+    canonical = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode()
+    payload["manifest_identity"] = (
+        "sha256:" + hashlib.sha256(SCHEMA.encode() + b"\0" + canonical).hexdigest()
+    )
     return payload
 
 
@@ -125,7 +135,9 @@ def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate and bind Hashmarks release artifacts.")
+    parser = argparse.ArgumentParser(
+        description="Validate and bind Hashmarks release artifacts."
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     tag = sub.add_parser("validate-tag")
@@ -157,23 +169,29 @@ def _run_command(args) -> int:
     if args.command == "validate-tag":
         expected = _expected_tag(root)
         if args.tag != expected:
-            raise SystemExit(f"release tag mismatch: expected {expected!r}, got {args.tag!r}")
-        print(f"Hashmarks release tag: PASS ({expected})")
+            raise SystemExit(
+                f"release tag mismatch: expected {expected!r}, got {args.tag!r}"
+            )
+        print(f"Hashmarks release tag: PASS ({expected})")  # noqa: T201 - intentional command output
         return 0
 
     value = release_manifest(root, Path(args.dist), tag=args.tag)
     if args.command == "manifest":
         output = Path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        output.write_text(
+            json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         _write_sha256sums(value, Path(args.sha256sums))
-        print(json.dumps(value, indent=2, sort_keys=True))
+        print(json.dumps(value, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
         return 0
 
     recorded = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
     if recorded != value:
-        raise SystemExit("release artifact manifest does not match current distribution bytes")
-    print("Hashmarks release artifact manifest: PASS")
+        raise SystemExit(
+            "release artifact manifest does not match current distribution bytes"
+        )
+    print("Hashmarks release artifact manifest: PASS")  # noqa: T201 - intentional command output
     return 0
 
 

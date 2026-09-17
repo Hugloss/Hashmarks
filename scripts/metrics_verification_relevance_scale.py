@@ -1,3 +1,5 @@
+# Imports below follow the standalone script path bootstrap.
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -13,7 +15,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from hashmarks.codemap import CodeMap
+from hashmarks.codemap import (
+    CodeMap,
+)
 
 SCHEMA = "hashmarks.verification-relevance-scale.v1"
 
@@ -28,7 +32,9 @@ def _materialize(root: Path, distractors: int, feature: int) -> tuple[str, str]:
     local = root / "packages" / namespace
     (local / "tests").mkdir(parents=True)
     (root / "tests" / "regression").mkdir(parents=True)
-    (root / "pyproject.toml").write_text("[tool.pytest.ini_options]\n", encoding="utf-8")
+    (root / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\n", encoding="utf-8"
+    )
     (local / "service.py").write_text(
         "def apply_policy(value):\n    return value\n", encoding="utf-8"
     )
@@ -39,7 +45,12 @@ def _materialize(root: Path, distractors: int, feature: int) -> tuple[str, str]:
         encoding="utf-8",
     )
     for index in range(distractors):
-        path = root / "tests" / "regression" / f"test_apply_policy_{namespace}_regression_{index:04d}.py"
+        path = (
+            root
+            / "tests"
+            / "regression"
+            / f"test_apply_policy_{namespace}_regression_{index:04d}.py"
+        )
         path.write_text(
             f"from packages.{namespace}.service import apply_policy\n\n"
             f"def test_apply_policy_{namespace}_regression():\n    assert apply_policy(1) == 1\n",
@@ -64,31 +75,49 @@ def collect(*, sizes: tuple[int, ...] = (10, 50, 100, 500)) -> dict[str, object]
                 action = codemap.task_action_map(task, limit=20)
                 action_ms = (time.perf_counter() - started) * 1000.0
                 relevance = action["verification_relevance"]
-                selected = relevance.get("selected") if isinstance(relevance, dict) else None
-                selected_path = str(selected.get("path") or "") if isinstance(selected, dict) else ""
-                canonical_path = str(relevance.get("current_canonical_verify") or "") if isinstance(relevance, dict) else ""
-                plan = codemap.verification_plan(
-                    selected_path,
-                    symbol=(str(selected.get("test_symbol") or "") or None) if isinstance(selected, dict) else None,
-                ) if selected_path else {"available": False}
-            rows.append({
-                "distractor_tests": distractors,
-                "total_test_surfaces": distractors + 1,
-                "task_sha256": hashlib.sha256(task.encode("utf-8")).hexdigest(),
-                "expected_local_verification": expected,
-                "baseline_canonical_verify": canonical_path,
-                "baseline_correct": canonical_path == expected,
-                "selected_verify": selected_path,
-                "selected_correct": selected_path == expected,
-                "selection_changed": bool(relevance.get("selection_changed")),
-                "selection_reason": relevance.get("selection_reason"),
-                "candidate_count": int(relevance.get("candidate_count") or 0),
-                "returned_candidates": len(relevance.get("candidates") or []),
-                "verification_plan_available": bool(plan.get("available")),
-                "verification_scope": plan.get("scope"),
-                "sync_ms": sync_ms,
-                "action_ms": action_ms,
-            })
+                selected = (
+                    relevance.get("selected") if isinstance(relevance, dict) else None
+                )
+                selected_path = (
+                    str(selected.get("path") or "")
+                    if isinstance(selected, dict)
+                    else ""
+                )
+                canonical_path = (
+                    str(relevance.get("current_canonical_verify") or "")
+                    if isinstance(relevance, dict)
+                    else ""
+                )
+                plan = (
+                    codemap.verification_plan(
+                        selected_path,
+                        symbol=(str(selected.get("test_symbol") or "") or None)
+                        if isinstance(selected, dict)
+                        else None,
+                    )
+                    if selected_path
+                    else {"available": False}
+                )
+            rows.append(
+                {
+                    "distractor_tests": distractors,
+                    "total_test_surfaces": distractors + 1,
+                    "task_sha256": hashlib.sha256(task.encode("utf-8")).hexdigest(),
+                    "expected_local_verification": expected,
+                    "baseline_canonical_verify": canonical_path,
+                    "baseline_correct": canonical_path == expected,
+                    "selected_verify": selected_path,
+                    "selected_correct": selected_path == expected,
+                    "selection_changed": bool(relevance.get("selection_changed")),
+                    "selection_reason": relevance.get("selection_reason"),
+                    "candidate_count": int(relevance.get("candidate_count") or 0),
+                    "returned_candidates": len(relevance.get("candidates") or []),
+                    "verification_plan_available": bool(plan.get("available")),
+                    "verification_scope": plan.get("scope"),
+                    "sync_ms": sync_ms,
+                    "action_ms": action_ms,
+                }
+            )
     finally:
         shutil.rmtree(base, ignore_errors=True)
 
@@ -102,11 +131,18 @@ def collect(*, sizes: tuple[int, ...] = (10, 50, 100, 500)) -> dict[str, object]
         "baseline_correct_rate": baseline_correct / len(rows) if rows else 0.0,
         "selected_correct": selected_correct,
         "selected_correct_rate": selected_correct / len(rows) if rows else 0.0,
-        "unsafe_regressions": sum(bool(row["baseline_correct"]) and not bool(row["selected_correct"]) for row in rows),
+        "unsafe_regressions": sum(
+            bool(row["baseline_correct"]) and not bool(row["selected_correct"])
+            for row in rows
+        ),
         "selection_changes": sum(bool(row["selection_changed"]) for row in rows),
-        "mean_action_ms": sum(float(row["action_ms"]) for row in rows) / len(rows) if rows else 0.0,
+        "mean_action_ms": sum(float(row["action_ms"]) for row in rows) / len(rows)
+        if rows
+        else 0.0,
         "max_action_ms": max((float(row["action_ms"]) for row in rows), default=0.0),
-        "max_candidate_count": max((int(row["candidate_count"]) for row in rows), default=0),
+        "max_candidate_count": max(
+            (int(row["candidate_count"]) for row in rows), default=0
+        ),
         "rows": rows,
         "authority": "PUBLIC task plus deterministic repository evidence; expected paths used only by scorer",
         "secret_knowledge_used_by_selector": False,
@@ -124,7 +160,7 @@ def main() -> int:
     if args.output:
         Path(args.output).write_text(text, encoding="utf-8")
     else:
-        print(text, end="")
+        print(text, end="")  # noqa: T201 - intentional command output
     return 0
 
 

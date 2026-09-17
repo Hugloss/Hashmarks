@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-
 CODEMAP_SCHEMA = "hashmarks.codemap.v1"
 PYTHON_PARSER = "hashmarks.python-ast.v5"
 
@@ -22,7 +21,7 @@ class ContextDisclosure(str, Enum):
     SOURCE = "source"
 
     @property
-    def next(self) -> "ContextDisclosure | None":
+    def next(self) -> ContextDisclosure | None:
         order = (self.ORIENT, self.OUTLINE, self.EVIDENCE, self.SOURCE)
         index = order.index(self)
         return None if index + 1 == len(order) else order[index + 1]
@@ -129,7 +128,9 @@ class SearchHit:
             "name": self.name,
             "qualname": self.qualname,
             "signature": self.signature,
-            "lines": None if self.start_line is None else [self.start_line, self.end_line],
+            "lines": None
+            if self.start_line is None
+            else [self.start_line, self.end_line],
             "evidence_visibility": self.evidence_visibility.value,
         }
 
@@ -229,7 +230,9 @@ class ContextPack:
             "query": self.query,
             "budget": self.budget,
             "disclosure": self.disclosure.value,
-            "next_disclosure": None if self.disclosure.next is None else self.disclosure.next.value,
+            "next_disclosure": None
+            if self.disclosure.next is None
+            else self.disclosure.next.value,
             "cache": {
                 "hit": self.cache_hit,
                 "shared_flight": self.shared_flight,

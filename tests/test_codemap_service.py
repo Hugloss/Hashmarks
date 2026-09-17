@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import threading
 import time
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMapService, CodeMapServiceClient
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _wait(client: CodeMapServiceClient) -> dict:
@@ -21,7 +24,9 @@ def test_codemap_service_shares_one_warm_authority(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "adapter.py").write_text("class NxImpactAdapter:\n    pass\n")
-    (tmp_path / "tests" / "test_adapter.py").write_text("from src.adapter import NxImpactAdapter\n")
+    (tmp_path / "tests" / "test_adapter.py").write_text(
+        "from src.adapter import NxImpactAdapter\n"
+    )
     socket_path = tmp_path / "service.sock"
     service = CodeMapService(tmp_path, socket_path=socket_path)
     thread = threading.Thread(target=service.serve_forever, daemon=True)
@@ -49,13 +54,18 @@ def test_codemap_service_shares_one_warm_authority(tmp_path: Path) -> None:
 
 
 def test_codemap_service_decision_brief(tmp_path: Path) -> None:
-    (tmp_path / "src").mkdir(); (tmp_path / "tests").mkdir()
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "engine.py").write_text("def widget(): return 1\n")
-    (tmp_path / "tests" / "test_engine.py").write_text("from src.engine import widget\ndef test_widget(): assert widget() == 1\n")
+    (tmp_path / "tests" / "test_engine.py").write_text(
+        "from src.engine import widget\ndef test_widget(): assert widget() == 1\n"
+    )
     socket_path = tmp_path / "brief.sock"
     service = CodeMapService(tmp_path, socket_path=socket_path)
-    thread = threading.Thread(target=service.serve_forever, daemon=True); thread.start()
-    client = CodeMapServiceClient(tmp_path, socket_path=socket_path); _wait(client)
+    thread = threading.Thread(target=service.serve_forever, daemon=True)
+    thread.start()
+    client = CodeMapServiceClient(tmp_path, socket_path=socket_path)
+    _wait(client)
     try:
         brief = client.task_decision_brief("widget implementation test")
         assert brief["schema"] == "hashmarks.task-decision-brief.v1"
@@ -63,92 +73,122 @@ def test_codemap_service_decision_brief(tmp_path: Path) -> None:
         assert brief["verify"]["path"] == "tests/test_engine.py"
         assert brief["full_packet_available"] is True
     finally:
-        client.stop(); thread.join(timeout=5)
+        client.stop()
+        thread.join(timeout=5)
 
 
-
-
-
-
-def test_service_refresh_after_change_brief_avoids_full_packet_surface(tmp_path: Path) -> None:
-    (tmp_path/'src').mkdir(exist_ok=True); (tmp_path/'tests').mkdir(exist_ok=True)
-    (tmp_path/'src'/'owner.py').write_text("def widget(): return 'old'\n")
-    (tmp_path/'tests'/'test_owner.py').write_text("from src.owner import widget\ndef test_widget(): assert widget() == 'new'\n")
-    socket_path=tmp_path/'refresh-brief.sock'; service=CodeMapService(tmp_path,socket_path=socket_path)
-    thread=threading.Thread(target=service.serve_forever,daemon=True); thread.start()
-    client=CodeMapServiceClient(tmp_path,socket_path=socket_path); _wait(client)
+def test_service_refresh_after_change_brief_avoids_full_packet_surface(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir(exist_ok=True)
+    (tmp_path / "tests").mkdir(exist_ok=True)
+    (tmp_path / "src" / "owner.py").write_text("def widget(): return 'old'\n")
+    (tmp_path / "tests" / "test_owner.py").write_text(
+        "from src.owner import widget\ndef test_widget(): assert widget() == 'new'\n"
+    )
+    socket_path = tmp_path / "refresh-brief.sock"
+    service = CodeMapService(tmp_path, socket_path=socket_path)
+    thread = threading.Thread(target=service.serve_forever, daemon=True)
+    thread.start()
+    client = CodeMapServiceClient(tmp_path, socket_path=socket_path)
+    _wait(client)
     try:
-        (tmp_path/'src'/'owner.py').write_text("def widget(): return 'new'\n")
-        refreshed=client.refresh_after_change_brief('widget implementation test',['src/owner.py'])
-        assert refreshed['schema']=='hashmarks.post-change-refresh-brief.v1'
-        assert refreshed['scope']=='changed-paths-only'
-        assert 'packet' not in refreshed
-        assert refreshed['decision_brief']['edit']['path']=='src/owner.py'
+        (tmp_path / "src" / "owner.py").write_text("def widget(): return 'new'\n")
+        refreshed = client.refresh_after_change_brief(
+            "widget implementation test", ["src/owner.py"]
+        )
+        assert refreshed["schema"] == "hashmarks.post-change-refresh-brief.v1"
+        assert refreshed["scope"] == "changed-paths-only"
+        assert "packet" not in refreshed
+        assert refreshed["decision_brief"]["edit"]["path"] == "src/owner.py"
     finally:
-        client.stop(); thread.join(timeout=5)
+        client.stop()
+        thread.join(timeout=5)
 
 
 def test_codemap_service_decision_brief_budget_sweep(tmp_path: Path) -> None:
-    (tmp_path / 'src').mkdir(); (tmp_path / 'tests').mkdir()
-    (tmp_path / 'src' / 'engine.py').write_text("def widget(): return 1\n")
-    (tmp_path / 'tests' / 'test_engine.py').write_text("from src.engine import widget\ndef test_widget(): assert widget() == 2\n")
-    socket_path = tmp_path / 'budget-sweep.sock'
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src" / "engine.py").write_text("def widget(): return 1\n")
+    (tmp_path / "tests" / "test_engine.py").write_text(
+        "from src.engine import widget\ndef test_widget(): assert widget() == 2\n"
+    )
+    socket_path = tmp_path / "budget-sweep.sock"
     service = CodeMapService(tmp_path, socket_path=socket_path)
-    thread = threading.Thread(target=service.serve_forever, daemon=True); thread.start()
-    client = CodeMapServiceClient(tmp_path, socket_path=socket_path); _wait(client)
+    thread = threading.Thread(target=service.serve_forever, daemon=True)
+    thread.start()
+    client = CodeMapServiceClient(tmp_path, socket_path=socket_path)
+    _wait(client)
     try:
-        sweep = client.task_decision_brief_budget_sweep('widget implementation test', budgets=[1, 64, 128, 512])
-        assert sweep['schema'] == 'hashmarks.task-decision-brief-budget-sweep.v1'
-        assert sweep['rows'][0]['safe'] is False
-        assert sweep['smallest_safe_budget'] in {64, 128, 512}
+        sweep = client.task_decision_brief_budget_sweep(
+            "widget implementation test", budgets=[1, 64, 128, 512]
+        )
+        assert sweep["schema"] == "hashmarks.task-decision-brief-budget-sweep.v1"
+        assert sweep["rows"][0]["safe"] is False
+        assert sweep["smallest_safe_budget"] in {64, 128, 512}
     finally:
-        client.stop(); thread.join(timeout=5)
+        client.stop()
+        thread.join(timeout=5)
 
 
 def test_codemap_service_task_action_brief(tmp_path: Path) -> None:
-    (tmp_path/'src').mkdir(); (tmp_path/'tests').mkdir()
-    (tmp_path/'src'/'engine.py').write_text("def widget(): return 1\n")
-    (tmp_path/'tests'/'test_engine.py').write_text("from src.engine import widget\ndef test_widget(): assert widget() == 2\n")
-    socket_path=tmp_path/'agent-action.sock'; service=CodeMapService(tmp_path,socket_path=socket_path)
-    thread=threading.Thread(target=service.serve_forever,daemon=True); thread.start()
-    client=CodeMapServiceClient(tmp_path,socket_path=socket_path); _wait(client)
-    try:
-        brief=client.task_action_brief('widget implementation test',token_budget=64)
-        assert brief['schema']=='hashmarks.task-action-brief.v1'
-        assert brief['status']=='safe-fresh'
-        assert brief['edit']=='src/engine.py'
-        assert isinstance(brief['verify'],list)
-    finally:
-        client.stop(); thread.join(timeout=5)
-
-
-def test_service_agent_task_start_returns_bounded_source_evidence(tmp_path: Path) -> None:
-    (tmp_path/'src').mkdir(); (tmp_path/'tests').mkdir()
-    (tmp_path/'src'/'engine.py').write_text(
-        "def normalize_widget(value: str) -> str:\n    return value.strip()\n",
-        encoding='utf-8',
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src" / "engine.py").write_text("def widget(): return 1\n")
+    (tmp_path / "tests" / "test_engine.py").write_text(
+        "from src.engine import widget\ndef test_widget(): assert widget() == 2\n"
     )
-    (tmp_path/'tests'/'test_engine.py').write_text(
+    socket_path = tmp_path / "agent-action.sock"
+    service = CodeMapService(tmp_path, socket_path=socket_path)
+    thread = threading.Thread(target=service.serve_forever, daemon=True)
+    thread.start()
+    client = CodeMapServiceClient(tmp_path, socket_path=socket_path)
+    _wait(client)
+    try:
+        brief = client.task_action_brief("widget implementation test", token_budget=64)
+        assert brief["schema"] == "hashmarks.task-action-brief.v1"
+        assert brief["status"] == "safe-fresh"
+        assert brief["edit"] == "src/engine.py"
+        assert isinstance(brief["verify"], list)
+    finally:
+        client.stop()
+        thread.join(timeout=5)
+
+
+def test_service_agent_task_start_returns_bounded_source_evidence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src" / "engine.py").write_text(
+        "def normalize_widget(value: str) -> str:\n    return value.strip()\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests" / "test_engine.py").write_text(
         "from src.engine import normalize_widget\n"
         "def test_normalize_widget(): assert normalize_widget(' A ') == 'a'\n",
-        encoding='utf-8',
+        encoding="utf-8",
     )
-    socket_path=tmp_path/'start.sock'; service=CodeMapService(tmp_path,socket_path=socket_path)
-    thread=threading.Thread(target=service.serve_forever,daemon=True); thread.start()
-    client=CodeMapServiceClient(tmp_path,socket_path=socket_path); _wait(client)
+    socket_path = tmp_path / "start.sock"
+    service = CodeMapService(tmp_path, socket_path=socket_path)
+    thread = threading.Thread(target=service.serve_forever, daemon=True)
+    thread.start()
+    client = CodeMapServiceClient(tmp_path, socket_path=socket_path)
+    _wait(client)
     try:
-        start=client.task_evidence(
-            'Change normalize_widget to lowercase the trimmed value and verify normalize_widget',
+        start = client.task_evidence(
+            "Change normalize_widget to lowercase the trimmed value and verify normalize_widget",
             token_budget=512,
         )
-        assert start['schema']=='hashmarks.task-evidence.v1'
-        assert start['status']=='safe-fresh'
-        assert start['edit']=='src/engine.py'
-        assert start['source_budget']['complete'] is True
-        assert start['edit_evidence']['representation']=='source-range'
-        assert 'test_normalize_widget' not in start['edit_evidence']['content']
+        assert start["schema"] == "hashmarks.task-evidence.v1"
+        assert start["status"] == "safe-fresh"
+        assert start["edit"] == "src/engine.py"
+        assert start["source_budget"]["complete"] is True
+        assert start["edit_evidence"]["representation"] == "source-range"
+        assert "test_normalize_widget" not in start["edit_evidence"]["content"]
     finally:
-        client.stop(); thread.join(timeout=5)
+        client.stop()
+        thread.join(timeout=5)
 
 
 def test_codemap_service_exposes_import_ownership_diagnostic(tmp_path: Path) -> None:
@@ -180,7 +220,9 @@ def test_codemap_service_exposes_import_ownership_diagnostic(tmp_path: Path) -> 
         thread.join(timeout=5)
 
 
-def test_codemap_service_exposes_v01115_ownership_intelligence_surfaces(tmp_path: Path) -> None:
+def test_codemap_service_exposes_v01115_ownership_intelligence_surfaces(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "__init__.py").write_text("", encoding="utf-8")
     (tmp_path / "pkg" / "state.py").write_text(
@@ -207,7 +249,9 @@ def test_codemap_service_exposes_v01115_ownership_intelligence_surfaces(tmp_path
         invalidation = client.cache_invalidation_ownership_graph(["pkg/state.py"])
         authority = client.repository_ownership_graph()
         concurrency = client.concurrency_risk_findings(["pkg/state.py"])
-        verification = client.verification_ownership_graph("Fix read behavior in pkg state", candidate_limit=4)
+        verification = client.verification_ownership_graph(
+            "Fix read behavior in pkg state", candidate_limit=4
+        )
         assert cache["schema"] == "hashmarks.cache-ownership.v1"
         assert invalidation["schema"] == "hashmarks.cache-invalidation-ownership.v1"
         assert authority["schema"] == "hashmarks.authority-ownership-graph.v3"

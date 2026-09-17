@@ -5,14 +5,18 @@ import threading
 from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
-from typing import Callable, Iterable, Literal, TypeVar
+from typing import TYPE_CHECKING, Literal, TypeVar
 
 from .digest import DIR_DOMAIN, INPUT_ROOT_DOMAIN, Digest, encode_field
-from .directory_store import DirectoryDigestStore
-from .file_store import FileDigestStore
 from .inputs import InputManifest
 from .observation import ChangeTracker, ObservationState, UnstableObservationError
 from .paths import canonical_host_path, normalize_relative_path
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from .directory_store import DirectoryDigestStore
+    from .file_store import FileDigestStore
 
 DEFAULT_WALK_IGNORE_NAMES = frozenset(
     {
@@ -43,7 +47,7 @@ class _Node:
 class _ManifestTrieNode:
     segment: str
     terminal_rel: str | None = None
-    children: dict[str, "_ManifestTrieNode"] = field(default_factory=dict)
+    children: dict[str, _ManifestTrieNode] = field(default_factory=dict)
     cached_node: _Node | None = None
     cached_digest: Digest | None = None
     dirty: bool = True
@@ -53,7 +57,7 @@ class _ManifestTrieNode:
         for child in self.children.values():
             child.mark_subtree_dirty()
 
-    def as_node(self, owner: "MerkleTree", *, verify: bool) -> _Node:
+    def as_node(self, owner: MerkleTree, *, verify: bool) -> _Node:
         if self.terminal_rel is not None:
             if not verify and not self.dirty and self.cached_node is not None:
                 return self.cached_node
@@ -178,7 +182,7 @@ class _ManifestTree:
         visit(self.root)
         return tuple(result)
 
-    def digest(self, owner: "MerkleTree", *, verify: bool) -> Digest:
+    def digest(self, owner: MerkleTree, *, verify: bool) -> Digest:
         if not verify and not self._root_dirty and self._root_digest is not None:
             return self._root_digest
         nodes = [
@@ -226,8 +230,8 @@ class MerkleTree:
         self.directory_store = directory_store
         self.change_tracker = change_tracker
         self.walk_ignore_names = frozenset(walk_ignore_names)
-        self.mandatory_exclude_names = (
-            DEFAULT_MANDATORY_EXCLUDE_NAMES | frozenset(mandatory_exclude_names)
+        self.mandatory_exclude_names = DEFAULT_MANDATORY_EXCLUDE_NAMES | frozenset(
+            mandatory_exclude_names
         )
         self._excluded_paths = self._build_excluded_paths(exclude_paths)
         self._dir_cache: dict[str, Digest] = {}
@@ -343,7 +347,9 @@ class MerkleTree:
             if not prefix:
                 self._path_cache.clear()
                 return
-            for key in [key for key in self._path_cache if key == rel or key.startswith(prefix)]:
+            for key in [
+                key for key in self._path_cache if key == rel or key.startswith(prefix)
+            ]:
                 self._path_cache.pop(key, None)
 
     def invalidate(
@@ -358,7 +364,11 @@ class MerkleTree:
 
         absolute = self.workspace / rel
         if kind == "auto":
-            kind = "directory" if absolute.is_dir() and not absolute.is_symlink() else "file"
+            kind = (
+                "directory"
+                if absolute.is_dir() and not absolute.is_symlink()
+                else "file"
+            )
 
         self._invalidate_path_cache(rel, kind=kind)
         # Direct MerkleTree users may not attach a ChangeTracker, so explicit
@@ -418,7 +428,9 @@ class MerkleTree:
         if self.directory_store is not None:
             self.directory_store.discard_pending()
         if self.change_tracker is not None:
-            self.change_tracker.mark_unknown("filesystem changed continuously during reconciliation")
+            self.change_tracker.mark_unknown(
+                "filesystem changed continuously during reconciliation"
+            )
         raise UnstableObservationError(
             "filesystem changed continuously during identity reconciliation"
         )
@@ -523,7 +535,9 @@ class MerkleTree:
             )
         raise FileNotFoundError(absolute)
 
-    def directory_digest(self, path: str | Path = "", *, verify: bool = False) -> Digest:
+    def directory_digest(
+        self, path: str | Path = "", *, verify: bool = False
+    ) -> Digest:
         rel = self._relative(path)
         return self._run_reconciled(lambda: self._directory_digest(rel, verify=verify))
 
@@ -601,7 +615,9 @@ class MerkleTree:
             )
         return digest
 
-    def path_digest(self, path: str | Path, *, verify: bool = False) -> tuple[bytes, Digest, bool]:
+    def path_digest(
+        self, path: str | Path, *, verify: bool = False
+    ) -> tuple[bytes, Digest, bool]:
         rel = self._relative(path)
         node = self._run_reconciled(
             lambda: self._node_for_path(rel, name=Path(rel).name or rel, verify=verify)
@@ -659,11 +675,14 @@ class MerkleTree:
                 for rel, target in symlinks.items():
                     self._path_cache[rel] = _Node(kind=b"L", name=b"", target=target)
 
-    def digest_manifest(self, manifest: InputManifest, *, verify: bool = False) -> Digest:
+    def digest_manifest(
+        self, manifest: InputManifest, *, verify: bool = False
+    ) -> Digest:
         with self._lock:
             self._stats["manifest_digest_calls"] += 1
             if verify:
                 self._stats["verify_calls"] += 1
+
         # One synthetic Merkle trie is built per resolved manifest. After that,
         # hot unchanged reads are O(1), and a dirty explicit file recomputes
         # only that leaf plus synthetic path ancestors rather than re-stat'ing
@@ -685,7 +704,6 @@ class MerkleTree:
 
         return self._run_reconciled(compute)
 
-
     def stats(self) -> dict[str, int]:
         with self._lock:
             return dict(self._stats)
@@ -702,7 +720,9 @@ class MerkleTree:
                 "paths": list(self._last_reconciliation_paths),
             }
 
-    def digest_selected(self, inputs: Iterable[str | Path], *, verify: bool = False) -> Digest:
+    def digest_selected(
+        self, inputs: Iterable[str | Path], *, verify: bool = False
+    ) -> Digest:
         """Digest ad-hoc declared inputs using the same manifest Merkle model."""
         requested = tuple(inputs)
         rels = sorted({self._relative(p) for p in requested})
@@ -716,7 +736,9 @@ class MerkleTree:
         for rel in rels:
             if self._is_mandatory_excluded(rel):
                 raise ValueError(f"input path is excluded from identity: {rel}")
-            if any(rel != d and rel.startswith(d.rstrip("/") + "/") for d in selected_dirs):
+            if any(
+                rel != d and rel.startswith(d.rstrip("/") + "/") for d in selected_dirs
+            ):
                 continue
 
             absolute = self.workspace / rel

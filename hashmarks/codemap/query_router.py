@@ -19,26 +19,244 @@ class QueryIntent(str, Enum):
 
 
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?$")
-_PATHISH = re.compile(r"(?:^|\s)(?:\.?[\w.-]+/)+[\w./-]+|\b[\w.-]+\.(?:py|pyi|js|jsx|ts|tsx|go|rs|java|kt|c|h|cc|cpp|hpp|cs|rb|php|swift|toml|ya?ml|json|ini|cfg|conf|md)\b", re.I)
-_RELATIONSHIP = {"caller", "callers", "calls", "called", "reference", "references", "refs", "import", "imports", "imported", "depend", "depends", "dependency", "dependencies", "dependent", "dependents", "uses", "usage"}
-_CONFIG = {"config", "configuration", "manifest", "makefile", "dockerfile", "pyproject", "package", "lockfile", "yaml", "yml", "toml", "json", "ini", "setting", "settings", "env"}
-_TEST = {"test", "tests", "testing", "pytest", "vitest", "jest", "spec", "specs", "fixture", "fixtures", "coverage"}
-_STRUCTURAL = {"class", "function", "method", "struct", "interface", "enum", "signature", "definition", "definitions", "symbol", "symbols", "export", "exports"}
-_CONCEPTUAL = {"architecture", "flow", "lifecycle", "authority", "ownership", "orchestration", "pipeline", "how", "where", "why", "design", "boundary", "boundaries", "overview"}
+_PATHISH = re.compile(
+    r"(?:^|\s)(?:\.?[\w.-]+/)+[\w./-]+|\b[\w.-]+\.(?:py|pyi|js|jsx|ts|tsx|go|rs|java|kt|c|h|cc|cpp|hpp|cs|rb|php|swift|toml|ya?ml|json|ini|cfg|conf|md)\b",
+    re.I,
+)
+_RELATIONSHIP = {
+    "caller",
+    "callers",
+    "calls",
+    "called",
+    "reference",
+    "references",
+    "refs",
+    "import",
+    "imports",
+    "imported",
+    "depend",
+    "depends",
+    "dependency",
+    "dependencies",
+    "dependent",
+    "dependents",
+    "uses",
+    "usage",
+}
+_CONFIG = {
+    "config",
+    "configuration",
+    "manifest",
+    "makefile",
+    "dockerfile",
+    "pyproject",
+    "package",
+    "lockfile",
+    "yaml",
+    "yml",
+    "toml",
+    "json",
+    "ini",
+    "setting",
+    "settings",
+    "env",
+}
+_TEST = {
+    "test",
+    "tests",
+    "testing",
+    "pytest",
+    "vitest",
+    "jest",
+    "spec",
+    "specs",
+    "fixture",
+    "fixtures",
+    "coverage",
+}
+_STRUCTURAL = {
+    "class",
+    "function",
+    "method",
+    "struct",
+    "interface",
+    "enum",
+    "signature",
+    "definition",
+    "definitions",
+    "symbol",
+    "symbols",
+    "export",
+    "exports",
+}
+_CONCEPTUAL = {
+    "architecture",
+    "flow",
+    "lifecycle",
+    "authority",
+    "ownership",
+    "orchestration",
+    "pipeline",
+    "how",
+    "where",
+    "why",
+    "design",
+    "boundary",
+    "boundaries",
+    "overview",
+}
 _TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 _DOMAIN_WORDS: tuple[tuple[RepositoryDomain, frozenset[str]], ...] = (
-    (RepositoryDomain.OWNERSHIP, frozenset({"owner", "owners", "ownership", "owns", "owned", "authority", "authoritative", "responsibility", "responsibilities", "responsible", "governs", "governed", "allowed", "forbidden"})),
-    (RepositoryDomain.ARCHITECTURE, frozenset({"architecture", "architectural", "design", "boundary", "boundaries", "structure", "structural", "shape", "layer", "layers"})),
-    (RepositoryDomain.BUILD, frozenset({"build", "make", "makefile", "init", "setup", "bootstrap", "package", "packaging", "release"})),
-    (RepositoryDomain.PLAN, frozenset({"plan", "plans", "goon", "goons", "template", "templates", "orchestration", "pipeline"})),
-    (RepositoryDomain.CONFIG, frozenset({"config", "configuration", "manifest", "setting", "settings", "yaml", "yml", "toml", "json", "env", "lockfile"})),
-    (RepositoryDomain.SCRIPT, frozenset({"script", "scripts", "shell", "bash", "command", "commands"})),
-    (RepositoryDomain.CONTRACT, frozenset({"contract", "contracts", "schema", "schemas", "invariant", "invariants", "policy", "policies", "requirement", "requirements", "allowed", "forbidden", "valid", "invalid", "rule", "rules"})),
-    (RepositoryDomain.DOC, frozenset({"doc", "docs", "documentation", "readme", "guide"})),
-    (RepositoryDomain.TEST, frozenset({"test", "tests", "testing", "pytest", "vitest", "jest", "spec", "fixture", "coverage"})),
-    (RepositoryDomain.SOURCE, frozenset({"class", "function", "method", "symbol", "implementation", "code", "source"})),
+    (
+        RepositoryDomain.OWNERSHIP,
+        frozenset(
+            {
+                "owner",
+                "owners",
+                "ownership",
+                "owns",
+                "owned",
+                "authority",
+                "authoritative",
+                "responsibility",
+                "responsibilities",
+                "responsible",
+                "governs",
+                "governed",
+                "allowed",
+                "forbidden",
+            }
+        ),
+    ),
+    (
+        RepositoryDomain.ARCHITECTURE,
+        frozenset(
+            {
+                "architecture",
+                "architectural",
+                "design",
+                "boundary",
+                "boundaries",
+                "structure",
+                "structural",
+                "shape",
+                "layer",
+                "layers",
+            }
+        ),
+    ),
+    (
+        RepositoryDomain.BUILD,
+        frozenset(
+            {
+                "build",
+                "make",
+                "makefile",
+                "init",
+                "setup",
+                "bootstrap",
+                "package",
+                "packaging",
+                "release",
+            }
+        ),
+    ),
+    (
+        RepositoryDomain.PLAN,
+        frozenset(
+            {
+                "plan",
+                "plans",
+                "goon",
+                "goons",
+                "template",
+                "templates",
+                "orchestration",
+                "pipeline",
+            }
+        ),
+    ),
+    (
+        RepositoryDomain.CONFIG,
+        frozenset(
+            {
+                "config",
+                "configuration",
+                "manifest",
+                "setting",
+                "settings",
+                "yaml",
+                "yml",
+                "toml",
+                "json",
+                "env",
+                "lockfile",
+            }
+        ),
+    ),
+    (
+        RepositoryDomain.SCRIPT,
+        frozenset({"script", "scripts", "shell", "bash", "command", "commands"}),
+    ),
+    (
+        RepositoryDomain.CONTRACT,
+        frozenset(
+            {
+                "contract",
+                "contracts",
+                "schema",
+                "schemas",
+                "invariant",
+                "invariants",
+                "policy",
+                "policies",
+                "requirement",
+                "requirements",
+                "allowed",
+                "forbidden",
+                "valid",
+                "invalid",
+                "rule",
+                "rules",
+            }
+        ),
+    ),
+    (
+        RepositoryDomain.DOC,
+        frozenset({"doc", "docs", "documentation", "readme", "guide"}),
+    ),
+    (
+        RepositoryDomain.TEST,
+        frozenset(
+            {
+                "test",
+                "tests",
+                "testing",
+                "pytest",
+                "vitest",
+                "jest",
+                "spec",
+                "fixture",
+                "coverage",
+            }
+        ),
+    ),
+    (
+        RepositoryDomain.SOURCE,
+        frozenset(
+            {
+                "class",
+                "function",
+                "method",
+                "symbol",
+                "implementation",
+                "code",
+                "source",
+            }
+        ),
+    ),
 )
 
 
@@ -49,8 +267,27 @@ def _preferred_domains(words: set[str]) -> tuple[RepositoryDomain, ...]:
             result.append(domain)
     # Lifecycle/change-impact/counterfactual questions usually require both the
     # implementation and its governing architecture/contract surface.
-    if words & {"lifecycle", "state", "terminal", "cancel", "cancellation", "change", "changes", "changed", "break", "breaks", "impact", "happen", "happens", "if"}:
-        for domain in (RepositoryDomain.SOURCE, RepositoryDomain.ARCHITECTURE, RepositoryDomain.CONTRACT):
+    if words & {
+        "lifecycle",
+        "state",
+        "terminal",
+        "cancel",
+        "cancellation",
+        "change",
+        "changes",
+        "changed",
+        "break",
+        "breaks",
+        "impact",
+        "happen",
+        "happens",
+        "if",
+    }:
+        for domain in (
+            RepositoryDomain.SOURCE,
+            RepositoryDomain.ARCHITECTURE,
+            RepositoryDomain.CONTRACT,
+        ):
             if domain not in result:
                 result.append(domain)
     return tuple(result)
@@ -93,17 +330,89 @@ def route_query(query: str) -> QueryRoute:
     # definitions add little for these and are safe to omit; lexical/path
     # indexes still provide the normal hybrid recall floor.
     if _PATHISH.search(raw):
-        return QueryRoute(QueryIntent.PATH, "high", False, False, True, True, "explicit path or filename", preferred_domains)
+        return QueryRoute(
+            QueryIntent.PATH,
+            "high",
+            False,
+            False,
+            True,
+            True,
+            "explicit path or filename",
+            preferred_domains,
+        )
     if words & _CONFIG:
-        return QueryRoute(QueryIntent.CONFIG, "high", False, False, True, True, "configuration vocabulary", preferred_domains)
+        return QueryRoute(
+            QueryIntent.CONFIG,
+            "high",
+            False,
+            False,
+            True,
+            True,
+            "configuration vocabulary",
+            preferred_domains,
+        )
     if words & _TEST:
-        return QueryRoute(QueryIntent.TEST, "high", False, False, True, True, "test vocabulary", preferred_domains)
+        return QueryRoute(
+            QueryIntent.TEST,
+            "high",
+            False,
+            False,
+            True,
+            True,
+            "test vocabulary",
+            preferred_domains,
+        )
     if words & _RELATIONSHIP:
-        return QueryRoute(QueryIntent.RELATIONSHIP, "high", True, True, True, True, "relationship vocabulary", preferred_domains)
+        return QueryRoute(
+            QueryIntent.RELATIONSHIP,
+            "high",
+            True,
+            True,
+            True,
+            True,
+            "relationship vocabulary",
+            preferred_domains,
+        )
     if words & _STRUCTURAL:
-        return QueryRoute(QueryIntent.STRUCTURAL, "medium", True, True, True, True, "structural vocabulary", preferred_domains)
+        return QueryRoute(
+            QueryIntent.STRUCTURAL,
+            "medium",
+            True,
+            True,
+            True,
+            True,
+            "structural vocabulary",
+            preferred_domains,
+        )
     if _IDENTIFIER.fullmatch(raw):
-        return QueryRoute(QueryIntent.IDENTIFIER, "high", True, True, True, True, "exact identifier shape", preferred_domains)
+        return QueryRoute(
+            QueryIntent.IDENTIFIER,
+            "high",
+            True,
+            True,
+            True,
+            True,
+            "exact identifier shape",
+            preferred_domains,
+        )
     if words & _CONCEPTUAL:
-        return QueryRoute(QueryIntent.CONCEPTUAL, "medium", True, True, True, True, "conceptual/architecture vocabulary", preferred_domains)
-    return QueryRoute(QueryIntent.HYBRID, "low", True, True, True, True, "ambiguous query keeps full hybrid retrieval", preferred_domains)
+        return QueryRoute(
+            QueryIntent.CONCEPTUAL,
+            "medium",
+            True,
+            True,
+            True,
+            True,
+            "conceptual/architecture vocabulary",
+            preferred_domains,
+        )
+    return QueryRoute(
+        QueryIntent.HYBRID,
+        "low",
+        True,
+        True,
+        True,
+        True,
+        "ambiguous query keeps full hybrid retrieval",
+        preferred_domains,
+    )

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks import CodeMap
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _repo(root: Path) -> tuple[str, list[str]]:
@@ -20,7 +23,9 @@ def _repo(root: Path) -> tuple[str, list[str]]:
     return "fix widget behavior and verify owner test", ["src/owner.py"]
 
 
-def test_opt_in_decision_session_diagnostics_reports_composition_and_reuse(tmp_path: Path) -> None:
+def test_opt_in_decision_session_diagnostics_reports_composition_and_reuse(
+    tmp_path: Path,
+) -> None:
     task, paths = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -30,7 +35,9 @@ def test_opt_in_decision_session_diagnostics_reports_composition_and_reuse(tmp_p
             snapshot = codemap.repository_intelligence_snapshot(task, paths)
             codemap.repository_intelligence_profile(task, paths, profile="compact")
             codemap.intelligence_economics_receipt(task, paths)
-            codemap.repository_intelligence_delta(task, paths, previous_snapshot=snapshot)
+            codemap.repository_intelligence_delta(
+                task, paths, previous_snapshot=snapshot
+            )
         receipt = codemap.decision_session_diagnostics()
 
     assert receipt is not None
@@ -44,14 +51,19 @@ def test_opt_in_decision_session_diagnostics_reports_composition_and_reuse(tmp_p
     assert producers["evidence_freshness_map"]["calls"] >= 1
     assert producers["task_action_map"]["calls"] >= 1
     assert producers["repository_intelligence_snapshot"]["calls"] >= 1
-    assert producers["task_action_map"]["inclusive_ns"] >= producers["task_action_map"]["exclusive_ns"]
+    assert (
+        producers["task_action_map"]["inclusive_ns"]
+        >= producers["task_action_map"]["exclusive_ns"]
+    )
     assert receipt["reuse"]["task_action_hit"] >= 1
     assert receipt["reuse"]["snapshot_hit"] >= 1
     assert receipt["spans"]
     assert any(row["parent_id"] is not None for row in receipt["spans"])
 
 
-def test_diagnostics_classifies_duplicate_semantic_producer_requests(tmp_path: Path) -> None:
+def test_diagnostics_classifies_duplicate_semantic_producer_requests(
+    tmp_path: Path,
+) -> None:
     task, _ = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()

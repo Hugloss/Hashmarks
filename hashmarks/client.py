@@ -6,17 +6,19 @@ import os
 import socket
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
-from .inputs import InputManifest
 from .observation import ObservationState
 from .paths import canonical_host_path
 from .schema import DAEMON_CAPABILITIES, DAEMON_PROTOCOL_VERSION, DAEMON_SEMANTICS
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .inputs import InputManifest
+
 _PROTOCOL_VERSION = DAEMON_PROTOCOL_VERSION
 _MAX_RESPONSE = 4 * 1024 * 1024
-
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +45,7 @@ class RepositoryObservation:
             and self.dirty_path_count == len(self.dirty_paths)
             and self.dirty_path_count > 0
         )
+
 
 class DaemonUnavailableError(ConnectionError):
     pass
@@ -120,7 +123,11 @@ class IdentityClient:
         timeout: float = 30.0,
     ) -> None:
         self.workspace = canonical_host_path(workspace)
-        self.state_dir = default_state_dir(self.workspace) if state_dir is None else canonical_host_path(state_dir)
+        self.state_dir = (
+            default_state_dir(self.workspace)
+            if state_dir is None
+            else canonical_host_path(state_dir)
+        )
         self.socket_path = (
             default_socket_path(self.workspace)
             if socket_path is None
@@ -131,7 +138,9 @@ class IdentityClient:
 
     def request(self, op: str, **payload: Any) -> dict[str, Any]:
         message = {"protocol": _PROTOCOL_VERSION, "op": op, **payload}
-        raw = (json.dumps(message, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
+        raw = (
+            json.dumps(message, separators=(",", ":"), sort_keys=True) + "\n"
+        ).encode("utf-8")
 
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(self.timeout)
@@ -146,7 +155,12 @@ class IdentityClient:
                 chunks.extend(chunk)
                 if b"\n" in chunk:
                     break
-        except (FileNotFoundError, ConnectionRefusedError, socket.timeout, OSError) as exc:
+        except (
+            TimeoutError,
+            FileNotFoundError,
+            ConnectionRefusedError,
+            OSError,
+        ) as exc:
             raise DaemonUnavailableError(
                 f"identity daemon unavailable at {self.socket_path}: {exc}"
             ) from exc
@@ -165,7 +179,9 @@ class IdentityClient:
         if not isinstance(response, dict):
             raise DaemonProtocolError("daemon response must be an object")
         if not response.get("ok", False):
-            raise DaemonProtocolError(str(response.get("error", "daemon request failed")))
+            raise DaemonProtocolError(
+                str(response.get("error", "daemon request failed"))
+            )
         return response
 
     def status(self) -> dict[str, Any]:
@@ -186,12 +202,17 @@ class IdentityClient:
             raise DaemonCompatibilityError(
                 f"identity daemon semantics mismatch: expected {DAEMON_SEMANTICS!r}, got {semantics!r}"
             )
-        if not isinstance(capabilities, list) or not all(isinstance(v, str) for v in capabilities):
-            raise DaemonCompatibilityError("identity daemon did not advertise a valid capability set")
+        if not isinstance(capabilities, list) or not all(
+            isinstance(v, str) for v in capabilities
+        ):
+            raise DaemonCompatibilityError(
+                "identity daemon did not advertise a valid capability set"
+            )
         missing = sorted(set(DAEMON_CAPABILITIES) - set(capabilities))
         if missing:
             raise DaemonCompatibilityError(
-                "identity daemon is missing required capabilities: " + ", ".join(missing)
+                "identity daemon is missing required capabilities: "
+                + ", ".join(missing)
             )
         self._compatibility_validated = True
         return response
@@ -215,23 +236,41 @@ class IdentityClient:
             paths_complete = response["paths_complete"]
             raw_paths = response["paths"]
         except (KeyError, TypeError, ValueError) as exc:
-            raise DaemonProtocolError("daemon returned an invalid repository observation") from exc
+            raise DaemonProtocolError(
+                "daemon returned an invalid repository observation"
+            ) from exc
         if not isinstance(paths_complete, bool):
-            raise DaemonProtocolError("repository observation paths_complete must be boolean")
-        if not isinstance(raw_paths, list) or not all(isinstance(path, str) for path in raw_paths):
-            raise DaemonProtocolError("repository observation paths must be a list of strings")
+            raise DaemonProtocolError(
+                "repository observation paths_complete must be boolean"
+            )
+        if not isinstance(raw_paths, list) or not all(
+            isinstance(path, str) for path in raw_paths
+        ):
+            raise DaemonProtocolError(
+                "repository observation paths must be a list of strings"
+            )
         paths = tuple(raw_paths)
         if paths_complete and dirty_path_count != len(paths):
-            raise DaemonProtocolError("complete repository observation path count mismatch")
+            raise DaemonProtocolError(
+                "complete repository observation path count mismatch"
+            )
         if not paths_complete and paths:
-            raise DaemonProtocolError("incomplete repository observation must not expose partial paths")
+            raise DaemonProtocolError(
+                "incomplete repository observation must not expose partial paths"
+            )
         if state is ObservationState.CLEAN and (dirty_path_count != 0 or paths):
-            raise DaemonProtocolError("clean repository observation cannot contain dirty paths")
+            raise DaemonProtocolError(
+                "clean repository observation cannot contain dirty paths"
+            )
         if state is ObservationState.UNKNOWN and paths:
-            raise DaemonProtocolError("unknown repository observation cannot authorize dirty paths")
+            raise DaemonProtocolError(
+                "unknown repository observation cannot authorize dirty paths"
+            )
         reason = response.get("reason")
         if reason is not None and not isinstance(reason, str):
-            raise DaemonProtocolError("repository observation reason must be a string or null")
+            raise DaemonProtocolError(
+                "repository observation reason must be a string or null"
+            )
         return RepositoryObservation(
             state=state,
             generation=generation,
@@ -269,7 +308,9 @@ class IdentityClient:
             path_bytes = len(json.dumps(path, ensure_ascii=False).encode("utf-8")) + 1
             if path_bytes + 128 > max_chunk_bytes:
                 raise ValueError(f"manifest path exceeds chunk byte budget: {path!r}")
-            if chunk and (len(chunk) >= chunk_size or encoded_bytes + path_bytes > max_chunk_bytes):
+            if chunk and (
+                len(chunk) >= chunk_size or encoded_bytes + path_bytes > max_chunk_bytes
+            ):
                 self.request("manifest_append", token=token, paths=chunk)
                 chunk = []
                 encoded_bytes = 128
@@ -280,7 +321,9 @@ class IdentityClient:
         committed = self.request("manifest_commit", token=token)
         handle = str(committed["manifest_handle"])
         if handle != manifest.fingerprint:
-            raise DaemonProtocolError("daemon registered a different manifest fingerprint")
+            raise DaemonProtocolError(
+                "daemon registered a different manifest fingerprint"
+            )
         return handle
 
     def drop_manifest(self, manifest_handle: str) -> bool:

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.repository_index_store import WorkspaceMapStore
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_repository_ownership_uses_single_current_name(tmp_path: Path) -> None:

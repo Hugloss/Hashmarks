@@ -5,7 +5,6 @@ import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 _CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 _WORD = re.compile(r"[A-Za-z0-9]+")
@@ -15,7 +14,9 @@ _SKIP_ROOTS = {".git", ".hashmarks", ".venv", "node_modules"}
 def code_terms(value: str) -> list[str]:
     """Code-aware lexical terms for BM25 without external dependencies."""
     out: list[str] = []
-    for raw in _WORD.findall(value.replace("_", " ").replace("-", " ").replace("/", " ").replace(".", " ")):
+    for raw in _WORD.findall(
+        value.replace("_", " ").replace("-", " ").replace("/", " ").replace(".", " ")
+    ):
         pieces = [p for p in _CAMEL.split(raw) if p]
         normalized = [p.casefold() for p in pieces if len(p) > 1]
         joined = "".join(normalized)
@@ -24,7 +25,7 @@ def code_terms(value: str) -> list[str]:
         out.extend(normalized)
         if joined and joined not in out:
             out.append(joined)
-        for left, right in zip(normalized, normalized[1:]):
+        for left, right in zip(normalized, normalized[1:], strict=False):
             out.append(left + right)
     return out
 
@@ -53,7 +54,9 @@ class FieldedBM25Index:
         "body": 1.0,
     }
 
-    def __init__(self, workspace: Path, documents: dict[str, dict[str, Counter[str]]]) -> None:
+    def __init__(
+        self, workspace: Path, documents: dict[str, dict[str, Counter[str]]]
+    ) -> None:
         self.workspace = workspace
         self.documents = documents
         self._field_lengths: dict[str, dict[str, int]] = {}
@@ -70,10 +73,12 @@ class FieldedBM25Index:
             self._dfs[field] = dict(df)
 
     @classmethod
-    def build(cls, codemap) -> "FieldedBM25Index":
+    def build(cls, codemap) -> FieldedBM25Index:
         workspace = Path(codemap.workspace)
         paths = sorted(codemap.store.paths())
-        symbols = codemap.store.symbols_for_paths(paths, limit=max(5000, len(paths) * 100))
+        symbols = codemap.store.symbols_for_paths(
+            paths, limit=max(5000, len(paths) * 100)
+        )
         symbols_by_path: dict[str, list[dict]] = defaultdict(list)
         for row in symbols:
             symbols_by_path[str(row.get("path") or "")].append(row)
@@ -89,9 +94,16 @@ class FieldedBM25Index:
                 body = p.read_text(encoding="utf-8", errors="ignore")
             except OSError:
                 body = ""
-            symbol_text = " ".join(str(r.get("name") or "") + " " + str(r.get("qualname") or "") for r in symbols_by_path.get(rel, ()))
-            signature_text = " ".join(str(r.get("signature") or "") for r in symbols_by_path.get(rel, ()))
-            imports_text = " ".join(str(r.get("target") or "") for r in edges_by_path.get(rel, ()))
+            symbol_text = " ".join(
+                str(r.get("name") or "") + " " + str(r.get("qualname") or "")
+                for r in symbols_by_path.get(rel, ())
+            )
+            signature_text = " ".join(
+                str(r.get("signature") or "") for r in symbols_by_path.get(rel, ())
+            )
+            imports_text = " ".join(
+                str(r.get("target") or "") for r in edges_by_path.get(rel, ())
+            )
             documents[rel] = {
                 "path": Counter(code_terms(rel)),
                 "symbol": Counter(code_terms(symbol_text)),
@@ -101,7 +113,9 @@ class FieldedBM25Index:
             }
         return cls(workspace, documents)
 
-    def search(self, query: str, *, limit: int = 20, k1: float = 1.2, b: float = 0.75) -> list[BM25Hit]:
+    def search(
+        self, query: str, *, limit: int = 20, k1: float = 1.2, b: float = 0.75
+    ) -> list[BM25Hit]:
         terms = code_terms(query)
         if not terms or not self.documents:
             return []
@@ -130,4 +144,11 @@ class FieldedBM25Index:
                     scores[path] += weight * idf * (tf * (k1 + 1.0) / norm)
                     matched[path].add(field)
         ranked = sorted(scores, key=lambda path: (-scores[path], path))[:limit]
-        return [BM25Hit(path=path, score=scores[path], matched_fields=tuple(sorted(matched[path]))) for path in ranked]
+        return [
+            BM25Hit(
+                path=path,
+                score=scores[path],
+                matched_fields=tuple(sorted(matched[path])),
+            )
+            for path in ranked
+        ]

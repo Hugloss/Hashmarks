@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import os
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import hashmarks_build
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _sha(path: Path) -> str:
@@ -19,19 +22,13 @@ def test_sdist_is_reproducible_across_source_mtime_changes(
     (release / "hashmarks").mkdir(parents=True)
     (release / "tests").mkdir()
     (release / "pyproject.toml").write_text(
-        "[project]\n"
-        'name = "hashmarks"\n'
-        'version = "1.2.3"\n'
-        'requires-python = ">=3.11"\n'
+        '[project]\nname = "hashmarks"\nversion = "1.2.3"\nrequires-python = ">=3.11"\n'
     )
-    (release / "hashmarks" / "_version.py").write_text(
-        '__version__ = "1.2.3"\n'
-    )
+    (release / "hashmarks" / "_version.py").write_text('__version__ = "1.2.3"\n')
     (release / "hashmarks" / "__init__.py").write_text("")
     (release / "README.md").write_text("# Hashmarks\n")
     (release / "tests" / "test_sample.py").write_text(
-        "def test_sample():\n"
-        "    assert True\n"
+        "def test_sample():\n    assert True\n"
     )
 
     monkeypatch.setattr(hashmarks_build, "ROOT", release)
@@ -55,10 +52,7 @@ def test_wheel_is_reproducible_across_source_mtime_changes(
     release = tmp_path / "release"
     (release / "hashmarks").mkdir(parents=True)
     (release / "pyproject.toml").write_text(
-        "[project]\n"
-        'name = "hashmarks"\n'
-        'version = "1.2.3"\n'
-        'requires-python = ">=3.11"\n'
+        '[project]\nname = "hashmarks"\nversion = "1.2.3"\nrequires-python = ">=3.11"\n'
     )
     (release / "hashmarks" / "_version.py").write_text('__version__ = "1.2.3"\n')
     (release / "hashmarks" / "__init__.py").write_text("")

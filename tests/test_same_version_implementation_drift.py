@@ -1,9 +1,7 @@
 from copy import deepcopy
-
 from pathlib import Path
 
 from hashmarks import __version__
-
 from hashmarks.producer_identity import native_producer_implementation_identity
 from hashmarks.verification_selection import (
     VerificationSelectionEnvelopeState,
@@ -68,11 +66,15 @@ def test_evidence_claiming_other_same_version_producer_identity_fails() -> None:
     a = _envelope("sha256:" + "a" * 64)
     b = _envelope("sha256:" + "b" * 64)
     claimed = deepcopy(a)
-    claimed["producer"]["implementation_identity"] = b["producer"]["implementation_identity"]
+    claimed["producer"]["implementation_identity"] = b["producer"][
+        "implementation_identity"
+    ]
     assert validate_verification_selection_envelope(claimed)["valid"] is False
 
 
-def test_same_version_different_package_bytes_produce_different_native_identities(tmp_path: Path) -> None:
+def test_same_version_different_package_bytes_produce_different_native_identities(
+    tmp_path: Path,
+) -> None:
     a = tmp_path / "a"
     b = tmp_path / "b"
     a.mkdir()
@@ -81,7 +83,9 @@ def test_same_version_different_package_bytes_produce_different_native_identitie
     (b / "_version.py").write_text(f'__version__ = "{__version__}"\n')
     (a / "engine.py").write_text("VALUE = 1\n")
     (b / "engine.py").write_text("VALUE = 2\n")
-    assert native_producer_implementation_identity(a) != native_producer_implementation_identity(b)
+    assert native_producer_implementation_identity(
+        a
+    ) != native_producer_implementation_identity(b)
 
 
 def test_native_producer_identity_is_stable_across_repeated_calls() -> None:

@@ -13,17 +13,13 @@ def _write(path: Path, content: str) -> None:
 
 def _dependency_path(root: Path) -> Path:
     return (
-        root
-        / ".venv"
-        / "lib"
-        / "python3.13"
-        / "site-packages"
-        / "demo_dep"
-        / "core.py"
+        root / ".venv" / "lib" / "python3.13" / "site-packages" / "demo_dep" / "core.py"
     )
 
 
-def test_outline_rejects_pruned_dependency_before_digest_or_index(tmp_path: Path) -> None:
+def test_outline_rejects_pruned_dependency_before_digest_or_index(
+    tmp_path: Path,
+) -> None:
     owned = tmp_path / "src" / "app.py"
     dependency = _dependency_path(tmp_path)
     _write(owned, "def owned():\n    return 1\n")
@@ -33,13 +29,15 @@ def test_outline_rejects_pruned_dependency_before_digest_or_index(tmp_path: Path
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         assert rel not in codemap.store.paths()
-        with patch.object(
-            codemap.file_store,
-            "digest",
-            side_effect=AssertionError("pruned dependency source must not be read"),
+        with (
+            patch.object(
+                codemap.file_store,
+                "digest",
+                side_effect=AssertionError("pruned dependency source must not be read"),
+            ),
+            pytest.raises(FileNotFoundError, match="not indexed"),
         ):
-            with pytest.raises(FileNotFoundError, match="not indexed"):
-                codemap.outline(rel)
+            codemap.outline(rel)
         assert rel not in codemap.store.paths()
 
 
@@ -50,17 +48,21 @@ def test_explicit_source_cannot_resurrect_pruned_dependency(tmp_path: Path) -> N
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
-        with patch.object(
-            codemap.file_store,
-            "digest",
-            side_effect=AssertionError("pruned dependency source must not be read"),
+        with (
+            patch.object(
+                codemap.file_store,
+                "digest",
+                side_effect=AssertionError("pruned dependency source must not be read"),
+            ),
+            pytest.raises(KeyError, match="symbol not found"),
         ):
-            with pytest.raises(KeyError, match="symbol not found"):
-                codemap.source(f"{rel}::dependency_impl")
+            codemap.source(f"{rel}::dependency_impl")
         assert rel not in codemap.store.paths()
 
 
-def test_explicit_query_currentness_respects_context_index_denial(tmp_path: Path) -> None:
+def test_explicit_query_currentness_respects_context_index_denial(
+    tmp_path: Path,
+) -> None:
     hidden = tmp_path / "private" / "hidden.py"
     _write(hidden, "def hidden():\n    return 3\n")
     (tmp_path / ".hashmarks-context.toml").write_text(
@@ -72,13 +74,15 @@ def test_explicit_query_currentness_respects_context_index_denial(tmp_path: Path
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         assert rel not in codemap.store.paths()
-        with patch.object(
-            codemap.file_store,
-            "digest",
-            side_effect=AssertionError("context-denied source must not be read"),
+        with (
+            patch.object(
+                codemap.file_store,
+                "digest",
+                side_effect=AssertionError("context-denied source must not be read"),
+            ),
+            pytest.raises(FileNotFoundError, match="not indexed"),
         ):
-            with pytest.raises(FileNotFoundError, match="not indexed"):
-                codemap.outline(rel)
+            codemap.outline(rel)
         assert rel not in codemap.store.paths()
 
 

@@ -7,15 +7,27 @@ import subprocess
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any
 
-from ..native_nx import collect_nx_graph, find_nx
-from ..native_pants import collect_pants_targets
-from ..native_maven import collect_maven_modules
-from ..native_gradle import collect_gradle_projects
+from hashmarks.native_gradle import collect_gradle_projects
+from hashmarks.native_maven import collect_maven_modules
+from hashmarks.native_nx import collect_nx_graph, find_nx
+from hashmarks.native_pants import collect_pants_targets
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
-_PRUNE = {".git", ".hashmarks", ".venv", "venv", "node_modules", "target", "dist", "build", ".next"}
+_PRUNE = {
+    ".git",
+    ".hashmarks",
+    ".venv",
+    "venv",
+    "node_modules",
+    "target",
+    "dist",
+    "build",
+    ".next",
+}
 
 
 @dataclass(frozen=True)
@@ -74,9 +86,13 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
     name = "npm-package-graph"
 
     def detect(self, workspace: Path) -> bool:
-        return (workspace / "package.json").is_file() or bool(_walk_manifests(workspace, "package.json"))
+        return (workspace / "package.json").is_file() or bool(
+            _walk_manifests(workspace, "package.json")
+        )
 
-    def _package_rows(self, workspace: Path) -> tuple[list[tuple[Path, dict[str, Any]]], list[str]]:
+    def _package_rows(
+        self, workspace: Path
+    ) -> tuple[list[tuple[Path, dict[str, Any]]], list[str]]:
         rows: list[tuple[Path, dict[str, Any]]] = []
         warnings: list[str] = []
         for manifest in _walk_manifests(workspace, "package.json"):
@@ -91,10 +107,14 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
 
     @staticmethod
     def _npm_name(workspace: Path, manifest: Path, value: dict[str, Any]) -> str:
-        root_rel = _rel(workspace, manifest.parent) if manifest.parent != workspace else "."
+        root_rel = (
+            _rel(workspace, manifest.parent) if manifest.parent != workspace else "."
+        )
         return str(value.get("name") or f"npm:{root_rel}")
 
-    def _npm_node(self, workspace: Path, manifest: Path, value: dict[str, Any]) -> ProjectNode:
+    def _npm_node(
+        self, workspace: Path, manifest: Path, value: dict[str, Any]
+    ) -> ProjectNode:
         root = manifest.parent
         root_rel = _rel(workspace, root) if root != workspace else "."
         name = self._npm_name(workspace, manifest, value)
@@ -106,18 +126,32 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
             root=root_rel,
             manifest=_rel(workspace, manifest),
             producer=self.name,
-            metadata={"name": name, "private": bool(value.get("private", False)), "scripts": script_names},
+            metadata={
+                "name": name,
+                "private": bool(value.get("private", False)),
+                "scripts": script_names,
+            },
         )
 
-    def _npm_nodes(self, workspace: Path, rows: list[tuple[Path, dict[str, Any]]]) -> tuple[list[ProjectNode], dict[str, str]]:
+    def _npm_nodes(
+        self, workspace: Path, rows: list[tuple[Path, dict[str, Any]]]
+    ) -> tuple[list[ProjectNode], dict[str, str]]:
         nodes = [self._npm_node(workspace, manifest, value) for manifest, value in rows]
         return nodes, {str(node.metadata["name"]): node.project_id for node in nodes}
 
     def _npm_edges(
-        self, workspace: Path, rows: list[tuple[Path, dict[str, Any]]], names: dict[str, str]
+        self,
+        workspace: Path,
+        rows: list[tuple[Path, dict[str, Any]]],
+        names: dict[str, str],
     ) -> list[ProjectEdge]:
         edges: list[ProjectEdge] = []
-        fields = ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies")
+        fields = (
+            "dependencies",
+            "devDependencies",
+            "peerDependencies",
+            "optionalDependencies",
+        )
         for manifest, value in rows:
             source = f"npm:{self._npm_name(workspace, manifest, value)}"
             for field_name in fields:
@@ -127,14 +161,20 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
                 for dep_name in deps:
                     target = names.get(str(dep_name))
                     if target is not None and target != source:
-                        edges.append(ProjectEdge(source, target, field_name, "manifest", self.name))
+                        edges.append(
+                            ProjectEdge(
+                                source, target, field_name, "manifest", self.name
+                            )
+                        )
         return edges
 
     def collect(self, workspace: Path) -> ProjectGraphEvidence:
         rows, warnings = self._package_rows(workspace)
         nodes, names = self._npm_nodes(workspace, rows)
         edges = self._npm_edges(workspace, rows, names)
-        return ProjectGraphEvidence(self.name, tuple(nodes), tuple(edges), tuple(warnings))
+        return ProjectGraphEvidence(
+            self.name, tuple(nodes), tuple(edges), tuple(warnings)
+        )
 
 
 class NxProjectGraphProvider(ProjectGraphProvider):
@@ -164,23 +204,31 @@ class NxProjectGraphProvider(ProjectGraphProvider):
         for row in graph.nodes:
             manifest = self._node_manifest(workspace, row.root)
             freshness = ["nx.json", manifest]
-            for candidate in ("package.json", "pnpm-workspace.yaml", "package-lock.json", "pnpm-lock.yaml", "yarn.lock"):
+            for candidate in (
+                "package.json",
+                "pnpm-workspace.yaml",
+                "package-lock.json",
+                "pnpm-lock.yaml",
+                "yarn.lock",
+            ):
                 if (workspace / candidate).is_file():
                     freshness.append(candidate)
-            nodes.append(ProjectNode(
-                project_id=f"nx:{row.name}",
-                kind=f"nx-{row.type}",
-                root=row.root,
-                manifest=manifest,
-                producer=self.name,
-                metadata={
-                    "name": row.name,
-                    "source_root": row.source_root,
-                    "targets": list(row.targets),
-                    "tags": list(row.tags),
-                    "freshness_manifests": list(dict.fromkeys(freshness)),
-                },
-            ))
+            nodes.append(
+                ProjectNode(
+                    project_id=f"nx:{row.name}",
+                    kind=f"nx-{row.type}",
+                    root=row.root,
+                    manifest=manifest,
+                    producer=self.name,
+                    metadata={
+                        "name": row.name,
+                        "source_root": row.source_root,
+                        "targets": list(row.targets),
+                        "tags": list(row.tags),
+                        "freshness_manifests": list(dict.fromkeys(freshness)),
+                    },
+                )
+            )
         edges = tuple(
             ProjectEdge(
                 source=f"nx:{row.source}",
@@ -248,7 +296,9 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
     name = "maven-pom-graph"
 
     def detect(self, workspace: Path) -> bool:
-        return (workspace / "pom.xml").is_file() or bool(_walk_manifests(workspace, "pom.xml"))
+        return (workspace / "pom.xml").is_file() or bool(
+            _walk_manifests(workspace, "pom.xml")
+        )
 
     @staticmethod
     def _module_indexes(modules):
@@ -267,13 +317,19 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
                 root=row.root,
                 manifest=row.manifest,
                 producer=self.name,
-                metadata={"group_id": row.group_id, "artifact_id": row.artifact_id, "freshness_manifests": [row.manifest]},
+                metadata={
+                    "group_id": row.group_id,
+                    "artifact_id": row.artifact_id,
+                    "freshness_manifests": [row.manifest],
+                },
             )
             for row in modules
         )
 
     @staticmethod
-    def _resolve_maven_target(group_id: str, artifact_id: str, by_ga, by_artifact) -> str | None:
+    def _resolve_maven_target(
+        group_id: str, artifact_id: str, by_ga, by_artifact
+    ) -> str | None:
         target_id = by_ga.get((group_id, artifact_id))
         if target_id is not None:
             return target_id
@@ -284,9 +340,19 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
         edges: list[ProjectEdge] = []
         for row in modules:
             for group_id, artifact_id in row.dependencies:
-                target_id = self._resolve_maven_target(group_id, artifact_id, by_ga, by_artifact)
+                target_id = self._resolve_maven_target(
+                    group_id, artifact_id, by_ga, by_artifact
+                )
                 if target_id is not None and target_id != row.module_id:
-                    edges.append(ProjectEdge(ids[row.module_id], ids[target_id], "dependency", "manifest", self.name))
+                    edges.append(
+                        ProjectEdge(
+                            ids[row.module_id],
+                            ids[target_id],
+                            "dependency",
+                            "manifest",
+                            self.name,
+                        )
+                    )
         return tuple(edges)
 
     def collect(self, workspace: Path) -> ProjectGraphEvidence:
@@ -301,7 +367,15 @@ class GradleProjectGraphProvider(ProjectGraphProvider):
     name = "gradle-project-graph"
 
     def detect(self, workspace: Path) -> bool:
-        return any((workspace / name).is_file() for name in ("settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts"))
+        return any(
+            (workspace / name).is_file()
+            for name in (
+                "settings.gradle",
+                "settings.gradle.kts",
+                "build.gradle",
+                "build.gradle.kts",
+            )
+        )
 
     def collect(self, workspace: Path) -> ProjectGraphEvidence:
         snapshot = collect_gradle_projects(workspace)
@@ -357,47 +431,85 @@ class GoProjectGraphProvider(ProjectGraphProvider):
             if isinstance(value, dict):
                 yield value
 
-    def _run_go_list(self, workspace: Path, go: str) -> tuple[subprocess.CompletedProcess[str] | None, str | None]:
+    def _run_go_list(
+        self, workspace: Path, go: str
+    ) -> tuple[subprocess.CompletedProcess[str] | None, str | None]:
         try:
             completed = subprocess.run(
-                [go, "list", "-json", "./..."], cwd=workspace, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                text=True, timeout=20, check=False, env={**os.environ, "GOWORK": os.environ.get("GOWORK", "auto")},
+                [go, "list", "-json", "./..."],
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=20,
+                check=False,
+                env={**os.environ, "GOWORK": os.environ.get("GOWORK", "auto")},
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             return None, f"go list failed: {exc}"
         if completed.returncode == 0:
             return completed, None
-        detail = completed.stderr.strip().splitlines()[-1] if completed.stderr.strip() else f"exit {completed.returncode}"
+        detail = (
+            completed.stderr.strip().splitlines()[-1]
+            if completed.stderr.strip()
+            else f"exit {completed.returncode}"
+        )
         return None, f"go list failed: {detail}"
 
     @staticmethod
     def _go_ids(packages: list[dict[str, Any]]) -> dict[str, str]:
-        return {str(row["ImportPath"]): f"go:{row['ImportPath']}" for row in packages if row.get("ImportPath")}
+        return {
+            str(row["ImportPath"]): f"go:{row['ImportPath']}"
+            for row in packages
+            if row.get("ImportPath")
+        }
 
-    def _go_node(self, workspace: Path, row: dict[str, Any], ids: dict[str, str]) -> ProjectNode | None:
+    def _go_node(
+        self, workspace: Path, row: dict[str, Any], ids: dict[str, str]
+    ) -> ProjectNode | None:
         import_path = row.get("ImportPath")
         directory = row.get("Dir")
         if not import_path or not directory:
             return None
         try:
-            root = Path(str(directory)).resolve(strict=False).relative_to(workspace).as_posix() or "."
+            root = (
+                Path(str(directory))
+                .resolve(strict=False)
+                .relative_to(workspace)
+                .as_posix()
+                or "."
+            )
         except ValueError:
             return None
         return ProjectNode(
-            project_id=ids[str(import_path)], kind="go-package", root=root, manifest="go.mod", producer=self.name,
-            metadata={"import_path": str(import_path), "name": str(row.get("Name") or "")},
+            project_id=ids[str(import_path)],
+            kind="go-package",
+            root=root,
+            manifest="go.mod",
+            producer=self.name,
+            metadata={
+                "import_path": str(import_path),
+                "name": str(row.get("Name") or ""),
+            },
         )
 
-    def _go_edges(self, row: dict[str, Any], source: str, ids: dict[str, str]) -> list[ProjectEdge]:
+    def _go_edges(
+        self, row: dict[str, Any], source: str, ids: dict[str, str]
+    ) -> list[ProjectEdge]:
         edges: list[ProjectEdge] = []
         for field_name in ("Imports", "TestImports", "XTestImports"):
             for imported in row.get(field_name) or ():
                 target = ids.get(str(imported))
                 if target is not None and target != source:
-                    edges.append(ProjectEdge(source, target, field_name.lower(), "native", self.name))
+                    edges.append(
+                        ProjectEdge(
+                            source, target, field_name.lower(), "native", self.name
+                        )
+                    )
         return edges
 
-    def _go_graph(self, workspace: Path, packages: list[dict[str, Any]]) -> tuple[list[ProjectNode], list[ProjectEdge]]:
+    def _go_graph(
+        self, workspace: Path, packages: list[dict[str, Any]]
+    ) -> tuple[list[ProjectNode], list[ProjectEdge]]:
         ids = self._go_ids(packages)
         nodes: list[ProjectNode] = []
         edges: list[ProjectEdge] = []
@@ -412,10 +524,17 @@ class GoProjectGraphProvider(ProjectGraphProvider):
     def collect(self, workspace: Path) -> ProjectGraphEvidence:
         go = shutil.which("go")
         if go is None:
-            return ProjectGraphEvidence(self.name, warnings=("go executable unavailable; native Go package graph not collected",))
+            return ProjectGraphEvidence(
+                self.name,
+                warnings=(
+                    "go executable unavailable; native Go package graph not collected",
+                ),
+            )
         completed, error = self._run_go_list(workspace, go)
         if completed is None:
-            return ProjectGraphEvidence(self.name, warnings=(error or "go list failed",))
+            return ProjectGraphEvidence(
+                self.name, warnings=(error or "go list failed",)
+            )
         packages = list(self._json_stream(completed.stdout))
         nodes, edges = self._go_graph(workspace, packages)
         return ProjectGraphEvidence(self.name, tuple(nodes), tuple(edges))
@@ -425,9 +544,13 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
     name = "cargo-metadata"
 
     def detect(self, workspace: Path) -> bool:
-        return (workspace / "Cargo.toml").is_file() or bool(_walk_manifests(workspace, "Cargo.toml"))
+        return (workspace / "Cargo.toml").is_file() or bool(
+            _walk_manifests(workspace, "Cargo.toml")
+        )
 
-    def _fallback_rows(self, workspace: Path) -> tuple[list[tuple[Path, dict[str, Any]]], list[str]]:
+    def _fallback_rows(
+        self, workspace: Path
+    ) -> tuple[list[tuple[Path, dict[str, Any]]], list[str]]:
         rows: list[tuple[Path, dict[str, Any]]] = []
         warnings: list[str] = []
         for manifest in _walk_manifests(workspace, "Cargo.toml"):
@@ -441,15 +564,30 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
                 rows.append((manifest, value))
         return rows, warnings
 
-    def _fallback_nodes(self, workspace: Path, rows) -> tuple[list[ProjectNode], dict[str, str]]:
+    def _fallback_nodes(
+        self, workspace: Path, rows
+    ) -> tuple[list[ProjectNode], dict[str, str]]:
         nodes: list[ProjectNode] = []
         names: dict[str, str] = {}
         for manifest, value in rows:
             package = value["package"]
             name = str(package["name"])
             project_id = f"cargo:{name}"
-            root = _rel(workspace, manifest.parent) if manifest.parent != workspace else "."
-            nodes.append(ProjectNode(project_id, "cargo", root, _rel(workspace, manifest), self.name, {"name": name}))
+            root = (
+                _rel(workspace, manifest.parent)
+                if manifest.parent != workspace
+                else "."
+            )
+            nodes.append(
+                ProjectNode(
+                    project_id,
+                    "cargo",
+                    root,
+                    _rel(workspace, manifest),
+                    self.name,
+                    {"name": name},
+                )
+            )
             names[name] = project_id
         return nodes, names
 
@@ -465,29 +603,47 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
             source = names.get(str(value["package"].get("name")))
             if source is None:
                 continue
-            for field_name in ("dependencies", "dev-dependencies", "build-dependencies"):
+            for field_name in (
+                "dependencies",
+                "dev-dependencies",
+                "build-dependencies",
+            ):
                 deps = value.get(field_name)
                 if not isinstance(deps, dict):
                     continue
                 for dep_name, dep_value in deps.items():
                     target = names.get(self._cargo_dependency_name(dep_name, dep_value))
                     if target is not None and target != source:
-                        edges.append(ProjectEdge(source, target, field_name, "manifest", self.name))
+                        edges.append(
+                            ProjectEdge(
+                                source, target, field_name, "manifest", self.name
+                            )
+                        )
         return edges
 
-    def _fallback(self, workspace: Path, warning: str | None = None) -> ProjectGraphEvidence:
+    def _fallback(
+        self, workspace: Path, warning: str | None = None
+    ) -> ProjectGraphEvidence:
         rows, parse_warnings = self._fallback_rows(workspace)
         warnings = ([warning] if warning else []) + parse_warnings
         nodes, names = self._fallback_nodes(workspace, rows)
         edges = self._fallback_edges(rows, names)
-        return ProjectGraphEvidence(self.name, tuple(nodes), tuple(edges), tuple(warnings))
+        return ProjectGraphEvidence(
+            self.name, tuple(nodes), tuple(edges), tuple(warnings)
+        )
 
     @staticmethod
-    def _run_cargo_metadata(workspace: Path, cargo: str) -> tuple[subprocess.CompletedProcess[str] | None, str | None]:
+    def _run_cargo_metadata(
+        workspace: Path, cargo: str
+    ) -> tuple[subprocess.CompletedProcess[str] | None, str | None]:
         try:
             completed = subprocess.run(
-                [cargo, "metadata", "--format-version", "1", "--no-deps"], cwd=workspace,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20, check=False,
+                [cargo, "metadata", "--format-version", "1", "--no-deps"],
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=20,
+                check=False,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             return None, f"cargo metadata failed; using manifest graph: {exc}"
@@ -504,7 +660,9 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
         packages = value.get("packages") if isinstance(value, dict) else None
         return (packages if isinstance(packages, list) else []), None
 
-    def _cargo_native_node(self, workspace: Path, row: dict[str, Any], ids: dict[str, str]) -> ProjectNode | None:
+    def _cargo_native_node(
+        self, workspace: Path, row: dict[str, Any], ids: dict[str, str]
+    ) -> ProjectNode | None:
         name = row.get("name")
         manifest_path = row.get("manifest_path")
         if not name or not manifest_path:
@@ -515,18 +673,30 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
             manifest_rel = manifest.relative_to(workspace).as_posix()
         except ValueError:
             return None
-        return ProjectNode(ids[str(name)], "cargo", root, manifest_rel, self.name, {"name": str(name)})
+        return ProjectNode(
+            ids[str(name)], "cargo", root, manifest_rel, self.name, {"name": str(name)}
+        )
 
-    def _cargo_native_edges(self, row: dict[str, Any], source: str, ids: dict[str, str]) -> list[ProjectEdge]:
+    def _cargo_native_edges(
+        self, row: dict[str, Any], source: str, ids: dict[str, str]
+    ) -> list[ProjectEdge]:
         edges: list[ProjectEdge] = []
         for dep in row.get("dependencies") or ():
             target = ids.get(str(dep.get("name") or ""))
             if target is not None and target != source:
-                edges.append(ProjectEdge(source, target, "dependency", "native", self.name))
+                edges.append(
+                    ProjectEdge(source, target, "dependency", "native", self.name)
+                )
         return edges
 
-    def _cargo_native_graph(self, workspace: Path, packages: list[dict[str, Any]]) -> tuple[list[ProjectNode], list[ProjectEdge]]:
-        ids = {str(row["name"]): f"cargo:{row['name']}" for row in packages if row.get("name")}
+    def _cargo_native_graph(
+        self, workspace: Path, packages: list[dict[str, Any]]
+    ) -> tuple[list[ProjectNode], list[ProjectEdge]]:
+        ids = {
+            str(row["name"]): f"cargo:{row['name']}"
+            for row in packages
+            if row.get("name")
+        }
         nodes: list[ProjectNode] = []
         edges: list[ProjectEdge] = []
         for row in packages:
@@ -539,7 +709,10 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
     def collect(self, workspace: Path) -> ProjectGraphEvidence:
         cargo = shutil.which("cargo")
         if cargo is None:
-            return self._fallback(workspace, "cargo executable unavailable; using Cargo.toml manifest graph")
+            return self._fallback(
+                workspace,
+                "cargo executable unavailable; using Cargo.toml manifest graph",
+            )
         completed, error = self._run_cargo_metadata(workspace, cargo)
         if completed is None:
             return self._fallback(workspace, error)
@@ -548,7 +721,6 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
             return self._fallback(workspace, error)
         nodes, edges = self._cargo_native_graph(workspace, packages)
         return ProjectGraphEvidence(self.name, tuple(nodes), tuple(edges))
-
 
 
 class DeclaredProjectLinksProvider(ProjectGraphProvider):
@@ -566,7 +738,9 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
     def detect(self, workspace: Path) -> bool:
         return (workspace / self.filename).is_file()
 
-    def _read_links(self, workspace: Path) -> tuple[dict[str, Any] | None, tuple[str, ...]]:
+    def _read_links(
+        self, workspace: Path
+    ) -> tuple[dict[str, Any] | None, tuple[str, ...]]:
         path = workspace / self.filename
         try:
             value = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -576,7 +750,9 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
             return None, (f"{self.filename} must contain a TOML object",)
         return value, ()
 
-    def _declared_edges(self, value: dict[str, Any], warnings: list[str]) -> list[ProjectEdge]:
+    def _declared_edges(
+        self, value: dict[str, Any], warnings: list[str]
+    ) -> list[ProjectEdge]:
         raw_links = value.get("link", [])
         if not isinstance(raw_links, list):
             warnings.append("project link entries must be [[link]] tables")
@@ -595,13 +771,17 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
         kind = str(row.get("kind") or "declared").strip() or "declared"
         return source, target, kind
 
-    def _declared_edge(self, index: int, row: object, warnings: list[str]) -> ProjectEdge | None:
+    def _declared_edge(
+        self, index: int, row: object, warnings: list[str]
+    ) -> ProjectEdge | None:
         if not isinstance(row, dict):
             warnings.append(f"link[{index}] must be a table")
             return None
         source, target, kind = self._link_values(row)
         if len({source, target}) != 2 or "" in {source, target}:
-            warnings.append(f"link[{index}] requires distinct non-empty source and target project ids")
+            warnings.append(
+                f"link[{index}] requires distinct non-empty source and target project ids"
+            )
             return None
         return ProjectEdge(source, target, kind, "declared", self.name)
 
@@ -615,7 +795,8 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
         projects = row.get("projects", [])
         kind = str(row.get("kind") or "shared-input").strip() or "shared-input"
         try:
-            from ..paths import normalize_relative_path
+            from hashmarks.paths import normalize_relative_path
+
             rel = normalize_relative_path(raw_path, allow_root=False)
         except ValueError:
             warnings.append(f"shared_input[{index}] has invalid path: {raw_path!r}")
@@ -625,19 +806,34 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
             return None, []
         synthetic = f"shared-input:{rel}"
         node = ProjectNode(
-            project_id=synthetic, kind="shared-input", root=rel, manifest=self.filename, producer=self.name,
+            project_id=synthetic,
+            kind="shared-input",
+            root=rel,
+            manifest=self.filename,
+            producer=self.name,
             metadata={"path": rel, "freshness_manifests": [self.filename, rel]},
         )
-        edges = [ProjectEdge(project_id, synthetic, kind, "declared", self.name) for project_id in project_ids]
+        edges = [
+            ProjectEdge(project_id, synthetic, kind, "declared", self.name)
+            for project_id in project_ids
+        ]
         return node, edges
 
     @staticmethod
-    def _shared_projects(index: int, projects: object, warnings: list[str]) -> tuple[str, ...]:
-        valid_list = isinstance(projects, list) and all(isinstance(item, str) and item.strip() for item in projects)
+    def _shared_projects(
+        index: int, projects: object, warnings: list[str]
+    ) -> tuple[str, ...]:
+        valid_list = isinstance(projects, list) and all(
+            isinstance(item, str) and item.strip() for item in projects
+        )
         if not valid_list:
-            warnings.append(f"shared_input[{index}] projects must be a non-empty string list")
+            warnings.append(
+                f"shared_input[{index}] projects must be a non-empty string list"
+            )
             return ()
-        project_ids = tuple(dict.fromkeys(item.strip() for item in projects if item.strip()))
+        project_ids = tuple(
+            dict.fromkeys(item.strip() for item in projects if item.strip())
+        )
         if not project_ids:
             warnings.append(f"shared_input[{index}] projects must not be empty")
         return project_ids
@@ -666,7 +862,9 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
         edges = self._declared_edges(value, warnings)
         nodes, shared_edges = self._shared_inputs(value, warnings)
         edges.extend(shared_edges)
-        return ProjectGraphEvidence(self.name, tuple(nodes), tuple(edges), tuple(warnings))
+        return ProjectGraphEvidence(
+            self.name, tuple(nodes), tuple(edges), tuple(warnings)
+        )
 
 
 def default_project_graph_providers() -> tuple[ProjectGraphProvider, ...]:

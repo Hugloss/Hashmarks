@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable
-from pathlib import Path
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from .errors import OptionalFeatureError, UserFacingError
 from .mcp_surface import HashmarksMcpSurface, McpSurfaceError
 from .paths import canonical_host_path
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from pathlib import Path
 
-_INSTALL_HINT = 'Hashmarks MCP support requires the optional extra: pip install "hashmarks[mcp]"'
+_INSTALL_HINT = (
+    'Hashmarks MCP support requires the optional extra: pip install "hashmarks[mcp]"'
+)
 
 _T = TypeVar("_T")
 
@@ -42,9 +45,16 @@ def _call_surface(
 
 def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = None):
     MCPServer, ToolAnnotations, ToolError = _sdk()
-    surface = HashmarksMcpSurface(str(workspace), state_dir=None if state_dir is None else str(state_dir))
+    surface = HashmarksMcpSurface(
+        str(workspace), state_dir=None if state_dir is None else str(state_dir)
+    )
     server = MCPServer("Hashmarks")
-    annotations = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
+    annotations = ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
 
     @server.tool(
         name="repository_context",
@@ -67,7 +77,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         description="Get the compact pre-edit authority, edit, verification, freshness, ambiguity, and next-read evidence for a coding task.",
         annotations=annotations,
     )
-    def task_evidence(task: str, limit: int = 20, per_role: int = 3, token_budget: int = 1536) -> dict[str, object]:
+    def task_evidence(
+        task: str, limit: int = 20, per_role: int = 3, token_budget: int = 1536
+    ) -> dict[str, object]:
         return _call_surface(
             ToolError,
             surface.task_evidence,
@@ -82,7 +94,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         description="Given a task and caller-reported changed repository paths, return bounded structural impact and verification relevance.",
         annotations=annotations,
     )
-    def change_impact(task: str, changed_paths: list[str], max_depth: int = 4) -> dict[str, object]:
+    def change_impact(
+        task: str, changed_paths: list[str], max_depth: int = 4
+    ) -> dict[str, object]:
         return _call_surface(
             ToolError, surface.change_impact, task, changed_paths, max_depth=max_depth
         )
@@ -92,7 +106,12 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         description="Refresh caller-reported changed paths against a previous task_evidence packet and return only invalidated/reused/replacement evidence.",
         annotations=annotations,
     )
-    def post_change(task: str, changed_paths: list[str], previous_evidence: dict[str, Any], token_budget: int = 1536) -> dict[str, object]:
+    def post_change(
+        task: str,
+        changed_paths: list[str],
+        previous_evidence: dict[str, Any],
+        token_budget: int = 1536,
+    ) -> dict[str, object]:
         return _call_surface(
             ToolError,
             surface.post_change,
@@ -102,11 +121,13 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
             token_budget=token_budget,
         )
 
-    setattr(server, "_hashmarks_surface", surface)
+    server._hashmarks_surface = surface
     return server
 
 
-def run_stdio(workspace: str | Path = ".", *, state_dir: str | Path | None = None) -> None:
+def run_stdio(
+    workspace: str | Path = ".", *, state_dir: str | Path | None = None
+) -> None:
     server = build_server(workspace, state_dir=state_dir)
     try:
         server.run(transport="stdio")
@@ -117,7 +138,10 @@ def run_stdio(workspace: str | Path = ".", *, state_dir: str | Path | None = Non
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="hashmarks mcp", description="Serve one Hashmarks workspace over local MCP stdio")
+    parser = argparse.ArgumentParser(
+        prog="hashmarks mcp",
+        description="Serve one Hashmarks workspace over local MCP stdio",
+    )
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--state-dir", default=None)
     args = parser.parse_args(argv)

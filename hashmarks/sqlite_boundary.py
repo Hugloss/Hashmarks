@@ -1,8 +1,43 @@
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Iterator
+import time
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+
+def _enable_wal_with_bounded_retry(
+    db: sqlite3.Connection,
+    *,
+    busy_timeout_ms: int,
+) -> None:
+    """Enable WAL across concurrent first-open callers.
+
+    SQLite's busy handler does not reliably wait while ``journal_mode`` itself is
+    being changed. Retry only that known lock/busy race, bounded by the same timeout
+    used for ordinary database lock contention.
+    """
+
+    timeout_seconds = max(0, int(busy_timeout_ms)) / 1_000
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            db.execute("PRAGMA journal_mode=WAL")
+            return
+        except sqlite3.OperationalError as exc:
+            message = str(exc).lower()
+            if (
+                "database is locked" not in message
+                and "database is busy" not in message
+            ):
+                raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise
+            time.sleep(min(0.01, remaining))
 
 
 def configure_sqlite_connection(
@@ -12,12 +47,13 @@ def configure_sqlite_connection(
 ) -> None:
     """Apply one shared SQLite concurrency policy to a new connection.
 
-    ``busy_timeout`` is installed before WAL negotiation so concurrent first-open
-    callers wait for the schema/journal owner instead of failing immediately.
+    ``busy_timeout`` owns ordinary lock contention. WAL negotiation has one additional
+    bounded retry because SQLite can return ``database is locked`` immediately when
+    multiple callers first-open the same database and change journal mode concurrently.
     """
 
     db.execute(f"PRAGMA busy_timeout={int(busy_timeout_ms)}")
-    db.execute("PRAGMA journal_mode=WAL")
+    _enable_wal_with_bounded_retry(db, busy_timeout_ms=busy_timeout_ms)
     db.execute("PRAGMA synchronous=NORMAL")
 
 

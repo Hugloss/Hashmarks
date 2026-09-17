@@ -9,14 +9,22 @@ def _write(root: Path, rel: str, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def test_exact_qualified_identifier_is_not_displaced_by_test_structural_walk(tmp_path: Path) -> None:
+def test_exact_qualified_identifier_is_not_displaced_by_test_structural_walk(
+    tmp_path: Path,
+) -> None:
     _write(
         tmp_path,
         "pkg/repository_index_store.py",
         "class WorkspaceMapStore:\n    def paths_under(self):\n        return []\n",
     )
-    _write(tmp_path, "pkg/indexing_lifecycle.py", "def _sorted_paths_under():\n    return []\n")
-    _write(tmp_path, "pkg/service.py", "def default_codemap_socket():\n    return 'sock'\n")
+    _write(
+        tmp_path,
+        "pkg/indexing_lifecycle.py",
+        "def _sorted_paths_under():\n    return []\n",
+    )
+    _write(
+        tmp_path, "pkg/service.py", "def default_codemap_socket():\n    return 'sock'\n"
+    )
     _write(tmp_path, "pkg/__init__.py", "from .service import default_codemap_socket\n")
     _write(
         tmp_path,
@@ -37,7 +45,9 @@ def test_exact_qualified_identifier_is_not_displaced_by_test_structural_walk(tmp
     assert action["ownership_resolution"] is None
 
 
-def test_exact_method_identifier_is_not_displaced_by_import_continuation(tmp_path: Path) -> None:
+def test_exact_method_identifier_is_not_displaced_by_import_continuation(
+    tmp_path: Path,
+) -> None:
     _write(
         tmp_path,
         "pkg/indexing_lifecycle.py",
@@ -53,14 +63,18 @@ def test_exact_method_identifier_is_not_displaced_by_import_continuation(tmp_pat
         "class WorkspaceMapStore(WorkspaceMapQueryMixin):\n"
         "    pass\n",
     )
-    _write(tmp_path, "pkg/store_queries.py", "class WorkspaceMapQueryMixin:\n    pass\n")
+    _write(
+        tmp_path, "pkg/store_queries.py", "class WorkspaceMapQueryMixin:\n    pass\n"
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map("optimize _sync_remove_stale_paths")
 
     assert action["edit"]["path"] == "pkg/indexing_lifecycle.py"
-    assert action["edit"]["qualname"] == "IndexingLifecycleMixin._sync_remove_stale_paths"
+    assert (
+        action["edit"]["qualname"] == "IndexingLifecycleMixin._sync_remove_stale_paths"
+    )
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_resolution"] is None
 
@@ -100,7 +114,9 @@ def test_generic_task_keeps_structural_owner_resolution(tmp_path: Path) -> None:
         "def test_ember_contract():\n"
         "    assert handle_ember('x') == 'x-active'\n",
     )
-    _write(tmp_path, "pyproject.toml", "[tool.pytest.ini_options]\ntestpaths=['tests']\n")
+    _write(
+        tmp_path, "pyproject.toml", "[tool.pytest.ini_options]\ntestpaths=['tests']\n"
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -111,7 +127,9 @@ def test_generic_task_keeps_structural_owner_resolution(tmp_path: Path) -> None:
     assert action["ambiguity"]["ambiguous"] is False
 
 
-def test_exact_verification_symbol_does_not_become_edit_authority(tmp_path: Path) -> None:
+def test_exact_verification_symbol_does_not_become_edit_authority(
+    tmp_path: Path,
+) -> None:
     _write(tmp_path, "src/__init__.py", "")
     _write(tmp_path, "src/worker.py", "def run_task():\n    return 1\n")
     _write(
@@ -131,7 +149,9 @@ def test_exact_verification_symbol_does_not_become_edit_authority(tmp_path: Path
     assert action["ambiguity"]["ambiguous"] is False
 
 
-def test_literal_path_remains_authoritative_without_structural_displacement(tmp_path: Path) -> None:
+def test_literal_path_remains_authoritative_without_structural_displacement(
+    tmp_path: Path,
+) -> None:
     _write(tmp_path, "src/worker.py", "def run_task():\n    return 1\n")
     _write(tmp_path, "src/wrapper.py", "from .worker import run_task\n")
 
@@ -144,7 +164,9 @@ def test_literal_path_remains_authoritative_without_structural_displacement(tmp_
     assert action["ambiguity"]["ambiguous"] is False
 
 
-def test_reexport_with_duplicate_exact_source_owners_stays_ambiguous(tmp_path: Path) -> None:
+def test_reexport_with_duplicate_exact_source_owners_stays_ambiguous(
+    tmp_path: Path,
+) -> None:
     _write(tmp_path, "src/__init__.py", "from .a import resolve_target\n")
     _write(tmp_path, "src/a.py", "def resolve_target():\n    return 'a'\n")
     _write(tmp_path, "src/b.py", "def resolve_target():\n    return 'b'\n")
@@ -165,9 +187,15 @@ def test_reexport_with_duplicate_exact_source_owners_stays_ambiguous(tmp_path: P
     assert action["ownership_authority"]["safe_to_edit"] is False
 
 
-def test_comment_only_lexical_match_cannot_override_active_exact_symbol(tmp_path: Path) -> None:
+def test_comment_only_lexical_match_cannot_override_active_exact_symbol(
+    tmp_path: Path,
+) -> None:
     _write(tmp_path, "src/live.py", "def active_target():\n    return 1\n")
-    _write(tmp_path, "src/dead.py", "# active_target old implementation removed\nVALUE = 2\n")
+    _write(
+        tmp_path,
+        "src/dead.py",
+        "# active_target old implementation removed\nVALUE = 2\n",
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -178,7 +206,9 @@ def test_comment_only_lexical_match_cannot_override_active_exact_symbol(tmp_path
     assert action["ambiguity"]["ambiguous"] is False
 
 
-def test_test_shaped_source_without_production_import_stays_verification_only(tmp_path: Path) -> None:
+def test_test_shaped_source_without_production_import_stays_verification_only(
+    tmp_path: Path,
+) -> None:
     _write(tmp_path, "pkg/__init__.py", "")
     _write(tmp_path, "pkg/test_support.py", "def runtime_probe():\n    return 1\n")
 
@@ -192,7 +222,9 @@ def test_test_shaped_source_without_production_import_stays_verification_only(tm
     assert action["ownership_authority"]["safe_to_edit"] is False
 
 
-def test_test_shaped_source_can_recover_edit_authority_from_exact_production_import(tmp_path: Path) -> None:
+def test_test_shaped_source_can_recover_edit_authority_from_exact_production_import(
+    tmp_path: Path,
+) -> None:
     _write(tmp_path, "pkg/__init__.py", "")
     _write(tmp_path, "pkg/test_support.py", "def runtime_probe():\n    return 1\n")
     _write(

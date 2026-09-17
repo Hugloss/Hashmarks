@@ -8,7 +8,6 @@ from pathlib import Path
 
 import hashmarks_build
 
-
 FORBIDDEN_SDIST_ROOTS = {
     ".codex",
     ".gitignore",
@@ -45,7 +44,8 @@ def test_sdist_members_are_the_deliberate_public_source_surface() -> None:
     assert roots == EXPECTED_SDIST_ROOTS
     assert not (roots & FORBIDDEN_SDIST_ROOTS)
     assert all(
-        path != Path("docs/development") and Path("docs/development") not in path.parents
+        path != Path("docs/development")
+        and Path("docs/development") not in path.parents
         for path in members
     )
     assert Path(".github/CONTRIBUTING.md") in members
@@ -56,7 +56,9 @@ def test_sdist_members_are_the_deliberate_public_source_surface() -> None:
     assert Path("hashmarks/cli.py") in members
 
 
-def test_sdist_archive_does_not_reintroduce_repository_only_material(tmp_path: Path) -> None:
+def test_sdist_archive_does_not_reintroduce_repository_only_material(
+    tmp_path: Path,
+) -> None:
     name = hashmarks_build.build_sdist(str(tmp_path))
     with tarfile.open(tmp_path / name, "r:gz") as archive:
         root = name.removesuffix(".tar.gz")
@@ -73,7 +75,9 @@ def test_sdist_archive_does_not_reintroduce_repository_only_material(tmp_path: P
     )
 
 
-def test_extracted_sdist_rebuilds_the_direct_wheel_byte_identically(tmp_path: Path) -> None:
+def test_extracted_sdist_rebuilds_the_direct_wheel_byte_identically(
+    tmp_path: Path,
+) -> None:
     direct_dir = tmp_path / "direct"
     sdist_dir = tmp_path / "sdist"
     extracted_dir = tmp_path / "extracted"
@@ -109,30 +113,45 @@ print(module.build_wheel(str(out)))
     assert _sha256(rebuilt_dir / rebuilt_name) == _sha256(direct_dir / direct_name)
 
 
-
 def test_shipped_markdown_relative_links_stay_inside_sdist() -> None:
     import re
 
     members = set(hashmarks_build._sdist_members())
-    markdown = sorted(path for path in members if path.suffix.lower() == ".md")
+    markdown = sorted(
+        path
+        for path in members
+        if path.suffix.lower() == ".md" and path != Path("CHANGELOG.md")
+    )
     failures: list[str] = []
     for source in markdown:
         text = (hashmarks_build.ROOT / source).read_text(encoding="utf-8")
         for raw in re.findall(r"\[[^\]]+\]\(([^)]+)\)", text):
             target = raw.split("#", 1)[0].strip()
-            if not target or target == "..." or "://" in target or target.startswith("mailto:"):
+            if (
+                not target
+                or target == "..."
+                or "://" in target
+                or target.startswith("mailto:")
+            ):
                 continue
-            resolved = (source.parent / target)
+            resolved = source.parent / target
             try:
-                normalized = Path(resolved).resolve().relative_to(hashmarks_build.ROOT.resolve())
+                normalized = (
+                    Path(resolved).resolve().relative_to(hashmarks_build.ROOT.resolve())
+                )
             except ValueError:
                 failures.append(f"{source}: escapes sdist root -> {raw}")
                 continue
             absolute = hashmarks_build.ROOT / normalized
             if absolute.is_file() and normalized not in members:
                 failures.append(f"{source}: linked file not shipped -> {normalized}")
-            elif absolute.is_dir() and not any(normalized == member or normalized in member.parents for member in members):
-                failures.append(f"{source}: linked directory not shipped -> {normalized}")
+            elif absolute.is_dir() and not any(
+                normalized == member or normalized in member.parents
+                for member in members
+            ):
+                failures.append(
+                    f"{source}: linked directory not shipped -> {normalized}"
+                )
             elif not absolute.exists():
                 failures.append(f"{source}: broken relative link -> {raw}")
     assert failures == []

@@ -3,11 +3,14 @@ from __future__ import annotations
 import json
 import threading
 import time
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks import cli
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _repo(root: Path) -> str:
@@ -27,11 +30,15 @@ def _repo(root: Path) -> str:
         "from src.case.route import handle_ember\n\ndef test_ember_accepted_response_contract():\n    assert handle_ember('accepted') == 'new'\n",
         encoding="utf-8",
     )
-    (root / "pyproject.toml").write_text("[tool.pytest.ini_options]\npythonpath = ['.']\n", encoding="utf-8")
+    (root / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\npythonpath = ['.']\n", encoding="utf-8"
+    )
     return "Accepted responses are transformed by the wrong active owner for ember"
 
 
-def test_task_change_impact_composes_owner_path_and_verification(tmp_path: Path) -> None:
+def test_task_change_impact_composes_owner_path_and_verification(
+    tmp_path: Path,
+) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -59,7 +66,9 @@ def test_task_change_impact_composes_owner_path_and_verification(tmp_path: Path)
     assert '"argv"' not in encoded
 
 
-def test_task_change_impact_config_root_is_typed_and_gets_verification(tmp_path: Path) -> None:
+def test_task_change_impact_config_root_is_typed_and_gets_verification(
+    tmp_path: Path,
+) -> None:
     from scripts.agent_evaluation.generate_hard_agent_corpus import generate
 
     repo = tmp_path / "repo"
@@ -76,25 +85,36 @@ def test_task_change_impact_config_root_is_typed_and_gets_verification(tmp_path:
     changed = impact["changed"][0]
     assert "contract" in changed["roles"]
     assert "build_config" in changed["roles"]
-    assert impact["surfaces"]["verification"][0]["path"] == "tests/case_004/test_behavior.py"
+    assert (
+        impact["surfaces"]["verification"][0]["path"]
+        == "tests/case_004/test_behavior.py"
+    )
 
 
-def test_task_change_impact_bounded_fanout_never_claims_complete_impact(tmp_path: Path) -> None:
+def test_task_change_impact_bounded_fanout_never_claims_complete_impact(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
-    (tmp_path / "src" / "core.py").write_text("def shared(): return 1\n", encoding="utf-8")
+    (tmp_path / "src" / "core.py").write_text(
+        "def shared(): return 1\n", encoding="utf-8"
+    )
     for index in range(20):
         (tmp_path / "src" / f"consumer_{index}.py").write_text(
-            "from src.core import shared\ndef consume(): return shared()\n", encoding="utf-8"
+            "from src.core import shared\ndef consume(): return shared()\n",
+            encoding="utf-8",
         )
     (tmp_path / "tests" / "test_core.py").write_text(
-        "from src.core import shared\ndef test_shared(): assert shared() == 1\n", encoding="utf-8"
+        "from src.core import shared\ndef test_shared(): assert shared() == 1\n",
+        encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         impact = codemap.task_change_impact(
-            "change shared implementation", ["src/core.py"],
-            impact_limit_per_surface=3, max_depth=3,
+            "change shared implementation",
+            ["src/core.py"],
+            impact_limit_per_surface=3,
+            max_depth=3,
         )
     assert len(impact["surfaces"]["implementation"]) == 3
     assert impact["bounds"]["per_surface"] == 3
@@ -113,7 +133,6 @@ def test_task_change_impact_bounds_surfaces(tmp_path: Path) -> None:
     assert impact["bounds"]["depth"] == 2
 
 
-
 def test_task_change_impact_never_discloses_denied_path(tmp_path: Path) -> None:
     task = _repo(tmp_path)
     (tmp_path / ".hashmarks-context.toml").write_text(
@@ -127,15 +146,26 @@ def test_task_change_impact_never_discloses_denied_path(tmp_path: Path) -> None:
     assert "src/case/route.py" not in encoded
     assert impact["surfaces"]["verification"][0]["path"] == "tests/test_behavior.py"
 
+
 def test_task_change_impact_cli(tmp_path: Path, capsys) -> None:
     task = _repo(tmp_path)
-    assert cli.main([
-        "--workspace", str(tmp_path),
-        "change-impact", task,
-        "--changed", "src/case/engine.py",
-        "--project-impact-limit", "20",
-        "--project-impact-encoding", "compact",
-    ]) == 0
+    assert (
+        cli.main(
+            [
+                "--workspace",
+                str(tmp_path),
+                "change-impact",
+                task,
+                "--changed",
+                "src/case/engine.py",
+                "--project-impact-limit",
+                "20",
+                "--project-impact-encoding",
+                "compact",
+            ]
+        )
+        == 0
+    )
     payload = json.loads(capsys.readouterr().out)
     assert payload["schema"] == "hashmarks.task-change-impact.v1"
     assert payload["surfaces"]["verification"][0]["path"] == "tests/test_behavior.py"
@@ -160,7 +190,12 @@ def test_service_task_change_impact(tmp_path: Path) -> None:
     client = CodeMapServiceClient(tmp_path, socket_path=socket_path)
     _wait(client)
     try:
-        impact = client.task_change_impact(task, ["src/case/engine.py"], project_impact_limit=20, project_impact_encoding="compact")
+        impact = client.task_change_impact(
+            task,
+            ["src/case/engine.py"],
+            project_impact_limit=20,
+            project_impact_encoding="compact",
+        )
         assert impact["schema"] == "hashmarks.task-change-impact.v1"
         assert impact["owner"] == "external"
         assert impact["surfaces"]["verification"][0]["path"] == "tests/test_behavior.py"
@@ -169,7 +204,9 @@ def test_service_task_change_impact(tmp_path: Path) -> None:
         thread.join(timeout=5)
 
 
-def test_task_change_impact_qualification_freezes_before_secret_join(tmp_path: Path) -> None:
+def test_task_change_impact_qualification_freezes_before_secret_join(
+    tmp_path: Path,
+) -> None:
     from scripts.agent_evaluation.generate_hard_agent_corpus import generate
     from scripts.agent_evaluation.score_agent_change_impact import run
 
@@ -184,11 +221,18 @@ def test_task_change_impact_qualification_freezes_before_secret_join(tmp_path: P
     assert payload["summary"]["fully_correct"] == 6
     assert payload["summary"]["verify_relevant"] == 6
     assert payload["summary"]["no_source_or_argv_replay"] == 6
-    assert payload["protocol"]["secret_join_after_start_external_edit_and_impact_freeze"] is True
+    assert (
+        payload["protocol"]["secret_join_after_start_external_edit_and_impact_freeze"]
+        is True
+    )
 
 
-def test_task_change_impact_reconstructs_same_package_go_owner_chain(tmp_path: Path) -> None:
-    (tmp_path / "go.mod").write_text("module example.local/demo\n\ngo 1.23\n", encoding="utf-8")
+def test_task_change_impact_reconstructs_same_package_go_owner_chain(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "go.mod").write_text(
+        "module example.local/demo\n\ngo 1.23\n", encoding="utf-8"
+    )
     for name in ("route", "service", "engine"):
         (tmp_path / name).mkdir()
     (tmp_path / "engine/engine.go").write_text(
@@ -217,10 +261,16 @@ def test_task_change_impact_reconstructs_same_package_go_owner_chain(tmp_path: P
         impact = codemap.task_change_impact(task, ["engine/engine.go"])
 
     implementation = [row["path"] for row in impact["surfaces"]["implementation"]]
-    assert implementation[:2] == ["route/route.go", "service/service.go"] or implementation[:2] == ["service/service.go", "route/route.go"]
+    assert implementation[:2] == [
+        "route/route.go",
+        "service/service.go",
+    ] or implementation[:2] == ["service/service.go", "route/route.go"]
     assert "service/service.go" in implementation
     assert "route/route.go" in implementation
-    assert impact["surfaces"]["verification"][0]["path"] == "route/cobaltridgealpha_test.go"
+    assert (
+        impact["surfaces"]["verification"][0]["path"]
+        == "route/cobaltridgealpha_test.go"
+    )
 
 
 def test_large_task_change_impact_matrix_small_smoke(tmp_path: Path) -> None:
@@ -240,11 +290,14 @@ def test_large_task_change_impact_matrix_small_smoke(tmp_path: Path) -> None:
     assert payload["summary"]["no_source_or_argv_replay"] == 8
 
 
-
-def test_exact_import_resolution_avoids_whole_file_map_materialization(tmp_path: Path) -> None:
+def test_exact_import_resolution_avoids_whole_file_map_materialization(
+    tmp_path: Path,
+) -> None:
     ts_root = tmp_path / "ts"
     (ts_root / "src").mkdir(parents=True)
-    (ts_root / "src/engine.ts").write_text("export const value = 'ok';\n", encoding="utf-8")
+    (ts_root / "src/engine.ts").write_text(
+        "export const value = 'ok';\n", encoding="utf-8"
+    )
     (ts_root / "src/route.ts").write_text(
         "import { value } from './engine.js';\nexport { value };\n",
         encoding="utf-8",
@@ -254,12 +307,16 @@ def test_exact_import_resolution_avoids_whole_file_map_materialization(tmp_path:
         codemap.store.all_file_rows = lambda: (_ for _ in ()).throw(
             AssertionError("whole file map must not be materialized")
         )  # type: ignore[method-assign]
-        assert codemap._resolve_import_paths("src/route.ts", "./engine.js") == ["src/engine.ts"]
+        assert codemap._resolve_import_paths("src/route.ts", "./engine.js") == [
+            "src/engine.ts"
+        ]
 
     go_root = tmp_path / "go"
     (go_root / "engine").mkdir(parents=True)
     (go_root / "route").mkdir()
-    (go_root / "go.mod").write_text("module example.local/demo\n\ngo 1.23\n", encoding="utf-8")
+    (go_root / "go.mod").write_text(
+        "module example.local/demo\n\ngo 1.23\n", encoding="utf-8"
+    )
     (go_root / "engine/engine.go").write_text(
         'package engine\nfunc Value() string { return "ok" }\n', encoding="utf-8"
     )
@@ -277,7 +334,9 @@ def test_exact_import_resolution_avoids_whole_file_map_materialization(tmp_path:
         ) == ["engine/engine.go"]
 
 
-def test_task_change_impact_declared_project_provenance_and_shared_input_refresh(tmp_path: Path) -> None:
+def test_task_change_impact_declared_project_provenance_and_shared_input_refresh(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "backend/src").mkdir(parents=True)
     (tmp_path / "frontend/src").mkdir(parents=True)
     (tmp_path / "mobile/src").mkdir(parents=True)
@@ -285,11 +344,19 @@ def test_task_change_impact_declared_project_provenance_and_shared_input_refresh
         "<project><groupId>com.example</groupId><artifactId>api</artifactId><version>1</version></project>",
         encoding="utf-8",
     )
-    (tmp_path / "frontend/package.json").write_text('{"name":"@demo/web"}', encoding="utf-8")
-    (tmp_path / "mobile/package.json").write_text('{"name":"@demo/mobile"}', encoding="utf-8")
+    (tmp_path / "frontend/package.json").write_text(
+        '{"name":"@demo/web"}', encoding="utf-8"
+    )
+    (tmp_path / "mobile/package.json").write_text(
+        '{"name":"@demo/mobile"}', encoding="utf-8"
+    )
     (tmp_path / "backend/src/Api.java").write_text("class Api {}\n", encoding="utf-8")
-    (tmp_path / "frontend/src/api.ts").write_text("export const api = 1\n", encoding="utf-8")
-    (tmp_path / "mobile/src/api.ts").write_text("export const api = 1\n", encoding="utf-8")
+    (tmp_path / "frontend/src/api.ts").write_text(
+        "export const api = 1\n", encoding="utf-8"
+    )
+    (tmp_path / "mobile/src/api.ts").write_text(
+        "export const api = 1\n", encoding="utf-8"
+    )
     (tmp_path / "openapi.yaml").write_text("openapi: 3.1.0\n", encoding="utf-8")
     (tmp_path / ".hashmarks-project-links.toml").write_text(
         "[[link]]\nsource='npm:@demo/web'\ntarget='maven:com.example:api'\nkind='api-client'\n"
@@ -299,36 +366,63 @@ def test_task_change_impact_declared_project_provenance_and_shared_input_refresh
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        codemap.enrich_projects(("npm-package-graph", "maven-pom-graph", "declared-project-links"))
-        source_impact = codemap.task_change_impact("backend api change", ["backend/src/Api.java"])
+        codemap.enrich_projects(
+            ("npm-package-graph", "maven-pom-graph", "declared-project-links")
+        )
+        source_impact = codemap.task_change_impact(
+            "backend api change", ["backend/src/Api.java"]
+        )
         assert source_impact["projects"] == ["npm:@demo/mobile", "npm:@demo/web"]
-        rows = {row["project"]: row for row in source_impact["project_impact"]["affected"]}
+        rows = {
+            row["project"]: row for row in source_impact["project_impact"]["affected"]
+        }
         assert rows["npm:@demo/web"]["depth"] == 1
-        assert any(edge["producer"] == "declared-project-links" for edge in source_impact["project_impact"]["edges"])
+        assert any(
+            edge["producer"] == "declared-project-links"
+            for edge in source_impact["project_impact"]["edges"]
+        )
         assert rows["npm:@demo/mobile"]["depth"] == 2
 
         (tmp_path / "openapi.yaml").write_text("openapi: 3.1.1\n", encoding="utf-8")
-        shared_impact = codemap.task_change_impact("openapi contract change", ["openapi.yaml"])
+        shared_impact = codemap.task_change_impact(
+            "openapi contract change", ["openapi.yaml"]
+        )
 
-    assert shared_impact["projects"] == ["maven:com.example:api", "npm:@demo/mobile", "npm:@demo/web"]
+    assert shared_impact["projects"] == [
+        "maven:com.example:api",
+        "npm:@demo/mobile",
+        "npm:@demo/web",
+    ]
     assert shared_impact["project_refresh"]["producer"] == "declared-project-links"
     assert shared_impact["project_refresh"]["changed"] == "openapi.yaml"
-    project_rows = {row["project"]: row for row in shared_impact["project_impact"]["affected"]}
-    assert any(edge["kind"] == "contract" for edge in shared_impact["project_impact"]["edges"])
+    project_rows = {
+        row["project"]: row for row in shared_impact["project_impact"]["affected"]
+    }
+    assert any(
+        edge["kind"] == "contract" for edge in shared_impact["project_impact"]["edges"]
+    )
     assert project_rows["npm:@demo/mobile"]["depth"] == 2
 
 
 def test_task_change_impact_project_provenance_is_bounded(tmp_path: Path) -> None:
     (tmp_path / "root").mkdir()
     (tmp_path / "root/package.json").write_text('{"name":"root"}', encoding="utf-8")
-    (tmp_path / "root/value.ts").write_text("export const value = 1\n", encoding="utf-8")
+    (tmp_path / "root/value.ts").write_text(
+        "export const value = 1\n", encoding="utf-8"
+    )
     links = []
     for index in range(8):
         name = f"client-{index}"
         (tmp_path / name).mkdir()
-        (tmp_path / name / "package.json").write_text(json.dumps({"name": name}), encoding="utf-8")
-        links.append(f"[[link]]\nsource='npm:{name}'\ntarget='npm:root'\nkind='consumer'\n")
-    (tmp_path / ".hashmarks-project-links.toml").write_text("".join(links), encoding="utf-8")
+        (tmp_path / name / "package.json").write_text(
+            json.dumps({"name": name}), encoding="utf-8"
+        )
+        links.append(
+            f"[[link]]\nsource='npm:{name}'\ntarget='npm:root'\nkind='consumer'\n"
+        )
+    (tmp_path / ".hashmarks-project-links.toml").write_text(
+        "".join(links), encoding="utf-8"
+    )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
@@ -360,23 +454,39 @@ def test_project_impact_limit_is_independent_and_reports_truncation(tmp_path: Pa
     for index in range(10):
         project = root / f"p{index}"
         (project / "src").mkdir(parents=True)
-        (project / "package.json").write_text(json.dumps({"name": f"@scale/p{index}"}), encoding="utf-8")
-        (project / "src/index.ts").write_text(f"export const value = {index};\n", encoding="utf-8")
+        (project / "package.json").write_text(
+            json.dumps({"name": f"@scale/p{index}"}), encoding="utf-8"
+        )
+        (project / "src/index.ts").write_text(
+            f"export const value = {index};\n", encoding="utf-8"
+        )
     links = []
     for index in range(1, 10):
-        links.append(f"[[link]]\nsource='npm:@scale/p{index}'\ntarget='npm:@scale/p0'\nkind='fanout'\n")
-    (root / ".hashmarks-project-links.toml").write_text("".join(links), encoding="utf-8")
+        links.append(
+            f"[[link]]\nsource='npm:@scale/p{index}'\ntarget='npm:@scale/p0'\nkind='fanout'\n"
+        )
+    (root / ".hashmarks-project-links.toml").write_text(
+        "".join(links), encoding="utf-8"
+    )
     with CodeMap(root, artifact_db=root / "artifacts.sqlite3") as codemap:
         codemap.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
-        (root / "p0/src/index.ts").write_text("export const value = 99;\n", encoding="utf-8")
+        (root / "p0/src/index.ts").write_text(
+            "export const value = 99;\n", encoding="utf-8"
+        )
         bounded = codemap.task_change_impact(
-            "update scale root", ["p0/src/index.ts"], max_depth=20,
-            impact_limit_per_surface=2, project_impact_limit=3,
+            "update scale root",
+            ["p0/src/index.ts"],
+            max_depth=20,
+            impact_limit_per_surface=2,
+            project_impact_limit=3,
         )
         complete = codemap.task_change_impact(
-            "update scale root", ["p0/src/index.ts"], max_depth=20,
-            impact_limit_per_surface=2, project_impact_limit=20,
+            "update scale root",
+            ["p0/src/index.ts"],
+            max_depth=20,
+            impact_limit_per_surface=2,
+            project_impact_limit=20,
         )
     assert bounded["bounds"]["per_surface"] == 2
     assert bounded["bounds"]["project_impact"] == 3
@@ -388,12 +498,20 @@ def test_project_impact_limit_is_independent_and_reports_truncation(tmp_path: Pa
     assert complete["project_impact"]["complete"] is True
 
 
-def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_topology(tmp_path: Path, monkeypatch) -> None:
+def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_topology(
+    tmp_path: Path, monkeypatch
+) -> None:
     (tmp_path / "backend").mkdir()
     (tmp_path / "frontend").mkdir()
-    (tmp_path / "backend/package.json").write_text('{"name":"backend"}', encoding="utf-8")
-    (tmp_path / "frontend/package.json").write_text('{"name":"frontend"}', encoding="utf-8")
-    (tmp_path / "backend/value.ts").write_text("export const value = 1\n", encoding="utf-8")
+    (tmp_path / "backend/package.json").write_text(
+        '{"name":"backend"}', encoding="utf-8"
+    )
+    (tmp_path / "frontend/package.json").write_text(
+        '{"name":"frontend"}', encoding="utf-8"
+    )
+    (tmp_path / "backend/value.ts").write_text(
+        "export const value = 1\n", encoding="utf-8"
+    )
     (tmp_path / "contract.json").write_text('{"v":1}\n', encoding="utf-8")
     (tmp_path / ".hashmarks-project-links.toml").write_text(
         "[[shared_input]]\npath='contract.json'\nprojects=['npm:backend','npm:frontend']\nkind='contract'\n",
@@ -402,7 +520,11 @@ def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_to
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
-        provider = next(p for p in codemap.project_graph_providers if p.name == "declared-project-links")
+        provider = next(
+            p
+            for p in codemap.project_graph_providers
+            if p.name == "declared-project-links"
+        )
         original_collect = provider.collect
         calls = 0
 
@@ -421,17 +543,30 @@ def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_to
     assert impact["projects"] == ["npm:backend", "npm:frontend"]
 
 
-def test_declared_topology_change_recollects_provider(tmp_path: Path, monkeypatch) -> None:
+def test_declared_topology_change_recollects_provider(
+    tmp_path: Path, monkeypatch
+) -> None:
     for name in ("backend", "frontend", "mobile"):
         (tmp_path / name).mkdir()
-        (tmp_path / name / "package.json").write_text(json.dumps({"name": name}), encoding="utf-8")
-    (tmp_path / "backend/value.ts").write_text("export const value = 1\n", encoding="utf-8")
+        (tmp_path / name / "package.json").write_text(
+            json.dumps({"name": name}), encoding="utf-8"
+        )
+    (tmp_path / "backend/value.ts").write_text(
+        "export const value = 1\n", encoding="utf-8"
+    )
     links = tmp_path / ".hashmarks-project-links.toml"
-    links.write_text("[[link]]\nsource='npm:frontend'\ntarget='npm:backend'\nkind='consumer'\n", encoding="utf-8")
+    links.write_text(
+        "[[link]]\nsource='npm:frontend'\ntarget='npm:backend'\nkind='consumer'\n",
+        encoding="utf-8",
+    )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
-        provider = next(p for p in codemap.project_graph_providers if p.name == "declared-project-links")
+        provider = next(
+            p
+            for p in codemap.project_graph_providers
+            if p.name == "declared-project-links"
+        )
         original_collect = provider.collect
         calls = 0
 
@@ -446,7 +581,9 @@ def test_declared_topology_change_recollects_provider(tmp_path: Path, monkeypatc
             "[[link]]\nsource='npm:mobile'\ntarget='npm:frontend'\nkind='consumer'\n",
             encoding="utf-8",
         )
-        impact = codemap.task_change_impact("declared topology changed", [".hashmarks-project-links.toml"])
+        impact = codemap.task_change_impact(
+            "declared topology changed", [".hashmarks-project-links.toml"]
+        )
         source = codemap.task_change_impact("backend changed", ["backend/value.ts"])
 
     assert calls == 1
@@ -455,12 +592,20 @@ def test_declared_topology_change_recollects_provider(tmp_path: Path, monkeypatc
     assert source["projects"] == ["npm:frontend", "npm:mobile"]
 
 
-def test_unreported_shared_input_change_does_not_rebind_stale_project_evidence(tmp_path: Path) -> None:
+def test_unreported_shared_input_change_does_not_rebind_stale_project_evidence(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "backend").mkdir()
     (tmp_path / "frontend").mkdir()
-    (tmp_path / "backend/package.json").write_text('{"name":"backend"}', encoding="utf-8")
-    (tmp_path / "frontend/package.json").write_text('{"name":"frontend"}', encoding="utf-8")
-    (tmp_path / "backend/value.ts").write_text("export const value = 1\n", encoding="utf-8")
+    (tmp_path / "backend/package.json").write_text(
+        '{"name":"backend"}', encoding="utf-8"
+    )
+    (tmp_path / "frontend/package.json").write_text(
+        '{"name":"frontend"}', encoding="utf-8"
+    )
+    (tmp_path / "backend/value.ts").write_text(
+        "export const value = 1\n", encoding="utf-8"
+    )
     (tmp_path / "contract.json").write_text('{"v":1}\n', encoding="utf-8")
     (tmp_path / ".hashmarks-project-links.toml").write_text(
         "[[shared_input]]\npath='contract.json'\nprojects=['npm:backend','npm:frontend']\nkind='contract'\n",
@@ -478,19 +623,29 @@ def test_unreported_shared_input_change_does_not_rebind_stale_project_evidence(t
     assert reason == "manifest changed: contract.json"
 
 
-def test_task_change_impact_compact_project_provenance_round_trips(tmp_path: Path) -> None:
+def test_task_change_impact_compact_project_provenance_round_trips(
+    tmp_path: Path,
+) -> None:
     from hashmarks.codemap import COMPACT_PROJECT_IMPACT_SCHEMA, expand_project_impact
 
     (tmp_path / "root").mkdir()
     (tmp_path / "root/package.json").write_text('{"name":"root"}', encoding="utf-8")
-    (tmp_path / "root/value.ts").write_text("export const value = 1\n", encoding="utf-8")
+    (tmp_path / "root/value.ts").write_text(
+        "export const value = 1\n", encoding="utf-8"
+    )
     links = []
     for index in range(6):
         name = f"client-{index}"
         (tmp_path / name).mkdir()
-        (tmp_path / name / "package.json").write_text(json.dumps({"name": name}), encoding="utf-8")
-        links.append(f"[[link]]\nsource='npm:{name}'\ntarget='npm:root'\nkind='consumer'\n")
-    (tmp_path / ".hashmarks-project-links.toml").write_text("".join(links), encoding="utf-8")
+        (tmp_path / name / "package.json").write_text(
+            json.dumps({"name": name}), encoding="utf-8"
+        )
+        links.append(
+            f"[[link]]\nsource='npm:{name}'\ntarget='npm:root'\nkind='consumer'\n"
+        )
+    (tmp_path / ".hashmarks-project-links.toml").write_text(
+        "".join(links), encoding="utf-8"
+    )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
@@ -498,7 +653,9 @@ def test_task_change_impact_compact_project_provenance_round_trips(tmp_path: Pat
             "root value change", ["root/value.ts"], project_impact_limit=20
         )
         compact = codemap.task_change_impact(
-            "root value change", ["root/value.ts"], project_impact_limit=20,
+            "root value change",
+            ["root/value.ts"],
+            project_impact_limit=20,
             project_impact_encoding="compact",
         )
 
@@ -509,7 +666,9 @@ def test_task_change_impact_compact_project_provenance_round_trips(tmp_path: Pat
     )
 
 
-def test_task_change_impact_rejects_unknown_project_impact_encoding(tmp_path: Path) -> None:
+def test_task_change_impact_rejects_unknown_project_impact_encoding(
+    tmp_path: Path,
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()

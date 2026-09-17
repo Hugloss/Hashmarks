@@ -18,7 +18,9 @@ def _codemap_repository_identity(codemap: Any) -> str:
     artifact_path = getattr(getattr(codemap, "artifacts", None), "db_path", None)
     if isinstance(artifact_path, Path):
         excluded.append(artifact_path)
-    return repository_content_identity(codemap.workspace, excluded_paths=tuple(excluded))
+    return repository_content_identity(
+        codemap.workspace, excluded_paths=tuple(excluded)
+    )
 
 
 def _canonical_bytes(value: Mapping[str, object]) -> bytes:
@@ -30,7 +32,9 @@ def _identity(domain: str, value: Mapping[str, object]) -> str:
     return "sha256:" + digest.hexdigest()
 
 
-def qualified_import_identity(codemap: Any, *, source_path: str, target: str) -> dict[str, object]:
+def qualified_import_identity(
+    codemap: Any, *, source_path: str, target: str
+) -> dict[str, object]:
     """Project exact import-owner identity from existing Hashmarks resolver evidence."""
     # Qualified identity is stronger than a best-effort query: every path that
     # contributes ownership authority must be reconciled against current bytes
@@ -58,7 +62,9 @@ def qualified_import_identity(codemap: Any, *, source_path: str, target: str) ->
         "requested_target": target,
         "status": status,
         "ambiguous": bool(ambiguous),
-        "qualified_identity": _identity(QUALIFIED_IMPORT_SCHEMA, payload) if status == "resolved" else None,
+        "qualified_identity": _identity(QUALIFIED_IMPORT_SCHEMA, payload)
+        if status == "resolved"
+        else None,
         "authority": "repository-intelligence-only",
     }
 
@@ -71,8 +77,14 @@ def _is_declared_shared_edge(row: Mapping[str, object], synthetic: str) -> bool:
 
 
 def _shared_input_projects(codemap: Any, synthetic: str) -> list[dict[str, str]]:
-    rows = [row for row in codemap.store.project_edges() if _is_declared_shared_edge(row, synthetic)]
-    rows.sort(key=lambda row: (str(row.get("source") or ""), str(row.get("kind") or "")))
+    rows = [
+        row
+        for row in codemap.store.project_edges()
+        if _is_declared_shared_edge(row, synthetic)
+    ]
+    rows.sort(
+        key=lambda row: (str(row.get("source") or ""), str(row.get("kind") or ""))
+    )
     return [
         {"project_id": str(row.get("source") or ""), "kind": str(row.get("kind") or "")}
         for row in rows
@@ -95,7 +107,9 @@ def _shared_input_status(node: object, fresh: bool) -> str:
     return "resolved" if fresh else "stale"
 
 
-def _shared_input_payload(codemap: Any, rel: str, projects: list[dict[str, str]]) -> dict[str, object]:
+def _shared_input_payload(
+    codemap: Any, rel: str, projects: list[dict[str, str]]
+) -> dict[str, object]:
     return {
         "schema": QUALIFIED_SHARED_INPUT_SCHEMA,
         "repository_identity": _codemap_repository_identity(codemap),
@@ -112,18 +126,31 @@ def qualified_shared_input_identity(codemap: Any, *, relpath: str) -> dict[str, 
 
     rel = normalize_relative_path(relpath, allow_root=False)
     synthetic = f"shared-input:{rel}"
-    node = next((row for row in codemap.store.project_nodes() if _shared_input_node_matches(row, rel)), None)
+    node = next(
+        (
+            row
+            for row in codemap.store.project_nodes()
+            if _shared_input_node_matches(row, rel)
+        ),
+        None,
+    )
     projects = _shared_input_projects(codemap, synthetic) if node is not None else []
     fresh, stale_reason = codemap._evidence_fresh("project", "declared-project-links")
     status = _shared_input_status(node, fresh)
     payload = _shared_input_payload(codemap, rel, projects)
-    identity_available = status == "resolved" and payload["content_sha256"] is not None and bool(projects)
+    identity_available = (
+        status == "resolved"
+        and payload["content_sha256"] is not None
+        and bool(projects)
+    )
     return {
         **payload,
         "status": status,
         "fresh": bool(fresh),
         "stale_reason": stale_reason,
-        "qualified_identity": _identity(QUALIFIED_SHARED_INPUT_SCHEMA, payload) if identity_available else None,
+        "qualified_identity": _identity(QUALIFIED_SHARED_INPUT_SCHEMA, payload)
+        if identity_available
+        else None,
         "authority": "repository-intelligence-only",
         "execution_authority": "external",
     }

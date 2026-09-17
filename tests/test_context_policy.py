@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks.codemap.model import EvidenceVisibility
 from hashmarks.codemap.policy import ContextPolicy
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_builtin_secret_detection_covers_root_nested_and_windows_paths() -> None:

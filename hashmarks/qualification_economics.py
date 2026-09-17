@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from collections import Counter
-from pathlib import Path
-from typing import Mapping
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 from .qualification_classification import classify_nodeids
 from .qualification_units import qualification_owner_plan
 from .test_shards import _nodeids
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 ECONOMICS_SCHEMA = "hashmarks.qualification-classification-economics.v1"
 

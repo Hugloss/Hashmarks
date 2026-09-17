@@ -1,5 +1,5 @@
-from pathlib import Path
 import tomllib
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -14,22 +14,20 @@ def _write(path: Path, content: str) -> None:
 
 def _dependency_path(root: Path) -> Path:
     return (
-        root
-        / ".venv"
-        / "lib"
-        / "python3.13"
-        / "site-packages"
-        / "demo_dep"
-        / "core.py"
+        root / ".venv" / "lib" / "python3.13" / "site-packages" / "demo_dep" / "core.py"
     )
 
 
-def _simulate_historical_dependency_row(codemap: CodeMap, rel: str, monkeypatch) -> None:
+def _simulate_historical_dependency_row(
+    codemap: CodeMap, rel: str, monkeypatch
+) -> None:
     original = codemap._path_admitted_for_analysis
     monkeypatch.setattr(codemap, "_path_admitted_for_analysis", lambda _rel: True)
     assert codemap.outline(rel)["path"] == rel
     monkeypatch.setattr(codemap, "_path_admitted_for_analysis", original)
-    codemap.store.set_meta("analysis_scope_conformance_identity", "historical-pre-hm303")
+    codemap.store.set_meta(
+        "analysis_scope_conformance_identity", "historical-pre-hm303"
+    )
 
 
 def test_global_queries_retire_historical_pruned_rows_before_returning_evidence(
@@ -54,7 +52,9 @@ def test_global_queries_retire_historical_pruned_rows_before_returning_evidence(
         assert {hit.path for hit in codemap.find("owned")} == {"src/app.py"}
 
 
-def test_stable_scope_identity_avoids_repeated_repository_map_scan(tmp_path: Path) -> None:
+def test_stable_scope_identity_avoids_repeated_repository_map_scan(
+    tmp_path: Path,
+) -> None:
     _write(tmp_path / "src" / "app.py", "def owned():\n    return 1\n")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
@@ -69,7 +69,9 @@ def test_stable_scope_identity_avoids_repeated_repository_map_scan(tmp_path: Pat
             assert codemap.symbol("owned")["matches"][0]["path"] == "src/app.py"
 
 
-def test_context_policy_change_retires_historical_rows_on_reopen(tmp_path: Path) -> None:
+def test_context_policy_change_retires_historical_rows_on_reopen(
+    tmp_path: Path,
+) -> None:
     hidden = tmp_path / "private" / "hidden.py"
     owned = tmp_path / "src" / "node_modules_adapter.py"
     _write(hidden, "def hidden():\n    return 2\n")
@@ -95,13 +97,17 @@ def test_context_policy_change_retires_historical_rows_on_reopen(tmp_path: Path)
         }
 
 
-def test_live_context_policy_deny_converges_without_reopening_codemap(tmp_path: Path) -> None:
+def test_live_context_policy_deny_converges_without_reopening_codemap(
+    tmp_path: Path,
+) -> None:
     hidden = tmp_path / "private" / "hidden.py"
     _write(hidden, "def hidden_owner():\n    return 2\n")
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
-        assert codemap.symbol("hidden_owner")["matches"][0]["path"] == "private/hidden.py"
+        assert (
+            codemap.symbol("hidden_owner")["matches"][0]["path"] == "private/hidden.py"
+        )
         (tmp_path / ".hashmarks-context.toml").write_text(
             '[[rule]]\npattern = "private/**"\nindex = false\n',
             encoding="utf-8",
@@ -111,7 +117,9 @@ def test_live_context_policy_deny_converges_without_reopening_codemap(tmp_path: 
         assert "private/hidden.py" not in codemap.store.paths()
 
 
-def test_live_context_policy_reallow_discovers_newly_admitted_paths(tmp_path: Path) -> None:
+def test_live_context_policy_reallow_discovers_newly_admitted_paths(
+    tmp_path: Path,
+) -> None:
     hidden = tmp_path / "private" / "hidden.py"
     _write(hidden, "def hidden_owner():\n    return 2\n")
     policy = tmp_path / ".hashmarks-context.toml"
@@ -125,10 +133,14 @@ def test_live_context_policy_reallow_discovers_newly_admitted_paths(tmp_path: Pa
         with pytest.raises(KeyError, match="symbol not found"):
             codemap.symbol("hidden_owner")
         policy.unlink()
-        assert codemap.symbol("hidden_owner")["matches"][0]["path"] == "private/hidden.py"
+        assert (
+            codemap.symbol("hidden_owner")["matches"][0]["path"] == "private/hidden.py"
+        )
 
 
-def test_live_custom_context_policy_path_is_authority_not_construction_snapshot(tmp_path: Path) -> None:
+def test_live_custom_context_policy_path_is_authority_not_construction_snapshot(
+    tmp_path: Path,
+) -> None:
     hidden = tmp_path / "private" / "hidden.py"
     policy = tmp_path / "config" / "context.toml"
     _write(hidden, "def hidden_owner():\n    return 2\n")
@@ -149,7 +161,9 @@ def test_live_custom_context_policy_path_is_authority_not_construction_snapshot(
             codemap.symbol("hidden_owner")
 
 
-def test_invalid_live_context_policy_fails_closed_before_persisted_evidence(tmp_path: Path) -> None:
+def test_invalid_live_context_policy_fails_closed_before_persisted_evidence(
+    tmp_path: Path,
+) -> None:
     _write(tmp_path / "src" / "app.py", "def owned():\n    return 1\n")
     policy = tmp_path / ".hashmarks-context.toml"
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:

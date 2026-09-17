@@ -9,16 +9,23 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import TYPE_CHECKING
 
-from ..paths import canonical_host_path
-from ..sqlite_boundary import configure_sqlite_connection, sqlite_transaction
-from .derived import DerivedNode, derive_file_nodes
-from .index_surfaces import index_surface_for_path
-from .model import EvidenceVisibility, EdgeRecord, LexicalRecord, ParsedArtifact, SearchHit, SymbolRecord
+from hashmarks.paths import canonical_host_path
+from hashmarks.sqlite_boundary import configure_sqlite_connection, sqlite_transaction
+
+from .derived import derive_file_nodes
+from .model import (
+    EdgeRecord,
+    EvidenceVisibility,
+    LexicalRecord,
+    ParsedArtifact,
+    SymbolRecord,
+)
 from .store_queries import WorkspaceMapQueryMixin
 
-
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
 
 
 class WorkspaceStateMismatchError(ValueError):
@@ -61,11 +68,16 @@ def repository_cache_key(workspace: Path) -> str:
 def default_artifact_db(workspace: Path) -> Path:
     return _shared_root() / repository_cache_key(workspace) / "artifacts.sqlite3"
 
+
 def git_base_identity(workspace: Path) -> str | None:
     try:
         completed = subprocess.run(
             ["git", "-C", str(workspace), "rev-parse", "HEAD^{tree}"],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False, timeout=2,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=False,
+            timeout=2,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -74,7 +86,12 @@ def git_base_identity(workspace: Path) -> str | None:
 
 
 def default_base_snapshot(workspace: Path, base_identity: str) -> Path:
-    return _shared_root() / repository_cache_key(workspace) / "bases" / f"{base_identity}.json"
+    return (
+        _shared_root()
+        / repository_cache_key(workspace)
+        / "bases"
+        / f"{base_identity}.json"
+    )
 
 
 def git_overlay_paths(workspace: Path) -> set[str] | None:
@@ -85,8 +102,19 @@ def git_overlay_paths(workspace: Path) -> set[str] | None:
     """
     try:
         completed = subprocess.run(
-            ["git", "-C", str(workspace), "status", "--porcelain=v1", "-z", "--untracked-files=all"],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False, timeout=5,
+            [
+                "git",
+                "-C",
+                str(workspace),
+                "status",
+                "--porcelain=v1",
+                "-z",
+                "--untracked-files=all",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=5,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -108,11 +136,17 @@ def git_overlay_paths(workspace: Path) -> set[str] | None:
         if b"R" in status or b"C" in status:
             if i >= len(records):
                 return None
-            origin = records[i]; i += 1
+            origin = records[i]
+            i += 1
             if origin:
                 out.add(os.fsdecode(origin).replace("\\", "/"))
         out.add(os.fsdecode(raw).replace("\\", "/"))
-    return {path for path in out if path not in {".hashmarks", ".fastidentity"} and not path.startswith((".hashmarks/", ".fastidentity/"))}
+    return {
+        path
+        for path in out
+        if path not in {".hashmarks", ".fastidentity"}
+        and not path.startswith((".hashmarks/", ".fastidentity/"))
+    }
 
 
 def _symbol_from(value: dict) -> SymbolRecord:
@@ -160,7 +194,9 @@ class ArtifactStore:
 
     def get(self, key: str) -> ParsedArtifact | None:
         with self._lock:
-            row = self._db.execute("SELECT payload FROM artifact WHERE artifact_key=?", (key,)).fetchone()
+            row = self._db.execute(
+                "SELECT payload FROM artifact WHERE artifact_key=?", (key,)
+            ).fetchone()
         if row is None:
             return None
         value = json.loads(row[0])
@@ -173,8 +209,13 @@ class ArtifactStore:
             outline=str(value.get("outline", "")),
             symbols=tuple(_symbol_from(item) for item in value.get("symbols", [])),
             edges=tuple(_edge_from(item) for item in value.get("edges", [])),
-            lexical=tuple(LexicalRecord(token=str(item["token"]), line=int(item["line"])) for item in value.get("lexical", [])),
-            parse_error=None if value.get("parse_error") is None else str(value["parse_error"]),
+            lexical=tuple(
+                LexicalRecord(token=str(item["token"]), line=int(item["line"]))
+                for item in value.get("lexical", [])
+            ),
+            parse_error=None
+            if value.get("parse_error") is None
+            else str(value["parse_error"]),
         )
 
     def put(self, artifact: ParsedArtifact) -> None:
@@ -326,7 +367,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             CREATE INDEX IF NOT EXISTS derived_node_identity_idx ON derived_node(identity);
             """
         )
-        self._db.execute("CREATE INDEX IF NOT EXISTS edge_target_short_idx ON edge(target_short)")
+        self._db.execute(
+            "CREATE INDEX IF NOT EXISTS edge_target_short_idx ON edge(target_short)"
+        )
         self._db.execute(
             "CREATE INDEX IF NOT EXISTS edge_target_short_path_line_idx "
             "ON edge(target_short,path,line)"
@@ -352,7 +395,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         return dict(self._read_counters)
 
     @contextmanager
-    def bulk_file_writes(self, *, batch_size: int = 32, on_commit: Callable[[int], None] | None = None):
+    def bulk_file_writes(
+        self, *, batch_size: int = 32, on_commit: Callable[[int], None] | None = None
+    ):
         """Bound cold-sync write amplification without changing file semantics.
 
         Each completed chunk is committed independently, so an interruption can
@@ -394,23 +439,27 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 self._bulk_file_write_count = 0
                 self._bulk_file_write_on_commit = None
 
-    _CURRENT_TABLES = frozenset({
-        "meta",
-        "file_map",
-        "symbol",
-        "edge",
-        "lexical",
-        "project_node",
-        "project_edge",
-        "native_definition",
-        "native_edge",
-        "native_file_edge",
-        "derived_node",
-    })
+    _CURRENT_TABLES = frozenset(
+        {
+            "meta",
+            "file_map",
+            "symbol",
+            "edge",
+            "lexical",
+            "project_node",
+            "project_edge",
+            "native_definition",
+            "native_edge",
+            "native_file_edge",
+            "derived_node",
+        }
+    )
 
     @staticmethod
     def _column_names(db: sqlite3.Connection, table: str) -> tuple[str, ...]:
-        return tuple(str(row[1]) for row in db.execute(f"PRAGMA table_info({table})").fetchall())
+        return tuple(
+            str(row[1]) for row in db.execute(f"PRAGMA table_info({table})").fetchall()
+        )
 
     def _schema_is_current(self) -> bool:
         """Accept only the current generated CodeMap schema; old cache shapes are disposable."""
@@ -425,13 +474,27 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         if tables != self._CURRENT_TABLES:
             return False
         if self._column_names(self._db, "edge") != (
-            "path", "source", "kind", "target", "target_short", "line", "confidence"
+            "path",
+            "source",
+            "kind",
+            "target",
+            "target_short",
+            "line",
+            "confidence",
         ):
             return False
         if self._column_names(self._db, "file_map") != (
-            "path", "file_digest", "artifact_key", "language", "module_name",
-            "evidence_visibility", "full_tokens", "outline", "parse_error",
-            "index_surface", "lexical_count",
+            "path",
+            "file_digest",
+            "artifact_key",
+            "language",
+            "module_name",
+            "evidence_visibility",
+            "full_tokens",
+            "outline",
+            "parse_error",
+            "index_surface",
+            "lexical_count",
         ):
             return False
         row = self._db.execute(
@@ -449,7 +512,6 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             for row in rows:
                 name = str(row[0]).replace('"', '""')
                 self._db.execute(f'DROP TABLE "{name}"')
-
 
     def bind_workspace(
         self,
@@ -470,7 +532,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             if self._db.in_transaction:
                 raise RuntimeError("cannot bind workspace inside an active transaction")
             with sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
-                row = self._db.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+                row = self._db.execute(
+                    "SELECT value FROM meta WHERE key=?", (key,)
+                ).fetchone()
                 if row is not None:
                     bound = str(row[0])
                     if bound != canonical:
@@ -481,8 +545,10 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                     return
 
                 existing = (
-                    self._db.execute("SELECT 1 FROM file_map LIMIT 1").fetchone() is not None
-                    or self._db.execute("SELECT 1 FROM meta LIMIT 1").fetchone() is not None
+                    self._db.execute("SELECT 1 FROM file_map LIMIT 1").fetchone()
+                    is not None
+                    or self._db.execute("SELECT 1 FROM meta LIMIT 1").fetchone()
+                    is not None
                 )
                 if existing and not allow_unbound_existing:
                     raise WorkspaceStateMismatchError(
@@ -500,7 +566,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
 
     def meta(self, key: str, default: str | None = None) -> str | None:
         with self._lock:
-            row = self._db.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+            row = self._db.execute(
+                "SELECT value FROM meta WHERE key=?", (key,)
+            ).fetchone()
         return default if row is None else str(row[0])
 
     def meta_items(self, *, prefix: str = "") -> list[tuple[str, str]]:
@@ -511,7 +579,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                     (prefix + "%",),
                 ).fetchall()
             else:
-                rows = self._db.execute("SELECT key,value FROM meta ORDER BY key").fetchall()
+                rows = self._db.execute(
+                    "SELECT key,value FROM meta ORDER BY key"
+                ).fetchall()
         return [(str(row[0]), str(row[1])) for row in rows]
 
     def set_meta(self, key: str, value: str) -> None:
@@ -527,7 +597,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             return
         with self._lock:
             if self._db.in_transaction:
-                raise RuntimeError("cannot publish sync metadata inside an active transaction")
+                raise RuntimeError(
+                    "cannot publish sync metadata inside an active transaction"
+                )
             self._db.executemany(
                 "INSERT INTO meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 list(values.items()),
@@ -546,7 +618,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         """
         with self._lock:
             if self._db.in_transaction:
-                raise RuntimeError("cannot bump generation inside an active transaction")
+                raise RuntimeError(
+                    "cannot bump generation inside an active transaction"
+                )
             # The Python lock owns one connection; BEGIN IMMEDIATE additionally
             # serializes other WorkspaceMapStore instances/processes using the
             # same durable database so the read-modify-write cannot lose a bump.
@@ -565,12 +639,17 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     def file_row(self, path: str):
         self._count_read("file_row")
         with self._lock:
-            return self._db.execute("SELECT * FROM file_map WHERE path=?", (path,)).fetchone()
+            return self._db.execute(
+                "SELECT * FROM file_map WHERE path=?", (path,)
+            ).fetchone()
 
     def has_files(self) -> bool:
         """Cheap readiness probe; avoids full-table COUNTs on query hot paths."""
         with self._lock:
-            return self._db.execute("SELECT 1 FROM file_map LIMIT 1").fetchone() is not None
+            return (
+                self._db.execute("SELECT 1 FROM file_map LIMIT 1").fetchone()
+                is not None
+            )
 
     def file_rows(self, paths: Iterable[str]) -> dict[str, dict]:
         unique = sorted({str(path) for path in paths if path})
@@ -583,14 +662,17 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 chunk = unique[start : start + 500]
                 placeholders = ",".join("?" for _ in chunk)
                 rows = self._db.execute(
-                    f"SELECT * FROM file_map WHERE path IN ({placeholders})", tuple(chunk)
+                    f"SELECT * FROM file_map WHERE path IN ({placeholders})",
+                    tuple(chunk),
                 ).fetchall()
                 result.update({str(row["path"]): dict(row) for row in rows})
         return result
 
     def paths(self) -> set[str]:
         with self._lock:
-            return {str(row[0]) for row in self._db.execute("SELECT path FROM file_map")}
+            return {
+                str(row[0]) for row in self._db.execute("SELECT path FROM file_map")
+            }
 
     def set_file(
         self,
@@ -603,12 +685,22 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     ) -> dict[str, object]:
         new_nodes = derive_file_nodes(path, artifact)
         old_nodes = {row["kind"]: row for row in self.derived_nodes(path)}
-        changed_kinds = tuple(node.kind for node in new_nodes if old_nodes.get(node.kind, {}).get("identity") != node.identity)
-        preserved_kinds = tuple(node.kind for node in new_nodes if old_nodes.get(node.kind, {}).get("identity") == node.identity)
-        shielded_kinds = tuple(
-            node.kind for node in new_nodes
+        changed_kinds = tuple(
+            node.kind
+            for node in new_nodes
+            if old_nodes.get(node.kind, {}).get("identity") != node.identity
+        )
+        preserved_kinds = tuple(
+            node.kind
+            for node in new_nodes
             if old_nodes.get(node.kind, {}).get("identity") == node.identity
-            and tuple(old_nodes[node.kind].get("input_identities", ())) != node.input_identities
+        )
+        shielded_kinds = tuple(
+            node.kind
+            for node in new_nodes
+            if old_nodes.get(node.kind, {}).get("identity") == node.identity
+            and tuple(old_nodes[node.kind].get("input_identities", ()))
+            != node.input_identities
         )
         with self._lock:
             bulk_write = self._bulk_file_write_batch_size > 0
@@ -628,19 +720,53 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                       evidence_visibility=excluded.evidence_visibility, full_tokens=excluded.full_tokens,
                       outline=excluded.outline, parse_error=excluded.parse_error,
                       index_surface=excluded.index_surface, lexical_count=excluded.lexical_count""",
-                    (path, artifact.file_digest, artifact.artifact_key, artifact.language, module_name,
-                     visibility.value, artifact.full_tokens, artifact.outline, artifact.parse_error,
-                     index_surface, len(artifact.lexical)),
+                    (
+                        path,
+                        artifact.file_digest,
+                        artifact.artifact_key,
+                        artifact.language,
+                        module_name,
+                        visibility.value,
+                        artifact.full_tokens,
+                        artifact.outline,
+                        artifact.parse_error,
+                        index_surface,
+                        len(artifact.lexical),
+                    ),
                 )
                 self._db.executemany(
                     """INSERT INTO symbol(path,name,qualname,kind,signature,start_line,end_line,signature_tokens,body_tokens,parent)
                     VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                    [(path, s.name, s.qualname, s.kind, s.signature, s.start_line, s.end_line,
-                      s.signature_tokens, s.body_tokens, s.parent) for s in artifact.symbols],
+                    [
+                        (
+                            path,
+                            s.name,
+                            s.qualname,
+                            s.kind,
+                            s.signature,
+                            s.start_line,
+                            s.end_line,
+                            s.signature_tokens,
+                            s.body_tokens,
+                            s.parent,
+                        )
+                        for s in artifact.symbols
+                    ],
                 )
                 self._db.executemany(
                     "INSERT INTO edge(path,source,kind,target,target_short,line,confidence) VALUES (?,?,?,?,?,?,?)",
-                    [(path, e.source, e.kind, e.target, e.target.rsplit(".", 1)[-1], e.line, e.confidence) for e in artifact.edges],
+                    [
+                        (
+                            path,
+                            e.source,
+                            e.kind,
+                            e.target,
+                            e.target.rsplit(".", 1)[-1],
+                            e.line,
+                            e.confidence,
+                        )
+                        for e in artifact.edges
+                    ],
                 )
                 self._db.executemany(
                     "INSERT INTO lexical(path,token,line) VALUES (?,?,?)",
@@ -649,9 +775,20 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 nodes = new_nodes
                 self._db.executemany(
                     "INSERT INTO derived_node(node_id,path,kind,identity,dependencies,input_identities,producer) VALUES (?,?,?,?,?,?,?)",
-                    [(node.node_id, node.path, node.kind, node.identity,
-                      json.dumps(list(node.dependencies), separators=(",", ":")),
-                      json.dumps(list(node.input_identities), separators=(",", ":")), node.producer) for node in nodes],
+                    [
+                        (
+                            node.node_id,
+                            node.path,
+                            node.kind,
+                            node.identity,
+                            json.dumps(list(node.dependencies), separators=(",", ":")),
+                            json.dumps(
+                                list(node.input_identities), separators=(",", ":")
+                            ),
+                            node.producer,
+                        )
+                        for node in nodes
+                    ],
                 )
                 if bulk_write:
                     self._bulk_file_write_count += 1
@@ -676,7 +813,6 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             "shielded_kinds": shielded_kinds,
         }
 
-
     def paths_under(self, prefix: str) -> set[str]:
         clean = prefix.strip("/")
         if not clean:
@@ -700,24 +836,35 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         values = list(paths)
         if not values:
             return 0
-        with self._lock:
-            with sqlite_transaction(self._db):
-                for path in values:
-                    self._db.execute("DELETE FROM symbol WHERE path=?", (path,))
-                    self._db.execute("DELETE FROM edge WHERE path=?", (path,))
-                    self._db.execute("DELETE FROM lexical WHERE path=?", (path,))
-                    self._db.execute("DELETE FROM derived_node WHERE path=?", (path,))
-                    self._db.execute("DELETE FROM file_map WHERE path=?", (path,))
+        with self._lock, sqlite_transaction(self._db):
+            for path in values:
+                self._db.execute("DELETE FROM symbol WHERE path=?", (path,))
+                self._db.execute("DELETE FROM edge WHERE path=?", (path,))
+                self._db.execute("DELETE FROM lexical WHERE path=?", (path,))
+                self._db.execute("DELETE FROM derived_node WHERE path=?", (path,))
+                self._db.execute("DELETE FROM file_map WHERE path=?", (path,))
         return len(values)
-
 
     def replace_native_file_edges(self, producer_prefix: str, edges) -> None:
         with self._lock:
             with sqlite_transaction(self._db):
-                self._db.execute("DELETE FROM native_file_edge WHERE producer LIKE ?", (producer_prefix + "%",))
+                self._db.execute(
+                    "DELETE FROM native_file_edge WHERE producer LIKE ?",
+                    (producer_prefix + "%",),
+                )
                 self._db.executemany(
                     "INSERT OR REPLACE INTO native_file_edge(source,target,kind,confidence,producer,specifier) VALUES (?,?,?,?,?,?)",
-                    [(edge.source, edge.target, edge.kind, edge.confidence, edge.producer, edge.specifier) for edge in edges],
+                    [
+                        (
+                            edge.source,
+                            edge.target,
+                            edge.kind,
+                            edge.confidence,
+                            edge.producer,
+                            edge.specifier,
+                        )
+                        for edge in edges
+                    ],
                 )
 
     def native_file_edges(self) -> list[dict]:
@@ -738,15 +885,39 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     def replace_native_occurrences(self, producer: str, definitions, edges) -> None:
         with self._lock:
             with sqlite_transaction(self._db):
-                self._db.execute("DELETE FROM native_definition WHERE producer=?", (producer,))
-                self._db.execute("DELETE FROM native_edge WHERE producer=?", (producer,))
+                self._db.execute(
+                    "DELETE FROM native_definition WHERE producer=?", (producer,)
+                )
+                self._db.execute(
+                    "DELETE FROM native_edge WHERE producer=?", (producer,)
+                )
                 self._db.executemany(
                     "INSERT OR REPLACE INTO native_definition(path,symbol,display_name,line,end_line,producer) VALUES (?,?,?,?,?,?)",
-                    [(row["path"], row["symbol"], row["display_name"], int(row["line"]), int(row["end_line"]), producer) for row in definitions],
+                    [
+                        (
+                            row["path"],
+                            row["symbol"],
+                            row["display_name"],
+                            int(row["line"]),
+                            int(row["end_line"]),
+                            producer,
+                        )
+                        for row in definitions
+                    ],
                 )
                 self._db.executemany(
                     "INSERT OR REPLACE INTO native_edge(path,source,target_symbol,target_name,line,producer) VALUES (?,?,?,?,?,?)",
-                    [(row["path"], row.get("source"), row["target_symbol"], row["target_name"], int(row["line"]), producer) for row in edges],
+                    [
+                        (
+                            row["path"],
+                            row.get("source"),
+                            row["target_symbol"],
+                            row["target_name"],
+                            int(row["line"]),
+                            producer,
+                        )
+                        for row in edges
+                    ],
                 )
 
     def native_definitions(self, query: str, limit: int = 100) -> list[dict]:
@@ -767,11 +938,14 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def native_edges_from(self, path: str, source: str | None = None, limit: int = 200) -> list[dict]:
+    def native_edges_from(
+        self, path: str, source: str | None = None, limit: int = 200
+    ) -> list[dict]:
         with self._lock:
             if source is None:
                 rows = self._db.execute(
-                    "SELECT * FROM native_edge WHERE path=? ORDER BY line LIMIT ?", (path, limit)
+                    "SELECT * FROM native_edge WHERE path=? ORDER BY line LIMIT ?",
+                    (path, limit),
                 ).fetchall()
             else:
                 rows = self._db.execute(
@@ -783,18 +957,40 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     def replace_project_graph(self, producer: str, nodes, edges) -> None:
         with self._lock:
             with sqlite_transaction(self._db):
-                self._db.execute("DELETE FROM project_edge WHERE producer=?", (producer,))
-                self._db.execute("DELETE FROM project_node WHERE producer=?", (producer,))
+                self._db.execute(
+                    "DELETE FROM project_edge WHERE producer=?", (producer,)
+                )
+                self._db.execute(
+                    "DELETE FROM project_node WHERE producer=?", (producer,)
+                )
                 self._db.executemany(
                     "INSERT INTO project_node(project_id,kind,root,manifest,producer,metadata) VALUES (?,?,?,?,?,?)",
                     [
-                        (node.project_id, node.kind, node.root, node.manifest, node.producer, json.dumps(node.metadata, sort_keys=True, separators=(",", ":")))
+                        (
+                            node.project_id,
+                            node.kind,
+                            node.root,
+                            node.manifest,
+                            node.producer,
+                            json.dumps(
+                                node.metadata, sort_keys=True, separators=(",", ":")
+                            ),
+                        )
                         for node in nodes
                     ],
                 )
                 self._db.executemany(
                     "INSERT OR REPLACE INTO project_edge(source,target,kind,confidence,producer) VALUES (?,?,?,?,?)",
-                    [(edge.source, edge.target, edge.kind, edge.confidence, edge.producer) for edge in edges],
+                    [
+                        (
+                            edge.source,
+                            edge.target,
+                            edge.kind,
+                            edge.confidence,
+                            edge.producer,
+                        )
+                        for edge in edges
+                    ],
                 )
 
     def project_nodes(self) -> list[dict]:
@@ -830,7 +1026,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         matches.sort(key=lambda row: len(str(row["root"])), reverse=True)
         return matches
 
-    def project_dependents(self, project_ids: set[str], max_depth: int = 12) -> set[str]:
+    def project_dependents(
+        self, project_ids: set[str], max_depth: int = 12
+    ) -> set[str]:
         reverse: dict[str, set[str]] = {}
         for edge in self.project_edges():
             reverse.setdefault(str(edge["target"]), set()).add(str(edge["source"]))
@@ -850,29 +1048,61 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     def clear(self) -> dict[str, int]:
         before = self.stats()
         tables = (
-            "native_file_edge", "native_edge", "native_definition",
-            "project_edge", "project_node", "lexical", "edge", "symbol", "file_map",
+            "native_file_edge",
+            "native_edge",
+            "native_definition",
+            "project_edge",
+            "project_node",
+            "lexical",
+            "edge",
+            "symbol",
+            "file_map",
         )
-        with self._lock:
-            with sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
-                for table in tables:
-                    self._db.execute(f"DELETE FROM {table}")
-                self._db.execute("DELETE FROM meta WHERE key != 'state.workspace'")
+        with self._lock, sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
+            for table in tables:
+                self._db.execute(f"DELETE FROM {table}")
+            self._db.execute("DELETE FROM meta WHERE key != 'state.workspace'")
         return before
 
     def stats(self) -> dict[str, int]:
         with self._lock:
             return {
-                "files": int(self._db.execute("SELECT COUNT(*) FROM file_map").fetchone()[0]),
-                "symbols": int(self._db.execute("SELECT COUNT(*) FROM symbol").fetchone()[0]),
-                "edges": int(self._db.execute("SELECT COUNT(*) FROM edge").fetchone()[0]),
-                "lexical_occurrences": int(self._db.execute("SELECT COUNT(*) FROM lexical").fetchone()[0]),
-                "parse_errors": int(self._db.execute("SELECT COUNT(*) FROM file_map WHERE parse_error IS NOT NULL").fetchone()[0]),
-                "projects": int(self._db.execute("SELECT COUNT(*) FROM project_node").fetchone()[0]),
-                "project_edges": int(self._db.execute("SELECT COUNT(*) FROM project_edge").fetchone()[0]),
-                "native_definitions": int(self._db.execute("SELECT COUNT(*) FROM native_definition").fetchone()[0]),
-                "native_edges": int(self._db.execute("SELECT COUNT(*) FROM native_edge").fetchone()[0]),
-                "native_file_edges": int(self._db.execute("SELECT COUNT(*) FROM native_file_edge").fetchone()[0]),
+                "files": int(
+                    self._db.execute("SELECT COUNT(*) FROM file_map").fetchone()[0]
+                ),
+                "symbols": int(
+                    self._db.execute("SELECT COUNT(*) FROM symbol").fetchone()[0]
+                ),
+                "edges": int(
+                    self._db.execute("SELECT COUNT(*) FROM edge").fetchone()[0]
+                ),
+                "lexical_occurrences": int(
+                    self._db.execute("SELECT COUNT(*) FROM lexical").fetchone()[0]
+                ),
+                "parse_errors": int(
+                    self._db.execute(
+                        "SELECT COUNT(*) FROM file_map WHERE parse_error IS NOT NULL"
+                    ).fetchone()[0]
+                ),
+                "projects": int(
+                    self._db.execute("SELECT COUNT(*) FROM project_node").fetchone()[0]
+                ),
+                "project_edges": int(
+                    self._db.execute("SELECT COUNT(*) FROM project_edge").fetchone()[0]
+                ),
+                "native_definitions": int(
+                    self._db.execute(
+                        "SELECT COUNT(*) FROM native_definition"
+                    ).fetchone()[0]
+                ),
+                "native_edges": int(
+                    self._db.execute("SELECT COUNT(*) FROM native_edge").fetchone()[0]
+                ),
+                "native_file_edges": int(
+                    self._db.execute(
+                        "SELECT COUNT(*) FROM native_file_edge"
+                    ).fetchone()[0]
+                ),
             }
 
     def economics_counts_by_surface(self) -> dict[str, object]:
@@ -897,7 +1127,12 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                     "files_with_lexical_evidence": count,
                     "lexical_occurrences": occurrences,
                 }
-        return {"files": files, "lexical_occurrences": lexical, "parse_errors": parse_errors, "surfaces": surfaces}
+        return {
+            "files": files,
+            "lexical_occurrences": lexical,
+            "parse_errors": parse_errors,
+            "surfaces": surfaces,
+        }
 
     def lexical_counts_by_path(self) -> dict[str, int]:
         """Return measured lexical occurrence counts keyed by indexed path."""
@@ -909,7 +1144,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
 
     def language_counts(self) -> dict[str, int]:
         with self._lock:
-            rows = self._db.execute("SELECT language,COUNT(*) n FROM file_map GROUP BY language ORDER BY n DESC").fetchall()
+            rows = self._db.execute(
+                "SELECT language,COUNT(*) n FROM file_map GROUP BY language ORDER BY n DESC"
+            ).fetchall()
         return {str(row[0]): int(row[1]) for row in rows}
 
     def top_level_counts(self) -> dict[str, int]:

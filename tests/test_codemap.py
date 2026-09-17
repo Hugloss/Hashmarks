@@ -10,11 +10,11 @@ from pathlib import Path
 import pytest
 
 from hashmarks.client import RepositoryObservation
-from hashmarks.observation import ObservationState
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.model import EvidenceVisibility
 from hashmarks.codemap.parsers import parse_source
 from hashmarks.codemap.repository_index_store import WorkspaceMapStore
+from hashmarks.observation import ObservationState
 
 
 def _write_repo(root: Path) -> None:
@@ -48,7 +48,9 @@ def test_identity_import_graph_does_not_import_codemap():
 
 def test_codemap_sync_outline_find_and_context(tmp_path: Path):
     _write_repo(tmp_path)
-    with CodeMap(tmp_path, artifact_db=tmp_path / "shared-artifacts.sqlite3") as codemap:
+    with CodeMap(
+        tmp_path, artifact_db=tmp_path / "shared-artifacts.sqlite3"
+    ) as codemap:
         first = codemap.sync()
         assert first.discovered == 3
         assert first.parsed_artifacts == 3
@@ -117,7 +119,9 @@ def test_evidence_visibility_is_separate_from_indexing(tmp_path: Path):
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         result = codemap.sync()
-        assert result.discovered == 4  # three normal Python files + vendor; .env.py denied
+        assert (
+            result.discovered == 4
+        )  # three normal Python files + vendor; .env.py denied
         outline = codemap.outline("vendor/lib.py")
         assert outline["evidence_visibility"] == "outline"
         pack = codemap.context("vendor_secret_algorithm", token_budget=500)
@@ -131,8 +135,12 @@ def test_evidence_visibility_is_separate_from_indexing(tmp_path: Path):
 
 def test_path_only_index_supports_other_repo_languages(tmp_path: Path):
     (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "app.ts").write_text("export function login() { return true }\n", encoding="utf-8")
-    (tmp_path / "main.go").write_text("package main\nfunc main() {}\n", encoding="utf-8")
+    (tmp_path / "src" / "app.ts").write_text(
+        "export function login() { return true }\n", encoding="utf-8"
+    )
+    (tmp_path / "main.go").write_text(
+        "package main\nfunc main() {}\n", encoding="utf-8"
+    )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         result = codemap.sync()
         capsule = codemap.orient()
@@ -160,12 +168,22 @@ def test_content_addressed_artifacts_reused_across_git_worktrees(
     repo.mkdir()
     (repo / "mod.py").write_text("def answer():\n    return 42\n", encoding="utf-8")
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-    subprocess.run(["git", "config", "user.email", "hashmarks@example.invalid"], cwd=repo, check=True)
-    subprocess.run(["git", "config", "user.name", "Hashmarks Test"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "hashmarks@example.invalid"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Hashmarks Test"], cwd=repo, check=True
+    )
     subprocess.run(["git", "add", "mod.py"], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-qm", "init"], cwd=repo, check=True)
     worktree = tmp_path / "worktree"
-    subprocess.run(["git", "worktree", "add", "-q", "-b", "other", str(worktree)], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "other", str(worktree)],
+        cwd=repo,
+        check=True,
+    )
 
     with CodeMap(repo) as first_map:
         first = first_map.sync()
@@ -186,12 +204,15 @@ def shutil_which(name: str) -> str | None:
     return which(name)
 
 
-def test_incremental_sync_reindexes_only_changed_path_and_handles_subtree_removal(tmp_path: Path):
+def test_incremental_sync_reindexes_only_changed_path_and_handles_subtree_removal(
+    tmp_path: Path,
+):
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         (tmp_path / "src" / "auth.py").write_text(
-            (tmp_path / "src" / "auth.py").read_text(encoding="utf-8") + "\ndef only_changed():\n    return 1\n",
+            (tmp_path / "src" / "auth.py").read_text(encoding="utf-8")
+            + "\ndef only_changed():\n    return 1\n",
             encoding="utf-8",
         )
         update = codemap.sync(["src/auth.py"])
@@ -213,7 +234,17 @@ def test_codemap_watcher_keeps_map_hot_without_identity_daemon(tmp_path: Path):
     _write_repo(tmp_path)
     source_root = Path(__file__).parents[1]
     proc = subprocess.Popen(
-        [sys.executable, "-m", "hashmarks.cli", "--workspace", str(tmp_path), "map", "watch", "--debounce", "0.01"],
+        [
+            sys.executable,
+            "-m",
+            "hashmarks.cli",
+            "--workspace",
+            str(tmp_path),
+            "map",
+            "watch",
+            "--debounce",
+            "0.01",
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         text=True,
@@ -239,12 +270,15 @@ def test_codemap_watcher_keeps_map_hot_without_identity_daemon(tmp_path: Path):
                     proc.kill()
                     proc.wait(timeout=3)
             pytest.fail(
-                "CodeMap watcher did not become ready "
-                f"(returncode={proc.returncode})"
+                f"CodeMap watcher did not become ready (returncode={proc.returncode})"
             )
 
         auth = tmp_path / "src" / "auth.py"
-        auth.write_text(auth.read_text(encoding="utf-8") + "\ndef watcher_added():\n    return True\n", encoding="utf-8")
+        auth.write_text(
+            auth.read_text(encoding="utf-8")
+            + "\ndef watcher_added():\n    return True\n",
+            encoding="utf-8",
+        )
         deadline = time_monotonic() + 5
         while time_monotonic() < deadline:
             with CodeMap(tmp_path) as reader:
@@ -277,7 +311,9 @@ def time_sleep(seconds: float) -> None:
     time.sleep(seconds)
 
 
-def test_persistent_grep_returns_only_candidate_lines_and_respects_outline_only(tmp_path: Path):
+def test_persistent_grep_returns_only_candidate_lines_and_respects_outline_only(
+    tmp_path: Path,
+):
     _write_repo(tmp_path)
     (tmp_path / "src" / "errors.py").write_text(
         "def fail():\n    raise RuntimeError('terminal cancellation handshake failed')\n",
@@ -297,7 +333,9 @@ def test_persistent_grep_returns_only_candidate_lines_and_respects_outline_only(
         result = codemap.grep("terminal cancellation handshake", context_lines=0)
     by_path = {row["path"]: row for row in result["matches"]}
     assert "src/errors.py" in by_path
-    assert "terminal cancellation handshake failed" in by_path["src/errors.py"]["content"]
+    assert (
+        "terminal cancellation handshake failed" in by_path["src/errors.py"]["content"]
+    )
     assert "vendor/hidden.py" not in by_path
 
 
@@ -330,10 +368,17 @@ def test_polyglot_advisory_outlines_are_provenance_bounded(tmp_path: Path):
         go = codemap.outline("main.go")
         rust = codemap.outline("lib.rs")
         deps = codemap.deps("web/auth.ts")
-    assert "AuthService" in ts["outline"] and "login" in ts["outline"] and "logout" in ts["outline"]
+    assert (
+        "AuthService" in ts["outline"]
+        and "login" in ts["outline"]
+        and "logout" in ts["outline"]
+    )
     assert "Service" in go["outline"] and "Login" in go["outline"]
     assert "Session" in rust["outline"] and "validate" in rust["outline"]
-    assert any(edge["target"] == "./user" and edge["confidence"] == "lexical" for edge in deps["edges"])
+    assert any(
+        edge["target"] == "./user" and edge["confidence"] == "lexical"
+        for edge in deps["edges"]
+    )
 
 
 def test_symbol_source_is_exact_budgeted_and_policy_checked(tmp_path: Path):
@@ -352,9 +397,17 @@ def test_symbol_source_is_exact_budgeted_and_policy_checked(tmp_path: Path):
 def test_reverse_dependency_graph_finds_transitive_tests(tmp_path: Path):
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
-    (tmp_path / "src" / "users.py").write_text("class User:\n    pass\n", encoding="utf-8")
-    (tmp_path / "src" / "auth.py").write_text("from src.users import User\n\ndef login():\n    return User()\n", encoding="utf-8")
-    (tmp_path / "tests" / "test_auth.py").write_text("from src.auth import login\n\ndef test_login():\n    assert login()\n", encoding="utf-8")
+    (tmp_path / "src" / "users.py").write_text(
+        "class User:\n    pass\n", encoding="utf-8"
+    )
+    (tmp_path / "src" / "auth.py").write_text(
+        "from src.users import User\n\ndef login():\n    return User()\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests" / "test_auth.py").write_text(
+        "from src.auth import login\n\ndef test_login():\n    assert login()\n",
+        encoding="utf-8",
+    )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         affected = codemap.affected("src/users.py")
@@ -364,7 +417,9 @@ def test_reverse_dependency_graph_finds_transitive_tests(tmp_path: Path):
     assert "tests/test_auth.py" in tests["tests"]
 
 
-def test_codemap_sync_does_not_claim_daemon_generation_if_generation_moves(tmp_path: Path, monkeypatch):
+def test_codemap_sync_does_not_claim_daemon_generation_if_generation_moves(
+    tmp_path: Path, monkeypatch
+):
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         generations = iter((10, 11))
@@ -387,7 +442,9 @@ def test_codemap_sync_does_not_claim_daemon_generation_if_generation_moves(tmp_p
 
 def test_codemap_never_follows_source_symlinks_outside_workspace(tmp_path: Path):
     outside = tmp_path.parent / f"{tmp_path.name}-outside-secret.py"
-    outside.write_text("def outside_secret():\n    return 'DO_NOT_LEAK'\n", encoding="utf-8")
+    outside.write_text(
+        "def outside_secret():\n    return 'DO_NOT_LEAK'\n", encoding="utf-8"
+    )
     link = tmp_path / "leak.py"
     try:
         link.symlink_to(outside)
@@ -422,8 +479,12 @@ def test_custom_state_dir_inside_workspace_is_never_indexed(tmp_path: Path):
     _write_repo(tmp_path)
     custom = tmp_path / "control-state"
     custom.mkdir()
-    (custom / "should_not_exist.py").write_text("def hidden_control():\n    pass\n", encoding="utf-8")
-    with CodeMap(tmp_path, state_dir=custom, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
+    (custom / "should_not_exist.py").write_text(
+        "def hidden_control():\n    pass\n", encoding="utf-8"
+    )
+    with CodeMap(
+        tmp_path, state_dir=custom, artifact_db=tmp_path / "artifacts.sqlite3"
+    ) as codemap:
         result = codemap.sync()
         assert result.discovered == 3
         assert codemap.store.file_row("control-state/should_not_exist.py") is None
@@ -484,7 +545,12 @@ def test_optional_precision_provider_changes_artifact_namespace(tmp_path: Path):
 
     class FakeStatus:
         def as_dict(self):
-            return {"name": "fake-structural", "available": True, "version": "1", "detail": None}
+            return {
+                "name": "fake-structural",
+                "available": True,
+                "version": "1",
+                "detail": None,
+            }
 
     class FakeProvider:
         def signature(self, language):
@@ -501,11 +567,15 @@ def test_optional_precision_provider_changes_artifact_namespace(tmp_path: Path):
         first = codemap.sync()
         key = str(codemap.store.file_row("src/auth.py")["artifact_key"])
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as plain:
-        plain.range_provider = type("Off", (), {
-            "signature": lambda self, language: None,
-            "enrich": lambda self, artifact, source, language: artifact,
-            "status": lambda self: FakeStatus(),
-        })()
+        plain.range_provider = type(
+            "Off",
+            (),
+            {
+                "signature": lambda self, language: None,
+                "enrich": lambda self, artifact, source, language: artifact,
+                "status": lambda self: FakeStatus(),
+            },
+        )()
         second = plain.sync()
         plain_key = str(plain.store.file_row("src/auth.py")["artifact_key"])
     assert first.parsed_artifacts == 3
@@ -517,16 +587,22 @@ def test_npm_project_graph_enrichment_and_reverse_project_impact(tmp_path: Path)
     (tmp_path / "packages" / "a" / "src").mkdir(parents=True)
     (tmp_path / "packages" / "b" / "src").mkdir(parents=True)
     (tmp_path / "package.json").write_text(
-        json.dumps({"name": "root", "private": True, "workspaces": ["packages/*"]}), encoding="utf-8"
+        json.dumps({"name": "root", "private": True, "workspaces": ["packages/*"]}),
+        encoding="utf-8",
     )
     (tmp_path / "packages" / "a" / "package.json").write_text(
-        json.dumps({"name": "@hm/a", "dependencies": {"@hm/b": "workspace:*"}}), encoding="utf-8"
+        json.dumps({"name": "@hm/a", "dependencies": {"@hm/b": "workspace:*"}}),
+        encoding="utf-8",
     )
     (tmp_path / "packages" / "b" / "package.json").write_text(
         json.dumps({"name": "@hm/b"}), encoding="utf-8"
     )
-    (tmp_path / "packages" / "a" / "src" / "a.ts").write_text("export function a() { return 1 }\n", encoding="utf-8")
-    (tmp_path / "packages" / "b" / "src" / "b.ts").write_text("export function b() { return 2 }\n", encoding="utf-8")
+    (tmp_path / "packages" / "a" / "src" / "a.ts").write_text(
+        "export function a() { return 1 }\n", encoding="utf-8"
+    )
+    (tmp_path / "packages" / "b" / "src" / "b.ts").write_text(
+        "export function b() { return 2 }\n", encoding="utf-8"
+    )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         enriched = codemap.enrich_projects(("npm-package-graph",))
@@ -534,13 +610,18 @@ def test_npm_project_graph_enrichment_and_reverse_project_impact(tmp_path: Path)
         capsule = codemap.orient()
     ids = {row["project_id"] for row in enriched["projects"]}
     assert {"npm:root", "npm:@hm/a", "npm:@hm/b"} <= ids
-    assert any(edge["source"] == "npm:@hm/a" and edge["target"] == "npm:@hm/b" for edge in enriched["edges"])
+    assert any(
+        edge["source"] == "npm:@hm/a" and edge["target"] == "npm:@hm/b"
+        for edge in enriched["edges"]
+    )
     assert impacted["root_projects"] == ["npm:@hm/b"]
     assert "npm:@hm/a" in impacted["affected_projects"]
     assert capsule["projects"]
 
 
-def test_ast_grep_structural_search_is_optional_local_and_policy_filtered(tmp_path: Path):
+def test_ast_grep_structural_search_is_optional_local_and_policy_filtered(
+    tmp_path: Path,
+):
     _write_repo(tmp_path)
     binary = tmp_path / "node_modules" / ".bin" / "ast-grep"
     binary.parent.mkdir(parents=True)
@@ -573,7 +654,9 @@ print(json.dumps({
 
 def test_ast_grep_structural_search_never_discloses_outline_only_match(tmp_path: Path):
     (tmp_path / "vendor").mkdir()
-    (tmp_path / "vendor" / "secret.py").write_text("def secret_impl():\n    return 42\n", encoding="utf-8")
+    (tmp_path / "vendor" / "secret.py").write_text(
+        "def secret_impl():\n    return 42\n", encoding="utf-8"
+    )
     (tmp_path / ".hashmarks-context.toml").write_text(
         "[[rule]]\npattern='vendor/**'\nvisibility='outline'\n", encoding="utf-8"
     )
@@ -600,31 +683,33 @@ def test_scip_json_import_adds_native_definitions_and_references(tmp_path: Path)
     _write_repo(tmp_path)
     scip_json = tmp_path / "index.json"
     scip_json.write_text(
-        json.dumps({
-            "metadata": {"toolInfo": {"name": "scip-python", "version": "test"}},
-            "documents": [
-                {
-                    "relativePath": "src/auth.py",
-                    "occurrences": [
-                        {
-                            "range": [2, 6, 17],
-                            "symbol": "scip-python python demo 0.1.0 `src.auth`/AuthService#",
-                            "symbolRoles": 1,
-                        }
-                    ],
-                },
-                {
-                    "relativePath": "tests/test_auth.py",
-                    "occurrences": [
-                        {
-                            "range": [3, 11, 22],
-                            "symbol": "scip-python python demo 0.1.0 `src.auth`/AuthService#",
-                            "symbolRoles": 0,
-                        }
-                    ],
-                },
-            ],
-        }),
+        json.dumps(
+            {
+                "metadata": {"toolInfo": {"name": "scip-python", "version": "test"}},
+                "documents": [
+                    {
+                        "relativePath": "src/auth.py",
+                        "occurrences": [
+                            {
+                                "range": [2, 6, 17],
+                                "symbol": "scip-python python demo 0.1.0 `src.auth`/AuthService#",
+                                "symbolRoles": 1,
+                            }
+                        ],
+                    },
+                    {
+                        "relativePath": "tests/test_auth.py",
+                        "occurrences": [
+                            {
+                                "range": [3, 11, 22],
+                                "symbol": "scip-python python demo 0.1.0 `src.auth`/AuthService#",
+                                "symbolRoles": 0,
+                            }
+                        ],
+                    },
+                ],
+            }
+        ),
         encoding="utf-8",
     )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
@@ -636,20 +721,37 @@ def test_scip_json_import_adds_native_definitions_and_references(tmp_path: Path)
     assert imported["producer"] == "scip-python:test"
     assert imported["definitions"] == 1
     assert imported["references"] == 1
-    assert any(row["path"] == "tests/test_auth.py" and row["target_name"] == "AuthService" for row in refs["native_references"])
+    assert any(
+        row["path"] == "tests/test_auth.py" and row["target_name"] == "AuthService"
+        for row in refs["native_references"]
+    )
     assert any(row["target_name"] == "AuthService" for row in deps["native_edges"])
     assert any(hit.path == "src/auth.py" for hit in hits)
 
 
-def test_graph_reference_expansion_prefers_referenced_source_over_unreferenced_source(tmp_path: Path):
+def test_graph_reference_expansion_prefers_referenced_source_over_unreferenced_source(
+    tmp_path: Path,
+):
     (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "central.py").write_text("def shared_name():\n    return 1\n", encoding="utf-8")
-    (tmp_path / "src" / "lonely.py").write_text("def shared_name():\n    return 2\n", encoding="utf-8")
-    (tmp_path / "src" / "caller_a.py").write_text("from src.central import shared_name\n", encoding="utf-8")
-    (tmp_path / "src" / "caller_b.py").write_text("from src.central import shared_name\n", encoding="utf-8")
+    (tmp_path / "src" / "central.py").write_text(
+        "def shared_name():\n    return 1\n", encoding="utf-8"
+    )
+    (tmp_path / "src" / "lonely.py").write_text(
+        "def shared_name():\n    return 2\n", encoding="utf-8"
+    )
+    (tmp_path / "src" / "caller_a.py").write_text(
+        "from src.central import shared_name\n", encoding="utf-8"
+    )
+    (tmp_path / "src" / "caller_b.py").write_text(
+        "from src.central import shared_name\n", encoding="utf-8"
+    )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
-        hits = [hit for hit in codemap.find("shared_name", limit=10) if hit.qualname == "shared_name"]
+        hits = [
+            hit
+            for hit in codemap.find("shared_name", limit=10)
+            if hit.qualname == "shared_name"
+        ]
     assert hits
     assert hits[0].path == "src/central.py"
 
@@ -660,10 +762,17 @@ def test_typescript_native_resolver_edges_close_path_alias_impact(tmp_path: Path
     (tmp_path / "src").mkdir()
     (tmp_path / "node_modules" / "typescript").mkdir(parents=True)
     (tmp_path / "tsconfig.json").write_text(
-        json.dumps({"compilerOptions": {"baseUrl": ".", "paths": {"@app/*": ["src/*"]}}}), encoding="utf-8"
+        json.dumps(
+            {"compilerOptions": {"baseUrl": ".", "paths": {"@app/*": ["src/*"]}}}
+        ),
+        encoding="utf-8",
     )
-    (tmp_path / "src" / "user.ts").write_text("export const user = 1\n", encoding="utf-8")
-    (tmp_path / "src" / "auth.ts").write_text("import { user } from '@app/user'\nexport const auth = user\n", encoding="utf-8")
+    (tmp_path / "src" / "user.ts").write_text(
+        "export const user = 1\n", encoding="utf-8"
+    )
+    (tmp_path / "src" / "auth.ts").write_text(
+        "import { user } from '@app/user'\nexport const auth = user\n", encoding="utf-8"
+    )
     fake_node = tmp_path / "fake-node"
     fake_node.write_text(
         """#!/usr/bin/env python3
@@ -684,13 +793,15 @@ print(json.dumps({'version':'test-ts','config':'tsconfig.json','edges':[{'source
     assert any(row["specifier"] == "@app/user" for row in deps["native_file_edges"])
 
 
-def test_context_orients_before_source_and_does_not_spend_budget_on_test_bodies(tmp_path: Path):
+def test_context_orients_before_source_and_does_not_spend_budget_on_test_bodies(
+    tmp_path: Path,
+):
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "policy.py").write_text(
         "class ImpactTrustPolicy:\n"
         "    def allows_complete_evidence(self, producer: str) -> bool:\n"
-        "        trusted = {\"native-runner\", \"compiler-depfile\"}\n"
+        '        trusted = {"native-runner", "compiler-depfile"}\n'
         "        return producer in trusted\n",
         encoding="utf-8",
     )
@@ -706,20 +817,27 @@ def test_context_orients_before_source_and_does_not_spend_budget_on_test_bodies(
     )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
-        pack = codemap.context("ImpactTrustPolicy complete evidence trusted producer", token_budget=420)
+        pack = codemap.context(
+            "ImpactTrustPolicy complete evidence trusted producer", token_budget=420
+        )
 
     assert not pack.abstained
     source_items = [item for item in pack.items if item.path == "src/policy.py"]
     test_items = [item for item in pack.items if item.path == "tests/test_policy.py"]
     assert source_items
-    assert any(item.symbol == "ImpactTrustPolicy.allows_complete_evidence" for item in source_items)
+    assert any(
+        item.symbol == "ImpactTrustPolicy.allows_complete_evidence"
+        for item in source_items
+    )
     assert any(item.representation == "source-range" for item in source_items)
     assert test_items
     assert all(item.representation != "source-range" for item in test_items)
     assert all("range(200)" not in item.content for item in test_items)
 
 
-def test_context_can_include_test_body_when_task_explicitly_requests_tests(tmp_path: Path):
+def test_context_can_include_test_body_when_task_explicitly_requests_tests(
+    tmp_path: Path,
+):
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
@@ -734,27 +852,35 @@ def test_scip_evidence_is_ignored_after_codemap_generation_changes(tmp_path: Pat
     _write_repo(tmp_path)
     scip_json = tmp_path / "index.json"
     scip_json.write_text(
-        json.dumps({
-            "metadata": {"toolInfo": {"name": "scip-python", "version": "freshness-test"}},
-            "documents": [
-                {
-                    "relativePath": "src/auth.py",
-                    "occurrences": [{
-                        "range": [2, 6, 17],
-                        "symbol": "scip-python python demo 0.1.0 `src.auth`/AuthService#",
-                        "symbolRoles": 1,
-                    }],
+        json.dumps(
+            {
+                "metadata": {
+                    "toolInfo": {"name": "scip-python", "version": "freshness-test"}
                 },
-                {
-                    "relativePath": "tests/test_auth.py",
-                    "occurrences": [{
-                        "range": [3, 11, 22],
-                        "symbol": "scip-python python demo 0.1.0 `src.auth`/AuthService#",
-                        "symbolRoles": 0,
-                    }],
-                },
-            ],
-        }),
+                "documents": [
+                    {
+                        "relativePath": "src/auth.py",
+                        "occurrences": [
+                            {
+                                "range": [2, 6, 17],
+                                "symbol": "scip-python python demo 0.1.0 `src.auth`/AuthService#",
+                                "symbolRoles": 1,
+                            }
+                        ],
+                    },
+                    {
+                        "relativePath": "tests/test_auth.py",
+                        "occurrences": [
+                            {
+                                "range": [3, 11, 22],
+                                "symbol": "scip-python python demo 0.1.0 `src.auth`/AuthService#",
+                                "symbolRoles": 0,
+                            }
+                        ],
+                    },
+                ],
+            }
+        ),
         encoding="utf-8",
     )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
@@ -762,7 +888,11 @@ def test_scip_evidence_is_ignored_after_codemap_generation_changes(tmp_path: Pat
         codemap.import_scip(scip_json)
         assert codemap.refs("AuthService")["native_references"]
         auth = tmp_path / "src" / "auth.py"
-        auth.write_text(auth.read_text(encoding="utf-8") + "\ndef changed_after_scip():\n    return True\n", encoding="utf-8")
+        auth.write_text(
+            auth.read_text(encoding="utf-8")
+            + "\ndef changed_after_scip():\n    return True\n",
+            encoding="utf-8",
+        )
         codemap.sync(["src/auth.py"])
         refs = codemap.refs("AuthService")
         status = codemap.status()
@@ -772,16 +902,25 @@ def test_scip_evidence_is_ignored_after_codemap_generation_changes(tmp_path: Pat
     assert "generation changed" in str(scip_status[0]["reason"])
 
 
-def test_typescript_native_edges_are_ignored_after_source_generation_changes(tmp_path: Path):
+def test_typescript_native_edges_are_ignored_after_source_generation_changes(
+    tmp_path: Path,
+):
     from hashmarks.codemap.typescript_resolver import TypeScriptResolverProvider
 
     (tmp_path / "src").mkdir()
     (tmp_path / "node_modules" / "typescript").mkdir(parents=True)
     (tmp_path / "tsconfig.json").write_text(
-        json.dumps({"compilerOptions": {"baseUrl": ".", "paths": {"@app/*": ["src/*"]}}}), encoding="utf-8"
+        json.dumps(
+            {"compilerOptions": {"baseUrl": ".", "paths": {"@app/*": ["src/*"]}}}
+        ),
+        encoding="utf-8",
     )
-    (tmp_path / "src" / "user.ts").write_text("export const user = 1\n", encoding="utf-8")
-    (tmp_path / "src" / "auth.ts").write_text("import { user } from '@app/user'\nexport const auth = user\n", encoding="utf-8")
+    (tmp_path / "src" / "user.ts").write_text(
+        "export const user = 1\n", encoding="utf-8"
+    )
+    (tmp_path / "src" / "auth.ts").write_text(
+        "import { user } from '@app/user'\nexport const auth = user\n", encoding="utf-8"
+    )
     fake_node = tmp_path / "fake-node"
     fake_node.write_text(
         "#!/usr/bin/env python3\nimport json\nprint(json.dumps({'version':'fresh-ts','config':'tsconfig.json','edges':[{'source':'src/auth.ts','target':'src/user.ts','specifier':'@app/user'}]}))\n",
@@ -805,16 +944,29 @@ def test_typescript_native_edges_are_ignored_after_source_generation_changes(tmp
 def test_project_graph_is_ignored_when_manifest_bytes_change(tmp_path: Path):
     (tmp_path / "packages" / "a" / "src").mkdir(parents=True)
     (tmp_path / "packages" / "b" / "src").mkdir(parents=True)
-    (tmp_path / "package.json").write_text(json.dumps({"name": "root", "workspaces": ["packages/*"]}), encoding="utf-8")
+    (tmp_path / "package.json").write_text(
+        json.dumps({"name": "root", "workspaces": ["packages/*"]}), encoding="utf-8"
+    )
     a_manifest = tmp_path / "packages" / "a" / "package.json"
-    a_manifest.write_text(json.dumps({"name": "@hm/a", "dependencies": {"@hm/b": "workspace:*"}}), encoding="utf-8")
-    (tmp_path / "packages" / "b" / "package.json").write_text(json.dumps({"name": "@hm/b"}), encoding="utf-8")
-    (tmp_path / "packages" / "a" / "src" / "a.ts").write_text("export const a = 1\n", encoding="utf-8")
-    (tmp_path / "packages" / "b" / "src" / "b.ts").write_text("export const b = 2\n", encoding="utf-8")
+    a_manifest.write_text(
+        json.dumps({"name": "@hm/a", "dependencies": {"@hm/b": "workspace:*"}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "packages" / "b" / "package.json").write_text(
+        json.dumps({"name": "@hm/b"}), encoding="utf-8"
+    )
+    (tmp_path / "packages" / "a" / "src" / "a.ts").write_text(
+        "export const a = 1\n", encoding="utf-8"
+    )
+    (tmp_path / "packages" / "b" / "src" / "b.ts").write_text(
+        "export const b = 2\n", encoding="utf-8"
+    )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         codemap.enrich_projects(("npm-package-graph",))
-        assert "npm:@hm/a" in codemap.affected("packages/b/src/b.ts")["affected_projects"]
+        assert (
+            "npm:@hm/a" in codemap.affected("packages/b/src/b.ts")["affected_projects"]
+        )
         a_manifest.write_text(json.dumps({"name": "@hm/a"}), encoding="utf-8")
         affected = codemap.affected("packages/b/src/b.ts")
         projects = codemap.projects()
@@ -826,12 +978,24 @@ def test_project_graph_is_ignored_when_manifest_bytes_change(tmp_path: Path):
 def test_nx_native_project_graph_enrichment_and_generation_freshness(tmp_path: Path):
     (tmp_path / "apps" / "web" / "src").mkdir(parents=True)
     (tmp_path / "libs" / "core" / "src").mkdir(parents=True)
-    (tmp_path / "nx.json").write_text('{"extends":"nx/presets/npm.json"}', encoding="utf-8")
-    (tmp_path / "package.json").write_text('{"name":"demo","private":true}', encoding="utf-8")
-    (tmp_path / "apps" / "web" / "project.json").write_text('{"name":"web"}', encoding="utf-8")
-    (tmp_path / "libs" / "core" / "project.json").write_text('{"name":"core"}', encoding="utf-8")
-    (tmp_path / "apps" / "web" / "src" / "main.ts").write_text("export const web = 1\n", encoding="utf-8")
-    (tmp_path / "libs" / "core" / "src" / "index.ts").write_text("export const core = 1\n", encoding="utf-8")
+    (tmp_path / "nx.json").write_text(
+        '{"extends":"nx/presets/npm.json"}', encoding="utf-8"
+    )
+    (tmp_path / "package.json").write_text(
+        '{"name":"demo","private":true}', encoding="utf-8"
+    )
+    (tmp_path / "apps" / "web" / "project.json").write_text(
+        '{"name":"web"}', encoding="utf-8"
+    )
+    (tmp_path / "libs" / "core" / "project.json").write_text(
+        '{"name":"core"}', encoding="utf-8"
+    )
+    (tmp_path / "apps" / "web" / "src" / "main.ts").write_text(
+        "export const web = 1\n", encoding="utf-8"
+    )
+    (tmp_path / "libs" / "core" / "src" / "index.ts").write_text(
+        "export const core = 1\n", encoding="utf-8"
+    )
     nx = tmp_path / "node_modules" / ".bin" / "nx"
     nx.parent.mkdir(parents=True)
     nx.write_text(
@@ -850,13 +1014,18 @@ def test_nx_native_project_graph_enrichment_and_generation_freshness(tmp_path: P
         enriched = codemap.enrich_projects(("nx-project-graph",))
         affected = codemap.affected("libs/core/src/index.ts")
         assert any(row["project_id"] == "nx:web" for row in enriched["projects"])
-        assert any(row["source"] == "nx:web" and row["target"] == "nx:core" for row in enriched["edges"])
+        assert any(
+            row["source"] == "nx:web" and row["target"] == "nx:core"
+            for row in enriched["edges"]
+        )
         assert affected["root_projects"] == ["nx:core"]
         assert "nx:web" in affected["affected_projects"]
 
         # Nx graph edges can be inferred from source imports, so any CodeMap
         # generation change invalidates the retained native graph until enrich.
-        (tmp_path / "libs" / "core" / "src" / "index.ts").write_text("export const core = 2\n", encoding="utf-8")
+        (tmp_path / "libs" / "core" / "src" / "index.ts").write_text(
+            "export const core = 2\n", encoding="utf-8"
+        )
         codemap.sync()
         projects = codemap.projects()
         assert projects["projects"] == []
@@ -868,7 +1037,9 @@ def test_pants_native_target_graph_enrichment_and_generation_freshness(tmp_path:
     (tmp_path / "tests").mkdir()
     (tmp_path / "pants.toml").write_text("[GLOBAL]\n", encoding="utf-8")
     (tmp_path / "src" / "lib.py").write_text("VALUE = 1\n", encoding="utf-8")
-    (tmp_path / "tests" / "test_lib.py").write_text("from src.lib import VALUE\n", encoding="utf-8")
+    (tmp_path / "tests" / "test_lib.py").write_text(
+        "from src.lib import VALUE\n", encoding="utf-8"
+    )
     pants = tmp_path / "pants"
     pants.write_text(
         "#!/usr/bin/env python3\n"
@@ -887,7 +1058,8 @@ def test_pants_native_target_graph_enrichment_and_generation_freshness(tmp_path:
         affected = codemap.affected("src/lib.py")
         assert any(row["project_id"] == "pants:src:lib" for row in enriched["projects"])
         assert any(
-            row["source"] == "pants:tests:test_lib.py" and row["target"] == "pants:src:lib"
+            row["source"] == "pants:tests:test_lib.py"
+            and row["target"] == "pants:src:lib"
             for row in enriched["edges"]
         )
         assert "pants:tests:test_lib.py" in affected["affected_projects"]
@@ -914,32 +1086,66 @@ def test_maven_project_graph_enrichment_and_reverse_impact(tmp_path: Path):
         "<dependencies><dependency><groupId>com.example</groupId><artifactId>core</artifactId><version>1</version></dependency></dependencies></project>",
         encoding="utf-8",
     )
-    (tmp_path / "core" / "src" / "main" / "java" / "Core.java").write_text("class Core {}\n", encoding="utf-8")
-    (tmp_path / "app" / "src" / "main" / "java" / "App.java").write_text("class App {}\n", encoding="utf-8")
+    (tmp_path / "core" / "src" / "main" / "java" / "Core.java").write_text(
+        "class Core {}\n", encoding="utf-8"
+    )
+    (tmp_path / "app" / "src" / "main" / "java" / "App.java").write_text(
+        "class App {}\n", encoding="utf-8"
+    )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         enriched = codemap.enrich_projects(("maven-pom-graph",))
         affected = codemap.affected("core/src/main/java/Core.java")
-    assert any(row["project_id"] == "maven:com.example:core" for row in enriched["projects"])
-    assert any(row["source"] == "maven:com.example:app" and row["target"] == "maven:com.example:core" for row in enriched["edges"])
+    assert any(
+        row["project_id"] == "maven:com.example:core" for row in enriched["projects"]
+    )
+    assert any(
+        row["source"] == "maven:com.example:app"
+        and row["target"] == "maven:com.example:core"
+        for row in enriched["edges"]
+    )
     assert "maven:com.example:app" in affected["affected_projects"]
 
 
 def test_gradle_native_project_graph_enrichment_and_reverse_impact(tmp_path: Path):
     (tmp_path / "core" / "src" / "main" / "java").mkdir(parents=True)
     (tmp_path / "app" / "src" / "main" / "java").mkdir(parents=True)
-    (tmp_path / "settings.gradle").write_text("include(':core', ':app')\n", encoding="utf-8")
-    (tmp_path / "core" / "build.gradle").write_text("plugins { id 'java' }\n", encoding="utf-8")
-    (tmp_path / "app" / "build.gradle").write_text("plugins { id 'java' }\n", encoding="utf-8")
-    (tmp_path / "core" / "src" / "main" / "java" / "Core.java").write_text("class Core {}\n", encoding="utf-8")
-    (tmp_path / "app" / "src" / "main" / "java" / "App.java").write_text("class App {}\n", encoding="utf-8")
+    (tmp_path / "settings.gradle").write_text(
+        "include(':core', ':app')\n", encoding="utf-8"
+    )
+    (tmp_path / "core" / "build.gradle").write_text(
+        "plugins { id 'java' }\n", encoding="utf-8"
+    )
+    (tmp_path / "app" / "build.gradle").write_text(
+        "plugins { id 'java' }\n", encoding="utf-8"
+    )
+    (tmp_path / "core" / "src" / "main" / "java" / "Core.java").write_text(
+        "class Core {}\n", encoding="utf-8"
+    )
+    (tmp_path / "app" / "src" / "main" / "java" / "App.java").write_text(
+        "class App {}\n", encoding="utf-8"
+    )
     gradle = tmp_path / "gradlew"
     payload = [
-        {"path": ":core", "name": "core", "projectDir": str(tmp_path / "core"), "dependencies": [], "tasks": ["build", "test"]},
-        {"path": ":app", "name": "app", "projectDir": str(tmp_path / "app"), "dependencies": [":core"], "tasks": ["build", "test"]},
+        {
+            "path": ":core",
+            "name": "core",
+            "projectDir": str(tmp_path / "core"),
+            "dependencies": [],
+            "tasks": ["build", "test"],
+        },
+        {
+            "path": ":app",
+            "name": "app",
+            "projectDir": str(tmp_path / "app"),
+            "dependencies": [":core"],
+            "tasks": ["build", "test"],
+        },
     ]
     gradle.write_text(
-        "#!/usr/bin/env python3\nimport json\nprint('__HASHMARKS_GRADLE_JSON__' + json.dumps(" + repr(payload) + "))\n",
+        "#!/usr/bin/env python3\nimport json\nprint('__HASHMARKS_GRADLE_JSON__' + json.dumps("
+        + repr(payload)
+        + "))\n",
         encoding="utf-8",
     )
     gradle.chmod(0o755)
@@ -948,7 +1154,10 @@ def test_gradle_native_project_graph_enrichment_and_reverse_impact(tmp_path: Pat
         enriched = codemap.enrich_projects(("gradle-project-graph",))
         affected = codemap.affected("core/src/main/java/Core.java")
     assert any(row["project_id"] == "gradle::core" for row in enriched["projects"])
-    assert any(row["source"] == "gradle::app" and row["target"] == "gradle::core" for row in enriched["edges"])
+    assert any(
+        row["source"] == "gradle::app" and row["target"] == "gradle::core"
+        for row in enriched["edges"]
+    )
     assert "gradle::app" in affected["affected_projects"]
 
 
@@ -969,15 +1178,25 @@ def test_cli_accepts_every_codemap_enrichment_provider(tmp_path: Path, capsys):
         "vitest-vite",
     )
     for provider in providers:
-        assert main([
-            "--workspace", str(tmp_path),
-            "map", "enrich",
-            "--provider", provider,
-        ]) == 0
+        assert (
+            main(
+                [
+                    "--workspace",
+                    str(tmp_path),
+                    "map",
+                    "enrich",
+                    "--provider",
+                    provider,
+                ]
+            )
+            == 0
+        )
         capsys.readouterr()
 
 
-def test_declared_cross_ecosystem_links_compose_native_projects_and_shared_inputs(tmp_path: Path):
+def test_declared_cross_ecosystem_links_compose_native_projects_and_shared_inputs(
+    tmp_path: Path,
+):
     (tmp_path / "backend" / "src").mkdir(parents=True)
     (tmp_path / "frontend" / "src").mkdir(parents=True)
     (tmp_path / "backend" / "pom.xml").write_text(
@@ -987,8 +1206,12 @@ def test_declared_cross_ecosystem_links_compose_native_projects_and_shared_input
     (tmp_path / "frontend" / "package.json").write_text(
         json.dumps({"name": "@demo/web"}), encoding="utf-8"
     )
-    (tmp_path / "backend" / "src" / "Api.java").write_text("class Api {}\n", encoding="utf-8")
-    (tmp_path / "frontend" / "src" / "api.ts").write_text("export const api = 1\n", encoding="utf-8")
+    (tmp_path / "backend" / "src" / "Api.java").write_text(
+        "class Api {}\n", encoding="utf-8"
+    )
+    (tmp_path / "frontend" / "src" / "api.ts").write_text(
+        "export const api = 1\n", encoding="utf-8"
+    )
     (tmp_path / "openapi.yaml").write_text("openapi: 3.1.0\n", encoding="utf-8")
     (tmp_path / ".hashmarks-project-links.toml").write_text(
         "[[link]]\n"
@@ -1003,7 +1226,9 @@ def test_declared_cross_ecosystem_links_compose_native_projects_and_shared_input
     )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
-        codemap.enrich_projects(("npm-package-graph", "maven-pom-graph", "declared-project-links"))
+        codemap.enrich_projects(
+            ("npm-package-graph", "maven-pom-graph", "declared-project-links")
+        )
         backend = codemap.affected("backend/src/Api.java")
         shared = codemap.affected("openapi.yaml")
         assert "npm:@demo/web" in backend["affected_projects"]
@@ -1027,20 +1252,30 @@ def test_declared_project_links_reject_invalid_shared_input_escape(tmp_path: Pat
     assert any("invalid path" in warning for warning in enriched["warnings"])
 
 
-def test_vitest_vite_native_graph_enrichment_and_generation_freshness(tmp_path: Path, monkeypatch):
+def test_vitest_vite_native_graph_enrichment_and_generation_freshness(
+    tmp_path: Path, monkeypatch
+):
+    import hashmarks.codemap.engine as codemap_engine
     from hashmarks.codemap import CodeMap
     from hashmarks.native_vitest import VitestViteEdge, VitestViteGraph
-    import hashmarks.codemap.engine as codemap_engine
 
     (tmp_path / "node_modules" / ".bin").mkdir(parents=True)
     (tmp_path / "node_modules" / ".bin" / "vitest").write_text("", encoding="utf-8")
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "package.json").write_text('{"name":"demo"}', encoding="utf-8")
-    (tmp_path / "src" / "auth.ts").write_text("export const auth = 1\n", encoding="utf-8")
-    (tmp_path / "tests" / "auth.test.ts").write_text("test('auth',()=>{})\n", encoding="utf-8")
+    (tmp_path / "src" / "auth.ts").write_text(
+        "export const auth = 1\n", encoding="utf-8"
+    )
+    (tmp_path / "tests" / "auth.test.ts").write_text(
+        "test('auth',()=>{})\n", encoding="utf-8"
+    )
 
-    monkeypatch.setattr(codemap_engine, "local_vitest", lambda _root: tmp_path / "node_modules/.bin/vitest")
+    monkeypatch.setattr(
+        codemap_engine,
+        "local_vitest",
+        lambda _root: tmp_path / "node_modules/.bin/vitest",
+    )
     monkeypatch.setattr(
         codemap_engine,
         "collect_vitest_vite_graph",
@@ -1057,7 +1292,9 @@ def test_vitest_vite_native_graph_enrichment_and_generation_freshness(tmp_path: 
         assert any(row["producer"] == "vitest-vite" for row in enriched["providers"])
         affected = codemap.affected("src/auth.ts")
         assert "tests/auth.test.ts" in affected["affected_files"]
-        (tmp_path / "src" / "auth.ts").write_text("export const auth = 2\n", encoding="utf-8")
+        (tmp_path / "src" / "auth.ts").write_text(
+            "export const auth = 2\n", encoding="utf-8"
+        )
         codemap.sync(["src/auth.ts"])
         stale = codemap.affected("src/auth.ts")
         assert "tests/auth.test.ts" not in stale["affected_files"]
@@ -1152,7 +1389,10 @@ def test_pyright_type_server_ignores_resolutions_outside_workspace(tmp_path: Pat
 
 
 def test_pyright_type_server_retries_once_after_stale_snapshot(tmp_path: Path):
-    from hashmarks.codemap.pyright_type_server import PyrightTypeServerProvider, _JsonRpcError
+    from hashmarks.codemap.pyright_type_server import (
+        PyrightTypeServerProvider,
+        _JsonRpcError,
+    )
 
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "dep.py").write_text("VALUE = 1\n", encoding="utf-8")
@@ -1189,7 +1429,9 @@ def test_pyright_type_server_retries_once_after_stale_snapshot(tmp_path: Path):
         client_factory=lambda _exe, _workspace, _timeout: client,
     )
     result = provider.collect(tmp_path, ("src/app.py",))
-    assert [(edge.source, edge.target) for edge in result.edges] == [("src/app.py", "src/dep.py")]
+    assert [(edge.source, edge.target) for edge in result.edges] == [
+        ("src/app.py", "src/dep.py")
+    ]
     assert client.resolve_calls == 2
 
 
@@ -1259,8 +1501,10 @@ def test_pyright_native_edges_are_generation_bound_and_become_stale(tmp_path: Pa
         assert deps_after["native_file_edges"] == []
         status = codemap.status()
         pyright_status = [
-            row for row in status["native_evidence"]
-            if row["kind"] == "native-file" and str(row["producer"]).startswith("pyright-typeserver")
+            row
+            for row in status["native_evidence"]
+            if row["kind"] == "native-file"
+            and str(row["producer"]).startswith("pyright-typeserver")
         ]
         assert pyright_status and pyright_status[0]["fresh"] is False
         assert "generation changed" in str(pyright_status[0]["reason"])
@@ -1268,6 +1512,7 @@ def test_pyright_native_edges_are_generation_bound_and_become_stale(tmp_path: Pa
 
 def test_pyright_jsonrpc_client_answers_server_requests_without_stealing_response():
     import queue
+
     from hashmarks.codemap.pyright_type_server import _JsonRpcProcess
 
     rpc = _JsonRpcProcess.__new__(_JsonRpcProcess)
@@ -1280,12 +1525,16 @@ def test_pyright_jsonrpc_client_answers_server_requests_without_stealing_respons
 
     # A server request intentionally reuses id=1 before our response id=1.
     # Method presence must win over response-id matching.
-    rpc._responses.put({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "workspace/configuration",
-        "params": {"items": [{"section": "python"}, {"section": "python.analysis"}]},
-    })
+    rpc._responses.put(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "workspace/configuration",
+            "params": {
+                "items": [{"section": "python"}, {"section": "python.analysis"}]
+            },
+        }
+    )
     rpc._responses.put({"jsonrpc": "2.0", "id": 1, "result": "0.4.1"})
 
     assert rpc.request("typeServer/getSupportedProtocolVersion") == "0.4.1"
@@ -1315,7 +1564,11 @@ def outer(flag):
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         result = codemap.sync()
         assert result.parse_errors == 0
-        rows = [row for row in codemap.outline("mod.py")["symbols"] if row["name"] == "value"]
+        rows = [
+            row
+            for row in codemap.outline("mod.py")["symbols"]
+            if row["name"] == "value"
+        ]
         assert len(rows) == 3
         assert len({row["qualname"] for row in rows}) == 3
         assert rows[0]["qualname"] == "outer.value"
@@ -1327,8 +1580,12 @@ def test_codemap_indexes_small_control_files_but_skips_noisy_lockfiles(tmp_path:
         "DEPENDENCY_RESOLUTION_RUNNER = python3 tools/bootstrap.py\ninit:\n\t$(DEPENDENCY_RESOLUTION_RUNNER)\n",
         encoding="utf-8",
     )
-    (tmp_path / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
-    (tmp_path / "package-lock.json").write_text('{"lockfileVersion": 3}', encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        "[project]\nname='demo'\n", encoding="utf-8"
+    )
+    (tmp_path / "package-lock.json").write_text(
+        '{"lockfileVersion": 3}', encoding="utf-8"
+    )
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         result = codemap.sync()
         assert result.discovered == 2
@@ -1340,9 +1597,13 @@ def test_codemap_indexes_small_control_files_but_skips_noisy_lockfiles(tmp_path:
         assert any(hit.path == "Makefile" for hit in hits)
 
 
-def test_find_preserves_path_diversity_when_one_file_has_many_matching_symbols(tmp_path: Path) -> None:
+def test_find_preserves_path_diversity_when_one_file_has_many_matching_symbols(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "primary.py").write_text(
-        "\n".join(f"def protocol_snapshot_resolve_{i}():\n    return {i}" for i in range(20)),
+        "\n".join(
+            f"def protocol_snapshot_resolve_{i}():\n    return {i}" for i in range(20)
+        ),
         encoding="utf-8",
     )
     (tmp_path / "companion.py").write_text(
@@ -1356,7 +1617,9 @@ def test_find_preserves_path_diversity_when_one_file_has_many_matching_symbols(t
     assert any(hit.path == "companion.py" for hit in hits)
 
 
-def test_find_promotes_symbol_less_control_file_with_broad_lexical_coverage(tmp_path: Path) -> None:
+def test_find_promotes_symbol_less_control_file_with_broad_lexical_coverage(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "Makefile").write_text(
         "DEPENDENCY_RESOLUTION_RUNNER := python bootstrap.py\ninit:\n\t$(DEPENDENCY_RESOLUTION_RUNNER) init\n",
         encoding="utf-8",
@@ -1370,7 +1633,9 @@ def test_find_promotes_symbol_less_control_file_with_broad_lexical_coverage(tmp_
         )
     with CodeMap(tmp_path) as code_map:
         code_map.sync()
-        hits = code_map.find("DEPENDENCY_RESOLUTION_RUNNER make init bootstrap", limit=10)
+        hits = code_map.find(
+            "DEPENDENCY_RESOLUTION_RUNNER make init bootstrap", limit=10
+        )
     assert any(hit.path == "Makefile" for hit in hits)
 
 
@@ -1378,25 +1643,39 @@ def test_context_progressive_disclosure_levels_share_one_evidence_base(tmp_path:
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
-        orient = codemap.context("AuthService login", token_budget=500, disclosure="orient")
-        outline = codemap.context("AuthService login", token_budget=500, disclosure="outline")
-        evidence = codemap.context("AuthService login", token_budget=500, disclosure="evidence")
-        source = codemap.context("AuthService login", token_budget=500, disclosure="source")
+        orient = codemap.context(
+            "AuthService login", token_budget=500, disclosure="orient"
+        )
+        outline = codemap.context(
+            "AuthService login", token_budget=500, disclosure="outline"
+        )
+        evidence = codemap.context(
+            "AuthService login", token_budget=500, disclosure="evidence"
+        )
+        source = codemap.context(
+            "AuthService login", token_budget=500, disclosure="source"
+        )
 
     assert orient.disclosure.value == "orient"
     assert orient.as_dict()["schema"] == "hashmarks.context-pack.v2"
     assert orient.as_dict()["next_disclosure"] == "outline"
-    assert orient.items and {item.representation for item in orient.items} == {"candidate"}
+    assert orient.items and {item.representation for item in orient.items} == {
+        "candidate"
+    }
 
     assert outline.disclosure.value == "outline"
     assert outline.as_dict()["next_disclosure"] == "evidence"
     assert outline.items
-    assert all(item.representation in {"signature", "outline"} for item in outline.items)
+    assert all(
+        item.representation in {"signature", "outline"} for item in outline.items
+    )
 
     assert evidence.disclosure.value == "evidence"
     assert evidence.as_dict()["next_disclosure"] == "source"
     assert evidence.items
-    assert all(item.representation in {"signature", "outline"} for item in evidence.items)
+    assert all(
+        item.representation in {"signature", "outline"} for item in evidence.items
+    )
 
     assert source.disclosure.value == "source"
     assert source.as_dict()["next_disclosure"] is None
@@ -1404,8 +1683,12 @@ def test_context_progressive_disclosure_levels_share_one_evidence_base(tmp_path:
 
     # Escalation is a projection of the same retrieval result/generation rather
     # than a parallel index or another freshness authority.
-    assert {pack.generation for pack in (orient, outline, evidence, source)} == {source.generation}
-    assert {pack.stale for pack in (orient, outline, evidence, source)} == {source.stale}
+    assert {pack.generation for pack in (orient, outline, evidence, source)} == {
+        source.generation
+    }
+    assert {pack.stale for pack in (orient, outline, evidence, source)} == {
+        source.stale
+    }
     orient_paths = {item.path for item in orient.items}
     assert {item.path for item in outline.items}.issubset(orient_paths)
 
@@ -1415,9 +1698,13 @@ def test_context_lower_disclosure_levels_never_read_source_bodies(tmp_path: Path
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         for level in ("orient", "outline", "evidence"):
-            pack = codemap.context("test login AuthService", token_budget=500, disclosure=level)
+            pack = codemap.context(
+                "test login AuthService", token_budget=500, disclosure=level
+            )
             assert all(item.representation != "source-range" for item in pack.items)
-            assert all("AuthService().login('a')" not in item.content for item in pack.items)
+            assert all(
+                "AuthService().login('a')" not in item.content for item in pack.items
+            )
 
 
 def test_context_rejects_unknown_disclosure_level(tmp_path: Path):
@@ -1428,21 +1715,25 @@ def test_context_rejects_unknown_disclosure_level(tmp_path: Path):
             codemap.context("AuthService login", disclosure="everything")
 
 
-def test_candidate_rerank_stage_bounds_large_working_set_with_path_diversity(tmp_path: Path):
+def test_candidate_rerank_stage_bounds_large_working_set_with_path_diversity(
+    tmp_path: Path,
+):
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         rows = []
         for index in range(600):
             path = f"src/group_{index % 100}/module.py"
             name = "TargetService" if index == 599 else f"helper_{index}"
-            rows.append({
-                "row_type": "symbol",
-                "path": path,
-                "name": name,
-                "qualname": name,
-                "signature": f"def {name}(): ...",
-                "evidence_visibility": "source",
-                "_relation_boost": 0.0,
-            })
+            rows.append(
+                {
+                    "row_type": "symbol",
+                    "path": path,
+                    "name": name,
+                    "qualname": name,
+                    "signature": f"def {name}(): ...",
+                    "evidence_visibility": "source",
+                    "_relation_boost": 0.0,
+                }
+            )
         bounded = codemap._bounded_rerank_rows(
             "TargetService", tuple(rows), limit=20, tokens=("target", "service")
         )
@@ -1459,13 +1750,21 @@ def test_candidate_rerank_stage_does_not_truncate_normal_queries(tmp_path: Path)
     assert bounded == rows
 
 
-def test_context_cas_reuses_structural_payload_without_replaying_freshness(tmp_path: Path):
+def test_context_cas_reuses_structural_payload_without_replaying_freshness(
+    tmp_path: Path,
+):
     _write_repo(tmp_path)
     state = tmp_path / ".state"
-    with CodeMap(tmp_path, state_dir=state, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
+    with CodeMap(
+        tmp_path, state_dir=state, artifact_db=tmp_path / "artifacts.sqlite3"
+    ) as codemap:
         codemap.sync()
-        first = codemap.context("AuthService login", token_budget=500, disclosure="outline")
-        second = codemap.context("AuthService login", token_budget=500, disclosure="outline")
+        first = codemap.context(
+            "AuthService login", token_budget=500, disclosure="outline"
+        )
+        second = codemap.context(
+            "AuthService login", token_budget=500, disclosure="outline"
+        )
 
     assert not first.cache_hit
     assert first.context_action_hash
@@ -1483,8 +1782,12 @@ def test_context_cas_source_payload_requires_positive_freshness(tmp_path: Path):
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
-        first = codemap.context("AuthService login", token_budget=500, disclosure="source")
-        second = codemap.context("AuthService login", token_budget=500, disclosure="source")
+        first = codemap.context(
+            "AuthService login", token_budget=500, disclosure="source"
+        )
+        second = codemap.context(
+            "AuthService login", token_budget=500, disclosure="source"
+        )
 
     assert first.stale is None
     assert second.stale is None
@@ -1497,21 +1800,42 @@ def test_context_cas_source_payload_requires_positive_freshness(tmp_path: Path):
 def test_context_cas_action_binds_budget_disclosure_and_policy(tmp_path: Path):
     _write_repo(tmp_path)
     state = tmp_path / ".state"
-    with CodeMap(tmp_path, state_dir=state, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
+    with CodeMap(
+        tmp_path, state_dir=state, artifact_db=tmp_path / "artifacts.sqlite3"
+    ) as codemap:
         codemap.sync()
-        outline = codemap.context("AuthService login", token_budget=500, disclosure="outline")
-        evidence = codemap.context("AuthService login", token_budget=500, disclosure="evidence")
-        smaller = codemap.context("AuthService login", token_budget=400, disclosure="outline")
+        outline = codemap.context(
+            "AuthService login", token_budget=500, disclosure="outline"
+        )
+        evidence = codemap.context(
+            "AuthService login", token_budget=500, disclosure="evidence"
+        )
+        smaller = codemap.context(
+            "AuthService login", token_budget=400, disclosure="outline"
+        )
 
     assert outline.context_action_hash
-    assert len({outline.context_action_hash, evidence.context_action_hash, smaller.context_action_hash}) == 3
+    assert (
+        len(
+            {
+                outline.context_action_hash,
+                evidence.context_action_hash,
+                smaller.context_action_hash,
+            }
+        )
+        == 3
+    )
 
     (tmp_path / ".hashmarks-context.toml").write_text(
         '[[rule]]\npattern = "src/**"\nvisibility = "outline"\n', encoding="utf-8"
     )
-    with CodeMap(tmp_path, state_dir=state, artifact_db=tmp_path / "artifacts.sqlite3") as changed_policy:
+    with CodeMap(
+        tmp_path, state_dir=state, artifact_db=tmp_path / "artifacts.sqlite3"
+    ) as changed_policy:
         changed_policy.sync()
-        policy_pack = changed_policy.context("AuthService login", token_budget=500, disclosure="outline")
+        policy_pack = changed_policy.context(
+            "AuthService login", token_budget=500, disclosure="outline"
+        )
     assert policy_pack.context_action_hash != outline.context_action_hash
 
 
@@ -1571,21 +1895,31 @@ def test_context_singleflight_returns_only_shared_immutable_result(tmp_path: Pat
         results = []
         errors = []
 
-        def slow_context(query: str, *, token_budget: int = 4000, limit: int = 30, disclosure="source"):
+        def slow_context(
+            query: str,
+            *,
+            token_budget: int = 4000,
+            limit: int = 30,
+            disclosure="source",
+        ):
             nonlocal calls
             with calls_lock:
                 calls += 1
             time.sleep(0.08)
-            return original(query, token_budget=token_budget, limit=limit, disclosure=disclosure)
+            return original(
+                query, token_budget=token_budget, limit=limit, disclosure=disclosure
+            )
 
         codemap._context_impl = slow_context  # type: ignore[method-assign]
 
         def worker():
             try:
                 barrier.wait()
-                results.append(codemap.context(
-                    "AuthService login", token_budget=500, disclosure="outline"
-                ))
+                results.append(
+                    codemap.context(
+                        "AuthService login", token_budget=500, disclosure="outline"
+                    )
+                )
             except BaseException as exc:
                 errors.append(exc)
 
@@ -1601,7 +1935,9 @@ def test_context_singleflight_returns_only_shared_immutable_result(tmp_path: Pat
     assert sum(pack.shared_flight for pack in results) == 4
     leader = next(pack for pack in results if not pack.shared_flight)
     assert all(pack.items == leader.items for pack in results)
-    assert all(pack.context_result_digest == leader.context_result_digest for pack in results)
+    assert all(
+        pack.context_result_digest == leader.context_result_digest for pack in results
+    )
 
 
 def test_source_singleflight_requires_positive_freshness(tmp_path: Path):
@@ -1617,20 +1953,30 @@ def test_source_singleflight_requires_positive_freshness(tmp_path: Path):
         barrier = threading.Barrier(3)
         results = []
 
-        def slow_context(query: str, *, token_budget: int = 4000, limit: int = 30, disclosure="source"):
+        def slow_context(
+            query: str,
+            *,
+            token_budget: int = 4000,
+            limit: int = 30,
+            disclosure="source",
+        ):
             nonlocal calls
             with calls_lock:
                 calls += 1
             time.sleep(0.05)
-            return original(query, token_budget=token_budget, limit=limit, disclosure=disclosure)
+            return original(
+                query, token_budget=token_budget, limit=limit, disclosure=disclosure
+            )
 
         codemap._context_impl = slow_context  # type: ignore[method-assign]
 
         def worker():
             barrier.wait()
-            results.append(codemap.context(
-                "AuthService login", token_budget=500, disclosure="source"
-            ))
+            results.append(
+                codemap.context(
+                    "AuthService login", token_budget=500, disclosure="source"
+                )
+            )
 
         threads = [threading.Thread(target=worker) for _ in range(3)]
         for thread in threads:
@@ -1643,7 +1989,9 @@ def test_source_singleflight_requires_positive_freshness(tmp_path: Path):
     assert all(not pack.shared_flight for pack in results)
 
 
-def test_annotation_relationship_protects_return_type_from_test_name_crowding(tmp_path: Path):
+def test_annotation_relationship_protects_return_type_from_test_name_crowding(
+    tmp_path: Path,
+):
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "context.py").write_text(
@@ -1661,8 +2009,13 @@ def test_annotation_relationship_protects_return_type_from_test_name_crowding(tm
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         edges = codemap.store.edges_from("src/context.py", "CodeMap.context")
-        hits = codemap.find("CodeMap context token budget retrieval confidence", limit=20)
-    assert any(edge["kind"] == "return-type" and edge["target"] == "ContextPack" for edge in edges)
+        hits = codemap.find(
+            "CodeMap context token budget retrieval confidence", limit=20
+        )
+    assert any(
+        edge["kind"] == "return-type" and edge["target"] == "ContextPack"
+        for edge in edges
+    )
     symbols = {hit.qualname for hit in hits}
     assert "ContextPack" in symbols
 
@@ -1691,7 +2044,10 @@ def test_edge_relationship_indexes_cover_path_and_source_lookup(tmp_path: Path):
     (tmp_path / "service.py").write_text("class Payload:\n    pass\n", encoding="utf-8")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
-        names = {row[1] for row in codemap.store._db.execute("PRAGMA index_list(edge)").fetchall()}
+        names = {
+            row[1]
+            for row in codemap.store._db.execute("PRAGMA index_list(edge)").fetchall()
+        }
     assert "edge_path_line_idx" in names
     assert "edge_path_source_line_idx" in names
 
@@ -1705,7 +2061,9 @@ def test_fresh_lexical_schema_uses_token_primary_key_and_path_index(tmp_path: Pa
             ).fetchone()[0]
         )
         shape = "".join(sql.lower().split())
-        indexes = {row[1] for row in store._db.execute("PRAGMA index_list(lexical)").fetchall()}
+        indexes = {
+            row[1] for row in store._db.execute("PRAGMA index_list(lexical)").fetchall()
+        }
     finally:
         store.close()
 
@@ -1737,11 +2095,15 @@ def test_incompatible_lexical_schema_is_discarded_and_rebuilt(tmp_path: Path):
     store = WorkspaceMapStore(db_path)
     try:
         rows = store._db.execute("SELECT path,token,line FROM lexical").fetchall()
-        sql = str(store._db.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='lexical'"
-        ).fetchone()[0])
+        sql = str(
+            store._db.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='lexical'"
+            ).fetchone()[0]
+        )
         shape = "".join(sql.lower().split())
-        indexes = {row[1] for row in store._db.execute("PRAGMA index_list(lexical)").fetchall()}
+        indexes = {
+            row[1] for row in store._db.execute("PRAGMA index_list(lexical)").fetchall()
+        }
     finally:
         store.close()
 
@@ -1751,7 +2113,10 @@ def test_incompatible_lexical_schema_is_discarded_and_rebuilt(tmp_path: Path):
     assert "lexical_path_idx" in indexes
     assert "lexical_token_idx" not in indexes
 
-def test_bulk_file_writes_commit_completed_chunks_and_rollback_only_current_chunk(tmp_path: Path):
+
+def test_bulk_file_writes_commit_completed_chunks_and_rollback_only_current_chunk(
+    tmp_path: Path,
+):
     db_path = tmp_path / "codemap.sqlite3"
     store = WorkspaceMapStore(db_path)
 
@@ -1764,23 +2129,45 @@ def test_bulk_file_writes_commit_completed_chunks_and_rollback_only_current_chun
 
     with pytest.raises(RuntimeError, match="stop-current-chunk"):
         with store.bulk_file_writes(batch_size=2):
-            store.set_file("a.py", artifact("alpha"), module_name="a", visibility=EvidenceVisibility.SOURCE)
-            store.set_file("b.py", artifact("beta"), module_name="b", visibility=EvidenceVisibility.SOURCE)
+            store.set_file(
+                "a.py",
+                artifact("alpha"),
+                module_name="a",
+                visibility=EvidenceVisibility.SOURCE,
+            )
+            store.set_file(
+                "b.py",
+                artifact("beta"),
+                module_name="b",
+                visibility=EvidenceVisibility.SOURCE,
+            )
 
             # The completed two-file chunk is already durable to another
             # connection before the context finishes.
             observer = sqlite3.connect(db_path)
             try:
-                assert observer.execute("SELECT COUNT(*) FROM file_map").fetchone()[0] == 2
+                assert (
+                    observer.execute("SELECT COUNT(*) FROM file_map").fetchone()[0] == 2
+                )
             finally:
                 observer.close()
 
-            store.set_file("c.py", artifact("gamma"), module_name="c", visibility=EvidenceVisibility.SOURCE)
+            store.set_file(
+                "c.py",
+                artifact("gamma"),
+                module_name="c",
+                visibility=EvidenceVisibility.SOURCE,
+            )
             raise RuntimeError("stop-current-chunk")
 
     observer = sqlite3.connect(db_path)
     try:
-        paths = [row[0] for row in observer.execute("SELECT path FROM file_map ORDER BY path").fetchall()]
+        paths = [
+            row[0]
+            for row in observer.execute(
+                "SELECT path FROM file_map ORDER BY path"
+            ).fetchall()
+        ]
     finally:
         observer.close()
         store.close()
@@ -1788,7 +2175,9 @@ def test_bulk_file_writes_commit_completed_chunks_and_rollback_only_current_chun
     assert paths == ["a.py", "b.py"]
 
 
-def test_codemap_indexes_bounded_repository_docs_and_scripts_as_control_surfaces(tmp_path: Path) -> None:
+def test_codemap_indexes_bounded_repository_docs_and_scripts_as_control_surfaces(
+    tmp_path: Path,
+) -> None:
     docs = tmp_path / "docs" / "development"
     docs.mkdir(parents=True)
     (docs / "APP_CERTIFICATION.md").write_text(
@@ -1797,11 +2186,16 @@ def test_codemap_indexes_bounded_repository_docs_and_scripts_as_control_surfaces
     )
     scripts = tmp_path / "scripts"
     scripts.mkdir()
-    (scripts / "verify.sh").write_text("#!/bin/sh\necho certification verify\n", encoding="utf-8")
+    (scripts / "verify.sh").write_text(
+        "#!/bin/sh\necho certification verify\n", encoding="utf-8"
+    )
     with CodeMap(tmp_path) as codemap:
         result = codemap.sync()
         assert result.parse_errors == 0
-        assert codemap.outline("docs/development/APP_CERTIFICATION.md")["language"] == "text"
+        assert (
+            codemap.outline("docs/development/APP_CERTIFICATION.md")["language"]
+            == "text"
+        )
         assert codemap.outline("scripts/verify.sh")["language"] == "text"
 
 
@@ -1818,17 +2212,23 @@ def test_find_task_preserves_exact_identifier_symbol_anchor(tmp_path: Path) -> N
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        hits = codemap.find_task("ExactAnchorAdapter native project graph test tasks", limit=10)
+        hits = codemap.find_task(
+            "ExactAnchorAdapter native project graph test tasks", limit=10
+        )
     assert hits
     assert hits[0].path == "src/adapter.py"
 
 
-def test_index_preflight_and_economics_report_measured_surfaces_without_execution_policy(tmp_path: Path):
+def test_index_preflight_and_economics_report_measured_surfaces_without_execution_policy(
+    tmp_path: Path,
+):
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "docs").mkdir()
     (tmp_path / "src/app.py").write_text("def run(value):\n    return value + 1\n")
-    (tmp_path / "tests/test_app.py").write_text("from src.app import run\ndef test_run(): assert run(1) == 2\n")
+    (tmp_path / "tests/test_app.py").write_text(
+        "from src.app import run\ndef test_run(): assert run(1) == 2\n"
+    )
     (tmp_path / "docs/readme.md").write_text("# App\nrun behavior\n")
     (tmp_path / "package-lock.json").write_text('{"lockfileVersion": 3}\n')
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
@@ -1847,14 +2247,18 @@ def test_index_preflight_and_economics_report_measured_surfaces_without_executio
     assert status["build"]["complete"] is True
 
 
-def test_interrupted_sync_leaves_durable_incomplete_generation_and_decision_fails_closed(tmp_path: Path, monkeypatch):
+def test_interrupted_sync_leaves_durable_incomplete_generation_and_decision_fails_closed(
+    tmp_path: Path, monkeypatch
+):
     (tmp_path / "src").mkdir()
     (tmp_path / "src/app.py").write_text("def run(value):\n    return value + 1\n")
     artifact_db = tmp_path / "artifacts.sqlite3"
     with CodeMap(tmp_path, artifact_db=artifact_db) as codemap:
         original = codemap._parse_or_reuse
+
         def explode(*args, **kwargs):
             raise RuntimeError("synthetic interruption")
+
         monkeypatch.setattr(codemap, "_parse_or_reuse", explode)
         with pytest.raises(RuntimeError, match="synthetic interruption"):
             codemap.sync()
@@ -1870,7 +2274,9 @@ def test_interrupted_sync_leaves_durable_incomplete_generation_and_decision_fail
     assert packet["context_budget"]["safe"] is False
 
 
-def test_bulk_reverse_reference_queries_preserve_per_target_semantics(tmp_path: Path) -> None:
+def test_bulk_reverse_reference_queries_preserve_per_target_semantics(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "owner.py").write_text(
         "class Alpha:\n    pass\n\nclass Beta:\n    pass\n",
         encoding="utf-8",
@@ -1888,9 +2294,13 @@ def test_bulk_reverse_reference_queries_preserve_per_target_semantics(tmp_path: 
         assert actual["Beta"] == expected_beta
 
 
-def test_lexical_file_expansion_does_not_promote_unrelated_symbols(tmp_path: Path) -> None:
+def test_lexical_file_expansion_does_not_promote_unrelated_symbols(
+    tmp_path: Path,
+) -> None:
     dense = ["# calibrationneedle lives at file scope"]
-    dense.extend(f"def unrelated_{index}():\n    return {index}" for index in range(300))
+    dense.extend(
+        f"def unrelated_{index}():\n    return {index}" for index in range(300)
+    )
     (tmp_path / "dense.py").write_text("\n\n".join(dense) + "\n", encoding="utf-8")
     (tmp_path / "owner.py").write_text(
         "def calibrationneedle_owner():\n    return True\n",
@@ -1911,18 +2321,29 @@ def test_incremental_economics_uses_compact_exact_per_file_facts(tmp_path: Path)
     (tmp_path / "tests").mkdir()
     (tmp_path / "docs").mkdir()
     (tmp_path / "src/app.py").write_text("def run(value):\n    return value + 1\n")
-    (tmp_path / "tests/test_app.py").write_text("from src.app import run\ndef test_run(): assert run(1) == 2\n")
+    (tmp_path / "tests/test_app.py").write_text(
+        "from src.app import run\ndef test_run(): assert run(1) == 2\n"
+    )
     (tmp_path / "docs/readme.md").write_text("# App\nrun behavior\n")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         first = codemap.sync()
         expected_lexical = codemap.store.stats()["lexical_occurrences"]
         expected_by_path = codemap.store.lexical_counts_by_path()
         assert first.economics["lexical_occurrences"] == expected_lexical
-        assert sum(row["lexical_occurrences"] for row in first.economics["surfaces"].values()) == sum(expected_by_path.values())
-        (tmp_path / "src/app.py").write_text("def run(value):\n    return value + 200\n")
+        assert sum(
+            row["lexical_occurrences"] for row in first.economics["surfaces"].values()
+        ) == sum(expected_by_path.values())
+        (tmp_path / "src/app.py").write_text(
+            "def run(value):\n    return value + 200\n"
+        )
         second = codemap.sync(paths=["src/app.py"])
-        assert second.economics["lexical_occurrences"] == codemap.store.stats()["lexical_occurrences"]
+        assert (
+            second.economics["lexical_occurrences"]
+            == codemap.store.stats()["lexical_occurrences"]
+        )
         assert second.economics["files"] == 3
-        assert second.economics["surfaces"]["source"]["files_with_lexical_evidence"] == 1
+        assert (
+            second.economics["surfaces"]["source"]["files_with_lexical_evidence"] == 1
+        )
         assert second.economics["surfaces"]["test"]["files_with_lexical_evidence"] == 1
         assert second.economics["surfaces"]["docs"]["files_with_lexical_evidence"] == 1

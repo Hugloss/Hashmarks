@@ -10,7 +10,9 @@ import hashmarks_build
 
 def test_public_package_declares_apache_license_and_optional_mcp_extra() -> None:
     root = Path(__file__).resolve().parents[1]
-    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]
     assert project["license"] == "Apache-2.0"
     assert project["license-files"] == ["LICENSE"]
     assert project["dependencies"] == []
@@ -28,15 +30,21 @@ def test_build_metadata_projects_real_license_and_mcp_extra() -> None:
     assert 'Requires-Dist: mcp>=2.2.0; extra == "mcp"' in metadata
 
 
-def test_built_wheel_and_sdist_contain_apache_license_and_mcp_requirement(tmp_path: Path) -> None:
+def test_built_wheel_and_sdist_contain_apache_license_and_mcp_requirement(
+    tmp_path: Path,
+) -> None:
     wheel_dir = tmp_path / "wheel"
     wheel_name = hashmarks_build.build_wheel(str(wheel_dir))
     with zipfile.ZipFile(wheel_dir / wheel_name) as archive:
-        metadata_name = next(name for name in archive.namelist() if name.endswith(".dist-info/METADATA"))
+        metadata_name = next(
+            name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
+        )
         metadata = archive.read(metadata_name).decode("utf-8")
         assert "License-Expression: Apache-2.0" in metadata
         assert 'Requires-Dist: mcp>=2.2.0; extra == "mcp"' in metadata
-        assert any(name.endswith(".dist-info/licenses/LICENSE") for name in archive.namelist())
+        assert any(
+            name.endswith(".dist-info/licenses/LICENSE") for name in archive.namelist()
+        )
 
     sdist_dir = tmp_path / "sdist"
     sdist_name = hashmarks_build.build_sdist(str(sdist_dir))

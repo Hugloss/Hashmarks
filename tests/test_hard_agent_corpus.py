@@ -30,9 +30,12 @@ def test_generator_covers_every_hardness_category(tmp_path: Path):
 
 
 def test_generator_is_deterministic(tmp_path: Path):
-    a = tmp_path / "a"; b = tmp_path / "b"
-    pa = tmp_path / "pa.json"; sa = tmp_path / "sa.json"
-    pb = tmp_path / "pb.json"; sb = tmp_path / "sb.json"
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    pa = tmp_path / "pa.json"
+    sa = tmp_path / "sa.json"
+    pb = tmp_path / "pb.json"
+    sb = tmp_path / "sb.json"
     ma = generate(a, pa, sa, cases_per_category=1)
     mb = generate(b, pb, sb, cases_per_category=1)
     assert pa.read_bytes() == pb.read_bytes()
@@ -44,4 +47,6 @@ def test_generator_is_deterministic(tmp_path: Path):
 def test_generator_refuses_secret_inside_worker_repo(tmp_path: Path):
     repo = tmp_path / "worker"
     with pytest.raises(ValueError):
-        generate(repo, tmp_path / "public.json", repo / "secret.json", cases_per_category=1)
+        generate(
+            repo, tmp_path / "public.json", repo / "secret.json", cases_per_category=1
+        )

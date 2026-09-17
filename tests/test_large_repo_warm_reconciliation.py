@@ -22,13 +22,17 @@ def test_warm_reconciliation_preserves_exact_workspace_identity(tmp_path: Path) 
     assert second.reused_artifacts == first.indexed
 
 
-def test_batched_digest_failure_falls_back_without_losing_peer_files(tmp_path: Path, monkeypatch) -> None:
+def test_batched_digest_failure_falls_back_without_losing_peer_files(
+    tmp_path: Path, monkeypatch
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         first = codemap.sync()
     with CodeMap(tmp_path) as codemap:
+
         def fail_batch(*args, **kwargs):
             raise UnstableFileError("synthetic batch instability")
+
         monkeypatch.setattr(codemap.file_store, "digest_many_info", fail_batch)
         second = codemap.sync()
     assert second.workspace_fingerprint == first.workspace_fingerprint

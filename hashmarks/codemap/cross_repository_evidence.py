@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from .decision_session import diagnostic_producer
-
 from collections.abc import Mapping, Sequence
-from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
+from .decision_session import diagnostic_producer
 from .project_impact_codec import expand_project_impact
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from .engine import CodeMap
 
 
 class CrossRepositoryEvidenceMixin:
@@ -28,6 +32,8 @@ class CrossRepositoryEvidenceMixin:
         max_depth: int = 3,
         project_impact_limit: int = 12,
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if project_impact_limit < 1:
             raise ValueError("project_impact_limit must be >= 1")
 
@@ -67,11 +73,7 @@ class CrossRepositoryEvidenceMixin:
             if isinstance(row, Mapping) and row.get("project")
         ]
         relationships = [
-            {
-                key: row[key]
-                for key in ("from", "to", "kind", "producer")
-                if key in row
-            }
+            {key: row[key] for key in ("from", "to", "kind", "producer") if key in row}
             for row in expanded.get("edges", [])
             if isinstance(row, Mapping)
         ]
@@ -85,7 +87,9 @@ class CrossRepositoryEvidenceMixin:
                 if key in ownership
             }
 
-        verify = action.get("verify") if isinstance(action.get("verify"), Mapping) else None
+        verify = (
+            action.get("verify") if isinstance(action.get("verify"), Mapping) else None
+        )
         verification_member = str(verify.get("path") or "") if verify else ""
         verification = self.explain_verification_selection(
             task,
@@ -106,7 +110,12 @@ class CrossRepositoryEvidenceMixin:
         if isinstance(cross_freshness, Mapping):
             freshness_projection = {
                 key: cross_freshness[key]
-                for key in ("state", "dependency_state", "evidence_identity", "dependencies")
+                for key in (
+                    "state",
+                    "dependency_state",
+                    "evidence_identity",
+                    "dependencies",
+                )
                 if key in cross_freshness
             }
         else:
@@ -114,30 +123,46 @@ class CrossRepositoryEvidenceMixin:
 
         unresolved: list[dict[str, object]] = []
         if not isinstance(project_impact, Mapping):
-            unresolved.append({
-                "reason": "no-cross-repository-impact-supported",
-                "scope": "project-impact",
-            })
+            unresolved.append(
+                {
+                    "reason": "no-cross-repository-impact-supported",
+                    "scope": "project-impact",
+                }
+            )
         elif expanded.get("complete") is not True:
-            unresolved.append({
-                "reason": "project-impact-not-complete",
-                "scope": "project-impact",
-            })
+            unresolved.append(
+                {
+                    "reason": "project-impact-not-complete",
+                    "scope": "project-impact",
+                }
+            )
         if ownership_projection is None:
             unresolved.append({"reason": "ownership-unresolved", "scope": "ownership"})
         if verification.get("status") == "insufficient-evidence":
-            unresolved.append({
-                "reason": str(verification.get("reason") or "insufficient-evidence"),
-                "scope": "verification",
-            })
+            unresolved.append(
+                {
+                    "reason": str(
+                        verification.get("reason") or "insufficient-evidence"
+                    ),
+                    "scope": "verification",
+                }
+            )
 
         changed = [
             str(row.get("path") or "")
             for row in impact.get("changed", [])
             if isinstance(row, Mapping) and row.get("path")
         ]
-        surfaces = impact.get("surfaces") if isinstance(impact.get("surfaces"), Mapping) else {}
-        repository = freshness.get("repository") if isinstance(freshness.get("repository"), Mapping) else {}
+        surfaces = (
+            impact.get("surfaces")
+            if isinstance(impact.get("surfaces"), Mapping)
+            else {}
+        )
+        repository = (
+            freshness.get("repository")
+            if isinstance(freshness.get("repository"), Mapping)
+            else {}
+        )
 
         payload: dict[str, object] = {
             "schema": "hashmarks.cross-repository-evidence-packet.v1",
@@ -151,11 +176,15 @@ class CrossRepositoryEvidenceMixin:
             "relationships": relationships,
             "affected_ownership_surface": {
                 "ownership": ownership_projection,
-                "surfaces": {key: list(value) for key, value in surfaces.items() if value},
+                "surfaces": {
+                    key: list(value) for key, value in surfaces.items() if value
+                },
             },
             "verification": {
                 "member": verification_member or None,
-                "test_symbol": verify.get("verification_test_symbol") if verify else None,
+                "test_symbol": verify.get("verification_test_symbol")
+                if verify
+                else None,
                 "status": verification.get("status"),
                 "reason": verification.get("reason"),
                 "explanation_identity": verification.get("explanation_identity"),
@@ -172,6 +201,7 @@ class CrossRepositoryEvidenceMixin:
             "execution_effect": "none",
         }
         payload["packet_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.cross-repository-evidence-packet.v1", payload,
+            "hashmarks.cross-repository-evidence-packet.v1",
+            payload,
         )
         return payload

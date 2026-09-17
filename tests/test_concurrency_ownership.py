@@ -3,13 +3,16 @@ from __future__ import annotations
 import os
 import threading
 import time
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from hashmarks.client import IdentityClient
 from hashmarks.codemap.repository_index_store import WorkspaceMapStore
 from hashmarks.daemon import IdentityDaemon
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class _BarrierWatcher:
@@ -27,7 +30,9 @@ class _BarrierWatcher:
         return True
 
 
-def test_workspace_generation_bump_is_one_atomic_read_modify_write(tmp_path: Path, monkeypatch) -> None:
+def test_workspace_generation_bump_is_one_atomic_read_modify_write(
+    tmp_path: Path, monkeypatch
+) -> None:
     store = WorkspaceMapStore(tmp_path / "map.sqlite3")
     try:
         workers = 12
@@ -69,7 +74,9 @@ def test_workspace_generation_bump_is_one_atomic_read_modify_write(tmp_path: Pat
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Unix identity daemon transport")
-def test_identity_daemon_status_is_not_serialized_behind_large_snapshot(tmp_path: Path, monkeypatch) -> None:
+def test_identity_daemon_status_is_not_serialized_behind_large_snapshot(
+    tmp_path: Path, monkeypatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("a", encoding="utf-8")
@@ -126,7 +133,9 @@ def test_identity_daemon_status_is_not_serialized_behind_large_snapshot(tmp_path
     try:
         # Do not use elapsed-time thresholds for the product operation itself:
         # simply prove status completes while the heavy request is still held.
-        assert status_done.wait(timeout=1), "status was serialized behind heavy identity work"
+        assert status_done.wait(timeout=1), (
+            "status was serialized behind heavy identity work"
+        )
         assert status_rows[0]["workspace"] == str(workspace.resolve())
         assert slow_thread.is_alive()
     finally:
@@ -145,7 +154,9 @@ def test_identity_daemon_status_is_not_serialized_behind_large_snapshot(tmp_path
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Unix identity daemon transport")
-def test_registered_manifest_can_be_dropped_while_snapshot_uses_immutable_handle(tmp_path: Path, monkeypatch) -> None:
+def test_registered_manifest_can_be_dropped_while_snapshot_uses_immutable_handle(
+    tmp_path: Path, monkeypatch
+) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("a", encoding="utf-8")
@@ -181,7 +192,9 @@ def test_registered_manifest_can_be_dropped_while_snapshot_uses_immutable_handle
     handle = owner.register_manifest(manifest)
     result: list[dict] = []
 
-    thread = threading.Thread(target=lambda: result.append(owner.input_root_manifest(handle, verify=True)))
+    thread = threading.Thread(
+        target=lambda: result.append(owner.input_root_manifest(handle, verify=True))
+    )
     thread.start()
     assert entered.wait(timeout=2)
     try:

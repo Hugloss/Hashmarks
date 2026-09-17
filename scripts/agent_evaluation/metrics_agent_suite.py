@@ -26,7 +26,9 @@ def _sha256_file(path: Path) -> str:
 
 
 def _protocol_identity(protocol: dict[str, object]) -> str:
-    payload = json.dumps(protocol, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    payload = json.dumps(protocol, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
     return "sha256:" + hashlib.sha256(payload).hexdigest()
 
 
@@ -40,24 +42,31 @@ def _parse_repo(value: str) -> tuple[str, Path, Path]:
     return name.strip(), Path(workspace), Path(corpus)
 
 
-
 def _validate_repository_roots(repos: list[tuple[str, Path, Path]]) -> None:
     resolved = [(name, workspace.resolve()) for name, workspace, _ in repos]
     for index, (name, root) in enumerate(resolved):
-        for other_name, other_root in resolved[index + 1:]:
-            if root == other_root or root in other_root.parents or other_root in root.parents:
+        for other_name, other_root in resolved[index + 1 :]:
+            if (
+                root == other_root
+                or root in other_root.parents
+                or other_root in root.parents
+            ):
                 raise ValueError(
                     f"repository workspaces must be disjoint: {name}={root} overlaps {other_name}={other_root}"
                 )
+
 
 def _weighted(results: list[dict[str, Any]], key: str) -> float:
     total_tasks = sum(int(row["parameters"]["tasks"]) for row in results)
     if total_tasks <= 0:
         return 0.0
-    return sum(
-        float(row["summary"][key]) * int(row["parameters"]["tasks"])
-        for row in results
-    ) / total_tasks
+    return (
+        sum(
+            float(row["summary"][key]) * int(row["parameters"]["tasks"])
+            for row in results
+        )
+        / total_tasks
+    )
 
 
 def collect_suite(
@@ -72,13 +81,15 @@ def collect_suite(
         reports.append({"name": name, **report})
     total_tasks = sum(int(row["parameters"]["tasks"]) for row in reports)
     protocol_repositories = []
-    for (name, workspace, corpus), report in zip(repos, reports):
-        protocol_repositories.append({
-            "name": name,
-            "workspace_fingerprint": str(report["sync"]["workspace_fingerprint"]),
-            "corpus_sha256": _sha256_file(corpus),
-            "tasks": int(report["parameters"]["tasks"]),
-        })
+    for (name, _workspace, corpus), report in zip(repos, reports, strict=False):
+        protocol_repositories.append(
+            {
+                "name": name,
+                "workspace_fingerprint": str(report["sync"]["workspace_fingerprint"]),
+                "corpus_sha256": _sha256_file(corpus),
+                "tasks": int(report["parameters"]["tasks"]),
+            }
+        )
     protocol = {
         "schema": PROTOCOL_SCHEMA,
         "retrieval": "CodeMap.find_task + CodeMap.context",
@@ -90,19 +101,32 @@ def collect_suite(
         "schema": SCHEMA,
         "benchmark_protocol": protocol,
         "benchmark_protocol_identity": _protocol_identity(protocol),
-        "parameters": {"budget": budget, "limit": limit, "repositories": len(reports), "tasks": total_tasks},
+        "parameters": {
+            "budget": budget,
+            "limit": limit,
+            "repositories": len(reports),
+            "tasks": total_tasks,
+        },
         "summary": {
             "file_recall": _weighted(reports, "file_recall"),
             "symbol_recall": _weighted(reports, "symbol_recall"),
             "first_query_hit_rate": _weighted(reports, "first_query_hit_rate"),
             "fallback_search_rate": _weighted(reports, "fallback_search_rate"),
             "average_context_tokens": _weighted(reports, "average_context_tokens"),
-            "average_candidate_file_reduction": _weighted(reports, "average_candidate_file_reduction"),
+            "average_candidate_file_reduction": _weighted(
+                reports, "average_candidate_file_reduction"
+            ),
             "average_find_ms": _weighted(reports, "average_find_ms"),
             "average_context_ms": _weighted(reports, "average_context_ms"),
-            "max_repo_p95_find_ms": max(float(row["summary"]["p95_find_ms"]) for row in reports),
-            "max_repo_p95_context_ms": max(float(row["summary"]["p95_context_ms"]) for row in reports),
-            "selected_file_tokens_avoided": sum(int(row["summary"]["selected_file_tokens_avoided"]) for row in reports),
+            "max_repo_p95_find_ms": max(
+                float(row["summary"]["p95_find_ms"]) for row in reports
+            ),
+            "max_repo_p95_context_ms": max(
+                float(row["summary"]["p95_context_ms"]) for row in reports
+            ),
+            "selected_file_tokens_avoided": sum(
+                int(row["summary"]["selected_file_tokens_avoided"]) for row in reports
+            ),
             "seconds": sum(float(row["summary"]["seconds"]) for row in reports),
         },
         "repositories": reports,
@@ -110,8 +134,16 @@ def collect_suite(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Replay agent-localization corpora across multiple repositories")
-    parser.add_argument("--repo", action="append", type=_parse_repo, required=True, metavar="NAME=WORKSPACE::CORPUS")
+    parser = argparse.ArgumentParser(
+        description="Replay agent-localization corpora across multiple repositories"
+    )
+    parser.add_argument(
+        "--repo",
+        action="append",
+        type=_parse_repo,
+        required=True,
+        metavar="NAME=WORKSPACE::CORPUS",
+    )
     parser.add_argument("--budget", type=int, default=1200)
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--output", type=Path)
@@ -126,14 +158,20 @@ def main() -> None:
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)
+    print(rendered)  # noqa: T201 - intentional command output
     summary = payload["summary"]
     failed = (
         float(summary["file_recall"]) < args.min_file_recall
         or float(summary["symbol_recall"]) < args.min_symbol_recall
         or float(summary["fallback_search_rate"]) > args.max_fallback_rate
-        or (args.max_average_find_ms is not None and float(summary["average_find_ms"]) > args.max_average_find_ms)
-        or (args.max_average_context_ms is not None and float(summary["average_context_ms"]) > args.max_average_context_ms)
+        or (
+            args.max_average_find_ms is not None
+            and float(summary["average_find_ms"]) > args.max_average_find_ms
+        )
+        or (
+            args.max_average_context_ms is not None
+            and float(summary["average_context_ms"]) > args.max_average_context_ms
+        )
     )
     if failed:
         raise SystemExit(2)

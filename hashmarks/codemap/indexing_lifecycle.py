@@ -1,27 +1,39 @@
 from __future__ import annotations
 
-import hashlib
+import contextlib
 import fnmatch
-from bisect import bisect_left
+import hashlib
 import json
 import os
 import threading
-import tomllib
 import time
+import tomllib
+from bisect import bisect_left
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Iterable, Sequence
+from typing import TYPE_CHECKING, cast
 
-from ..client import RepositoryObservation
-from ..file_store import UnstableFileError
-from ..paths import normalize_relative_path
-from ..observation import ChangeTracker, ObservationState
-from ..watcher import create_default_watcher
+from hashmarks.file_store import UnstableFileError
+from hashmarks.observation import ChangeTracker, ObservationState
+from hashmarks.paths import normalize_relative_path
+from hashmarks.watcher import create_default_watcher
+
+from .index_surfaces import index_surface_for_path
 from .model import EvidenceVisibility, SyncResult
 from .parsers import artifact_key_for, parse_source
 from .policy import ContextPolicy
-from .repository_index_store import default_base_snapshot, git_base_identity, git_overlay_paths
-from .index_surfaces import index_surface_for_path
+from .repository_index_store import (
+    default_base_snapshot,
+    git_base_identity,
+    git_overlay_paths,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
+    from hashmarks.client import RepositoryObservation
+
+    from .engine import CodeMap
 
 _SOURCE_EXTENSIONS = {
     ".py": "python",
@@ -48,21 +60,66 @@ _SOURCE_EXTENSIONS = {
     ".sql": "sql",
 }
 _TEXT_EXTENSIONS = {
-    ".toml", ".yaml", ".yml", ".json", ".ini", ".cfg", ".conf", ".properties",
-    ".md", ".rst", ".txt", ".sh", ".bash", ".zsh", ".fish", ".ps1", ".cmd", ".bat",
+    ".toml",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".properties",
+    ".md",
+    ".rst",
+    ".txt",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".fish",
+    ".ps1",
+    ".cmd",
+    ".bat",
 }
 _TEXT_NAMES = {
-    "Makefile", "Dockerfile", "Justfile", "go.mod", "go.sum", "gradlew", "mvnw",
-    "README.md", "AGENTS.md", "AGENTS.override.md",
+    "Makefile",
+    "Dockerfile",
+    "Justfile",
+    "go.mod",
+    "go.sum",
+    "gradlew",
+    "mvnw",
+    "README.md",
+    "AGENTS.md",
+    "AGENTS.override.md",
 }
 _NOISY_TEXT_NAMES = {
-    "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "uv.lock", "Cargo.lock", "poetry.lock",
-    ".hashmarks-context.toml", ".hashmarks-project-links.toml",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "uv.lock",
+    "Cargo.lock",
+    "poetry.lock",
+    ".hashmarks-context.toml",
+    ".hashmarks-project-links.toml",
 }
 _PRUNE_DIRS = {
-    ".git", ".hashmarks", ".fastidentity", ".venv", "venv", "node_modules",
-    "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "dist", "build",
-    ".next", "target", ".tox", ".nox", "coverage", ".coverage",
+    ".git",
+    ".hashmarks",
+    ".fastidentity",
+    ".venv",
+    "venv",
+    "node_modules",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    ".next",
+    "target",
+    ".tox",
+    ".nox",
+    "coverage",
+    ".coverage",
 }
 _ANALYSIS_SCOPE_CONFORMANCE_SCHEMA = "hashmarks.analysis-scope-conformance.v1"
 
@@ -76,6 +133,8 @@ def _is_pruned_relative_path(rel: str) -> bool:
 
 
 _MAX_INDEX_BYTES = 2 * 1024 * 1024
+
+
 def _language_for_path(path: Path) -> str | None:
     if path.name in _NOISY_TEXT_NAMES:
         return None
@@ -85,6 +144,8 @@ def _language_for_path(path: Path) -> str | None:
     if path.name in _TEXT_NAMES or path.suffix.lower() in _TEXT_EXTENSIONS:
         return "text"
     return None
+
+
 def _pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
@@ -97,7 +158,11 @@ def _pid_alive(pid: int) -> bool:
     except OSError:
         return False
     return True
-def _uv_workspace_pyprojects(workspace: Path, pyprojects: Sequence[Path]) -> tuple[Path, ...]:
+
+
+def _uv_workspace_pyprojects(
+    workspace: Path, pyprojects: Sequence[Path]
+) -> tuple[Path, ...]:
     """Restrict nested project metadata to declared uv workspace members when configured."""
     root_manifest = workspace / "pyproject.toml"
     try:
@@ -112,9 +177,21 @@ def _uv_workspace_pyprojects(workspace: Path, pyprojects: Sequence[Path]) -> tup
     members = workspace_cfg.get("members")
     if not isinstance(members, list):
         return tuple(pyprojects)
-    member_patterns = tuple(value.strip().strip("/") for value in members if isinstance(value, str) and value.strip())
+    member_patterns = tuple(
+        value.strip().strip("/")
+        for value in members
+        if isinstance(value, str) and value.strip()
+    )
     excludes = workspace_cfg.get("exclude")
-    exclude_patterns = tuple(value.strip().strip("/") for value in excludes if isinstance(value, str) and value.strip()) if isinstance(excludes, list) else ()
+    exclude_patterns = (
+        tuple(
+            value.strip().strip("/")
+            for value in excludes
+            if isinstance(value, str) and value.strip()
+        )
+        if isinstance(excludes, list)
+        else ()
+    )
 
     def selected(pyproject: Path) -> bool:
         if pyproject == root_manifest:
@@ -123,9 +200,13 @@ def _uv_workspace_pyprojects(workspace: Path, pyprojects: Sequence[Path]) -> tup
             project = pyproject.parent.relative_to(workspace).as_posix()
         except ValueError:
             return False
-        if not any(fnmatch.fnmatchcase(project, pattern) for pattern in member_patterns):
+        if not any(
+            fnmatch.fnmatchcase(project, pattern) for pattern in member_patterns
+        ):
             return False
-        return not any(fnmatch.fnmatchcase(project, pattern) for pattern in exclude_patterns)
+        return not any(
+            fnmatch.fnmatchcase(project, pattern) for pattern in exclude_patterns
+        )
 
     return tuple(pyproject for pyproject in pyprojects if selected(pyproject))
 
@@ -177,7 +258,9 @@ def _python_source_roots_from_pyprojects(
         except ValueError:
             continue
         for root in configured:
-            combined = "/".join(part for part in (project_prefix, root) if part and part != ".")
+            combined = "/".join(
+                part for part in (project_prefix, root) if part and part != "."
+            )
             if combined:
                 roots.add(combined)
     return tuple(sorted(roots))
@@ -185,7 +268,9 @@ def _python_source_roots_from_pyprojects(
 
 def _python_source_roots(workspace: Path) -> tuple[str, ...]:
     """Return explicitly configured Python import roots from root project metadata."""
-    return _python_source_roots_from_pyprojects(workspace, (workspace / "pyproject.toml",))
+    return _python_source_roots_from_pyprojects(
+        workspace, (workspace / "pyproject.toml",)
+    )
 
 
 def _module_name(relpath: str, source_roots: Sequence[str] = ()) -> str | None:
@@ -195,7 +280,7 @@ def _module_name(relpath: str, source_roots: Sequence[str] = ()) -> str | None:
     for root in sorted(source_roots, key=len, reverse=True):
         prefix = root.rstrip("/") + "/"
         if module_path.startswith(prefix):
-            module_path = module_path[len(prefix):]
+            module_path = module_path[len(prefix) :]
             break
     parts = module_path.split("/")
     if parts and parts[-1] == "__init__":
@@ -262,6 +347,8 @@ class IndexingLifecycleMixin:
         trusting a process-lifetime snapshot. The semantic fingerprint avoids
         generation churn for byte-only rewrites that preserve the same rules.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         current = ContextPolicy.load(self.workspace, self._policy_config_path)
         if current.fingerprint() == self.policy.fingerprint():
             return False
@@ -275,6 +362,8 @@ class IndexingLifecycleMixin:
 
     def _path_admitted_for_analysis(self, rel: str) -> bool:
         """Return whether an explicit repository path may feed analysis surfaces."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         return (
             not self._internal_path(rel)
             and not _is_pruned_relative_path(rel)
@@ -283,16 +372,22 @@ class IndexingLifecycleMixin:
 
     def _analysis_scope_conformance_identity(self) -> str:
         """Bind the inputs that decide whether persisted repository rows are admissible."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         payload = {
             "schema": _ANALYSIS_SCOPE_CONFORMANCE_SCHEMA,
             "pruned_segments": sorted(_PRUNE_DIRS),
             "policy_fingerprint": self.policy.fingerprint(),
             "internal_state_path": self._state_rel or "",
         }
-        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
         return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
     def _workspace_fingerprint_from_store(self) -> str:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         fingerprint_blob = json.dumps(
             self.store.file_digests(), separators=(",", ":")
         ).encode("utf-8")
@@ -307,6 +402,8 @@ class IndexingLifecycleMixin:
         policy changes.  Stable queries reuse the persisted conformance identity
         and do not rescan the repository map.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         identity = self._analysis_scope_conformance_identity()
         if self.store.meta("analysis_scope_conformance_identity", "") == identity:
             return 0
@@ -330,9 +427,13 @@ class IndexingLifecycleMixin:
         return removed
 
     def _discover(self) -> tuple[list[_DiscoveredFile], list[str]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         result: list[_DiscoveredFile] = []
         warnings: list[str] = []
-        for root, dirs, files in os.walk(self.workspace, topdown=True, followlinks=False):
+        for root, dirs, files in os.walk(
+            self.workspace, topdown=True, followlinks=False
+        ):
             root_path = Path(root)
             try:
                 root_rel_value = root_path.relative_to(self.workspace).as_posix()
@@ -340,7 +441,8 @@ class IndexingLifecycleMixin:
             except ValueError:
                 root_rel = ""
             dirs[:] = sorted(
-                name for name in dirs
+                name
+                for name in dirs
                 if name not in _PRUNE_DIRS
                 and not self._internal_path(f"{root_rel}/{name}".strip("/"))
             )
@@ -366,22 +468,35 @@ class IndexingLifecycleMixin:
                 if size > self.max_index_bytes:
                     warnings.append(f"skipped oversized source {rel} ({size} bytes)")
                     continue
-                result.append(_DiscoveredFile(rel, path, language, decision.evidence_visibility, int(size)))
+                result.append(
+                    _DiscoveredFile(
+                        rel, path, language, decision.evidence_visibility, int(size)
+                    )
+                )
         return result, warnings
 
-
     def _parse_or_reuse(self, rel: str, path: Path, language: str, digest_hash: str):
-        key = artifact_key_for(digest_hash, language, range_provider=self.range_provider)
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        key = artifact_key_for(
+            digest_hash, language, range_provider=self.range_provider
+        )
         cached = self.artifacts.get(key)
         if cached is not None:
             return cached, True
         source = path.read_text(encoding="utf-8", errors="replace")
-        artifact = parse_source(source, file_digest=digest_hash, language=language, range_provider=self.range_provider)
+        artifact = parse_source(
+            source,
+            file_digest=digest_hash,
+            language=language,
+            range_provider=self.range_provider,
+        )
         self.artifacts.put(artifact)
         return artifact, False
 
-
     def _discover_subtree(self, rel: str) -> list[_DiscoveredFile]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if not self._path_admitted_for_analysis(rel):
             return []
         path = self.workspace / rel
@@ -397,7 +512,11 @@ class IndexingLifecycleMixin:
             except OSError:
                 return []
             if size <= self.max_index_bytes:
-                return [_DiscoveredFile(rel, path, language, decision.evidence_visibility, size)]
+                return [
+                    _DiscoveredFile(
+                        rel, path, language, decision.evidence_visibility, size
+                    )
+                ]
             return []
         if not path.is_dir():
             return []
@@ -405,9 +524,12 @@ class IndexingLifecycleMixin:
         for root, dirs, files in os.walk(path, topdown=True, followlinks=False):
             root_path = Path(root)
             dirs[:] = sorted(
-                name for name in dirs
+                name
+                for name in dirs
                 if name not in _PRUNE_DIRS
-                and not self._internal_path((Path(root).relative_to(self.workspace) / name).as_posix())
+                and not self._internal_path(
+                    (Path(root).relative_to(self.workspace) / name).as_posix()
+                )
             )
             for name in sorted(files):
                 child = root_path / name
@@ -424,16 +546,20 @@ class IndexingLifecycleMixin:
                     continue
                 if size > self.max_index_bytes:
                     continue
-                result.append(_DiscoveredFile(child_rel, child, language, decision.evidence_visibility, size))
+                result.append(
+                    _DiscoveredFile(
+                        child_rel, child, language, decision.evidence_visibility, size
+                    )
+                )
         return result
-
 
     @staticmethod
     def _index_surface_for_path(path: str) -> str:
         return index_surface_for_path(path)
 
-
-    def _preflight_from_discovered(self, discovered: Sequence[_DiscoveredFile]) -> dict[str, object]:
+    def _preflight_from_discovered(
+        self, discovered: Sequence[_DiscoveredFile]
+    ) -> dict[str, object]:
         language_files: dict[str, int] = {}
         language_bytes: dict[str, int] = {}
         surface_files: dict[str, int] = {}
@@ -464,11 +590,17 @@ class IndexingLifecycleMixin:
             "measured_files": measurable_files,
             "source_bytes": source_bytes,
             "languages": {
-                language: {"files": language_files[language], "bytes": language_bytes.get(language, 0)}
+                language: {
+                    "files": language_files[language],
+                    "bytes": language_bytes.get(language, 0),
+                }
                 for language in sorted(language_files)
             },
             "surfaces": {
-                surface: {"files": surface_files[surface], "bytes": surface_bytes.get(surface, 0)}
+                surface: {
+                    "files": surface_files[surface],
+                    "bytes": surface_bytes.get(surface, 0),
+                }
                 for surface in sorted(surface_files)
             },
             "work_class": work_class,
@@ -482,7 +614,6 @@ class IndexingLifecycleMixin:
             "estimated_lexical_rows_reason": "not guessed before parsing",
         }
 
-
     def index_preflight(self) -> dict[str, object]:
         """Cheap, read-only repository indexing cost evidence.
 
@@ -494,30 +625,35 @@ class IndexingLifecycleMixin:
         result["warnings"] = list(warnings)
         return result
 
-
     def _codemap_build_state(self) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         state = self.store.meta("sync.build_state") or "NEVER_SYNCED"
         return {
             "state": state,
             "complete": state == "COMPLETE",
             "build_id": self.store.meta("sync.build_id"),
-            "started_unix": None if not self.store.meta("sync.started_unix") else float(self.store.meta("sync.started_unix") or 0),
-            "completed_unix": None if not self.store.meta("sync.completed_unix") else float(self.store.meta("sync.completed_unix") or 0),
+            "started_unix": None
+            if not self.store.meta("sync.started_unix")
+            else float(self.store.meta("sync.started_unix") or 0),
+            "completed_unix": None
+            if not self.store.meta("sync.completed_unix")
+            else float(self.store.meta("sync.completed_unix") or 0),
             "discovered": int(self.store.meta("sync.discovered", "0") or 0),
-            "persisted_file_writes": int(self.store.meta("sync.persisted_file_writes", "0") or 0),
+            "persisted_file_writes": int(
+                self.store.meta("sync.persisted_file_writes", "0") or 0
+            ),
         }
 
-
     def _workspace_map_bytes(self) -> int:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         total = 0
         for suffix in ("", "-wal"):
             path = Path(str(self.store.db_path) + suffix)
-            try:
+            with contextlib.suppress(OSError):
                 total += int(path.stat().st_size)
-            except OSError:
-                pass
         return total
-
 
     def _sync_remove_stale_paths(
         self,
@@ -528,10 +664,14 @@ class IndexingLifecycleMixin:
         requested_paths: Sequence[str],
     ) -> int:
         """Remove rows no longer admitted by the current repository discovery."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if full:
             to_remove = self.store.paths() - present
             for rel in to_remove:
-                if (self.workspace / rel).exists() and not self.policy.decide(rel).index:
+                if (self.workspace / rel).exists() and not self.policy.decide(
+                    rel
+                ).index:
                     row = self.store.file_row(rel)
                     if row is not None:
                         self.artifacts.delete(str(row["artifact_key"]))
@@ -553,7 +693,14 @@ class IndexingLifecycleMixin:
         skipped: int,
     ) -> None:
         """Persist reusable base evidence only for a complete clean-base sync."""
-        if not (full and base_identity is not None and overlay_paths == set() and skipped == 0):
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if not (
+            full
+            and base_identity is not None
+            and overlay_paths == set()
+            and skipped == 0
+        ):
             return
         snapshot_path = default_base_snapshot(self.workspace, base_identity)
         snapshot_path.parent.mkdir(parents=True, exist_ok=True)
@@ -574,7 +721,10 @@ class IndexingLifecycleMixin:
             "files": files_payload,
         }
         temp = snapshot_path.with_suffix(snapshot_path.suffix + ".tmp")
-        temp.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+        temp.write_text(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
         os.replace(temp, snapshot_path)
 
     def _sync_economics(
@@ -587,6 +737,8 @@ class IndexingLifecycleMixin:
         persisted_file_writes: int,
     ) -> dict[str, object]:
         """Describe measured indexing economics without choosing execution policy."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         store_stats = self.store.economics_counts_by_surface()
         workspace_map_bytes = self._workspace_map_bytes()
         surface_economics = store_stats["surfaces"]
@@ -595,16 +747,22 @@ class IndexingLifecycleMixin:
             "cache_state": cache_state,
             "seconds": elapsed,
             "files_per_second": (discovered_count / elapsed) if elapsed > 0 else None,
-            "source_bytes_per_second": (source_bytes / elapsed) if elapsed > 0 else None,
+            "source_bytes_per_second": (source_bytes / elapsed)
+            if elapsed > 0
+            else None,
             "source_bytes": source_bytes,
             "workspace_map_bytes": workspace_map_bytes,
-            "workspace_map_to_source_ratio": (workspace_map_bytes / source_bytes) if source_bytes else None,
+            "workspace_map_to_source_ratio": (workspace_map_bytes / source_bytes)
+            if source_bytes
+            else None,
             "lexical_occurrences": store_stats["lexical_occurrences"],
             "files": store_stats["files"],
             "parse_errors": store_stats["parse_errors"],
             "persistence_batch_files": 32,
             "persisted_file_writes": persisted_file_writes,
-            "surfaces": {key: surface_economics[key] for key in sorted(surface_economics)},
+            "surfaces": {
+                key: surface_economics[key] for key in sorted(surface_economics)
+            },
             "deadline_policy": None,
             "retry_policy": None,
         }
@@ -619,7 +777,9 @@ class IndexingLifecycleMixin:
             discovered, discovered_warnings = self._discover()
             warnings.extend(discovered_warnings)
             return discovered, True, ()
-        requested_paths = tuple(normalize_relative_path(raw, allow_root=False) for raw in paths)
+        requested_paths = tuple(
+            normalize_relative_path(raw, allow_root=False) for raw in paths
+        )
         discovered: list[_DiscoveredFile] = []
         seen: set[str] = set()
         for rel in requested_paths:
@@ -639,32 +799,48 @@ class IndexingLifecycleMixin:
         preflight: dict[str, object],
     ) -> str:
         """Publish build-in-progress evidence before repository rows can change."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         has_existing_files = self.store.has_files()
-        cache_state = "incremental" if not full else ("warm" if has_existing_files else "cold")
+        cache_state = (
+            "incremental" if not full else ("warm" if has_existing_files else "cold")
+        )
         build_started_unix = time.time()
         build_id = hashlib.sha256(
-            f"{build_started_unix:.9f}:{self.store.generation()}:{len(discovered)}".encode("utf-8")
+            f"{build_started_unix:.9f}:{self.store.generation()}:{len(discovered)}".encode()
         ).hexdigest()[:24]
-        self.store.set_meta_many({
-            "sync.build_state": "BUILDING",
-            "sync.build_id": build_id,
-            "sync.started_unix": str(build_started_unix),
-            "sync.completed_unix": "",
-            "sync.discovered": str(len(discovered)),
-            "sync.persisted_file_writes": "0",
-            "sync.preflight": json.dumps(preflight, sort_keys=True, separators=(",", ":")),
-            "sync.cache_state": cache_state,
-        })
+        self.store.set_meta_many(
+            {
+                "sync.build_state": "BUILDING",
+                "sync.build_id": build_id,
+                "sync.started_unix": str(build_started_unix),
+                "sync.completed_unix": "",
+                "sync.discovered": str(len(discovered)),
+                "sync.persisted_file_writes": "0",
+                "sync.preflight": json.dumps(
+                    preflight, sort_keys=True, separators=(",", ":")
+                ),
+                "sync.cache_state": cache_state,
+            }
+        )
         recent = [] if full else list(requested_paths)[:1000]
-        self.store.set_meta("recent_changed_paths", json.dumps(recent, separators=(",", ":")))
+        self.store.set_meta(
+            "recent_changed_paths", json.dumps(recent, separators=(",", ":"))
+        )
         return cache_state
 
     def _sync_base_snapshot(
         self, *, full: bool
     ) -> tuple[str | None, set[str] | None, dict[str, object] | None]:
         """Load reusable clean-base evidence without changing repository state."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         base_identity = git_base_identity(self.workspace) if full else None
-        overlay_paths = git_overlay_paths(self.workspace) if full and base_identity is not None else None
+        overlay_paths = (
+            git_overlay_paths(self.workspace)
+            if full and base_identity is not None
+            else None
+        )
         if not (full and base_identity is not None and overlay_paths is not None):
             return base_identity, overlay_paths, None
         snapshot_path = default_base_snapshot(self.workspace, base_identity)
@@ -691,7 +867,13 @@ class IndexingLifecycleMixin:
         state: _SyncIndexState,
     ) -> bool:
         """Reuse one qualified base-snapshot artifact when its evidence still matches."""
-        if base_snapshot_payload is None or overlay_paths is None or rel in overlay_paths:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if (
+            base_snapshot_payload is None
+            or overlay_paths is None
+            or rel in overlay_paths
+        ):
             return False
         entries = base_snapshot_payload.get("files")
         entry = entries.get(rel) if isinstance(entries, dict) else None
@@ -699,7 +881,11 @@ class IndexingLifecycleMixin:
             return False
         snap_digest = entry.get("file_digest")
         snap_artifact_key = entry.get("artifact_key")
-        artifact = self.artifacts.get(str(snap_artifact_key)) if isinstance(snap_artifact_key, str) else None
+        artifact = (
+            self.artifacts.get(str(snap_artifact_key))
+            if isinstance(snap_artifact_key, str)
+            else None
+        )
         if not (
             isinstance(snap_digest, str)
             and artifact is not None
@@ -721,7 +907,13 @@ class IndexingLifecycleMixin:
             state.reused += 1
             state.base_snapshot_reused += 1
             return True
-        derived_update = self.store.set_file(rel, artifact, module_name=_module_name(rel, getattr(self, "_python_import_roots", ())), visibility=visibility, index_surface=self._index_surface_for_path(rel))
+        derived_update = self.store.set_file(
+            rel,
+            artifact,
+            module_name=_module_name(rel, getattr(self, "_python_import_roots", ())),
+            visibility=visibility,
+            index_surface=self._index_surface_for_path(rel),
+        )
         state.persisted_file_writes += 1
         state.derived_changed += len(derived_update["changed_kinds"])
         state.derived_preserved += len(derived_update["preserved_kinds"])
@@ -746,16 +938,22 @@ class IndexingLifecycleMixin:
         has_derived: bool | None = None,
     ) -> None:
         """Reuse or parse one already-discovered repository file and persist its evidence."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if digest is None:
             try:
-                digest = self.file_store.digest(path, workspace=self.workspace, relative_path=rel)
+                digest = self.file_store.digest(
+                    path, workspace=self.workspace, relative_path=rel
+                )
             except (OSError, UnstableFileError) as exc:
                 warnings.append(f"cannot index {rel}: {exc}")
                 state.skipped += 1
                 return
         if row is None:
             row = self.store.file_row(rel)
-        expected_artifact = artifact_key_for(digest.hash, language, range_provider=self.range_provider)
+        expected_artifact = artifact_key_for(
+            digest.hash, language, range_provider=self.range_provider
+        )
         if isinstance(row, tuple):
             row_digest, row_artifact, row_visibility, row_module, row_has_derived = row
         elif row is not None:
@@ -763,7 +961,11 @@ class IndexingLifecycleMixin:
             row_artifact = str(row["artifact_key"])
             row_visibility = str(row["evidence_visibility"])
             row_module = str(row["module_name"] or "")
-            row_has_derived = self.store.has_derived_nodes(rel) if has_derived is None else has_derived
+            row_has_derived = (
+                self.store.has_derived_nodes(rel)
+                if has_derived is None
+                else has_derived
+            )
         else:
             row_digest = row_artifact = row_visibility = row_module = None
             row_has_derived = False
@@ -772,19 +974,28 @@ class IndexingLifecycleMixin:
             and row_digest == digest.hash
             and row_artifact == expected_artifact
             and row_visibility == visibility.value
-            and row_module == (_module_name(rel, getattr(self, "_python_import_roots", ())) or "")
+            and row_module
+            == (_module_name(rel, getattr(self, "_python_import_roots", ())) or "")
             and row_has_derived
         ):
             state.indexed += 1
             state.reused += 1
             return
         try:
-            artifact, was_reused = self._parse_or_reuse(rel, path, language, digest.hash)
+            artifact, was_reused = self._parse_or_reuse(
+                rel, path, language, digest.hash
+            )
         except OSError as exc:
             warnings.append(f"cannot read {rel}: {exc}")
             state.skipped += 1
             return
-        derived_update = self.store.set_file(rel, artifact, module_name=_module_name(rel, getattr(self, "_python_import_roots", ())), visibility=visibility, index_surface=self._index_surface_for_path(rel))
+        derived_update = self.store.set_file(
+            rel,
+            artifact,
+            module_name=_module_name(rel, getattr(self, "_python_import_roots", ())),
+            visibility=visibility,
+            index_surface=self._index_surface_for_path(rel),
+        )
         state.persisted_file_writes += 1
         state.derived_changed += len(derived_update["changed_kinds"])
         state.derived_preserved += len(derived_update["preserved_kinds"])
@@ -804,19 +1015,34 @@ class IndexingLifecycleMixin:
         warnings: list[str],
     ) -> _SyncIndexState:
         """Persist repository evidence for the discovered surface in bounded batches."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         state = _SyncIndexState()
+
         def publish_persisted(committed: int) -> None:
-            self.store.set_meta_many({
-                "sync.persisted_file_writes": str(committed),
-                "sync.progress_unix": str(time.time()),
-            })
+            self.store.set_meta_many(
+                {
+                    "sync.persisted_file_writes": str(committed),
+                    "sync.progress_unix": str(time.time()),
+                }
+            )
+
         candidates: list[_DiscoveredFile] = []
         for item in discovered:
-            rel, path, language, visibility = item.rel, item.path, item.language, item.visibility
+            rel, path, language, visibility = (
+                item.rel,
+                item.path,
+                item.language,
+                item.visibility,
+            )
             state.present.add(rel)
             if self._sync_base_entry(
-                rel=rel, language=language, visibility=visibility, overlay_paths=overlay_paths,
-                base_snapshot_payload=base_snapshot_payload, state=state,
+                rel=rel,
+                language=language,
+                visibility=visibility,
+                overlay_paths=overlay_paths,
+                base_snapshot_payload=base_snapshot_payload,
+                state=state,
             ):
                 continue
             candidates.append(item)
@@ -843,10 +1069,21 @@ class IndexingLifecycleMixin:
         reuse_rows = self.store.file_reuse_rows(candidate_paths)
         with self.store.bulk_file_writes(batch_size=32, on_commit=publish_persisted):
             for item in candidates:
-                rel, path, language, visibility = item.rel, item.path, item.language, item.visibility
+                rel, path, language, visibility = (
+                    item.rel,
+                    item.path,
+                    item.language,
+                    item.visibility,
+                )
                 self._sync_index_file(
-                    rel=rel, path=path, language=language, visibility=visibility, warnings=warnings, state=state,
-                    digest=digests.get(rel), row=reuse_rows.get(rel),
+                    rel=rel,
+                    path=path,
+                    language=language,
+                    visibility=visibility,
+                    warnings=warnings,
+                    state=state,
+                    digest=digests.get(rel),
+                    row=reuse_rows.get(rel),
                 )
         return state
 
@@ -858,15 +1095,22 @@ class IndexingLifecycleMixin:
         warnings: list[str],
     ) -> tuple[int, str, int | None]:
         """Seal workspace and observation identities after repository rows are stable."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         fingerprint = self._workspace_fingerprint_from_store()
         if self.store.meta("workspace_fingerprint") != fingerprint:
             changed = True
-        generation = self.store.bump_generation() if changed else self.store.generation()
+        generation = (
+            self.store.bump_generation() if changed else self.store.generation()
+        )
         observation_after = self._daemon_observation()
-        identity_generation_after = None if observation_after is None else observation_after.generation
+        identity_generation_after = (
+            None if observation_after is None else observation_after.generation
+        )
         identity_generation = (
             identity_generation_before
-            if identity_generation_before is not None and identity_generation_before == identity_generation_after
+            if identity_generation_before is not None
+            and identity_generation_before == identity_generation_after
             else None
         )
         if (
@@ -874,9 +1118,14 @@ class IndexingLifecycleMixin:
             and identity_generation_after is not None
             and identity_generation_before != identity_generation_after
         ):
-            warnings.append("identity observation generation changed during CodeMap sync; freshness remains unproven")
+            warnings.append(
+                "identity observation generation changed during CodeMap sync; freshness remains unproven"
+            )
         self.store.set_meta("workspace_fingerprint", fingerprint)
-        self.store.set_meta("identity_generation", "" if identity_generation is None else str(identity_generation))
+        self.store.set_meta(
+            "identity_generation",
+            "" if identity_generation is None else str(identity_generation),
+        )
         self.store.set_meta("last_sync_unix", str(time.time()))
         self.store.set_meta("artifact_db", str(self.artifacts.db_path))
         return generation, fingerprint, identity_generation
@@ -889,20 +1138,29 @@ class IndexingLifecycleMixin:
         requested_paths: Sequence[str],
     ) -> None:
         """Refresh packaging-derived import roots without a second full repository walk."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if full:
-            pyprojects = tuple(item.path for item in discovered if item.rel.endswith("pyproject.toml"))
-            self._python_import_roots = _python_source_roots_from_pyprojects(self.workspace, pyprojects)
+            pyprojects = tuple(
+                item.path for item in discovered if item.rel.endswith("pyproject.toml")
+            )
+            self._python_import_roots = _python_source_roots_from_pyprojects(
+                self.workspace, pyprojects
+            )
             return
         if not any(rel.endswith("pyproject.toml") for rel in requested_paths):
             return
         # Packaging edits are rare. A targeted configuration sync must also notice
         # deleted project manifests, so rebuild roots from current repository manifests.
         pyprojects = tuple(
-            path for path in self.workspace.rglob("pyproject.toml")
+            path
+            for path in self.workspace.rglob("pyproject.toml")
             if not _is_pruned_relative_path(path.relative_to(self.workspace).as_posix())
             and not self._internal_path(path.relative_to(self.workspace).as_posix())
         )
-        self._python_import_roots = _python_source_roots_from_pyprojects(self.workspace, pyprojects)
+        self._python_import_roots = _python_source_roots_from_pyprojects(
+            self.workspace, pyprojects
+        )
 
     def _sync_expand_python_reprojection(
         self,
@@ -912,6 +1170,8 @@ class IndexingLifecycleMixin:
         previous_roots: Sequence[str],
     ) -> int:
         """Re-index persisted Python files whose import identity changed with packaging authority."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if full or tuple(previous_roots) == tuple(self._python_import_roots):
             return 0
         seen = {item.rel for item in discovered}
@@ -954,13 +1214,17 @@ class IndexingLifecycleMixin:
         # A semantic policy change changes both negative and positive admission.
         # Re-enter once without a path bound so newly denied rows retire and
         # newly admitted paths are discovered from the same authority cut.
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if self._refresh_context_policy():
             return self.sync()
         started = time.perf_counter()
         warnings: list[str] = []
         scope_removed = self._reconcile_persisted_analysis_scope()
         observation_before = self._daemon_observation()
-        identity_generation_before = None if observation_before is None else observation_before.generation
+        identity_generation_before = (
+            None if observation_before is None else observation_before.generation
+        )
         discovered, full, requested_paths = self._sync_discovery(paths, warnings)
         previous_python_import_roots = self._python_import_roots
         self._sync_refresh_python_import_roots(
@@ -971,47 +1235,80 @@ class IndexingLifecycleMixin:
         )
         preflight = self._preflight_from_discovered(discovered)
         cache_state = self._sync_begin_build(
-            discovered=discovered, full=full, requested_paths=requested_paths, preflight=preflight,
+            discovered=discovered,
+            full=full,
+            requested_paths=requested_paths,
+            preflight=preflight,
         )
-        base_identity, overlay_paths, base_snapshot_payload = self._sync_base_snapshot(full=full)
+        base_identity, overlay_paths, base_snapshot_payload = self._sync_base_snapshot(
+            full=full
+        )
         state = self._sync_index_discovered(
-            discovered=discovered, overlay_paths=overlay_paths,
-            base_snapshot_payload=base_snapshot_payload, warnings=warnings,
+            discovered=discovered,
+            overlay_paths=overlay_paths,
+            base_snapshot_payload=base_snapshot_payload,
+            warnings=warnings,
         )
         removed = reprojection_removed + self._sync_remove_stale_paths(
-            full=full, present=state.present, discovered=discovered, requested_paths=requested_paths,
+            full=full,
+            present=state.present,
+            discovered=discovered,
+            requested_paths=requested_paths,
         )
         generation, fingerprint, identity_generation = self._sync_finalize_identity(
             changed=state.changed or bool(removed),
-            identity_generation_before=identity_generation_before, warnings=warnings,
+            identity_generation_before=identity_generation_before,
+            warnings=warnings,
         )
         self._sync_write_base_snapshot(
-            full=full, base_identity=base_identity, overlay_paths=overlay_paths, skipped=state.skipped,
+            full=full,
+            base_identity=base_identity,
+            overlay_paths=overlay_paths,
+            skipped=state.skipped,
         )
         elapsed = time.perf_counter() - started
         source_bytes = int(preflight.get("source_bytes") or 0)
         economics = self._sync_economics(
-            cache_state=cache_state, elapsed=elapsed, discovered_count=len(discovered),
-            source_bytes=source_bytes, persisted_file_writes=state.persisted_file_writes,
+            cache_state=cache_state,
+            elapsed=elapsed,
+            discovered_count=len(discovered),
+            source_bytes=source_bytes,
+            persisted_file_writes=state.persisted_file_writes,
         )
-        self.store.set_meta_many({
-            "sync.build_state": "COMPLETE",
-            "sync.completed_unix": str(time.time()),
-            "sync.persisted_file_writes": str(state.persisted_file_writes),
-            "sync.economics": json.dumps(economics, sort_keys=True, separators=(",", ":")),
-        })
+        self.store.set_meta_many(
+            {
+                "sync.build_state": "COMPLETE",
+                "sync.completed_unix": str(time.time()),
+                "sync.persisted_file_writes": str(state.persisted_file_writes),
+                "sync.economics": json.dumps(
+                    economics, sort_keys=True, separators=(",", ":")
+                ),
+            }
+        )
         self._reverse_file_graph_cache = None
         return SyncResult(
-            generation=generation, discovered=len(discovered), indexed=state.indexed,
-            reused_artifacts=state.reused, parsed_artifacts=state.parsed, removed=scope_removed + removed,
-            skipped=state.skipped, parse_errors=state.parse_errors, seconds=elapsed,
-            workspace_fingerprint=fingerprint, identity_generation=identity_generation,
-            derived_surfaces_changed=state.derived_changed, derived_surfaces_preserved=state.derived_preserved,
-            semantic_invalidation_shields=state.semantic_shields, base_snapshot_reused=state.base_snapshot_reused,
-            base_identity=base_identity, overlay_paths=0 if overlay_paths is None else len(overlay_paths),
-            warnings=tuple(warnings), preflight=preflight, economics=economics, build_state="COMPLETE",
+            generation=generation,
+            discovered=len(discovered),
+            indexed=state.indexed,
+            reused_artifacts=state.reused,
+            parsed_artifacts=state.parsed,
+            removed=scope_removed + removed,
+            skipped=state.skipped,
+            parse_errors=state.parse_errors,
+            seconds=elapsed,
+            workspace_fingerprint=fingerprint,
+            identity_generation=identity_generation,
+            derived_surfaces_changed=state.derived_changed,
+            derived_surfaces_preserved=state.derived_preserved,
+            semantic_invalidation_shields=state.semantic_shields,
+            base_snapshot_reused=state.base_snapshot_reused,
+            base_identity=base_identity,
+            overlay_paths=0 if overlay_paths is None else len(overlay_paths),
+            warnings=tuple(warnings),
+            preflight=preflight,
+            economics=economics,
+            build_state="COMPLETE",
         )
-
 
     def derived_graph(self, path: str | None = None) -> dict[str, object]:
         """Expose dependency-tracked derived CodeMap surfaces for diagnostics.
@@ -1019,8 +1316,12 @@ class IndexingLifecycleMixin:
         Retrieval does not consume this graph yet; 0.10.8 records identities and
         dependencies only so later invalidation work has a measured foundation.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         self._ensure_map_ready()
-        normalized = None if path is None else normalize_relative_path(path, allow_root=False)
+        normalized = (
+            None if path is None else normalize_relative_path(path, allow_root=False)
+        )
         if normalized is not None:
             self._ensure_path_current(normalized)
         nodes = self.store.derived_nodes(normalized)
@@ -1031,8 +1332,9 @@ class IndexingLifecycleMixin:
             "nodes": nodes,
         }
 
-
     def clean(self, *, shared_artifacts: bool = False) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         workspace_before = self.store.clear()
         artifacts_removed = self.artifacts.clear() if shared_artifacts else 0
         return {
@@ -1043,7 +1345,6 @@ class IndexingLifecycleMixin:
             "shared_artifact_db": str(self.artifacts.db_path),
         }
 
-
     def watch_forever(self, *, debounce_seconds: float = 0.05, on_update=None) -> None:
         """Maintain CodeMap incrementally in a separate foreground process.
 
@@ -1051,11 +1352,9 @@ class IndexingLifecycleMixin:
         and performs a full reconciliation. Parser work stays outside the
         identity daemon and therefore outside identity's latency-critical path.
         """
-        import threading
-        import tomllib
-        from ..observation import ChangeTracker, ObservationState
-        from ..watcher import create_default_watcher
 
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         tracker = ChangeTracker()
         update_lock = threading.RLock()
 
@@ -1067,7 +1366,9 @@ class IndexingLifecycleMixin:
         def update(paths: list[str]) -> None:
             with update_lock:
                 before = tracker.snapshot()
-                result = self.sync(None if before.state is ObservationState.UNKNOWN else paths)
+                result = self.sync(
+                    None if before.state is ObservationState.UNKNOWN else paths
+                )
                 clean = tracker.mark_reconciled(expected_generation=before.generation)
                 publish_state("clean" if clean else "dirty")
                 if on_update is not None:
@@ -1108,7 +1409,9 @@ class IndexingLifecycleMixin:
                         if snapshot.state is ObservationState.UNKNOWN:
                             publish_state("reconciling")
                             result = self.sync()
-                            clean = tracker.mark_reconciled(expected_generation=snapshot.generation)
+                            clean = tracker.mark_reconciled(
+                                expected_generation=snapshot.generation
+                            )
                             publish_state("clean" if clean else "dirty")
                             if on_update is not None:
                                 on_update(result, [])
@@ -1122,10 +1425,11 @@ class IndexingLifecycleMixin:
             self.store.set_meta("watcher_heartbeat_unix", str(time.time()))
             self.store.set_meta("watcher_pid", "")
 
-
     def _generation_status(
         self, observation: RepositoryObservation | None = None
     ) -> tuple[int, int | None, bool | None]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         generation = self.store.generation()
         synced_raw = self.store.meta("identity_generation", "") or ""
         synced = None if not synced_raw else int(synced_raw)
@@ -1151,7 +1455,6 @@ class IndexingLifecycleMixin:
             return generation, synced, state != "clean"
         return generation, synced, None
 
-
     def _query_freshness_fields(self) -> dict[str, object]:
         """Project existing CodeMap freshness authority into query responses."""
         generation, identity_generation, stale = self._generation_status()
@@ -1161,8 +1464,9 @@ class IndexingLifecycleMixin:
             "stale": stale,
         }
 
-
     def status(self) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         generation, identity_generation, stale = self._generation_status()
         return {
             "schema": "hashmarks.codemap-status.v1",
@@ -1172,13 +1476,16 @@ class IndexingLifecycleMixin:
             "identity_generation_at_sync": identity_generation,
             "daemon_generation_changed": stale,
             "workspace_fingerprint": self.store.meta("workspace_fingerprint"),
-            "last_sync_unix": None if self.store.meta("last_sync_unix") is None else float(self.store.meta("last_sync_unix") or 0),
+            "last_sync_unix": None
+            if self.store.meta("last_sync_unix") is None
+            else float(self.store.meta("last_sync_unix") or 0),
             "artifact_db": str(self.artifacts.db_path),
             "artifact_count": self.artifacts.count(),
             "build": self._codemap_build_state(),
             "last_index_economics": (
                 json.loads(self.store.meta("sync.economics") or "null")
-                if self.store.meta("sync.economics") else None
+                if self.store.meta("sync.economics")
+                else None
             ),
             "precision_providers": [
                 self.range_provider.status().as_dict(),
@@ -1190,7 +1497,12 @@ class IndexingLifecycleMixin:
                     "detail": None,
                 },
                 *[
-                    {"name": provider.name, "available": provider.detect(self.workspace), "version": None, "detail": None}
+                    {
+                        "name": provider.name,
+                        "available": provider.detect(self.workspace),
+                        "version": None,
+                        "detail": None,
+                    }
                     for provider in self.project_graph_providers
                 ],
             ],
@@ -1198,14 +1510,17 @@ class IndexingLifecycleMixin:
             "watcher": {
                 "pid": self.store.meta("watcher_pid", "") or None,
                 "state": self.store.meta("watcher_state", "") or None,
-                "heartbeat_unix": None if not (self.store.meta("watcher_heartbeat_unix", "") or "") else float(self.store.meta("watcher_heartbeat_unix", "0") or 0),
+                "heartbeat_unix": None
+                if not (self.store.meta("watcher_heartbeat_unix", "") or "")
+                else float(self.store.meta("watcher_heartbeat_unix", "0") or 0),
             },
             **self.store.stats(),
         }
 
-
     def _indexed_path_current(self, relpath: str) -> bool:
         """Return whether durable file evidence still matches current workspace bytes."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         rel = normalize_relative_path(relpath, allow_root=False)
         row = self.store.file_row(rel)
         path = self.workspace / rel
@@ -1219,8 +1534,9 @@ class IndexingLifecycleMixin:
             return False
         return actual == str(row["file_digest"] or "")
 
-
     def _ensure_path_current(self, relpath: str) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         rel = normalize_relative_path(relpath, allow_root=False)
         row = self.store.file_row(rel)
         if not self._path_admitted_for_analysis(rel):
@@ -1243,9 +1559,21 @@ class IndexingLifecycleMixin:
         decision = self.policy.decide(rel)
         if language is None:
             return
-        digest = self.file_store.digest(path, workspace=self.workspace, relative_path=rel)
-        if row is not None and str(row["file_digest"]) == digest.hash and str(row["evidence_visibility"]) == decision.evidence_visibility.value:
+        digest = self.file_store.digest(
+            path, workspace=self.workspace, relative_path=rel
+        )
+        if (
+            row is not None
+            and str(row["file_digest"]) == digest.hash
+            and str(row["evidence_visibility"]) == decision.evidence_visibility.value
+        ):
             return
         artifact, _ = self._parse_or_reuse(rel, path, language, digest.hash)
-        self.store.set_file(rel, artifact, module_name=_module_name(rel, getattr(self, "_python_import_roots", ())), visibility=decision.evidence_visibility, index_surface=self._index_surface_for_path(rel))
+        self.store.set_file(
+            rel,
+            artifact,
+            module_name=_module_name(rel, getattr(self, "_python_import_roots", ())),
+            visibility=decision.evidence_visibility,
+            index_surface=self._index_surface_for_path(rel),
+        )
         self.store.bump_generation()

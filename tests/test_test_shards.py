@@ -1,27 +1,53 @@
 from __future__ import annotations
-from pathlib import Path
+
+from typing import TYPE_CHECKING
+
 import pytest
+
 from hashmarks.python_ast_cache import ast_cache_info, clear_ast_cache
 from hashmarks.test_shards import plan, select
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
 def _write(root: Path, name: str, body: str) -> None:
-    tests=root/'tests'; tests.mkdir(exist_ok=True); (tests/name).write_text(body,encoding='utf-8')
+    tests = root / "tests"
+    tests.mkdir(exist_ok=True)
+    (tests / name).write_text(body, encoding="utf-8")
+
 
 def test_plan_is_deterministic_complete_and_non_overlapping(tmp_path: Path) -> None:
-    _write(tmp_path,'test_a.py','def test_one(): pass\ndef test_two(): pass\n')
-    _write(tmp_path,'test_b.py','class TestGroup:\n def test_three(self): pass\n\ndef helper(): pass\n')
-    first=plan(tmp_path,2); second=plan(tmp_path,2); assert first==second
-    nodes=[n for row in first['shards'] for n in row['nodeids']]
-    assert sorted(nodes)==['tests/test_a.py::test_one','tests/test_a.py::test_two','tests/test_b.py::TestGroup::test_three']
-    assert len(nodes)==len(set(nodes)); assert first['plan_identity'].startswith('sha256:')
+    _write(tmp_path, "test_a.py", "def test_one(): pass\ndef test_two(): pass\n")
+    _write(
+        tmp_path,
+        "test_b.py",
+        "class TestGroup:\n def test_three(self): pass\n\ndef helper(): pass\n",
+    )
+    first = plan(tmp_path, 2)
+    second = plan(tmp_path, 2)
+    assert first == second
+    nodes = [n for row in first["shards"] for n in row["nodeids"]]
+    assert sorted(nodes) == [
+        "tests/test_a.py::test_one",
+        "tests/test_a.py::test_two",
+        "tests/test_b.py::TestGroup::test_three",
+    ]
+    assert len(nodes) == len(set(nodes))
+    assert first["plan_identity"].startswith("sha256:")
+
 
 def test_selector_returns_only_requested_shard(tmp_path: Path) -> None:
-    _write(tmp_path,'test_a.py','\n'.join(f'def test_{i}(): pass' for i in range(5)))
-    chosen=select(tmp_path,2,1); assert chosen; assert all(v.startswith('tests/test_a.py::test_') for v in chosen)
+    _write(tmp_path, "test_a.py", "\n".join(f"def test_{i}(): pass" for i in range(5)))
+    chosen = select(tmp_path, 2, 1)
+    assert chosen
+    assert all(v.startswith("tests/test_a.py::test_") for v in chosen)
+
 
 def test_selector_rejects_invalid_shard(tmp_path: Path) -> None:
-    _write(tmp_path,'test_a.py','def test_a(): pass\n')
-    with pytest.raises(ValueError,match='shard_index'): select(tmp_path,2,2)
+    _write(tmp_path, "test_a.py", "def test_a(): pass\n")
+    with pytest.raises(ValueError, match="shard_index"):
+        select(tmp_path, 2, 2)
 
 
 def test_process_sensitive_nodes_are_isolated(tmp_path: Path) -> None:
@@ -52,14 +78,17 @@ def test_expensive_benchmark_nodes_are_always_singleton_shards(tmp_path: Path) -
     tests = tmp_path / "tests"
     tests.mkdir()
     (tests / "test_agent_metrics_suite.py").write_text(
-        "\n".join([
-            "def test_blind_worker_ab_is_reproducible_and_scores_both_workers(): pass",
-            "def test_worker_behavior_ab_is_answer_blind_and_reproducible(): pass",
-            "def test_worker_inspection_ab_recovers_ambiguity_without_hidden_answers(): pass",
-            "def test_worker_multistep_ab_improves_edit_safety_and_preserves_verification(): pass",
-            "def test_worker_failed_verification_ab_recovers_without_hidden_answers(): pass",
-            "def test_ordinary_metrics_contract(): pass",
-        ]) + "\n",
+        "\n".join(
+            [
+                "def test_blind_worker_ab_is_reproducible_and_scores_both_workers(): pass",
+                "def test_worker_behavior_ab_is_answer_blind_and_reproducible(): pass",
+                "def test_worker_inspection_ab_recovers_ambiguity_without_hidden_answers(): pass",
+                "def test_worker_multistep_ab_improves_edit_safety_and_preserves_verification(): pass",
+                "def test_worker_failed_verification_ab_recovers_without_hidden_answers(): pass",
+                "def test_ordinary_metrics_contract(): pass",
+            ]
+        )
+        + "\n",
         encoding="utf-8",
     )
     payload = plan(tmp_path, 6)
@@ -67,10 +96,15 @@ def test_expensive_benchmark_nodes_are_always_singleton_shards(tmp_path: Path) -
     assert len(isolated) == 5
     assert all(len(row["nodeids"]) == 1 for row in isolated)
     isolated_nodes = {row["nodeids"][0] for row in isolated}
-    assert "tests/test_agent_metrics_suite.py::test_ordinary_metrics_contract" not in isolated_nodes
+    assert (
+        "tests/test_agent_metrics_suite.py::test_ordinary_metrics_contract"
+        not in isolated_nodes
+    )
 
 
-def test_expensive_benchmark_nodes_never_mix_with_ordinary_nodes(tmp_path: Path) -> None:
+def test_expensive_benchmark_nodes_never_mix_with_ordinary_nodes(
+    tmp_path: Path,
+) -> None:
     tests = tmp_path / "tests"
     tests.mkdir()
     (tests / "test_agent_metrics_suite.py").write_text(
@@ -85,10 +119,15 @@ def test_expensive_benchmark_nodes_never_mix_with_ordinary_nodes(tmp_path: Path)
         if row["isolated_process"]:
             assert len(row["nodeids"]) == 1
         else:
-            assert all("blind_worker_ab" not in node and "worker_behavior_ab" not in node for node in row["nodeids"])
+            assert all(
+                "blind_worker_ab" not in node and "worker_behavior_ab" not in node
+                for node in row["nodeids"]
+            )
 
 
-def test_plan_fails_closed_when_shard_count_cannot_preserve_singleton_isolation(tmp_path: Path) -> None:
+def test_plan_fails_closed_when_shard_count_cannot_preserve_singleton_isolation(
+    tmp_path: Path,
+) -> None:
     tests = tmp_path / "tests"
     tests.mkdir()
     (tests / "test_agent_metrics_suite.py").write_text(

@@ -21,8 +21,12 @@ def main(argv: list[str] | None = None) -> int:
         "result_authority": "external",
         "certification_authority": "external",
     }
-    print(json.dumps(payload, indent=2, sort_keys=True))
-    return 0 if all(row["result"]["valid"] == row["expected_valid"] for row in vectors) else 2
+    print(json.dumps(payload, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+    return (
+        0
+        if all(row["result"]["valid"] == row["expected_valid"] for row in vectors)
+        else 2
+    )
 
 
 if __name__ == "__main__":

@@ -1,3 +1,5 @@
+# Imports below follow the standalone script path bootstrap.
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -16,8 +18,15 @@ if str(_REPO_ROOT) not in sys.path:
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from hashmarks.codemap import CodeMap
-from .metrics_blind_worker_ab import _load_corpus, _public_tasks, _sha256_bytes, materialize_challenge
+from hashmarks.codemap import (
+    CodeMap,
+)
+
+from .metrics_blind_worker_ab import (
+    _load_corpus,
+    _sha256_bytes,
+    materialize_challenge,
+)
 
 SCHEMA = "hashmarks.worker-behavior-ab.v1"
 PROTOCOL_SCHEMA = "hashmarks.worker-behavior-ab-protocol.v1"
@@ -25,11 +34,15 @@ FAMILY = "hashmarks-v0.10.37-worker-behavior-a"
 
 
 def _identity(value: object) -> str:
-    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    payload = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
     return "sha256:" + hashlib.sha256(payload).hexdigest()
 
 
-def _entry_state(source: Path | CodeMap, query: str, *, limit: int) -> dict[str, object]:
+def _entry_state(
+    source: Path | CodeMap, query: str, *, limit: int
+) -> dict[str, object]:
     if isinstance(source, CodeMap):
         value = source.task_entry_points(query, limit=limit)
     else:
@@ -44,11 +57,13 @@ def _entry_state(source: Path | CodeMap, query: str, *, limit: int) -> dict[str,
     for row in ambiguity.get("alternatives", []):
         if not isinstance(row, dict):
             continue
-        alternatives.append({
-            "role": row.get("role"),
-            "path": row.get("path"),
-            "canonical_rank": row.get("canonical_rank"),
-        })
+        alternatives.append(
+            {
+                "role": row.get("role"),
+                "path": row.get("path"),
+                "canonical_rank": row.get("canonical_rank"),
+            }
+        )
     return {
         "first_path": str(recommended[0].get("path") or "") if recommended else None,
         "first_role": recommended[0].get("role") if recommended else None,
@@ -59,7 +74,9 @@ def _entry_state(source: Path | CodeMap, query: str, *, limit: int) -> dict[str,
     }
 
 
-def run_worker(*, policy: str, workspace: Path, tasks_path: Path, output: Path, limit: int) -> None:
+def run_worker(
+    *, policy: str, workspace: Path, tasks_path: Path, output: Path, limit: int
+) -> None:
     payload = json.loads(tasks_path.read_text(encoding="utf-8"))
     if payload.get("schema") != "hashmarks.blind-worker-tasks.v1":
         raise ValueError("unsupported public task input")
@@ -87,24 +104,36 @@ def run_worker(*, policy: str, workspace: Path, tasks_path: Path, output: Path, 
                     target = state["first_path"]
             else:
                 raise ValueError(f"unsupported policy: {policy}")
-            rows.append({
-                "id": task_id,
-                "query": query,
-                "action": action,
-                "target": target,
-                "first_role": state["first_role"],
-                "ambiguous": state["ambiguous"],
-                "ambiguity_reason": state["ambiguity_reason"],
-                "ambiguity_roles": state["ambiguity_roles"],
-                "alternatives": state["alternatives"],
-            })
-    result = {"schema": "hashmarks.worker-behavior-output.v1", "policy": policy, "tasks": rows}
+            rows.append(
+                {
+                    "id": task_id,
+                    "query": query,
+                    "action": action,
+                    "target": target,
+                    "first_role": state["first_role"],
+                    "ambiguous": state["ambiguous"],
+                    "ambiguity_reason": state["ambiguity_reason"],
+                    "ambiguity_roles": state["ambiguity_roles"],
+                    "alternatives": state["alternatives"],
+                }
+            )
+    result = {
+        "schema": "hashmarks.worker-behavior-output.v1",
+        "policy": policy,
+        "tasks": rows,
+    }
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _score(tasks: list[dict[str, Any]], output: dict[str, Any]) -> dict[str, object]:
-    by_id = {str(row.get("id") or ""): row for row in output.get("tasks", []) if isinstance(row, dict)}
+    by_id = {
+        str(row.get("id") or ""): row
+        for row in output.get("tasks", [])
+        if isinstance(row, dict)
+    }
     rows = []
     for task in tasks:
         task_id = str(task.get("id") or task.get("query") or "")
@@ -116,19 +145,27 @@ def _score(tasks: list[dict[str, Any]], output: dict[str, Any]) -> dict[str, obj
         correct_edit = edited and str(target) in expected
         wrong_edit = edited and not correct_edit
         inspection = action == "inspect-competing-evidence"
-        rows.append({
-            "id": task_id,
-            "query": str(task.get("query") or ""),
-            "expected_files": sorted(expected),
-            "action": action,
-            "target": target,
-            "correct_immediate_edit": correct_edit,
-            "unsafe_wrong_first_edit": wrong_edit,
-            "inspection": inspection,
-            "ambiguous": bool(observed.get("ambiguous")) if isinstance(observed, dict) else False,
-            "ambiguity_roles": list(observed.get("ambiguity_roles") or []) if isinstance(observed, dict) else [],
-            "alternatives": list(observed.get("alternatives") or []) if isinstance(observed, dict) else [],
-        })
+        rows.append(
+            {
+                "id": task_id,
+                "query": str(task.get("query") or ""),
+                "expected_files": sorted(expected),
+                "action": action,
+                "target": target,
+                "correct_immediate_edit": correct_edit,
+                "unsafe_wrong_first_edit": wrong_edit,
+                "inspection": inspection,
+                "ambiguous": bool(observed.get("ambiguous"))
+                if isinstance(observed, dict)
+                else False,
+                "ambiguity_roles": list(observed.get("ambiguity_roles") or [])
+                if isinstance(observed, dict)
+                else [],
+                "alternatives": list(observed.get("alternatives") or [])
+                if isinstance(observed, dict)
+                else [],
+            }
+        )
     count = len(rows)
     wrong = sum(bool(row["unsafe_wrong_first_edit"]) for row in rows)
     correct = sum(bool(row["correct_immediate_edit"]) for row in rows)
@@ -157,26 +194,49 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
             env = dict(os.environ)
             source_root = str(_REPO_ROOT)
             prior = env.get("PYTHONPATH")
-            env["PYTHONPATH"] = source_root if not prior else source_root + os.pathsep + prior
-            subprocess.run([
-                sys.executable, "-m", "scripts.agent_evaluation.metrics_worker_behavior_ab", "--worker", "--policy", policy,
-                "--workspace", str(workspace), "--tasks", str(public_path), "--output", str(output),
-                "--limit", str(limit),
-            ], check=True, env=env)
+            env["PYTHONPATH"] = (
+                source_root if not prior else source_root + os.pathsep + prior
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "scripts.agent_evaluation.metrics_worker_behavior_ab",
+                    "--worker",
+                    "--policy",
+                    policy,
+                    "--workspace",
+                    str(workspace),
+                    "--tasks",
+                    str(public_path),
+                    "--output",
+                    str(output),
+                    "--limit",
+                    str(limit),
+                ],
+                check=True,
+                env=env,
+            )
             outputs[policy] = output
 
         # Hidden expectations are opened only after both policy workers have exited.
         hidden = _load_corpus(corpus)
-        direct = _score(hidden, json.loads(outputs["direct-edit"].read_text(encoding="utf-8")))
-        gated = _score(hidden, json.loads(outputs["uncertainty-gated"].read_text(encoding="utf-8")))
-        reports.append({
-            "name": name,
-            "workspace": str(workspace),
-            "public_task_sha256": _sha256_bytes(public_path.read_bytes()),
-            "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
-            "direct_edit": direct,
-            "uncertainty_gated": gated,
-        })
+        direct = _score(
+            hidden, json.loads(outputs["direct-edit"].read_text(encoding="utf-8"))
+        )
+        gated = _score(
+            hidden, json.loads(outputs["uncertainty-gated"].read_text(encoding="utf-8"))
+        )
+        reports.append(
+            {
+                "name": name,
+                "workspace": str(workspace),
+                "public_task_sha256": _sha256_bytes(public_path.read_bytes()),
+                "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
+                "direct_edit": direct,
+                "uncertainty_gated": gated,
+            }
+        )
 
     def total(policy: str, key: str) -> int:
         return sum(int(repo[policy]["summary"][key]) for repo in reports)  # type: ignore[index]
@@ -198,7 +258,11 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
         "uncertainty_action": "inspect-competing-evidence",
         "limit": limit,
         "repositories": [
-            {"name": repo["name"], "public_task_sha256": repo["public_task_sha256"], "hidden_corpus_sha256": repo["hidden_corpus_sha256"]}
+            {
+                "name": repo["name"],
+                "public_task_sha256": repo["public_task_sha256"],
+                "hidden_corpus_sha256": repo["hidden_corpus_sha256"],
+            }
             for repo in reports
         ],
     }
@@ -210,18 +274,28 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
             "repositories": len(reports),
             "tasks": tasks,
             "direct_correct_immediate_edits": direct_correct,
-            "direct_correct_immediate_edit_rate": direct_correct / tasks if tasks else 0.0,
+            "direct_correct_immediate_edit_rate": direct_correct / tasks
+            if tasks
+            else 0.0,
             "direct_unsafe_wrong_first_edits": direct_wrong,
-            "direct_unsafe_wrong_first_edit_rate": direct_wrong / tasks if tasks else 0.0,
+            "direct_unsafe_wrong_first_edit_rate": direct_wrong / tasks
+            if tasks
+            else 0.0,
             "gated_correct_immediate_edits": gated_correct,
-            "gated_correct_immediate_edit_rate": gated_correct / tasks if tasks else 0.0,
+            "gated_correct_immediate_edit_rate": gated_correct / tasks
+            if tasks
+            else 0.0,
             "gated_unsafe_wrong_first_edits": gated_wrong,
             "gated_unsafe_wrong_first_edit_rate": gated_wrong / tasks if tasks else 0.0,
             "gated_inspections": inspections,
             "gated_inspection_rate": inspections / tasks if tasks else 0.0,
             "unsafe_wrong_first_edits_prevented": prevented,
-            "unsafe_wrong_first_edit_reduction": (prevented / direct_wrong) if direct_wrong else 1.0,
-            "extra_inspections_per_prevented_wrong_edit": (inspections / prevented) if prevented else None,
+            "unsafe_wrong_first_edit_reduction": (prevented / direct_wrong)
+            if direct_wrong
+            else 1.0,
+            "extra_inspections_per_prevented_wrong_edit": (inspections / prevented)
+            if prevented
+            else None,
             "correct_immediate_edits_deferred": max(0, direct_correct - gated_correct),
         },
         "repositories": reports,
@@ -229,7 +303,9 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Measure whether uncertainty changes worker first-action safety")
+    parser = argparse.ArgumentParser(
+        description="Measure whether uncertainty changes worker first-action safety"
+    )
     parser.add_argument("--worker", action="store_true")
     parser.add_argument("--policy", choices=["direct-edit", "uncertainty-gated"])
     parser.add_argument("--workspace", type=Path)
@@ -239,9 +315,20 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=20)
     args = parser.parse_args()
     if args.worker:
-        if args.policy is None or args.workspace is None or args.tasks is None or args.output is None:
+        if (
+            args.policy is None
+            or args.workspace is None
+            or args.tasks is None
+            or args.output is None
+        ):
             parser.error("worker mode requires --policy --workspace --tasks --output")
-        run_worker(policy=args.policy, workspace=args.workspace, tasks_path=args.tasks, output=args.output, limit=args.limit)
+        run_worker(
+            policy=args.policy,
+            workspace=args.workspace,
+            tasks_path=args.tasks,
+            output=args.output,
+            limit=args.limit,
+        )
         return
     if args.root is None:
         parser.error("benchmark mode requires --root")
@@ -250,7 +337,7 @@ def main() -> None:
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)
+    print(rendered)  # noqa: T201 - intentional command output
 
 
 if __name__ == "__main__":

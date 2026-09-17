@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -10,7 +9,9 @@ def _text(path: str) -> str:
 
 def test_root_readme_is_a_current_product_landing_page() -> None:
     readme = _text("README.md")
-    assert readme.startswith("# Hashmarks — Repository intelligence and a local MCP server for coding agents\n")
+    assert readme.startswith(
+        "# Hashmarks — Repository intelligence and a local MCP server for coding agents\n"
+    )
     assert "Current package version: **0.14.0**" in readme
     for section in (
         "## Why Hashmarks",
@@ -54,8 +55,12 @@ def test_public_docs_separate_current_contracts_from_history() -> None:
     assert "historical development evidence" in docs
     assert (ROOT / "docs/development/HISTORICAL_RELEASE_NOTES.md").is_file()
     assert (ROOT / "docs/development/HISTORICAL_OH_GOON_INTEGRATION_NOTES.md").is_file()
-    assert "Historical, non-normative record." in _text("docs/development/HISTORICAL_RELEASE_NOTES.md")
-    assert "Historical, non-normative record." in _text("docs/development/HISTORICAL_OH_GOON_INTEGRATION_NOTES.md")
+    assert "Historical, non-normative record." in _text(
+        "docs/development/HISTORICAL_RELEASE_NOTES.md"
+    )
+    assert "Historical, non-normative record." in _text(
+        "docs/development/HISTORICAL_OH_GOON_INTEGRATION_NOTES.md"
+    )
 
 
 def test_github_entry_points_exist() -> None:
@@ -78,32 +83,6 @@ def test_current_integration_contract_is_not_version_pinned() -> None:
     assert "## v0.10." not in integration
 
 
-def test_public_ci_separates_release_qualification_and_tool_compatibility() -> None:
-    workflow = _text(".github/workflows/ci.yml")
-    assert "release-environment:" in workflow
-    assert "uv sync --group test" in workflow
-    assert "uv sync --frozen --group test" not in workflow
-    assert "pytest-compatibility:" in workflow
-    assert 'pytest: "pytest==8.4.0"' in workflow
-    assert 'pytest: "pytest>=8.4"' in workflow
-    assert "ruff-compatibility:" in workflow
-    assert 'ruff: "ruff==0.12.0"' in workflow
-    assert 'ruff: "ruff>=0.12"' in workflow
-    assert 'version: "0.10.0"' in workflow
-
-
-def test_qualification_tool_compatibility_is_publicly_documented() -> None:
-    docs = _text("docs/qualification/TOOL_COMPATIBILITY.md")
-    assert "minimum supported tool versions" in docs
-    assert "local, generated dependency-resolution state" in docs
-    assert "not committed, packaged, or treated as release identity" in docs
-    assert "pytest >=8.4" in docs
-    assert "Ruff >=0.12" in docs
-    assert "does **not inherit Ruff's default rule selection**" in docs
-    assert "Qualification tool compatibility" in _text("README.md")
-    assert "qualification/TOOL_COMPATIBILITY.md" in _text("docs/README.md")
-
-
 def test_public_release_contract_documents_stability_and_changelog() -> None:
     readme = _text("README.md")
     docs = _text("docs/README.md")
@@ -119,7 +98,9 @@ def test_public_release_contract_documents_stability_and_changelog() -> None:
     assert "agent-loop" in changelog
 
 
-def test_publication_root_moves_agent_evaluation_corpora_out_of_product_surface() -> None:
+def test_publication_root_moves_agent_evaluation_corpora_out_of_product_surface() -> (
+    None
+):
     for old_root in (
         "baseline",
         "challenge",
@@ -150,14 +131,28 @@ def test_public_onboarding_leads_with_installed_package_not_source_checkout() ->
     assert "pip install hashmarks" in readme
     assert readme.index("pip install hashmarks") < readme.index("make init")
     assert "pip install hashmarks" in getting_started
-    assert getting_started.index("pip install hashmarks") < getting_started.index("make init")
+    assert getting_started.index("pip install hashmarks") < getting_started.index(
+        "make init"
+    )
     assert "Git and `uv` are development/qualification tools" in getting_started
 
 
 def test_agent_evaluation_executables_are_isolated_from_product_script_root() -> None:
     root_scripts = {path.name for path in (ROOT / "scripts").glob("*.py")}
-    forbidden_fragments = ("agent", "codex", "worker", "swarm", "scout", "full_edit", "harness_run")
-    leaked = sorted(name for name in root_scripts if any(fragment in name for fragment in forbidden_fragments))
+    forbidden_fragments = (
+        "agent",
+        "codex",
+        "worker",
+        "swarm",
+        "scout",
+        "full_edit",
+        "harness_run",
+    )
+    leaked = sorted(
+        name
+        for name in root_scripts
+        if any(fragment in name for fragment in forbidden_fragments)
+    )
     assert leaked == []
     evaluation_root = ROOT / "scripts" / "agent_evaluation"
     assert (evaluation_root / "metrics_agent.py").is_file()
@@ -181,7 +176,9 @@ def test_normative_invariants_exclude_prepublic_agent_execution_history() -> Non
     ):
         assert historical_term not in current
         assert historical_term in historical
-    assert "PB6. Hashmarks must never become the agent or the execution motor." in current
+    assert (
+        "PB6. Hashmarks must never become the agent or the execution motor." in current
+    )
     assert "PB7. Interoperability transfers evidence, never authority." in current
 
 
@@ -201,7 +198,13 @@ def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None
     assert "Apache License 2.0" in readme
     assert "integration/MCP.md" in docs
     assert "only five tools" in mcp
-    for tool in ("repository_context", "find", "task_evidence", "change_impact", "post_change"):
+    for tool in (
+        "repository_context",
+        "find",
+        "task_evidence",
+        "change_impact",
+        "post_change",
+    ):
         assert f"`{tool}`" in mcp
     assert "does not add planning, editing, shell execution" in mcp
     assert "`opencode.json`" in mcp

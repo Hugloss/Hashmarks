@@ -3,11 +3,19 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from hashlib import sha256
-from pathlib import Path
-from typing import Iterable, Iterator
+from typing import TYPE_CHECKING
 
 from .digest import encode_field
-from .paths import canonical_host_path, has_glob, normalize_relative_path, normalize_relative_pattern
+from .paths import (
+    canonical_host_path,
+    has_glob,
+    normalize_relative_path,
+    normalize_relative_pattern,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+    from pathlib import Path
 
 _MANIFEST_DOMAIN = b"fastidentity.input-manifest.v1\0"
 
@@ -42,7 +50,7 @@ class InputManifest:
         patterns: Iterable[str],
         *,
         require_matches: bool = True,
-    ) -> "InputManifest":
+    ) -> InputManifest:
         root = canonical_host_path(workspace)
         paths = resolve_inputs(
             root,

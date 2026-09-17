@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from hashmarks.codemap import CodeMap
 from hashmarks.cli import main
+from hashmarks.codemap import CodeMap
 
 
 def _write_package(repo, *, loader_path="scripts/research.py", register=False):
@@ -52,7 +52,8 @@ def test_import_ownership_does_not_flag_normal_package_import(tmp_path):
     (tmp_path / "scripts" / "__init__.py").write_text("", encoding="utf-8")
     (tmp_path / "scripts" / "helper.py").write_text("CACHE = {}\n", encoding="utf-8")
     (tmp_path / "scripts" / "research.py").write_text(
-        "from scripts import helper\n\ndef get():\n    return helper.CACHE\n", encoding="utf-8"
+        "from scripts import helper\n\ndef get():\n    return helper.CACHE\n",
+        encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()

@@ -9,26 +9,49 @@ from pathlib import Path
 from typing import Any
 
 from hashmarks.codemap import CodeMap
-from scripts.agent_evaluation.decision_qa import evaluate_decision_packet, summarize_decision_qa
+from scripts.agent_evaluation.decision_qa import (
+    evaluate_decision_packet,
+    summarize_decision_qa,
+)
 
 
 def _sha(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def run(repo: Path, public_path: Path, secret_path: Path, output: Path, *, token_budget: int = 512) -> dict[str, Any]:
+def run(
+    repo: Path,
+    public_path: Path,
+    secret_path: Path,
+    output: Path,
+    *,
+    token_budget: int = 512,
+) -> dict[str, Any]:
     public = json.loads(public_path.read_text(encoding="utf-8"))
     tasks = public.get("tasks")
-    if not isinstance(tasks, list) or not tasks or any(set(row) != {"id", "query"} for row in tasks):
+    if (
+        not isinstance(tasks, list)
+        or not tasks
+        or any(set(row) != {"id", "query"} for row in tasks)
+    ):
         raise ValueError("PUBLIC tasks must contain exactly id/query")
     started = time.perf_counter()
     frozen: list[dict[str, Any]] = []
     with CodeMap(repo) as codemap:
-        sync_started = time.perf_counter(); codemap.sync(); sync_ms = (time.perf_counter() - sync_started) * 1000
+        sync_started = time.perf_counter()
+        codemap.sync()
+        sync_ms = (time.perf_counter() - sync_started) * 1000
         for task in tasks:
-            packet = codemap.task_decision_packet(str(task["query"]), token_budget=token_budget)
+            packet = codemap.task_decision_packet(
+                str(task["query"]), token_budget=token_budget
+            )
             frozen.append({"id": str(task["id"]), "packet": packet})
-    frozen_identity = "sha256:" + hashlib.sha256(json.dumps(frozen, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    frozen_identity = (
+        "sha256:"
+        + hashlib.sha256(
+            json.dumps(frozen, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+    )
 
     # SECRET is opened only after every worker packet has been frozen.
     secret = json.loads(secret_path.read_text(encoding="utf-8"))
@@ -57,7 +80,8 @@ def run(repo: Path, public_path: Path, secret_path: Path, output: Path, *, token
             "discrimination_needed": grade["discrimination_needed"],
             "safe": bool(safe_packet),
         }
-        graded.append(row); categories[row["category"]].append(row)
+        graded.append(row)
+        categories[row["category"]].append(row)
     summary = summarize_decision_qa(graded)
     category_summary = {}
     for name, rows in sorted(categories.items()):
@@ -80,12 +104,18 @@ def run(repo: Path, public_path: Path, secret_path: Path, output: Path, *, token
             "secret_sha256": _sha(secret_path),
             "frozen_packets_identity": frozen_identity,
         },
-        "summary": {**summary, "sync_ms": sync_ms, "wall_ms": (time.perf_counter() - started) * 1000},
+        "summary": {
+            **summary,
+            "sync_ms": sync_ms,
+            "wall_ms": (time.perf_counter() - started) * 1000,
+        },
         "categories": category_summary,
         "results": graded,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return payload
 
 
@@ -97,8 +127,16 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--token-budget", type=int, default=512)
     args = parser.parse_args()
-    result = run(args.repo, args.public, args.secret, args.output, token_budget=args.token_budget)
-    print(json.dumps({"summary": result["summary"], "categories": result["categories"]}, indent=2, sort_keys=True))
+    result = run(
+        args.repo, args.public, args.secret, args.output, token_budget=args.token_budget
+    )
+    print(  # noqa: T201 - intentional command output
+        json.dumps(
+            {"summary": result["summary"], "categories": result["categories"]},
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":

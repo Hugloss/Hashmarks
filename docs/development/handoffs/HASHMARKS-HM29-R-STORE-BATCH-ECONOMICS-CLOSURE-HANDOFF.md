@@ -21,4 +21,3 @@ NO CHANGE; retain batched store ownership and avoid row-at-a-time regression.
 - scale selection correctness: **4/4**
 - unsafe regressions: **0**
 - 501-surface action sample: **293.26 ms**
-

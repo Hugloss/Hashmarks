@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import threading
 import time
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _repo(root: Path) -> str:
@@ -13,7 +16,9 @@ def _repo(root: Path) -> str:
     (root / "tests").mkdir()
     (root / "src" / "__init__.py").write_text("")
     (root / "src" / "case" / "__init__.py").write_text("")
-    (root / "src" / "case" / "engine.py").write_text("def ember(v): return v + '-old'\n")
+    (root / "src" / "case" / "engine.py").write_text(
+        "def ember(v): return v + '-old'\n"
+    )
     (root / "src" / "case" / "route.py").write_text(
         "from .engine import ember\ndef handle(v): return ember(v)\n"
     )
@@ -21,17 +26,25 @@ def _repo(root: Path) -> str:
         "from src.case.route import handle\ndef test_ember(): assert handle('x') == 'x-new'\n"
     )
     (root / "tests" / "test_other.py").write_text("def test_other(): assert True\n")
-    (root / "pyproject.toml").write_text("[tool.pytest.ini_options]\npythonpath=['.']\n")
+    (root / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\npythonpath=['.']\n"
+    )
     return "Fix ember implementation and verify behavior"
 
 
 def _row_key(row: dict[str, object]) -> tuple[str, str | None]:
     kind = str(row["kind"])
-    member = str(row["member"]) if kind == "negative-verification-evidence" and row.get("member") is not None else None
+    member = (
+        str(row["member"])
+        if kind == "negative-verification-evidence" and row.get("member") is not None
+        else None
+    )
     return kind, member
 
 
-def _by_key(freshness: dict[str, object]) -> dict[tuple[str, str | None], dict[str, object]]:
+def _by_key(
+    freshness: dict[str, object],
+) -> dict[tuple[str, str | None], dict[str, object]]:
     return {_row_key(row): row for row in freshness["entries"]}
 
 
@@ -40,7 +53,9 @@ def test_freshness_map_is_derived_bounded_repository_truth(tmp_path: Path) -> No
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         freshness = codemap.evidence_freshness_map(
-            task, ["src/case/engine.py"], negative_members=["tests/test_other.py"],
+            task,
+            ["src/case/engine.py"],
+            negative_members=["tests/test_other.py"],
         )
 
     entries = _by_key(freshness)
@@ -66,12 +81,18 @@ def test_prior_map_invalidates_only_changed_evidence_identity(tmp_path: Path) ->
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         before = codemap.evidence_freshness_map(
-            task, ["src/case/engine.py"], negative_members=["tests/test_other.py"],
+            task,
+            ["src/case/engine.py"],
+            negative_members=["tests/test_other.py"],
         )
-        (tmp_path / "src" / "case" / "engine.py").write_text("def ember(v): return v + '-new'\n")
+        (tmp_path / "src" / "case" / "engine.py").write_text(
+            "def ember(v): return v + '-new'\n"
+        )
         codemap.sync()
         after = codemap.evidence_freshness_map(
-            task, ["src/case/engine.py"], negative_members=["tests/test_other.py"],
+            task,
+            ["src/case/engine.py"],
+            negative_members=["tests/test_other.py"],
             previous_map=before,
         )
 
@@ -79,7 +100,10 @@ def test_prior_map_invalidates_only_changed_evidence_identity(tmp_path: Path) ->
     assert prior[("impact", None)]["state"] == "invalidated"
     assert prior[("ownership", None)]["state"] == "current"
     assert prior[("verification-membership", None)]["state"] == "current"
-    assert prior[("negative-verification-evidence", "tests/test_other.py")]["state"] == "current"
+    assert (
+        prior[("negative-verification-evidence", "tests/test_other.py")]["state"]
+        == "current"
+    )
 
 
 def test_selected_member_invalidates_prior_negative_claim(tmp_path: Path) -> None:
@@ -87,7 +111,9 @@ def test_selected_member_invalidates_prior_negative_claim(tmp_path: Path) -> Non
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         freshness = codemap.evidence_freshness_map(
-            task, ["src/case/engine.py"], negative_members=["tests/test_ember.py"],
+            task,
+            ["src/case/engine.py"],
+            negative_members=["tests/test_ember.py"],
         )
 
     row = _by_key(freshness)[("negative-verification-evidence", "tests/test_ember.py")]
@@ -107,13 +133,17 @@ def test_cross_repository_freshness_is_dependency_bound(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
-        freshness = codemap.evidence_freshness_map("backend value change", ["backend/value.ts"])
+        freshness = codemap.evidence_freshness_map(
+            "backend value change", ["backend/value.ts"]
+        )
 
     rows = _by_key(freshness)
     cross = rows[("cross-repository", None)]
     assert cross["state"] == "dependent"
     assert cross["dependency_state"] == "current"
-    assert any(row["producer"] == "declared-project-links" for row in cross["dependencies"])
+    assert any(
+        row["producer"] == "declared-project-links" for row in cross["dependencies"]
+    )
 
 
 def _wait(client: CodeMapServiceClient) -> None:
@@ -136,7 +166,10 @@ def test_service_exposes_freshness_map(tmp_path: Path) -> None:
     _wait(client)
     try:
         freshness = client.repository_intelligence_query(
-            "freshness", task, ["src/case/engine.py"], negative_members=["tests/test_other.py"],
+            "freshness",
+            task,
+            ["src/case/engine.py"],
+            negative_members=["tests/test_other.py"],
         )["result"]
         assert freshness["schema"] == "hashmarks.evidence-freshness-map.v1"
     finally:
@@ -144,44 +177,61 @@ def test_service_exposes_freshness_map(tmp_path: Path) -> None:
         thread.join(timeout=5)
 
 
-def test_negative_evidence_invalidates_when_reference_evidence_changes(tmp_path: Path) -> None:
+def test_negative_evidence_invalidates_when_reference_evidence_changes(
+    tmp_path: Path,
+) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         before = codemap.evidence_freshness_map(
-            task, ["src/case/engine.py"], negative_members=["tests/test_other.py"],
+            task,
+            ["src/case/engine.py"],
+            negative_members=["tests/test_other.py"],
         )
         (tmp_path / "tests" / "test_other.py").write_text(
             "from src.case.route import handle\ndef test_other(): assert handle('x')\n"
         )
         codemap.sync()
         after = codemap.evidence_freshness_map(
-            task, ["src/case/engine.py"], negative_members=["tests/test_other.py"],
+            task,
+            ["src/case/engine.py"],
+            negative_members=["tests/test_other.py"],
             previous_map=before,
         )
 
     prior = {_row_key(row): row for row in after["prior"]}
-    assert prior[("negative-verification-evidence", "tests/test_other.py")]["state"] == "invalidated"
+    assert (
+        prior[("negative-verification-evidence", "tests/test_other.py")]["state"]
+        == "invalidated"
+    )
 
 
-def test_cross_repository_prior_invalidates_on_declared_dependency_change(tmp_path: Path) -> None:
+def test_cross_repository_prior_invalidates_on_declared_dependency_change(
+    tmp_path: Path,
+) -> None:
     for name in ("backend", "frontend", "mobile"):
         (tmp_path / name).mkdir()
         (tmp_path / name / "package.json").write_text(f'{{"name":"{name}"}}')
     (tmp_path / "backend" / "value.ts").write_text("export const value = 1\n")
     links = tmp_path / ".hashmarks-project-links.toml"
-    links.write_text("[[link]]\nsource='npm:frontend'\ntarget='npm:backend'\nkind='consumer'\n")
+    links.write_text(
+        "[[link]]\nsource='npm:frontend'\ntarget='npm:backend'\nkind='consumer'\n"
+    )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
-        before = codemap.evidence_freshness_map("backend value change", ["backend/value.ts"])
+        before = codemap.evidence_freshness_map(
+            "backend value change", ["backend/value.ts"]
+        )
         links.write_text(
             "[[link]]\nsource='npm:frontend'\ntarget='npm:backend'\nkind='consumer'\n"
             "[[link]]\nsource='npm:mobile'\ntarget='npm:backend'\nkind='consumer'\n"
         )
         codemap.sync()
         after = codemap.evidence_freshness_map(
-            "backend value change", ["backend/value.ts"], previous_map=before,
+            "backend value change",
+            ["backend/value.ts"],
+            previous_map=before,
         )
 
     prior = {_row_key(row): row for row in after["prior"]}

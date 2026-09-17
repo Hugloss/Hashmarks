@@ -57,11 +57,13 @@ def producer_implementation_provenance(
     inputs: list[dict[str, object]] = []
     for path in files:
         data = path.read_bytes()
-        inputs.append({
-            "path": path.relative_to(root).as_posix(),
-            "bytes": len(data),
-            "content_sha256": "sha256:" + hashlib.sha256(data).hexdigest(),
-        })
+        inputs.append(
+            {
+                "path": path.relative_to(root).as_posix(),
+                "bytes": len(data),
+                "content_sha256": "sha256:" + hashlib.sha256(data).hexdigest(),
+            }
+        )
     return {
         "schema": PRODUCER_IDENTITY_PROVENANCE_SCHEMA,
         "authority": "non-authoritative-explanation",

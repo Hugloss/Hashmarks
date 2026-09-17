@@ -76,7 +76,9 @@ def _events() -> list[dict[str, object]]:
     ]
 
 
-def test_claude_event_validation_requires_connected_model_visible_tools_and_results() -> None:
+def test_claude_event_validation_requires_connected_model_visible_tools_and_results() -> (
+    None
+):
     result = claude_gate._validate_events(_events())
     assert set(result) == set(claude_gate.EXPECTED)
 
@@ -86,7 +88,9 @@ def test_claude_connected_but_tools_not_model_visible_is_environment_blocked() -
     init = events[0]
     assert isinstance(init, dict)
     init["tools"] = []
-    with pytest.raises(claude_gate.HostGateEnvironmentBlocked, match="model-visible catalog"):
+    with pytest.raises(
+        claude_gate.HostGateEnvironmentBlocked, match="model-visible catalog"
+    ):
         claude_gate._validate_events(events)
 
 
@@ -95,7 +99,11 @@ def test_claude_event_validation_rejects_builtin_tool() -> None:
     events.append(
         {
             "type": "assistant",
-            "message": {"content": [{"type": "tool_use", "id": "x", "name": "Bash", "input": {}}]},
+            "message": {
+                "content": [
+                    {"type": "tool_use", "id": "x", "name": "Bash", "input": {}}
+                ]
+            },
         }
     )
     with pytest.raises(claude_gate.HostGateError, match="unexpected tool"):

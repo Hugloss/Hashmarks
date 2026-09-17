@@ -9,7 +9,9 @@ from typing import Any
 def _load(path: str) -> dict[str, Any]:
     value = json.loads(Path(path).read_text(encoding="utf-8"))
     if value.get("schema") != "fastidentity.metrics.v1":
-        raise SystemExit(f"unsupported metrics schema in {path!r}: {value.get('schema')!r}")
+        raise SystemExit(
+            f"unsupported metrics schema in {path!r}: {value.get('schema')!r}"
+        )
     return value
 
 
@@ -20,7 +22,9 @@ def _seconds(value: Any, prefix: tuple[str, ...] = ()) -> dict[str, float]:
             next_prefix = (*prefix, str(key))
             if key == "seconds" and isinstance(child, dict):
                 for name, number in child.items():
-                    if isinstance(number, (int, float)) and not isinstance(number, bool):
+                    if isinstance(number, (int, float)) and not isinstance(
+                        number, bool
+                    ):
                         out[".".join((*next_prefix, str(name)))] = float(number)
             else:
                 out.update(_seconds(child, next_prefix))
@@ -28,7 +32,9 @@ def _seconds(value: Any, prefix: tuple[str, ...] = ()) -> dict[str, float]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Compare two Hashmarks metric baselines")
+    parser = argparse.ArgumentParser(
+        description="Compare two Hashmarks metric baselines"
+    )
     parser.add_argument("--baseline", required=True)
     parser.add_argument("--current", default=".hashmarks/metrics/latest.json")
     args = parser.parse_args()
@@ -53,7 +59,7 @@ def main() -> None:
                 "faster": after < before,
             }
         )
-    print(
+    print(  # noqa: T201 - intentional command output
         json.dumps(
             {
                 "schema": "fastidentity.metrics-comparison.v1",

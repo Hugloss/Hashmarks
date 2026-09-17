@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .evidence_context import validate_evidence_context
 from .qualification_units import (
     native_qualification_handoff,
     validate_native_qualification_handoff,
 )
+from .validation_inputs import require_mapping_for_validation
 from .verification_selection import (
     VerificationSelectionEnvelopeState,
     downstream_consumption_contract,
@@ -18,7 +19,9 @@ from .verification_selection import (
     verification_membership,
     verification_selection_envelope,
 )
-from .validation_inputs import require_mapping_for_validation
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 CONSUMER_CONFORMANCE_SCHEMA = "hashmarks.consumer-conformance.v1"
 CONSUMER_VECTOR_SCHEMA = "hashmarks.consumer-conformance-vector.v1"
@@ -104,7 +107,9 @@ def validate_native_consumer_bundle(
         "codemap_generation": repository_binding.get("codemap_generation"),
         "identity_generation": repository_binding.get("identity_generation"),
         "stale": repository_binding.get("stale"),
-        "members": list(selection_binding.get("members", [])) if isinstance(selection_binding.get("members"), list) else [],
+        "members": list(selection_binding.get("members", []))
+        if isinstance(selection_binding.get("members"), list)
+        else [],
         "membership_identity": selection_binding.get("membership_identity"),
         "selection_identity": envelope.get("envelope_identity"),
         "repository_provenance_identity": envelope.get("envelope_identity"),
@@ -122,7 +127,6 @@ def validate_native_consumer_bundle(
         "result_authority": "external",
         "certification_authority": "external",
     }
-
 
 
 def validate_native_evidence_context_bundle(
@@ -163,10 +167,11 @@ def validate_native_evidence_context_bundle(
         "certification_authority": "external",
     }
 
+
 def _synthetic_envelope(producer_identity: str) -> dict[str, object]:
-    membership = verification_membership([
-        verification_member("tests/test_consumer.py", test_symbol="test_contract")
-    ])
+    membership = verification_membership(
+        [verification_member("tests/test_consumer.py", test_symbol="test_contract")]
+    )
     return verification_selection_envelope(
         VerificationSelectionEnvelopeState(
             repository_identity="sha256:" + "1" * 64 + ":1",
@@ -196,7 +201,9 @@ def _consumer_conformance_vectors_from_handoff(
     native_envelope = _synthetic_envelope(native_identity)
     native_contract = downstream_consumption_contract(native_envelope)
 
-    def invalid_generation_vector(name: str, field: str, value: object, reason: str) -> dict[str, object]:
+    def invalid_generation_vector(
+        name: str, field: str, value: object, reason: str
+    ) -> dict[str, object]:
         tampered = deepcopy(native_envelope)
         repository = tampered["repository"]
         assert isinstance(repository, dict)
@@ -217,7 +224,9 @@ def _consumer_conformance_vectors_from_handoff(
             "name": "same-version-a-with-a",
             "expected_valid": True,
             "result": validate_native_consumer_bundle(
-                envelope_a, contract_a, expected_producer_implementation_identity=a_identity
+                envelope_a,
+                contract_a,
+                expected_producer_implementation_identity=a_identity,
             ),
         },
         {
@@ -247,12 +256,42 @@ def _consumer_conformance_vectors_from_handoff(
                 expected_producer_implementation_identity=b_identity,
             ),
         },
-        invalid_generation_vector("boolean-codemap-generation", "codemap_generation", True, "invalid-codemap-generation"),
-        invalid_generation_vector("boolean-identity-generation", "identity_generation", False, "invalid-identity-generation"),
-        invalid_generation_vector("negative-codemap-generation", "codemap_generation", -1, "invalid-codemap-generation"),
-        invalid_generation_vector("negative-identity-generation", "identity_generation", -1, "invalid-identity-generation"),
-        invalid_generation_vector("overflow-codemap-generation", "codemap_generation", 1 << 53, "invalid-codemap-generation"),
-        invalid_generation_vector("overflow-identity-generation", "identity_generation", 1 << 53, "invalid-identity-generation"),
+        invalid_generation_vector(
+            "boolean-codemap-generation",
+            "codemap_generation",
+            True,
+            "invalid-codemap-generation",
+        ),
+        invalid_generation_vector(
+            "boolean-identity-generation",
+            "identity_generation",
+            False,
+            "invalid-identity-generation",
+        ),
+        invalid_generation_vector(
+            "negative-codemap-generation",
+            "codemap_generation",
+            -1,
+            "invalid-codemap-generation",
+        ),
+        invalid_generation_vector(
+            "negative-identity-generation",
+            "identity_generation",
+            -1,
+            "invalid-identity-generation",
+        ),
+        invalid_generation_vector(
+            "overflow-codemap-generation",
+            "codemap_generation",
+            1 << 53,
+            "invalid-codemap-generation",
+        ),
+        invalid_generation_vector(
+            "overflow-identity-generation",
+            "identity_generation",
+            1 << 53,
+            "invalid-identity-generation",
+        ),
     )
 
 
@@ -298,7 +337,9 @@ def validate_native_repository_evidence_bundle(
         evidence_receipt,
         provenance,
         expected_producer_implementation_identity=(
-            str(producer_identity) if isinstance(producer_identity, str) else expected_producer_implementation_identity
+            str(producer_identity)
+            if isinstance(producer_identity, str)
+            else expected_producer_implementation_identity
         ),
     )
     reasons = [
@@ -311,9 +352,13 @@ def validate_native_repository_evidence_bundle(
     ]
     repository = envelope.get("repository")
     envelope_repository = repository if isinstance(repository, Mapping) else {}
-    if envelope_repository.get("repository_identity") != evidence_receipt.get("repository_identity"):
+    if envelope_repository.get("repository_identity") != evidence_receipt.get(
+        "repository_identity"
+    ):
         reasons.append("cross-contract-repository-identity-mismatch")
-    if envelope_repository.get("codemap_generation") != evidence_receipt.get("codemap_generation"):
+    if envelope_repository.get("codemap_generation") != evidence_receipt.get(
+        "codemap_generation"
+    ):
         reasons.append("cross-contract-codemap-generation-mismatch")
     return {
         "schema": "hashmarks.repository-evidence-consumer-conformance.v1",
@@ -322,7 +367,8 @@ def validate_native_repository_evidence_bundle(
         "producer_implementation_identity": producer_identity,
         "verification_membership_identity": (
             envelope.get("selection", {}).get("membership_identity")
-            if isinstance(envelope.get("selection"), Mapping) else None
+            if isinstance(envelope.get("selection"), Mapping)
+            else None
         ),
         "context_identity": context.get("context_identity"),
         "authority": "repository-intelligence-only",

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import tempfile
 from hashlib import sha256
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from .digest import BLOB_DOMAIN, DEFAULT_CHUNK_SIZE, Digest, hash_bytes, hash_file
 from .paths import canonical_host_path
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class UnstableCASSourceError(RuntimeError):
@@ -109,7 +113,10 @@ class CAS:
             h.update(BLOB_DOMAIN)
             size = 0
             try:
-                with source.open("rb", buffering=0) as src, os.fdopen(fd, "wb", buffering=0) as dst:
+                with (
+                    source.open("rb", buffering=0) as src,
+                    os.fdopen(fd, "wb", buffering=0) as dst,
+                ):
                     while True:
                         chunk = src.read(chunk_size)
                         if not chunk:
@@ -141,13 +148,17 @@ class CAS:
             raise FileNotFoundError(digest.as_key())
         actual = hash_file(path, domain=BLOB_DOMAIN)
         if actual != digest:
-            raise IOError(f"CAS corruption: expected {digest.as_key()}, got {actual.as_key()}")
+            raise OSError(
+                f"CAS corruption: expected {digest.as_key()}, got {actual.as_key()}"
+            )
 
     def get_bytes(self, digest: Digest) -> bytes:
         data = self._path(digest).read_bytes()
         actual = hash_bytes(data, domain=BLOB_DOMAIN)
         if actual != digest:
-            raise IOError(f"CAS corruption: expected {digest.as_key()}, got {actual.as_key()}")
+            raise OSError(
+                f"CAS corruption: expected {digest.as_key()}, got {actual.as_key()}"
+            )
         return data
 
     def materialize(
@@ -185,10 +196,8 @@ class CAS:
             path.unlink()
         except FileNotFoundError:
             return False
-        try:
+        with contextlib.suppress(OSError):
             path.parent.rmdir()
-        except OSError:
-            pass
         return True
 
     def iter_digests(self) -> Iterator[str]:

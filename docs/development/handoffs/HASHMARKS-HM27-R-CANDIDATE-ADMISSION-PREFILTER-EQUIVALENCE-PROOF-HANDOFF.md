@@ -21,4 +21,3 @@ REJECT cheap candidate exclusion; preserve full semantic candidate evaluation.
 - scale selection correctness: **4/4**
 - unsafe regressions: **0**
 - 501-surface action sample: **293.26 ms**
-

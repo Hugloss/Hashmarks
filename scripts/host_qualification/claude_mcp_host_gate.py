@@ -13,7 +13,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from mcp_host_gate_common import (
+from mcp_host_gate_common import (  # noqa: E402 - import follows standalone script path setup
     HostGateEnvironmentBlocked,
     HostGateError,
     build_installed_wheel,
@@ -116,7 +116,9 @@ def _tool_uses(events: list[dict[str, Any]]) -> dict[str, str]:
                 raise HostGateError(f"Claude Code used unexpected tool: {name}")
             tool_id = str(block.get("id"))
             if name in uses:
-                raise HostGateError(f"Claude Code called Hashmarks tool more than once: {name}")
+                raise HostGateError(
+                    f"Claude Code called Hashmarks tool more than once: {name}"
+                )
             uses[name] = tool_id
     return uses
 
@@ -141,7 +143,9 @@ def _tool_results(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     connected, offered = _init_catalog(events)
     if not connected:
-        raise HostGateEnvironmentBlocked("Claude Code did not report the project Hashmarks MCP server connected")
+        raise HostGateEnvironmentBlocked(
+            "Claude Code did not report the project Hashmarks MCP server connected"
+        )
     missing_offered = set(EXPECTED) - offered
     if missing_offered:
         raise HostGateEnvironmentBlocked(
@@ -150,7 +154,9 @@ def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         )
     uses = _tool_uses(events)
     if set(uses) != set(EXPECTED):
-        raise HostGateError(f"Claude Code did not call required Hashmarks tools: {sorted(set(EXPECTED) - set(uses))}")
+        raise HostGateError(
+            f"Claude Code did not call required Hashmarks tools: {sorted(set(EXPECTED) - set(uses))}"
+        )
     results = _tool_results(events)
     validated: dict[str, dict[str, Any]] = {}
     for name, tool_id in uses.items():
@@ -161,7 +167,9 @@ def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
             raise HostGateError(f"Claude Code reported an MCP error for {name}")
         expected_schema = EXPECTED[name]
         if expected_schema not in _schemas_in(result.get("content")):
-            raise HostGateError(f"Claude Code result for {name} did not expose schema {expected_schema}")
+            raise HostGateError(
+                f"Claude Code result for {name} did not expose schema {expected_schema}"
+            )
         if "BUILDING" in json.dumps(result, sort_keys=True, default=str):
             raise HostGateError("transient BUILDING state escaped through Claude Code")
         validated[name] = result
@@ -209,8 +217,7 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
             cwd=repo,
             input=_prompt(),
             text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             timeout=900,
             check=False,
         )
@@ -241,7 +248,9 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Qualify the installed Hashmarks MCP wheel through Claude Code CLI.")
+    parser = argparse.ArgumentParser(
+        description="Qualify the installed Hashmarks MCP wheel through Claude Code CLI."
+    )
     parser.add_argument("--model", default="")
     parser.add_argument("--python", default="3.14")
     parser.add_argument("--uv", default="uv")
@@ -273,10 +282,14 @@ def main(argv: list[str] | None = None) -> int:
     else:
         code = 0
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
-    receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"HASHMARKS CLAUDE MCP HOST GATE: {receipt['status']}\nreceipt: {receipt_path}")
+    receipt_path.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(  # noqa: T201 - intentional command output
+        f"HASHMARKS CLAUDE MCP HOST GATE: {receipt['status']}\nreceipt: {receipt_path}"
+    )
     if receipt["status"] != "PASS" and receipt.get("error"):
-        print(receipt["error"])
+        print(receipt["error"])  # noqa: T201 - intentional command output
     return code
 
 

@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import json
-import posixpath
 import time
 from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING, cast
 
-from ..paths import normalize_relative_path
+from hashmarks.paths import normalize_relative_path
 
-from ..native_vitest import collect_vitest_vite_graph, local_vitest
 from .model import EvidenceVisibility
 from .repository_domains import is_test_path
 from .scip_adapter import load_scip_json
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from .engine import CodeMap
 
 
 class EvidenceGraphMixin:
@@ -21,11 +24,14 @@ class EvidenceGraphMixin:
         # never to a CodeMap instance or dynamically reloaded heavy module.
         return is_test_path(path)
 
-
     def _file_graph(self) -> dict[str, set[str]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         rows = [dict(row) for row in self.store.all_file_rows()]
         graph: dict[str, set[str]] = {str(row["path"]): set() for row in rows}
-        language_by_path = {str(row["path"]): str(row.get("language") or "") for row in rows}
+        language_by_path = {
+            str(row["path"]): str(row.get("language") or "") for row in rows
+        }
         module_paths: dict[str, list[str]] = {}
         for row in rows:
             module = str(row.get("module_name") or "")
@@ -61,7 +67,9 @@ class EvidenceGraphMixin:
                     candidates.append(normalized + suffix)
                 for suffix in ("/index.ts", "/index.tsx", "/index.js", "/index.jsx"):
                     candidates.append(normalized.rstrip("/") + suffix)
-                graph.setdefault(source, set()).update(candidate for candidate in candidates if candidate in known_paths)
+                graph.setdefault(source, set()).update(
+                    candidate for candidate in candidates if candidate in known_paths
+                )
 
         for edge in self._fresh_native_file_edges():
             source = str(edge["source"])
@@ -70,29 +78,45 @@ class EvidenceGraphMixin:
                 graph[source].add(target)
         return graph
 
-
     def _recent_changed_paths(self) -> set[str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         raw = self.store.meta("recent_changed_paths", "[]") or "[]"
         try:
             value = json.loads(raw)
         except json.JSONDecodeError:
             return set()
-        return {str(item) for item in value if isinstance(item, str)} if isinstance(value, list) else set()
+        return (
+            {str(item) for item in value if isinstance(item, str)}
+            if isinstance(value, list)
+            else set()
+        )
 
-
-    def _python_reverse_levels(self, roots: set[str], *, max_depth: int) -> list[list[str]] | None:
+    def _python_reverse_levels(
+        self, roots: set[str], *, max_depth: int
+    ) -> list[list[str]] | None:
         """Traverse Python reverse imports without materializing the repository graph.
 
         Returns ``None`` when the bounded fast path cannot prove semantic
         equivalence, causing callers to use the established full graph.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         root_rows = [self._session_file_row(path) for path in sorted(roots)]
-        if any(row is None or str(row.get("language") or "") != "python" or not str(row.get("module_name") or "") for row in root_rows):
+        if any(
+            row is None
+            or str(row.get("language") or "") != "python"
+            or not str(row.get("module_name") or "")
+            for row in root_rows
+        ):
             return None
         # Native file evidence can add cross-language/path relationships that
         # raw Python imports do not represent. Preserve existing semantics by
         # falling back whenever such evidence is currently authoritative.
-        if any(row.get("kind") == "native-file" and row.get("fresh") for row in self._native_evidence_status()):
+        if any(
+            row.get("kind") == "native-file" and row.get("fresh")
+            for row in self._native_evidence_status()
+        ):
             return None
 
         seen = set(roots)
@@ -107,13 +131,18 @@ class EvidenceGraphMixin:
             }
             if len(modules_by_path) != len(frontier):
                 return None
-            candidates = self.store.python_import_candidates_for_modules(modules_by_path.values())
+            candidates = self.store.python_import_candidates_for_modules(
+                modules_by_path.values()
+            )
             raw_rows = [row for bucket in candidates.values() for row in bucket]
             targets = {str(row.get("target") or "") for row in raw_rows}
             prefixes = {
                 prefix
                 for target in targets
-                for prefix in (".".join(target.split(".")[:i]) for i in range(1, len(target.split(".")) + 1))
+                for prefix in (
+                    ".".join(target.split(".")[:i])
+                    for i in range(1, len(target.split(".")) + 1)
+                )
                 if prefix
             }
             resolved = self.store.module_paths_many(prefixes)
@@ -127,7 +156,9 @@ class EvidenceGraphMixin:
                     resolved_paths = resolved.get(".".join(parts[:i]), [])
                     if resolved_paths:
                         break
-                if len(resolved_paths) == 1 and target_paths.intersection(resolved_paths):
+                if len(resolved_paths) == 1 and target_paths.intersection(
+                    resolved_paths
+                ):
                     source = str(row.get("path") or "")
                     if source and source not in seen:
                         nxt.add(source)
@@ -140,6 +171,8 @@ class EvidenceGraphMixin:
         return levels
 
     def _reverse_file_graph(self) -> dict[str, set[str]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         generation = self.store.generation()
         cached = self._reverse_file_graph_cache
         if cached is not None and cached[0] == generation:
@@ -151,8 +184,9 @@ class EvidenceGraphMixin:
         self._reverse_file_graph_cache = (generation, reverse)
         return reverse
 
-
     def _query_paths(self, query: str) -> set[str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         try:
             rel = normalize_relative_path(query, allow_root=False)
         except ValueError:
@@ -162,17 +196,21 @@ class EvidenceGraphMixin:
         return {
             str(row["path"])
             for row in self.store.symbol(query)
-            if EvidenceVisibility(str(row["evidence_visibility"])) is not EvidenceVisibility.DENY
+            if EvidenceVisibility(str(row["evidence_visibility"]))
+            is not EvidenceVisibility.DENY
         }
-
 
     def import_scip(self, path: str | Path) -> dict[str, object]:
         """Import compiler/language-server definitions and references from SCIP."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         self._ensure_map_ready()
         raw_path = Path(path)
         if not raw_path.is_absolute():
             raw_path = self.workspace / raw_path
-        producer, occurrences, warnings = load_scip_json(raw_path, workspace=self.workspace)
+        producer, occurrences, warnings = load_scip_json(
+            raw_path, workspace=self.workspace
+        )
         definitions: list[dict[str, object]] = []
         edges: list[dict[str, object]] = []
         skipped = 0
@@ -183,33 +221,47 @@ class EvidenceGraphMixin:
                 skipped += 1
                 continue
             file_row = self._session_file_row(rel)
-            if file_row is None or EvidenceVisibility(str(file_row["evidence_visibility"])) is EvidenceVisibility.DENY:
+            if (
+                file_row is None
+                or EvidenceVisibility(str(file_row["evidence_visibility"]))
+                is EvidenceVisibility.DENY
+            ):
                 skipped += 1
                 continue
             if occurrence.definition:
-                definitions.append({
-                    "path": rel,
-                    "symbol": occurrence.symbol,
-                    "display_name": occurrence.display_name,
-                    "line": occurrence.line,
-                    "end_line": occurrence.end_line,
-                })
+                definitions.append(
+                    {
+                        "path": rel,
+                        "symbol": occurrence.symbol,
+                        "display_name": occurrence.display_name,
+                        "line": occurrence.line,
+                        "end_line": occurrence.end_line,
+                    }
+                )
                 continue
             enclosing = None
             candidates = [
-                row for row in self._session_symbols_for_path(rel)
+                row
+                for row in self._session_symbols_for_path(rel)
                 if int(row["start_line"]) <= occurrence.line <= int(row["end_line"])
             ]
             if candidates:
-                candidates.sort(key=lambda row: (int(row["end_line"]) - int(row["start_line"]), -int(row["start_line"])))
+                candidates.sort(
+                    key=lambda row: (
+                        int(row["end_line"]) - int(row["start_line"]),
+                        -int(row["start_line"]),
+                    )
+                )
                 enclosing = str(candidates[0]["qualname"])
-            edges.append({
-                "path": rel,
-                "source": enclosing,
-                "target_symbol": occurrence.symbol,
-                "target_name": occurrence.display_name,
-                "line": occurrence.line,
-            })
+            edges.append(
+                {
+                    "path": rel,
+                    "source": enclosing,
+                    "target_symbol": occurrence.symbol,
+                    "target_name": occurrence.display_name,
+                    "line": occurrence.line,
+                }
+            )
         self.store.replace_native_occurrences(producer, definitions, edges)
         self._record_evidence_snapshot("scip", producer, bind_generation=True)
         self.store.set_meta("scip_last_import_unix", str(time.time()))
@@ -222,9 +274,12 @@ class EvidenceGraphMixin:
             "warnings": list(warnings),
         }
 
-
-    def enrich_projects(self, providers: Iterable[str] | None = None) -> dict[str, object]:
+    def enrich_projects(
+        self, providers: Iterable[str] | None = None
+    ) -> dict[str, object]:
         """Collect slower/native package graph evidence explicitly in the enrichment lane."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         selected = None if providers is None else {str(value) for value in providers}
         results = []
         warnings: list[str] = []
@@ -234,7 +289,9 @@ class EvidenceGraphMixin:
             if not provider.detect(self.workspace):
                 continue
             evidence = provider.collect(self.workspace)
-            self.store.replace_project_graph(provider.name, evidence.nodes, evidence.edges)
+            self.store.replace_project_graph(
+                provider.name, evidence.nodes, evidence.edges
+            )
             project_manifests = [
                 manifest
                 for node in evidence.nodes
@@ -251,19 +308,26 @@ class EvidenceGraphMixin:
             self._record_evidence_snapshot(
                 "project",
                 provider.name,
-                bind_generation=(provider.name in {"go-list", "nx-project-graph", "pants-target-graph"}),
+                bind_generation=(
+                    provider.name
+                    in {"go-list", "nx-project-graph", "pants-target-graph"}
+                ),
                 manifests=project_manifests,
             )
-            results.append({
-                "producer": evidence.producer,
-                "projects": len(evidence.nodes),
-                "edges": len(evidence.edges),
-            })
+            results.append(
+                {
+                    "producer": evidence.producer,
+                    "projects": len(evidence.nodes),
+                    "edges": len(evidence.edges),
+                }
+            )
             warnings.extend(evidence.warnings)
         if selected is None or self.typescript_resolver.name in selected:
             if self.typescript_resolver.detect(self.workspace):
                 ts = self.typescript_resolver.collect(self.workspace)
-                self.store.replace_native_file_edges(self.typescript_resolver.name, ts.edges)
+                self.store.replace_native_file_edges(
+                    self.typescript_resolver.name, ts.edges
+                )
                 self._record_evidence_snapshot(
                     "native-file",
                     ts.producer,
@@ -279,24 +343,31 @@ class EvidenceGraphMixin:
                     for row in self.store.all_file_rows()
                     if str(row.get("language") or "") == "python"
                 ]
-                pyright = self.pyright_type_server.collect(self.workspace, python_sources)
-                self.store.replace_native_file_edges(self.pyright_type_server.name, pyright.edges)
+                pyright = self.pyright_type_server.collect(
+                    self.workspace, python_sources
+                )
+                self.store.replace_native_file_edges(
+                    self.pyright_type_server.name, pyright.edges
+                )
                 self._record_evidence_snapshot(
                     "native-file",
                     pyright.producer,
                     bind_generation=True,
                     manifests=("pyrightconfig.json", "pyproject.toml"),
                 )
-                results.append({
-                    "producer": pyright.producer,
-                    "file_edges": len(pyright.edges),
-                    "protocol_version": pyright.protocol_version,
-                })
+                results.append(
+                    {
+                        "producer": pyright.producer,
+                        "file_edges": len(pyright.edges),
+                        "protocol_version": pyright.protocol_version,
+                    }
+                )
                 warnings.extend(pyright.warnings)
         if selected is None or "vitest-vite" in selected:
             # Preserve the historical monkeypatch seam on codemap.engine while
             # implementation ownership lives in this mixin.
             from . import engine as engine_module
+
             if engine_module.local_vitest(self.workspace) is not None:
                 vite = engine_module.collect_vitest_vite_graph(self.workspace)
                 if vite.command or vite.edges:
@@ -307,11 +378,19 @@ class EvidenceGraphMixin:
                         bind_generation=True,
                         manifests=(
                             "package.json",
-                            "vitest.config.ts", "vitest.config.js", "vitest.config.mts", "vitest.config.mjs",
-                            "vite.config.ts", "vite.config.js", "vite.config.mts", "vite.config.mjs",
+                            "vitest.config.ts",
+                            "vitest.config.js",
+                            "vitest.config.mts",
+                            "vitest.config.mjs",
+                            "vite.config.ts",
+                            "vite.config.js",
+                            "vite.config.mts",
+                            "vite.config.mjs",
                         ),
                     )
-                    results.append({"producer": vite.producer, "file_edges": len(vite.edges)})
+                    results.append(
+                        {"producer": vite.producer, "file_edges": len(vite.edges)}
+                    )
                 warnings.extend(vite.warnings)
         self.store.set_meta("project_graph_last_sync_unix", str(time.time()))
         self._reverse_file_graph_cache = None

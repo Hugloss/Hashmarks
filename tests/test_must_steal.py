@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from hashmarks.cas import CAS
 from hashmarks.directory_store import DirectoryDigestStore
 from hashmarks.engine import IdentityEngine
@@ -75,7 +73,9 @@ def test_reconciliation_generation_cannot_erase_newer_event():
     assert after.paths == ("src/a.py",)
 
 
-def test_verify_rehashes_bytes_but_preserves_canonical_identity(tmp_path: Path, monkeypatch):
+def test_verify_rehashes_bytes_but_preserves_canonical_identity(
+    tmp_path: Path, monkeypatch
+):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("A")
@@ -105,7 +105,9 @@ def test_verify_rehashes_bytes_but_preserves_canonical_identity(tmp_path: Path, 
     assert calls["count"] == 1
 
 
-def test_directory_nodes_are_persisted_but_not_used_as_freshness_authority(tmp_path: Path):
+def test_directory_nodes_are_persisted_but_not_used_as_freshness_authority(
+    tmp_path: Path,
+):
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
     (workspace / "src" / "a.py").write_text("a")
@@ -142,10 +144,6 @@ def test_warm_scan_reuses_file_bytes_after_hot_cache_drop(tmp_path: Path, monkey
     assert tree.directory_digest("") == first
 
 
-
-
-
-
 def test_identity_engine_owns_state_and_keeps_it_out_of_identity(tmp_path: Path):
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
@@ -166,7 +164,6 @@ def test_identity_engine_owns_state_and_keeps_it_out_of_identity(tmp_path: Path)
     third = engine.input_root(manifest)
     assert third != first
     engine.close()
-
 
 
 def test_file_hash_retries_if_file_changes_during_read(tmp_path: Path, monkeypatch):
@@ -200,7 +197,9 @@ def test_file_hash_retries_if_file_changes_during_read(tmp_path: Path, monkeypat
     assert digest == real_hash_file(target)
 
 
-def test_observation_change_during_reconciliation_is_retried(tmp_path: Path, monkeypatch):
+def test_observation_change_during_reconciliation_is_retried(
+    tmp_path: Path, monkeypatch
+):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("A")
@@ -260,12 +259,16 @@ def test_watcher_stop_marks_observation_unknown(tmp_path: Path):
 
     tracker = ChangeTracker()
     tracker.mark_reconciled()
-    watcher = WatchdogBatchWatcher(tmp_path, lambda _paths: None, change_tracker=tracker)
+    watcher = WatchdogBatchWatcher(
+        tmp_path, lambda _paths: None, change_tracker=tracker
+    )
     watcher.stop()
     assert tracker.snapshot().state is ObservationState.UNKNOWN
 
 
-def test_selected_file_manifest_uses_one_batched_store_lookup(tmp_path: Path, monkeypatch):
+def test_selected_file_manifest_uses_one_batched_store_lookup(
+    tmp_path: Path, monkeypatch
+):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     paths = []

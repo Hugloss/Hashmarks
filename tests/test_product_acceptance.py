@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks.product_acceptance import (
     executable_acceptance_suite,
@@ -8,13 +8,15 @@ from hashmarks.product_acceptance import (
     scale_class_contract,
 )
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 def _repo(root: Path) -> None:
     (root / "src").mkdir()
     (root / "tests").mkdir()
     (root / "src" / "engine.py").write_text(
-        "def normalize_widget(value):\n"
-        "    return value.strip().lower()\n"
+        "def normalize_widget(value):\n    return value.strip().lower()\n"
     )
     (root / "tests" / "test_engine.py").write_text(
         "from src.engine import normalize_widget\n"
@@ -25,9 +27,17 @@ def _repo(root: Path) -> None:
 
 def test_scale_class_contract_is_explicit_and_monotonic() -> None:
     assert scale_class_contract(files=10, source_bytes=1_000)["class"] == "tiny"
-    assert scale_class_contract(files=5_000, source_bytes=50_000_000)["class"] == "small"
-    assert scale_class_contract(files=50_000, source_bytes=500_000_000)["class"] == "medium"
-    assert scale_class_contract(files=500_000, source_bytes=5_000_000_000)["class"] == "large"
+    assert (
+        scale_class_contract(files=5_000, source_bytes=50_000_000)["class"] == "small"
+    )
+    assert (
+        scale_class_contract(files=50_000, source_bytes=500_000_000)["class"]
+        == "medium"
+    )
+    assert (
+        scale_class_contract(files=500_000, source_bytes=5_000_000_000)["class"]
+        == "large"
+    )
 
 
 def test_observability_capabilities_are_bounded() -> None:

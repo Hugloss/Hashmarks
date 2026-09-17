@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import hashmarks
-import hashmarks_build
 import pytest
 
+import hashmarks
+import hashmarks_build
 from scripts import release_contract
 from scripts.release_contract import release_manifest
 
@@ -23,7 +23,9 @@ def _dist(tmp_path: Path) -> Path:
 
 
 def test_release_manifest_binds_exact_distribution_bytes(tmp_path: Path) -> None:
-    manifest = release_manifest(_root(), _dist(tmp_path), tag=f"v{hashmarks.__version__}")
+    manifest = release_manifest(
+        _root(), _dist(tmp_path), tag=f"v{hashmarks.__version__}"
+    )
     assert manifest["schema"] == "hashmarks.release-artifact-manifest.v1"
     assert manifest["project"] == "hashmarks"
     assert manifest["version"] == hashmarks.__version__
@@ -47,7 +49,6 @@ def test_release_manifest_rejects_extra_distribution(tmp_path: Path) -> None:
         release_manifest(_root(), dist, tag=f"v{hashmarks.__version__}")
 
 
-
 def test_release_manifest_rejects_any_unexpected_publish_entry(tmp_path: Path) -> None:
     dist = _dist(tmp_path)
     (dist / "notes.txt").write_text("must not enter publish bundle", encoding="utf-8")
@@ -60,12 +61,22 @@ def test_release_contract_cli_translates_invalid_tag_without_traceback(
 ) -> None:
     dist = _dist(tmp_path)
     with pytest.raises(SystemExit, match="release tag mismatch"):
-        release_contract.main([
-            "verify", "--root", str(_root()), "--dist", str(dist),
-            "--tag", "v999.0.0", "--manifest", str(tmp_path / "missing.json"),
-        ])
+        release_contract.main(
+            [
+                "verify",
+                "--root",
+                str(_root()),
+                "--dist",
+                str(dist),
+                "--tag",
+                "v999.0.0",
+                "--manifest",
+                str(tmp_path / "missing.json"),
+            ]
+        )
     captured = capsys.readouterr()
     assert "Traceback" not in captured.err
+
 
 def test_release_manifest_is_stable_for_unchanged_bytes(tmp_path: Path) -> None:
     dist = _dist(tmp_path)

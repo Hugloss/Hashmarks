@@ -2,13 +2,23 @@ from __future__ import annotations
 
 import threading
 import time
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
-from hashmarks import Directory, File, Glob, RepositoryIdentity, RepositoryIdentityMode, InputManifest
+from hashmarks import (
+    Directory,
+    File,
+    Glob,
+    InputManifest,
+    RepositoryIdentity,
+    RepositoryIdentityMode,
+)
 from hashmarks.client import DaemonUnavailableError, IdentityClient
 from hashmarks.daemon import IdentityDaemon
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class _BarrierWatcher:
@@ -50,7 +60,9 @@ def test_identity_auto_falls_back_to_safe_local(tmp_path: Path):
     target = workspace / "a.txt"
     target.write_text("A")
 
-    with RepositoryIdentity(workspace, mode="auto", state_dir=tmp_path / "state") as identity:
+    with RepositoryIdentity(
+        workspace, mode="auto", state_dir=tmp_path / "state"
+    ) as identity:
         first = identity.snapshot(File("a.txt"))
         assert first.mode == "local"
         target.write_text("B")
@@ -86,7 +98,9 @@ def test_input_specs_are_small_and_explicit(tmp_path: Path):
     (workspace / "src").mkdir(parents=True)
     (workspace / "src" / "a.py").write_text("A")
     (workspace / "uv.lock").write_text("lock")
-    with RepositoryIdentity(workspace, mode="local", state_dir=tmp_path / "state") as identity:
+    with RepositoryIdentity(
+        workspace, mode="local", state_dir=tmp_path / "state"
+    ) as identity:
         manifest = identity.manifest([Directory("src"), File("uv.lock")])
         assert manifest.paths == ("src", "uv.lock")
         globbed = identity.manifest([Glob("src/*.py")])
@@ -98,7 +112,9 @@ def test_snapshot_diff_explains_repository_identity_change(tmp_path: Path):
     workspace.mkdir()
     target = workspace / "a.txt"
     target.write_text("A")
-    with RepositoryIdentity(workspace, mode="local", state_dir=tmp_path / "state") as identity:
+    with RepositoryIdentity(
+        workspace, mode="local", state_dir=tmp_path / "state"
+    ) as identity:
         first = identity.snapshot(File("a.txt"))
         target.write_text("B")
         second = identity.snapshot(File("a.txt"))
@@ -108,8 +124,9 @@ def test_snapshot_diff_explains_repository_identity_change(tmp_path: Path):
     assert diff.old_digest != diff.new_digest
 
 
-
-def test_registered_manifest_is_uploaded_once_and_reused_hot(tmp_path: Path, monkeypatch):
+def test_registered_manifest_is_uploaded_once_and_reused_hot(
+    tmp_path: Path, monkeypatch
+):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     paths = []
@@ -145,7 +162,9 @@ def test_stats_expose_cache_and_incremental_counters(tmp_path: Path):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("A")
-    with RepositoryIdentity(workspace, mode="local", state_dir=tmp_path / "state") as identity:
+    with RepositoryIdentity(
+        workspace, mode="local", state_dir=tmp_path / "state"
+    ) as identity:
         identity.snapshot(File("a.txt"))
         stats = identity.stats()
     assert stats["schema"] == "fastidentity.identity.v1"
@@ -159,18 +178,23 @@ def test_daemon_mode_is_explicitly_required_when_requested(tmp_path: Path):
     with pytest.raises(DaemonUnavailableError):
         RepositoryIdentity(workspace, mode="daemon", state_dir=tmp_path / "state")
 
+
 def test_typed_input_specs_reject_wrong_kind(tmp_path: Path):
     workspace = tmp_path / "repo"
     (workspace / "src").mkdir(parents=True)
     (workspace / "a.txt").write_text("A")
-    with RepositoryIdentity(workspace, mode="local", state_dir=tmp_path / "state") as identity:
+    with RepositoryIdentity(
+        workspace, mode="local", state_dir=tmp_path / "state"
+    ) as identity:
         with pytest.raises(ValueError, match="not a file"):
             identity.manifest([File("src")])
         with pytest.raises(ValueError, match="not a real directory"):
             identity.manifest([Directory("a.txt")])
 
 
-def test_local_watcher_mode_detects_immediate_edit_without_manual_record(tmp_path: Path):
+def test_local_watcher_mode_detects_immediate_edit_without_manual_record(
+    tmp_path: Path,
+):
     if not __import__("sys").platform.startswith("linux"):
         pytest.skip("native request barrier test is Linux-specific")
     workspace = tmp_path / "repo"
@@ -188,21 +212,24 @@ def test_local_watcher_mode_detects_immediate_edit_without_manual_record(tmp_pat
         second = identity.snapshot(File("a.txt"))
         assert second.hash != first.hash
 
+
 def test_cli_root_auto_mode_safely_falls_back_local(tmp_path: Path, capsys):
     from hashmarks.cli import main
 
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("A")
-    rc = main([
-        "--workspace",
-        str(workspace),
-        "root",
-        "--mode",
-        "auto",
-        "--input",
-        "a.txt",
-    ])
+    rc = main(
+        [
+            "--workspace",
+            str(workspace),
+            "root",
+            "--mode",
+            "auto",
+            "--input",
+            "a.txt",
+        ]
+    )
     assert rc == 0
     output = capsys.readouterr().out
     assert '"mode": "local"' in output
@@ -221,7 +248,10 @@ def test_cli_stats_and_doctor_are_available(tmp_path: Path, capsys):
     doctor = capsys.readouterr().out
     assert '"requested_mode": "local"' in doctor
 
-def test_identity_snapshot_manifest_registers_once_with_daemon(tmp_path: Path, monkeypatch):
+
+def test_identity_snapshot_manifest_registers_once_with_daemon(
+    tmp_path: Path, monkeypatch
+):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     paths = []
@@ -255,7 +285,9 @@ def test_identity_snapshot_manifest_registers_once_with_daemon(tmp_path: Path, m
     identity.close()
 
 
-def test_manual_local_observer_reuses_hot_state_when_changes_are_reported(tmp_path: Path):
+def test_manual_local_observer_reuses_hot_state_when_changes_are_reported(
+    tmp_path: Path,
+):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     target = workspace / "a.txt"
@@ -282,9 +314,10 @@ def test_workspace_isolation_with_shared_persistent_state(tmp_path: Path):
     (b / "same.txt").write_text("B")
     shared = tmp_path / "shared-state"
 
-    with RepositoryIdentity(a, mode="local", state_dir=shared / "a") as ia, RepositoryIdentity(
-        b, mode="local", state_dir=shared / "b"
-    ) as ib:
+    with (
+        RepositoryIdentity(a, mode="local", state_dir=shared / "a") as ia,
+        RepositoryIdentity(b, mode="local", state_dir=shared / "b") as ib,
+    ):
         sa = ia.snapshot(File("same.txt"))
         sb = ib.snapshot(File("same.txt"))
         assert sa.hash != sb.hash
@@ -303,4 +336,3 @@ def test_workspace_runtime_socket_namespaces_are_distinct(tmp_path: Path):
     a.mkdir()
     b.mkdir()
     assert default_socket_path(a) != default_socket_path(b)
-

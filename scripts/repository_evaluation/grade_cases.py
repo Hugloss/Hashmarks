@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scripts.repository_evaluation.common import GRADER_SCHEMA, REPORT_SCHEMA, RUN_SCHEMA, load_json, write_json
+from scripts.repository_evaluation.common import (
+    GRADER_SCHEMA,
+    REPORT_SCHEMA,
+    RUN_SCHEMA,
+    load_json,
+    write_json,
+)
 
 
 def _classification(
@@ -32,7 +39,9 @@ def _classification(
     return wrong_resolved_classification
 
 
-def grade_run(*, run: Mapping[str, object], grader: Mapping[str, object]) -> dict[str, Any]:
+def grade_run(
+    *, run: Mapping[str, object], grader: Mapping[str, object]
+) -> dict[str, Any]:
     expected = grader.get("cases")
     if not isinstance(expected, Mapping):
         raise ValueError("repository evaluation grader cases must be an object")
@@ -90,7 +99,8 @@ def grade_run(*, run: Mapping[str, object], grader: Mapping[str, object]) -> dic
         counters[classification] += 1
         retrieval = result.get("retrieval") if isinstance(result, Mapping) else None
         retrieval_paths = {
-            str(row.get("path") or "") for row in (retrieval or ())
+            str(row.get("path") or "")
+            for row in (retrieval or ())
             if isinstance(row, Mapping)
         }
         if classification in {"PASS", "AMBIGUOUS_EXPECTED", "OVER_AMBIGUOUS"}:
@@ -102,17 +112,19 @@ def grade_run(*, run: Mapping[str, object], grader: Mapping[str, object]) -> dic
         else:
             failure_stage = "ACTION_PROJECTION_DISPLACEMENT"
         seen.add(case_id)
-        rows.append({
-            "id": case_id,
-            "classification": classification,
-            "failure_stage": failure_stage,
-            "actual_edit_path": actual_path,
-            "actual_edit_qualname": actual_qualname,
-            "actual_ambiguous": ambiguous,
-            "expected_edit_path": expected_path,
-            "expected_edit_qualname": expected_qualname,
-            "expected_ambiguous": expected_ambiguous,
-        })
+        rows.append(
+            {
+                "id": case_id,
+                "classification": classification,
+                "failure_stage": failure_stage,
+                "actual_edit_path": actual_path,
+                "actual_edit_qualname": actual_qualname,
+                "actual_ambiguous": ambiguous,
+                "expected_edit_path": expected_path,
+                "expected_edit_qualname": expected_qualname,
+                "expected_ambiguous": expected_ambiguous,
+            }
+        )
 
     missing = sorted(set(map(str, expected)) - seen)
     return {

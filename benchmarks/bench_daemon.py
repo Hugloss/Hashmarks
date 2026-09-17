@@ -9,8 +9,8 @@ import time
 from pathlib import Path
 
 from hashmarks.client import IdentityClient
-from hashmarks.inputs import InputManifest
 from hashmarks.daemon import IdentityDaemon
+from hashmarks.inputs import InputManifest
 
 
 def timed(fn):
@@ -38,7 +38,9 @@ def main() -> None:
     parser.add_argument("--files", type=int, default=10_000)
     parser.add_argument("--files-per-dir", type=int, default=250)
     parser.add_argument("--hot-requests", type=int, default=50)
-    parser.add_argument("--manifest", choices=("directory", "files"), default="directory")
+    parser.add_argument(
+        "--manifest", choices=("directory", "files"), default="directory"
+    )
     parser.add_argument("--keep", action="store_true")
     args = parser.parse_args()
 
@@ -61,10 +63,16 @@ def main() -> None:
         manifest_registration_s = 0.0
         if args.manifest == "files":
             manifest = InputManifest(tuple(paths))
-            handle, manifest_registration_s = timed(lambda: client.register_manifest(manifest))
-            request_root = lambda: client.input_root_manifest(handle)
+            handle, manifest_registration_s = timed(
+                lambda: client.register_manifest(manifest)
+            )
+
+            def request_root():
+                return client.input_root_manifest(handle)
         else:
-            request_root = lambda: client.input_root(["src"])
+
+            def request_root():
+                return client.input_root(["src"])
 
         cold, cold_s = timed(request_root)
 
@@ -79,7 +87,10 @@ def main() -> None:
         # The real filesystem watcher daemon will observe this asynchronously. Wait until
         # its tracker leaves CLEAN, bounded so benchmark failures are explicit.
         deadline = time.monotonic() + 2.0
-        while daemon.engine.changes.snapshot().state.value == "clean" and time.monotonic() < deadline:
+        while (
+            daemon.engine.changes.snapshot().state.value == "clean"
+            and time.monotonic() < deadline
+        ):
             time.sleep(0.001)
         edited, edit_s = timed(request_root)
 
@@ -105,7 +116,7 @@ def main() -> None:
             "daemon_status": status,
             "workspace": str(root) if args.keep else None,
         }
-        print(json.dumps(result, indent=2, sort_keys=True))
+        print(json.dumps(result, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
     finally:
         if not args.keep:
             shutil.rmtree(root, ignore_errors=True)

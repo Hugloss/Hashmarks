@@ -28,7 +28,9 @@ def test_oversized_source_audit_does_not_encode_historical_file_sizes() -> None:
     root = Path(__file__).resolve().parents[1]
     payload = audit(root)
     critical_paths = {row["path"] for row in payload["critical_files"]}
-    engine_lines = len((root / "hashmarks/codemap/engine.py").read_text(encoding="utf-8").splitlines())
+    engine_lines = len(
+        (root / "hashmarks/codemap/engine.py").read_text(encoding="utf-8").splitlines()
+    )
 
     # Classification follows the bytes in the candidate, not a historical expectation
     # that engine.py was a >10k-line monolith before responsibility extraction.
@@ -40,5 +42,7 @@ def test_oversized_source_audit_does_not_encode_historical_file_sizes() -> None:
 def test_oversized_source_audit_thresholds_are_review_nominations() -> None:
     root = Path(__file__).resolve().parents[1]
     payload = audit(root)
-    assert payload["policy"]["critical_file_lines"] > payload["policy"]["high_file_lines"]
+    assert (
+        payload["policy"]["critical_file_lines"] > payload["policy"]["high_file_lines"]
+    )
     assert "nominate review" in payload["policy"]["note"]

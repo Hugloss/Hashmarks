@@ -1,9 +1,9 @@
-from pathlib import Path
-
 from hashmarks.qualification_units import _native_qualification_handoff_from_plan
 
 
-def test_native_handoff_is_provenance_bound_without_execution_layout_authority(repository_qualification_plan) -> None:
+def test_native_handoff_is_provenance_bound_without_execution_layout_authority(
+    repository_qualification_plan,
+) -> None:
     first = _native_qualification_handoff_from_plan(repository_qualification_plan)
     second = _native_qualification_handoff_from_plan(repository_qualification_plan)
     assert first == second
@@ -19,5 +19,13 @@ def test_native_handoff_is_provenance_bound_without_execution_layout_authority(r
     assert first["certification_authority"] == "external"
     assert first["may_regroup"] is True
     assert all("preferred_granularity" in unit for unit in first["units"])
-    forbidden = {"workers", "timeout", "retry", "ordering", "subprocesses", "bisection", "resume"}
+    forbidden = {
+        "workers",
+        "timeout",
+        "retry",
+        "ordering",
+        "subprocesses",
+        "bisection",
+        "resume",
+    }
     assert forbidden.isdisjoint(first)

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks.client import RepositoryObservation
 from hashmarks.codemap.engine import CodeMap
-from hashmarks.observation import ObservationState
 from hashmarks.daemon import IdentityDaemon
+from hashmarks.observation import ObservationState
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class _BarrierWatcher:
@@ -99,7 +102,9 @@ def test_map_ready_reuses_one_atomic_complete_observation(tmp_path: Path, monkey
         codemap.close()
 
 
-def test_map_ready_falls_back_to_full_sync_without_authoritative_change_set(tmp_path: Path, monkeypatch):
+def test_map_ready_falls_back_to_full_sync_without_authoritative_change_set(
+    tmp_path: Path, monkeypatch
+):
     codemap = _indexed_map(tmp_path)
     calls: list[object] = []
     try:
@@ -137,7 +142,9 @@ def test_map_ready_clean_matching_generation_does_not_sync(tmp_path: Path, monke
         codemap.close()
 
 
-def test_map_ready_unknown_generation_change_falls_back_to_full_sync(tmp_path: Path, monkeypatch):
+def test_map_ready_unknown_generation_change_falls_back_to_full_sync(
+    tmp_path: Path, monkeypatch
+):
     codemap = _indexed_map(tmp_path)
     calls: list[object] = []
     try:
@@ -145,7 +152,11 @@ def test_map_ready_unknown_generation_change_falls_back_to_full_sync(tmp_path: P
             codemap,
             "_daemon_observation",
             lambda: _observation(
-                state=ObservationState.UNKNOWN, generation=2, paths=(), paths_complete=False, dirty_path_count=0
+                state=ObservationState.UNKNOWN,
+                generation=2,
+                paths=(),
+                paths_complete=False,
+                dirty_path_count=0,
             ),
         )
         monkeypatch.setattr(codemap, "sync", lambda paths=None: calls.append(paths))

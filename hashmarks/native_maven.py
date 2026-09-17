@@ -6,7 +6,16 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 
-_PRUNE = {".git", ".hashmarks", ".venv", "venv", "node_modules", "target", "build", "dist"}
+_PRUNE = {
+    ".git",
+    ".hashmarks",
+    ".venv",
+    "venv",
+    "node_modules",
+    "target",
+    "build",
+    "dist",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +45,9 @@ def find_maven(workspace: Path) -> str | None:
 def _text(parent: ET.Element | None, name: str) -> str | None:
     if parent is None:
         return None
-    child = next((value for value in parent if value.tag.rsplit("}", 1)[-1] == name), None)
+    child = next(
+        (value for value in parent if value.tag.rsplit("}", 1)[-1] == name), None
+    )
     if child is None or child.text is None:
         return None
     value = child.text.strip()
@@ -46,7 +57,9 @@ def _text(parent: ET.Element | None, name: str) -> str | None:
 def _child(parent: ET.Element | None, name: str) -> ET.Element | None:
     if parent is None:
         return None
-    return next((value for value in parent if value.tag.rsplit("}", 1)[-1] == name), None)
+    return next(
+        (value for value in parent if value.tag.rsplit("}", 1)[-1] == name), None
+    )
 
 
 def collect_maven_modules(workspace: Path) -> MavenSnapshot:
@@ -63,7 +76,9 @@ def collect_maven_modules(workspace: Path) -> MavenSnapshot:
         try:
             root = ET.parse(manifest).getroot()
         except (ET.ParseError, OSError) as exc:
-            warnings.append(f"cannot parse {manifest.relative_to(workspace).as_posix()}: {exc}")
+            warnings.append(
+                f"cannot parse {manifest.relative_to(workspace).as_posix()}: {exc}"
+            )
             continue
         parent = _child(root, "parent")
         group_id = _text(root, "groupId") or _text(parent, "groupId") or ""
@@ -83,5 +98,14 @@ def collect_maven_modules(workspace: Path) -> MavenSnapshot:
         rel_root = manifest.parent.relative_to(workspace).as_posix() or "."
         rel_manifest = manifest.relative_to(workspace).as_posix()
         module_id = f"{group_id}:{artifact_id}" if group_id else artifact_id
-        modules.append(MavenModuleData(module_id, group_id, artifact_id, rel_root, rel_manifest, tuple(dependencies)))
+        modules.append(
+            MavenModuleData(
+                module_id,
+                group_id,
+                artifact_id,
+                rel_root,
+                rel_manifest,
+                tuple(dependencies),
+            )
+        )
     return MavenSnapshot(find_maven(workspace), tuple(modules), tuple(warnings))

@@ -4,21 +4,29 @@ import ast
 import hashlib
 import json
 import os
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import TYPE_CHECKING, cast
 
-from ..paths import normalize_relative_path
-from ..validation_inputs import require_mapping_for_validation
-from ..python_ast_cache import read_python_ast
-from ..native_vitest import local_vitest
-from ..verification_selection import VerificationSelectionEnvelopeState, downstream_consumption_contract, verification_membership_from_selection, verification_selection_envelope
-from .python_ast import identifier_terms
+from hashmarks.native_vitest import local_vitest
+from hashmarks.paths import normalize_relative_path
+from hashmarks.python_ast_cache import read_python_ast
+from hashmarks.verification_selection import (
+    VerificationSelectionEnvelopeState,
+    downstream_consumption_contract,
+    verification_membership_from_selection,
+    verification_selection_envelope,
+)
+
 from .model import EvidenceVisibility
-from .repository_domains import RepositoryDomain, classify_repository_path, is_test_path
-from .repository_index_store import git_base_identity
 from .query_primitives import _TASK_STOPWORDS, _query_terms
+from .repository_domains import RepositoryDomain, classify_repository_path
+from .repository_index_store import git_base_identity
+
+if TYPE_CHECKING:
+    from .engine import CodeMap
 
 
 @dataclass(frozen=True)
@@ -82,8 +90,7 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         self.bindings.extend(
-            (alias.name, alias.asname or alias.name, self.guard)
-            for alias in node.names
+            (alias.name, alias.asname or alias.name, self.guard) for alias in node.names
         )
 
     def visit_Name(self, node: ast.Name) -> None:
@@ -145,9 +152,28 @@ class VerificationMixin:
     @staticmethod
     def _verification_generic_parts() -> set[str]:
         return {
-            "src", "source", "lib", "app", "apps", "pkg", "packages", "test", "tests",
-            "spec", "specs", "check", "checks", "unit", "integration", "e2e", "regression",
-            "frontend", "backend", "python", "javascript", "typescript",
+            "src",
+            "source",
+            "lib",
+            "app",
+            "apps",
+            "pkg",
+            "packages",
+            "test",
+            "tests",
+            "spec",
+            "specs",
+            "check",
+            "checks",
+            "unit",
+            "integration",
+            "e2e",
+            "regression",
+            "frontend",
+            "backend",
+            "python",
+            "javascript",
+            "typescript",
         }
 
     def _verification_state(
@@ -164,10 +190,13 @@ class VerificationMixin:
             if part.casefold() not in generic_parts
         }
         task_terms = {
-            term for term in _query_terms(task)
+            term
+            for term in _query_terms(task)
             if len(term) >= 3 and term not in _TASK_STOPWORDS
         }
-        canonical_rank, candidate_paths = self._verification_candidate_seeds(rows, current_path)
+        canonical_rank, candidate_paths = self._verification_candidate_seeds(
+            rows, current_path
+        )
         return _VerificationRelevanceState(
             current_path=current_path,
             edit_path=edit_path,
@@ -207,6 +236,8 @@ class VerificationMixin:
         edit_path: str,
         edit: Mapping[str, object] | None,
     ) -> list[str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         symbol_names: list[str] = []
         for symbol in self._session_symbols_for_path(edit_path)[:32]:
             self._append_verification_symbol_names(symbol_names, symbol)
@@ -227,7 +258,9 @@ class VerificationMixin:
     @staticmethod
     def _verification_ref_visible(ref: Mapping[str, object]) -> bool:
         try:
-            visibility = EvidenceVisibility(str(ref.get("evidence_visibility") or EvidenceVisibility.DENY.value))
+            visibility = EvidenceVisibility(
+                str(ref.get("evidence_visibility") or EvidenceVisibility.DENY.value)
+            )
         except ValueError:
             return False
         return visibility is not EvidenceVisibility.DENY
@@ -236,6 +269,8 @@ class VerificationMixin:
         self,
         direct_symbol_refs: Mapping[str, Sequence[Mapping[str, object]]],
     ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         import_refs = [
             ref
             for refs in direct_symbol_refs.values()
@@ -256,7 +291,9 @@ class VerificationMixin:
                 continue
             ref_row = self._session_file_row(ref_path)
             if ref_row is not None and str(ref_row.get("language") or "") == "python":
-                module_prefetch.update(self._python_import_module_candidates(ref_path, target))
+                module_prefetch.update(
+                    self._python_import_module_candidates(ref_path, target)
+                )
         self._session_preload_module_paths(module_prefetch)
 
     def _verification_relative_import_paths(
@@ -264,6 +301,8 @@ class VerificationMixin:
         ref_path: str,
         target: str,
     ) -> set[str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if not ref_path.endswith(".py") or not target.startswith("."):
             return set()
         leading = len(target) - len(target.lstrip("."))
@@ -271,13 +310,19 @@ class VerificationMixin:
         source_parts = list(Path(ref_path).with_suffix("").parts[:-1])
         keep = max(0, len(source_parts) - max(0, leading - 1))
         absolute_target = ".".join(source_parts[:keep] + ([suffix] if suffix else []))
-        return self._resolve_import_paths(ref_path, absolute_target) if absolute_target else set()
+        return (
+            self._resolve_import_paths(ref_path, absolute_target)
+            if absolute_target
+            else set()
+        )
 
     def _verification_exact_import_paths(
         self,
         state: _VerificationRelevanceState,
         symbol_refs: Sequence[Mapping[str, object]],
     ) -> tuple[set[str], bool]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         exact_import_paths: set[str] = set()
         import_resolution_available = False
         for ref in symbol_refs:
@@ -287,11 +332,17 @@ class VerificationMixin:
             target = str(ref.get("target") or "")
             if not ref_path or not target:
                 continue
-            resolved_paths, unresolved_identity = self._resolve_import_owner_evidence(ref_path, target)
-            if unresolved_identity and RepositoryDomain.TEST in set(classify_repository_path(ref_path)):
+            resolved_paths, unresolved_identity = self._resolve_import_owner_evidence(
+                ref_path, target
+            )
+            if unresolved_identity and RepositoryDomain.TEST in set(
+                classify_repository_path(ref_path)
+            ):
                 state.unresolved_import_identity_paths.add(ref_path)
             if not resolved_paths:
-                resolved_paths = self._verification_relative_import_paths(ref_path, target)
+                resolved_paths = self._verification_relative_import_paths(
+                    ref_path, target
+                )
             if resolved_paths:
                 import_resolution_available = True
             if state.edit_path in resolved_paths:
@@ -305,13 +356,17 @@ class VerificationMixin:
         symbol_refs: Sequence[Mapping[str, object]],
     ) -> None:
         short = symbol.rsplit(".", 1)[-1]
-        exact_import_paths, resolution_available = self._verification_exact_import_paths(state, symbol_refs)
+        exact_import_paths, resolution_available = (
+            self._verification_exact_import_paths(state, symbol_refs)
+        )
         for ref in symbol_refs:
             path = str(ref.get("path") or "")
             if not path or not self._verification_ref_visible(ref):
                 continue
             short_match = str(ref.get("target_short") or "") == short
-            exact_reference = path in exact_import_paths if resolution_available else short_match
+            exact_reference = (
+                path in exact_import_paths if resolution_available else short_match
+            )
             if not short_match or not exact_reference:
                 if RepositoryDomain.TEST in set(classify_repository_path(path)):
                     state.candidate_paths.add(path)
@@ -329,7 +384,11 @@ class VerificationMixin:
         symbol_names: Sequence[str],
     ) -> None:
         # Explicit scale bound: 16 edit symbols × 1024 reverse refs.
-        direct_symbol_refs = self._session_refs_many(symbol_names[:16], limit_per_target=1024)
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        direct_symbol_refs = self._session_refs_many(
+            symbol_names[:16], limit_per_target=1024
+        )
 
         # A repository-wide same-short-name prefix can hide the qualified
         # reference to the current edit once more than 1,024 unrelated refs sort
@@ -342,7 +401,9 @@ class VerificationMixin:
             for symbol in symbol_names[:16]:
                 short = symbol.rsplit(".", 1)[-1]
                 suffix = f"{edit_module}.{short}"
-                targeted = self.store.refs_matching_target_suffix(short, suffix, limit=1024)
+                targeted = self.store.refs_matching_target_suffix(
+                    short, suffix, limit=1024
+                )
                 existing = list(direct_symbol_refs.get(symbol, ()))
                 merged: list[Mapping[str, object]] = []
                 seen: set[tuple[str, int, str, str]] = set()
@@ -370,6 +431,8 @@ class VerificationMixin:
         self,
         source_ref_paths: set[str],
     ) -> list[tuple[str, str, str]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         via_paths = sorted(source_ref_paths)[:64]
         via_symbols = self.store.symbols_for_paths_many(via_paths, limit_per_path=16)
         result: list[tuple[str, str, str]] = []
@@ -385,6 +448,8 @@ class VerificationMixin:
         self,
         state: _VerificationRelevanceState,
     ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         via_symbol_sources = self._verification_via_symbols(state.source_ref_paths)
         indirect_ref_sets = self._session_refs_many(
             [symbol for _via_path, symbol, _short in via_symbol_sources],
@@ -404,7 +469,9 @@ class VerificationMixin:
     ) -> None:
         for ref in refs:
             path = str(ref.get("path") or "")
-            if not path or RepositoryDomain.TEST not in set(classify_repository_path(path)):
+            if not path or RepositoryDomain.TEST not in set(
+                classify_repository_path(path)
+            ):
                 continue
             if not self._verification_ref_visible(ref):
                 continue
@@ -423,7 +490,9 @@ class VerificationMixin:
             name = str(symbol.get("name") or "")
             if not name.startswith("test_"):
                 continue
-            terms = set(_query_terms(name)) | set(_query_terms(str(symbol.get("qualname") or "")))
+            terms = set(_query_terms(name)) | set(
+                _query_terms(str(symbol.get("qualname") or ""))
+            )
             scored.append((len(task_terms.intersection(terms)), name))
         if not scored:
             return None
@@ -432,10 +501,17 @@ class VerificationMixin:
             return None
         return scored[0][1] if scored[0][0] > 0 or len(scored) == 1 else None
 
-    def _verification_reference_strength(self, path: str, symbols: Sequence[str]) -> dict[str, object]:
+    def _verification_reference_strength(
+        self, path: str, symbols: Sequence[str]
+    ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if not path.endswith(".py") or not symbols:
             strength = "syntactic" if symbols else "none"
-            return {"syntactic_reference": bool(symbols), "reference_strength": strength}
+            return {
+                "syntactic_reference": bool(symbols),
+                "reference_strength": strength,
+            }
         try:
             snapshot = read_python_ast(self.workspace / path)
             index = _verification_reference_index(
@@ -501,7 +577,9 @@ class VerificationMixin:
             evidence_terms.update(_query_terms(str(symbol.get("name") or "")))
             evidence_terms.update(_query_terms(str(symbol.get("qualname") or "")))
         anchor_terms = sorted(state.task_terms.intersection(evidence_terms))
-        test_symbol = self._verification_relevance_test_symbol(test_symbols, state.task_terms)
+        test_symbol = self._verification_relevance_test_symbol(
+            test_symbols, state.task_terms
+        )
         direct_symbols = sorted(state.refs_by_path.get(path, set()))
         indirect_symbols = sorted(state.indirect_refs_by_path.get(path, set()))
         reference = self._verification_reference_strength(path, direct_symbols)
@@ -521,7 +599,9 @@ class VerificationMixin:
             "canonical_rank": state.canonical_rank.get(path),
             "test_symbol": test_symbol,
             "runner_available": bool(
-                self._python_verification_plan(path, test_symbol, None, pytest_declared=pytest_declared).get("available")
+                self._python_verification_plan(
+                    path, test_symbol, None, pytest_declared=pytest_declared
+                ).get("available")
                 if Path(path).suffix.lower() == ".py" and pytest_declared is not None
                 else self.verification_plan(path, symbol=test_symbol).get("available")
             ),
@@ -531,10 +611,16 @@ class VerificationMixin:
         self,
         state: _VerificationRelevanceState,
     ) -> list[dict[str, object]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         paths = sorted(state.candidate_paths)
         candidate_symbols = self.store.symbols_for_paths_many(paths, limit_per_path=64)
         result: list[dict[str, object]] = []
-        pytest_declared = self._pytest_declared() if any(Path(path).suffix.lower() == ".py" for path in paths) else None
+        pytest_declared = (
+            self._pytest_declared()
+            if any(Path(path).suffix.lower() == ".py" for path in paths)
+            else None
+        )
         for path in paths:
             if RepositoryDomain.TEST not in set(classify_repository_path(path)):
                 continue
@@ -582,12 +668,15 @@ class VerificationMixin:
         if not candidates:
             return selected, reason
         best = candidates[0]
-        reference_candidates = [row for row in candidates if cls._verification_candidate_score(row)[0] > 0]
-        unique_reference = (
-            len(reference_candidates) == 1
-            and (selected is None or cls._verification_candidate_score(selected)[0] == 0)
+        reference_candidates = [
+            row for row in candidates if cls._verification_candidate_score(row)[0] > 0
+        ]
+        unique_reference = len(reference_candidates) == 1 and (
+            selected is None or cls._verification_candidate_score(selected)[0] == 0
         )
-        if cls._verification_best_can_replace(best, selected, unique_reference, current_path):
+        if cls._verification_best_can_replace(
+            best, selected, unique_reference, current_path
+        ):
             reason = (
                 "unique-exact-reference-plus-namespace-locality"
                 if bool(best.get("direct_reference"))
@@ -613,7 +702,10 @@ class VerificationMixin:
             return False
         if selected is None or str(best.get("path") or "") == current_path:
             return True
-        return best_score[:2] > cls._verification_candidate_score(selected)[:2] or unique_reference
+        return (
+            best_score[:2] > cls._verification_candidate_score(selected)[:2]
+            or unique_reference
+        )
 
     @staticmethod
     def _verification_relevance_result(
@@ -623,14 +715,22 @@ class VerificationMixin:
         selection_reason: str,
         limit: int,
     ) -> dict[str, object]:
-        selected = None if selected_row is None else {**selected_row, "selection_reason": selection_reason}
-        identity_ambiguous = bool(state.unresolved_import_identity_paths) and not bool(state.refs_by_path)
+        selected = (
+            None
+            if selected_row is None
+            else {**selected_row, "selection_reason": selection_reason}
+        )
+        identity_ambiguous = bool(state.unresolved_import_identity_paths) and not bool(
+            state.refs_by_path
+        )
         return {
             "schema": "hashmarks.verification-relevance.v1",
             "selected": selected,
             "candidates": list(candidates[:limit]),
             "candidate_count": len(candidates),
-            "selection_reason": selection_reason if selected is not None else "no-verification-candidate",
+            "selection_reason": selection_reason
+            if selected is not None
+            else "no-verification-candidate",
             "selection_changed": bool(
                 selected is not None
                 and state.current_path
@@ -639,7 +739,9 @@ class VerificationMixin:
             "current_canonical_verify": state.current_path or None,
             "qualified_identity_ambiguous": identity_ambiguous,
             "unresolved_import_identity_paths": (
-                sorted(state.unresolved_import_identity_paths)[:limit] if identity_ambiguous else []
+                sorted(state.unresolved_import_identity_paths)[:limit]
+                if identity_ambiguous
+                else []
             ),
             "bounds": {
                 "returned_candidates": limit,
@@ -666,7 +768,11 @@ class VerificationMixin:
         if limit < 1:
             raise ValueError("limit must be >= 1")
         limit = min(int(limit), 16)
-        current_path = str(current_verify.get("path") or "") if isinstance(current_verify, Mapping) else ""
+        current_path = (
+            str(current_verify.get("path") or "")
+            if isinstance(current_verify, Mapping)
+            else ""
+        )
         edit_path = str(edit.get("path") or "") if isinstance(edit, Mapping) else ""
         if not edit_path:
             return self._verification_without_edit_owner(current_path)
@@ -677,7 +783,9 @@ class VerificationMixin:
         self._verification_collect_indirect_references(state)
         candidates = self._verification_candidates(state)
         selected, reason = self._verification_select_candidate(candidates, current_path)
-        return self._verification_relevance_result(state, candidates, selected, reason, limit)
+        return self._verification_relevance_result(
+            state, candidates, selected, reason, limit
+        )
 
     def verification_relevance(
         self,
@@ -687,6 +795,8 @@ class VerificationMixin:
         candidate_limit: int = 8,
     ) -> dict[str, object]:
         """Return the task's bounded verification relevance evidence."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         action = self.task_action_map(task, limit=limit)
         relevance = action.get("verification_relevance")
         if not isinstance(relevance, dict):
@@ -708,13 +818,23 @@ class VerificationMixin:
         return [str(path)] if isinstance(path, str) else []
 
     @staticmethod
-    def _authority_rows(authority: dict[str, object] | None) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    def _authority_rows(
+        authority: dict[str, object] | None,
+    ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
         if not isinstance(authority, dict):
             return [], []
         nodes = authority.get("nodes")
         edges = authority.get("edges")
-        node_rows = [row for row in nodes if isinstance(row, dict)] if isinstance(nodes, list) else []
-        edge_rows = [row for row in edges if isinstance(row, dict)] if isinstance(edges, list) else []
+        node_rows = (
+            [row for row in nodes if isinstance(row, dict)]
+            if isinstance(nodes, list)
+            else []
+        )
+        edge_rows = (
+            [row for row in edges if isinstance(row, dict)]
+            if isinstance(edges, list)
+            else []
+        )
         return node_rows, edge_rows
 
     @staticmethod
@@ -723,13 +843,20 @@ class VerificationMixin:
         return {
             str(row["id"])
             for row in nodes
-            if isinstance(row.get("id"), str) and (row.get("path") == path or row.get("id") == file_id)
+            if isinstance(row.get("id"), str)
+            and (row.get("path") == path or row.get("id") == file_id)
         }
 
     @staticmethod
-    def _authority_relations(path: str, edges: list[dict[str, object]]) -> list[dict[str, object]]:
+    def _authority_relations(
+        path: str, edges: list[dict[str, object]]
+    ) -> list[dict[str, object]]:
         file_id = f"file:{path}"
-        return [dict(row) for row in edges if row.get("source") == file_id or row.get("target") == file_id]
+        return [
+            dict(row)
+            for row in edges
+            if row.get("source") == file_id or row.get("target") == file_id
+        ]
 
     @staticmethod
     def _relation_node_ids(relations: list[dict[str, object]]) -> set[str]:
@@ -742,29 +869,51 @@ class VerificationMixin:
 
     @classmethod
     def _authority_entry(
-        cls, path: str, nodes: list[dict[str, object]], edges: list[dict[str, object]], ownership_resolution: object
+        cls,
+        path: str,
+        nodes: list[dict[str, object]],
+        edges: list[dict[str, object]],
+        ownership_resolution: object,
     ) -> dict[str, object]:
         relations = cls._authority_relations(path, edges)
-        node_ids = cls._authority_node_ids(path, nodes) | cls._relation_node_ids(relations)
+        node_ids = cls._authority_node_ids(path, nodes) | cls._relation_node_ids(
+            relations
+        )
         entry: dict[str, object] = {
             "path": path,
             "authority_node_ids": sorted(node_ids),
             "authority_relations": sorted(
-                relations, key=lambda row: (str(row.get("source") or ""), str(row.get("target") or ""), str(row.get("relation") or ""))
+                relations,
+                key=lambda row: (
+                    str(row.get("source") or ""),
+                    str(row.get("target") or ""),
+                    str(row.get("relation") or ""),
+                ),
             ),
         }
-        if isinstance(ownership_resolution, dict) and ownership_resolution.get("path") == path:
+        if (
+            isinstance(ownership_resolution, dict)
+            and ownership_resolution.get("path") == path
+        ):
             entry["ownership_resolution"] = dict(ownership_resolution)
         return entry
 
     def _edit_authorities(
-        self, edit_paths: list[str], authority: dict[str, object] | None, ownership_resolution: object
+        self,
+        edit_paths: list[str],
+        authority: dict[str, object] | None,
+        ownership_resolution: object,
     ) -> list[dict[str, object]]:
         nodes, edges = self._authority_rows(authority)
-        return [self._authority_entry(path, nodes, edges, ownership_resolution) for path in edit_paths]
+        return [
+            self._authority_entry(path, nodes, edges, ownership_resolution)
+            for path in edit_paths
+        ]
 
     @staticmethod
-    def _coverage_for_candidate(item: dict[str, object], edit_paths: list[str]) -> tuple[list[str], str | None]:
+    def _coverage_for_candidate(
+        item: dict[str, object], edit_paths: list[str]
+    ) -> tuple[list[str], str | None]:
         if not edit_paths:
             return [], None
         if bool(item.get("direct_reference")):
@@ -773,7 +922,9 @@ class VerificationMixin:
             return list(edit_paths), "bounded-indirect-reference"
         return [], None
 
-    def _verification_owner_row(self, item: dict[str, object], edit_paths: list[str]) -> dict[str, object] | None:
+    def _verification_owner_row(
+        self, item: dict[str, object], edit_paths: list[str]
+    ) -> dict[str, object] | None:
         path = item.get("path")
         if not isinstance(path, str):
             return None
@@ -782,7 +933,9 @@ class VerificationMixin:
             "path": path,
             "score": item.get("score"),
             "reason": item.get("reason"),
-            "plan": self.verification_plan(path, symbol=item.get("name"), qualname=item.get("qualname")),
+            "plan": self.verification_plan(
+                path, symbol=item.get("name"), qualname=item.get("qualname")
+            ),
             "covers_edit_candidates": coverage,
             "coverage_evidence": evidence,
         }
@@ -794,8 +947,10 @@ class VerificationMixin:
         if not isinstance(candidates, list):
             return [], 0
         rows = [
-            row for item in candidates
-            if isinstance(item, dict) and (row := self._verification_owner_row(item, edit_paths)) is not None
+            row
+            for item in candidates
+            if isinstance(item, dict)
+            and (row := self._verification_owner_row(item, edit_paths)) is not None
         ]
         links = sum(len(row.get("covers_edit_candidates", [])) for row in rows)
         return rows, links
@@ -803,19 +958,30 @@ class VerificationMixin:
     @staticmethod
     def _linked_edit_paths(verifiers: list[dict[str, object]]) -> set[str]:
         return {
-            covered for verifier in verifiers
+            covered
+            for verifier in verifiers
             for covered in verifier.get("covers_edit_candidates", [])
             if isinstance(covered, str)
         }
 
-    def verification_ownership_graph(self, task: str, *, limit: int = 20, candidate_limit: int = 8) -> dict[str, object]:
+    def verification_ownership_graph(
+        self, task: str, *, limit: int = 20, candidate_limit: int = 8
+    ) -> dict[str, object]:
         """Expose verification owners and their evidence-backed edit-authority links."""
-        relevance = self.verification_relevance(task, limit=limit, candidate_limit=candidate_limit)
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        relevance = self.verification_relevance(
+            task, limit=limit, candidate_limit=candidate_limit
+        )
         action = self.task_action_map(task, limit=limit)
         edit_paths = sorted(set(self._verification_edit_paths(action)))
         authority = self.repository_ownership_graph(edit_paths) if edit_paths else None
-        edit_authorities = self._edit_authorities(edit_paths, authority, action.get("ownership_resolution"))
-        verifiers, verification_links = self._verification_owner_rows(relevance, edit_paths)
+        edit_authorities = self._edit_authorities(
+            edit_paths, authority, action.get("ownership_resolution")
+        )
+        verifiers, verification_links = self._verification_owner_rows(
+            relevance, edit_paths
+        )
         linked_paths = self._linked_edit_paths(verifiers)
         selected = relevance.get("selected")
         generation, identity_generation, stale = self._generation_status()
@@ -841,16 +1007,22 @@ class VerificationMixin:
         }
 
     def _pytest_declared(self) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         pyproject = self.workspace / "pyproject.toml"
         if not pyproject.is_file():
             return False
         try:
-            return "[tool.pytest." in pyproject.read_text(encoding="utf-8", errors="replace")
+            return "[tool.pytest." in pyproject.read_text(
+                encoding="utf-8", errors="replace"
+            )
         except OSError:
             return False
 
     @staticmethod
-    def _verification_test_symbol(symbol: str | None, qualname: str | None) -> str | None:
+    def _verification_test_symbol(
+        symbol: str | None, qualname: str | None
+    ) -> str | None:
         if isinstance(symbol, str) and symbol.startswith("test_"):
             return symbol
         if not isinstance(qualname, str):
@@ -871,22 +1043,39 @@ class VerificationMixin:
         test_symbol = self._verification_test_symbol(symbol, qualname)
         target_arg = f"{rel}::{test_symbol}" if test_symbol else rel
         return {
-            "schema": "hashmarks.verification-plan.v1", "path": rel, "available": True,
-            "runner": "pytest", "argv": ["python", "-m", "pytest", "-q", target_arg],
-            "working_directory": ".", "confidence": "high" if pytest_declared else "medium",
-            "evidence": "pyproject-pytest-config" if pytest_declared else "python-test-domain",
-            "scope": "test-node" if test_symbol else "test-file", "test_symbol": test_symbol,
+            "schema": "hashmarks.verification-plan.v1",
+            "path": rel,
+            "available": True,
+            "runner": "pytest",
+            "argv": ["python", "-m", "pytest", "-q", target_arg],
+            "working_directory": ".",
+            "confidence": "high" if pytest_declared else "medium",
+            "evidence": "pyproject-pytest-config"
+            if pytest_declared
+            else "python-test-domain",
+            "scope": "test-node" if test_symbol else "test-file",
+            "test_symbol": test_symbol,
         }
 
     def _go_verification_plan(self, rel: str, target: Path) -> dict[str, object] | None:
-        if not target.name.endswith("_test.go") or not (self.workspace / "go.mod").is_file():
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if (
+            not target.name.endswith("_test.go")
+            or not (self.workspace / "go.mod").is_file()
+        ):
             return None
         package = target.parent.as_posix()
         package_arg = "." if package == "." else f"./{package}"
         return {
-            "schema": "hashmarks.verification-plan.v1", "path": rel, "available": True,
-            "runner": "go-test", "argv": ["go", "test", package_arg], "working_directory": ".",
-            "confidence": "high", "evidence": "go-mod-plus-test-file",
+            "schema": "hashmarks.verification-plan.v1",
+            "path": rel,
+            "available": True,
+            "runner": "go-test",
+            "argv": ["go", "test", package_arg],
+            "working_directory": ".",
+            "confidence": "high",
+            "evidence": "go-mod-plus-test-file",
         }
 
     @staticmethod
@@ -899,44 +1088,73 @@ class VerificationMixin:
         except ValueError:
             return str(vitest)
 
-    def _javascript_verification_plan(self, rel: str, target: Path) -> dict[str, object] | None:
+    def _javascript_verification_plan(
+        self, rel: str, target: Path
+    ) -> dict[str, object] | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         runner = self._vitest_runner(self.workspace)
         if runner is not None:
             return {
-                "schema": "hashmarks.verification-plan.v1", "path": rel, "available": True,
-                "runner": "vitest", "argv": [runner, "run", rel], "working_directory": ".",
-                "confidence": "high", "evidence": "local-vitest-plus-test-file", "scope": "test-file",
+                "schema": "hashmarks.verification-plan.v1",
+                "path": rel,
+                "available": True,
+                "runner": "vitest",
+                "argv": [runner, "run", rel],
+                "working_directory": ".",
+                "confidence": "high",
+                "evidence": "local-vitest-plus-test-file",
+                "scope": "test-file",
             }
         if target.suffix.lower() not in {".js", ".mjs", ".cjs"}:
             return None
         try:
-            source = (self.workspace / rel).read_text(encoding="utf-8", errors="replace")
+            source = (self.workspace / rel).read_text(
+                encoding="utf-8", errors="replace"
+            )
         except OSError:
             source = ""
         if "node:test" not in source and "node:test/" not in source:
             return None
         return {
-            "schema": "hashmarks.verification-plan.v1", "path": rel, "available": True,
-            "runner": "node-test", "argv": ["node", "--test", rel], "working_directory": ".",
-            "confidence": "high", "evidence": "node-test-import-plus-test-file", "scope": "test-file",
+            "schema": "hashmarks.verification-plan.v1",
+            "path": rel,
+            "available": True,
+            "runner": "node-test",
+            "argv": ["node", "--test", rel],
+            "working_directory": ".",
+            "confidence": "high",
+            "evidence": "node-test-import-plus-test-file",
+            "scope": "test-file",
         }
 
-    def _typescript_verification_plan(self, rel: str, target: Path) -> dict[str, object] | None:
+    def _typescript_verification_plan(
+        self, rel: str, target: Path
+    ) -> dict[str, object] | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if target.suffix.lower() not in {".ts", ".tsx", ".mts", ".cts"}:
             return None
         if not (self.workspace / "tsconfig.json").is_file():
             return None
         return {
-            "schema": "hashmarks.verification-plan.v1", "path": rel, "available": True,
-            "runner": "typescript-compiler", "argv": ["tsc", "--noEmit", "-p", "tsconfig.json"],
-            "working_directory": ".", "confidence": "medium",
-            "evidence": "tsconfig-plus-typescript-test-file", "scope": "typescript-project",
+            "schema": "hashmarks.verification-plan.v1",
+            "path": rel,
+            "available": True,
+            "runner": "typescript-compiler",
+            "argv": ["tsc", "--noEmit", "-p", "tsconfig.json"],
+            "working_directory": ".",
+            "confidence": "medium",
+            "evidence": "tsconfig-plus-typescript-test-file",
+            "scope": "typescript-project",
         }
 
     def verification_plan(
         self, path: str, *, symbol: str | None = None, qualname: str | None = None
     ) -> dict[str, object]:
         """Derive a bounded argv for a known verification surface."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         rel = normalize_relative_path(path, allow_root=False)
         if not self._path_admitted_for_analysis(rel):
             return {
@@ -948,7 +1166,12 @@ class VerificationMixin:
         target = Path(rel)
         domains = set(classify_repository_path(rel))
         if RepositoryDomain.TEST not in domains:
-            return {"schema": "hashmarks.verification-plan.v1", "path": rel, "available": False, "reason": "path-is-not-test-domain"}
+            return {
+                "schema": "hashmarks.verification-plan.v1",
+                "path": rel,
+                "available": False,
+                "reason": "path-is-not-test-domain",
+            }
         if target.suffix.lower() == ".py":
             return self._python_verification_plan(rel, symbol, qualname)
         plan = self._go_verification_plan(rel, target)
@@ -962,19 +1185,34 @@ class VerificationMixin:
             plan = self._typescript_verification_plan(rel, target)
             if plan is not None:
                 return plan
-        return {"schema": "hashmarks.verification-plan.v1", "path": rel, "available": False, "reason": "unsupported-test-runner"}
+        return {
+            "schema": "hashmarks.verification-plan.v1",
+            "path": rel,
+            "available": False,
+            "reason": "unsupported-test-runner",
+        }
 
     @staticmethod
     def _packet_digest(domain: str, payload: object) -> str:
         encoded = json.dumps(
-            payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
         ).encode("utf-8")
         return hashlib.sha256(domain.encode("utf-8") + b"\0" + encoded).hexdigest()
 
     def _repository_packet_identity(self) -> str:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         generation = self.store.generation()
         cached = self._decision_repository_identity_cache
-        if self._decision_session_depth > 0 and cached is not None and cached[0] == generation:
+        if (
+            self._decision_session_depth > 0
+            and cached is not None
+            and cached[0] == generation
+        ):
             return cached[1]
         base = git_base_identity(self.workspace)
         if base:
@@ -1017,6 +1255,8 @@ class VerificationMixin:
         the same repository generation and action evidence therefore carry the
         same identity even when their visible context budgets differ.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         generation, identity_generation, stale = self._generation_status()
 
         def anchor(value: object) -> dict[str, object] | None:
@@ -1028,8 +1268,16 @@ class VerificationMixin:
                     row[key] = str(value[key])
             return row
 
-        ownership = action.get("ownership_resolution") if isinstance(action.get("ownership_resolution"), Mapping) else {}
-        owner_path = ownership.get("owner_path") if isinstance(ownership.get("owner_path"), list) else []
+        ownership = (
+            action.get("ownership_resolution")
+            if isinstance(action.get("ownership_resolution"), Mapping)
+            else {}
+        )
+        owner_path = (
+            ownership.get("owner_path")
+            if isinstance(ownership.get("owner_path"), list)
+            else []
+        )
         normalized_owner_path = [
             {
                 "from": str(edge.get("from") or ""),
@@ -1039,7 +1287,11 @@ class VerificationMixin:
             for edge in owner_path
             if isinstance(edge, Mapping)
         ]
-        ambiguity = action.get("ambiguity") if isinstance(action.get("ambiguity"), Mapping) else {}
+        ambiguity = (
+            action.get("ambiguity")
+            if isinstance(action.get("ambiguity"), Mapping)
+            else {}
+        )
         payload: dict[str, object] = {
             "schema": "hashmarks.decision-evidence.v1",
             "repository_identity": self._repository_packet_identity(),
@@ -1063,7 +1315,9 @@ class VerificationMixin:
                 "hashmarks.verification-plan.v1", verification
             ),
         }
-        evidence_identity = self._packet_digest("hashmarks.decision-evidence.v1", payload)
+        evidence_identity = self._packet_digest(
+            "hashmarks.decision-evidence.v1", payload
+        )
         return {
             "schema": "hashmarks.decision-evidence-receipt.v1",
             "evidence_identity": evidence_identity,
@@ -1080,11 +1334,13 @@ class VerificationMixin:
     ) -> dict[str, str]:
         return {
             "verification_plan": f"sha256:{verification_digest}",
-            "verification_relevance": "sha256:" + self._packet_digest(
+            "verification_relevance": "sha256:"
+            + self._packet_digest(
                 "hashmarks.verification-relevance.v1",
                 action.get("verification_relevance"),
             ),
-            "ownership": "sha256:" + self._packet_digest(
+            "ownership": "sha256:"
+            + self._packet_digest(
                 "hashmarks.ownership-resolution.v1",
                 action.get("ownership_resolution"),
             ),
@@ -1134,15 +1390,16 @@ class VerificationMixin:
             "source_identity": source_identity,
             "verification_membership_identity": (
                 membership.get("membership_identity")
-                if membership is not None else None
+                if membership is not None
+                else None
             ),
             "verification_selection_envelope_identity": (
-                envelope.get("envelope_identity")
-                if envelope is not None else None
+                envelope.get("envelope_identity") if envelope is not None else None
             ),
             "verification_selection_producer_implementation_identity": (
                 envelope.get("producer", {}).get("implementation_identity")
-                if isinstance(envelope, Mapping) else None
+                if isinstance(envelope, Mapping)
+                else None
             ),
         }
 
@@ -1165,9 +1422,7 @@ class VerificationMixin:
             else None
         )
         qualname = (
-            str(verify.get("qualname"))
-            if verify.get("qualname") is not None
-            else None
+            str(verify.get("qualname")) if verify.get("qualname") is not None else None
         )
         return self.verification_plan(
             str(verify["path"]),
@@ -1182,4 +1437,3 @@ class VerificationMixin:
         if selection_envelope is None:
             return None
         return downstream_consumption_contract(selection_envelope)
-

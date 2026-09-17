@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from hashmarks.digest import Digest
 from hashmarks.file_store import FileDigestStore
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 BIG = 2**63
 
@@ -68,7 +70,10 @@ def test_batch_digest_accepts_oversized_metadata_and_reuses_after_reopen(
     monkeypatch.setattr(store, "_metadata", lambda path: metadata_by_name[path.name])
     monkeypatch.setattr(
         "hashmarks.file_store.hash_file",
-        lambda path: Digest(hash=path.name.encode().hex().ljust(64, "0")[:64], size=metadata_by_name[path.name][2]),
+        lambda path: Digest(
+            hash=path.name.encode().hex().ljust(64, "0")[:64],
+            size=metadata_by_name[path.name][2],
+        ),
     )
     first = store.digest_many_info(files, workspace=workspace)
     store.close()
@@ -84,7 +89,9 @@ def test_batch_digest_accepts_oversized_metadata_and_reuses_after_reopen(
     reopened.close()
 
 
-def test_fresh_schema_keeps_existing_integer_affinity_without_versioning(tmp_path: Path) -> None:
+def test_fresh_schema_keeps_existing_integer_affinity_without_versioning(
+    tmp_path: Path,
+) -> None:
     db = tmp_path / "identity.sqlite3"
     store = FileDigestStore(db)
     store.close()
@@ -109,7 +116,9 @@ def test_fresh_schema_keeps_existing_integer_affinity_without_versioning(tmp_pat
     connection.close()
 
 
-def test_incompatible_file_digest_schema_is_rebuilt_as_disposable_cache(tmp_path: Path) -> None:
+def test_incompatible_file_digest_schema_is_rebuilt_as_disposable_cache(
+    tmp_path: Path,
+) -> None:
     db = tmp_path / "identity.sqlite3"
     connection = sqlite3.connect(db)
     connection.execute(
@@ -198,7 +207,6 @@ def test_corrupt_persisted_row_is_evicted_in_batch_path(
     reopened.close()
 
 
-
 def test_signed64_metadata_stays_on_integer_fast_path_without_overflow_payload(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -217,6 +225,7 @@ def test_signed64_metadata_stays_on_integer_fast_path_without_overflow_payload(
     ).fetchone()
     assert row == ("integer", "integer", "integer", "integer", "integer", None)
     store.close()
+
 
 def test_overflow_metadata_uses_one_canonical_blob_and_bind_safe_integer_placeholders(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -274,8 +283,15 @@ def test_distinct_oversized_metadata_never_collapses_through_sqlite_numeric_affi
         "SELECT typeof(inode), inode, typeof(overflow_metadata), overflow_metadata "
         "FROM file_digest ORDER BY path"
     ).fetchall()
-    assert {inode_kind for inode_kind, _inode, _overflow_kind, _overflow in rows} == {"integer"}
+    assert {inode_kind for inode_kind, _inode, _overflow_kind, _overflow in rows} == {
+        "integer"
+    }
     assert {inode for _inode_kind, inode, _overflow_kind, _overflow in rows} == {0}
-    assert {overflow_kind for _inode_kind, _inode, overflow_kind, _overflow in rows} == {"blob"}
-    assert len({overflow for _inode_kind, _inode, _overflow_kind, overflow in rows}) == 1000
+    assert {
+        overflow_kind for _inode_kind, _inode, overflow_kind, _overflow in rows
+    } == {"blob"}
+    assert (
+        len({overflow for _inode_kind, _inode, _overflow_kind, overflow in rows})
+        == 1000
+    )
     store.close()

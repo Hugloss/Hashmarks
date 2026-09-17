@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import pytest
 from copy import deepcopy
 
-from hashmarks import __version__
+import pytest
 
+from hashmarks import __version__
 from hashmarks.verification_selection import (
     VerificationSelectionEnvelopeState,
     downstream_consumption_contract,
+    validate_verification_membership,
+    validate_verification_selection_envelope,
     verification_member,
     verification_membership,
     verification_selection_envelope,
-    validate_verification_selection_envelope,
-    validate_verification_membership,
 )
 
 
@@ -45,9 +45,11 @@ def test_membership_identity_changes_on_omission_and_duplicate_fails_closed() ->
 
 
 def test_selection_envelope_binds_repository_source_owner_and_evidence_hashes() -> None:
-    membership = verification_membership([
-        verification_member("tests/test_a.py", test_symbol="test_a"),
-    ])
+    membership = verification_membership(
+        [
+            verification_member("tests/test_a.py", test_symbol="test_a"),
+        ]
+    )
     envelope = verification_selection_envelope(
         VerificationSelectionEnvelopeState(
             repository_identity="git-tree:abc",
@@ -64,7 +66,10 @@ def test_selection_envelope_binds_repository_source_owner_and_evidence_hashes() 
         )
     )
 
-    assert envelope["selection"]["membership_identity"] == membership["membership_identity"]
+    assert (
+        envelope["selection"]["membership_identity"]
+        == membership["membership_identity"]
+    )
     assert envelope["repository"]["repository_identity"] == "git-tree:abc"
     assert envelope["repository"]["source_identity"].startswith("sha256:")
     assert envelope["producer"]["name"] == "hashmarks"
@@ -73,10 +78,12 @@ def test_selection_envelope_binds_repository_source_owner_and_evidence_hashes() 
 
 
 def test_selection_envelope_rejects_membership_and_provenance_tampering() -> None:
-    membership = verification_membership([
-        verification_member("tests/test_a.py"),
-        verification_member("tests/test_b.py"),
-    ])
+    membership = verification_membership(
+        [
+            verification_member("tests/test_a.py"),
+            verification_member("tests/test_b.py"),
+        ]
+    )
     envelope = verification_selection_envelope(
         VerificationSelectionEnvelopeState(
             repository_identity="git-tree:abc",
@@ -105,10 +112,12 @@ def test_selection_envelope_rejects_membership_and_provenance_tampering() -> Non
 
 
 def test_downstream_contract_is_compact_and_execution_layout_independent() -> None:
-    membership = verification_membership([
-        verification_member("tests/test_a.py"),
-        verification_member("tests/test_b.py"),
-    ])
+    membership = verification_membership(
+        [
+            verification_member("tests/test_a.py"),
+            verification_member("tests/test_b.py"),
+        ]
+    )
     envelope = verification_selection_envelope(
         VerificationSelectionEnvelopeState(
             repository_identity="git-tree:abc",
@@ -127,7 +136,10 @@ def test_downstream_contract_is_compact_and_execution_layout_independent() -> No
     assert contract["repository_identity"] == "git-tree:abc"
     assert contract["source_identity"] == "sha256:" + "1" * 64
     assert contract["hashmarks_identity"] == f"hashmarks:{__version__}"
-    assert contract["producer_implementation_identity"] == envelope["producer"]["implementation_identity"]
+    assert (
+        contract["producer_implementation_identity"]
+        == envelope["producer"]["implementation_identity"]
+    )
     assert contract["selected_membership_identity"] == membership["membership_identity"]
     assert contract["envelope_identity"] == envelope["envelope_identity"]
     assert contract["contract_identity"].startswith("sha256:")
@@ -137,8 +149,7 @@ def test_downstream_contract_is_compact_and_execution_layout_independent() -> No
 
 def test_external_batch_layouts_do_not_change_membership_identity() -> None:
     members = [
-        verification_member(f"tests/test_{name}.py")
-        for name in ("a", "b", "c", "d")
+        verification_member(f"tests/test_{name}.py") for name in ("a", "b", "c", "d")
     ]
     layouts = [
         [members],
@@ -155,8 +166,12 @@ def test_external_batch_layouts_do_not_change_membership_identity() -> None:
     assert len(identities) == 1
 
 
-def test_membership_validator_rejects_tampered_member_id_even_when_outer_membership_identity_is_unchanged() -> None:
-    membership = verification_membership([verification_member("tests/test_a.py", test_symbol="test_a")])
+def test_membership_validator_rejects_tampered_member_id_even_when_outer_membership_identity_is_unchanged() -> (
+    None
+):
+    membership = verification_membership(
+        [verification_member("tests/test_a.py", test_symbol="test_a")]
+    )
     tampered = dict(membership)
     tampered["members"] = [dict(membership["members"][0])]
     tampered["members"][0]["member_id"] = "sha256:" + "f" * 64
@@ -171,16 +186,16 @@ def test_generation_domain_and_identity_types_fail_closed() -> None:
     membership = verification_membership([verification_member("tests/test_a.py")])
 
     def state(**changes):
-        values = dict(
-            repository_identity="git-tree:abc",
-            source_identity="sha256:" + "1" * 64,
-            codemap_generation=1,
-            identity_generation=1,
-            stale=False,
-            membership=membership,
-            owner_evidence={},
-            evidence_hashes={},
-        )
+        values = {
+            "repository_identity": "git-tree:abc",
+            "source_identity": "sha256:" + "1" * 64,
+            "codemap_generation": 1,
+            "identity_generation": 1,
+            "stale": False,
+            "membership": membership,
+            "owner_evidence": {},
+            "evidence_hashes": {},
+        }
         values.update(changes)
         return VerificationSelectionEnvelopeState(**values)
 
@@ -202,26 +217,44 @@ def test_generation_domain_and_identity_types_fail_closed() -> None:
         else:
             raise AssertionError(f"producer accepted {field}={value!r}")
 
-    assert verification_selection_envelope(state(codemap_generation=0))["repository"]["codemap_generation"] == 0
-    assert verification_selection_envelope(state(codemap_generation=MAX_PORTABLE_GENERATION))["repository"]["codemap_generation"] == MAX_PORTABLE_GENERATION
-    assert verification_selection_envelope(state(identity_generation=None))["repository"]["identity_generation"] is None
+    assert (
+        verification_selection_envelope(state(codemap_generation=0))["repository"][
+            "codemap_generation"
+        ]
+        == 0
+    )
+    assert (
+        verification_selection_envelope(
+            state(codemap_generation=MAX_PORTABLE_GENERATION)
+        )["repository"]["codemap_generation"]
+        == MAX_PORTABLE_GENERATION
+    )
+    assert (
+        verification_selection_envelope(state(identity_generation=None))["repository"][
+            "identity_generation"
+        ]
+        is None
+    )
 
 
 def test_unknown_freshness_fails_closed_as_stale() -> None:
     membership = verification_membership([verification_member("tests/test_a.py")])
-    envelope = verification_selection_envelope(VerificationSelectionEnvelopeState(
-        repository_identity="git-tree:abc",
-        source_identity="sha256:" + "1" * 64,
-        codemap_generation=1,
-        identity_generation=None,
-        stale=None,
-        membership=membership,
-        owner_evidence={},
-        evidence_hashes={},
-    ))
+    envelope = verification_selection_envelope(
+        VerificationSelectionEnvelopeState(
+            repository_identity="git-tree:abc",
+            source_identity="sha256:" + "1" * 64,
+            codemap_generation=1,
+            identity_generation=None,
+            stale=None,
+            membership=membership,
+            owner_evidence={},
+            evidence_hashes={},
+        )
+    )
     assert envelope["repository"]["stale"] is True
     contract = downstream_consumption_contract(envelope)
     from hashmarks.consumer_conformance import validate_native_consumer_bundle
+
     checked = validate_native_consumer_bundle(envelope, contract, require_fresh=True)
     assert checked["valid"] is False
     assert "fresh-evidence-required" in checked["reasons"]
@@ -246,7 +279,12 @@ def test_envelope_rejects_invalid_membership_before_identity_formation():
                 codemap_generation=1,
                 identity_generation=1,
                 stale=False,
-                membership={"schema": "bad", "members": [], "membership_identity": "sha256:x", "member_count": 0},
+                membership={
+                    "schema": "bad",
+                    "members": [],
+                    "membership_identity": "sha256:x",
+                    "member_count": 0,
+                },
                 owner_evidence={},
                 evidence_hashes={},
             )
@@ -304,7 +342,9 @@ def test_envelope_validator_rejects_identity_bound_invalid_evidence_hashes() -> 
         )
     )
     envelope["evidence_hashes"] = {"ownership": "not-a-sha256"}
-    payload = {key: value for key, value in envelope.items() if key != "envelope_identity"}
+    payload = {
+        key: value for key, value in envelope.items() if key != "envelope_identity"
+    }
     envelope["envelope_identity"] = selection_module._identity(
         selection_module.SELECTION_ENVELOPE_SCHEMA, payload
     )

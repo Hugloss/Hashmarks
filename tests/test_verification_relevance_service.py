@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import threading
 import time
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMapService, CodeMapServiceClient
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _wait(client: CodeMapServiceClient) -> None:
@@ -30,7 +33,12 @@ def test_service_exposes_verification_relevance(tmp_path: Path) -> None:
         "def test_contract():\n    assert apply_policy(1) == 1\n"
     )
     for index in range(25):
-        (tmp_path / "tests" / "regression" / f"test_apply_policy_feature0042_{index:04d}.py").write_text(
+        (
+            tmp_path
+            / "tests"
+            / "regression"
+            / f"test_apply_policy_feature0042_{index:04d}.py"
+        ).write_text(
             "from packages.feature0042.service import apply_policy\n\n"
             "def test_apply_policy_feature0042():\n    assert apply_policy(1) == 1\n"
         )

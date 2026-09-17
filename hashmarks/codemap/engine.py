@@ -1,103 +1,70 @@
 from __future__ import annotations
 
-import ast
-import heapq
-import hashlib
-import json
-import math
-import os
-import posixpath
-import re
-import time
-import tomllib
-from contextlib import nullcontext
-from dataclasses import dataclass, replace
-from functools import lru_cache
-from pathlib import Path, PurePosixPath
-from typing import Iterable, Mapping, Sequence
+from pathlib import Path
 
-from ..client import (DaemonCompatibilityError, DaemonProtocolError, DaemonUnavailableError, IdentityClient, RepositoryObservation, default_state_dir)
-from ..file_store import FileDigestStore, UnstableFileError
-from ..paths import canonical_host_path, normalize_relative_path
-from ..python_ast_cache import read_python_ast
-from ..evidence_context import evidence_context_identity
-from ..native_vitest import collect_vitest_vite_graph, local_vitest
-from .model import EvidenceVisibility, ContextDisclosure, ContextItem, ContextPack, SearchHit, SyncResult
-from .context_cache import ContextCache
-from .import_ownership import analyze_python_import_ownership
-from .cache_ownership import analyze_python_cache_ownership
-from .cache_invalidation import analyze_python_cache_invalidators
-from .concurrency_risk import analyze_python_concurrency_risk
-from .singleflight import SingleFlight
-from .policy import ContextPolicy
-from .project_impact_codec import compact_project_impact
-from .python_ast import estimate_tokens, identifier_terms
-from .parsers import artifact_key_for, parse_source
-from .providers import TreeSitterRangeProvider
-from .project_graph import default_project_graph_providers
-from .query_router import QueryRoute, route_query
-from .repository_domains import RepositoryDomain, classify_repository_path, is_test_path
-from .structural_search import AstGrepSearchProvider
-from .scip_adapter import load_scip_json
-from .typescript_resolver import TypeScriptResolverProvider
-from ..verification_selection import VerificationSelectionEnvelopeState, downstream_consumption_contract, verification_membership_from_selection, verification_selection_envelope
-from ..ownership_decision import OwnershipDecisionState, ownership_authority_contract, ownership_decision_trace
-from ..symbolic_identity import symbolic_nomination_record, symbolic_task_terms
-from .pyright_type_server import PyrightTypeServerProvider
-from .repository_index_store import ArtifactStore, WorkspaceMapStore, default_artifact_db, default_base_snapshot, git_base_identity, git_overlay_paths
-from .decision_session import DecisionSessionMixin
-from .evidence_packet import TaskEvidencePacketMixin
-from .post_change import PostChangeMixin
+from hashmarks.client import (
+    DaemonCompatibilityError,
+    DaemonProtocolError,
+    DaemonUnavailableError,
+    IdentityClient,
+    RepositoryObservation,
+    default_state_dir,
+)
+from hashmarks.file_store import FileDigestStore
+from hashmarks.native_vitest import (  # noqa: F401 - evidence_graph uses these engine module attributes
+    collect_vitest_vite_graph,
+    local_vitest,
+)
+from hashmarks.paths import canonical_host_path, normalize_relative_path
+
 from .change_intelligence import ChangeIntelligenceMixin
-from .freshness_map import EvidenceFreshnessMapMixin
-from .repository_delta import RepositoryDeltaMixin
-from .evidence_profiles import EvidenceProfilesMixin
+from .context_cache import ContextCache
 from .cross_repository_evidence import CrossRepositoryEvidenceMixin
-from .repository_intelligence_query import RepositoryIntelligenceQueryMixin
-from .intelligence_economics import IntelligenceEconomicsMixin
-from .verification_explanation import VerificationExplanationMixin
-from .repository_task_action import TaskActionMixin
-from .query_primitives import _TASK_EVIDENCE_FAMILIES, _TASK_GOVERNANCE_CUES, _TASK_STOPWORDS, _WORD_RE, _query_terms
-from .evidence_verification import VerificationMixin, _VerificationSelectionState
-from .relationships import RelationshipsMixin
-from .evidence_graph import EvidenceGraphMixin
-from .import_resolution import ImportResolutionMixin
+from .decision_session import DecisionSessionMixin
 from .evidence_freshness import EvidenceFreshnessMixin
-from .repository_context import ContextPlanningMixin
-from .ownership_analysis import OwnershipAnalysisMixin
-from .query_surface import QuerySurfaceMixin
-from .work_context import WorkContextMixin
-from .indexing_lifecycle import IndexingLifecycleMixin, _python_source_roots, _MAX_INDEX_BYTES
-from .task_retrieval import TaskRetrievalMixin
-from .ownership_graph import OwnershipGraphMixin
+from .evidence_graph import EvidenceGraphMixin
+from .evidence_packet import TaskEvidencePacketMixin
+from .evidence_profiles import EvidenceProfilesMixin
+from .evidence_verification import VerificationMixin
 from .find_engine import FindEngineMixin
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+from .freshness_map import EvidenceFreshnessMapMixin
+from .import_resolution import ImportResolutionMixin
+from .indexing_lifecycle import (
+    _MAX_INDEX_BYTES,
+    IndexingLifecycleMixin,
+    _python_source_roots,
+)
+from .intelligence_economics import IntelligenceEconomicsMixin
+from .model import (
+    ContextPack,
+    EvidenceVisibility,
+    SearchHit,
+)
+from .ownership_analysis import OwnershipAnalysisMixin
+from .ownership_graph import OwnershipGraphMixin
+from .policy import ContextPolicy
+from .post_change import PostChangeMixin
+from .project_graph import default_project_graph_providers
+from .providers import TreeSitterRangeProvider
+from .pyright_type_server import PyrightTypeServerProvider
+from .python_ast import estimate_tokens
+from .query_surface import QuerySurfaceMixin
+from .relationships import RelationshipsMixin
+from .repository_context import ContextPlanningMixin
+from .repository_delta import RepositoryDeltaMixin
+from .repository_index_store import (
+    ArtifactStore,
+    WorkspaceMapStore,
+    default_artifact_db,
+)
+from .repository_intelligence_query import RepositoryIntelligenceQueryMixin
+from .repository_task_action import TaskActionMixin
+from .singleflight import SingleFlight
+from .structural_search import AstGrepSearchProvider
+from .task_retrieval import TaskRetrievalMixin
+from .typescript_resolver import TypeScriptResolverProvider
+from .verification_explanation import VerificationExplanationMixin
+from .work_context import WorkContextMixin
 
 # Generic repository evidence families. These are query-formulation hints only:
 # they never name project-specific files, never grant authority, and are emitted
@@ -107,18 +74,33 @@ from .find_engine import FindEngineMixin
 # documentation.
 
 
-
-
-
-
-
-
-
-
-
-
-
-class CodeMap(TaskEvidencePacketMixin, ChangeIntelligenceMixin, EvidenceFreshnessMapMixin, RepositoryDeltaMixin, EvidenceProfilesMixin, CrossRepositoryEvidenceMixin, RepositoryIntelligenceQueryMixin, IntelligenceEconomicsMixin, VerificationExplanationMixin, PostChangeMixin, TaskActionMixin, VerificationMixin, RelationshipsMixin, ImportResolutionMixin, EvidenceFreshnessMixin, EvidenceGraphMixin, ContextPlanningMixin, OwnershipAnalysisMixin, QuerySurfaceMixin, WorkContextMixin, IndexingLifecycleMixin, TaskRetrievalMixin, OwnershipGraphMixin, FindEngineMixin, DecisionSessionMixin):
+class CodeMap(
+    TaskEvidencePacketMixin,
+    ChangeIntelligenceMixin,
+    EvidenceFreshnessMapMixin,
+    RepositoryDeltaMixin,
+    EvidenceProfilesMixin,
+    CrossRepositoryEvidenceMixin,
+    RepositoryIntelligenceQueryMixin,
+    IntelligenceEconomicsMixin,
+    VerificationExplanationMixin,
+    PostChangeMixin,
+    TaskActionMixin,
+    VerificationMixin,
+    RelationshipsMixin,
+    ImportResolutionMixin,
+    EvidenceFreshnessMixin,
+    EvidenceGraphMixin,
+    ContextPlanningMixin,
+    OwnershipAnalysisMixin,
+    QuerySurfaceMixin,
+    WorkContextMixin,
+    IndexingLifecycleMixin,
+    TaskRetrievalMixin,
+    OwnershipGraphMixin,
+    FindEngineMixin,
+    DecisionSessionMixin,
+):
     """Derived repository-intelligence map.
 
     This subsystem is intentionally outside the Identity import graph. It may
@@ -145,7 +127,9 @@ class CodeMap(TaskEvidencePacketMixin, ChangeIntelligenceMixin, EvidenceFreshnes
             self.state_dir = canonical_host_path(raw_state)
         self.state_dir.mkdir(parents=True, exist_ok=True)
         try:
-            self._state_rel = self.state_dir.relative_to(self.workspace).as_posix().strip("/")
+            self._state_rel = (
+                self.state_dir.relative_to(self.workspace).as_posix().strip("/")
+            )
         except ValueError:
             self._state_rel = None
         store = WorkspaceMapStore(self.state_dir / "codemap.sqlite3")
@@ -158,8 +142,14 @@ class CodeMap(TaskEvidencePacketMixin, ChangeIntelligenceMixin, EvidenceFreshnes
         # Protocol v3 is the compatibility fence. Reuse one stateless IPC client
         # so repository observations validate daemon compatibility once rather
         # than spending an extra status round-trip on every freshness sample.
-        self._identity_client = IdentityClient(self.workspace, state_dir=self.state_dir, timeout=0.1)
-        artifact_path = default_artifact_db(self.workspace) if artifact_db is None else canonical_host_path(artifact_db)
+        self._identity_client = IdentityClient(
+            self.workspace, state_dir=self.state_dir, timeout=0.1
+        )
+        artifact_path = (
+            default_artifact_db(self.workspace)
+            if artifact_db is None
+            else canonical_host_path(artifact_db)
+        )
         self.artifacts = ArtifactStore(artifact_path)
         config = None
         if policy_path is not None:
@@ -167,7 +157,10 @@ class CodeMap(TaskEvidencePacketMixin, ChangeIntelligenceMixin, EvidenceFreshnes
             if not config.is_absolute():
                 config = self.workspace / config
             config = canonical_host_path(config)
-        self._policy_config_path, self.policy = config, ContextPolicy.load(self.workspace, config)
+        self._policy_config_path, self.policy = (
+            config,
+            ContextPolicy.load(self.workspace, config),
+        )
         self.context_cache = ContextCache(self.state_dir)
         self._find_flight: SingleFlight[tuple[SearchHit, ...]] = SingleFlight()
         self._context_flight: SingleFlight[ContextPack] = SingleFlight()
@@ -188,7 +181,9 @@ class CodeMap(TaskEvidencePacketMixin, ChangeIntelligenceMixin, EvidenceFreshnes
         # Structural ownership may select an authority path that is not present in
         # the canonical retrieval rows. Remember those selected paths separately
         # so an unsignaled byte change is reconciled before the next decision.
-        self._task_authority_paths_cache: dict[tuple[int, str, int], tuple[str, ...]] = {}
+        self._task_authority_paths_cache: dict[
+            tuple[int, str, int], tuple[str, ...]
+        ] = {}
         # Retain a bounded task-local history of authority-contributing paths.
         # This is freshness evidence only: it lets a later ABA restoration or
         # path replacement be reconciled even after an intermediate decision
@@ -200,17 +195,33 @@ class CodeMap(TaskEvidencePacketMixin, ChangeIntelligenceMixin, EvidenceFreshnes
         self._decision_session_depth = 0
         self._decision_session_generation: int | None = None
         self._decision_session_observation: RepositoryObservation | None = None
-        self._decision_symbols_cache: dict[tuple[int, str], list[dict[str, object]]] = {}
-        self._decision_file_row_cache: dict[tuple[int, str], dict[str, object] | None] = {}
+        self._decision_symbols_cache: dict[
+            tuple[int, str], list[dict[str, object]]
+        ] = {}
+        self._decision_file_row_cache: dict[
+            tuple[int, str], dict[str, object] | None
+        ] = {}
         self._decision_module_paths_cache: dict[tuple[int, str], tuple[str, ...]] = {}
-        self._decision_exact_symbols_cache: dict[tuple[int, tuple[str, ...]], tuple[int, tuple[dict[str, object], ...]]] = {}
+        self._decision_exact_symbols_cache: dict[
+            tuple[int, tuple[str, ...]], tuple[int, tuple[dict[str, object], ...]]
+        ] = {}
         # Reverse-reference semantics are keyed by target_short in the store;
         # qualified aliases with the same short name therefore share one cache.
-        self._decision_refs_cache: dict[tuple[int, str], tuple[int, tuple[dict[str, object], ...]]] = {}
-        self._decision_edges_from_cache: dict[tuple[int, str, str], tuple[int, tuple[dict[str, object], ...]]] = {}
-        self._decision_edges_for_path_cache: dict[tuple[int, str], tuple[int, tuple[dict[str, object], ...]]] = {}
-        self._decision_df_cache: dict[tuple[int, tuple[str, ...]], tuple[int, dict[str, int]]] = {}
-        self._decision_candidates_cache: dict[tuple[int, tuple[str, ...], int], list[dict[str, object]]] = {}
+        self._decision_refs_cache: dict[
+            tuple[int, str], tuple[int, tuple[dict[str, object], ...]]
+        ] = {}
+        self._decision_edges_from_cache: dict[
+            tuple[int, str, str], tuple[int, tuple[dict[str, object], ...]]
+        ] = {}
+        self._decision_edges_for_path_cache: dict[
+            tuple[int, str], tuple[int, tuple[dict[str, object], ...]]
+        ] = {}
+        self._decision_df_cache: dict[
+            tuple[int, tuple[str, ...]], tuple[int, dict[str, int]]
+        ] = {}
+        self._decision_candidates_cache: dict[
+            tuple[int, tuple[str, ...], int], list[dict[str, object]]
+        ] = {}
         self._decision_repository_identity_cache: tuple[int, str] | None = None
         # Complete repository-intelligence snapshots are expensive compositions of
         # already generation-bound evidence. Reuse them only inside one explicit
@@ -230,12 +241,47 @@ class CodeMap(TaskEvidencePacketMixin, ChangeIntelligenceMixin, EvidenceFreshnes
         # derivation inside one explicit decision session.
         self._decision_change_impact_owner_chain_cache: dict[
             tuple[int, str, int, int],
-            tuple[str, dict[str, object] | None, str, list[str], dict[tuple[str, str], str]],
+            tuple[
+                str,
+                dict[str, object] | None,
+                str,
+                list[str],
+                dict[tuple[str, str], str],
+            ],
         ] = {}
         self._decision_ownership_import_paths_cache: dict[
             tuple[int, str, str], tuple[str, ...]
         ] = {}
-        self._decision_session_stats = {"task_result_hit": 0, "task_result_miss": 0, "symbols_hit": 0, "symbols_miss": 0, "file_row_hit": 0, "file_row_miss": 0, "module_paths_hit": 0, "module_paths_miss": 0, "exact_symbols_hit": 0, "exact_symbols_miss": 0, "refs_hit": 0, "refs_miss": 0, "edges_from_hit": 0, "edges_from_miss": 0, "edges_for_path_hit": 0, "edges_for_path_miss": 0, "df_hit": 0, "df_miss": 0, "candidates_hit": 0, "candidates_miss": 0, "snapshot_hit": 0, "snapshot_miss": 0, "task_action_hit": 0, "task_action_miss": 0, "impact_owner_chain_hit": 0, "impact_owner_chain_miss": 0, "ownership_import_paths_hit": 0, "ownership_import_paths_miss": 0}
+        self._decision_session_stats = {
+            "task_result_hit": 0,
+            "task_result_miss": 0,
+            "symbols_hit": 0,
+            "symbols_miss": 0,
+            "file_row_hit": 0,
+            "file_row_miss": 0,
+            "module_paths_hit": 0,
+            "module_paths_miss": 0,
+            "exact_symbols_hit": 0,
+            "exact_symbols_miss": 0,
+            "refs_hit": 0,
+            "refs_miss": 0,
+            "edges_from_hit": 0,
+            "edges_from_miss": 0,
+            "edges_for_path_hit": 0,
+            "edges_for_path_miss": 0,
+            "df_hit": 0,
+            "df_miss": 0,
+            "candidates_hit": 0,
+            "candidates_miss": 0,
+            "snapshot_hit": 0,
+            "snapshot_miss": 0,
+            "task_action_hit": 0,
+            "task_action_miss": 0,
+            "impact_owner_chain_hit": 0,
+            "impact_owner_chain_miss": 0,
+            "ownership_import_paths_hit": 0,
+            "ownership_import_paths_miss": 0,
+        }
         self._decision_diagnostics_enabled = False
         self._decision_diagnostics_started_ns = 0
         self._decision_diagnostics_sequence = 0
@@ -244,7 +290,7 @@ class CodeMap(TaskEvidencePacketMixin, ChangeIntelligenceMixin, EvidenceFreshnes
         self._decision_diagnostics_producers: dict[str, dict[str, object]] = {}
         self._decision_diagnostics_last: dict[str, object] | None = None
 
-    def __enter__(self) -> "CodeMap":
+    def __enter__(self) -> CodeMap:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -256,34 +302,21 @@ class CodeMap(TaskEvidencePacketMixin, ChangeIntelligenceMixin, EvidenceFreshnes
         self.artifacts.close()
         self.file_store.close()
 
-
-
     def _daemon_observation(self) -> RepositoryObservation | None:
         try:
             return self._identity_client.repository_observation()
-        except (DaemonUnavailableError, DaemonCompatibilityError, DaemonProtocolError, OSError):
+        except (
+            DaemonUnavailableError,
+            DaemonCompatibilityError,
+            DaemonProtocolError,
+            OSError,
+        ):
             return None
 
     def _internal_path(self, rel: str) -> bool:
         clean = rel.strip("/")
         state = self._state_rel
         return bool(state and (clean == state or clean.startswith(state + "/")))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     def outline(self, relpath: str) -> dict[str, object]:
         self._ensure_map_ready()
@@ -294,7 +327,9 @@ class CodeMap(TaskEvidencePacketMixin, ChangeIntelligenceMixin, EvidenceFreshnes
             raise FileNotFoundError(f"not indexed: {rel}")
         visibility = EvidenceVisibility(str(row["evidence_visibility"]))
         if visibility is EvidenceVisibility.DENY:
-            raise PermissionError(f"repository evidence denied by context policy: {rel}")
+            raise PermissionError(
+                f"repository evidence denied by context policy: {rel}"
+            )
         generation, identity_generation, stale = self._generation_status()
         return {
             "schema": "hashmarks.outline.v1",
@@ -355,232 +390,3 @@ class CodeMap(TaskEvidencePacketMixin, ChangeIntelligenceMixin, EvidenceFreshnes
             return observation
         self.sync()
         return observation
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

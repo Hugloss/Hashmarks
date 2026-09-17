@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -99,7 +98,9 @@ def test_watcher_event_alias_collapses_but_symlink_leaf_is_preserved(tmp_path: P
     assert canonical_event_relative_path(repo, "src/new.py") == "src/new.py"
 
 
-def test_walk_ignored_directory_is_ignored_broadly_but_selectable_explicitly(tmp_path: Path):
+def test_walk_ignored_directory_is_ignored_broadly_but_selectable_explicitly(
+    tmp_path: Path,
+):
     workspace = tmp_path / "repo"
     ignored = workspace / "__pycache__"
     ignored.mkdir(parents=True)
@@ -120,7 +121,9 @@ def test_walk_ignored_directory_is_ignored_broadly_but_selectable_explicitly(tmp
     assert tree.digest_selected(["__pycache__"]) != selected_before
 
 
-def test_mandatory_hashmarks_exclusion_cannot_be_disabled_by_legacy_ignore_names(tmp_path: Path):
+def test_mandatory_hashmarks_exclusion_cannot_be_disabled_by_legacy_ignore_names(
+    tmp_path: Path,
+):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     state = workspace / ".hashmarks"
@@ -158,7 +161,9 @@ def test_package_has_no_absolute_path_authority_calls():
     assert offenders == []
 
 
-def test_real_symlink_and_dotdot_workspace_aliases_produce_same_identity(tmp_path: Path):
+def test_real_symlink_and_dotdot_workspace_aliases_produce_same_identity(
+    tmp_path: Path,
+):
     real = tmp_path / "real"
     repo = real / "repo"
     (repo / "src").mkdir(parents=True)

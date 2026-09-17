@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import sys
 from pathlib import Path
 
@@ -46,7 +45,10 @@ def test_codex_event_validation_accepts_exact_two_hashmarks_calls() -> None:
 
 def test_codex_event_validation_rejects_built_in_tool_use() -> None:
     events = [
-        {"type": "item.completed", "item": {"type": "command_execution", "status": "completed"}},
+        {
+            "type": "item.completed",
+            "item": {"type": "command_execution", "status": "completed"},
+        },
         _event("repository_context", "hashmarks.repository-capsule.v1"),
         _event("find", "hashmarks.mcp-find.v1"),
     ]
@@ -58,7 +60,11 @@ def test_codex_event_validation_rejects_failed_or_wrong_schema() -> None:
     with pytest.raises(codex_gate.HostGateError, match="did not complete"):
         codex_gate._validate_events(
             [
-                _event("repository_context", "hashmarks.repository-capsule.v1", status="failed"),
+                _event(
+                    "repository_context",
+                    "hashmarks.repository-capsule.v1",
+                    status="failed",
+                ),
                 _event("find", "hashmarks.mcp-find.v1"),
             ]
         )
@@ -76,7 +82,9 @@ def test_codex_config_binds_absolute_installed_hashmarks(tmp_path: Path) -> None
     repo.mkdir()
     executable = tmp_path / "venv" / "bin" / "hashmarks"
     path = codex_gate._write_codex_config(repo, executable)
-    data = codex_gate.json.loads("{}")  # prove json module remains ordinary before TOML read
+    data = codex_gate.json.loads(
+        "{}"
+    )  # prove json module remains ordinary before TOML read
     assert data == {}
     import tomllib
 
@@ -91,4 +99,6 @@ def test_codex_headless_approval_block_detection_is_narrow() -> None:
     assert codex_gate._looks_like_headless_mcp_approval_block(
         "mcp: hashmarks/find failed: user cancelled MCP tool call"
     )
-    assert not codex_gate._looks_like_headless_mcp_approval_block("model authentication failed")
+    assert not codex_gate._looks_like_headless_mcp_approval_block(
+        "model authentication failed"
+    )

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from .decision_session import diagnostic_producer
-
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
-from ..paths import normalize_relative_path
+from hashmarks.paths import normalize_relative_path
+
+from .decision_session import diagnostic_producer
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from .engine import CodeMap
 
 
 class RepositoryDeltaMixin:
@@ -25,40 +30,63 @@ class RepositoryDeltaMixin:
             raise ValueError(f"{field} must be an object")
         return value
 
-    def _snapshot_paths(self, changed_paths: Sequence[str | Path]) -> dict[str, dict[str, object]]:
-        paths = tuple(dict.fromkeys(
-            normalize_relative_path(path, allow_root=False) for path in changed_paths
-        ))
+    def _snapshot_paths(
+        self, changed_paths: Sequence[str | Path]
+    ) -> dict[str, dict[str, object]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        paths = tuple(
+            dict.fromkeys(
+                normalize_relative_path(path, allow_root=False)
+                for path in changed_paths
+            )
+        )
         if not paths:
-            raise ValueError("changed_paths must contain at least one repository-relative path")
+            raise ValueError(
+                "changed_paths must contain at least one repository-relative path"
+            )
         symbols_by_path = self.store.symbols_for_paths_many(paths, limit_per_path=32)
         edges_by_path = self._session_edges_for_paths_many(paths, limit_per_path=32)
         rows: dict[str, dict[str, object]] = {}
         for path in paths:
             file_row = self._session_file_row(path)
             revision = (
-                None if file_row is None or not file_row["file_digest"]
+                None
+                if file_row is None or not file_row["file_digest"]
                 else str(file_row["file_digest"])
             )
-            symbols = sorted((
-                {
-                    key: str(symbol[key])
-                    for key in ("name", "qualname", "kind")
-                    if symbol.get(key) is not None and str(symbol.get(key) or "")
-                }
-                for symbol in symbols_by_path.get(path, ())
-            ), key=lambda row: (row.get("qualname", ""), row.get("name", ""), row.get("kind", "")))
-            dependencies = sorted((
-                {
-                    key: str(edge[key])
-                    for key in ("source", "kind", "target", "confidence")
-                    if edge.get(key) is not None and str(edge.get(key) or "")
-                }
-                for edge in edges_by_path.get(path, ())
-                if edge.get("kind") and edge.get("target")
-            ), key=lambda row: (
-                row.get("kind", ""), row.get("source", ""), row.get("target", ""), row.get("confidence", "")
-            ))
+            symbols = sorted(
+                (
+                    {
+                        key: str(symbol[key])
+                        for key in ("name", "qualname", "kind")
+                        if symbol.get(key) is not None and str(symbol.get(key) or "")
+                    }
+                    for symbol in symbols_by_path.get(path, ())
+                ),
+                key=lambda row: (
+                    row.get("qualname", ""),
+                    row.get("name", ""),
+                    row.get("kind", ""),
+                ),
+            )
+            dependencies = sorted(
+                (
+                    {
+                        key: str(edge[key])
+                        for key in ("source", "kind", "target", "confidence")
+                        if edge.get(key) is not None and str(edge.get(key) or "")
+                    }
+                    for edge in edges_by_path.get(path, ())
+                    if edge.get("kind") and edge.get("target")
+                ),
+                key=lambda row: (
+                    row.get("kind", ""),
+                    row.get("source", ""),
+                    row.get("target", ""),
+                    row.get("confidence", ""),
+                ),
+            )
             rows[path] = {
                 "revision": revision,
                 "symbols": symbols,
@@ -78,7 +106,9 @@ class RepositoryDeltaMixin:
         }
 
     @staticmethod
-    def _snapshot_freshness(freshness: Mapping[str, object]) -> dict[str, dict[str, object]]:
+    def _snapshot_freshness(
+        freshness: Mapping[str, object],
+    ) -> dict[str, dict[str, object]]:
         entries = freshness.get("entries")
         if not isinstance(entries, list):
             return {}
@@ -116,9 +146,13 @@ class RepositoryDeltaMixin:
         The cache is generation-bound and disposable; callers always receive a
         deep copy so mutation cannot become shared authority.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         snapshot_key = None
         if self._decision_session_depth > 0:
-            generation = int(self._decision_session_generation or self.store.generation())
+            generation = int(
+                self._decision_session_generation or self.store.generation()
+            )
             snapshot_key = (
                 generation,
                 task,
@@ -179,7 +213,12 @@ class RepositoryDeltaMixin:
         task: str,
         previous_snapshot: Mapping[str, object],
     ) -> tuple[Mapping[str, object], str]:
-        if previous_snapshot.get("schema") != "hashmarks.repository-intelligence-snapshot.v1":
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if (
+            previous_snapshot.get("schema")
+            != "hashmarks.repository-intelligence-snapshot.v1"
+        ):
             raise ValueError(
                 "previous_snapshot must be a hashmarks.repository-intelligence-snapshot.v1 packet"
             )
@@ -210,9 +249,13 @@ class RepositoryDeltaMixin:
                 if key not in current:
                     changes.append({"path": list(child), "delete": True})
                 elif key not in previous:
-                    changes.append({"path": list(child), "value": deepcopy(current[key])})
+                    changes.append(
+                        {"path": list(child), "value": deepcopy(current[key])}
+                    )
                 else:
-                    changes.extend(cls._leaf_changes(previous[key], current[key], child))
+                    changes.extend(
+                        cls._leaf_changes(previous[key], current[key], child)
+                    )
             return changes
         if isinstance(previous, list) and isinstance(current, list):
             if previous == current:
@@ -227,10 +270,14 @@ class RepositoryDeltaMixin:
         rows = snapshot.get("paths")
         if not isinstance(rows, Mapping):
             return {}
-        return {str(path): row for path, row in rows.items() if isinstance(row, Mapping)}
+        return {
+            str(path): row for path, row in rows.items() if isinstance(row, Mapping)
+        }
 
     @staticmethod
-    def _row_set(row: Mapping[str, object] | None, key: str) -> set[tuple[tuple[str, str], ...]]:
+    def _row_set(
+        row: Mapping[str, object] | None, key: str
+    ) -> set[tuple[tuple[str, str], ...]]:
         if not isinstance(row, Mapping):
             return set()
         values = row.get(key)
@@ -238,7 +285,8 @@ class RepositoryDeltaMixin:
             return set()
         return {
             tuple(sorted((str(k), str(v)) for k, v in item.items()))
-            for item in values if isinstance(item, Mapping)
+            for item in values
+            if isinstance(item, Mapping)
         }
 
     @staticmethod
@@ -261,10 +309,22 @@ class RepositoryDeltaMixin:
             new_symbols = self._row_set(after.get(path), "symbols")
             old_dependencies = self._row_set(before.get(path), "dependencies")
             new_dependencies = self._row_set(after.get(path), "dependencies")
-            symbols_added.extend({"path": path, **self._decode_row(value)} for value in sorted(new_symbols - old_symbols))
-            symbols_removed.extend({"path": path, **self._decode_row(value)} for value in sorted(old_symbols - new_symbols))
-            dependencies_added.extend({"path": path, **self._decode_row(value)} for value in sorted(new_dependencies - old_dependencies))
-            dependencies_removed.extend({"path": path, **self._decode_row(value)} for value in sorted(old_dependencies - new_dependencies))
+            symbols_added.extend(
+                {"path": path, **self._decode_row(value)}
+                for value in sorted(new_symbols - old_symbols)
+            )
+            symbols_removed.extend(
+                {"path": path, **self._decode_row(value)}
+                for value in sorted(old_symbols - new_symbols)
+            )
+            dependencies_added.extend(
+                {"path": path, **self._decode_row(value)}
+                for value in sorted(new_dependencies - old_dependencies)
+            )
+            dependencies_removed.extend(
+                {"path": path, **self._decode_row(value)}
+                for value in sorted(old_dependencies - new_dependencies)
+            )
         moved: list[dict[str, object]] = []
         removed_by_symbol = {
             (row.get("qualname") or row.get("name"), row.get("kind")): row
@@ -274,12 +334,14 @@ class RepositoryDeltaMixin:
             key = (added.get("qualname") or added.get("name"), added.get("kind"))
             removed = removed_by_symbol.get(key)
             if removed is not None and removed["path"] != added["path"]:
-                moved.append({
-                    "name": added.get("qualname") or added.get("name"),
-                    "kind": added.get("kind"),
-                    "from": removed["path"],
-                    "to": added["path"],
-                })
+                moved.append(
+                    {
+                        "name": added.get("qualname") or added.get("name"),
+                        "kind": added.get("kind"),
+                        "from": removed["path"],
+                        "to": added["path"],
+                    }
+                )
         result: dict[str, object] = {}
         for key, rows in (
             ("symbols_added", symbols_added),
@@ -291,11 +353,23 @@ class RepositoryDeltaMixin:
             if rows:
                 result[key] = rows
         for key, changed in (
-            ("ownership_changed", previous.get("ownership") != current.get("ownership")),
+            (
+                "ownership_changed",
+                previous.get("ownership") != current.get("ownership"),
+            ),
             ("impact_changed", previous.get("affected") != current.get("affected")),
-            ("verification_changed", previous.get("verification") != current.get("verification")),
-            ("freshness_changed", previous.get("freshness") != current.get("freshness")),
-            ("project_provenance_changed", previous.get("project_impact") != current.get("project_impact")),
+            (
+                "verification_changed",
+                previous.get("verification") != current.get("verification"),
+            ),
+            (
+                "freshness_changed",
+                previous.get("freshness") != current.get("freshness"),
+            ),
+            (
+                "project_provenance_changed",
+                previous.get("project_impact") != current.get("project_impact"),
+            ),
         ):
             if changed:
                 result[key] = True
@@ -314,6 +388,8 @@ class RepositoryDeltaMixin:
         max_depth: int = 3,
     ) -> dict[str, object]:
         """Return changed repository-intelligence facts between admitted states."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         previous_repository, repository_identity = self._validate_previous_snapshot(
             task, previous_snapshot
         )
@@ -330,11 +406,13 @@ class RepositoryDeltaMixin:
         )
         changes = self._leaf_changes(previous_snapshot, current)
         changes = [row for row in changes if row.get("path") != ["snapshot_identity"]]
-        changed_sections = sorted({
-            str(row["path"][0])
-            for row in changes
-            if isinstance(row.get("path"), list) and row["path"]
-        })
+        changed_sections = sorted(
+            {
+                str(row["path"][0])
+                for row in changes
+                if isinstance(row.get("path"), list) and row["path"]
+            }
+        )
         payload: dict[str, object] = {
             "schema": "hashmarks.repository-intelligence-delta.v1",
             "repository_identity": repository_identity,

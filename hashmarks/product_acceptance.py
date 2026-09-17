@@ -3,10 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
+from .portable_scalar import require_portable_nonnegative_integer
 from .semantic_equivalence import verify_cold_warm_semantic_equivalence
 from .verification_selection import validate_verification_selection_envelope
-from .portable_scalar import require_portable_nonnegative_integer
-
 
 _SCALE_CLASSES = (
     ("tiny", 1_000, 10_000_000),
@@ -26,7 +25,9 @@ def _scale_class(files: int, source_bytes: int) -> str:
 def scale_class_contract(*, files: int, source_bytes: int) -> dict[str, object]:
     """Classify repository scale using explicit file-count and source-byte bounds."""
     files = require_portable_nonnegative_integer(files, field="files")
-    source_bytes = require_portable_nonnegative_integer(source_bytes, field="source_bytes")
+    source_bytes = require_portable_nonnegative_integer(
+        source_bytes, field="source_bytes"
+    )
     return {
         "schema": "hashmarks.repository-scale-class.v1",
         "class": _scale_class(files, source_bytes),
@@ -60,9 +61,8 @@ def _ownership_check(action: Mapping[str, object]) -> bool:
 
 def _verification_check(packet: Mapping[str, object]) -> bool:
     membership = packet.get("verification_membership")
-    return (
-        isinstance(membership, Mapping)
-        and bool(membership.get("membership_identity"))
+    return isinstance(membership, Mapping) and bool(
+        membership.get("membership_identity")
     )
 
 
@@ -85,7 +85,6 @@ def _downstream_check(packet: Mapping[str, object]) -> bool:
     )
 
 
-
 def _symbolic_nomination_check(packet: Mapping[str, object]) -> bool:
     nomination = packet.get("symbolic_nomination")
     return (
@@ -94,6 +93,7 @@ def _symbolic_nomination_check(packet: Mapping[str, object]) -> bool:
         and nomination.get("ranking_effect") == "none"
         and nomination.get("execution_effect") == "none"
     )
+
 
 def _packet_checks(
     packet: Mapping[str, object],

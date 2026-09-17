@@ -7,11 +7,16 @@ import sys
 import time
 from pathlib import Path
 
-from .client import DaemonCompatibilityError, DaemonUnavailableError, IdentityClient, default_state_dir
 from ._version import __version__
+from .client import (
+    DaemonCompatibilityError,
+    DaemonUnavailableError,
+    IdentityClient,
+    default_state_dir,
+)
+from .daemon import IdentityDaemon
 from .errors import UserFacingError
 from .identity import RepositoryIdentity, RepositoryIdentityMode
-from .daemon import IdentityDaemon
 from .paths import canonical_host_path
 
 
@@ -20,16 +25,19 @@ def _version(args) -> int:
     _print({"version": __version__})
     return 0
 
+
 def _workspace(value: str) -> Path:
     return canonical_host_path(value)
 
 
 def _client(args) -> IdentityClient:
-    return IdentityClient(args.workspace, state_dir=args.state_dir, timeout=args.timeout)
+    return IdentityClient(
+        args.workspace, state_dir=args.state_dir, timeout=args.timeout
+    )
 
 
 def _print(value) -> None:
-    print(json.dumps(value, indent=2, sort_keys=True))
+    print(json.dumps(value, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
 
 
 def _daemon_start(args) -> int:
@@ -48,7 +56,11 @@ def _daemon_start(args) -> int:
         return 0
 
     workspace = canonical_host_path(args.workspace)
-    state = default_state_dir(workspace) if args.state_dir is None else canonical_host_path(args.state_dir)
+    state = (
+        default_state_dir(workspace)
+        if args.state_dir is None
+        else canonical_host_path(args.state_dir)
+    )
     state.mkdir(parents=True, exist_ok=True)
     log_path = state / "identity-daemon.log"
     log = log_path.open("ab", buffering=0)
@@ -137,7 +149,6 @@ def _doctor(args) -> int:
     return 0
 
 
-
 def _mcp(args) -> int:
     from .mcp_server import run_stdio
 
@@ -154,7 +165,9 @@ def _add_mode_argument(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _add_common_arguments(parser: argparse.ArgumentParser, *, inherited: bool = False) -> None:
+def _add_common_arguments(
+    parser: argparse.ArgumentParser, *, inherited: bool = False
+) -> None:
     default = argparse.SUPPRESS if inherited else "."
     parser.add_argument("--workspace", default=default)
     parser.add_argument(
@@ -221,7 +234,9 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     _add_daemon_cli(sub)
     _add_identity_cli(sub)
-    mcp = sub.add_parser("mcp", help="serve this workspace as a local read-only MCP stdio server")
+    mcp = sub.add_parser(
+        "mcp", help="serve this workspace as a local read-only MCP stdio server"
+    )
     _add_common_arguments(mcp, inherited=True)
     mcp.set_defaults(func=_mcp)
     from .repository_cli import add_repository_cli

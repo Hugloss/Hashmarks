@@ -9,11 +9,19 @@ def _root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def test_classification_economics_preserves_exact_membership_and_separates_work() -> None:
+def test_classification_economics_preserves_exact_membership_and_separates_work() -> (
+    None
+):
     result = qualification_classification_economics(_root())
     assert result["exact_total_membership_preserved"] is True
-    assert result["baseline_all_ordinary_correctness_members"] == result["total_verification_membership"]
-    assert result["classified_ordinary_correctness_members"] == result["release_correctness_members"]
+    assert (
+        result["baseline_all_ordinary_correctness_members"]
+        == result["total_verification_membership"]
+    )
+    assert (
+        result["classified_ordinary_correctness_members"]
+        == result["release_correctness_members"]
+    )
     assert result["ordinary_correctness_members_avoided"] == (
         result["process_sensitive_members"] + result["empirical_benchmark_members"]
     )

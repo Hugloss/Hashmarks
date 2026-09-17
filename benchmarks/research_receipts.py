@@ -3,15 +3,20 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+    from pathlib import Path
 
 SCHEMA = "hashmarks.research-work-receipt.v1"
 SUMMARY_SCHEMA = "hashmarks.research-durability-summary.v1"
 
 
 def canonical_sha256(payload: object) -> str:
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -32,7 +37,9 @@ def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
             os.close(directory_fd)
 
 
-def work_identity(*, protocol_identity: str, work_id: str, work_payload: object, lane: str = "default") -> dict[str, str]:
+def work_identity(
+    *, protocol_identity: str, work_id: str, work_payload: object, lane: str = "default"
+) -> dict[str, str]:
     return {
         "protocol_identity": str(protocol_identity),
         "lane": str(lane),
@@ -54,19 +61,26 @@ def evaluate_with_receipt(
     """
     if receipt_path.exists():
         payload = json.loads(receipt_path.read_text(encoding="utf-8"))
-        if payload.get("schema") != SCHEMA or payload.get("identity") != identity or payload.get("complete") is not True:
+        if (
+            payload.get("schema") != SCHEMA
+            or payload.get("identity") != identity
+            or payload.get("complete") is not True
+        ):
             raise ValueError("research work receipt identity mismatch")
         result = payload.get("result")
         if not isinstance(result, dict):
             raise ValueError("research work receipt result is malformed")
         return result, True
     result = evaluate()
-    atomic_write_json(receipt_path, {
-        "schema": SCHEMA,
-        "identity": identity,
-        "complete": True,
-        "result": result,
-    })
+    atomic_write_json(
+        receipt_path,
+        {
+            "schema": SCHEMA,
+            "identity": identity,
+            "complete": True,
+            "result": result,
+        },
+    )
     return result, False
 
 

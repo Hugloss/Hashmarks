@@ -68,14 +68,16 @@ def _selected_nodes(shards: int, shard: int) -> tuple[str, ...]:
 def _run_shard(shards: int, shard: int, *, extra_marker: str) -> int:
     nodes = _selected_nodes(shards, shard)
     if not nodes:
-        print(f"--- HOSTED DIAGNOSTIC SHARD {shard + 1}/{shards}: EMPTY ---")
+        print(f"--- HOSTED DIAGNOSTIC SHARD {shard + 1}/{shards}: EMPTY ---")  # noqa: T201 - intentional command output
         return 0
     env = os.environ.copy()
     env["HASHMARKS_CONSTRAINED_HOST"] = "1"
     # Hosted runners often inject unrelated pytest plugins. Hashmarks has no pytest
     # plugin dependency, so diagnostic evidence deliberately disables host autoload.
     env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
-    env["PYTHONPATH"] = str(ROOT) + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    env["PYTHONPATH"] = str(ROOT) + (
+        os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else ""
+    )
     command = [
         sys.executable,
         "-m",
@@ -85,12 +87,15 @@ def _run_shard(shards: int, shard: int, *, extra_marker: str) -> int:
         marker_expression(extra_marker),
         *nodes,
     ]
-    print(f"--- HOSTED DIAGNOSTIC SHARD {shard + 1}/{shards}: {len(nodes)} selected nodes ---", flush=True)
+    print(  # noqa: T201 - intentional command output
+        f"--- HOSTED DIAGNOSTIC SHARD {shard + 1}/{shards}: {len(nodes)} selected nodes ---",
+        flush=True,
+    )
     code = subprocess.run(command, cwd=ROOT, env=env, check=False).returncode
     if code == 5:
         # Deterministic membership can legitimately contain only tests excluded by
         # the mandatory constrained-host marker policy (for example scale tests).
-        print(f"--- HOSTED DIAGNOSTIC SHARD {shard + 1}/{shards}: POLICY-EXCLUDED ---")
+        print(f"--- HOSTED DIAGNOSTIC SHARD {shard + 1}/{shards}: POLICY-EXCLUDED ---")  # noqa: T201 - intentional command output
         return 0
     return code
 
@@ -107,7 +112,9 @@ def _validate_range(shards: int, start: int, limit: int | None) -> tuple[int, in
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Capability-aware constrained-host pytest runner")
+    parser = argparse.ArgumentParser(
+        description="Capability-aware constrained-host pytest runner"
+    )
     parser.add_argument("--shards", type=int, default=64)
     parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--limit", type=int)
@@ -117,28 +124,31 @@ def main(argv: list[str] | None = None) -> int:
 
     inventory = capabilities()
     if args.capabilities:
-        print(json.dumps(inventory, indent=2, sort_keys=True))
+        print(json.dumps(inventory, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
         return 0
     if inventory["pytest"] is None:
-        print("HASHMARKS HOSTED DIAGNOSTIC: ENVIRONMENT-BLOCKED (pytest unavailable)", file=sys.stderr)
+        print(  # noqa: T201 - intentional command output
+            "HASHMARKS HOSTED DIAGNOSTIC: ENVIRONMENT-BLOCKED (pytest unavailable)",
+            file=sys.stderr,
+        )
         return 2
 
     try:
         start, stop = _validate_range(args.shards, args.start, args.limit)
     except ValueError as exc:
-        print(str(exc), file=sys.stderr)
+        print(str(exc), file=sys.stderr)  # noqa: T201 - intentional command output
         return 2
 
-    print(json.dumps(inventory, sort_keys=True))
-    print(f"mandatory-marker={MANDATORY_MARKER}")
+    print(json.dumps(inventory, sort_keys=True))  # noqa: T201 - intentional command output
+    print(f"mandatory-marker={MANDATORY_MARKER}")  # noqa: T201 - intentional command output
     if args.extra_marker.strip():
-        print(f"extra-marker={args.extra_marker.strip()}")
-    print(f"shards={args.shards} range={start}..{stop - 1}")
+        print(f"extra-marker={args.extra_marker.strip()}")  # noqa: T201 - intentional command output
+    print(f"shards={args.shards} range={start}..{stop - 1}")  # noqa: T201 - intentional command output
 
     for shard in range(start, stop):
         code = _run_shard(args.shards, shard, extra_marker=args.extra_marker)
         if code != 0:
-            print(
+            print(  # noqa: T201 - intentional command output
                 f"HASHMARKS HOSTED DIAGNOSTIC: FAIL (shard {shard}; reproduce with "
                 f"HASHMARKS_CONSTRAINED_HOST=1 make test-diagnostic-shard DIAGNOSTIC_SHARD={shard})",
                 file=sys.stderr,
@@ -149,8 +159,10 @@ def main(argv: list[str] | None = None) -> int:
         scope = "complete constrained-host selection"
     else:
         scope = f"bounded shard range {start}..{stop - 1}"
-    print(f"HASHMARKS HOSTED DIAGNOSTIC: HOSTED-DIAGNOSTIC-PASSED ({scope})")
-    print("This is diagnostic evidence only and is never native release/certification authority.")
+    print(f"HASHMARKS HOSTED DIAGNOSTIC: HOSTED-DIAGNOSTIC-PASSED ({scope})")  # noqa: T201 - intentional command output
+    print(  # noqa: T201 - intentional command output
+        "This is diagnostic evidence only and is never native release/certification authority."
+    )
     return 0
 
 

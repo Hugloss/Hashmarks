@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-from .decision_session import incomplete_decision_scoped
 import time
-from typing import Mapping, Sequence
+from typing import TYPE_CHECKING, cast
 
+from .decision_session import incomplete_decision_scoped
 from .evidence_verification import _VerificationSelectionState
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from .engine import CodeMap
 
 
 class DecisionPacketMixin:
@@ -25,11 +30,13 @@ class DecisionPacketMixin:
             if not path or path in seen:
                 return
             seen.add(path)
-            candidates.append({
-                "path": path,
-                "canonical_rank": int(row.get("canonical_rank") or 0),
-                "roles": list(row.get("roles") or []),
-            })
+            candidates.append(
+                {
+                    "path": path,
+                    "canonical_rank": int(row.get("canonical_rank") or 0),
+                    "roles": list(row.get("roles") or []),
+                }
+            )
 
         for row in (edit, verify, action.get("contract")):
             add(row)
@@ -53,7 +60,9 @@ class DecisionPacketMixin:
         limit: int,
     ) -> dict[str, object]:
         """Describe whether repository evidence needs more discrimination without choosing consumer workflow."""
-        ambiguity = action.get("ambiguity") if isinstance(action.get("ambiguity"), dict) else {}
+        ambiguity = (
+            action.get("ambiguity") if isinstance(action.get("ambiguity"), dict) else {}
+        )
         needed = False
         reason = "resolved"
         if not bool(build.get("complete")):
@@ -84,22 +93,30 @@ class DecisionPacketMixin:
         build: Mapping[str, object],
     ) -> tuple[dict[str, object], object, object, str]:
         """Bind packet evidence to repository, task, context and verification selection."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         generation, identity_generation, stale = self._generation_status()
         task_identity = self._packet_digest("hashmarks.task.v1", {"task": task})
         context_digest = self._packet_digest("hashmarks.work-context.v1", work_context)
-        verification_digest = self._packet_digest("hashmarks.verification-plan.v1", verification)
-        verification_membership, source_identity, selection_envelope = self._verification_selection_artifacts(
-            _VerificationSelectionState(
-                generation=generation,
-                identity_generation=identity_generation,
-                stale=stale,
-                verify=verify,
-                action=action,
-                verification_digest=verification_digest,
+        verification_digest = self._packet_digest(
+            "hashmarks.verification-plan.v1", verification
+        )
+        verification_membership, source_identity, selection_envelope = (
+            self._verification_selection_artifacts(
+                _VerificationSelectionState(
+                    generation=generation,
+                    identity_generation=identity_generation,
+                    stale=stale,
+                    verify=verify,
+                    action=action,
+                    verification_digest=verification_digest,
+                )
             )
         )
         selection_identity_fields = self._verification_selection_identity_fields(
-            verification_membership, source_identity, selection_envelope,
+            verification_membership,
+            source_identity,
+            selection_envelope,
         )
         repository_identity = self._repository_packet_identity()
         decision_generation = self._packet_digest(
@@ -128,7 +145,12 @@ class DecisionPacketMixin:
             "verification_plan_digest": verification_digest,
             **selection_identity_fields,
         }
-        return identity, verification_membership, selection_envelope, decision_generation
+        return (
+            identity,
+            verification_membership,
+            selection_envelope,
+            decision_generation,
+        )
 
     @incomplete_decision_scoped
     def task_decision_packet(
@@ -140,16 +162,24 @@ class DecisionPacketMixin:
         token_budget: int = 512,
     ) -> dict[str, object]:
         """Return bounded repository evidence for one task decision."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         decision_started = time.perf_counter()
         phase_started = decision_started
         action = self.task_action_map(
-            task, limit=limit, per_role=per_role,
+            task,
+            limit=limit,
+            per_role=per_role,
         )
         action_seconds = time.perf_counter() - phase_started
         edit = action.get("edit") if isinstance(action.get("edit"), dict) else None
-        verify = action.get("verify") if isinstance(action.get("verify"), dict) else None
+        verify = (
+            action.get("verify") if isinstance(action.get("verify"), dict) else None
+        )
         build = self._codemap_build_state()
-        discrimination = self._decision_packet_discrimination(action=action, edit=edit, verify=verify, build=build, limit=limit)
+        discrimination = self._decision_packet_discrimination(
+            action=action, edit=edit, verify=verify, build=build, limit=limit
+        )
 
         phase_started = time.perf_counter()
         work_context = self.work_context(action, token_budget=token_budget)
@@ -158,9 +188,15 @@ class DecisionPacketMixin:
         verification = self._task_decision_verification_plan(verify)
         verification_seconds = time.perf_counter() - phase_started
         phase_started = time.perf_counter()
-        identity, verification_membership, selection_envelope, _decision_generation = self._decision_packet_identity(
-            task=task, action=action, verify=verify, verification=verification,
-            work_context=work_context, build=build,
+        identity, verification_membership, selection_envelope, _decision_generation = (
+            self._decision_packet_identity(
+                task=task,
+                action=action,
+                verify=verify,
+                verification=verification,
+                work_context=work_context,
+                build=build,
+            )
         )
         evidence_receipt = self._decision_evidence_receipt(task, action, verification)
         packet_assembly_seconds = time.perf_counter() - phase_started
@@ -176,10 +212,16 @@ class DecisionPacketMixin:
             "verification_plan": verification,
             "verification_membership": verification_membership,
             "verification_selection_envelope": selection_envelope,
-            "downstream_verification_contract": self._downstream_verification_contract(selection_envelope),
+            "downstream_verification_contract": self._downstream_verification_contract(
+                selection_envelope
+            ),
             "evidence_surfaces": {
-                "edit": None if edit is None else self._index_surface_for_path(str(edit.get("path") or "")),
-                "verify": None if verify is None else self._index_surface_for_path(str(verify.get("path") or "")),
+                "edit": None
+                if edit is None
+                else self._index_surface_for_path(str(edit.get("path") or "")),
+                "verify": None
+                if verify is None
+                else self._index_surface_for_path(str(verify.get("path") or "")),
             },
             "contract": action.get("contract"),
             "ownership_resolution": action.get("ownership_resolution"),

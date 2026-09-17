@@ -13,7 +13,9 @@ def _write_partial_fixture(root: Path) -> None:
         )
 
 
-def _interrupt_after_one_committed_batch(codemap: CodeMap, monkeypatch: pytest.MonkeyPatch) -> None:
+def _interrupt_after_one_committed_batch(
+    codemap: CodeMap, monkeypatch: pytest.MonkeyPatch
+) -> None:
     original = codemap._parse_or_reuse
     calls = 0
 
