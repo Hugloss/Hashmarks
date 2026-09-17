@@ -430,16 +430,7 @@ class ImportResolutionMixin:
             )
         candidates.extend(
             normalized + suffix
-            for suffix in (
-                ".ts",
-                ".tsx",
-                ".mts",
-                ".cts",
-                ".js",
-                ".jsx",
-                ".mjs",
-                ".cjs",
-            )
+            for suffix in (".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs")
         )
         candidates.extend(
             normalized.rstrip("/") + suffix
