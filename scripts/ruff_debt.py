@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import json
 import sys
+import tomllib
 from collections import Counter
 from pathlib import Path
 
@@ -11,16 +12,31 @@ if __package__ in {None, ""}:
 
 from hashmarks.python_ast_cache import read_python_ast
 
-LIMITS = {
-    "C901": 8,
-    "PLR0911": 6,
-    "PLR0912": 8,
-    "PLR0913": 6,
-    "PLR0914": 15,
-    "PLR0915": 40,
-    "PLR0916": 5,
-}
+ROOT = Path(__file__).resolve().parents[1]
 ROOTS = (Path("hashmarks"), Path("scripts"), Path("benchmarks"))
+EXCLUDED_PREFIXES = (Path("benchmarks/agent_evaluation/retained"),)
+
+
+def _quality_config() -> tuple[dict[str, int], int]:
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    tool = data["tool"]
+    ruff_lint = tool["ruff"]["lint"]
+    mccabe = ruff_lint["mccabe"]
+    pylint = ruff_lint["pylint"]
+    quality = tool["hashmarks"]["quality"]
+    limits = {
+        "C901": int(mccabe["max-complexity"]),
+        "PLR0911": int(pylint["max-returns"]),
+        "PLR0912": int(pylint["max-branches"]),
+        "PLR0913": int(pylint["max-args"]),
+        "PLR0914": int(pylint["max-locals"]),
+        "PLR0915": int(pylint["max-statements"]),
+        "PLR0916": int(pylint["max-bool-expr"]),
+    }
+    return limits, int(quality["max-python-file-lines"])
+
+
+LIMITS, MAX_PYTHON_FILE_LINES = _quality_config()
 
 
 class _FunctionBody(ast.NodeVisitor):
@@ -100,10 +116,16 @@ def _metrics(node: ast.FunctionDef | ast.AsyncFunctionDef) -> dict[str, int]:
     }
 
 
+def _excluded(path: Path) -> bool:
+    return any(path == prefix or prefix in path.parents for prefix in EXCLUDED_PREFIXES)
+
+
 def inventory() -> list[dict[str, object]]:
     findings: list[dict[str, object]] = []
     for root in ROOTS:
         for path in sorted(root.rglob("*.py")):
+            if _excluded(path):
+                continue
             tree = read_python_ast(path).tree
             for node in ast.walk(tree):
                 if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -126,6 +148,15 @@ def inventory() -> list[dict[str, object]]:
     return findings
 
 
+def _oversized_production_files() -> dict[str, int]:
+    oversized: dict[str, int] = {}
+    for path in sorted(Path("hashmarks").rglob("*.py")):
+        line_count = len(path.read_text(encoding="utf-8").splitlines())
+        if line_count > MAX_PYTHON_FILE_LINES:
+            oversized[path.as_posix()] = line_count
+    return oversized
+
+
 def _summary(findings: list[dict[str, object]]) -> dict[str, object]:
     files: dict[str, dict[str, int]] = {}
     for finding in findings:
@@ -141,8 +172,10 @@ def _summary(findings: list[dict[str, object]]) -> dict[str, object]:
         path.split("/", 1)[0] for path in files for _ in range(files[path]["functions"])
     )
     return {
-        "schema": "hashmarks.ruff-debt.v1",
+        "schema": "hashmarks.ruff-debt.v2",
         "limits": LIMITS,
+        "max_python_file_lines": MAX_PYTHON_FILE_LINES,
+        "oversized_files": _oversized_production_files(),
         "functions": len(findings),
         "rule_findings": sum(len(dict(item["violations"])) for item in findings),
         "excess": sum(
@@ -174,6 +207,10 @@ def _baseline_failures(
         failures.append(
             f"total debt increased: {baseline['excess']} -> {summary['excess']}"
         )
+    for path, lines in dict(summary["oversized_files"]).items():
+        failures.append(
+            f"production file too long: {path} {lines} > {MAX_PYTHON_FILE_LINES} lines"
+        )
     return failures
 
 
@@ -203,28 +240,40 @@ def _report_baseline(args, summary: dict[str, object]) -> int | None:
     baseline = json.loads(args.baseline.read_text(encoding="utf-8"))
     failures = _baseline_failures(summary, baseline)
     if args.json:
-        print(json.dumps({"summary": summary, "failures": failures}, sort_keys=True))  # noqa: T201 - intentional command output
+        print(json.dumps({"summary": summary, "failures": failures}, sort_keys=True))
     else:
-        print(f"Ruff debt excess: {summary['excess']} (baseline {baseline['excess']})")  # noqa: T201 - intentional command output
+        print(f"Ruff debt excess: {summary['excess']} (baseline {baseline['excess']})")
+        print(
+            "Production file line ceiling: "
+            f"{MAX_PYTHON_FILE_LINES} (oversized={len(dict(summary['oversized_files']))})"
+        )
         for failure in failures:
-            print(f"FAIL: {failure}")  # noqa: T201 - intentional command output
+            print(f"FAIL: {failure}")
     return 1 if failures else 0
 
 
 def _report_inventory(
     findings: list[dict[str, object]], summary: dict[str, object], as_json: bool
 ) -> int:
+    oversized = dict(summary["oversized_files"])
     if as_json:
-        print(json.dumps(summary, sort_keys=True))  # noqa: T201 - intentional command output
-        return 1 if findings else 0
-    keys = ("functions", "rule_findings", "excess", "by_root")
-    print(json.dumps({key: summary[key] for key in keys}, sort_keys=True))  # noqa: T201 - intentional command output
+        print(json.dumps(summary, sort_keys=True))
+        return 1 if findings or oversized else 0
+    keys = (
+        "functions",
+        "rule_findings",
+        "excess",
+        "by_root",
+        "max_python_file_lines",
+        "oversized_files",
+    )
+    print(json.dumps({key: summary[key] for key in keys}, sort_keys=True))
     for finding in findings:
         rules = ", ".join(
             f"{rule}={value}" for rule, value in finding["violations"].items()
         )
-        print(f"{finding['path']}:{finding['line']}:{finding['function']}: {rules}")  # noqa: T201 - intentional command output
-    return 1 if findings else 0
+        print(f"{finding['path']}:{finding['line']}:{finding['function']}: {rules}")
+    return 1 if findings or oversized else 0
 
 
 def main() -> int:
@@ -233,8 +282,15 @@ def main() -> int:
     summary = _summary(findings)
     _write_baseline(args.write_baseline, summary)
     if args.summary_only:
-        keys = ("functions", "rule_findings", "excess", "by_root")
-        print(json.dumps({key: summary[key] for key in keys}, sort_keys=True))  # noqa: T201 - intentional command output
+        keys = (
+            "functions",
+            "rule_findings",
+            "excess",
+            "by_root",
+            "max_python_file_lines",
+            "oversized_files",
+        )
+        print(json.dumps({key: summary[key] for key in keys}, sort_keys=True))
         return 0
     baseline_result = _report_baseline(args, summary)
     if baseline_result is not None:
