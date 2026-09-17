@@ -152,11 +152,11 @@ A useful feature that crosses these boundaries must be split: keep the determini
 
 Development/refactor work must be qualified in named, bounded batches. A host/runtime timeout is not a test failure and must invalidate only the in-flight batch. Never rerun already-proven batches merely because a later controller window expired. For the deterministic pytest boundary, use `make dev-check-batch DEV_BATCH=N` (four selection shards by default), reproduce a single failing shard with `make test-shard TEST_SHARD=N`, and resume later batches with `make dev-check-tests DEV_BATCH_START=N`. Partial batches are never counted as proof.
 
-### Qualification runner supply boundary
+### Tooling configuration boundary
 
-Hashmarks owns the repository qualification contract: deterministic test membership, supported runner compatibility, repository selection identity, and evidence describing what should be verified. Hashmarks does **not** own the package distribution or execution environment that supplies pytest/Ruff for certification. The external execution/certification layer owns exact runner bytes, interpreter/environment identity, preparation, and execution receipts.
+Hashmarks owns repository qualification semantics: deterministic test membership, repository selection identity, and evidence describing what should be verified. Tool installation, dependency resolution, interpreter/environment identity, and execution receipts are environment concerns.
 
-Hashmarks uses minimum-only qualification-tool admission: pytest `>=8.4`, Ruff `>=0.12`, and uv `>=0.10.0`. Newer releases are accepted by default; add an upper bound or exact-version requirement only after a concrete incompatibility is reproduced. The exact tool versions used in a qualification run must be captured by external execution receipts as provenance, not admission policy. Hashmarks must not acquire pytest/Ruff implicitly or encode external tool bytes into repository evidence authority. `make test*` may consume an already-prepared environment but must fail clearly when the required runner is absent or below the supported minimum. Ruff is an explicitly resolved development diagnostic through the project-owned `lint` group; `make ruff-min` and `make ruff-latest` sync that group to a dedicated environment without changing the prepared test environment. Ruff is diagnostic structural-quality tooling only and is never a canonical-promotion prerequisite. Chosen CI/artifact-host versions are qualification environments, not extra contributor version pins.
+`pyproject.toml` is the single source of truth for declared development/test tool requirements and configuration. Do not add bespoke min/latest matrices, compatibility-envelope scripts, duplicate version-policy documents, or tests that re-parse configuration merely to assert those declarations. `make test*`, `make ruff`, and `make typecheck` consume the project configuration; CI proves those configured commands actually execute. Exact resolved tool versions may be recorded as provenance by CI or an external execution layer, but they do not create a second policy surface. Ruff remains development diagnostic tooling and is never canonical-promotion authority.
 
 Python tooling that repeatedly parses repository files must use `hashmarks.python_ast_cache.read_python_ast` rather than coupling `ast.parse` directly to `Path.read_text`. The cache is process-local acceleration only and is keyed by device/inode/size/mtime/ctime with a stable-read check. It must never become repository identity, freshness, or execution authority. Source-only analyzer APIs may retain `ast.parse(source)` as a fallback, but file-backed callers should pass the cached tree so one stable file snapshot can serve multiple analyzers.
 
@@ -218,46 +218,6 @@ Exact-ZIP `compileall` and a second deterministic ZIP rebuild are not mandatory 
 ## Ownership-intelligence boundary
 Hashmarks ownership/cache/import/verification/concurrency diagnostics are repository evidence only. They may nominate risks, owners, repair surfaces, and verification surfaces, but must never execute repairs, manage runtime concurrency/processes, admit execution, retry, recover, or certify results. Those external execution responsibilities remain Oh-Goon-owned.
 
-### Warm-service parity / invalidation ownership
-
-Repository-intelligence methods exposed by `CodeMapServiceClient` require a matching validated service operation; client-only API surfaces are defects, not deferred features. Cache invalidation ownership is static repository evidence: resolve only local/simple aliases or qualified import identity to a known cache owner, fail closed on same-name ambiguity, and never execute `.clear()`, `.cache_clear()`, `.invalidate()`, or `.invalidate_all()`. Runtime cache lifecycle and mutation authority remain outside Hashmarks.
-
-
-### Verification ownership v2 authority links
-
-Hashmarks may bind verification candidates to edit authorities only when structural repository evidence proves that relation. It must fail closed on wording-only or namespace-only matches. This remains repository intelligence; Oh-Goon owns execution, process lifecycle, recovery, and certification.
-
-## Hashmarks / Oh-Goon authority boundary
-
-Hashmarks owns repository-intelligence and verification-selection semantics. Oh-Goon owns admission and physical execution semantics. Hashmarks may identify, classify, associate, rank, and recommend repository evidence, but must not schedule, launch, retry, bisect, resume, or certify it. Oh-Goon may admit, freeze, regroup, execute, retry, bisect, resume, and certify admitted evidence, but must not infer, reconstruct, repair, or reinterpret Hashmarks repository intelligence. Producer-defined identities and semantics are verified by consumers and are never independently recreated by consumers. Schema evolution must not transfer authority: execution-policy-looking producer fields are non-authoritative unless an explicit Oh-Goon-owned schema/policy admits them.
-
-## Current-contract boundary
-
-Before the first public release, Hashmarks keeps one current public spelling/schema per supported surface. Historical local database shapes, evaluation schemas, and unpublished aliases are disposable development state, not compatibility obligations. Remove obsolete readers/aliases instead of adding migration or normalization layers. Runtime protocol validation may still reject an incompatible daemon because that is a current safety fence, not backward-compatibility support.
-
-### G50 — Oversized-source decomposition preserves authority
-Structural decomposition may move cohesive repository-intelligence implementation behind internal mixins/modules, but it must not change public CodeMap contracts, ranking/selection semantics, deterministic identities, or transfer execution/certification authority into Hashmarks. File-size reduction is a maintainability outcome, not an authority or schema change.
-
-## Responsibility-first naming and decomposition gate
-
-Large LOC is a signal to investigate, not proof that a file should be split. Before reducing a large source file, classify it as **KEEP COHESIVE**, **REFACTOR INTERNALLY**, **EXTRACT RESPONSIBILITY**, or **DECOMPOSE MULTIPLE RESPONSIBILITIES** after reviewing domain ownership, public contracts, function/control-flow complexity, mutable state, dependency direction, testing difficulty, and discoverability.
-
-Names must reveal responsibility and product ownership without relying on historical filename prefixes. Avoid generic cross-module names such as `Receipt`, `Identity`, `Context`, `State`, `Result`, `Verifier`, `Manager`, `Runtime`, `Manifest`, `ResumeState`, and `Provenance` unless a genuinely local scope makes ownership obvious. Avoid mechanical `*_helpers`, `*_utils`, `*_core`, `*_impl`, `*_partN`, and source-filename-prefix decomposition.
-
-Hashmarks vocabulary should prefer `evidence`, `repository`, `CodeMap`, `impact`, `repository qualification`, `qualified repository identity`, `evidence packet`, `evidence receipt`, `evidence freshness`, `repository projection`, and `consumer conformance`. `authority`, `admission`, `execution`, `certification`, `sandbox`, `supply`, `execution generation`, `authority receipt`, `release promotion`, and `Game Tape` are Oh-Goon vocabulary and must not name new Hashmarks-owned permission/runtime concepts.
-
-At interoperability boundaries, product names are intentionally explicit: a consumer-side contract should say `Hashmarks` or unmistakably say `Evidence`. Hashmarks observes repository state; Oh-Goon admits source. If a symbol could plausibly exist unchanged in both products, add a domain noun.
-
-Before the first public release, historical development names are not compatibility promises. If an unpublished name crosses the product boundary, remove it or move it to development-only evaluation infrastructure rather than preserving a shim. After publication, compatibility changes require an explicit versioned API decision.
-
-### G52 — One current pre-public contract
-
-Before the first public release, obsolete aliases/readers are removed rather than preserved. Generated local databases are rebuilt when their current shape is not satisfied. Historical vocabulary does not justify expanding ambiguous `authority`, `admission`, `execution`, or `certification` concepts inside Hashmarks. Current client/daemon protocol validation remains a fail-closed safety boundary.
-
-### G53 — Historical execution surfaces stay out of the first public contract
-
-The historical standalone execution/result-cache/work-session surfaces modeled authority that belongs to an external execution system or consumer workflow. The current `IdentityEngine` is explicitly **not** in that category: it owns canonical repository-content identity and freshness observation only. HM255 removes those unpublished surfaces from the installed public API instead of preserving compatibility shims. Content-addressed repository-artifact reuse remains valid; execution-result reuse, process authority, retry/resume, and certification remain external. These historical names must not re-enter Hashmarks merely because archived patches or benchmarks still mention them.
-
 ## Responsibility-first refactoring gate
 
 Before file-size, naming, or complexity cleanup, apply `docs/development/reviews/RESPONSIBILITY_COMPLEXITY_REFACTORING.md`. Large LOC and Ruff debt are investigation signals, not extraction requirements. Every candidate must be classified KEEP COHESIVE, REFACTOR INTERNALLY, EXTRACT RESPONSIBILITY, or DECOMPOSE MULTIPLE RESPONSIBILITIES before code movement. Interoperability transfers information, never authority.
@@ -298,9 +258,9 @@ Tests that only validate projections, tamper rejection, authority fields, or con
 
 The full-suite runtime profile is owned by `make test-profile` and reports the slowest 25 pytest phases taking at least one second. Duration alone never changes PASS/FAIL semantics, and slow-test optimization must preserve the proof scope required by the tested contract. Do not duplicate duration flags across qualification entrypoints or introduce production caches solely to improve test timing.
 
-### G64 — Ruff is minimum-version diagnostic evidence, never canonical-promotion authority
+### G64 — Development-tool configuration has one owner
 
-Hashmarks declares a minimum supported Ruff version plus an explicit rule contract so tool defaults cannot silently change lint semantics. Newer Ruff releases are accepted by default; each external diagnostic receipt records the exact version that produced it. Add an upper bound only when concrete incompatibility is proven. Ruff remains diagnostic-only: missing/failing Ruff debt does not create or transfer canonical promotion authority, and the Python dependency supply remains independently locked.
+`pyproject.toml` owns the Ruff dependency and rule configuration. Developer hooks, Make targets, and CI must invoke that configured Ruff rather than maintaining parallel min/latest compatibility paths. Do not add tests whose only assertion is that tool configuration, docs, and version strings agree. If a real tool upgrade breaks Hashmarks behavior, reproduce the failure and change the single project declaration or the affected behavior. Ruff remains diagnostic-only and never creates or transfers canonical promotion authority.
 
 ### G65 — Exception translation has one owner per boundary
 
