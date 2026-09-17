@@ -10,7 +10,9 @@ def _write(root: Path, path: str, text: str) -> None:
 
 
 def _owners(root: Path, target: str = "pkg.Public") -> tuple[list[str], bool]:
-    _write(root, "tests/test_public.py", f"from pkg import {target.rsplit('.', 1)[-1]}\n")
+    _write(
+        root, "tests/test_public.py", f"from pkg import {target.rsplit('.', 1)[-1]}\n"
+    )
     with CodeMap(root) as codemap:
         codemap.sync()
         return codemap._resolve_import_owner_evidence("tests/test_public.py", target)
