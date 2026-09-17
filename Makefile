@@ -30,7 +30,7 @@ DIAGNOSTIC_BATCH_LIMIT ?= 8
 DIAGNOSTIC_SHARD ?= 0
 DIAGNOSTIC_EXTRA_MARKER ?=
 
-.PHONY: help evaluation-help lock init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help qualification-preflight lint ruff-min ruff-latest typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-gate test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
+.PHONY: help evaluation-help lock init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help qualification-preflight lint ruff typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-gate test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
 
 help:
 	@printf '%s\n' \
@@ -55,9 +55,8 @@ help:
 	  '  make map            Sync the derived repository CodeMap' \
 	  '  make map-status     Show CodeMap generation/staleness' \
 	  '  make map-watch      Maintain CodeMap incrementally in foreground' \
-	  '  make lint           Run minimum and latest Ruff compatibility checks' \
-	  '  make ruff-min       Check the project with the minimum supported Ruff' \
-	  '  make ruff-latest    Check the project with the latest supported Ruff' \
+	  '  make lint           Run the canonical project Ruff check' \
+	  '  make ruff           Run Ruff check + format check using the project lint group/config' \
 	  '  make typecheck      Run ty and Pyright on live repository Python' \
 	  '  make precommit      Run all configured pre-commit hooks on tracked files' \
 	  '  make hooks-install  Install the local Git pre-commit hook' \
@@ -159,17 +158,11 @@ qualification-preflight:
 	@test -f uv.lock || (echo "local uv.lock is missing; run: make init" >&2; exit 2)
 	@$(UV) run --offline --frozen --no-sync --group test python scripts/qualification_environment.py pytest
 
-ruff-min:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) sync --only-group lint --resolution lowest-direct --upgrade-package ruff
-	@PATH="$(CURDIR)/.ruff-venv/bin:$$PATH" .ruff-venv/bin/python scripts/qualification_environment.py ruff-floor
-	@.ruff-venv/bin/ruff check .
+ruff:
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint ruff check .
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint ruff format --check .
 
-ruff-latest:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) sync --only-group lint --resolution highest --upgrade-package ruff
-	@PATH="$(CURDIR)/.ruff-venv/bin:$$PATH" .ruff-venv/bin/python scripts/qualification_environment.py ruff
-	@.ruff-venv/bin/ruff check .
-
-lint: ruff-min ruff-latest
+lint: ruff
 
 ty-check:
 	@$(UV) run --python 3.11 --group typing ty check .
@@ -180,10 +173,12 @@ pyright-check:
 typecheck: ty-check pyright-check
 
 precommit:
-	@$(UV) run --isolated --only-group hooks pre-commit run --all-files
+	@UV_PROJECT_ENVIRONMENT=.pre-commit-venv $(UV) sync --only-group hooks
+	@.pre-commit-venv/bin/pre-commit run --all-files
 
 hooks-install:
-	@$(UV) run --isolated --only-group hooks pre-commit install
+	@UV_PROJECT_ENVIRONMENT=.pre-commit-venv $(UV) sync --only-group hooks
+	@.pre-commit-venv/bin/pre-commit install
 
 lint-debt:
 	@$(UV) run --offline python scripts/ruff_debt.py
