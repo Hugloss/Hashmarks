@@ -153,9 +153,7 @@ def test_coverage_ledger_can_certify_exact_matrix() -> None:
         ],
     )
     bundles = [
-        _bundle(lane, task)
-        for lane in ("native", "hm")
-        for task in ("t1", "t2")
+        _bundle(lane, task) for lane in ("native", "hm") for task in ("t1", "t2")
     ]
     ledger = coverage_ledger(manifest=manifest, task_ids=["t1", "t2"], bundles=bundles)
     assert ledger["complete"] is True and ledger["observed_runs"] == 4
