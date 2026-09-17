@@ -136,8 +136,7 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
-      - run: uv run --only-group lint ruff check .
-      - run: uv run --only-group lint ruff format --check .
+      - run: make ruff
 
   precommit:
     name: Pre-commit checks
@@ -151,4 +150,4 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.11
-      - run: uv run --only-group hooks pre-commit run --all-files
+      - run: make precommit
