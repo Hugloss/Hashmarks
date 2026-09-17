@@ -44,9 +44,19 @@ Boundary decision: ADMIT / SPLIT / REJECT
 
 ## Development setup
 
+Prepare the local development environment:
+
 ```bash
 make init
 ```
+
+Install the lightweight Git pre-commit hook once per clone:
+
+```bash
+make hooks-install
+```
+
+The commit hook only performs fast file hygiene: whitespace/end-of-file checks, YAML/TOML/merge-conflict checks, large-file protection, Ruff fixes, and Ruff formatting. Repository-wide type checking, Ruff compatibility qualification, lock validation, and tests remain explicit developer or CI checks.
 
 Run the normal bounded development check:
 
@@ -112,4 +122,4 @@ Avoid unrelated refactors in the same change unless they are required to make ow
 
 The compatibility envelope for pytest and Ruff is documented in [`docs/qualification/TOOL_COMPATIBILITY.md`](../docs/qualification/TOOL_COMPATIBILITY.md). Widening a range requires boundary-version proof; it must not be done as an incidental dependency update.
 
-`make hooks-install` installs the Git pre-commit hook. The hooks use project dependency groups through `uv`; `make init` prepares the local gitignored `uv.lock` checked by the lock hook. Type and format checks cover live repository Python and exclude retained benchmark fixture repositories.
+`make hooks-install` installs the Git pre-commit hook. The hook owns only fast commit-time hygiene and uses pinned upstream pre-commit hook revisions. `make ruff-min`, `make ruff-latest`, `make typecheck`, and the test/qualification targets remain separate so commit-time editing does not become qualification authority. Retained benchmark fixture repositories remain excluded from live-repository formatting and linting.
