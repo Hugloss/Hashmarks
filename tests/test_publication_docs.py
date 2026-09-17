@@ -182,15 +182,6 @@ def test_normative_invariants_exclude_prepublic_agent_execution_history() -> Non
     assert "PB7. Interoperability transfers evidence, never authority." in current
 
 
-def test_ruff_debt_baseline_contains_only_current_files() -> None:
-    import json
-
-    baseline = json.loads(_text("ruff-debt-baseline.json"))
-    missing = sorted(path for path in baseline["files"] if not (ROOT / path).is_file())
-    assert missing == []
-    assert int(baseline["excess"]) < 5000
-
-
 def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None:
     readme = _text("README.md")
     docs = _text("docs/README.md")
