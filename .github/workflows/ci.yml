@@ -8,8 +8,26 @@ permissions:
   contents: read
 
 jobs:
+  fast-gate:
+    name: Fast validation gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.11
+      - run: uv sync --group test --python 3.11
+      - run: make ruff
+      - run: make lint-debt-gate
+      - run: make compile
+
   release-environment:
     name: Release qualification environment (Python 3.14)
+    needs: fast-gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -26,10 +44,11 @@ jobs:
 
   python-support:
     name: Tests / Python ${{ matrix.python }}
+    needs: fast-gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
@@ -46,10 +65,11 @@ jobs:
 
   mcp-interop:
     name: ${{ matrix.label }} / Python ${{ matrix.python }}
+    needs: fast-gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - python: "3.11"
@@ -79,23 +99,9 @@ jobs:
       - name: Smoke installed wheel through official MCP SDK
         run: .mcp-venv/bin/python -I scripts/mcp_installed_artifact_smoke.py --hashmarks "$PWD/.mcp-venv/bin/hashmarks"
 
-  ruff:
-    name: Ruff
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        with:
-          enable-cache: true
-      - run: uv sync --group test --python 3.11
-      - run: make ruff
-      - run: make lint-debt-gate
-
   precommit:
     name: Pre-commit checks
+    needs: fast-gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
