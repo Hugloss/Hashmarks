@@ -1,4 +1,5 @@
 """Measure structural source outliers without making them runtime authority."""
+
 from __future__ import annotations
 
 import argparse
@@ -13,13 +14,15 @@ def _definitions(tree: ast.AST) -> list[dict[str, object]]:
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             continue
         end = getattr(node, "end_lineno", node.lineno)
-        rows.append({
-            "kind": type(node).__name__,
-            "name": node.name,
-            "start_line": node.lineno,
-            "end_line": end,
-            "lines": end - node.lineno + 1,
-        })
+        rows.append(
+            {
+                "kind": type(node).__name__,
+                "name": node.name,
+                "start_line": node.lineno,
+                "end_line": end,
+                "lines": end - node.lineno + 1,
+            }
+        )
     return rows
 
 
@@ -29,14 +32,20 @@ def audit(root: Path) -> dict[str, object]:
         text = path.read_text(encoding="utf-8")
         tree = ast.parse(text, filename=str(path))
         defs = _definitions(tree)
-        files.append({
-            "path": path.relative_to(root).as_posix(),
-            "bytes": len(text.encode()),
-            "lines": len(text.splitlines()),
-            "definitions": len(defs),
-            "largest_definition_lines": max((int(row["lines"]) for row in defs), default=0),
-            "largest_definitions": sorted(defs, key=lambda row: (-int(row["lines"]), int(row["start_line"])))[:5],
-        })
+        files.append(
+            {
+                "path": path.relative_to(root).as_posix(),
+                "bytes": len(text.encode()),
+                "lines": len(text.splitlines()),
+                "definitions": len(defs),
+                "largest_definition_lines": max(
+                    (int(row["lines"]) for row in defs), default=0
+                ),
+                "largest_definitions": sorted(
+                    defs, key=lambda row: (-int(row["lines"]), int(row["start_line"]))
+                )[:5],
+            }
+        )
     ranked = sorted(files, key=lambda row: (-int(row["lines"]), str(row["path"])))
     return {
         "schema": "hashmarks.development-oversized-source-audit.v1",
@@ -67,7 +76,7 @@ def main() -> int:
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
     else:
-        print(rendered, end="")
+        print(rendered, end="")  # noqa: T201 - intentional command output
     return 0
 
 

@@ -14,13 +14,17 @@ def require_portable_nonnegative_integer(value: object, *, field: str) -> int:
     return value
 
 
-def require_optional_portable_nonnegative_integer(value: object, *, field: str) -> int | None:
+def require_optional_portable_nonnegative_integer(
+    value: object, *, field: str
+) -> int | None:
     if value is None:
         return None
     return require_portable_nonnegative_integer(value, field=field)
 
 
-def require_nonblank_string(value: object, *, field: str, optional: bool = False) -> str | None:
+def require_nonblank_string(
+    value: object, *, field: str, optional: bool = False
+) -> str | None:
     if value is None and optional:
         return None
     if type(value) is not str or not value.strip():

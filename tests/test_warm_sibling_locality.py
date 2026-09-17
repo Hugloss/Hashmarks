@@ -8,7 +8,9 @@ def _build_repetitive_repo(root: Path, count: int = 25) -> list[dict[str, str]]:
     (root / "src" / "__init__.py").write_text("")
     (root / "tests").mkdir()
     (root / "checks").mkdir()
-    (root / "pyproject.toml").write_text("[tool.pytest.ini_options]\npythonpath=['.']\n")
+    (root / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\npythonpath=['.']\n"
+    )
     tasks: list[dict[str, str]] = []
     for index in range(1, count + 1):
         token = f"ember_case_{index:03d}_unique"
@@ -19,7 +21,9 @@ def _build_repetitive_repo(root: Path, count: int = 25) -> list[dict[str, str]]:
         active = "logic_a" if index % 2 else "logic_b"
         inactive = "logic_b" if index % 2 else "logic_a"
         fn = f"apply_case_{index:03d}"
-        (pkg / f"{active}.py").write_text(f"def {fn}(value: str) -> str:\n    return value + '-old'\n")
+        (pkg / f"{active}.py").write_text(
+            f"def {fn}(value: str) -> str:\n    return value + '-old'\n"
+        )
         (pkg / f"{inactive}.py").write_text(
             f"def {fn}(value: str) -> str:\n    return value + '-decoy'\n\n# {token} migration decoy\n"
         )
@@ -64,11 +68,20 @@ def _build_repetitive_repo(root: Path, count: int = 25) -> list[dict[str, str]]:
                 f"from src.{ns}.route import handle_{token}\n\n"
                 f"def test_{token}_accepted():\n    assert handle_{token}('x') == 'x-new'\n"
             )
-        tasks.append({"query": query, "edit": expected_edit, "verify": expected_verify, "token": token})
+        tasks.append(
+            {
+                "query": query,
+                "edit": expected_edit,
+                "verify": expected_verify,
+                "token": token,
+            }
+        )
     return tasks
 
 
-def test_repetitive_warm_repository_keeps_edit_and_verify_in_task_namespace(tmp_path: Path) -> None:
+def test_repetitive_warm_repository_keeps_edit_and_verify_in_task_namespace(
+    tmp_path: Path,
+) -> None:
     tasks = _build_repetitive_repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -85,7 +98,9 @@ def test_repetitive_warm_repository_keeps_edit_and_verify_in_task_namespace(tmp_
                 assert namespace in brief["contract"], task["token"]
 
 
-def test_rare_identifier_component_is_preserved_before_generic_siblings(tmp_path: Path) -> None:
+def test_rare_identifier_component_is_preserved_before_generic_siblings(
+    tmp_path: Path,
+) -> None:
     tasks = _build_repetitive_repo(tmp_path, count=12)
     target = tasks[-1]
     with CodeMap(tmp_path) as codemap:
@@ -93,5 +108,5 @@ def test_rare_identifier_component_is_preserved_before_generic_siblings(tmp_path
         hits = codemap.find_task(target["query"], limit=20)
     paths = [hit.path for hit in hits]
     assert target["verify"] in paths
-    assert f"src/unit_012/route.py" in paths
+    assert "src/unit_012/route.py" in paths
     assert paths.index(target["verify"]) < 6

@@ -34,7 +34,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--files", type=int, default=10_000)
     parser.add_argument("--files-per-dir", type=int, default=250)
-    parser.add_argument("--manifest", choices=("directory", "files"), default="directory")
+    parser.add_argument(
+        "--manifest", choices=("directory", "files"), default="directory"
+    )
     parser.add_argument("--keep", action="store_true")
     args = parser.parse_args()
 
@@ -98,7 +100,7 @@ def main() -> None:
             },
             "workspace": str(root) if args.keep else None,
         }
-        print(json.dumps(result, indent=2, sort_keys=True))
+        print(json.dumps(result, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
     finally:
         if not args.keep:
             shutil.rmtree(root, ignore_errors=True)

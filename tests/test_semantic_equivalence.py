@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from hashmarks.semantic_equivalence import verify_cold_warm_semantic_equivalence
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _repository(root: Path) -> None:
     (root / "src").mkdir()
     (root / "tests").mkdir()
     (root / "src" / "engine.py").write_text(
-        "def normalize_widget(value):\n"
-        "    return value.strip().lower()\n"
+        "def normalize_widget(value):\n    return value.strip().lower()\n"
     )
     (root / "tests" / "test_engine.py").write_text(
         "from src.engine import normalize_widget\n"

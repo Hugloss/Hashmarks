@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _write(root: Path, path: str, text: str) -> None:
@@ -16,7 +19,9 @@ def _codemap(root: Path) -> CodeMap:
     return CodeMap(root, state_dir=state, artifact_db=state / "artifacts.sqlite3")
 
 
-def test_aliased_package_init_reexport_resolves_underlying_owner(tmp_path: Path) -> None:
+def test_aliased_package_init_reexport_resolves_underlying_owner(
+    tmp_path: Path,
+) -> None:
     _write(tmp_path, "pkg/__init__.py", "from .impl import Internal as Public\n")
     _write(tmp_path, "pkg/impl.py", "class Internal: pass\n")
     _write(tmp_path, "tests/test_a.py", "from pkg import Public\n")

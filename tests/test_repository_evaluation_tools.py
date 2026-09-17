@@ -1,6 +1,7 @@
-from pathlib import Path
+import contextlib
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -51,9 +52,21 @@ def _grader() -> dict[str, object]:
 
 def test_repository_evaluation_scripts_are_directly_executable() -> None:
     root = Path(__file__).resolve().parents[1]
-    for name in ("run_cases.py", "grade_cases.py", "compare_runs.py", "merge_runs.py", "profile_cases.py", "compare_profiles.py", "merge_profiles.py"):
+    for name in (
+        "run_cases.py",
+        "grade_cases.py",
+        "compare_runs.py",
+        "merge_runs.py",
+        "profile_cases.py",
+        "compare_profiles.py",
+        "merge_profiles.py",
+    ):
         completed = subprocess.run(
-            [sys.executable, str(root / "scripts/repository_evaluation" / name), "--help"],
+            [
+                sys.executable,
+                str(root / "scripts/repository_evaluation" / name),
+                "--help",
+            ],
             cwd=root,
             check=False,
             capture_output=True,
@@ -147,8 +160,11 @@ def test_repository_evaluation_comparison_suppresses_resumed_timing() -> None:
     assert "suppressed" in comparison["timing_note"]
 
 
-def test_repository_evaluation_shards_merge_without_duplicate_work(tmp_path: Path) -> None:
+def test_repository_evaluation_shards_merge_without_duplicate_work(
+    tmp_path: Path,
+) -> None:
     from scripts.repository_evaluation.merge_runs import merge_runs
+
     repo = tmp_path / "repo"
     _write(repo, "src/live.py", "def active_target():\n    return 1\n")
     cases = tmp_path / "cases.json"
@@ -158,8 +174,20 @@ def test_repository_evaluation_shards_merge_without_duplicate_work(tmp_path: Pat
         '{"id":"b","operation":"task_action_map","task":"optimize active_target"}]}'
     )
     receipts = tmp_path / "receipts"
-    first = run_cases(workspace=repo, cases_path=cases, receipts_dir=receipts, shard_count=2, shard_index=0)
-    second = run_cases(workspace=repo, cases_path=cases, receipts_dir=receipts, shard_count=2, shard_index=1)
+    first = run_cases(
+        workspace=repo,
+        cases_path=cases,
+        receipts_dir=receipts,
+        shard_count=2,
+        shard_index=0,
+    )
+    second = run_cases(
+        workspace=repo,
+        cases_path=cases,
+        receipts_dir=receipts,
+        shard_count=2,
+        shard_index=1,
+    )
     merged = merge_runs([first, second])
     assert merged["complete"] is True
     assert [row["id"] for row in merged["cases"]] == ["a", "b"]
@@ -167,13 +195,44 @@ def test_repository_evaluation_shards_merge_without_duplicate_work(tmp_path: Pat
 
 def test_repository_evaluation_grader_distinguishes_over_and_wrong_ambiguity() -> None:
     base = {
-        "schema": "hashmarks.repository-evaluation-run.v1", "suite": "portable-evaluation",
-        "protocol_identity": "sha256:x", "repository_identity": "sha256:r",
-        "producer_implementation_identity": "sha256:p", "producer_artifact_identity": None,
+        "schema": "hashmarks.repository-evaluation-run.v1",
+        "suite": "portable-evaluation",
+        "protocol_identity": "sha256:x",
+        "repository_identity": "sha256:r",
+        "producer_implementation_identity": "sha256:p",
+        "producer_artifact_identity": None,
         "timing_comparable": True,
     }
-    over = {**base, "cases": [{"id": "target", "result": {"retrieval": [{"path": "src/live.py"}], "action": {"edit": {"path": "src/live.py", "qualname": "active_target"}, "ambiguity": {"ambiguous": True}}}}]}
-    wrong = {**base, "cases": [{"id": "target", "result": {"retrieval": [{"path": "src/live.py"}], "action": {"edit": {"path": "src/wrong.py", "qualname": "wrong"}, "ambiguity": {"ambiguous": True}}}}]}
+    over = {
+        **base,
+        "cases": [
+            {
+                "id": "target",
+                "result": {
+                    "retrieval": [{"path": "src/live.py"}],
+                    "action": {
+                        "edit": {"path": "src/live.py", "qualname": "active_target"},
+                        "ambiguity": {"ambiguous": True},
+                    },
+                },
+            }
+        ],
+    }
+    wrong = {
+        **base,
+        "cases": [
+            {
+                "id": "target",
+                "result": {
+                    "retrieval": [{"path": "src/live.py"}],
+                    "action": {
+                        "edit": {"path": "src/wrong.py", "qualname": "wrong"},
+                        "ambiguity": {"ambiguous": True},
+                    },
+                },
+            }
+        ],
+    }
     assert grade_run(run=over, grader=_grader())["counters"]["OVER_AMBIGUOUS"] == 1
     report = grade_run(run=wrong, grader=_grader())
     assert report["counters"]["WRONG_AMBIGUOUS"] == 1
@@ -182,24 +241,58 @@ def test_repository_evaluation_grader_distinguishes_over_and_wrong_ambiguity() -
 
 def test_profile_comparison_uses_same_version_noise_floor() -> None:
     from scripts.repository_evaluation.compare_profiles import compare_profiles
+
     def doc(median: int):
-        return {"cases": [{"id": "x", "median_ns": median, "semantic_fingerprint": "sha256:same", "semantic_stable": True}]}
-    result = compare_profiles(baseline=doc(100), candidate=doc(94), repeat=doc(96), minimum_gain_pct=3.0)
+        return {
+            "cases": [
+                {
+                    "id": "x",
+                    "median_ns": median,
+                    "semantic_fingerprint": "sha256:same",
+                    "semantic_stable": True,
+                }
+            ]
+        }
+
+    result = compare_profiles(
+        baseline=doc(100), candidate=doc(94), repeat=doc(96), minimum_gain_pct=3.0
+    )
     assert result["cases"][0]["same_version_noise_pct"] == 4.0
     assert result["cases"][0]["decision"] == "WIN"
-    noisy = compare_profiles(baseline=doc(100), candidate=doc(94), repeat=doc(93), minimum_gain_pct=3.0)
+    noisy = compare_profiles(
+        baseline=doc(100), candidate=doc(94), repeat=doc(93), minimum_gain_pct=3.0
+    )
     assert noisy["cases"][0]["decision"] == "NOISE_BAND"
 
 
 def test_profile_comparison_uses_per_case_noise_not_global_p90() -> None:
     from scripts.repository_evaluation.compare_profiles import compare_profiles
+
     def doc(x: int, y: int):
-        return {"cases": [
-            {"id":"stable","median_ns":x,"semantic_fingerprint":"sha256:s","semantic_stable":True},
-            {"id":"noisy","median_ns":y,"semantic_fingerprint":"sha256:n","semantic_stable":True},
-        ]}
-    result=compare_profiles(baseline=doc(100,100),candidate=doc(88,100),repeat=doc(100,60),minimum_gain_pct=3.0)
-    rows={row["id"]:row for row in result["cases"]}
+        return {
+            "cases": [
+                {
+                    "id": "stable",
+                    "median_ns": x,
+                    "semantic_fingerprint": "sha256:s",
+                    "semantic_stable": True,
+                },
+                {
+                    "id": "noisy",
+                    "median_ns": y,
+                    "semantic_fingerprint": "sha256:n",
+                    "semantic_stable": True,
+                },
+            ]
+        }
+
+    result = compare_profiles(
+        baseline=doc(100, 100),
+        candidate=doc(88, 100),
+        repeat=doc(100, 60),
+        minimum_gain_pct=3.0,
+    )
+    rows = {row["id"]: row for row in result["cases"]}
     assert result["noise_floor_percent"] == 40.0
     assert "diagnostic only" in result["noise_floor_authority"]
     assert rows["stable"]["required_gain_pct"] == 3.0
@@ -208,34 +301,62 @@ def test_profile_comparison_uses_per_case_noise_not_global_p90() -> None:
 
 def test_profile_shards_merge_strict_identity_and_complete() -> None:
     from scripts.repository_evaluation.merge_profiles import merge_profiles
+
     def shard(index: int, case_id: str):
-        return {"schema":"hashmarks.repository-evaluation-profile.v1","suite":"s","cases_sha256":"sha256:c","repository_identity":"sha256:r","producer_implementation_identity":"sha256:p","warmups":2,"samples":5,"shard_count":2,"shard_index":index,"cases":[{"id":case_id}]}
-    merged=merge_profiles([shard(1,"b"),shard(0,"a")])
+        return {
+            "schema": "hashmarks.repository-evaluation-profile.v1",
+            "suite": "s",
+            "cases_sha256": "sha256:c",
+            "repository_identity": "sha256:r",
+            "producer_implementation_identity": "sha256:p",
+            "warmups": 2,
+            "samples": 5,
+            "shard_count": 2,
+            "shard_index": index,
+            "cases": [{"id": case_id}],
+        }
+
+    merged = merge_profiles([shard(1, "b"), shard(0, "a")])
     assert merged["complete"] is True
-    assert [r["id"] for r in merged["cases"]] == ["a","b"]
-    with pytest.raises(ValueError,match="incomplete profile shards"):
-        merge_profiles([shard(0,"a")])
-    bad=shard(1,"b"); bad["repository_identity"]="sha256:other"
-    with pytest.raises(ValueError,match="profile identity mismatch"):
-        merge_profiles([shard(0,"a"),bad])
+    assert [r["id"] for r in merged["cases"]] == ["a", "b"]
+    with pytest.raises(ValueError, match="incomplete profile shards"):
+        merge_profiles([shard(0, "a")])
+    bad = shard(1, "b")
+    bad["repository_identity"] = "sha256:other"
+    with pytest.raises(ValueError, match="profile identity mismatch"):
+        merge_profiles([shard(0, "a"), bad])
 
 
-def test_paired_profile_interleaves_semantics_and_fails_closed_on_noise(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_paired_profile_interleaves_semantics_and_fails_closed_on_noise(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     import scripts.repository_evaluation.profile_cases as profiles
-    repo_a=tmp_path/"a"; repo_b=tmp_path/"b"
-    _write(repo_a,"src/live.py","def active_target():\n    return 1\n")
-    _write(repo_b,"src/live.py","def active_target():\n    return 1\n")
-    cases=tmp_path/"cases.json"; _cases(cases)
-    timings=iter([100,100, 100,100, 100,140, 100,60, 100,140])
-    original=profiles._run_action
+
+    repo_a = tmp_path / "a"
+    repo_b = tmp_path / "b"
+    _write(repo_a, "src/live.py", "def active_target():\n    return 1\n")
+    _write(repo_b, "src/live.py", "def active_target():\n    return 1\n")
+    cases = tmp_path / "cases.json"
+    _cases(cases)
+    timings = iter([100, 100, 100, 100, 100, 140, 100, 60, 100, 140])
+    original = profiles._run_action
+
     def fake(codemap, case):
-        elapsed,_=original(codemap,case)
-        try: elapsed=next(timings)
-        except StopIteration: pass
-        return elapsed,"sha256:same"
-    monkeypatch.setattr(profiles,"_run_action",fake)
-    result=profiles.paired_profile_cases(workspace_a=repo_a,workspace_b=repo_b,cases_path=cases,warmups=0,pairs=5,max_control_mad_pct=10.0)
-    row=result["cases"][0]
+        elapsed, _ = original(codemap, case)
+        with contextlib.suppress(StopIteration):
+            elapsed = next(timings)
+        return elapsed, "sha256:same"
+
+    monkeypatch.setattr(profiles, "_run_action", fake)
+    result = profiles.paired_profile_cases(
+        workspace_a=repo_a,
+        workspace_b=repo_b,
+        cases_path=cases,
+        warmups=0,
+        pairs=5,
+        max_control_mad_pct=10.0,
+    )
+    row = result["cases"][0]
     assert row["semantic_equal"] is True
     assert row["paired_mad_pct"] > 10.0
     assert row["admitted"] is False

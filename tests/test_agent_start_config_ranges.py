@@ -41,7 +41,12 @@ def test_toml_key_range_replaces_symbol_less_next_read(tmp_path: Path) -> None:
         "representation": "config-key-range",
         "content": "mode='active'",
         "estimated_tokens": 4,
-        "config": {"format": "toml", "kind": "key", "name": "mode", "locator": "exact-task-key"},
+        "config": {
+            "format": "toml",
+            "kind": "key",
+            "name": "mode",
+            "locator": "exact-task-key",
+        },
     }
     assert start["next_read"] is None
     assert start["source_budget"]["complete"] is True
@@ -57,7 +62,10 @@ def test_toml_section_range_is_bounded_to_named_section(tmp_path: Path) -> None:
     evidence = start["edit_evidence"]
     assert evidence["representation"] == "config-key-range"
     assert evidence["config"] == {
-        "format": "toml", "kind": "section", "name": "response", "locator": "exact-task-key"
+        "format": "toml",
+        "kind": "section",
+        "name": "response",
+        "locator": "exact-task-key",
     }
     assert evidence["lines"] == [3, 5]
     assert evidence["content"] == "[response]\nmode='active'\nfeature='ember'"
@@ -84,7 +92,10 @@ def test_yaml_nested_key_range_uses_task_supported_path(tmp_path: Path) -> None:
     evidence = start["edit_evidence"]
     assert evidence["representation"] == "config-key-range"
     assert evidence["config"] == {
-        "format": "yaml", "kind": "key", "name": "response.mode", "locator": "exact-task-key"
+        "format": "yaml",
+        "kind": "key",
+        "name": "response.mode",
+        "locator": "exact-task-key",
     }
     assert evidence["lines"] == [2, 2]
     assert evidence["content"] == "  mode: active"
@@ -105,8 +116,14 @@ def test_ambiguous_yaml_key_fails_closed_instead_of_guessing(tmp_path: Path) -> 
 
 
 def test_config_range_over_budget_is_not_clipped(tmp_path: Path) -> None:
-    _repo(tmp_path, "policy.toml", "mode='this-is-a-long-active-policy-value'\nfeature='ember'\n")
-    start = _start(tmp_path, "Change ember policy config accepted response mode", token_budget=1)
+    _repo(
+        tmp_path,
+        "policy.toml",
+        "mode='this-is-a-long-active-policy-value'\nfeature='ember'\n",
+    )
+    start = _start(
+        tmp_path, "Change ember policy config accepted response mode", token_budget=1
+    )
     assert start["edit_evidence"] is None
     assert start["next_read"]["reason"] == "exact-config-range-exceeds-start-budget"
     assert start["next_read"]["lines"] == [1, 1]

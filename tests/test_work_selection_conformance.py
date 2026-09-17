@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from copy import deepcopy
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -13,14 +13,17 @@ from hashmarks.test_shards import (
     HASHMARKS_AUTHORITIES,
     MEMBERSHIP_SCHEMA,
     SCHEMA,
+    node_membership_identity,
     plan,
     selection_membership_identity,
-    node_membership_identity,
     validate_test_shard_plan,
     validate_work_selection_envelope,
     validate_work_selection_repository_binding,
     work_selection_envelope,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _write_repo(root: Path) -> None:
@@ -48,7 +51,9 @@ def _resign_plan(value: dict[str, object]) -> None:
         "test_node_count": value.get("test_node_count"),
         "shards": value.get("shards"),
     }
-    value["plan_identity"] = "sha256:" + hashlib.sha256(_canonical_bytes(body)).hexdigest()
+    value["plan_identity"] = (
+        "sha256:" + hashlib.sha256(_canonical_bytes(body)).hexdigest()
+    )
 
 
 def _resign_envelope(value: dict[str, object]) -> None:
@@ -62,7 +67,11 @@ def _resign_envelope(value: dict[str, object]) -> None:
 
 
 def test_membership_identity_is_grouping_and_order_independent() -> None:
-    nodeids = ["tests/test_a.py::test_one", "tests/test_b.py::test_two", "tests/test_c.py::test_three"]
+    nodeids = [
+        "tests/test_a.py::test_one",
+        "tests/test_b.py::test_two",
+        "tests/test_c.py::test_three",
+    ]
     expected = node_membership_identity(nodeids)
     assert expected.startswith("sha256:")
     assert node_membership_identity(list(reversed(nodeids))) == expected
@@ -90,7 +99,9 @@ def test_membership_identity_rejects_omission_and_duplicate() -> None:
         node_membership_identity([full[0], full[0]])
 
 
-def test_generated_v3_plan_is_strictly_valid_and_exposes_membership_identity(tmp_path: Path) -> None:
+def test_generated_v3_plan_is_strictly_valid_and_exposes_membership_identity(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     payload = plan(tmp_path, 3)
     result = validate_test_shard_plan(payload)
@@ -102,7 +113,9 @@ def test_generated_v3_plan_is_strictly_valid_and_exposes_membership_identity(tmp
     assert result["membership_identity"] == selection_membership_identity(payload)
 
 
-def test_plan_rejects_recomputed_identity_with_unknown_shard_field(tmp_path: Path) -> None:
+def test_plan_rejects_recomputed_identity_with_unknown_shard_field(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     payload = deepcopy(plan(tmp_path, 3))
     payload["shards"][0]["timeout_seconds"] = 10  # type: ignore[index]
@@ -113,7 +126,9 @@ def test_plan_rejects_recomputed_identity_with_unknown_shard_field(tmp_path: Pat
     assert "$.selection.shards[0].timeout_seconds" in result["unexpected_fields"]
 
 
-def test_plan_rejects_duplicate_membership_even_if_identity_is_recomputed(tmp_path: Path) -> None:
+def test_plan_rejects_duplicate_membership_even_if_identity_is_recomputed(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     payload = deepcopy(plan(tmp_path, 3))
     duplicate = payload["shards"][0]["nodeids"][0]  # type: ignore[index]
@@ -128,7 +143,9 @@ def test_plan_rejects_duplicate_membership_even_if_identity_is_recomputed(tmp_pa
     assert result["membership_identity"] is None
 
 
-def test_plan_rejects_unowned_isolation_requirement_even_if_resigned(tmp_path: Path) -> None:
+def test_plan_rejects_unowned_isolation_requirement_even_if_resigned(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     payload = deepcopy(plan(tmp_path, 5))
     payload["shards"][0]["isolated_process"] = True  # type: ignore[index]
@@ -151,7 +168,9 @@ def test_envelope_enforces_exact_frozen_authority_declaration(tmp_path: Path) ->
     assert "hashmarks-authority-mismatch" in result["reasons"]
 
 
-def test_envelope_rejects_unknown_or_execution_policy_fields_after_resign(tmp_path: Path) -> None:
+def test_envelope_rejects_unknown_or_execution_policy_fields_after_resign(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     envelope = deepcopy(work_selection_envelope(tmp_path, 3))
     envelope["timeout_seconds"] = 30
@@ -164,7 +183,9 @@ def test_envelope_rejects_unknown_or_execution_policy_fields_after_resign(tmp_pa
     assert "$.timeout_seconds" in result["forbidden_execution_policy_paths"]
 
 
-def test_envelope_rejects_unknown_non_execution_extension_after_resign(tmp_path: Path) -> None:
+def test_envelope_rejects_unknown_non_execution_extension_after_resign(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     envelope = deepcopy(work_selection_envelope(tmp_path, 3))
     envelope["future_hint"] = {"value": True}
@@ -180,17 +201,24 @@ def test_membership_schema_is_separate_from_shard_and_envelope_schema() -> None:
     assert MEMBERSHIP_SCHEMA not in {SCHEMA, ENVELOPE_SCHEMA}
 
 
-def test_repository_binding_reproof_accepts_current_exact_repository(tmp_path: Path) -> None:
+def test_repository_binding_reproof_accepts_current_exact_repository(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     envelope = work_selection_envelope(tmp_path, 3)
     result = validate_work_selection_repository_binding(tmp_path, envelope)
     assert result["valid"] is True
     assert result["repository_bound"] is True
-    assert result["current_repository_content_identity"] == envelope["repository"]["content_identity"]
+    assert (
+        result["current_repository_content_identity"]
+        == envelope["repository"]["content_identity"]
+    )
     assert result["current_plan_identity"] == envelope["selection"]["plan_identity"]
 
 
-def test_repository_binding_reproof_rejects_stale_non_test_source(tmp_path: Path) -> None:
+def test_repository_binding_reproof_rejects_stale_non_test_source(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     envelope = work_selection_envelope(tmp_path, 3)
     (tmp_path / "src.py").write_text("VALUE = 2\n", encoding="utf-8")
@@ -202,7 +230,9 @@ def test_repository_binding_reproof_rejects_stale_non_test_source(tmp_path: Path
     assert "selection-does-not-reproduce" not in result["reasons"]
 
 
-def test_repository_binding_reproof_rejects_resigned_forged_membership(tmp_path: Path) -> None:
+def test_repository_binding_reproof_rejects_resigned_forged_membership(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     envelope = deepcopy(work_selection_envelope(tmp_path, 3))
     first = envelope["selection"]["shards"][0]  # type: ignore[index]

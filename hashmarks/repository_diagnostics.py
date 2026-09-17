@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import ast
-import time
 import tempfile
+import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -19,15 +19,11 @@ def _read_assignment_target_names(node: ast.AST) -> set[str]:
         return set()
     func = value.func
     if not (
-        isinstance(func, ast.Attribute)
-        and func.attr in {"read_text", "read_bytes"}
+        isinstance(func, ast.Attribute) and func.attr in {"read_text", "read_bytes"}
     ):
         return set()
     targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-    return {
-        target.id for target in targets
-        if isinstance(target, ast.Name)
-    }
+    return {target.id for target in targets if isinstance(target, ast.Name)}
 
 
 def _file_read_assignment_names(function: ast.AST) -> set[str]:
@@ -42,9 +38,7 @@ def _is_ast_parse_call(call: ast.Call) -> bool:
         return False
     owner = call.func.value
     return (
-        call.func.attr == "parse"
-        and isinstance(owner, ast.Name)
-        and owner.id == "ast"
+        call.func.attr == "parse" and isinstance(owner, ast.Name) and owner.id == "ast"
     )
 
 
@@ -54,35 +48,34 @@ def _source_is_file_read(source: ast.AST, read_names: set[str]) -> bool:
     if not isinstance(source, ast.Call):
         return False
     func = source.func
-    return (
-        isinstance(func, ast.Attribute)
-        and func.attr in {"read_text", "read_bytes"}
-    )
+    return isinstance(func, ast.Attribute) and func.attr in {"read_text", "read_bytes"}
 
 
 def _ast_parse_uses_file_read(call: ast.Call, read_names: set[str]) -> bool:
-    return (
-        _is_ast_parse_call(call)
-        and _source_is_file_read(call.args[0], read_names)
-    )
+    return _is_ast_parse_call(call) and _source_is_file_read(call.args[0], read_names)
 
 
 def _file_ast_parse_violations(path: Path) -> list[dict[str, object]]:
     tree = read_python_ast(path).tree
     violations: list[dict[str, object]] = []
     for function in [
-        node for node in ast.walk(tree)
+        node
+        for node in ast.walk(tree)
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     ]:
         read_names = _file_read_assignment_names(function)
         for node in ast.walk(function):
-            if isinstance(node, ast.Call) and _ast_parse_uses_file_read(node, read_names):
-                violations.append({
-                    "path": path.as_posix(),
-                    "line": int(node.lineno),
-                    "function": function.name,
-                    "reason": "file-backed-ast-parse-bypasses-shared-cache",
-                })
+            if isinstance(node, ast.Call) and _ast_parse_uses_file_read(
+                node, read_names
+            ):
+                violations.append(
+                    {
+                        "path": path.as_posix(),
+                        "line": int(node.lineno),
+                        "function": function.name,
+                        "reason": "file-backed-ast-parse-bypasses-shared-cache",
+                    }
+                )
     return violations
 
 
@@ -153,7 +146,9 @@ def _candidate_count(value: object) -> int:
     if isinstance(canonical, list):
         return len(canonical)
     discrimination = ready.get("discrimination")
-    if isinstance(discrimination, Mapping) and isinstance(discrimination.get("candidates"), list):
+    if isinstance(discrimination, Mapping) and isinstance(
+        discrimination.get("candidates"), list
+    ):
         return len(discrimination["candidates"])
     return 0
 
@@ -193,9 +188,7 @@ def repository_query_runtime_diagnostics(
 
     paths = sorted(_evidence_paths(result))
     existing = [
-        workspace_path / path
-        for path in paths
-        if (workspace_path / path).is_file()
+        workspace_path / path for path in paths if (workspace_path / path).is_file()
     ]
     return {
         "schema": "hashmarks.repository-query-runtime-diagnostics.v1",
@@ -239,8 +232,7 @@ def _delta_stats(
 ) -> dict[str, int]:
     keys = set(before) | set(after)
     return {
-        key: int(after.get(key, 0)) - int(before.get(key, 0))
-        for key in sorted(keys)
+        key: int(after.get(key, 0)) - int(before.get(key, 0)) for key in sorted(keys)
     }
 
 
@@ -314,7 +306,7 @@ def _related_query_semantics(
         "packet_roles": packet_roles,
     }
     equivalent = (
-        found_paths[:len(action_paths)] == action_paths
+        found_paths[: len(action_paths)] == action_paths
         and action_roles == packet_roles
     )
     return semantics, equivalent
@@ -343,9 +335,7 @@ def related_query_reuse_receipt(
             artifact_db=state_dir / "artifacts.sqlite3",
         ) as codemap:
             codemap.sync()
-            found, action, packet, deltas = _related_query_session(
-                codemap, task, limit
-            )
+            found, action, packet, deltas = _related_query_session(codemap, task, limit)
 
     semantics, equivalent = _related_query_semantics(found, action, packet)
     return {
@@ -365,6 +355,7 @@ def related_query_reuse_receipt(
         ),
         "boundary": "repository-intelligence-only",
     }
+
 
 def _profile_limit(
     codemap,
@@ -408,16 +399,11 @@ def bounded_top_n_candidate_profile(
             artifact_db=state_dir / "artifacts.sqlite3",
         ) as codemap:
             codemap.sync()
-            profiles = [
-                _profile_limit(codemap, task, limit)
-                for limit in normalized
-            ]
+            profiles = [_profile_limit(codemap, task, limit) for limit in normalized]
 
     largest = profiles[-1]["paths"]
     prefix_checks = {
-        str(profile["limit"]): (
-            profile["paths"] == largest[:profile["result_count"]]
-        )
+        str(profile["limit"]): (profile["paths"] == largest[: profile["result_count"]])
         for profile in profiles
     }
     return {
@@ -425,8 +411,7 @@ def bounded_top_n_candidate_profile(
         "task": task,
         "profiles": profiles,
         "all_bounds_respected": all(
-            bool(profile["bound_respected"])
-            for profile in profiles
+            bool(profile["bound_respected"]) for profile in profiles
         ),
         "prefix_semantics_equivalent": all(prefix_checks.values()),
         "prefix_checks": prefix_checks,

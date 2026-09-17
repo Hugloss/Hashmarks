@@ -39,12 +39,18 @@ def test_render_distinguishes_pi_native_mcp_from_adapter() -> None:
         "codex": _host(),
         "pi": {
             "installed": {"status": "PASS", "detail": "pi 0.1"},
-            "native_mcp": {"status": "NO", "detail": "Pi core intentionally has no native MCP client"},
+            "native_mcp": {
+                "status": "NO",
+                "detail": "Pi core intentionally has no native MCP client",
+            },
             "mcp_adapter": {"status": "ADAPTER REQUIRED", "detail": ""},
             "project_registration": {"status": "PASS", "detail": ""},
             "registration_source": {"status": "PASS", "detail": ".mcp.json"},
             "registration_ownership": {"status": "HASHMARKS", "detail": ""},
-            "global_hashmarks_registration": {"status": "NOT REQUIRED", "detail": "Hashmarks registration is project-local"},
+            "global_hashmarks_registration": {
+                "status": "NOT REQUIRED",
+                "detail": "Hashmarks registration is project-local",
+            },
             "discovery": {"status": "NOT CHECKED", "detail": ""},
             "last_successful_mcp_call": {"status": "NOT RECORDED", "detail": ""},
         },
@@ -60,7 +66,10 @@ def _host() -> dict[str, dict[str, str]]:
         "project_registration": {"status": "PASS", "detail": ""},
         "registration_source": {"status": "PASS", "detail": "local"},
         "registration_ownership": {"status": "HASHMARKS", "detail": ""},
-        "global_hashmarks_registration": {"status": "NOT REQUIRED", "detail": "Hashmarks registration is project-local"},
+        "global_hashmarks_registration": {
+            "status": "NOT REQUIRED",
+            "detail": "Hashmarks registration is project-local",
+        },
         "discovery": {"status": "NOT CHECKED", "detail": ""},
         "last_successful_mcp_call": {"status": "NOT RECORDED", "detail": ""},
     }
@@ -74,15 +83,22 @@ def test_codex_discovery_reports_project_trust_required(tmp_path, monkeypatch) -
         '[mcp_servers.hashmarks]\ncommand = "uv"\nargs = ["run", "--no-sync", "hashmarks", "--workspace", ".", "mcp"]\nenabled = true\n',
         encoding="utf-8",
     )
-    monkeypatch.setattr(status, "_version", lambda *args, **kwargs: status.Check("PASS", "codex-cli 0.154.0"))
+    monkeypatch.setattr(
+        status,
+        "_version",
+        lambda *args, **kwargs: status.Check("PASS", "codex-cli 0.154.0"),
+    )
 
     def fake_run(argv, *, cwd, timeout=20):
         import subprocess
+
         assert cwd == workspace
         if "-c" in argv:
-            assert "trust_level=\"trusted\"" in argv[2]
+            assert 'trust_level="trusted"' in argv[2]
             return subprocess.CompletedProcess(argv, 0, '{"name":"hashmarks"}\n', "")
-        return subprocess.CompletedProcess(argv, 1, "", "project config disabled until trusted")
+        return subprocess.CompletedProcess(
+            argv, 1, "", "project config disabled until trusted"
+        )
 
     monkeypatch.setattr(status, "_run", fake_run)
     result = status._codex(workspace, "sha256:test:1")

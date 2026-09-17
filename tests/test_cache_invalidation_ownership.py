@@ -108,16 +108,22 @@ def test_cache_invalidation_resolves_decorator_cache_clear(tmp_path):
 
 def test_cli_cache_invalidation_ownership(tmp_path, capsys):
     _package(tmp_path)
-    (tmp_path / "pkg" / "state.py").write_text("CACHE = {}\n\ndef reset():\n    CACHE.clear()\n", encoding="utf-8")
+    (tmp_path / "pkg" / "state.py").write_text(
+        "CACHE = {}\n\ndef reset():\n    CACHE.clear()\n", encoding="utf-8"
+    )
     assert main(["map", "sync", "--workspace", str(tmp_path)]) == 0
     capsys.readouterr()
-    assert main(["map", "cache-invalidation-ownership", "--workspace", str(tmp_path)]) == 0
+    assert (
+        main(["map", "cache-invalidation-ownership", "--workspace", str(tmp_path)]) == 0
+    )
     out = capsys.readouterr().out
     assert '"schema": "hashmarks.cache-invalidation-ownership.v1"' in out
     assert '"relation": "invalidates-cache"' in out
 
 
-def test_cache_invalidation_imported_symbol_shadowed_by_parameter_is_not_authority(tmp_path):
+def test_cache_invalidation_imported_symbol_shadowed_by_parameter_is_not_authority(
+    tmp_path,
+):
     _package(tmp_path)
     (tmp_path / "pkg" / "state.py").write_text("CACHE = {}\n", encoding="utf-8")
     (tmp_path / "consumer.py").write_text(

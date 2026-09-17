@@ -29,12 +29,42 @@ _REPOSITORIES: dict[str, dict[str, object]] = {
             "pyproject.toml": "[project]\nname='fresh-orders'\nversion='0.1.0'\nrequires-python='>=3.11'\n",
         },
         "tasks": [
-            {"id":"py-service","query":"OrderService submit_order implementation","expected_files":["src/orders/service.py"],"expected_symbols":["OrderService","submit_order"]},
-            {"id":"py-storage","query":"OrderStore save_order persistence","expected_files":["src/orders/storage.py"],"expected_symbols":["OrderStore","save_order"]},
-            {"id":"py-validation","query":"validate_order_id validation","expected_files":["src/orders/validation.py"],"expected_symbols":["validate_order_id"]},
-            {"id":"py-test","query":"test_submit_order order test","expected_files":["tests/test_orders.py"],"expected_symbols":["test_submit_order"]},
-            {"id":"py-config","query":"fresh-orders project pyproject configuration","expected_files":["pyproject.toml"],"expected_symbols":[]},
-            {"id":"py-authority","query":"Python order service validate changes tests AGENTS","expected_files":["AGENTS.md"],"expected_symbols":[]},
+            {
+                "id": "py-service",
+                "query": "OrderService submit_order implementation",
+                "expected_files": ["src/orders/service.py"],
+                "expected_symbols": ["OrderService", "submit_order"],
+            },
+            {
+                "id": "py-storage",
+                "query": "OrderStore save_order persistence",
+                "expected_files": ["src/orders/storage.py"],
+                "expected_symbols": ["OrderStore", "save_order"],
+            },
+            {
+                "id": "py-validation",
+                "query": "validate_order_id validation",
+                "expected_files": ["src/orders/validation.py"],
+                "expected_symbols": ["validate_order_id"],
+            },
+            {
+                "id": "py-test",
+                "query": "test_submit_order order test",
+                "expected_files": ["tests/test_orders.py"],
+                "expected_symbols": ["test_submit_order"],
+            },
+            {
+                "id": "py-config",
+                "query": "fresh-orders project pyproject configuration",
+                "expected_files": ["pyproject.toml"],
+                "expected_symbols": [],
+            },
+            {
+                "id": "py-authority",
+                "query": "Python order service validate changes tests AGENTS",
+                "expected_files": ["AGENTS.md"],
+                "expected_symbols": [],
+            },
         ],
     },
     "typescript-dashboard": {
@@ -44,22 +74,52 @@ _REPOSITORIES: dict[str, dict[str, object]] = {
             "src/components/MetricsPanel.tsx": "import { loadMetrics } from '../api/metrics';\nexport async function MetricsPanel() { const values = await loadMetrics(); return values.join(','); }\n",
             "src/state/selection.ts": "export function normalizeSelection(value: string): string { return value.trim().toLowerCase(); }\n",
             "tests/MetricsPanel.test.tsx": "import { MetricsPanel } from '../src/components/MetricsPanel';\nexport async function testMetricsPanel() { return MetricsPanel(); }\n",
-            "package.json": "{\"name\":\"fresh-dashboard\",\"scripts\":{\"test\":\"vitest run\"}}\n",
+            "package.json": '{"name":"fresh-dashboard","scripts":{"test":"vitest run"}}\n',
             "vite.config.ts": "export default { test: { environment: 'jsdom' } };\n",
         },
         "tasks": [
-            {"id":"ts-api","query":"loadMetrics API adapter","expected_files":["src/api/metrics.ts"],"expected_symbols":["loadMetrics"]},
-            {"id":"ts-panel","query":"MetricsPanel component loadMetrics","expected_files":["src/components/MetricsPanel.tsx"],"expected_symbols":["MetricsPanel"]},
-            {"id":"ts-selection","query":"normalizeSelection state selection","expected_files":["src/state/selection.ts"],"expected_symbols":["normalizeSelection"]},
-            {"id":"ts-test","query":"testMetricsPanel MetricsPanel test","expected_files":["tests/MetricsPanel.test.tsx"],"expected_symbols":["testMetricsPanel"]},
-            {"id":"ts-package","query":"fresh-dashboard vitest package scripts","expected_files":["package.json"],"expected_symbols":[]},
-            {"id":"ts-vite","query":"jsdom vite test environment","expected_files":["vite.config.ts"],"expected_symbols":[]},
+            {
+                "id": "ts-api",
+                "query": "loadMetrics API adapter",
+                "expected_files": ["src/api/metrics.ts"],
+                "expected_symbols": ["loadMetrics"],
+            },
+            {
+                "id": "ts-panel",
+                "query": "MetricsPanel component loadMetrics",
+                "expected_files": ["src/components/MetricsPanel.tsx"],
+                "expected_symbols": ["MetricsPanel"],
+            },
+            {
+                "id": "ts-selection",
+                "query": "normalizeSelection state selection",
+                "expected_files": ["src/state/selection.ts"],
+                "expected_symbols": ["normalizeSelection"],
+            },
+            {
+                "id": "ts-test",
+                "query": "testMetricsPanel MetricsPanel test",
+                "expected_files": ["tests/MetricsPanel.test.tsx"],
+                "expected_symbols": ["testMetricsPanel"],
+            },
+            {
+                "id": "ts-package",
+                "query": "fresh-dashboard vitest package scripts",
+                "expected_files": ["package.json"],
+                "expected_symbols": [],
+            },
+            {
+                "id": "ts-vite",
+                "query": "jsdom vite test environment",
+                "expected_files": ["vite.config.ts"],
+                "expected_symbols": [],
+            },
         ],
     },
     "release-contracts": {
         "files": {
             "AGENTS.md": "Release automation repository. Contracts are immutable inputs to packaging.\n",
-            "contracts/release.schema.json": "{\"title\":\"ReleaseManifest\",\"required\":[\"artifact\",\"sha256\"]}\n",
+            "contracts/release.schema.json": '{"title":"ReleaseManifest","required":["artifact","sha256"]}\n',
             "scripts/package_release.py": "from pathlib import Path\n\ndef package_release(artifact: Path) -> str:\n    return artifact.name\n",
             "scripts/verify_checksum.py": "def verify_checksum(expected: str, observed: str) -> bool:\n    return expected == observed\n",
             "tests/test_release_contract.py": "from scripts.verify_checksum import verify_checksum\n\ndef test_release_checksum_contract():\n    assert verify_checksum('a', 'a')\n",
@@ -67,12 +127,42 @@ _REPOSITORIES: dict[str, dict[str, object]] = {
             "config/release.toml": "[release]\nrequire_checksum=true\nmanifest='contracts/release.schema.json'\n",
         },
         "tasks": [
-            {"id":"rel-schema","query":"ReleaseManifest artifact sha256 contract schema","expected_files":["contracts/release.schema.json"],"expected_symbols":[]},
-            {"id":"rel-package","query":"package_release artifact packaging","expected_files":["scripts/package_release.py"],"expected_symbols":["package_release"]},
-            {"id":"rel-checksum","query":"verify_checksum expected observed","expected_files":["scripts/verify_checksum.py"],"expected_symbols":["verify_checksum"]},
-            {"id":"rel-test","query":"test_release_checksum_contract checksum contract test","expected_files":["tests/test_release_contract.py"],"expected_symbols":["test_release_checksum_contract"]},
-            {"id":"rel-make","query":"release verify Makefile targets","expected_files":["Makefile"],"expected_symbols":[]},
-            {"id":"rel-config","query":"require_checksum release manifest configuration","expected_files":["config/release.toml"],"expected_symbols":[]},
+            {
+                "id": "rel-schema",
+                "query": "ReleaseManifest artifact sha256 contract schema",
+                "expected_files": ["contracts/release.schema.json"],
+                "expected_symbols": [],
+            },
+            {
+                "id": "rel-package",
+                "query": "package_release artifact packaging",
+                "expected_files": ["scripts/package_release.py"],
+                "expected_symbols": ["package_release"],
+            },
+            {
+                "id": "rel-checksum",
+                "query": "verify_checksum expected observed",
+                "expected_files": ["scripts/verify_checksum.py"],
+                "expected_symbols": ["verify_checksum"],
+            },
+            {
+                "id": "rel-test",
+                "query": "test_release_checksum_contract checksum contract test",
+                "expected_files": ["tests/test_release_contract.py"],
+                "expected_symbols": ["test_release_checksum_contract"],
+            },
+            {
+                "id": "rel-make",
+                "query": "release verify Makefile targets",
+                "expected_files": ["Makefile"],
+                "expected_symbols": [],
+            },
+            {
+                "id": "rel-config",
+                "query": "require_checksum release manifest configuration",
+                "expected_files": ["config/release.toml"],
+                "expected_symbols": [],
+            },
         ],
     },
 }
@@ -86,7 +176,12 @@ def _tree_identity(root: Path) -> str:
     rows: list[tuple[str, str]] = []
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
         rel = path.relative_to(root)
-        if rel.parts and rel.parts[0] in {".hashmarks", ".git", ".venv", "node_modules"}:
+        if rel.parts and rel.parts[0] in {
+            ".hashmarks",
+            ".git",
+            ".venv",
+            "node_modules",
+        }:
             continue
         rows.append((rel.as_posix(), _sha256_bytes(path.read_bytes())))
     payload = json.dumps(rows, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
@@ -109,28 +204,42 @@ def materialize_fixture(root: Path) -> list[tuple[str, Path, Path]]:
             path.write_text(str(content), encoding="utf-8")
         corpus = root / "corpora" / f"{name}.json"
         corpus.parent.mkdir(parents=True, exist_ok=True)
-        corpus.write_text(json.dumps({"schema":"hashmarks.agent-task-corpus.v1","tasks":spec["tasks"]}, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        corpus.write_text(
+            json.dumps(
+                {"schema": "hashmarks.agent-task-corpus.v1", "tasks": spec["tasks"]},
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         repos.append((name, workspace, corpus))
     return repos
 
 
-def collect_fresh(root: Path, *, budget: int = 1200, limit: int = 20) -> dict[str, object]:
+def collect_fresh(
+    root: Path, *, budget: int = 1200, limit: int = 20
+) -> dict[str, object]:
     repos = materialize_fixture(root)
     suite = collect_suite(repos, budget=budget, limit=limit)
     fixture_repos = []
     for name, workspace, corpus in repos:
-        fixture_repos.append({
-            "name": name,
-            "workspace_tree_identity": _tree_identity(workspace),
-            "corpus_sha256": _sha256_bytes(corpus.read_bytes()),
-            "tasks": len(json.loads(corpus.read_text(encoding="utf-8"))["tasks"]),
-        })
+        fixture_repos.append(
+            {
+                "name": name,
+                "workspace_tree_identity": _tree_identity(workspace),
+                "corpus_sha256": _sha256_bytes(corpus.read_bytes()),
+                "tasks": len(json.loads(corpus.read_text(encoding="utf-8"))["tasks"]),
+            }
+        )
     fixture = {
         "schema": FIXTURE_SCHEMA,
         "family": FIXTURE_FAMILY,
         "repositories": fixture_repos,
     }
-    fixture_identity = _sha256_bytes(json.dumps(fixture, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+    fixture_identity = _sha256_bytes(
+        json.dumps(fixture, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    )
     return {
         "schema": SCHEMA,
         "fixture": fixture,
@@ -140,7 +249,9 @@ def collect_fresh(root: Path, *, budget: int = 1200, limit: int = 20) -> dict[st
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Materialize and run the canonical fresh multi-repository Hashmarks corpus")
+    parser = argparse.ArgumentParser(
+        description="Materialize and run the canonical fresh multi-repository Hashmarks corpus"
+    )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--budget", type=int, default=1200)
     parser.add_argument("--limit", type=int, default=20)
@@ -154,7 +265,7 @@ def main() -> None:
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)
+    print(rendered)  # noqa: T201 - intentional command output
     summary = payload["suite"]["summary"]  # type: ignore[index]
     if (
         float(summary["file_recall"]) < args.min_file_recall

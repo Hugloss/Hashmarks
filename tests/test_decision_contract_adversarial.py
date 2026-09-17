@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 import pytest
 
 from hashmarks.codemap.decision_contract import DecisionPacketContract
@@ -12,7 +10,11 @@ def packet():
         "task": "fix owner",
         "edit": {"path": "src/a.py"},
         "verify": {"path": "tests/test_a.py"},
-        "discrimination": {"needed": True, "reason": "competing", "ambiguity": {"ambiguous": True}},
+        "discrimination": {
+            "needed": True,
+            "reason": "competing",
+            "ambiguity": {"ambiguous": True},
+        },
         "identity": {"codemap_complete": True, "stale": False},
         "canonical_generation": 1,
     }

@@ -18,7 +18,9 @@ def test_handoff_cli_emits_external_authority_contract(capsys) -> None:
     assert value["producer"]["implementation_identity"].startswith("sha256:")
 
 
-def test_economics_cli_reports_membership_preservation_without_execution_policy(capsys) -> None:
+def test_economics_cli_reports_membership_preservation_without_execution_policy(
+    capsys,
+) -> None:
     assert economics_main(["--root", str(_root())]) == 0
     value = json.loads(capsys.readouterr().out)
     assert value["exact_total_membership_preserved"] is True

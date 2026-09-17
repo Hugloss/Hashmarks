@@ -3,18 +3,20 @@ from __future__ import annotations
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from hashmarks import IdentityCycleError
 from hashmarks.cas import CAS
-from hashmarks.digest import hash_bytes
 from hashmarks.file_store import FileDigestStore
 from hashmarks.graph import IdentityGraph
 from hashmarks.inputs import resolve_inputs
 from hashmarks.merkle import MerkleTree
 from hashmarks.watcher import DirtyBatch
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def make_tree(workspace: Path) -> tuple[FileDigestStore, MerkleTree]:
@@ -254,8 +256,6 @@ def test_cas_detects_corruption_and_maintenance(tmp_path: Path):
     assert not cas.delete(digest)
 
 
-
-
 def test_file_store_count_and_prune_missing(tmp_path: Path):
     workspace = tmp_path / "repo"
     workspace.mkdir()
@@ -278,7 +278,9 @@ def test_dirty_batch_deduplicates_and_sorts():
     assert batch.drain() == []
 
 
-def test_fresh_process_style_reopen_is_stable_with_state_inside_workspace(tmp_path: Path):
+def test_fresh_process_style_reopen_is_stable_with_state_inside_workspace(
+    tmp_path: Path,
+):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "src.py").write_text("x = 1\n")

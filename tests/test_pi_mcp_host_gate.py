@@ -47,7 +47,12 @@ def test_pi_event_validation_accepts_exact_proxy_calls() -> None:
 
 def test_pi_event_validation_rejects_non_mcp_tool() -> None:
     events = [
-        {"type": "tool_execution_start", "toolCallId": "x", "toolName": "bash", "args": {}},
+        {
+            "type": "tool_execution_start",
+            "toolCallId": "x",
+            "toolName": "bash",
+            "args": {},
+        },
     ]
     with pytest.raises(pi_gate.HostGateError, match="unexpected tool"):
         pi_gate._validate_events(events)

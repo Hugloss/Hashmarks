@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from hashmarks.file_store import UnstableFileError
 from hashmarks import mcp_server, mcp_surface, repository_retry
+from hashmarks.file_store import UnstableFileError
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
 
 
@@ -26,7 +26,9 @@ def _repo(tmp_path: Path) -> Path:
     return repo
 
 
-def test_mcp_surface_exposes_only_bounded_repository_intelligence(tmp_path: Path) -> None:
+def test_mcp_surface_exposes_only_bounded_repository_intelligence(
+    tmp_path: Path,
+) -> None:
     repo = _repo(tmp_path)
     surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
     try:
@@ -45,7 +47,9 @@ def test_mcp_surface_exposes_only_bounded_repository_intelligence(tmp_path: Path
 
 
 def test_mcp_surface_rejects_unbounded_or_empty_inputs(tmp_path: Path) -> None:
-    surface = HashmarksMcpSurface(str(_repo(tmp_path)), state_dir=str(tmp_path / "state"))
+    surface = HashmarksMcpSurface(
+        str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
+    )
     try:
         with pytest.raises(McpSurfaceError, match="query must not be empty"):
             surface.find(" ")
@@ -62,11 +66,11 @@ def test_mcp_surface_rejects_unbounded_or_empty_inputs(tmp_path: Path) -> None:
         surface.close()
 
 
-
 def test_mcp_find_truncated_only_when_an_extra_hit_exists(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     (repo / "src" / "feature_two.py").write_text(
-        "def flare041_second(value: int) -> int:\n    return value + 2\n", encoding="utf-8"
+        "def flare041_second(value: int) -> int:\n    return value + 2\n",
+        encoding="utf-8",
     )
     surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
     try:
@@ -83,7 +87,9 @@ def test_mcp_find_truncated_only_when_an_extra_hit_exists(tmp_path: Path) -> Non
 @pytest.mark.parametrize(
     "exc",
     [
-        RuntimeError("CodeMap generation is incomplete (BUILDING); run sync() before querying"),
+        RuntimeError(
+            "CodeMap generation is incomplete (BUILDING); run sync() before querying"
+        ),
         RuntimeError("CodeMap generation changed before nested decision session"),
         RuntimeError("CodeMap generation changed during decision session"),
         UnstableFileError("file changed while hashing: src/feature.py"),
@@ -133,8 +139,12 @@ def test_mcp_retry_remains_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls == len(repository_retry._TRANSIENT_RETRY_DELAYS)
 
 
-def test_mcp_surface_read_centralizes_gate_and_retry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    surface = HashmarksMcpSurface(str(_repo(tmp_path)), state_dir=str(tmp_path / "state"))
+def test_mcp_surface_read_centralizes_gate_and_retry(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    surface = HashmarksMcpSurface(
+        str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
+    )
     calls: list[object] = []
 
     def fake_retry(operation):
@@ -171,7 +181,9 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
         mcp_server._call_surface(FakeToolError, broken)
 
 
-def test_mcp_server_registers_exact_small_read_only_tool_catalog(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_mcp_server_registers_exact_small_read_only_tool_catalog(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     registered: list[dict[str, object]] = []
 
     class FakeToolAnnotations:
@@ -186,6 +198,7 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(monkeypatch: py
             def decorate(fn):
                 registered.append({"fn": fn, **metadata})
                 return fn
+
             return decorate
 
         def run(self, *, transport: str = "stdio") -> None:
@@ -205,7 +218,9 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(monkeypatch: py
     monkeypatch.setitem(sys.modules, "mcp", mcp_module)
     monkeypatch.setitem(sys.modules, "mcp.server", server_module)
     monkeypatch.setitem(sys.modules, "mcp.server.mcpserver", mcpserver_module)
-    monkeypatch.setitem(sys.modules, "mcp.server.mcpserver.exceptions", exceptions_module)
+    monkeypatch.setitem(
+        sys.modules, "mcp.server.mcpserver.exceptions", exceptions_module
+    )
     monkeypatch.setitem(sys.modules, "mcp.types", types_module)
 
     from hashmarks.mcp_server import build_server
@@ -213,7 +228,13 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(monkeypatch: py
     server = build_server(_repo(tmp_path), state_dir=tmp_path / "state")
     try:
         names = [str(row["name"]) for row in registered]
-        assert names == ["repository_context", "find", "task_evidence", "change_impact", "post_change"]
+        assert names == [
+            "repository_context",
+            "find",
+            "task_evidence",
+            "change_impact",
+            "post_change",
+        ]
         for row in registered:
             annotations = row["annotations"]
             assert annotations.values == {
@@ -257,6 +278,7 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             def decorate(fn):
                 registered.append(str(metadata["name"]))
                 return fn
+
             return decorate
 
     class FakeToolError(Exception):
@@ -273,7 +295,9 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
     monkeypatch.setitem(sys.modules, "mcp", mcp_module)
     monkeypatch.setitem(sys.modules, "mcp.server", server_module)
     monkeypatch.setitem(sys.modules, "mcp.server.mcpserver", mcpserver_module)
-    monkeypatch.setitem(sys.modules, "mcp.server.mcpserver.exceptions", exceptions_module)
+    monkeypatch.setitem(
+        sys.modules, "mcp.server.mcpserver.exceptions", exceptions_module
+    )
     monkeypatch.setitem(sys.modules, "mcp.types", types_module)
 
     from hashmarks.mcp_server import build_server

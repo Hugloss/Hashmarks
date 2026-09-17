@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 from threading import RLock
-from typing import Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from .codemap import CodeMap
 from .repository_retry import retry_transient_repository_race
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 _MAX_QUERY_CHARS = 8_192
 _MAX_TASK_CHARS = 16_384
@@ -22,7 +24,9 @@ class McpSurfaceError(ValueError):
     """Invalid consumer input at the Hashmarks MCP boundary."""
 
 
-def _bounded_text(value: str, *, name: str, maximum: int, allow_empty: bool = False) -> str:
+def _bounded_text(
+    value: str, *, name: str, maximum: int, allow_empty: bool = False
+) -> str:
     if not isinstance(value, str):
         raise McpSurfaceError(f"{name} must be a string")
     text = value.strip()
@@ -45,9 +49,13 @@ def _previous_evidence(value: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise McpSurfaceError("previous_evidence must be an object")
     try:
-        encoded = json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        encoded = json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode(
+            "utf-8"
+        )
     except (TypeError, ValueError) as exc:
-        raise McpSurfaceError("previous_evidence must contain JSON-compatible values") from exc
+        raise McpSurfaceError(
+            "previous_evidence must contain JSON-compatible values"
+        ) from exc
     if len(encoded) > _MAX_PREVIOUS_EVIDENCE_BYTES:
         raise McpSurfaceError(
             f"previous_evidence exceeds {_MAX_PREVIOUS_EVIDENCE_BYTES} encoded bytes"
@@ -57,10 +65,15 @@ def _previous_evidence(value: dict[str, Any]) -> dict[str, Any]:
 
 def _changed_paths(values: list[str]) -> list[str]:
     if not isinstance(values, list) or not values:
-        raise McpSurfaceError("changed_paths must contain at least one repository-relative path")
+        raise McpSurfaceError(
+            "changed_paths must contain at least one repository-relative path"
+        )
     if len(values) > _MAX_CHANGED_PATHS:
         raise McpSurfaceError(f"changed_paths exceeds {_MAX_CHANGED_PATHS} entries")
-    return [_bounded_text(str(value), name="changed path", maximum=4_096) for value in values]
+    return [
+        _bounded_text(str(value), name="changed path", maximum=4_096)
+        for value in values
+    ]
 
 
 class HashmarksMcpSurface:

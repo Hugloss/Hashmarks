@@ -31,7 +31,9 @@ def test_sqlite_transaction_rolls_back_any_failed_operation() -> None:
     assert db.execute("SELECT value FROM item").fetchall() == []
 
 
-def test_sqlite_transaction_rolls_back_failed_commit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sqlite_transaction_rolls_back_failed_commit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class FailingCommitConnection:
         def __init__(self) -> None:
             self.in_transaction = False

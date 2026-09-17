@@ -1,4 +1,8 @@
-from scripts.agent_evaluation.adapters import CodexJsonlAdapter, GenericJsonlAdapter, adapter
+from scripts.agent_evaluation.adapters import (
+    CodexJsonlAdapter,
+    GenericJsonlAdapter,
+    adapter,
+)
 
 
 def test_codex_adapter_only_translates_packet_and_events() -> None:
@@ -6,16 +10,29 @@ def test_codex_adapter_only_translates_packet_and_events() -> None:
     packet = a.packet("fix widget", {"edit": {"path": "src/widget.py"}})
     rendered = packet.as_json()
     assert '"harness":"codex-jsonl"' in rendered
-    assert 'src/widget.py' in rendered
+    assert "src/widget.py" in rendered
     events = a.normalize_events(
         [
             {"type": "thread.started", "thread_id": "t-1"},
             {"type": "unknown.native.event", "payload": "ignored"},
-            {"type": "turn.completed", "usage": {"input_tokens": 100, "cached_input_tokens": 40, "output_tokens": 12, "reasoning_output_tokens": 7}},
+            {
+                "type": "turn.completed",
+                "usage": {
+                    "input_tokens": 100,
+                    "cached_input_tokens": 40,
+                    "output_tokens": 12,
+                    "reasoning_output_tokens": 7,
+                },
+            },
         ],
-        session_id="s1", task_id="task1", repository_identity="repo1",
+        session_id="s1",
+        task_id="task1",
+        repository_identity="repo1",
     )
-    assert [event["event_type"] for event in events] == ["task_received", "final_result"]
+    assert [event["event_type"] for event in events] == [
+        "task_received",
+        "final_result",
+    ]
     assert events[-1]["input_tokens"] == 100
     assert events[-1]["cached_input_tokens"] == 40
     assert events[-1]["reasoning_tokens"] == 7
@@ -25,8 +42,13 @@ def test_codex_adapter_only_translates_packet_and_events() -> None:
 def test_generic_adapter_rejects_unknown_event_types_by_ignoring_them() -> None:
     a = GenericJsonlAdapter()
     events = a.normalize_events(
-        [{"event_type": "work_packet", "actor": "opencode-adapter", "files_read": 2}, {"event_type": "made_up"}],
-        session_id="s", task_id="t", repository_identity="r",
+        [
+            {"event_type": "work_packet", "actor": "opencode-adapter", "files_read": 2},
+            {"event_type": "made_up"},
+        ],
+        session_id="s",
+        task_id="t",
+        repository_identity="r",
     )
     assert len(events) == 1
     assert events[0]["event_type"] == "work_packet"

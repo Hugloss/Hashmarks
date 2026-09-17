@@ -3,7 +3,6 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -27,7 +26,9 @@ def test_readme_launch_surface_is_descriptive_before_internal_detail() -> None:
     ):
         assert phrase in above_fold
     assert readme.index("## Quick start") < readme.index("## Core architecture")
-    assert readme.index("## MCP server for coding agents") < readme.index("## Core architecture")
+    assert readme.index("## MCP server for coding agents") < readme.index(
+        "## Core architecture"
+    )
 
 
 def test_readme_names_supported_agent_hosts_without_comparison_marketing() -> None:
@@ -42,7 +43,12 @@ def test_readme_names_supported_agent_hosts_without_comparison_marketing() -> No
 def test_package_metadata_carries_high_intent_discovery_terms() -> None:
     metadata = tomllib.loads(_text("pyproject.toml"))["project"]
     description = metadata["description"].lower()
-    for phrase in ("repository intelligence", "mcp server", "coding agents", "codebase search"):
+    for phrase in (
+        "repository intelligence",
+        "mcp server",
+        "coding agents",
+        "codebase search",
+    ):
         assert phrase in description
 
     keywords = set(metadata["keywords"])
@@ -73,6 +79,7 @@ def test_search_facing_document_titles_are_specific() -> None:
     assert _text("docs/README.md").startswith(
         "# Hashmarks repository intelligence documentation\n"
     )
+
 
 def test_readme_has_search_facing_workflows_without_keyword_stuffing() -> None:
     readme = _text("README.md")

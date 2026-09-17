@@ -8,10 +8,9 @@ import re
 import shutil
 import subprocess
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-
 
 EXPECTED_HASHMARKS_TOOLS = {
     "hashmarks_repository_context",
@@ -44,8 +43,7 @@ def _run(
         cwd=cwd,
         env=env,
         text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         timeout=timeout,
         check=False,
     )
@@ -81,7 +79,9 @@ def _parse_jsonl(text: str) -> list[dict[str, Any]]:
         try:
             value = json.loads(line)
         except json.JSONDecodeError as exc:
-            raise HostGateError(f"OpenCode emitted non-JSON stdout on line {line_number}: {line!r}") from exc
+            raise HostGateError(
+                f"OpenCode emitted non-JSON stdout on line {line_number}: {line!r}"
+            ) from exc
         if not isinstance(value, dict):
             raise HostGateError(f"OpenCode JSON event {line_number} is not an object")
         events.append(value)
@@ -123,10 +123,14 @@ def _assert_completed_tool_set(
         raise HostGateError(f"OpenCode did not call required tools: {sorted(missing)}")
     duplicates = sorted(tool for tool in observed if observed_list.count(tool) > 1)
     if duplicates:
-        raise HostGateError(f"OpenCode called qualification tools more than once: {duplicates}")
+        raise HostGateError(
+            f"OpenCode called qualification tools more than once: {duplicates}"
+        )
     extra_hashmarks = observed - expected
     if extra_hashmarks:
-        raise HostGateError(f"OpenCode called Hashmarks tools outside this phase: {sorted(extra_hashmarks)}")
+        raise HostGateError(
+            f"OpenCode called Hashmarks tools outside this phase: {sorted(extra_hashmarks)}"
+        )
     completed: dict[str, dict[str, Any]] = {}
     for part in tool_parts:
         tool = str(part.get("tool"))
@@ -164,13 +168,17 @@ def _tool_payload(part: dict[str, Any], expected_schema: str) -> dict[str, Any]:
         raise HostGateError("OpenCode tool event has no state object")
     payload = _decode_json_object(state.get("output"))
     if payload is None:
-        raise HostGateError(f"unable to decode structured output for {part.get('tool')}")
+        raise HostGateError(
+            f"unable to decode structured output for {part.get('tool')}"
+        )
     if payload.get("schema") != expected_schema:
         raise HostGateError(
             f"unexpected schema from {part.get('tool')}: {payload.get('schema')!r}"
         )
     if "BUILDING" in json.dumps(payload, sort_keys=True):
-        raise HostGateError(f"transient BUILDING state escaped through {part.get('tool')}")
+        raise HostGateError(
+            f"transient BUILDING state escaped through {part.get('tool')}"
+        )
     return payload
 
 
@@ -226,16 +234,23 @@ def _configure_opencode_mcp(
     env.pop("OPENCODE_CONFIG", None)
     env.pop("OPENCODE_CONFIG_CONTENT", None)
     result = _run([opencode, "mcp", "list"], cwd=repo, env=env, timeout=120)
-    lines = [line.strip().lower() for line in f"{result.stdout}\n{result.stderr}".splitlines()]
+    lines = [
+        line.strip().lower()
+        for line in f"{result.stdout}\n{result.stderr}".splitlines()
+    ]
     matching = [line for line in lines if "hashmarks" in line]
     bad = ("fail", "error", "disconnected", "not connected", "disabled", "unavailable")
-    if any("connected" in line and not any(marker in line for marker in bad) for line in matching):
+    if any(
+        "connected" in line and not any(marker in line for marker in bad)
+        for line in matching
+    ):
         return result, str(config_path.relative_to(repo)), env
     raise HostGateError(
         "OpenCode did not report the repo-local Hashmarks MCP registration as connected.\n"
         f"config: {config_path}\n"
         f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     )
+
 
 def _phase1_prompt() -> str:
     return f"""Hashmarks 1.0 host qualification. Use only the Hashmarks MCP tools; built-in repository tools are forbidden.
@@ -299,7 +314,9 @@ def _package_versions(python: Path) -> dict[str, str]:
 def _opencode_version(version_text: str) -> tuple[int, int]:
     match = re.search(r"(?:^|\D)(\d+)\.(\d+)", version_text)
     if match is None:
-        raise HostGateError(f"unable to parse OpenCode version from {version_text.strip()!r}")
+        raise HostGateError(
+            f"unable to parse OpenCode version from {version_text.strip()!r}"
+        )
     version = (int(match.group(1)), int(match.group(2)))
     if version < (1, 18):
         raise HostGateError(
@@ -315,7 +332,9 @@ def _host_gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
         raise HostGateEnvironmentBlocked(
             f"{args.opencode!r} is not installed; install OpenCode before running this gate"
         )
-    opencode_version = _run([args.opencode, "--version"], cwd=project_root).stdout.strip()
+    opencode_version = _run(
+        [args.opencode, "--version"], cwd=project_root
+    ).stdout.strip()
     _opencode_version(opencode_version)
     source_registration = project_root / "opencode.json"
     if not source_registration.is_file():
@@ -330,7 +349,9 @@ def _host_gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
     phase1_log = receipt_path.with_name(receipt_path.stem + "-phase1.jsonl")
     phase2_log = receipt_path.with_name(receipt_path.stem + "-phase2.jsonl")
 
-    with tempfile.TemporaryDirectory(prefix="hashmarks-opencode-host-gate-") as tmp_text:
+    with tempfile.TemporaryDirectory(
+        prefix="hashmarks-opencode-host-gate-"
+    ) as tmp_text:
         tmp = Path(tmp_text)
         build_dir = tmp / "dist"
         build_dir.mkdir()
@@ -378,22 +399,38 @@ def _host_gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
                 "hashmarks_change_impact",
             },
         )
-        context1 = _tool_payload(tools1["hashmarks_repository_context"], "hashmarks.repository-capsule.v1")
+        context1 = _tool_payload(
+            tools1["hashmarks_repository_context"], "hashmarks.repository-capsule.v1"
+        )
         find1 = _tool_payload(tools1["hashmarks_find"], "hashmarks.mcp-find.v1")
-        evidence = _tool_payload(tools1["hashmarks_task_evidence"], "hashmarks.task-evidence.v1")
-        impact = _tool_payload(tools1["hashmarks_change_impact"], "hashmarks.task-change-impact.v1")
-        found_paths = {str(row.get("path")) for row in find1.get("results", []) if isinstance(row, dict)}
+        evidence = _tool_payload(
+            tools1["hashmarks_task_evidence"], "hashmarks.task-evidence.v1"
+        )
+        impact = _tool_payload(
+            tools1["hashmarks_change_impact"], "hashmarks.task-change-impact.v1"
+        )
+        found_paths = {
+            str(row.get("path"))
+            for row in find1.get("results", [])
+            if isinstance(row, dict)
+        }
         if CHANGED_PATH not in found_paths:
-            raise HostGateError(f"OpenCode-hosted Hashmarks find did not return {CHANGED_PATH}")
+            raise HostGateError(
+                f"OpenCode-hosted Hashmarks find did not return {CHANGED_PATH}"
+            )
         if evidence.get("edit") != CHANGED_PATH:
-            raise HostGateError(f"task_evidence selected unexpected edit path: {evidence.get('edit')!r}")
+            raise HostGateError(
+                f"task_evidence selected unexpected edit path: {evidence.get('edit')!r}"
+            )
 
         generation_before = context1.get("generation")
         receipt = evidence.get("evidence_receipt")
         if not isinstance(generation_before, int) or not isinstance(receipt, dict):
             raise HostGateError("phase 1 did not expose generation-bound evidence")
         if receipt.get("codemap_generation") != generation_before:
-            raise HostGateError("task_evidence generation does not match repository_context")
+            raise HostGateError(
+                "task_evidence generation does not match repository_context"
+            )
 
         source = repo / CHANGED_PATH
         source.write_text(
@@ -416,28 +453,47 @@ def _host_gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
             events2,
             {"hashmarks_post_change", "hashmarks_repository_context"},
         )
-        post = _tool_payload(tools2["hashmarks_post_change"], "hashmarks.task-post-change-delta.v1")
-        context2 = _tool_payload(tools2["hashmarks_repository_context"], "hashmarks.repository-capsule.v1")
+        post = _tool_payload(
+            tools2["hashmarks_post_change"], "hashmarks.task-post-change-delta.v1"
+        )
+        context2 = _tool_payload(
+            tools2["hashmarks_repository_context"], "hashmarks.repository-capsule.v1"
+        )
         generation_after = context2.get("generation")
         if post.get("status") != "changed":
-            raise HostGateError(f"post_change status was not changed: {post.get('status')!r}")
+            raise HostGateError(
+                f"post_change status was not changed: {post.get('status')!r}"
+            )
         if post.get("generation_before") != generation_before:
-            raise HostGateError("post_change generation_before does not match pre-edit generation")
-        if not isinstance(generation_after, int) or generation_after <= generation_before:
-            raise HostGateError("repository generation did not advance after external mutation")
+            raise HostGateError(
+                "post_change generation_before does not match pre-edit generation"
+            )
+        if (
+            not isinstance(generation_after, int)
+            or generation_after <= generation_before
+        ):
+            raise HostGateError(
+                "repository generation did not advance after external mutation"
+            )
         if post.get("generation_after") != generation_after:
-            raise HostGateError("post_change generation_after does not match final repository_context")
+            raise HostGateError(
+                "post_change generation_after does not match final repository_context"
+            )
         changes = post.get("path_changes")
         if not isinstance(changes, list) or not any(
-            isinstance(row, dict) and row.get("path") == CHANGED_PATH and row.get("state") == "changed"
+            isinstance(row, dict)
+            and row.get("path") == CHANGED_PATH
+            and row.get("state") == "changed"
             for row in changes
         ):
-            raise HostGateError("post_change did not report the externally changed path")
+            raise HostGateError(
+                "post_change did not report the externally changed path"
+            )
 
         return {
             "schema": "hashmarks.opencode-mcp-host-gate.v1",
             "status": "PASS",
-            "completed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "completed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "source_repository_identity": source_repository_identity,
             "source_project_registration": {
                 "path": source_registration.relative_to(project_root).as_posix(),
@@ -477,8 +533,14 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Qualify the installed Hashmarks MCP wheel through a real OpenCode host."
     )
-    parser.add_argument("--model", required=True, help="OpenCode provider/model with tool calling")
-    parser.add_argument("--python", default="3.14", help="Python selector for the isolated wheel environment")
+    parser.add_argument(
+        "--model", required=True, help="OpenCode provider/model with tool calling"
+    )
+    parser.add_argument(
+        "--python",
+        default="3.14",
+        help="Python selector for the isolated wheel environment",
+    )
     parser.add_argument("--uv", default="uv")
     parser.add_argument("--opencode", default="opencode")
     parser.add_argument("--receipt", default="dist/opencode-mcp-host-gate.json")
@@ -506,7 +568,10 @@ def main(argv: list[str] | None = None) -> int:
             + "\n",
             encoding="utf-8",
         )
-        print(f"HASHMARKS OPENCODE MCP HOST GATE: ENVIRONMENT_BLOCKED\n{exc}", file=os.sys.stderr)
+        print(
+            f"HASHMARKS OPENCODE MCP HOST GATE: ENVIRONMENT_BLOCKED\n{exc}",
+            file=os.sys.stderr,
+        )
         return 2
     except (HostGateError, OSError, subprocess.TimeoutExpired) as exc:
         receipt_path.parent.mkdir(parents=True, exist_ok=True)
@@ -526,8 +591,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"HASHMARKS OPENCODE MCP HOST GATE: FAIL\n{exc}", file=os.sys.stderr)
         return 1
 
-    receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"HASHMARKS OPENCODE MCP HOST GATE: PASS\nreceipt: {receipt_path}")
+    receipt_path.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(f"HASHMARKS OPENCODE MCP HOST GATE: PASS\nreceipt: {receipt_path}")  # noqa: T201 - intentional command output
     return 0
 
 

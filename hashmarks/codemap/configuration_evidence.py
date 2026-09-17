@@ -4,10 +4,15 @@ import json
 import re
 import tomllib
 from pathlib import Path
-from typing import Sequence
+from typing import TYPE_CHECKING, cast
 
 from .python_ast import estimate_tokens
 from .query_primitives import _TASK_STOPWORDS, _WORD_RE
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .engine import CodeMap
 
 
 class ConfigurationEvidenceMixin:
@@ -25,7 +30,6 @@ class ConfigurationEvidenceMixin:
             if len(part) >= 2
         )
 
-
     @staticmethod
     def _config_task_terms(task: str) -> frozenset[str]:
         return frozenset(
@@ -34,9 +38,10 @@ class ConfigurationEvidenceMixin:
             if len(token) >= 2 and token.lower() not in _TASK_STOPWORDS
         )
 
-
     @classmethod
-    def _config_candidate_score(cls, name: str, task_terms: frozenset[str]) -> tuple[int, int] | None:
+    def _config_candidate_score(
+        cls, name: str, task_terms: frozenset[str]
+    ) -> tuple[int, int] | None:
         parts = cls._config_name_parts(name)
         if not parts or not set(parts).issubset(task_terms):
             return None
@@ -44,7 +49,6 @@ class ConfigurationEvidenceMixin:
         # deterministic secondary preference only; it never overcomes missing
         # task evidence.
         return (len(set(parts)), len(name))
-
 
     @staticmethod
     def _yaml_section_end(lines: list[str], start_index: int, indent: int) -> int:
@@ -61,9 +65,10 @@ class ConfigurationEvidenceMixin:
             end = index
         return end
 
-
     @staticmethod
-    def _json_value_end(lines: list[str], start_index: int, value_text: str) -> int | None:
+    def _json_value_end(
+        lines: list[str], start_index: int, value_text: str
+    ) -> int | None:
         stripped = value_text.strip()
         if not stripped:
             return None
@@ -108,9 +113,11 @@ class ConfigurationEvidenceMixin:
                         return index
         return None
 
-
     def _toml_config_candidates(
-        self, source: str, lines: Sequence[str], task_terms: set[str],
+        self,
+        source: str,
+        lines: Sequence[str],
+        task_terms: set[str],
     ) -> list[dict[str, object]] | None:
         """Return exact TOML key/section candidates, or None for invalid syntax."""
         try:
@@ -123,34 +130,63 @@ class ConfigurationEvidenceMixin:
         for index, raw in enumerate(lines):
             match = re.match(r"^\s*\[\[?\s*([^\]]+?)\s*\]\]?\s*(?:#.*)?$", raw)
             if match:
-                section = match.group(1).strip().strip('"\'')
+                section = match.group(1).strip().strip("\"'")
                 headers.append((index, section))
                 continue
-            match = re.match(r'^\s*([A-Za-z0-9_.-]+|"[^"]+"|\'[^\']+\')\s*=\s*(.+?)\s*$', raw)
+            match = re.match(
+                r'^\s*([A-Za-z0-9_.-]+|"[^"]+"|\'[^\']+\')\s*=\s*(.+?)\s*$', raw
+            )
             if not match:
                 continue
-            key = match.group(1).strip().strip('"\'')
+            key = match.group(1).strip().strip("\"'")
             try:
                 tomllib.loads(f"{key} = {match.group(2)}\n")
             except tomllib.TOMLDecodeError:
                 continue
             full_name = f"{section}.{key}" if section else key
             score = self._config_candidate_score(full_name, task_terms)
-            score = self._config_candidate_score(key, task_terms) if score is None else score
+            score = (
+                self._config_candidate_score(key, task_terms)
+                if score is None
+                else score
+            )
             if score is not None:
-                candidates.append({"kind": "key", "name": full_name, "start": index, "end": index, "score": score})
+                candidates.append(
+                    {
+                        "kind": "key",
+                        "name": full_name,
+                        "start": index,
+                        "end": index,
+                        "score": score,
+                    }
+                )
         for header_index, (start, name) in enumerate(headers):
             score = self._config_candidate_score(name, task_terms)
             if score is None:
                 continue
-            end = headers[header_index + 1][0] - 1 if header_index + 1 < len(headers) else len(lines) - 1
+            end = (
+                headers[header_index + 1][0] - 1
+                if header_index + 1 < len(headers)
+                else len(lines) - 1
+            )
             while end > start and not lines[end].strip():
                 end -= 1
-            candidates.append({"kind": "section", "name": name, "start": start, "end": end, "score": score})
+            candidates.append(
+                {
+                    "kind": "section",
+                    "name": name,
+                    "start": start,
+                    "end": end,
+                    "score": score,
+                }
+            )
         return candidates
 
     def _json_config_candidates(
-        self, source: str, lines: Sequence[str], task_terms: set[str],
+        self,
+        source: str,
+        lines: Sequence[str],
+        task_terms: set[str],
     ) -> list[dict[str, object]] | None:
         """Return exact JSON key ranges, or None for invalid syntax."""
         try:
@@ -168,36 +204,65 @@ class ConfigurationEvidenceMixin:
                 continue
             end = self._json_value_end(lines, index, match.group(2))
             if end is not None:
-                candidates.append({"kind": "key", "name": key, "start": index, "end": end, "score": score})
+                candidates.append(
+                    {
+                        "kind": "key",
+                        "name": key,
+                        "start": index,
+                        "end": end,
+                        "score": score,
+                    }
+                )
         return candidates
 
     def _yaml_config_candidates(
-        self, lines: Sequence[str], task_terms: set[str],
+        self,
+        lines: Sequence[str],
+        task_terms: set[str],
     ) -> list[dict[str, object]]:
         """Return indentation-bounded YAML key/section candidates."""
         candidates: list[dict[str, object]] = []
         stack: list[tuple[int, str]] = []
         for index, raw in enumerate(lines):
-            if not raw.strip() or raw.lstrip().startswith("#") or "\t" in raw[: len(raw) - len(raw.lstrip())]:
+            if (
+                not raw.strip()
+                or raw.lstrip().startswith("#")
+                or "\t" in raw[: len(raw) - len(raw.lstrip())]
+            ):
                 continue
-            match = re.match(r'^(\s*)([A-Za-z0-9_.-]+|"[^"]+"|\'[^\']+\')\s*:\s*(.*)$', raw)
+            match = re.match(
+                r'^(\s*)([A-Za-z0-9_.-]+|"[^"]+"|\'[^\']+\')\s*:\s*(.*)$', raw
+            )
             if not match:
                 continue
             indent = len(match.group(1))
-            key = match.group(2).strip().strip('"\'')
+            key = match.group(2).strip().strip("\"'")
             while stack and stack[-1][0] >= indent:
                 stack.pop()
             parent = ".".join(name for _, name in stack)
             full_name = f"{parent}.{key}" if parent else key
             score = self._config_candidate_score(full_name, task_terms)
-            score = self._config_candidate_score(key, task_terms) if score is None else score
+            score = (
+                self._config_candidate_score(key, task_terms)
+                if score is None
+                else score
+            )
             value = match.group(3).strip()
             if score is not None:
-                end = index if value and value not in {"|", ">", "|-", ">-", "|+", ">+"} else self._yaml_section_end(lines, index, indent)
-                candidates.append({
-                    "kind": "key" if end == index else "section",
-                    "name": full_name, "start": index, "end": end, "score": score,
-                })
+                end = (
+                    index
+                    if value and value not in {"|", ">", "|-", ">-", "|+", ">+"}
+                    else self._yaml_section_end(lines, index, indent)
+                )
+                candidates.append(
+                    {
+                        "kind": "key" if end == index else "section",
+                        "name": full_name,
+                        "start": index,
+                        "end": end,
+                        "score": score,
+                    }
+                )
             if not value:
                 stack.append((indent, key))
         return candidates
@@ -218,13 +283,17 @@ class ConfigurationEvidenceMixin:
         must name every component of the key/section and the best candidate must
         be unique.  Unsupported/ambiguous syntax remains an explicit next-read.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         suffix = Path(path).suffix.lower()
         if suffix not in {".toml", ".json", ".yaml", ".yml"} or not task.strip():
             return None, None
         task_terms = self._config_task_terms(task)
         if not task_terms:
             return None, {
-                "role": role, "path": path, "reason": "no-task-local-config-key",
+                "role": role,
+                "path": path,
+                "reason": "no-task-local-config-key",
             }
         # Reconcile the selected configuration path before reading it so the
         # emitted range and its source revision are bound to current bytes.
@@ -236,7 +305,9 @@ class ConfigurationEvidenceMixin:
             source = (self.workspace / path).read_text(encoding="utf-8")
         except (OSError, PermissionError, FileNotFoundError):
             return None, {
-                "role": role, "path": path, "reason": "config-source-unavailable",
+                "role": role,
+                "path": path,
+                "reason": "config-source-unavailable",
             }
         lines = source.splitlines()
         if suffix == ".toml":
@@ -247,19 +318,30 @@ class ConfigurationEvidenceMixin:
             candidates = self._yaml_config_candidates(lines, task_terms)
         if candidates is None:
             return None, {
-                "role": role, "path": path, "reason": "invalid-config-syntax",
+                "role": role,
+                "path": path,
+                "reason": "invalid-config-syntax",
             }
 
         if not candidates:
             return None, {
-                "role": role, "path": path, "reason": "no-task-local-config-key",
+                "role": role,
+                "path": path,
+                "reason": "no-task-local-config-key",
             }
         best_score = max(candidate["score"] for candidate in candidates)
-        best = [candidate for candidate in candidates if candidate["score"] == best_score]
-        unique_ranges = {(int(candidate["start"]), int(candidate["end"]), str(candidate["name"])) for candidate in best}
+        best = [
+            candidate for candidate in candidates if candidate["score"] == best_score
+        ]
+        unique_ranges = {
+            (int(candidate["start"]), int(candidate["end"]), str(candidate["name"]))
+            for candidate in best
+        }
         if len(unique_ranges) != 1:
             return None, {
-                "role": role, "path": path, "reason": "ambiguous-task-local-config-key",
+                "role": role,
+                "path": path,
+                "reason": "ambiguous-task-local-config-key",
                 "candidate_count": len(unique_ranges),
             }
         chosen = best[0]
@@ -294,5 +376,3 @@ class ConfigurationEvidenceMixin:
             "estimated_tokens": estimated_tokens,
             "config": pending["config"],
         }, None
-
-

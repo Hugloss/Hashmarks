@@ -6,9 +6,19 @@ change analysis is needed.
 """
 
 from .engine import CodeMap
-from .model import EvidenceVisibility, ContextDisclosure, ContextPack, SearchHit, SyncResult
+from .model import (
+    ContextDisclosure,
+    ContextPack,
+    EvidenceVisibility,
+    SearchHit,
+    SyncResult,
+)
 from .policy import ContextPolicy
-from .project_impact_codec import COMPACT_PROJECT_IMPACT_SCHEMA, compact_project_impact, expand_project_impact
+from .project_impact_codec import (
+    COMPACT_PROJECT_IMPACT_SCHEMA,
+    compact_project_impact,
+    expand_project_impact,
+)
 from .service import CodeMapService, CodeMapServiceClient, default_codemap_socket
 from .worktree_overlay import WorktreeOverlay
 

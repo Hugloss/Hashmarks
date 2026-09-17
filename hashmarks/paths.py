@@ -70,7 +70,11 @@ def canonical_event_relative_path(
 
 
 def _reject_absolute(raw: str) -> None:
-    if Path(raw).is_absolute() or PureWindowsPath(raw).is_absolute() or PureWindowsPath(raw).drive:
+    if (
+        Path(raw).is_absolute()
+        or PureWindowsPath(raw).is_absolute()
+        or PureWindowsPath(raw).drive
+    ):
         raise ValueError(f"input path must be relative to workspace: {raw}")
 
 

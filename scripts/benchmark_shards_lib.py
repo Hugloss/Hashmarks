@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -7,7 +8,10 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 SCHEMA = "hashmarks.benchmark-shards.v1"
 
@@ -60,13 +64,19 @@ def _atomic_write(path: Path, data: bytes) -> None:
             os.fsync(fh.fileno())
         os.replace(tmp_name, path)
     finally:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.unlink(tmp_name)
-        except FileNotFoundError:
-            pass
 
 
-def create_manifest(*, total: int, shard_size: int, command: Sequence[str], id_field: str = "id", warmup_command: Sequence[str] | None = None, run_identity: str = "unbound") -> dict[str, Any]:
+def create_manifest(
+    *,
+    total: int,
+    shard_size: int,
+    command: Sequence[str],
+    id_field: str = "id",
+    warmup_command: Sequence[str] | None = None,
+    run_identity: str = "unbound",
+) -> dict[str, Any]:
     shards = deterministic_shards(total, shard_size)
     return {
         "schema": SCHEMA,
@@ -88,7 +98,9 @@ def write_manifest(output_dir: Path, manifest: dict[str, Any]) -> Path:
     if path.exists():
         existing = json.loads(path.read_text())
         if existing != manifest:
-            raise ValueError("existing benchmark shard manifest differs from requested plan")
+            raise ValueError(
+                "existing benchmark shard manifest differs from requested plan"
+            )
         return path
     _atomic_write(path, _canonical_json_bytes(manifest))
     return path
@@ -100,8 +112,6 @@ def load_manifest(output_dir: Path) -> dict[str, Any]:
     if value.get("schema") != SCHEMA:
         raise ValueError("unsupported benchmark shard manifest schema")
     return value
-
-
 
 
 def warmup_marker_path(output_dir: Path) -> Path:
@@ -137,9 +147,17 @@ def run_warmup(output_dir: Path, *, timeout_seconds: float | None = None) -> boo
     subprocess.run(list(command), check=True, timeout=timeout_seconds)
     _atomic_write(
         warmup_marker_path(output_dir),
-        _canonical_json_bytes({"schema": SCHEMA, "command": command, "manifest_identity": manifest_identity(manifest), "complete": True}),
+        _canonical_json_bytes(
+            {
+                "schema": SCHEMA,
+                "command": command,
+                "manifest_identity": manifest_identity(manifest),
+                "complete": True,
+            }
+        ),
     )
     return True
+
 
 def shard_path(output_dir: Path, shard: Shard) -> Path:
     return output_dir / "shards" / f"{shard.key}.json"
@@ -149,12 +167,16 @@ def seal_path(output_dir: Path, shard: Shard) -> Path:
     return output_dir / "shards" / f"{shard.key}.seal.json"
 
 
-def _read_rows(path: Path, *, expected_count: int, id_field: str) -> list[dict[str, Any]]:
+def _read_rows(
+    path: Path, *, expected_count: int, id_field: str
+) -> list[dict[str, Any]]:
     rows = json.loads(path.read_text())
     if not isinstance(rows, list):
         raise ValueError(f"shard output must be a JSON list: {path}")
     if len(rows) != expected_count:
-        raise ValueError(f"shard row count mismatch: expected {expected_count}, got {len(rows)}")
+        raise ValueError(
+            f"shard row count mismatch: expected {expected_count}, got {len(rows)}"
+        )
     ids: list[Any] = []
     for row in rows:
         if not isinstance(row, dict):
@@ -209,8 +231,13 @@ def verify_sealed_shard(output_dir: Path, shard: Shard, *, id_field: str) -> boo
 
 def pending_shards(output_dir: Path, manifest: dict[str, Any]) -> tuple[Shard, ...]:
     id_field = str(manifest.get("id_field", "id"))
-    planned = tuple(Shard(int(s["index"]), int(s["start"]), int(s["end"])) for s in manifest["shards"])
-    return tuple(s for s in planned if not verify_sealed_shard(output_dir, s, id_field=id_field))
+    planned = tuple(
+        Shard(int(s["index"]), int(s["start"]), int(s["end"]))
+        for s in manifest["shards"]
+    )
+    return tuple(
+        s for s in planned if not verify_sealed_shard(output_dir, s, id_field=id_field)
+    )
 
 
 def _render_command(template: Sequence[str], shard: Shard, output: Path) -> list[str]:
@@ -239,7 +266,9 @@ def execute_shard(
     id_field = str(manifest.get("id_field", "id"))
     final_path = shard_path(output_dir, shard)
     final_path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix=f"hashmarks-shard-{shard.key}-", dir=output_dir) as tmp:
+    with tempfile.TemporaryDirectory(
+        prefix=f"hashmarks-shard-{shard.key}-", dir=output_dir
+    ) as tmp:
         candidate = Path(tmp) / "candidate.json"
         command = _render_command(manifest["command"], shard, candidate)
         subprocess.run(command, check=True, timeout=timeout_seconds)
@@ -271,11 +300,15 @@ def run_next(output_dir: Path, *, timeout_seconds: float | None = None) -> Shard
     return shard
 
 
-def _merged_rows(output_dir: Path, planned: tuple[Shard, ...], id_field: str) -> list[dict[str, Any]]:
+def _merged_rows(
+    output_dir: Path, planned: tuple[Shard, ...], id_field: str
+) -> list[dict[str, Any]]:
     all_rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for shard in planned:
-        rows = _read_rows(shard_path(output_dir, shard), expected_count=shard.count, id_field=id_field)
+        rows = _read_rows(
+            shard_path(output_dir, shard), expected_count=shard.count, id_field=id_field
+        )
         for row in rows:
             key = str(row[id_field])
             if key in seen:
@@ -288,13 +321,24 @@ def _merged_rows(output_dir: Path, planned: tuple[Shard, ...], id_field: str) ->
 def merge_shards(output_dir: Path, *, aggregate_name: str = "aggregate.json") -> Path:
     manifest = load_manifest(output_dir)
     id_field = str(manifest.get("id_field", "id"))
-    planned = tuple(Shard(int(item["index"]), int(item["start"]), int(item["end"])) for item in manifest["shards"])
-    missing = [shard.key for shard in planned if not verify_sealed_shard(output_dir, shard, id_field=id_field)]
+    planned = tuple(
+        Shard(int(item["index"]), int(item["start"]), int(item["end"]))
+        for item in manifest["shards"]
+    )
+    missing = [
+        shard.key
+        for shard in planned
+        if not verify_sealed_shard(output_dir, shard, id_field=id_field)
+    ]
     if missing:
-        raise ValueError(f"cannot merge incomplete benchmark; missing/invalid shards: {', '.join(missing)}")
+        raise ValueError(
+            f"cannot merge incomplete benchmark; missing/invalid shards: {', '.join(missing)}"
+        )
     all_rows = _merged_rows(output_dir, planned, id_field)
     if len(all_rows) != int(manifest["total"]):
-        raise ValueError(f"aggregate count mismatch: expected {manifest['total']}, got {len(all_rows)}")
+        raise ValueError(
+            f"aggregate count mismatch: expected {manifest['total']}, got {len(all_rows)}"
+        )
     path = output_dir / aggregate_name
     _atomic_write(path, _canonical_json_bytes(all_rows))
     return path

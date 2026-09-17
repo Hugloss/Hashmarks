@@ -8,7 +8,7 @@ Use Hashmarks with **Claude Code, Codex, OpenCode, Pi**, other stdio MCP clients
 
 > **Hashmarks understands the repository. Your agent still decides what to do.**
 
-**Works with:** Claude Code · Codex · OpenCode · Pi · stdio MCP clients  
+**Works with:** Claude Code · Codex · OpenCode · Pi · stdio MCP clients
 **Use it as:** CLI · Python library · local MCP server
 
 ## Why Hashmarks

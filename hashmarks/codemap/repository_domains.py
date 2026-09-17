@@ -19,8 +19,25 @@ class RepositoryDomain(str, Enum):
 
 
 _SOURCE_SUFFIXES = {
-    ".py", ".pyi", ".js", ".jsx", ".ts", ".tsx", ".go", ".rs", ".java",
-    ".kt", ".c", ".h", ".cc", ".cpp", ".hpp", ".cs", ".rb", ".php", ".swift",
+    ".py",
+    ".pyi",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".go",
+    ".rs",
+    ".java",
+    ".kt",
+    ".c",
+    ".h",
+    ".cc",
+    ".cpp",
+    ".hpp",
+    ".cs",
+    ".rb",
+    ".php",
+    ".swift",
     ".sql",
 }
 _CONFIG_SUFFIXES = {".toml", ".yaml", ".yml", ".json", ".ini", ".cfg", ".conf"}
@@ -63,7 +80,14 @@ def classify_repository_path(path: str) -> tuple[RepositoryDomain, ...]:
         add(RepositoryDomain.OWNERSHIP)
         add(RepositoryDomain.CONTRACT)
         add(RepositoryDomain.DOC)
-    if name in {"makefile", "gnumakefile", "justfile", "taskfile", "taskfile.yml", "taskfile.yaml"}:
+    if name in {
+        "makefile",
+        "gnumakefile",
+        "justfile",
+        "taskfile",
+        "taskfile.yml",
+        "taskfile.yaml",
+    }:
         add(RepositoryDomain.BUILD)
     if "templates" in parts and ({"plans", "goons"} & parts):
         add(RepositoryDomain.PLAN)
@@ -75,7 +99,12 @@ def classify_repository_path(path: str) -> tuple[RepositoryDomain, ...]:
         add(RepositoryDomain.SCRIPT)
     if rel.suffix.lower() in _CONFIG_SUFFIXES:
         add(RepositoryDomain.CONFIG)
-    if "contract" in lower or "schema" in lower or "invariant" in lower or "policy" in lower:
+    if (
+        "contract" in lower
+        or "schema" in lower
+        or "invariant" in lower
+        or "policy" in lower
+    ):
         add(RepositoryDomain.CONTRACT)
     if "docs" in parts or rel.suffix.lower() in {".md", ".rst", ".txt"}:
         add(RepositoryDomain.DOC)
@@ -92,10 +121,26 @@ def classify_repository_path(path: str) -> tuple[RepositoryDomain, ...]:
         or (name.startswith("test_") and not source_tree)
         or ("checks" in parts and name.endswith("_spec.py"))
         or name.endswith("_test.go")
-        or name.endswith((
-            ".test.js", ".test.jsx", ".test.mjs", ".test.cjs", ".test.ts", ".test.tsx", ".test.mts", ".test.cts",
-            ".spec.js", ".spec.jsx", ".spec.mjs", ".spec.cjs", ".spec.ts", ".spec.tsx", ".spec.mts", ".spec.cts",
-        ))
+        or name.endswith(
+            (
+                ".test.js",
+                ".test.jsx",
+                ".test.mjs",
+                ".test.cjs",
+                ".test.ts",
+                ".test.tsx",
+                ".test.mts",
+                ".test.cts",
+                ".spec.js",
+                ".spec.jsx",
+                ".spec.mjs",
+                ".spec.cjs",
+                ".spec.ts",
+                ".spec.tsx",
+                ".spec.mts",
+                ".spec.cts",
+            )
+        )
     ):
         add(RepositoryDomain.TEST)
     if rel.suffix.lower() in _SOURCE_SUFFIXES:

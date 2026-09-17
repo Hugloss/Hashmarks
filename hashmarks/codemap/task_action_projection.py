@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
+from typing import TYPE_CHECKING, cast
 
 from .decision_session import decision_scoped, diagnostic_producer
-from typing import Mapping, Sequence
-
 from .repository_domains import RepositoryDomain
 from .task_action_types import _TaskActionAmbiguityPayloadState
+
+if TYPE_CHECKING:
+    from .engine import CodeMap
 
 
 class TaskActionProjectionMixin:
@@ -25,10 +28,14 @@ class TaskActionProjectionMixin:
         already-retrieved paths into edit, verify, contract, inspect, and related
         roles, preserving canonical rank/provenance on every row.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         self._validate_task_action_limits(limit, per_role)
         action_key = None
         if self._decision_session_depth > 0:
-            generation = int(self._decision_session_generation or self.store.generation())
+            generation = int(
+                self._decision_session_generation or self.store.generation()
+            )
             action_key = (generation, task, int(limit), int(per_role))
             cached = self._decision_task_action_cache.get(action_key)
             if cached is not None:
@@ -68,11 +75,15 @@ class TaskActionProjectionMixin:
         verify = surface_state["verify"]
         contract = surface_state["contract"]
         explicit_surface_ambiguity = bool(surface_state["explicit_surface_ambiguity"])
-        explicit_edit_surface_selected = bool(surface_state["explicit_edit_surface_selected"])
+        explicit_edit_surface_selected = bool(
+            surface_state["explicit_edit_surface_selected"]
+        )
         verification_anchor_tokens = surface_state["verification_anchor_tokens"]
         literal_reference_owner = surface_state["literal_reference_owner"]
         localized_config_edit = bool(surface_state["localized_config_edit"])
-        explicit_config_surface_request = bool(surface_state["explicit_config_surface_request"])
+        explicit_config_surface_request = bool(
+            surface_state["explicit_config_surface_request"]
+        )
 
         # Task-local discrimination helpers are shared by every ownership path,
         # including literal-reference owners that intentionally bypass the normal
@@ -189,7 +200,11 @@ class TaskActionProjectionMixin:
         # that stale path regain safe-to-edit authority.
         if isinstance(edit, Mapping):
             edit_path = edit.get("path")
-            if isinstance(edit_path, str) and edit_path and not self._indexed_path_current(edit_path):
+            if (
+                isinstance(edit_path, str)
+                and edit_path
+                and not self._indexed_path_current(edit_path)
+            ):
                 edit = None
                 structural_owner = None
                 ambiguous = True
@@ -244,10 +259,14 @@ class TaskActionProjectionMixin:
         ] = tuple(sorted(authority_paths))
         recent_key = (task, int(limit))
         previous_authority_paths = self._task_recent_authority_paths.get(recent_key, ())
-        self._task_recent_authority_paths[recent_key] = tuple(sorted({
-            *previous_authority_paths,
-            *authority_paths,
-        }))
+        self._task_recent_authority_paths[recent_key] = tuple(
+            sorted(
+                {
+                    *previous_authority_paths,
+                    *authority_paths,
+                }
+            )
+        )
         if len(self._task_recent_authority_paths) > 256:
             self._task_recent_authority_paths.clear()
         if action_key is not None:
@@ -272,21 +291,28 @@ class TaskActionProjectionMixin:
         limit: int,
     ) -> dict[str, object]:
         """Resolve the active implementation owner from existing repository evidence."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         structural_owner = literal_reference_owner
-        edit, archive_live_owner_ambiguity = self._task_action_archive_live_owner_choice(
-            edit, rows, failed, discrimination, verification_anchor_tokens
+        edit, archive_live_owner_ambiguity = (
+            self._task_action_archive_live_owner_choice(
+                edit, rows, failed, discrimination, verification_anchor_tokens
+            )
         )
         edit_path = str(edit.get("path") or "") if isinstance(edit, dict) else ""
         task_path_tokens = {
-            token.strip("`'\"()[]{}<>,:;").replace("\\", "/")
-            for token in task.split()
+            token.strip("`'\"()[]{}<>,:;").replace("\\", "/") for token in task.split()
         }
-        literal_task_paths = tuple(dict.fromkeys(
-            str(row.get("path") or "")
-            for row in rows
-            if row.get("path") and str(row.get("path") or "") in task_path_tokens
-        ))
-        literal_task_path = literal_task_paths[0] if len(literal_task_paths) == 1 else ""
+        literal_task_paths = tuple(
+            dict.fromkeys(
+                str(row.get("path") or "")
+                for row in rows
+                if row.get("path") and str(row.get("path") or "") in task_path_tokens
+            )
+        )
+        literal_task_path = (
+            literal_task_paths[0] if len(literal_task_paths) == 1 else ""
+        )
         exact_identifier_edits: list[dict[str, object]] = []
         if (
             structural_owner is None
@@ -299,7 +325,8 @@ class TaskActionProjectionMixin:
             )
             if literal_task_path:
                 exact_identifier_edits = [
-                    row for row in exact_identifier_edits
+                    row
+                    for row in exact_identifier_edits
                     if str(row.get("path") or "") == literal_task_path
                 ]
             if len(exact_identifier_edits) == 1:
@@ -310,10 +337,15 @@ class TaskActionProjectionMixin:
             .lstrip()
             .startswith(("def ", "async def "))
         )
-        exact_identifier_paths = tuple(sorted({
-            str(row.get("path") or "") for row in exact_identifier_edits
-            if row.get("path")
-        }))
+        exact_identifier_paths = tuple(
+            sorted(
+                {
+                    str(row.get("path") or "")
+                    for row in exact_identifier_edits
+                    if row.get("path")
+                }
+            )
+        )
         selected_edit_path = (
             str(edit.get("path") or "") if isinstance(edit, dict) else ""
         )
@@ -388,8 +420,10 @@ class TaskActionProjectionMixin:
             }
         owner_path = str(resolved["path"])
         if len(exact_identifier_paths) > 1:
-            discriminated_exact_path = self._task_action_structural_exact_identifier_owner(
-                resolved, exact_identifier_edits
+            discriminated_exact_path = (
+                self._task_action_structural_exact_identifier_owner(
+                    resolved, exact_identifier_edits
+                )
             )
             if discriminated_exact_path is None:
                 return {
@@ -412,9 +446,8 @@ class TaskActionProjectionMixin:
         live_current_edit = self._task_action_live_current_edit(
             edit, discrimination, verification_anchor_tokens
         )
-        if (
-            not exact_identifier_displacement_guard
-            and not (archive_owner and live_current_edit)
+        if not exact_identifier_displacement_guard and not (
+            archive_owner and live_current_edit
         ):
             edit = self._task_action_projected_owner_row(
                 owner_path, resolved, rows, limit
@@ -428,13 +461,14 @@ class TaskActionProjectionMixin:
             "structural_owner_origin": {
                 "path": owner_start,
                 "resolved": resolved,
-            } if structural_owner is not None else None,
+            }
+            if structural_owner is not None
+            else None,
             "archive_live_owner_ambiguity": archive_live_owner_ambiguity,
             "exact_identifier_paths": exact_identifier_paths,
             "exact_identifier_displacement_guard": exact_identifier_displacement_guard,
             "exact_identifier_surface_selected": exact_identifier_surface_selected,
         }
-
 
     def _task_action_initial_surface_selection(
         self,
@@ -449,6 +483,10 @@ class TaskActionProjectionMixin:
         limit: int,
     ) -> dict[str, object]:
         """Select explicit and task-local surfaces before ownership resolution."""
+
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+
         def first_for(role: str) -> dict[str, object] | None:
             for row in rows:
                 if role in row["roles"]:
@@ -468,7 +506,9 @@ class TaskActionProjectionMixin:
                 test_surface = {
                     **test_surface,
                     "roles": list(
-                        dict.fromkeys([*test_surface.get("roles", []), "edit", "verify"])
+                        dict.fromkeys(
+                            [*test_surface.get("roles", []), "edit", "verify"]
+                        )
                     ),
                 }
                 edit = test_surface
@@ -490,7 +530,9 @@ class TaskActionProjectionMixin:
                 edit = {
                     **build_surface,
                     "roles": list(
-                        dict.fromkeys([*build_surface.get("roles", []), "edit", "related"])
+                        dict.fromkeys(
+                            [*build_surface.get("roles", []), "edit", "related"]
+                        )
                     ),
                 }
                 explicit_edit_surface_selected = True
@@ -521,12 +563,16 @@ class TaskActionProjectionMixin:
             cue_words.intersection(strong_config_cues) or cues.explicit_policy_surface
         )
         if (
-            cue_words.intersection(strong_config_cues | {"policy", "schema", "invariant"})
+            cue_words.intersection(
+                strong_config_cues | {"policy", "schema", "invariant"}
+            )
             and not explicit_edit_surface_selected
         ):
             config_state = self._task_action_config_state(task, rows)
             anchor = self._task_action_config_anchor(rows, config_state)
-            config_candidates = self._task_action_initial_config_candidates(rows, failed)
+            config_candidates = self._task_action_initial_config_candidates(
+                rows, failed
+            )
             source_anchor = self._verification_locality_source_anchor(
                 task, verify, rows, limit
             )
@@ -557,7 +603,6 @@ class TaskActionProjectionMixin:
             "localized_config_edit": localized_config_edit,
             "explicit_config_surface_request": explicit_config_surface_request,
         }
-
 
     def _task_action_projection_ambiguity_state(
         self,
@@ -590,6 +635,8 @@ class TaskActionProjectionMixin:
         This stage performs discrimination only. It does not discover paths,
         rerank canonical task evidence, or acquire a new ownership authority.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         task_local_structural_owners: dict[str, dict[str, object]] = {}
         task_local_verification_origins: list[dict[str, object]] = []
         if structural_owner is not None and not localized_config_edit:
@@ -611,13 +658,17 @@ class TaskActionProjectionMixin:
         identifier_edit_paths = {
             str(row.get("path") or "") for row in identifier_edit_candidates
         }
-        exact_identifier_path_set = {str(path) for path in exact_identifier_paths if path}
+        exact_identifier_path_set = {
+            str(path) for path in exact_identifier_paths if path
+        }
         exact_identifier_ambiguity = len(exact_identifier_path_set) > 1
         explicit_field_contract = self._task_action_explicit_field_contract(
             edit, verification_anchor_tokens, cue_words
         )
-        decisive_qualified_verification = self._task_action_decisive_qualified_verification(
-            verification_relevance, verification_identity_ambiguity
+        decisive_qualified_verification = (
+            self._task_action_decisive_qualified_verification(
+                verification_relevance, verification_identity_ambiguity
+            )
         )
         explicit_identifier_surface = bool(
             explicit_edit_surface_selected
@@ -626,16 +677,18 @@ class TaskActionProjectionMixin:
             or exact_identifier_displacement_guard
             or exact_identifier_surface_selected
         )
-        multi_identifier_edit_ambiguity = self._task_action_multi_identifier_edit_ambiguity(
-            identifier_edit_paths,
-            structural_owner,
-            decisive_qualified_verification,
-            explicit_identifier_surface,
-            (
-                archive_live_owner_ambiguity,
-                multi_structural_owner_ambiguity,
-                verification_identity_ambiguity,
-            ),
+        multi_identifier_edit_ambiguity = (
+            self._task_action_multi_identifier_edit_ambiguity(
+                identifier_edit_paths,
+                structural_owner,
+                decisive_qualified_verification,
+                explicit_identifier_surface,
+                (
+                    archive_live_owner_ambiguity,
+                    multi_structural_owner_ambiguity,
+                    verification_identity_ambiguity,
+                ),
+            )
         )
 
         repository_rare_anchor = self._task_action_repository_rare_anchor(
@@ -647,20 +700,24 @@ class TaskActionProjectionMixin:
             or explicit_architecture_contract
             or explicit_policy_surface
         )
-        weak_contract_anchor_ambiguity = self._task_action_weak_contract_anchor_ambiguity(
-            edit,
-            verification_anchor_tokens,
-            structural_owner,
-            explicit_surface_selected,
-            repository_rare_anchor,
-            decisive_qualified_verification,
+        weak_contract_anchor_ambiguity = (
+            self._task_action_weak_contract_anchor_ambiguity(
+                edit,
+                verification_anchor_tokens,
+                structural_owner,
+                explicit_surface_selected,
+                repository_rare_anchor,
+                decisive_qualified_verification,
+            )
         )
         ambiguous = self._task_action_global_ambiguity(
             edit,
             competing,
             structural_owner,
             localized_config_edit,
-            bool(exact_identifier_displacement_guard or exact_identifier_surface_selected),
+            bool(
+                exact_identifier_displacement_guard or exact_identifier_surface_selected
+            ),
             (
                 explicit_surface_ambiguity,
                 exact_identifier_ambiguity,
@@ -676,9 +733,18 @@ class TaskActionProjectionMixin:
             (
                 ("ambiguous-explicit-task-surface", explicit_surface_ambiguity),
                 ("weak-task-anchor", weak_contract_anchor_ambiguity),
-                ("multiple-live-owners-behind-archive-hit", archive_live_owner_ambiguity),
-                ("multiple-task-local-structural-owners", multi_structural_owner_ambiguity),
-                ("unresolved-qualified-import-identity", verification_identity_ambiguity),
+                (
+                    "multiple-live-owners-behind-archive-hit",
+                    archive_live_owner_ambiguity,
+                ),
+                (
+                    "multiple-task-local-structural-owners",
+                    multi_structural_owner_ambiguity,
+                ),
+                (
+                    "unresolved-qualified-import-identity",
+                    verification_identity_ambiguity,
+                ),
                 ("multiple-exact-identifier-edit-owners", exact_identifier_ambiguity),
                 ("multiple-identifier-edit-owners", multi_identifier_edit_ambiguity),
             ),
@@ -687,10 +753,11 @@ class TaskActionProjectionMixin:
         return {
             "ambiguous": ambiguous,
             "reason": reason,
-            "candidates": self._task_action_ambiguity_candidates(edit, competing, per_role),
+            "candidates": self._task_action_ambiguity_candidates(
+                edit, competing, per_role
+            ),
             "competing": competing,
             "structural_owners": task_local_structural_owners,
             "verification_origins": task_local_verification_origins,
             "multi_structural_owner_ambiguity": multi_structural_owner_ambiguity,
         }
-

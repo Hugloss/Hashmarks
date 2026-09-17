@@ -1,26 +1,23 @@
 from __future__ import annotations
 
-from .decision_session import decision_scoped
 import json
-import time
-from pathlib import Path
-from typing import Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, cast
 
-from ..digest import hash_file
-from ..evidence_context import evidence_context_identity
-from ..paths import normalize_relative_path
-from .model import EvidenceVisibility
-from .project_impact_codec import compact_project_impact
-from .python_ast import estimate_tokens
-from .repository_domains import RepositoryDomain, classify_repository_path
-from .evidence_verification import _VerificationSelectionState
-from .evidence_decision_packet import DecisionPacketMixin
+from hashmarks.digest import hash_file
+from hashmarks.evidence_context import evidence_context_identity
+
 from .configuration_evidence import ConfigurationEvidenceMixin
+from .decision_session import decision_scoped
+from .evidence_decision_packet import DecisionPacketMixin
+from .model import EvidenceVisibility
+from .python_ast import estimate_tokens
+
+if TYPE_CHECKING:
+    from .engine import CodeMap
 
 
 class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
-
-
     @decision_scoped
     def task_decision_brief(
         self,
@@ -37,7 +34,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         verify plus safety/freshness signals.
         """
         packet = self.task_decision_packet(
-            task, limit=limit, per_role=per_role, token_budget=token_budget,
+            task,
+            limit=limit,
+            per_role=per_role,
+            token_budget=token_budget,
         )
 
         def anchor(value: object) -> dict[str, object] | None:
@@ -49,21 +49,47 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 row["symbol"] = str(symbol)
             return row
 
-        edit = anchor(packet.get("edit")); verify = anchor(packet.get("verify")); contract = anchor(packet.get("contract"))
+        edit = anchor(packet.get("edit"))
+        verify = anchor(packet.get("verify"))
+        contract = anchor(packet.get("contract"))
         used = {row["path"] for row in (edit, verify) if row is not None}
         if contract is not None and contract["path"] in used:
             contract = None
-        plan = packet.get("verification_plan") if isinstance(packet.get("verification_plan"), dict) else {}
-        context = packet.get("context_budget") if isinstance(packet.get("context_budget"), dict) else {}
-        discrimination = packet.get("discrimination") if isinstance(packet.get("discrimination"), dict) else {}
-        identity = packet.get("identity") if isinstance(packet.get("identity"), dict) else {}
-        ownership = packet.get("ownership_resolution") if isinstance(packet.get("ownership_resolution"), dict) else {}
-        owner_path = ownership.get("owner_path") if isinstance(ownership.get("owner_path"), list) else []
+        plan = (
+            packet.get("verification_plan")
+            if isinstance(packet.get("verification_plan"), dict)
+            else {}
+        )
+        context = (
+            packet.get("context_budget")
+            if isinstance(packet.get("context_budget"), dict)
+            else {}
+        )
+        discrimination = (
+            packet.get("discrimination")
+            if isinstance(packet.get("discrimination"), dict)
+            else {}
+        )
+        identity = (
+            packet.get("identity") if isinstance(packet.get("identity"), dict) else {}
+        )
+        ownership = (
+            packet.get("ownership_resolution")
+            if isinstance(packet.get("ownership_resolution"), dict)
+            else {}
+        )
+        owner_path = (
+            ownership.get("owner_path")
+            if isinstance(ownership.get("owner_path"), list)
+            else []
+        )
         result: dict[str, object] = {
             "schema": "hashmarks.task-decision-brief.v1",
             "edit": edit,
             "verify": verify,
-            "verification_argv": list(plan.get("argv") or []) if plan.get("available") else None,
+            "verification_argv": list(plan.get("argv") or [])
+            if plan.get("available")
+            else None,
             "safe": bool(context.get("safe")),
             "stale": bool(identity.get("stale")),
             "decision_generation": identity.get("decision_generation"),
@@ -72,7 +98,11 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         }
         if owner_path:
             result["owner_path"] = [
-                {"from": str(edge.get("from") or ""), "to": str(edge.get("to") or ""), "relation": str(edge.get("relation") or "")}
+                {
+                    "from": str(edge.get("from") or ""),
+                    "to": str(edge.get("to") or ""),
+                    "relation": str(edge.get("relation") or ""),
+                }
                 for edge in owner_path
             ]
         if contract is not None:
@@ -81,9 +111,11 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         if missing:
             result["missing_roles"] = missing
         if bool(discrimination.get("needed")):
-            result["discrimination"] = {"needed": True, "reason": str(discrimination.get("reason") or "unresolved")}
+            result["discrimination"] = {
+                "needed": True,
+                "reason": str(discrimination.get("reason") or "unresolved"),
+            }
         return result
-
 
     def _minimum_safe_action_budget(self, action: dict[str, object]) -> int:
         """Return exact tokens required by the mandatory action skeleton.
@@ -93,6 +125,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         those unique mandatory anchor costs. This is the production fast path;
         exhaustive budget sweeps remain a QA/diagnostic surface.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         used = 0
         seen: set[str] = set()
         for role in ("edit", "verify", "contract"):
@@ -105,7 +139,6 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             seen.add(path)
             used += int(self._work_context_anchor(row, role=role)["estimated_tokens"])
         return used
-
 
     @staticmethod
     def _owner_path_text(action: Mapping[str, object]) -> str | None:
@@ -148,7 +181,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
     @staticmethod
     def _task_action_selected_rows(
         action: Mapping[str, object],
-    ) -> tuple[dict[str, object] | None, dict[str, object] | None, dict[str, object] | None]:
+    ) -> tuple[
+        dict[str, object] | None, dict[str, object] | None, dict[str, object] | None
+    ]:
         """Return the already-selected edit, verification, and contract evidence rows."""
         selected = []
         for role in ("edit", "verify", "contract"):
@@ -157,9 +192,12 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         return selected[0], selected[1], selected[2]
 
     def _task_action_verification_plan(
-        self, verify: Mapping[str, object] | None,
+        self,
+        verify: Mapping[str, object] | None,
     ) -> dict[str, object]:
         """Project the selected verification evidence into its existing plan contract."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if verify is None or not verify.get("path"):
             return {
                 "schema": "hashmarks.verification-plan.v1",
@@ -169,12 +207,16 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         symbol = (
             str(verify.get("verification_test_symbol"))
             if verify.get("verification_test_symbol") is not None
-            else str(verify.get("name")) if verify.get("name") is not None else None
+            else str(verify.get("name"))
+            if verify.get("name") is not None
+            else None
         )
         return self.verification_plan(
             str(verify["path"]),
             symbol=symbol,
-            qualname=str(verify.get("qualname")) if verify.get("qualname") is not None else None,
+            qualname=str(verify.get("qualname"))
+            if verify.get("qualname") is not None
+            else None,
         )
 
     def _task_action_brief_from_action(
@@ -192,17 +234,25 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         ``verification_plan``; the helper avoids recomputing repository
         retrieval merely to strip authority/debug metadata from the model view.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         context = self.work_context(action, token_budget=token_budget)
         _generation, _identity_generation, stale = self._generation_status()
         edit, verify, contract = self._task_action_selected_rows(action)
         verification = self._task_action_verification_plan(verify)
 
-        safe = bool(context.get("safe")) and edit is not None and bool(verification.get("available"))
+        safe = (
+            bool(context.get("safe"))
+            and edit is not None
+            and bool(verification.get("available"))
+        )
         status = "unsafe" if not safe else "safe-stale" if stale else "safe-fresh"
         result: dict[str, object] = {
             "schema": "hashmarks.task-action-brief.v1",
             "status": status,
-            "evidence_receipt": self._decision_evidence_receipt(task, action, verification),
+            "evidence_receipt": self._decision_evidence_receipt(
+                task, action, verification
+            ),
         }
         if edit and edit.get("path"):
             result["edit"] = str(edit["path"])
@@ -228,18 +278,23 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             for row in (edit, verify)
             if isinstance(row, dict) and row.get("path")
         }
-        if contract and contract.get("path") and str(contract["path"]) not in used_paths:
+        if (
+            contract
+            and contract.get("path")
+            and str(contract["path"]) not in used_paths
+        ):
             result["contract"] = str(contract["path"])
 
         missing = list(context.get("missing_roles") or [])
         if missing:
             result["missing"] = missing
 
-        discrimination_reason = self._discrimination_reason(action, edit, verify, limit=limit)
+        discrimination_reason = self._discrimination_reason(
+            action, edit, verify, limit=limit
+        )
         if discrimination_reason is not None:
             result["discrimination"] = discrimination_reason
         return result
-
 
     def _task_evidence_current_symbol(
         self,
@@ -249,11 +304,14 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         name: str | None,
     ) -> Mapping[str, object] | None:
         """Rebind a selected evidence row to its unique current indexed symbol."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         current = self.store.symbol_at(path, qualname) if qualname else None
         if current is not None or not name:
             return current
         matches = [
-            symbol for symbol in self._session_symbols_for_path(path)
+            symbol
+            for symbol in self._session_symbols_for_path(path)
             if str(symbol.get("name") or "") == name
         ]
         return matches[0] if len(matches) == 1 else None
@@ -269,11 +327,17 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         pending: Mapping[str, object] | None,
     ) -> tuple[dict[str, object] | None, dict[str, object] | None]:
         """Return the smallest policy-safe structural fallback for selected evidence."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         content = signature
         representation = "signature"
         if not content:
             outline = self.store.outline(path)
-            if outline is not None and EvidenceVisibility(str(outline["evidence_visibility"])) is not EvidenceVisibility.DENY:
+            if (
+                outline is not None
+                and EvidenceVisibility(str(outline["evidence_visibility"]))
+                is not EvidenceVisibility.DENY
+            ):
                 content = str(outline.get("outline") or "").strip()
                 representation = "outline"
         if content:
@@ -291,6 +355,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
 
     def _task_evidence_visibility(self, path: str) -> EvidenceVisibility | None:
         """Return current source-disclosure policy for one already-selected path."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         file_row = self._session_file_row(path)
         if file_row is None:
             return None
@@ -300,7 +366,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             return EvidenceVisibility.DENY
 
     def _task_evidence_current_range(
-        self, path: str, row: Mapping[str, object],
+        self,
+        path: str,
+        row: Mapping[str, object],
     ) -> tuple[str | None, str | None, str, int | None, int | None]:
         """Rebind selected symbol/range evidence to the current repository index."""
         qualname = str(row.get("qualname") or "") or None
@@ -316,8 +384,16 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         name = str(current.get("name") or name or "") or None
         signature = str(current.get("signature") or signature).strip()
         current_start, current_end = current.get("start_line"), current.get("end_line")
-        start = int(current_start) if isinstance(current_start, int) and current_start > 0 else start
-        end = int(current_end) if isinstance(current_end, int) and current_end > 0 else end
+        start = (
+            int(current_start)
+            if isinstance(current_start, int) and current_start > 0
+            else start
+        )
+        end = (
+            int(current_end)
+            if isinstance(current_end, int) and current_end > 0
+            else end
+        )
         return qualname, name, signature, start, end
 
     def _task_evidence_evidence_item(
@@ -336,6 +412,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         It never searches for a replacement owner and never invents a partial
         source body when the exact symbol range does not fit.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if token_budget < 0:
             raise ValueError("token_budget must be >= 0")
         path = str(row.get("path") or "")
@@ -343,13 +421,27 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             return None, None
         visibility = self._task_evidence_visibility(path)
         if visibility is None:
-            return None, {"role": role, "path": path, "reason": "path-no-longer-indexed"}
+            return None, {
+                "role": role,
+                "path": path,
+                "reason": "path-no-longer-indexed",
+            }
         if visibility is EvidenceVisibility.DENY:
-            return None, {"role": role, "path": path, "reason": "source-evidence-denied"}
+            return None, {
+                "role": role,
+                "path": path,
+                "reason": "source-evidence-denied",
+            }
 
-        qualname, name, signature, start, end = self._task_evidence_current_range(path, row)
+        qualname, name, signature, start, end = self._task_evidence_current_range(
+            path, row
+        )
         symbol = qualname or name
-        if visibility is EvidenceVisibility.SOURCE and start is not None and end is not None:
+        if (
+            visibility is EvidenceVisibility.SOURCE
+            and start is not None
+            and end is not None
+        ):
             try:
                 body = self._source_slice(path, start, end, qualname=qualname)
             except (OSError, PermissionError, FileNotFoundError):
@@ -384,7 +476,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 }
         elif visibility is EvidenceVisibility.SOURCE:
             config_item, config_pending = self._task_evidence_config_evidence(
-                path, task=task, role=role, token_budget=token_budget,
+                path,
+                task=task,
+                role=role,
+                token_budget=token_budget,
             )
             if config_item is not None or config_pending is not None:
                 return config_item, config_pending
@@ -413,10 +508,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             pending=pending,
         )
 
-
     @staticmethod
     def _task_evidence_selection_reason(
-        action: dict[str, object], edit: dict[str, object] | None,
+        action: dict[str, object],
+        edit: dict[str, object] | None,
     ) -> str:
         """Explain *why* the already-selected edit evidence is present.
 
@@ -449,7 +544,6 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             return "config-role"
         return "canonical-edit-role"
 
-
     def _task_evidence_provenance(
         self,
         action: dict[str, object],
@@ -458,6 +552,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         verification_stale: bool = False,
     ) -> dict[str, object]:
         """Return compact source-revision and freshness evidence for a start packet."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         edit = action.get("edit") if isinstance(action.get("edit"), dict) else None
         generation, identity_generation, stale = self._generation_status()
         if generation != selection_generation:
@@ -498,7 +594,6 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 result["selection_generation"] = selection_generation
         return result
 
-
     def _bind_task_evidence_evidence_context(
         self,
         provenance: dict[str, object],
@@ -512,9 +607,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         state and native Hashmarks producer identity.  It adds no new authority.
         """
         bound = dict(provenance)
-        bound["context_identity"] = evidence_context_identity(evidence_receipt, provenance)
+        bound["context_identity"] = evidence_context_identity(
+            evidence_receipt, provenance
+        )
         return bound
-
 
     @staticmethod
     def _task_evidence_base_result(
@@ -527,7 +623,15 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "status": str(action_brief.get("status") or "unsafe"),
             "evidence_receipt": dict(action_brief.get("evidence_receipt") or {}),
         }
-        for key in ("edit", "verify", "verify_path", "owner_path", "contract", "missing", "discrimination"):
+        for key in (
+            "edit",
+            "verify",
+            "verify_path",
+            "owner_path",
+            "contract",
+            "missing",
+            "discrimination",
+        ):
             if key in action_brief:
                 result[key] = action_brief[key]
         return result
@@ -544,15 +648,28 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         used = 0
         complete = False
         if item is not None:
-            compact_item = {key: value for key, value in item.items() if key not in {"role", "path"}}
+            compact_item = {
+                key: value for key, value in item.items() if key not in {"role", "path"}
+            }
             used = int(item.get("estimated_tokens") or 0)
-            complete = item.get("representation") in {"source-range", "config-key-range"}
-        compact_pending = None if pending is None else {key: value for key, value in pending.items() if key != "role"}
-        return compact_item, compact_pending, {
-            "requested_tokens": token_budget,
-            "estimated_tokens": used,
-            "complete": complete,
-        }
+            complete = item.get("representation") in {
+                "source-range",
+                "config-key-range",
+            }
+        compact_pending = (
+            None
+            if pending is None
+            else {key: value for key, value in pending.items() if key != "role"}
+        )
+        return (
+            compact_item,
+            compact_pending,
+            {
+                "requested_tokens": token_budget,
+                "estimated_tokens": used,
+                "complete": complete,
+            },
+        )
 
     def _task_evidence_verification_stale(self, action: Mapping[str, object]) -> bool:
         """Check only the selected verification file against its indexed revision.
@@ -561,6 +678,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         belongs to the action map; the fence only prevents a stale verification
         target from being emitted as safe-fresh after selection.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         verify = action.get("verify")
         if not isinstance(verify, Mapping) or not verify.get("path"):
             return False
@@ -584,11 +703,13 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
     ) -> None:
         """Attach freshness/context provenance to a packet without changing evidence selection."""
         provenance = self._task_evidence_provenance(
-            dict(action), selection_generation=selection_generation,
+            dict(action),
+            selection_generation=selection_generation,
             verification_stale=verification_stale,
         )
         provenance = self._bind_task_evidence_evidence_context(
-            provenance, result["evidence_receipt"],
+            provenance,
+            result["evidence_receipt"],
         )
         result["provenance"] = provenance
         if provenance.get("freshness") == "stale" and result["status"] != "unsafe":
@@ -608,6 +729,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         composes their already-selected result into the current start
         packet; it does not execute, schedule, retry, or certify work.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if token_budget < 1:
             raise ValueError("token_budget must be >= 1")
         reconciled_task_paths = set(self._reconcile_cached_task_paths(task, limit))
@@ -617,12 +740,17 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         # packet as safe-stale via the independent closing provenance sample.
         with self.decision_session():
             action = self.task_action_map(
-                task, limit=limit, per_role=per_role,
+                task,
+                limit=limit,
+                per_role=per_role,
             )
             selection_generation = self.store.generation()
             action_budget = self._minimum_safe_action_budget(action)
             action_brief = self._task_action_brief_from_action(
-                action, task=task, token_budget=max(1, action_budget), limit=limit,
+                action,
+                task=task,
+                token_budget=max(1, action_budget),
+                limit=limit,
             )
             result = self._task_evidence_base_result(action_brief, action)
 
@@ -635,7 +763,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 "complete": False,
             }
             self._task_evidence_attach_provenance(
-                result, action, selection_generation=selection_generation,
+                result,
+                action,
+                selection_generation=selection_generation,
             )
             return result
 
@@ -643,10 +773,17 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         item = pending = None
         if isinstance(edit_row, dict) and edit_row.get("path"):
             item, pending = self._task_evidence_evidence_item(
-                edit_row, role="edit", token_budget=token_budget, task=task,
+                edit_row,
+                role="edit",
+                token_budget=token_budget,
+                task=task,
             )
-        compact_item, compact_pending, source_budget = self._task_evidence_compact_evidence(
-            item, pending, token_budget=token_budget,
+        compact_item, compact_pending, source_budget = (
+            self._task_evidence_compact_evidence(
+                item,
+                pending,
+                token_budget=token_budget,
+            )
         )
         result["edit_evidence"] = compact_item
         result["next_read"] = compact_pending
@@ -662,11 +799,12 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             or self._task_evidence_verification_stale(action)
         )
         self._task_evidence_attach_provenance(
-            result, action, selection_generation=selection_generation,
+            result,
+            action,
+            selection_generation=selection_generation,
             verification_stale=verification_stale,
         )
         return result
-
 
     def task_action_brief(
         self,
@@ -675,7 +813,18 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         limit: int = 20,
         per_role: int = 3,
         token_budget: int | None = None,
-        candidate_budgets: Sequence[int] = (32, 64, 96, 128, 192, 256, 384, 512, 768, 1024),
+        candidate_budgets: Sequence[int] = (
+            32,
+            64,
+            96,
+            128,
+            192,
+            256,
+            384,
+            512,
+            768,
+            1024,
+        ),
     ) -> dict[str, object]:
         """Return the smallest model-facing Stage-1 action contract.
 
@@ -684,8 +833,12 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         packet, but producing the model projection must not repeat repository
         archaeology simply to discard that metadata again.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         action = self.task_action_map(
-            task, limit=limit, per_role=per_role,
+            task,
+            limit=limit,
+            per_role=per_role,
         )
         selected_budget = token_budget
         if selected_budget is None:
@@ -698,9 +851,11 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 normalized_budgets[-1],
             )
         return self._task_action_brief_from_action(
-            action, task=task, token_budget=int(selected_budget), limit=limit,
+            action,
+            task=task,
+            token_budget=int(selected_budget),
+            limit=limit,
         )
-
 
     def task_decision_brief_budget_sweep(
         self,
@@ -724,19 +879,28 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         rows: list[dict[str, object]] = []
         for budget in normalized:
             brief = self.task_decision_brief(
-                task, limit=limit, per_role=per_role, token_budget=budget,
+                task,
+                limit=limit,
+                per_role=per_role,
+                token_budget=budget,
             )
-            encoded = json.dumps(brief, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            encoded = json.dumps(brief, sort_keys=True, separators=(",", ":")).encode(
+                "utf-8"
+            )
             missing = list(brief.get("missing_roles") or [])
-            rows.append({
-                "budget": budget,
-                "safe": bool(brief.get("safe")),
-                "missing_roles": missing,
-                "visible_brief_bytes": len(encoded),
-                "edit_available": isinstance(brief.get("edit"), dict),
-                "verify_available": isinstance(brief.get("verify"), dict),
-                "verification_argv_available": isinstance(brief.get("verification_argv"), list),
-            })
+            rows.append(
+                {
+                    "budget": budget,
+                    "safe": bool(brief.get("safe")),
+                    "missing_roles": missing,
+                    "visible_brief_bytes": len(encoded),
+                    "edit_available": isinstance(brief.get("edit"), dict),
+                    "verify_available": isinstance(brief.get("verify"), dict),
+                    "verification_argv_available": isinstance(
+                        brief.get("verification_argv"), list
+                    ),
+                }
+            )
         safe = [row for row in rows if bool(row["safe"])]
         smallest = int(safe[0]["budget"]) if safe else None
         smallest_row = safe[0] if safe else None

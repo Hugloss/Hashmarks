@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
-def test_task_action_map_routes_source_test_contract_without_changing_ranking(tmp_path: Path) -> None:
+
+def test_task_action_map_routes_source_test_contract_without_changing_ranking(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "benchmarks").mkdir()
@@ -15,48 +20,74 @@ def test_task_action_map_routes_source_test_contract_without_changing_ranking(tm
         "from src.widget import WidgetEngine\n\ndef test_widget():\n    assert WidgetEngine\n"
     )
     (tmp_path / "INVARIANTS.md").write_text("WidgetEngine contract and policy.\n")
-    (tmp_path / "benchmarks" / "corpus.json").write_text(json.dumps({"note": "WidgetEngine historical corpus"}))
+    (tmp_path / "benchmarks" / "corpus.json").write_text(
+        json.dumps({"note": "WidgetEngine historical corpus"})
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        canonical = codemap.find_task("WidgetEngine implementation test contract", limit=20)
-        action = codemap.task_action_map("WidgetEngine implementation test contract", limit=20)
+        canonical = codemap.find_task(
+            "WidgetEngine implementation test contract", limit=20
+        )
+        action = codemap.task_action_map(
+            "WidgetEngine implementation test contract", limit=20
+        )
 
-    assert [row["path"] for row in action["canonical"]] == [hit.path for hit in canonical]
+    assert [row["path"] for row in action["canonical"]] == [
+        hit.path for hit in canonical
+    ]
     assert action["ranking_effect"] == "none"
     assert action["discovery_effect"] == "none"
     assert action["edit"]["path"] == "src/widget.py"
     assert action["verify"]["path"] == "tests/test_widget.py"
-    assert "edit" not in next(row for row in action["canonical"] if row["path"] == "tests/test_widget.py").get("roles", [])
+    assert "edit" not in next(
+        row for row in action["canonical"] if row["path"] == "tests/test_widget.py"
+    ).get("roles", [])
 
 
 def test_task_action_map_never_uses_benchmark_corpus_as_edit(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "benchmarks").mkdir()
-    (tmp_path / "src" / "resolver.py").write_text("def resolve_manifest():\n    return True\n")
-    (tmp_path / "benchmarks" / "manifest.json").write_text(json.dumps({"resolve_manifest": "answer-like corpus"}))
+    (tmp_path / "src" / "resolver.py").write_text(
+        "def resolve_manifest():\n    return True\n"
+    )
+    (tmp_path / "benchmarks" / "manifest.json").write_text(
+        json.dumps({"resolve_manifest": "answer-like corpus"})
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = codemap.task_action_map("resolve_manifest registered manifest implementation", limit=20)
+        action = codemap.task_action_map(
+            "resolve_manifest registered manifest implementation", limit=20
+        )
 
     assert action["edit"]["path"] == "src/resolver.py"
-    assert all(not str(row["path"]).startswith("benchmarks/") for row in [action["edit"]] if row)
+    assert all(
+        not str(row["path"]).startswith("benchmarks/")
+        for row in [action["edit"]]
+        if row
+    )
 
 
-def test_task_action_map_generic_build_word_does_not_force_makefile(tmp_path: Path) -> None:
+def test_task_action_map_generic_build_word_does_not_force_makefile(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "adapter.py").write_text("class GoImpactAdapter:\n    pass\n")
     (tmp_path / "Makefile").write_text("build:\n\t@echo build\n")
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = codemap.task_action_map("GoImpactAdapter build project impact implementation", limit=20)
+        action = codemap.task_action_map(
+            "GoImpactAdapter build project impact implementation", limit=20
+        )
 
     assert action["edit"]["path"] == "pkg/adapter.py"
 
 
-def test_source_tree_test_prefixed_module_remains_editable_source(tmp_path: Path) -> None:
+def test_source_tree_test_prefixed_module_remains_editable_source(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "src/tooling").mkdir(parents=True)
     (tmp_path / "tests").mkdir()
     (tmp_path / "src/tooling/test_batches.py").write_text(
@@ -68,7 +99,9 @@ def test_source_tree_test_prefixed_module_remains_editable_source(tmp_path: Path
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = codemap.task_action_map("Change shard_batch_size implementation from 8 to 4", limit=20)
+        action = codemap.task_action_map(
+            "Change shard_batch_size implementation from 8 to 4", limit=20
+        )
 
     assert action["edit"]["path"] == "src/tooling/test_batches.py"
 
@@ -84,23 +117,30 @@ def test_explicit_test_repair_can_select_test_as_edit_surface(tmp_path: Path) ->
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(
-            "Strengthen the WorkspaceLease regression test to assert the contract", limit=20
+            "Strengthen the WorkspaceLease regression test to assert the contract",
+            limit=20,
         )
 
     assert action["edit"]["path"] == "tests/test_lease.py"
 
 
-def test_verify_test_language_does_not_turn_test_into_edit_authority(tmp_path: Path) -> None:
+def test_verify_test_language_does_not_turn_test_into_edit_authority(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
-    (tmp_path / "src" / "owner.py").write_text("def widget(): return 'old'\n", encoding="utf-8")
+    (tmp_path / "src" / "owner.py").write_text(
+        "def widget(): return 'old'\n", encoding="utf-8"
+    )
     (tmp_path / "tests" / "test_owner.py").write_text(
         "from src.owner import widget\ndef test_widget(): assert widget() == 'new'\n",
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = codemap.task_action_map("change widget implementation and verify widget test", limit=20)
+        action = codemap.task_action_map(
+            "change widget implementation and verify widget test", limit=20
+        )
     assert action["edit"]["path"] == "src/owner.py"
     assert action["verify"]["path"] == "tests/test_owner.py"
 
@@ -109,13 +149,16 @@ def test_explicit_pytest_shard_tuning_selects_makefile(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src/runner.py").write_text("def run_tests():\n    return True\n")
-    (tmp_path / "tests/test_runner.py").write_text("def test_runner():\n    assert True\n")
+    (tmp_path / "tests/test_runner.py").write_text(
+        "def test_runner():\n    assert True\n"
+    )
     (tmp_path / "Makefile").write_text("PYTEST_BATCH_SIZE := 8\ntest:\n\tpytest -q\n")
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(
-            "Change pytest batch shard size from 8 to 4 while keeping the timeout unchanged", limit=20
+            "Change pytest batch shard size from 8 to 4 while keeping the timeout unchanged",
+            limit=20,
         )
 
     assert action["edit"]["path"] == "Makefile"
@@ -134,13 +177,16 @@ def test_camelcase_task_anchor_matches_snake_case_owner(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(
-            "Fix CandidateCheckpoint marker validation in the active implementation", limit=20
+            "Fix CandidateCheckpoint marker validation in the active implementation",
+            limit=20,
         )
 
     assert action["edit"]["path"] == "src/runtime/checkpoint.py"
 
 
-def test_close_model_and_runtime_identifier_owners_require_discrimination(tmp_path: Path) -> None:
+def test_close_model_and_runtime_identifier_owners_require_discrimination(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "src/models").mkdir(parents=True)
     (tmp_path / "src/runtime").mkdir(parents=True)
     (tmp_path / "src/models/workspace_lease.py").write_text(
@@ -161,9 +207,14 @@ def test_close_model_and_runtime_identifier_owners_require_discrimination(tmp_pa
     assert packet["discrimination"]["needed"] is True
 
 
-def test_task_action_map_exposes_resolved_ownership_trace_and_authority(tmp_path: Path) -> None:
-    (tmp_path / "src").mkdir(); (tmp_path / "tests").mkdir()
-    (tmp_path / "src" / "engine.py").write_text("def apply_widget(value):\n    return value\n")
+def test_task_action_map_exposes_resolved_ownership_trace_and_authority(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src" / "engine.py").write_text(
+        "def apply_widget(value):\n    return value\n"
+    )
     (tmp_path / "tests" / "test_engine.py").write_text(
         "from src.engine import apply_widget\ndef test_widget(): assert apply_widget('x') == 'x'\n"
     )
@@ -192,7 +243,9 @@ def test_task_action_map_no_edit_fails_closed(tmp_path: Path) -> None:
     assert action["ownership_authority"]["authoritative_edit"] is None
 
 
-def test_task_action_map_reuses_primary_structural_owner_for_ambiguity(tmp_path: Path, monkeypatch) -> None:
+def test_task_action_map_reuses_primary_structural_owner_for_ambiguity(
+    tmp_path: Path, monkeypatch
+) -> None:
     """One decision must not rebuild the same ownership graph for ambiguity evidence."""
     from hashmarks.codemap.ownership_graph import OwnershipGraphMixin
 

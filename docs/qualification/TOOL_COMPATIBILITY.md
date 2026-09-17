@@ -28,12 +28,12 @@ Pytest is a qualification dependency, not a Hashmarks runtime dependency.
 Minimum supported version:
 
 ```text
-Ruff >=0.12
+Ruff >=0.12.0
 ```
 
-Hashmarks does **not inherit Ruff's default rule selection**. `[tool.ruff.lint].select` declares the complete rule contract explicitly, so upgrading Ruff does not silently opt Hashmarks into a different default lint policy. CI exercises both the minimum Ruff line and the newest available Ruff satisfying `>=0.12`.
+The project-owned `lint` dependency group declares this floor. Hashmarks does **not inherit Ruff's default rule selection**. `[tool.ruff.lint].select` declares the complete rule contract explicitly, so upgrading Ruff does not silently opt Hashmarks into a different default lint policy. `make ruff-min` and `make ruff-latest` sync that group into a dedicated `.ruff-venv`, keeping the prepared test environment intact. CI calls those same targets.
 
-Ruff remains externally prepared diagnostic tooling. It is not a runtime dependency and its PASS result is not canonical promotion authority. External evidence records the exact Ruff version that actually produced it, but that concrete version only needs to satisfy the minimum contract.
+Ruff is an explicitly resolved development dependency, not a runtime dependency. Its PASS result is not canonical promotion authority. External evidence records the exact Ruff version that actually produced it, but that concrete version only needs to satisfy the minimum contract.
 
 ## uv
 

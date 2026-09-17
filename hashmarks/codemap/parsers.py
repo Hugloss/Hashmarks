@@ -3,12 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Callable
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 from .model import CODEMAP_SCHEMA, EdgeRecord, ParsedArtifact, SymbolRecord
 from .python_ast import PYTHON_PARSER, estimate_tokens, lexical_records, parse_python
-from .providers import TreeSitterRangeProvider
+
+if TYPE_CHECKING:
+    from .providers import TreeSitterRangeProvider
 
 NODE_PARSER = "hashmarks.ecmascript-outline.v3"
 GO_PARSER = "hashmarks.go-outline.v2"
@@ -28,7 +30,9 @@ def parser_id(language: str) -> str:
     return PATH_ONLY_PARSER
 
 
-def parser_signature(language: str, range_provider: TreeSitterRangeProvider | None = None) -> str:
+def parser_signature(
+    language: str, range_provider: TreeSitterRangeProvider | None = None
+) -> str:
     base = parser_id(language)
     if range_provider is None:
         return base
@@ -36,7 +40,12 @@ def parser_signature(language: str, range_provider: TreeSitterRangeProvider | No
     return base if extra is None else f"{base}+{extra}"
 
 
-def artifact_key_for(file_digest: str, language: str, *, range_provider: TreeSitterRangeProvider | None = None) -> str:
+def artifact_key_for(
+    file_digest: str,
+    language: str,
+    *,
+    range_provider: TreeSitterRangeProvider | None = None,
+) -> str:
     payload = json.dumps(
         {
             "schema": CODEMAP_SCHEMA,
@@ -86,34 +95,89 @@ def _node_outline(source: str, *, file_digest: str, language: str) -> ParsedArti
             r"\brequire\(\s*['\"]([^'\"]+)['\"]\s*\)",
         ):
             for match in re.finditer(pattern, stripped):
-                edges.append(EdgeRecord(None, "import", match.group(1), line_no, "lexical"))
-        match = re.match(r"^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)", stripped)
+                edges.append(
+                    EdgeRecord(None, "import", match.group(1), line_no, "lexical")
+                )
+        match = re.match(
+            r"^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)",
+            stripped,
+        )
         if match:
-            symbols.append(_symbol(name=match.group(1), kind="function", signature=stripped.split("{")[0].rstrip(), line=line_no))
+            symbols.append(
+                _symbol(
+                    name=match.group(1),
+                    kind="function",
+                    signature=stripped.split("{")[0].rstrip(),
+                    line=line_no,
+                )
+            )
             continue
-        match = re.match(r"^(?:export\s+)?(?:default\s+)?class\s+([A-Za-z_$][\w$]*)\b", stripped)
+        match = re.match(
+            r"^(?:export\s+)?(?:default\s+)?class\s+([A-Za-z_$][\w$]*)\b", stripped
+        )
         if match:
-            symbols.append(_symbol(name=match.group(1), kind="class", signature=stripped.split("{")[0].rstrip(), line=line_no))
+            symbols.append(
+                _symbol(
+                    name=match.group(1),
+                    kind="class",
+                    signature=stripped.split("{")[0].rstrip(),
+                    line=line_no,
+                )
+            )
             continue
-        match = re.match(r"^(?:export\s+)?(?:interface|type|enum)\s+([A-Za-z_$][\w$]*)\b", stripped)
+        match = re.match(
+            r"^(?:export\s+)?(?:interface|type|enum)\s+([A-Za-z_$][\w$]*)\b", stripped
+        )
         if match:
-            keyword = stripped.split(None, 2)[1] if stripped.startswith("export ") else stripped.split(None, 1)[0]
-            symbols.append(_symbol(name=match.group(1), kind=keyword, signature=stripped.split("{")[0].rstrip(), line=line_no))
+            keyword = (
+                stripped.split(None, 2)[1]
+                if stripped.startswith("export ")
+                else stripped.split(None, 1)[0]
+            )
+            symbols.append(
+                _symbol(
+                    name=match.group(1),
+                    kind=keyword,
+                    signature=stripped.split("{")[0].rstrip(),
+                    line=line_no,
+                )
+            )
             continue
-        match = re.match(r"^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>", stripped)
+        match = re.match(
+            r"^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>",
+            stripped,
+        )
         if match:
-            symbols.append(_symbol(name=match.group(1), kind="function", signature=stripped.split("=>", 1)[0].rstrip() + " =>", line=line_no))
+            symbols.append(
+                _symbol(
+                    name=match.group(1),
+                    kind="function",
+                    signature=stripped.split("=>", 1)[0].rstrip() + " =>",
+                    line=line_no,
+                )
+            )
             continue
         # React/hooks and modern TypeScript frequently expose important code
         # landmarks as const bindings rather than declarations (for example
         # ``const cancel = useCallback(...)``). Keep the binding as advisory
         # structure without pretending to infer the RHS type or call graph.
-        match = re.match(r"^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=", stripped)
+        match = re.match(
+            r"^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=", stripped
+        )
         if match:
             prefix = stripped.split("=", 1)[0].rstrip()
-            symbols.append(_symbol(name=match.group(1), kind="binding", signature=prefix + " = …", line=line_no))
+            symbols.append(
+                _symbol(
+                    name=match.group(1),
+                    kind="binding",
+                    signature=prefix + " = …",
+                    line=line_no,
+                )
+            )
 
-    outline = "\n".join(f"{symbol.signature}  [{symbol.start_line}]" for symbol in symbols)
+    outline = "\n".join(
+        f"{symbol.signature}  [{symbol.start_line}]" for symbol in symbols
+    )
     return ParsedArtifact(
         artifact_key=artifact_key_for(file_digest, language),
         file_digest=file_digest,
@@ -142,16 +206,38 @@ def _go_outline(source: str, *, file_digest: str) -> ParsedArtifact:
         if stripped.startswith("import ") or in_import:
             match = re.search(r'"([^"]+)"', stripped)
             if match:
-                edges.append(EdgeRecord(None, "import", match.group(1), line_no, "lexical"))
-        match = re.match(r"^func\s+(?:\([^)]*\)\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(", stripped)
+                edges.append(
+                    EdgeRecord(None, "import", match.group(1), line_no, "lexical")
+                )
+        match = re.match(
+            r"^func\s+(?:\([^)]*\)\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(", stripped
+        )
         if match:
             kind = "method" if stripped.startswith("func (") else "function"
-            symbols.append(_symbol(name=match.group(1), kind=kind, signature=stripped.split("{")[0].rstrip(), line=line_no))
+            symbols.append(
+                _symbol(
+                    name=match.group(1),
+                    kind=kind,
+                    signature=stripped.split("{")[0].rstrip(),
+                    line=line_no,
+                )
+            )
             continue
-        match = re.match(r"^type\s+([A-Za-z_][A-Za-z0-9_]*)\s+(struct|interface)\b", stripped)
+        match = re.match(
+            r"^type\s+([A-Za-z_][A-Za-z0-9_]*)\s+(struct|interface)\b", stripped
+        )
         if match:
-            symbols.append(_symbol(name=match.group(1), kind=match.group(2), signature=stripped.split("{")[0].rstrip(), line=line_no))
-    outline = "\n".join(f"{symbol.signature}  [{symbol.start_line}]" for symbol in symbols)
+            symbols.append(
+                _symbol(
+                    name=match.group(1),
+                    kind=match.group(2),
+                    signature=stripped.split("{")[0].rstrip(),
+                    line=line_no,
+                )
+            )
+    outline = "\n".join(
+        f"{symbol.signature}  [{symbol.start_line}]" for symbol in symbols
+    )
     return ParsedArtifact(
         artifact_key=artifact_key_for(file_digest, "go"),
         file_digest=file_digest,
@@ -172,15 +258,39 @@ def _rust_outline(source: str, *, file_digest: str) -> ParsedArtifact:
         stripped = raw.strip()
         match = re.match(r"^(?:pub(?:\([^)]*\))?\s+)?use\s+([^;]+);", stripped)
         if match:
-            edges.append(EdgeRecord(None, "import", match.group(1).strip(), line_no, "lexical"))
-        match = re.match(r"^(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", stripped)
+            edges.append(
+                EdgeRecord(None, "import", match.group(1).strip(), line_no, "lexical")
+            )
+        match = re.match(
+            r"^(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+            stripped,
+        )
         if match:
-            symbols.append(_symbol(name=match.group(1), kind="function", signature=stripped.split("{")[0].rstrip(), line=line_no))
+            symbols.append(
+                _symbol(
+                    name=match.group(1),
+                    kind="function",
+                    signature=stripped.split("{")[0].rstrip(),
+                    line=line_no,
+                )
+            )
             continue
-        match = re.match(r"^(?:pub(?:\([^)]*\))?\s+)?(struct|enum|trait)\s+([A-Za-z_][A-Za-z0-9_]*)\b", stripped)
+        match = re.match(
+            r"^(?:pub(?:\([^)]*\))?\s+)?(struct|enum|trait)\s+([A-Za-z_][A-Za-z0-9_]*)\b",
+            stripped,
+        )
         if match:
-            symbols.append(_symbol(name=match.group(2), kind=match.group(1), signature=stripped.split("{")[0].rstrip(), line=line_no))
-    outline = "\n".join(f"{symbol.signature}  [{symbol.start_line}]" for symbol in symbols)
+            symbols.append(
+                _symbol(
+                    name=match.group(2),
+                    kind=match.group(1),
+                    signature=stripped.split("{")[0].rstrip(),
+                    line=line_no,
+                )
+            )
+    outline = "\n".join(
+        f"{symbol.signature}  [{symbol.start_line}]" for symbol in symbols
+    )
     return ParsedArtifact(
         artifact_key=artifact_key_for(file_digest, "rust"),
         file_digest=file_digest,
@@ -194,7 +304,9 @@ def _rust_outline(source: str, *, file_digest: str) -> ParsedArtifact:
     )
 
 
-def _unique_symbol_occurrences(symbols: tuple[SymbolRecord, ...]) -> tuple[SymbolRecord, ...]:
+def _unique_symbol_occurrences(
+    symbols: tuple[SymbolRecord, ...],
+) -> tuple[SymbolRecord, ...]:
     """Make persisted symbol occurrence keys deterministic and unique.
 
     Source languages can legally contain repeated lexical qualnames: Python local
@@ -210,7 +322,15 @@ def _unique_symbol_occurrences(symbols: tuple[SymbolRecord, ...]) -> tuple[Symbo
     """
     used: set[str] = set()
     out: list[SymbolRecord] = []
-    for row in sorted(symbols, key=lambda value: (value.start_line, value.end_line, value.qualname, value.kind)):
+    for row in sorted(
+        symbols,
+        key=lambda value: (
+            value.start_line,
+            value.end_line,
+            value.qualname,
+            value.kind,
+        ),
+    ):
         qualname = row.qualname
         if qualname in used:
             base = f"{qualname}@L{row.start_line}"
@@ -237,7 +357,13 @@ def _path_only(source: str, *, file_digest: str, language: str) -> ParsedArtifac
     )
 
 
-def parse_source(source: str, *, file_digest: str, language: str, range_provider: TreeSitterRangeProvider | None = None) -> ParsedArtifact:
+def parse_source(
+    source: str,
+    *,
+    file_digest: str,
+    language: str,
+    range_provider: TreeSitterRangeProvider | None = None,
+) -> ParsedArtifact:
     if language == "python":
         artifact = parse_python(source, file_digest=file_digest)
     elif language in {"javascript", "typescript"}:

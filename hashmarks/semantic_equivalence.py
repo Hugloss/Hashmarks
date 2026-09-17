@@ -10,27 +10,26 @@ from .python_ast_cache import clear_ast_cache
 
 QueryKind = Literal["find_task", "task_action_map", "task_decision_packet"]
 
-_DEFAULT_DIAGNOSTIC_KEYS = frozenset({
-    "elapsed_ms",
-    "duration_ms",
-    "wall_ms",
-    "wall_time_ms",
-    "cache_hits",
-    "cache_misses",
-    "cache_state",
-    "timing",
-    "timings",
-    "economics",
-    "decision_metrics",
-})
+_DEFAULT_DIAGNOSTIC_KEYS = frozenset(
+    {
+        "elapsed_ms",
+        "duration_ms",
+        "wall_ms",
+        "wall_time_ms",
+        "cache_hits",
+        "cache_misses",
+        "cache_state",
+        "timing",
+        "timings",
+        "economics",
+        "decision_metrics",
+    }
+)
 
 
 def _json_ready(value: object) -> object:
     if isinstance(value, Mapping):
-        return {
-            str(key): _json_ready(child)
-            for key, child in value.items()
-        }
+        return {str(key): _json_ready(child) for key, child in value.items()}
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         return [_json_ready(child) for child in value]
     as_dict = getattr(value, "as_dict", None)
@@ -51,10 +50,7 @@ def _semantic_projection(
             if key not in diagnostic_keys
         }
     if isinstance(ready, list):
-        return [
-            _semantic_projection(child, diagnostic_keys)
-            for child in ready
-        ]
+        return [_semantic_projection(child, diagnostic_keys) for child in ready]
     return ready
 
 

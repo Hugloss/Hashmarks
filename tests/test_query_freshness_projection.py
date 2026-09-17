@@ -15,7 +15,9 @@ def _rewrite_without_observer(tmp_path: Path) -> tuple[Path, Path]:
     return repo, state
 
 
-def test_symbol_exposes_unknown_freshness_after_unsignaled_rewrite(tmp_path: Path) -> None:
+def test_symbol_exposes_unknown_freshness_after_unsignaled_rewrite(
+    tmp_path: Path,
+) -> None:
     repo, state = _rewrite_without_observer(tmp_path)
     with CodeMap(repo, state_dir=state) as codemap:
         assert codemap.status()["daemon_generation_changed"] is None
@@ -29,8 +31,12 @@ def test_symbol_exposes_unknown_freshness_after_unsignaled_rewrite(tmp_path: Pat
 def test_structured_persisted_queries_share_freshness_authority(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     (repo / "src").mkdir(parents=True)
-    (repo / "src" / "a.py").write_text("from .b import target\ndef caller():\n    return target()\n", encoding="utf-8")
-    (repo / "src" / "b.py").write_text("def target():\n    return 1\n", encoding="utf-8")
+    (repo / "src" / "a.py").write_text(
+        "from .b import target\ndef caller():\n    return target()\n", encoding="utf-8"
+    )
+    (repo / "src" / "b.py").write_text(
+        "def target():\n    return 1\n", encoding="utf-8"
+    )
     state = repo / ".state"
     with CodeMap(repo, state_dir=state) as codemap:
         codemap.sync()
@@ -49,7 +55,9 @@ def test_structured_persisted_queries_share_freshness_authority(tmp_path: Path) 
         assert value["stale"] is None
 
 
-def test_exact_outline_still_revalidates_path_without_global_observer(tmp_path: Path) -> None:
+def test_exact_outline_still_revalidates_path_without_global_observer(
+    tmp_path: Path,
+) -> None:
     repo, state = _rewrite_without_observer(tmp_path)
     with CodeMap(repo, state_dir=state) as codemap:
         value = codemap.outline("src/app.py")

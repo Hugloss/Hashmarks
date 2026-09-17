@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks import CodeMap
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 def _go_repo(root: Path) -> tuple[str, list[str]]:
-    (root / "go.mod").write_text("module example.local/demo\n\ngo 1.23\n", encoding="utf-8")
+    (root / "go.mod").write_text(
+        "module example.local/demo\n\ngo 1.23\n", encoding="utf-8"
+    )
     for name in ("route", "service", "engine"):
         (root / name).mkdir()
     (root / "engine/engine.go").write_text(
@@ -25,7 +30,9 @@ def _go_repo(root: Path) -> tuple[str, list[str]]:
         'package route\nimport "testing"\nfunc TestCobaltRidgeAlpha(t *testing.T) {}\n',
         encoding="utf-8",
     )
-    return "Change CobaltRidgeAlpha accepted response from old to new", ["engine/engine.go"]
+    return "Change CobaltRidgeAlpha accepted response from old to new", [
+        "engine/engine.go"
+    ]
 
 
 def test_owner_chain_reuse_keeps_sync_currentness_check(tmp_path: Path) -> None:
@@ -110,8 +117,12 @@ def test_owner_chain_cached_result_is_detached(tmp_path: Path) -> None:
                 impact_limit_per_surface=6,
                 effective_project_impact_limit=6,
             )
-            first = codemap._change_impact_owner_chain(task, action, tuple(paths), visible)
+            first = codemap._change_impact_owner_chain(
+                task, action, tuple(paths), visible
+            )
             first[3].append("mutated.py")
-            second = codemap._change_impact_owner_chain(task, action, tuple(paths), visible)
+            second = codemap._change_impact_owner_chain(
+                task, action, tuple(paths), visible
+            )
 
     assert "mutated.py" not in second[3]

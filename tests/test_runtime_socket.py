@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import os
-import sys
 import threading
 import time
 from pathlib import Path
 
 import pytest
 
-from hashmarks.client import IdentityClient, default_runtime_dir, default_socket_path
+from hashmarks.client import IdentityClient, default_socket_path
 from hashmarks.daemon import IdentityDaemon
 
 
@@ -53,7 +52,9 @@ def test_state_dir_does_not_move_default_socket(tmp_path: Path, monkeypatch):
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Unix runtime socket policy")
-def test_default_daemon_socket_round_trip_with_separate_state(tmp_path: Path, monkeypatch):
+def test_default_daemon_socket_round_trip_with_separate_state(
+    tmp_path: Path, monkeypatch
+):
     workspace = tmp_path / "repo"
     workspace.mkdir()
     (workspace / "a.txt").write_text("A")

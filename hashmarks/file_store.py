@@ -4,16 +4,22 @@ import os
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING
 
 from .digest import Digest, hash_file
-from .file_metadata_codec import MetadataCodecError, decode_overflow_metadata, encode_metadata_fields
+from .file_metadata_codec import (
+    MetadataCodecError,
+    decode_overflow_metadata,
+    encode_metadata_fields,
+)
 from .paths import canonical_host_path, sqlite_identity_exclusions
 from .sqlite_boundary import configure_sqlite_connection, sqlite_transaction
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
 _Metadata = tuple[int, int, int, int, int, int]
 _CachedRow = tuple[int, int, int, int, int, int, str]
-
 
 
 class UnstableFileError(RuntimeError):
@@ -49,7 +55,6 @@ class FileDigestStore:
             "sqlite_batches": 0,
             "rows_written": 0,
         }
-
 
     @staticmethod
     def _schema_sql() -> str:
@@ -97,13 +102,17 @@ class FileDigestStore:
                 self._db.execute(self._schema_sql())
 
     @staticmethod
-    def _encode_metadata(metadata: _Metadata) -> tuple[int, int, int, int, int, int, bytes | None]:
+    def _encode_metadata(
+        metadata: _Metadata,
+    ) -> tuple[int, int, int, int, int, int, bytes | None]:
         device, inode, size, mtime_ns, ctime_ns, executable = metadata
         if device < 0 or inode < 0 or size < 0:
             raise MetadataCodecError("device, inode, and size must be non-negative")
         if executable not in (0, 1):
             raise MetadataCodecError("executable metadata must be 0 or 1")
-        stored, overflow = encode_metadata_fields((device, inode, size, mtime_ns, ctime_ns))
+        stored, overflow = encode_metadata_fields(
+            (device, inode, size, mtime_ns, ctime_ns)
+        )
         return (*stored, executable, overflow)
 
     @staticmethod
@@ -116,7 +125,9 @@ class FileDigestStore:
         metadata = decode_overflow_metadata(overflow)
         device, inode, size, mtime_ns, ctime_ns = metadata
         if device < 0 or inode < 0 or size < 0:
-            raise MetadataCodecError("persisted device, inode, and size must be non-negative")
+            raise MetadataCodecError(
+                "persisted device, inode, and size must be non-negative"
+            )
         return (device, inode, size, mtime_ns, ctime_ns, executable, digest)  # type: ignore[return-value]
 
     def _discard_corrupt_row(self, workspace: str, relpath: str) -> None:
@@ -259,7 +270,9 @@ class FileDigestStore:
             for rel, metadata, digest in records:
                 self._rows[(workspace, rel)] = (*metadata, digest.hash)
 
-    def _store(self, workspace: str, relative_path: str, metadata: _Metadata, digest: Digest) -> None:
+    def _store(
+        self, workspace: str, relative_path: str, metadata: _Metadata, digest: Digest
+    ) -> None:
         self._store_many(workspace, [(relative_path, metadata, digest)])
 
     def digest(
@@ -295,7 +308,9 @@ class FileDigestStore:
         """Digest files with one stat each and batched persistent-cache lookup."""
         workspace_key = str(canonical_host_path(workspace))
         items = [(Path(path), rel) for path, rel in files]
-        rows = {} if force else self._rows_many(workspace_key, [rel for _, rel in items])
+        rows = (
+            {} if force else self._rows_many(workspace_key, [rel for _, rel in items])
+        )
         result: dict[str, tuple[Digest, bool]] = {}
         changed: list[tuple[str, _Metadata, Digest]] = []
 
@@ -330,7 +345,6 @@ class FileDigestStore:
             ).items()
         }
 
-
     def stats(self) -> dict[str, int]:
         with self._lock:
             return dict(self._stats)
@@ -362,7 +376,9 @@ class FileDigestStore:
     def count(self, workspace: str | Path | None = None) -> int:
         with self._lock:
             if workspace is None:
-                return int(self._db.execute("SELECT COUNT(*) FROM file_digest").fetchone()[0])
+                return int(
+                    self._db.execute("SELECT COUNT(*) FROM file_digest").fetchone()[0]
+                )
             workspace_key = str(canonical_host_path(workspace))
             return int(
                 self._db.execute(
@@ -379,7 +395,9 @@ class FileDigestStore:
                 "SELECT path FROM file_digest WHERE workspace = ?",
                 (workspace_key,),
             ).fetchall()
-            missing = [rel for (rel,) in rows if not os.path.lexists(workspace_path / rel)]
+            missing = [
+                rel for (rel,) in rows if not os.path.lexists(workspace_path / rel)
+            ]
             self._db.executemany(
                 "DELETE FROM file_digest WHERE workspace = ? AND path = ?",
                 ((workspace_key, rel) for rel in missing),

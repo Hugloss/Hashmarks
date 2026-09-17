@@ -1,8 +1,10 @@
-\
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
 
 _IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
 _CAMEL_BOUNDARY_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
@@ -10,7 +12,8 @@ _CAMEL_BOUNDARY_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
 def _snake_case(value: str) -> str:
     parts = [
-        part for part in _CAMEL_BOUNDARY_RE.sub("_", value.replace("-", "_")).split("_")
+        part
+        for part in _CAMEL_BOUNDARY_RE.sub("_", value.replace("-", "_")).split("_")
         if part
     ]
     return "_".join(part.lower() for part in parts)
@@ -22,7 +25,9 @@ def _identifier_variants(token: str) -> tuple[str, ...]:
     compact = re.sub(r"[^a-z0-9]+", "", leaf.lower())
     values = [token, leaf, snake, compact]
     if "." in token:
-        values.extend([token.lower(), ".".join(_snake_case(part) for part in token.split("."))])
+        values.extend(
+            [token.lower(), ".".join(_snake_case(part) for part in token.split("."))]
+        )
     return tuple(dict.fromkeys(value for value in values if len(value) >= 3))
 
 
@@ -31,9 +36,7 @@ def symbolic_task_terms(task: str) -> tuple[str, ...]:
     values: list[str] = []
     for token in _IDENTIFIER_RE.findall(task):
         identifier_like = (
-            "." in token
-            or "_" in token
-            or any(ch.isupper() for ch in token[1:])
+            "." in token or "_" in token or any(ch.isupper() for ch in token[1:])
         )
         if identifier_like:
             values.extend(_identifier_variants(token))
@@ -55,12 +58,15 @@ def _nomination_candidates(
     for row in candidates:
         identity = _candidate_identity(row)
         if identity[0]:
-            unique.setdefault(identity, {
-                "path": identity[0],
-                "name": identity[1] or None,
-                "qualname": identity[2] or None,
-                "kind": str(row.get("kind") or "symbol"),
-            })
+            unique.setdefault(
+                identity,
+                {
+                    "path": identity[0],
+                    "name": identity[1] or None,
+                    "qualname": identity[2] or None,
+                    "kind": str(row.get("kind") or "symbol"),
+                },
+            )
     return list(unique.values())
 
 

@@ -7,7 +7,14 @@ from typing import Any
 
 TRACE_SCHEMA = "hashmarks.agent-work-trace.v1"
 REPORT_SCHEMA = "hashmarks.agent-work-score.v1"
-EVENT_KINDS = {"search", "read", "action_packet", "edit_attempt", "verification", "scout"}
+EVENT_KINDS = {
+    "search",
+    "read",
+    "action_packet",
+    "edit_attempt",
+    "verification",
+    "scout",
+}
 
 
 def load_trace(path: Path) -> dict[str, Any]:
@@ -28,10 +35,26 @@ def load_trace(path: Path) -> dict[str, Any]:
         if not isinstance(seq, int) or isinstance(seq, bool) or seq <= last:
             raise ValueError(f"event sequence must be strictly increasing: {path}")
         last = seq
-        for field in ("started_at_ns", "finished_at_ns", "bytes", "estimated_tokens", "model_input_tokens", "model_output_tokens", "reasoning_tokens"):
-            if field in event and (not isinstance(event[field], int) or isinstance(event[field], bool) or event[field] < 0):
+        for field in (
+            "started_at_ns",
+            "finished_at_ns",
+            "bytes",
+            "estimated_tokens",
+            "model_input_tokens",
+            "model_output_tokens",
+            "reasoning_tokens",
+        ):
+            if field in event and (
+                not isinstance(event[field], int)
+                or isinstance(event[field], bool)
+                or event[field] < 0
+            ):
                 raise ValueError(f"{field} must be a non-negative integer: {path}")
-        if "started_at_ns" in event and "finished_at_ns" in event and event["finished_at_ns"] < event["started_at_ns"]:
+        if (
+            "started_at_ns" in event
+            and "finished_at_ns" in event
+            and event["finished_at_ns"] < event["started_at_ns"]
+        ):
             raise ValueError(f"event time moved backwards: {path}")
     return value
 
@@ -51,8 +74,16 @@ def load_secret(path: Path) -> dict[str, set[str]]:
 
 def score_trace(trace: dict[str, Any], expected_files: set[str]) -> dict[str, Any]:
     events = trace["events"]
-    edits = [event for event in events if event["kind"] == "edit_attempt" and isinstance(event.get("path"), str)]
-    reads = [str(event["path"]) for event in events if event["kind"] == "read" and isinstance(event.get("path"), str)]
+    edits = [
+        event
+        for event in events
+        if event["kind"] == "edit_attempt" and isinstance(event.get("path"), str)
+    ]
+    reads = [
+        str(event["path"])
+        for event in events
+        if event["kind"] == "read" and isinstance(event.get("path"), str)
+    ]
     verifications = [event for event in events if event["kind"] == "verification"]
     scouts = [event for event in events if event["kind"] == "scout"]
     searches = [event for event in events if event["kind"] == "search"]
@@ -92,11 +123,19 @@ def score_trace(trace: dict[str, Any], expected_files: set[str]) -> dict[str, An
     model_output = sum(int(event.get("model_output_tokens", 0)) for event in events)
     reasoning = sum(int(event.get("reasoning_tokens", 0)) for event in events)
 
-    starts = [int(event["started_at_ns"]) for event in events if "started_at_ns" in event]
-    finishes = [int(event["finished_at_ns"]) for event in events if "finished_at_ns" in event]
+    starts = [
+        int(event["started_at_ns"]) for event in events if "started_at_ns" in event
+    ]
+    finishes = [
+        int(event["finished_at_ns"]) for event in events if "finished_at_ns" in event
+    ]
     trace_start = min(starts) if starts else None
     trace_finish = max(finishes) if finishes else None
-    wall_ns = trace_finish - trace_start if trace_start is not None and trace_finish is not None else None
+    wall_ns = (
+        trace_finish - trace_start
+        if trace_start is not None and trace_finish is not None
+        else None
+    )
     first_correct_edit_ns = None
     if trace_start is not None:
         for event in edits:
@@ -156,7 +195,12 @@ def score(paths: list[Path], secret_path: Path) -> dict[str, Any]:
     rows.sort(key=lambda row: (row["task_id"], row["worker_kind"]))
     n = len(rows)
     verified = sum(row["verified_solution"] for row in rows)
-    total_model_tokens = sum((row["model_input_tokens"] or 0) + (row["model_output_tokens"] or 0) + (row["reasoning_tokens"] or 0) for row in rows)
+    total_model_tokens = sum(
+        (row["model_input_tokens"] or 0)
+        + (row["model_output_tokens"] or 0)
+        + (row["reasoning_tokens"] or 0)
+        for row in rows
+    )
     total_wall_ns = sum(row["wall_ns"] or 0 for row in rows)
     return {
         "schema": REPORT_SCHEMA,
@@ -165,16 +209,24 @@ def score(paths: list[Path], secret_path: Path) -> dict[str, Any]:
             "first_edit_correct": sum(row["first_edit_correct"] for row in rows),
             "final_edit_correct": sum(row["final_edit_correct"] for row in rows),
             "verified_solutions": verified,
-            "average_work_score": (sum(row["work_score"] for row in rows) / n) if n else None,
+            "average_work_score": (sum(row["work_score"] for row in rows) / n)
+            if n
+            else None,
             "wrong_edit_attempts": sum(row["wrong_edit_attempts"] for row in rows),
-            "repeated_disproven_targets": sum(row["repeated_disproven_targets"] for row in rows),
+            "repeated_disproven_targets": sum(
+                row["repeated_disproven_targets"] for row in rows
+            ),
             "duplicate_reads": sum(row["duplicate_reads"] for row in rows),
             "scout_calls": sum(row["scout_calls"] for row in rows),
             "verification_failures": sum(row["verification_failures"] for row in rows),
             "verification_not_run": sum(row["verification_not_run"] for row in rows),
             "total_model_tokens": total_model_tokens or None,
-            "model_tokens_per_verified_solution": (total_model_tokens / verified) if verified and total_model_tokens else None,
-            "wall_ms_per_verified_solution": (total_wall_ns / 1_000_000 / verified) if verified and total_wall_ns else None,
+            "model_tokens_per_verified_solution": (total_model_tokens / verified)
+            if verified and total_model_tokens
+            else None,
+            "wall_ms_per_verified_solution": (total_wall_ns / 1_000_000 / verified)
+            if verified and total_wall_ns
+            else None,
         },
         "rows": rows,
     }
@@ -190,7 +242,7 @@ def main() -> None:
     rendered = json.dumps(result, indent=2, sort_keys=True)
     if args.output:
         args.output.write_text(rendered + "\n")
-    print(rendered)
+    print(rendered)  # noqa: T201 - intentional command output
 
 
 if __name__ == "__main__":

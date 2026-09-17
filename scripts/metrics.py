@@ -10,7 +10,6 @@ import time
 import tomllib
 from pathlib import Path
 
-from hashmarks import RepositoryIdentity
 from hashmarks.codemap import CodeMap
 
 SCHEMA = "fastidentity.metrics.v1"
@@ -20,8 +19,7 @@ def _run_json(argv: list[str], *, cwd: Path) -> dict:
     completed = subprocess.run(
         argv,
         cwd=cwd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         text=True,
         check=False,
         env=os.environ.copy(),
@@ -49,17 +47,14 @@ def _repo_inputs(root: Path) -> list[str]:
     return [value for value in candidates if (root / value).exists()]
 
 
-
-
-
-
-
 def _codemap_probe(root: Path) -> dict:
     with CodeMap(root) as codemap:
         first, first_s = _timed(codemap.sync)
         second, second_s = _timed(codemap.sync)
         hits, find_s = _timed(lambda: codemap.find("Identity impact", limit=10))
-        pack, context_s = _timed(lambda: codemap.context("Identity impact", token_budget=1200, limit=10))
+        pack, context_s = _timed(
+            lambda: codemap.context("Identity impact", token_budget=1200, limit=10)
+        )
         stats = codemap.status()
     return {
         "seconds": {
@@ -114,7 +109,14 @@ def main() -> None:
     generated_at = time.time()
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
 
-    repo_cmd = [python, "benchmarks/bench_repo.py", "--workspace", str(root), "--mode", "local"]
+    repo_cmd = [
+        python,
+        "benchmarks/bench_repo.py",
+        "--workspace",
+        str(root),
+        "--mode",
+        "local",
+    ]
     for value in repo_inputs:
         repo_cmd.extend(["--input", value])
     repo_cmd.extend(["--hot-requests", str(args.hot_requests)])
@@ -122,7 +124,10 @@ def main() -> None:
     result: dict[str, object] = {
         "schema": SCHEMA,
         "generated_at_unix": generated_at,
-        "project": {"name": project["project"]["name"], "version": project["project"]["version"]},
+        "project": {
+            "name": project["project"]["name"],
+            "version": project["project"]["version"],
+        },
         "environment": {
             "python": sys.version.split()[0],
             "implementation": platform.python_implementation(),
@@ -216,7 +221,13 @@ def main() -> None:
         latest = output.parent / "latest.json"
         latest.write_text(payload, encoding="utf-8")
 
-    print(json.dumps({"ok": True, "output": str(output), "metrics": result}, indent=2, sort_keys=True))
+    print(  # noqa: T201 - intentional command output
+        json.dumps(
+            {"ok": True, "output": str(output), "metrics": result},
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":

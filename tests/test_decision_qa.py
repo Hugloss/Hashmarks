@@ -5,13 +5,25 @@ from scripts.agent_evaluation.decision_qa import (
 )
 
 
-def _packet(*, safe=True, edit="src/owner.py", verify="tests/test_owner.py", shared=False):
+def _packet(
+    *, safe=True, edit="src/owner.py", verify="tests/test_owner.py", shared=False
+):
     items = [
-        {"path": edit, "role": "edit", "covered_roles": ["edit", "contract"] if shared else ["edit"]},
+        {
+            "path": edit,
+            "role": "edit",
+            "covered_roles": ["edit", "contract"] if shared else ["edit"],
+        },
         {"path": verify, "role": "verify", "covered_roles": ["verify"]},
     ]
     if not shared:
-        items.append({"path": "src/contract.py", "role": "contract", "covered_roles": ["contract"]})
+        items.append(
+            {
+                "path": "src/contract.py",
+                "role": "contract",
+                "covered_roles": ["contract"],
+            }
+        )
     missing = [] if safe else ["contract"]
     if not safe:
         items = items[:2]
@@ -43,7 +55,10 @@ def test_consistency_detects_false_role_safety_claim():
 
 def test_authority_grading_classifies_correct_safe_without_leaking_expected_paths():
     result = evaluate_decision_packet(
-        _packet(), expected_edit_path="src/owner.py", expected_verify_path="tests/test_owner.py", expected_safe=True
+        _packet(),
+        expected_edit_path="src/owner.py",
+        expected_verify_path="tests/test_owner.py",
+        expected_safe=True,
     )
     assert result["safety_class"] == "correct-safe"
     assert result["fully_correct"] is True
@@ -54,7 +69,10 @@ def test_authority_grading_classifies_correct_safe_without_leaking_expected_path
 
 def test_authority_grading_classifies_false_safe():
     result = evaluate_decision_packet(
-        _packet(safe=True), expected_edit_path="src/owner.py", expected_verify_path="tests/test_owner.py", expected_safe=False
+        _packet(safe=True),
+        expected_edit_path="src/owner.py",
+        expected_verify_path="tests/test_owner.py",
+        expected_safe=False,
     )
     assert result["safety_class"] == "false-safe"
     assert result["fully_correct"] is False
@@ -62,7 +80,10 @@ def test_authority_grading_classifies_false_safe():
 
 def test_authority_grading_classifies_false_unsafe():
     result = evaluate_decision_packet(
-        _packet(safe=False), expected_edit_path="src/owner.py", expected_verify_path="tests/test_owner.py", expected_safe=True
+        _packet(safe=False),
+        expected_edit_path="src/owner.py",
+        expected_verify_path="tests/test_owner.py",
+        expected_safe=True,
     )
     assert result["safety_class"] == "false-unsafe"
     assert result["fully_correct"] is False
@@ -70,7 +91,10 @@ def test_authority_grading_classifies_false_unsafe():
 
 def test_authority_grading_marks_wrong_decision_even_when_safety_is_correct():
     result = evaluate_decision_packet(
-        _packet(edit="src/decoy.py"), expected_edit_path="src/owner.py", expected_verify_path="tests/test_owner.py", expected_safe=True
+        _packet(edit="src/decoy.py"),
+        expected_edit_path="src/owner.py",
+        expected_verify_path="tests/test_owner.py",
+        expected_safe=True,
     )
     assert result["edit_correct"] is False
     assert result["verify_correct"] is True
@@ -79,10 +103,34 @@ def test_authority_grading_marks_wrong_decision_even_when_safety_is_correct():
 
 def test_summary_reports_false_safe_and_false_unsafe_rates():
     rows = [
-        {"safety_class": "correct-safe", "fully_correct": True, "edit_correct": True, "verify_correct": True, "packet_consistent": True},
-        {"safety_class": "false-safe", "fully_correct": False, "edit_correct": True, "verify_correct": True, "packet_consistent": True},
-        {"safety_class": "false-unsafe", "fully_correct": False, "edit_correct": True, "verify_correct": True, "packet_consistent": True},
-        {"safety_class": "correct-unsafe", "fully_correct": True, "edit_correct": True, "verify_correct": True, "packet_consistent": True},
+        {
+            "safety_class": "correct-safe",
+            "fully_correct": True,
+            "edit_correct": True,
+            "verify_correct": True,
+            "packet_consistent": True,
+        },
+        {
+            "safety_class": "false-safe",
+            "fully_correct": False,
+            "edit_correct": True,
+            "verify_correct": True,
+            "packet_consistent": True,
+        },
+        {
+            "safety_class": "false-unsafe",
+            "fully_correct": False,
+            "edit_correct": True,
+            "verify_correct": True,
+            "packet_consistent": True,
+        },
+        {
+            "safety_class": "correct-unsafe",
+            "fully_correct": True,
+            "edit_correct": True,
+            "verify_correct": True,
+            "packet_consistent": True,
+        },
     ]
     summary = summarize_decision_qa(rows)
     assert summary["tasks"] == 4

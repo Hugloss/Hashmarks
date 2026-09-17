@@ -3,10 +3,13 @@ from __future__ import annotations
 import json
 import threading
 import time
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
 from hashmarks.cli import main
+from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _write_repository(root: Path) -> None:
@@ -34,7 +37,9 @@ def _write_repository(root: Path) -> None:
     )
 
 
-def test_repository_findings_projects_existing_analyzers_without_low_signal_cache_noise(tmp_path: Path) -> None:
+def test_repository_findings_projects_existing_analyzers_without_low_signal_cache_noise(
+    tmp_path: Path,
+) -> None:
     _write_repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -45,18 +50,30 @@ def test_repository_findings_projects_existing_analyzers_without_low_signal_cach
         "findings": 3,
         "warnings": 2,
         "advisories": 1,
-        "categories": {"cache-ownership": 1, "concurrency-risk": 1, "import-identity": 1},
+        "categories": {
+            "cache-ownership": 1,
+            "concurrency-risk": 1,
+            "import-identity": 1,
+        },
     }
     by_code = {finding["code"]: finding for finding in result["findings"]}
     assert by_code["python-duplicate-module-identity"]["path"] == "scripts/loader.py"
     assert by_code["python-cache-owner-import-identity-risk"]["path"] == "pkg/state.py"
-    assert by_code["python-read-modify-write-without-visible-guard"]["path"] == "pkg/state.py"
+    assert (
+        by_code["python-read-modify-write-without-visible-guard"]["path"]
+        == "pkg/state.py"
+    )
     assert result["analyzers"]["cache_ownership"]["owners"] >= 1
-    assert all(finding["source_schema"].startswith("hashmarks.") for finding in result["findings"])
+    assert all(
+        finding["source_schema"].startswith("hashmarks.")
+        for finding in result["findings"]
+    )
     assert "execution" in result["boundary"]
 
 
-def test_repository_findings_path_scope_preserves_repository_import_risk_linkage(tmp_path: Path) -> None:
+def test_repository_findings_path_scope_preserves_repository_import_risk_linkage(
+    tmp_path: Path,
+) -> None:
     _write_repository(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -70,12 +87,16 @@ def test_repository_findings_path_scope_preserves_repository_import_risk_linkage
     assert result["analyzers"]["import_ownership"]["findings"] == 0
 
 
-def test_cli_map_findings_is_one_step_repository_analysis_surface(tmp_path: Path, capsys) -> None:
+def test_cli_map_findings_is_one_step_repository_analysis_surface(
+    tmp_path: Path, capsys
+) -> None:
     _write_repository(tmp_path)
     assert main(["map", "findings", "--workspace", str(tmp_path)]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["schema"] == "hashmarks.repository-findings.v1"
-    assert "python-duplicate-module-identity" in {finding["code"] for finding in payload["findings"]}
+    assert "python-duplicate-module-identity" in {
+        finding["code"] for finding in payload["findings"]
+    }
 
 
 def _wait(client: CodeMapServiceClient) -> None:

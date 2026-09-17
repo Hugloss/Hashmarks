@@ -9,13 +9,11 @@ from __future__ import annotations
 
 import base64
 import csv
-import hashlib
 import gzip
+import hashlib
 import io
 import os
 import re
-import shutil
-import sys
 import tarfile
 import tomllib
 import zipfile
@@ -26,7 +24,9 @@ ROOT = Path(__file__).resolve().parent
 
 def _runtime_version() -> str:
     source = (ROOT / "hashmarks" / "_version.py").read_text(encoding="utf-8")
-    match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']\s*$', source, re.MULTILINE)
+    match = re.search(
+        r'^__version__\s*=\s*["\']([^"\']+)["\']\s*$', source, re.MULTILINE
+    )
     if match is None:
         raise RuntimeError("hashmarks/_version.py does not declare __version__")
     return match.group(1)
@@ -70,26 +70,36 @@ def _license_file_paths(project: dict[str, object]) -> tuple[Path, ...]:
     patterns = project.get("license-files")
     if patterns is None:
         return ()
-    if not isinstance(patterns, list) or not all(isinstance(value, str) for value in patterns):
+    if not isinstance(patterns, list) or not all(
+        isinstance(value, str) for value in patterns
+    ):
         raise RuntimeError("project.license-files must be an array of strings")
 
     root = ROOT.resolve()
     matched: dict[str, Path] = {}
     for pattern in patterns:
         if not pattern or "\\" in pattern:
-            raise RuntimeError("project.license-files patterns must use non-empty POSIX paths")
+            raise RuntimeError(
+                "project.license-files patterns must use non-empty POSIX paths"
+            )
         pattern_path = Path(pattern)
         if pattern_path.is_absolute() or ".." in pattern_path.parts:
-            raise RuntimeError("project.license-files patterns must remain below the project root")
+            raise RuntimeError(
+                "project.license-files patterns must remain below the project root"
+            )
         files = [path for path in ROOT.glob(pattern) if path.is_file()]
         if not files:
-            raise RuntimeError(f"project.license-files pattern matched no files: {pattern!r}")
+            raise RuntimeError(
+                f"project.license-files pattern matched no files: {pattern!r}"
+            )
         for path in files:
             resolved = path.resolve()
             try:
                 relative = resolved.relative_to(root)
             except ValueError as exc:
-                raise RuntimeError("project.license-files resolved outside the project root") from exc
+                raise RuntimeError(
+                    "project.license-files resolved outside the project root"
+                ) from exc
             resolved.read_text(encoding="utf-8")
             matched[relative.as_posix()] = relative
     return tuple(matched[key] for key in sorted(matched))
@@ -106,7 +116,9 @@ def _publication_metadata_lines(project: dict[str, object]) -> list[str]:
             + _header_value(license_expression, field="project.license")
         )
 
-    lines.extend(f"License-File: {path.as_posix()}" for path in _license_file_paths(project))
+    lines.extend(
+        f"License-File: {path.as_posix()}" for path in _license_file_paths(project)
+    )
 
     urls = project.get("urls")
     if urls is not None:
@@ -142,8 +154,12 @@ def _metadata_bytes() -> bytes:
         raise RuntimeError("project.optional-dependencies must be a table")
     for extra in sorted(optional):
         requirements = optional[extra]
-        if not isinstance(requirements, list) or not all(isinstance(value, str) and value.strip() for value in requirements):
-            raise RuntimeError(f"project.optional-dependencies.{extra} must be an array of non-empty requirement strings")
+        if not isinstance(requirements, list) or not all(
+            isinstance(value, str) and value.strip() for value in requirements
+        ):
+            raise RuntimeError(
+                f"project.optional-dependencies.{extra} must be an array of non-empty requirement strings"
+            )
         for requirement in requirements:
             lines.append(f'Requires-Dist: {requirement}; extra == "{extra}"')
     lines.extend(_publication_metadata_lines(project))
@@ -153,11 +169,11 @@ def _metadata_bytes() -> bytes:
 
 def _wheel_bytes() -> bytes:
     return (
-        "Wheel-Version: 1.0\n"
-        "Generator: hashmarks-stdlib-backend\n"
-        "Root-Is-Purelib: true\n"
-        "Tag: py3-none-any\n\n"
-    ).encode("utf-8")
+        b"Wheel-Version: 1.0\n"
+        b"Generator: hashmarks-stdlib-backend\n"
+        b"Root-Is-Purelib: true\n"
+        b"Tag: py3-none-any\n\n"
+    )
 
 
 def _entry_points_bytes() -> bytes:
@@ -165,7 +181,11 @@ def _entry_points_bytes() -> bytes:
 
 
 def _hash_record(data: bytes) -> tuple[str, str]:
-    digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode("ascii")
+    digest = (
+        base64.urlsafe_b64encode(hashlib.sha256(data).digest())
+        .rstrip(b"=")
+        .decode("ascii")
+    )
     return f"sha256={digest}", str(len(data))
 
 
@@ -191,7 +211,9 @@ def _write_wheel(wheel_directory: str, *, editable: bool) -> str:
     }
     project = _project_metadata()
     for relative in _license_file_paths(project):
-        members[f"{dist_info}/licenses/{relative.as_posix()}"] = (ROOT / relative).read_bytes()
+        members[f"{dist_info}/licenses/{relative.as_posix()}"] = (
+            ROOT / relative
+        ).read_bytes()
 
     if editable:
         pth_name = f"__editable__.{name.replace('-', '_')}-{version}.pth"
@@ -199,7 +221,11 @@ def _write_wheel(wheel_directory: str, *, editable: bool) -> str:
     else:
         package = ROOT / "hashmarks"
         for path in sorted(package.rglob("*")):
-            if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc":
+            if (
+                path.is_file()
+                and "__pycache__" not in path.parts
+                and path.suffix != ".pyc"
+            ):
                 members[path.relative_to(ROOT).as_posix()] = path.read_bytes()
 
     rows: list[tuple[str, str, str]] = []
@@ -249,7 +275,6 @@ def build_editable(wheel_directory, config_settings=None, metadata_directory=Non
     return _write_wheel(wheel_directory, editable=True)
 
 
-
 def get_requires_for_build_sdist(config_settings=None):
     return []
 
@@ -269,9 +294,7 @@ _SDIST_DIRECTORIES = (
     Path("examples"),
 )
 
-_SDIST_EXCLUDED_PREFIXES = (
-    Path("docs/development"),
-)
+_SDIST_EXCLUDED_PREFIXES = (Path("docs/development"),)
 
 
 def _sdist_members() -> list[Path]:
@@ -304,9 +327,23 @@ def _sdist_members() -> list[Path]:
             if not path.is_file():
                 continue
             relative = path.relative_to(ROOT)
-            if any(relative == prefix or prefix in relative.parents for prefix in _SDIST_EXCLUDED_PREFIXES):
+            if any(
+                relative == prefix or prefix in relative.parents
+                for prefix in _SDIST_EXCLUDED_PREFIXES
+            ):
                 continue
-            if any(part in {"__pycache__", ".pytest_cache", ".hashmarks", ".venv", "dist", "build"} for part in relative.parts):
+            if any(
+                part
+                in {
+                    "__pycache__",
+                    ".pytest_cache",
+                    ".hashmarks",
+                    ".venv",
+                    "dist",
+                    "build",
+                }
+                for part in relative.parts
+            ):
                 continue
             if path.suffix in {".pyc", ".pyo"}:
                 continue
@@ -335,7 +372,9 @@ def build_sdist(sdist_directory, config_settings=None):
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("wb") as raw:
         with gzip.GzipFile(fileobj=raw, mode="wb", filename="", mtime=0) as compressed:
-            with tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as archive:
+            with tarfile.open(
+                fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT
+            ) as archive:
                 for relative in _sdist_members():
                     archive.add(
                         ROOT / relative,

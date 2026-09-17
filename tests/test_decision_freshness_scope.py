@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks.client import RepositoryObservation
 from hashmarks.codemap.engine import CodeMap
 from hashmarks.observation import ObservationState
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _map(tmp_path: Path) -> CodeMap:
@@ -45,7 +48,9 @@ def _count_observations(codemap: CodeMap, monkeypatch) -> list[int]:
     return calls
 
 
-def test_find_task_reuses_one_freshness_sample_for_nested_find(tmp_path: Path, monkeypatch):
+def test_find_task_reuses_one_freshness_sample_for_nested_find(
+    tmp_path: Path, monkeypatch
+):
     codemap = _map(tmp_path)
     calls = _count_observations(codemap, monkeypatch)
     try:
@@ -55,7 +60,9 @@ def test_find_task_reuses_one_freshness_sample_for_nested_find(tmp_path: Path, m
         codemap.close()
 
 
-def test_context_reuses_one_freshness_sample_for_nested_find(tmp_path: Path, monkeypatch):
+def test_context_reuses_one_freshness_sample_for_nested_find(
+    tmp_path: Path, monkeypatch
+):
     codemap = _map(tmp_path)
     calls = _count_observations(codemap, monkeypatch)
     try:
@@ -65,11 +72,15 @@ def test_context_reuses_one_freshness_sample_for_nested_find(tmp_path: Path, mon
         codemap.close()
 
 
-def test_decision_packet_reuses_one_freshness_sample_for_nested_surfaces(tmp_path: Path, monkeypatch):
+def test_decision_packet_reuses_one_freshness_sample_for_nested_surfaces(
+    tmp_path: Path, monkeypatch
+):
     codemap = _map(tmp_path)
     calls = _count_observations(codemap, monkeypatch)
     try:
-        codemap.task_decision_packet("repository observation", limit=20, token_budget=512)
+        codemap.task_decision_packet(
+            "repository observation", limit=20, token_budget=512
+        )
         assert len(calls) == 1
     finally:
         codemap.close()
@@ -89,7 +100,9 @@ def test_decision_session_still_fails_if_generation_changes(tmp_path: Path):
         codemap.close()
 
 
-def test_task_evidence_uses_selection_and_closing_freshness_samples(tmp_path: Path, monkeypatch):
+def test_task_evidence_uses_selection_and_closing_freshness_samples(
+    tmp_path: Path, monkeypatch
+):
     codemap = _map(tmp_path)
     calls = _count_observations(codemap, monkeypatch)
     try:

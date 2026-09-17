@@ -11,8 +11,7 @@ def test_consumer_conformance_cli_emits_self_checking_vectors(capsys) -> None:
     assert payload["schema"] == "hashmarks.consumer-conformance-suite.v1"
     assert len(payload["vectors"]) == 10
     assert all(
-        row["result"]["valid"] == row["expected_valid"]
-        for row in payload["vectors"]
+        row["result"]["valid"] == row["expected_valid"] for row in payload["vectors"]
     )
     assert payload["execution_authority"] == "external"
     assert payload["result_authority"] == "external"

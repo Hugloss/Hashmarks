@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import TYPE_CHECKING
 
-from .repository_domains import RepositoryDomain
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+
+    from .repository_domains import RepositoryDomain
+
 
 @dataclass(frozen=True)
 class _TaskActionCues:
@@ -11,6 +15,7 @@ class _TaskActionCues:
     explicit_test_edit: bool
     explicit_policy_surface: bool
     explicit_architecture_contract: bool
+
 
 @dataclass(frozen=True)
 class _TaskActionSurface:
@@ -20,6 +25,7 @@ class _TaskActionSurface:
     is_contract: bool
     is_config: bool
     is_source: bool
+
 
 @dataclass
 class _TaskActionProjectionState:
@@ -31,11 +37,13 @@ class _TaskActionProjectionState:
     rows: list[dict[str, object]]
     limit: int
 
+
 @dataclass
 class _TaskActionDiscriminationState:
     task_terms: list[str]
     row_text: dict[int, str]
     term_rows: dict[str, int]
+
 
 @dataclass
 class _TaskActionAmbiguityPayloadState:
@@ -46,6 +54,7 @@ class _TaskActionAmbiguityPayloadState:
     structural_owners: Mapping[str, object]
     verification_origins: Sequence[dict[str, object]]
     multi_structural_owner_ambiguity: bool
+
 
 @dataclass
 class _TaskActionConfigState:

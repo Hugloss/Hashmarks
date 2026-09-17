@@ -3,10 +3,12 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 pytestmark = pytest.mark.host_mcp_sdk
 
@@ -96,15 +98,24 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
                 tools = await session.list_tools()
                 assert [tool.name for tool in tools.tools] == _EXPECTED_TOOLS
 
-                result = await session.call_tool("find", arguments={"query": "flare041", "limit": 5})
+                result = await session.call_tool(
+                    "find", arguments={"query": "flare041", "limit": 5}
+                )
                 assert result.is_error is not True
                 assert result.structured_content is not None
                 assert result.structured_content["schema"] == "hashmarks.mcp-find.v1"
-                assert any(row["path"] == "src/feature.py" for row in result.structured_content["results"])
+                assert any(
+                    row["path"] == "src/feature.py"
+                    for row in result.structured_content["results"]
+                )
 
-                invalid = await session.call_tool("find", arguments={"query": "", "limit": 5})
+                invalid = await session.call_tool(
+                    "find", arguments={"query": "", "limit": 5}
+                )
                 assert invalid.is_error is True
-                text = "\n".join(getattr(block, "text", "") for block in invalid.content)
+                text = "\n".join(
+                    getattr(block, "text", "") for block in invalid.content
+                )
                 assert "query must not be empty" in text
                 assert "Traceback" not in text
 

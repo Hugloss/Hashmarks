@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from .decision_session import diagnostic_producer
-
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
+from .decision_session import diagnostic_producer
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from .engine import CodeMap
 
 _PROFILE_NAMES = frozenset({"compact", "standard", "audit"})
 
@@ -23,7 +27,9 @@ class EvidenceProfilesMixin:
         return value if isinstance(value, Mapping) else {}
 
     @classmethod
-    def _compact_profile_evidence(cls, snapshot: Mapping[str, object]) -> dict[str, object]:
+    def _compact_profile_evidence(
+        cls, snapshot: Mapping[str, object]
+    ) -> dict[str, object]:
         repository = cls._profile_mapping(snapshot.get("repository"))
         path_rows = cls._profile_mapping(snapshot.get("paths"))
         paths = {
@@ -76,13 +82,20 @@ class EvidenceProfilesMixin:
             project = cls._profile_mapping(snapshot.get("project_impact"))
             payload["provenance"] = {
                 key: deepcopy(project[key])
-                for key in ("schema", "identity", "project_identity", "producer_identity")
+                for key in (
+                    "schema",
+                    "identity",
+                    "project_identity",
+                    "producer_identity",
+                )
                 if key in project
             }
         return payload
 
     @classmethod
-    def _standard_profile_evidence(cls, snapshot: Mapping[str, object]) -> dict[str, object]:
+    def _standard_profile_evidence(
+        cls, snapshot: Mapping[str, object]
+    ) -> dict[str, object]:
         verification = cls._profile_mapping(snapshot.get("verification"))
         payload: dict[str, object] = {
             "repository": deepcopy(snapshot.get("repository")),
@@ -107,13 +120,20 @@ class EvidenceProfilesMixin:
         return {"snapshot": deepcopy(dict(snapshot))}
 
     def _profile_from_snapshot(
-        self, snapshot: Mapping[str, object], *, profile: str,
+        self,
+        snapshot: Mapping[str, object],
+        *,
+        profile: str,
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         profile_name = str(profile).strip().lower()
         if profile_name not in _PROFILE_NAMES:
             raise ValueError("profile must be one of: audit, compact, standard")
         if snapshot.get("schema") != "hashmarks.repository-intelligence-snapshot.v1":
-            raise ValueError("snapshot must be hashmarks.repository-intelligence-snapshot.v1")
+            raise ValueError(
+                "snapshot must be hashmarks.repository-intelligence-snapshot.v1"
+            )
         snapshot_identity = str(snapshot.get("snapshot_identity") or "")
         if not snapshot_identity:
             raise ValueError("snapshot is missing snapshot_identity")
@@ -135,7 +155,8 @@ class EvidenceProfilesMixin:
             "evidence": evidence,
         }
         payload["profile_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.evidence-profile.v1", payload,
+            "hashmarks.evidence-profile.v1",
+            payload,
         )
         return payload
 
@@ -152,6 +173,8 @@ class EvidenceProfilesMixin:
         max_depth: int = 3,
     ) -> dict[str, object]:
         """Project one bounded F3 snapshot at compact, standard, or audit density."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         snapshot = self.repository_intelligence_snapshot(
             task,
             changed_paths,

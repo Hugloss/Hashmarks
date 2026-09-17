@@ -64,15 +64,11 @@ def test_selected_inputs_ignore_unrelated_file(tmp_path: Path):
     assert before == after
 
 
-
-
 def test_cas_round_trip(tmp_path: Path):
     cas = CAS(tmp_path / "cas")
     digest = cas.put_bytes(b"hello")
     assert cas.get_bytes(digest) == b"hello"
     assert cas.has(digest)
-
-
 
 
 def test_graph_equality_cutoff():

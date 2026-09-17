@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import copy
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from hashmarks.codemap import CodeMap
 from scripts.agent_evaluation.generate_hard_agent_corpus import generate
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _hard_repo(root: Path, *, cases_per_category: int = 4):
@@ -29,7 +32,9 @@ def test_cross_task_previous_evidence_never_launders_authority(tmp_path: Path) -
             foreign = starts[(index + 1) % len(starts)]
             changed = [foreign["edit"]]
             with pytest.raises(ValueError, match="task-mismatch"):
-                codemap.task_post_change_delta(row["query"], changed, previous_evidence=foreign)
+                codemap.task_post_change_delta(
+                    row["query"], changed, previous_evidence=foreign
+                )
 
 
 def test_context_identity_mutation_matrix_fails_closed(tmp_path: Path) -> None:
@@ -41,10 +46,14 @@ def test_context_identity_mutation_matrix_fails_closed(tmp_path: Path) -> None:
             tampered = copy.deepcopy(start)
             tampered["provenance"]["context_identity"] = "sha256:" + "0" * 64
             with pytest.raises(ValueError, match="context-identity-mismatch"):
-                codemap.task_post_change_delta(row["query"], [start["edit"]], previous_evidence=tampered)
+                codemap.task_post_change_delta(
+                    row["query"], [start["edit"]], previous_evidence=tampered
+                )
 
 
-def test_selected_verification_mutation_is_never_safe_fresh_across_hard_corpus(tmp_path: Path) -> None:
+def test_selected_verification_mutation_is_never_safe_fresh_across_hard_corpus(
+    tmp_path: Path,
+) -> None:
     repo, tasks = _hard_repo(tmp_path)
     with CodeMap(repo) as codemap:
         codemap.sync()
@@ -52,32 +61,45 @@ def test_selected_verification_mutation_is_never_safe_fresh_across_hard_corpus(t
             start = codemap.task_evidence(row["query"])
             verify_path = repo / start["verify_path"]
             original = verify_path.read_text(encoding="utf-8")
-            verify_path.write_text(original + "\n# adversarial verification mutation\n", encoding="utf-8")
+            verify_path.write_text(
+                original + "\n# adversarial verification mutation\n", encoding="utf-8"
+            )
             stale = codemap.task_evidence(row["query"])
             assert stale["status"] == "safe-stale"
             assert stale["provenance"]["freshness"] == "stale"
-            assert stale["provenance"]["freshness_reason"] == "verification-changed-since-selection"
+            assert (
+                stale["provenance"]["freshness_reason"]
+                == "verification-changed-since-selection"
+            )
             verify_path.write_text(original, encoding="utf-8")
 
 
 @pytest.mark.parametrize("fanout", [1, 3, 10, 30, 100])
 @pytest.mark.parametrize("limit", [1, 2, 5, 20])
-def test_bounded_fanout_never_claims_exhaustive(tmp_path: Path, fanout: int, limit: int) -> None:
+def test_bounded_fanout_never_claims_exhaustive(
+    tmp_path: Path, fanout: int, limit: int
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
-    (tmp_path / "src" / "core.py").write_text("def shared(): return 1\n", encoding="utf-8")
+    (tmp_path / "src" / "core.py").write_text(
+        "def shared(): return 1\n", encoding="utf-8"
+    )
     for index in range(fanout):
         (tmp_path / "src" / f"consumer_{index}.py").write_text(
-            "from src.core import shared\ndef consume(): return shared()\n", encoding="utf-8"
+            "from src.core import shared\ndef consume(): return shared()\n",
+            encoding="utf-8",
         )
     (tmp_path / "tests" / "test_core.py").write_text(
-        "from src.core import shared\ndef test_shared(): assert shared() == 1\n", encoding="utf-8"
+        "from src.core import shared\ndef test_shared(): assert shared() == 1\n",
+        encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         impact = codemap.task_change_impact(
-            "change shared implementation", ["src/core.py"],
-            impact_limit_per_surface=limit, max_depth=3,
+            "change shared implementation",
+            ["src/core.py"],
+            impact_limit_per_surface=limit,
+            max_depth=3,
         )
     implementations = impact["surfaces"]["implementation"]
     assert len(implementations) <= limit

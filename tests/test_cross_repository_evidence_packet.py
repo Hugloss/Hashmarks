@@ -3,9 +3,12 @@ from __future__ import annotations
 import json
 import threading
 import time
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _repo(root: Path) -> tuple[str, str, str]:
@@ -35,18 +38,24 @@ def _repo(root: Path) -> tuple[str, str, str]:
 
 def _prepare(codemap: CodeMap) -> None:
     codemap.sync()
-    codemap.enrich_projects(("npm-package-graph", "maven-pom-graph", "declared-project-links"))
+    codemap.enrich_projects(
+        ("npm-package-graph", "maven-pom-graph", "declared-project-links")
+    )
 
 
-def test_cross_repository_packet_preserves_provenance_and_freshness(tmp_path: Path) -> None:
+def test_cross_repository_packet_preserves_provenance_and_freshness(
+    tmp_path: Path,
+) -> None:
     backend, web, mobile = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         _prepare(codemap)
         packet = codemap.cross_repository_evidence_packet(
-            "Update backend API implementation", ["backend/src/Api.java"],
+            "Update backend API implementation",
+            ["backend/src/Api.java"],
         )
         repeated = codemap.cross_repository_evidence_packet(
-            "Update backend API implementation", ["backend/src/Api.java"],
+            "Update backend API implementation",
+            ["backend/src/Api.java"],
         )
 
     assert packet == repeated
@@ -56,7 +65,9 @@ def test_cross_repository_packet_preserves_provenance_and_freshness(tmp_path: Pa
         {"project_identity": web, "depth": 1},
         {"project_identity": mobile, "depth": 2},
     ]
-    assert {row["producer"] for row in packet["relationships"]} == {"declared-project-links"}
+    assert {row["producer"] for row in packet["relationships"]} == {
+        "declared-project-links"
+    }
     assert packet["freshness"]["state"] == "dependent"
     assert packet["freshness"]["dependency_state"] == "current"
     assert packet["freshness"]["dependencies"] == [
@@ -73,7 +84,8 @@ def test_shared_input_packet_reports_all_affected_projects(tmp_path: Path) -> No
     with CodeMap(tmp_path) as codemap:
         _prepare(codemap)
         packet = codemap.cross_repository_evidence_packet(
-            "Update shared API contract", ["contracts/api.yaml"],
+            "Update shared API contract",
+            ["contracts/api.yaml"],
         )
 
     projects = {row["project_identity"]: row["depth"] for row in packet["dependents"]}
@@ -86,7 +98,9 @@ def test_no_cross_repository_evidence_is_explicitly_unresolved(tmp_path: Path) -
     (tmp_path / "src" / "owner.py").write_text("VALUE = 1\n")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        packet = codemap.cross_repository_evidence_packet("Update owner value", ["src/owner.py"])
+        packet = codemap.cross_repository_evidence_packet(
+            "Update owner value", ["src/owner.py"]
+        )
 
     reasons = {row["reason"] for row in packet["unresolved"]}
     assert "no-cross-repository-impact-supported" in reasons
@@ -113,9 +127,13 @@ def test_cross_repository_packet_service_roundtrip(tmp_path: Path) -> None:
             time.sleep(0.01)
     try:
         client.sync()
-        service._map().enrich_projects(("npm-package-graph", "maven-pom-graph", "declared-project-links"))
+        service._map().enrich_projects(
+            ("npm-package-graph", "maven-pom-graph", "declared-project-links")
+        )
         packet = client.repository_intelligence_query(
-            "cross-repository", "Update backend API implementation", ["backend/src/Api.java"],
+            "cross-repository",
+            "Update backend API implementation",
+            ["backend/src/Api.java"],
         )["result"]
         assert packet["schema"] == "hashmarks.cross-repository-evidence-packet.v1"
         assert packet["authority"] == "repository-intelligence-only"

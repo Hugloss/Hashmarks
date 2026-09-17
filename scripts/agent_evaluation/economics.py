@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 SCHEMA = "hashmarks.harness-economics.v1"
 COMPLEMENTARITY_SCHEMA = "hashmarks.agent-complementarity-economics.v1"
@@ -98,7 +101,9 @@ def trace_economics(trace: dict[str, Any], grade: GradedRun) -> dict[str, Any]:
     }
 
 
-def _available_sum(items: list[dict[str, Any]], key: str, types: tuple[type, ...]) -> tuple[bool, float | int | None]:
+def _available_sum(
+    items: list[dict[str, Any]], key: str, types: tuple[type, ...]
+) -> tuple[bool, float | int | None]:
     values = [row.get(key) for row in items]
     available = bool(items) and all(isinstance(value, types) for value in values)
     if not available:
@@ -108,18 +113,30 @@ def _available_sum(items: list[dict[str, Any]], key: str, types: tuple[type, ...
     return True, sum(float(value) for value in values)
 
 
-def summarize_lane(name: str, rows: Iterable[dict[str, Any]], *, model: str | None = None, strategy: str | None = None) -> dict[str, Any]:
+def summarize_lane(
+    name: str,
+    rows: Iterable[dict[str, Any]],
+    *,
+    model: str | None = None,
+    strategy: str | None = None,
+) -> dict[str, Any]:
     items = list(rows)
     verified = sum(int(bool(row.get("verified_solution"))) for row in items)
     tokens_available, total_tokens = _available_sum(items, "model_tokens", (int,))
     wall_available, total_wall = _available_sum(items, "wall_ms", (int, float))
     return {
-        "schema": SCHEMA, "name": name, "model": model, "strategy": strategy,
-        "runs": len(items), "verified_solutions": verified,
+        "schema": SCHEMA,
+        "name": name,
+        "model": model,
+        "strategy": strategy,
+        "runs": len(items),
+        "verified_solutions": verified,
         "verified_rate": _rate(verified, len(items)),
-        "token_metrics_available": tokens_available, "total_model_tokens": total_tokens,
+        "token_metrics_available": tokens_available,
+        "total_model_tokens": total_tokens,
         "tokens_per_verified_solution": _per_verified(total_tokens, verified),
-        "wall_metrics_available": wall_available, "total_wall_ms": total_wall,
+        "wall_metrics_available": wall_available,
+        "total_wall_ms": total_wall,
         "wall_ms_per_verified_solution": _per_verified(total_wall, verified),
         "scout_calls": sum(_nonnegative_int(row.get("scout_calls")) for row in items),
         "bytes_read": sum(_nonnegative_int(row.get("bytes_read")) for row in items),
@@ -128,25 +145,40 @@ def summarize_lane(name: str, rows: Iterable[dict[str, Any]], *, model: str | No
 
 
 def _dominates(left: dict[str, Any], right: dict[str, Any]) -> bool:
-    left_tokens, right_tokens = left.get("total_model_tokens"), right.get("total_model_tokens")
+    left_tokens, right_tokens = (
+        left.get("total_model_tokens"),
+        right.get("total_model_tokens"),
+    )
     if not isinstance(left_tokens, int) or not isinstance(right_tokens, int):
         return False
     left_rate = float(left.get("verified_rate") or 0.0)
     right_rate = float(right.get("verified_rate") or 0.0)
-    return left_rate >= right_rate and left_tokens <= right_tokens and (left_rate > right_rate or left_tokens < right_tokens)
+    return (
+        left_rate >= right_rate
+        and left_tokens <= right_tokens
+        and (left_rate > right_rate or left_tokens < right_tokens)
+    )
 
 
 def pareto_dominance(lanes: Iterable[dict[str, Any]]) -> list[dict[str, str]]:
     rows = list(lanes)
     return [
         {"dominant": str(left.get("name")), "dominated": str(right.get("name"))}
-        for left in rows for right in rows if left is not right and _dominates(left, right)
+        for left in rows
+        for right in rows
+        if left is not right and _dominates(left, right)
     ]
 
 
-def _positional_targets(args: list[str], start: int, *, skip: set[str] | None = None) -> list[str]:
+def _positional_targets(
+    args: list[str], start: int, *, skip: set[str] | None = None
+) -> list[str]:
     ignored = skip or set()
-    return [value for value in args[start:] if value not in ignored and not value.startswith("-")]
+    return [
+        value
+        for value in args[start:]
+        if value not in ignored and not value.startswith("-")
+    ]
 
 
 def _pytest_surface(args: list[str], start: int) -> dict[str, str | None]:
@@ -222,7 +254,14 @@ def _maybe_vitest(args: list[str]) -> dict[str, str | None] | None:
 
 def verification_surface(argv: Iterable[str]) -> dict[str, str | None]:
     args = [str(value) for value in argv]
-    parsers = (_maybe_python_pytest, _maybe_pytest, _maybe_go, _maybe_tsc, _maybe_node, _maybe_vitest)
+    parsers = (
+        _maybe_python_pytest,
+        _maybe_pytest,
+        _maybe_go,
+        _maybe_tsc,
+        _maybe_node,
+        _maybe_vitest,
+    )
     for parser in parsers:
         result = parser(args)
         if result is not None:
@@ -231,7 +270,9 @@ def verification_surface(argv: Iterable[str]) -> dict[str, str | None]:
     return {"runner": runner, "surface": None, "selector": None}
 
 
-def verification_surface_equivalent(candidate: Iterable[str], authority: Iterable[str]) -> bool:
+def verification_surface_equivalent(
+    candidate: Iterable[str], authority: Iterable[str]
+) -> bool:
     left, right = verification_surface(candidate), verification_surface(authority)
     if left["runner"] != right["runner"] or left["surface"] != right["surface"]:
         return False
@@ -239,41 +280,84 @@ def verification_surface_equivalent(candidate: Iterable[str], authority: Iterabl
     return required_selector is None or left.get("selector") == required_selector
 
 
-def summarize_complementarity_lane(name: str, rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
+def summarize_complementarity_lane(
+    name: str, rows: Iterable[dict[str, Any]]
+) -> dict[str, Any]:
     items = list(rows)
     verified = sum(int(bool(row.get("verified_solution"))) for row in items)
-    totals = {key: sum(_nonnegative_int(row.get(key)) for row in items) for key in ("decision_visible_bytes", "repository_evidence_bytes", "decision_interactions", "search_calls", "read_calls")}
+    totals = {
+        key: sum(_nonnegative_int(row.get(key)) for row in items)
+        for key in (
+            "decision_visible_bytes",
+            "repository_evidence_bytes",
+            "decision_interactions",
+            "search_calls",
+            "read_calls",
+        )
+    }
     return {
-        "schema": COMPLEMENTARITY_SCHEMA, "name": name, "runs": len(items),
-        "verified_solutions": verified, "verified_rate": _rate(verified, len(items)),
+        "schema": COMPLEMENTARITY_SCHEMA,
+        "name": name,
+        "runs": len(items),
+        "verified_solutions": verified,
+        "verified_rate": _rate(verified, len(items)),
         "decision_visible_bytes": totals["decision_visible_bytes"],
-        "decision_visible_bytes_per_verified_solution": _per_verified(totals["decision_visible_bytes"], verified),
+        "decision_visible_bytes_per_verified_solution": _per_verified(
+            totals["decision_visible_bytes"], verified
+        ),
         "repository_evidence_bytes": totals["repository_evidence_bytes"],
-        "repository_evidence_bytes_per_verified_solution": _per_verified(totals["repository_evidence_bytes"], verified),
+        "repository_evidence_bytes_per_verified_solution": _per_verified(
+            totals["repository_evidence_bytes"], verified
+        ),
         "decision_interactions": totals["decision_interactions"],
-        "decision_interactions_per_verified_solution": _per_verified(totals["decision_interactions"], verified),
-        "search_calls": totals["search_calls"], "read_calls": totals["read_calls"],
+        "decision_interactions_per_verified_solution": _per_verified(
+            totals["decision_interactions"], verified
+        ),
+        "search_calls": totals["search_calls"],
+        "read_calls": totals["read_calls"],
     }
 
 
-def _reduction(native: dict[str, Any], assisted: dict[str, Any], key: str) -> float | None:
+def _reduction(
+    native: dict[str, Any], assisted: dict[str, Any], key: str
+) -> float | None:
     base, value = native.get(key), assisted.get(key)
-    if not isinstance(base, (int, float)) or not isinstance(value, (int, float)) or base == 0:
+    if (
+        not isinstance(base, (int, float))
+        or not isinstance(value, (int, float))
+        or base == 0
+    ):
         return None
     return (float(base) - float(value)) / float(base) * 100.0
 
 
-def complementarity_comparison(native: dict[str, Any], assisted: dict[str, Any]) -> dict[str, Any]:
-    native_rate, assisted_rate = float(native.get("verified_rate") or 0.0), float(assisted.get("verified_rate") or 0.0)
+def complementarity_comparison(
+    native: dict[str, Any], assisted: dict[str, Any]
+) -> dict[str, Any]:
+    native_rate, assisted_rate = (
+        float(native.get("verified_rate") or 0.0),
+        float(assisted.get("verified_rate") or 0.0),
+    )
     native_cost = native.get("decision_visible_bytes_per_verified_solution")
     assisted_cost = assisted.get("decision_visible_bytes_per_verified_solution")
-    supports = assisted_rate >= native_rate and isinstance(native_cost, (int, float)) and isinstance(assisted_cost, (int, float)) and assisted_cost < native_cost
+    supports = (
+        assisted_rate >= native_rate
+        and isinstance(native_cost, (int, float))
+        and isinstance(assisted_cost, (int, float))
+        and assisted_cost < native_cost
+    )
     return {
         "schema": COMPLEMENTARITY_SCHEMA,
         "verified_rate_delta_pp": (assisted_rate - native_rate) * 100.0,
-        "decision_visible_bytes_reduction_pct": _reduction(native, assisted, "decision_visible_bytes"),
-        "repository_evidence_bytes_reduction_pct": _reduction(native, assisted, "repository_evidence_bytes"),
-        "decision_interactions_reduction_pct": _reduction(native, assisted, "decision_interactions"),
+        "decision_visible_bytes_reduction_pct": _reduction(
+            native, assisted, "decision_visible_bytes"
+        ),
+        "repository_evidence_bytes_reduction_pct": _reduction(
+            native, assisted, "repository_evidence_bytes"
+        ),
+        "decision_interactions_reduction_pct": _reduction(
+            native, assisted, "decision_interactions"
+        ),
         "search_call_reduction_pct": _reduction(native, assisted, "search_calls"),
         "read_call_reduction_pct": _reduction(native, assisted, "read_calls"),
         "supports_complementarity_claim": supports,

@@ -31,7 +31,9 @@ def _base_repo(root: Path) -> None:
     )
 
 
-def test_explicit_config_surface_beats_same_stem_contract_source(tmp_path: Path) -> None:
+def test_explicit_config_surface_beats_same_stem_contract_source(
+    tmp_path: Path,
+) -> None:
     _base_repo(tmp_path)
     _write(tmp_path / "src/case/policy.toml", "suffix = '-old'\n")
 

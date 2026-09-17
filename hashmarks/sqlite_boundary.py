@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-import sqlite3
-from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import sqlite3
+    from collections.abc import Iterator
 
 
 def configure_sqlite_connection(

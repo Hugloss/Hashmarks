@@ -52,7 +52,9 @@ def _identity(domain: str, value: object) -> str:
 def _implementation_identity(value: str | None) -> str:
     identity = value or native_producer_implementation_identity()
     if not _SHA256.fullmatch(identity):
-        raise ValueError("producer implementation identity must be sha256:<64 lowercase hex>")
+        raise ValueError(
+            "producer implementation identity must be sha256:<64 lowercase hex>"
+        )
     return identity
 
 
@@ -122,18 +124,23 @@ def verification_membership_from_selection(
     symbol = selected.get("verification_test_symbol")
     if symbol is None:
         symbol = selected.get("test_symbol")
-    return verification_membership([
-        {
-            "path": path,
-            "test_symbol": symbol if isinstance(symbol, str) else None,
-        }
-    ])
+    return verification_membership(
+        [
+            {
+                "path": path,
+                "test_symbol": symbol if isinstance(symbol, str) else None,
+            }
+        ]
+    )
 
 
 def verification_selection_envelope(
     state: VerificationSelectionEnvelopeState,
 ) -> dict[str, object]:
-    if not isinstance(state.repository_identity, str) or not state.repository_identity.strip():
+    if (
+        not isinstance(state.repository_identity, str)
+        or not state.repository_identity.strip()
+    ):
         raise ValueError("repository_identity must be a nonblank string")
     if not isinstance(state.source_identity, str) or not state.source_identity.strip():
         raise ValueError("source_identity must be a nonblank string")
@@ -154,8 +161,12 @@ def verification_selection_envelope(
             + ", ".join(str(reason) for reason in membership_validation["reasons"])
         )
     membership_identity = state.membership.get("membership_identity")
-    if not isinstance(membership_identity, str) or not _SHA256.fullmatch(membership_identity):
-        raise ValueError("membership must carry a sha256:<64 lowercase hex> membership_identity")
+    if not isinstance(membership_identity, str) or not _SHA256.fullmatch(
+        membership_identity
+    ):
+        raise ValueError(
+            "membership must carry a sha256:<64 lowercase hex> membership_identity"
+        )
     owner_evidence = dict(state.owner_evidence or {})
     try:
         _canonical_bytes(owner_evidence)
@@ -196,7 +207,9 @@ def verification_selection_envelope(
     }
 
 
-def _unexpected_fields(value: Mapping[str, object], allowed: frozenset[str], prefix: str) -> list[str]:
+def _unexpected_fields(
+    value: Mapping[str, object], allowed: frozenset[str], prefix: str
+) -> list[str]:
     return [f"unexpected-{prefix}-field:{key}" for key in sorted(set(value) - allowed)]
 
 
@@ -207,23 +220,30 @@ def validate_verification_membership(
         membership, reason="invalid-membership"
     )
     reasons: list[str] = [*root_reasons]
-    reasons.extend(_unexpected_fields(
-        membership,
-        frozenset({"schema", "members", "membership_identity", "member_count"}),
-        "membership",
-    ))
+    reasons.extend(
+        _unexpected_fields(
+            membership,
+            frozenset({"schema", "members", "membership_identity", "member_count"}),
+            "membership",
+        )
+    )
     if membership.get("schema") != MEMBERSHIP_SCHEMA:
         reasons.append("unsupported-membership-schema")
     members = membership.get("members")
     if not isinstance(members, list) or not members:
-        return {"valid": False, "reasons": list(dict.fromkeys([*reasons, "invalid-members"]))}
+        return {
+            "valid": False,
+            "reasons": list(dict.fromkeys([*reasons, "invalid-members"])),
+        }
     for raw in members:
         if not isinstance(raw, Mapping):
             reasons.append("invalid-member-shape")
             continue
-        reasons.extend(_unexpected_fields(
-            raw, frozenset({"schema", "path", "test_symbol", "member_id"}), "member"
-        ))
+        reasons.extend(
+            _unexpected_fields(
+                raw, frozenset({"schema", "path", "test_symbol", "member_id"}), "member"
+            )
+        )
         if raw.get("schema") != MEMBER_SCHEMA:
             reasons.append("unsupported-member-schema")
     try:
@@ -252,7 +272,15 @@ def _repository_validation_reasons(
         return ["missing-repository"]
     reasons: list[str] = _unexpected_fields(
         repository,
-        frozenset({"repository_identity", "source_identity", "codemap_generation", "identity_generation", "stale"}),
+        frozenset(
+            {
+                "repository_identity",
+                "source_identity",
+                "codemap_generation",
+                "identity_generation",
+                "stale",
+            }
+        ),
         "repository",
     )
     repository_identity = repository.get("repository_identity")
@@ -280,7 +308,10 @@ def _producer_validation_reasons(
     reasons = _unexpected_fields(
         producer, frozenset({"name", "version", "implementation_identity"}), "producer"
     )
-    if not isinstance(producer.get("version"), str) or not str(producer.get("version")).strip():
+    if (
+        not isinstance(producer.get("version"), str)
+        or not str(producer.get("version")).strip()
+    ):
         reasons.append("missing-or-invalid-producer-version")
     identity = producer.get("implementation_identity")
     if not isinstance(identity, str) or not _SHA256.fullmatch(identity):
@@ -294,16 +325,32 @@ def validate_verification_selection_envelope(
     envelope, root_reasons = require_mapping_for_validation(
         envelope, reason="invalid-envelope"
     )
-    envelope_reasons = [*root_reasons, *_unexpected_fields(
-        envelope,
-        frozenset({"schema", "producer", "repository", "owner_evidence", "selection", "evidence_hashes", "envelope_identity"}),
-        "envelope",
-    )]
+    envelope_reasons = [
+        *root_reasons,
+        *_unexpected_fields(
+            envelope,
+            frozenset(
+                {
+                    "schema",
+                    "producer",
+                    "repository",
+                    "owner_evidence",
+                    "selection",
+                    "evidence_hashes",
+                    "envelope_identity",
+                }
+            ),
+            "envelope",
+        ),
+    ]
     if envelope.get("schema") != SELECTION_ENVELOPE_SCHEMA:
         envelope_reasons.append("unsupported-envelope-schema")
     selection = envelope.get("selection")
     if not isinstance(selection, Mapping):
-        return {"valid": False, "reasons": list(dict.fromkeys([*envelope_reasons, "missing-selection"]))}
+        return {
+            "valid": False,
+            "reasons": list(dict.fromkeys([*envelope_reasons, "missing-selection"])),
+        }
     membership_validation = validate_verification_membership(selection)
     reasons = [
         *envelope_reasons,
@@ -394,16 +441,23 @@ def validate_downstream_consumption_contract(
     if not envelope_validation["valid"]:
         return {
             "valid": False,
-            "reasons": list(dict.fromkeys([
-                *envelope_root_reasons,
-                *contract_root_reasons,
-                "invalid-envelope",
-                *envelope_validation["reasons"],
-            ])),
+            "reasons": list(
+                dict.fromkeys(
+                    [
+                        *envelope_root_reasons,
+                        *contract_root_reasons,
+                        "invalid-envelope",
+                        *envelope_validation["reasons"],
+                    ]
+                )
+            ),
         }
     expected = downstream_consumption_contract(envelope)
     reasons: list[str] = [*envelope_root_reasons, *contract_root_reasons]
-    if contract.get("producer_implementation_identity") != expected["producer_implementation_identity"]:
+    if (
+        contract.get("producer_implementation_identity")
+        != expected["producer_implementation_identity"]
+    ):
         reasons.append("producer-implementation-identity-mismatch")
     if contract.get("envelope_identity") != expected["envelope_identity"]:
         reasons.append("envelope-contract-linkage-mismatch")

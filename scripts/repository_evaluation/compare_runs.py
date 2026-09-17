@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scripts.repository_evaluation.common import COMPARISON_SCHEMA, RUN_SCHEMA, load_json, write_json
+from scripts.repository_evaluation.common import (
+    COMPARISON_SCHEMA,
+    RUN_SCHEMA,
+    load_json,
+    write_json,
+)
 
 
 def _by_id(run: Mapping[str, object]) -> dict[str, Mapping[str, object]]:
@@ -29,7 +35,9 @@ def _semantic_projection(row: Mapping[str, object]) -> dict[str, object]:
         return {}
     edit = action.get("edit") if isinstance(action.get("edit"), Mapping) else {}
     verify = action.get("verify") if isinstance(action.get("verify"), Mapping) else {}
-    ambiguity = action.get("ambiguity") if isinstance(action.get("ambiguity"), Mapping) else {}
+    ambiguity = (
+        action.get("ambiguity") if isinstance(action.get("ambiguity"), Mapping) else {}
+    )
     authority = action.get("ownership_authority")
     authority = authority if isinstance(authority, Mapping) else {}
     return {
@@ -54,15 +62,16 @@ def compare_runs(
     for case_id in ids:
         before = _semantic_projection(left.get(case_id, {}))
         after = _semantic_projection(right.get(case_id, {}))
-        rows.append({
-            "id": case_id,
-            "baseline": before,
-            "candidate": after,
-            "semantic_changed": before != after,
-        })
+        rows.append(
+            {
+                "id": case_id,
+                "baseline": before,
+                "candidate": after,
+                "semantic_changed": before != after,
+            }
+        )
     clean_timing = bool(
-        baseline.get("timing_comparable")
-        and candidate.get("timing_comparable")
+        baseline.get("timing_comparable") and candidate.get("timing_comparable")
     )
     return {
         "schema": COMPARISON_SCHEMA,

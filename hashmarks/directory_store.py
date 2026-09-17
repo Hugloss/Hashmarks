@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .digest import Digest
 from .paths import canonical_host_path, sqlite_identity_exclusions
 from .sqlite_boundary import configure_sqlite_connection, sqlite_transaction
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class DirectoryDigestStore:
@@ -122,7 +125,11 @@ class DirectoryDigestStore:
     def count(self, workspace: str | Path | None = None) -> int:
         with self._lock:
             if workspace is None:
-                return int(self._db.execute("SELECT COUNT(*) FROM directory_digest_latest").fetchone()[0])
+                return int(
+                    self._db.execute(
+                        "SELECT COUNT(*) FROM directory_digest_latest"
+                    ).fetchone()[0]
+                )
             workspace_key = str(canonical_host_path(workspace))
             return int(
                 self._db.execute(

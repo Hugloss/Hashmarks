@@ -3,15 +3,20 @@ from __future__ import annotations
 import ast
 import posixpath
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
-from ..paths import normalize_relative_path
-from ..python_ast_cache import read_python_ast
+from hashmarks.python_ast_cache import read_python_ast
+
+if TYPE_CHECKING:
+    from .engine import CodeMap
 
 
 class ImportResolutionMixin:
     """Own repository import/re-export identity resolution for CodeMap evidence."""
 
-    def _python_reexport_targets(self, facade_path: str, exported_name: str) -> list[str]:
+    def _python_reexport_targets(
+        self, facade_path: str, exported_name: str
+    ) -> list[str]:
         """Return bounded Python import targets that expose ``exported_name``.
 
         This is intentionally syntax-only repository evidence.  It preserves
@@ -19,6 +24,8 @@ class ImportResolutionMixin:
         a star import only for the single name currently being qualified.  Parse
         failures simply contribute no extra authority.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if not facade_path.endswith(".py") or not exported_name:
             return []
         try:
@@ -44,8 +51,9 @@ class ImportResolutionMixin:
                     return targets
         return targets
 
-
-    def _python_export_binding(self, facade_path: str, exported_name: str) -> tuple[str, list[str]]:
+    def _python_export_binding(
+        self, facade_path: str, exported_name: str
+    ) -> tuple[str, list[str]]:
         """Return conservative top-level binding authority for one exported name.
 
         Multiple re-export statements remain ambiguous even though Python runtime
@@ -53,6 +61,8 @@ class ImportResolutionMixin:
         import execution order.  A single direct re-export and a local binding can
         however be ordered exactly when both are unconditional top-level statements.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if not facade_path.endswith(".py") or not exported_name:
             return "unknown", []
         try:
@@ -62,12 +72,20 @@ class ImportResolutionMixin:
         bindings: list[tuple[str, list[str]]] = []
         reexport_count = 0
         for node in tree.body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == exported_name:
+            if (
+                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                and node.name == exported_name
+            ):
                 bindings.append(("local", []))
                 continue
             if isinstance(node, (ast.Assign, ast.AnnAssign)):
-                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-                if any(isinstance(item, ast.Name) and item.id == exported_name for item in targets):
+                targets = (
+                    node.targets if isinstance(node, ast.Assign) else [node.target]
+                )
+                if any(
+                    isinstance(item, ast.Name) and item.id == exported_name
+                    for item in targets
+                ):
                     bindings.append(("local", []))
                 continue
             if not isinstance(node, ast.ImportFrom):
@@ -88,23 +106,37 @@ class ImportResolutionMixin:
                         direct.append(candidate)
             if direct:
                 reexport_count += 1
-                bindings.append(("star" if star else "reexport", list(dict.fromkeys(direct))))
+                bindings.append(
+                    ("star" if star else "reexport", list(dict.fromkeys(direct)))
+                )
         if reexport_count > 1:
-            targets = [target for kind, values in bindings if kind in {"reexport", "star"} for target in values]
+            targets = [
+                target
+                for kind, values in bindings
+                if kind in {"reexport", "star"}
+                for target in values
+            ]
             return "ambiguous", list(dict.fromkeys(targets))
         return bindings[-1] if bindings else ("unknown", [])
 
-
-    def _python_star_export_authority(self, facade_path: str, target: str, exported_name: str) -> bool | None:
+    def _python_star_export_authority(
+        self, facade_path: str, target: str, exported_name: str
+    ) -> bool | None:
         """Prove whether a star-import target exports one name.
 
         ``from module import *`` is name-sensitive: a static ``__all__`` is
         authoritative, while absent ``__all__`` exports non-underscore names.
         Dynamic or ambiguous ``__all__`` remains unknown/fail-closed.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if not exported_name or exported_name.startswith("_"):
             return False
-        module_target = target.rsplit(".", 1)[0] if "." in target.lstrip(".") else target.rstrip(".")
+        module_target = (
+            target.rsplit(".", 1)[0]
+            if "." in target.lstrip(".")
+            else target.rstrip(".")
+        )
         owners = self._resolve_import_paths(facade_path, module_target)[:20]
         if len(owners) != 1:
             return None
@@ -115,12 +147,15 @@ class ImportResolutionMixin:
             tree = read_python_ast(self.workspace / owner).tree
         except (OSError, UnicodeError, SyntaxError, ValueError):
             return None
+
         def static_names(value: ast.expr | None) -> list[str] | None:
             if not isinstance(value, (ast.List, ast.Tuple, ast.Set)):
                 return None
             names: list[str] = []
             for item in value.elts:
-                if not isinstance(item, ast.Constant) or not isinstance(item.value, str):
+                if not isinstance(item, ast.Constant) or not isinstance(
+                    item.value, str
+                ):
                     return None
                 names.append(item.value)
             return names
@@ -129,9 +164,16 @@ class ImportResolutionMixin:
         saw_all = False
         for node in tree.body:
             assigned_value: ast.expr | None = None
-            if isinstance(node, ast.Assign) and any(isinstance(item, ast.Name) and item.id == "__all__" for item in node.targets):
-                assigned_value = node.value
-            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "__all__":
+            if (
+                isinstance(node, ast.Assign)
+                and any(
+                    isinstance(item, ast.Name) and item.id == "__all__"
+                    for item in node.targets
+                )
+                or isinstance(node, ast.AnnAssign)
+                and isinstance(node.target, ast.Name)
+                and node.target.id == "__all__"
+            ):
                 assigned_value = node.value
             if assigned_value is not None:
                 saw_all = True
@@ -141,7 +183,11 @@ class ImportResolutionMixin:
                 all_values = names
                 continue
 
-            if isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name) and node.target.id == "__all__":
+            if (
+                isinstance(node, ast.AugAssign)
+                and isinstance(node.target, ast.Name)
+                and node.target.id == "__all__"
+            ):
                 saw_all = True
                 if not isinstance(node.op, ast.Add) or all_values is None:
                     return None
@@ -165,7 +211,9 @@ class ImportResolutionMixin:
                         return None
                     if func.attr == "append":
                         arg = call.args[0]
-                        if not isinstance(arg, ast.Constant) or not isinstance(arg.value, str):
+                        if not isinstance(arg, ast.Constant) or not isinstance(
+                            arg.value, str
+                        ):
                             return None
                         all_values.append(arg.value)
                     else:
@@ -175,15 +223,19 @@ class ImportResolutionMixin:
                         all_values.extend(names)
                     continue
 
-            if isinstance(node, ast.Delete) and any(isinstance(item, ast.Name) and item.id == "__all__" for item in node.targets):
+            if isinstance(node, ast.Delete) and any(
+                isinstance(item, ast.Name) and item.id == "__all__"
+                for item in node.targets
+            ):
                 return None
         if saw_all:
             return exported_name in (all_values or [])
         symbols = self._session_symbols_for_path(owner)
         return any(str(symbol.get("name") or "") == exported_name for symbol in symbols)
 
-
-    def _resolve_import_owner_evidence(self, source_path: str, target: str) -> tuple[list[str], bool]:
+    def _resolve_import_owner_evidence(
+        self, source_path: str, target: str
+    ) -> tuple[list[str], bool]:
         """Resolve bounded import-owner evidence and report unresolved identity.
 
         The boolean is true when the qualified re-export frontier is ambiguous,
@@ -191,10 +243,14 @@ class ImportResolutionMixin:
         make safety decisions must preserve that uncertainty rather than treating
         a facade-only resolution as proof of the underlying owner.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         resolved = list(self._resolve_import_paths(source_path, target))
         short = target.lstrip(".").rsplit(".", 1)[-1]
         if not short or not resolved:
-            ambiguous = source_path.endswith((".py", ".pyi")) and self._python_import_identity_ambiguous(source_path, target)
+            ambiguous = source_path.endswith(
+                (".py", ".pyi")
+            ) and self._python_import_identity_ambiguous(source_path, target)
             return resolved, ambiguous
 
         leaves: set[str] = set()
@@ -209,21 +265,36 @@ class ImportResolutionMixin:
                 return
             visited.add(key)
             symbols = self._session_symbols_for_path(facade_path)
-            has_local_symbol = any(str(symbol.get("name") or "") == exported_name for symbol in symbols)
-            binding_kind, binding_targets = self._python_export_binding(facade_path, exported_name)
+            has_local_symbol = any(
+                str(symbol.get("name") or "") == exported_name for symbol in symbols
+            )
+            binding_kind, binding_targets = self._python_export_binding(
+                facade_path, exported_name
+            )
             if binding_kind == "local":
                 leaves.add(facade_path)
                 return
             if binding_kind in {"reexport", "ambiguous"}:
                 nested_targets = binding_targets
             else:
-                nested_targets = self._python_reexport_targets(facade_path, exported_name)
+                nested_targets = self._python_reexport_targets(
+                    facade_path, exported_name
+                )
             if binding_kind == "star":
-                authorities = [self._python_star_export_authority(facade_path, target, exported_name) for target in binding_targets]
-                if not authorities or any(authority is not True for authority in authorities):
+                authorities = [
+                    self._python_star_export_authority(
+                        facade_path, target, exported_name
+                    )
+                    for target in binding_targets
+                ]
+                if not authorities or any(
+                    authority is not True for authority in authorities
+                ):
                     unresolved = True
                     nested_targets = []
-            if binding_kind == "ambiguous" or (has_local_symbol and binding_kind in {"unknown", "star"}):
+            if binding_kind == "ambiguous" or (
+                has_local_symbol and binding_kind in {"unknown", "star"}
+            ):
                 unresolved = True
             if not nested_targets and not facade_path.endswith((".py", ".pyi")):
                 # Python AST binding evidence is scope-sensitive.  The compact
@@ -257,7 +328,10 @@ class ImportResolutionMixin:
                         continue
                     branch_progress = True
                     owner_symbols = self._session_symbols_for_path(owner)
-                    if any(str(symbol.get("name") or "") == nested_name for symbol in owner_symbols):
+                    if any(
+                        str(symbol.get("name") or "") == nested_name
+                        for symbol in owner_symbols
+                    ):
                         leaves.add(owner)
                     else:
                         walk(owner, nested_name, depth + 1)
@@ -271,15 +345,17 @@ class ImportResolutionMixin:
         qualified = sorted(leaves) if len(leaves) == 1 and not unresolved else []
         return list(dict.fromkeys([*resolved, *qualified])), unresolved
 
-
     def _resolve_import_owner_paths(self, source_path: str, target: str) -> list[str]:
         """Return bounded concrete import-owner paths without collapsing ambiguity."""
         resolved, _ = self._resolve_import_owner_evidence(source_path, target)
         return resolved
 
-
-    def _python_import_module_candidates(self, source_path: str, target: str) -> tuple[str, ...]:
+    def _python_import_module_candidates(
+        self, source_path: str, target: str
+    ) -> tuple[str, ...]:
         """Return exact Python module candidates in resolver fallback order."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         candidate = target.strip()
         if not candidate:
             return ()
@@ -287,7 +363,9 @@ class ImportResolutionMixin:
             leading = len(candidate) - len(candidate.lstrip("."))
             suffix = candidate[leading:]
             source_row = self._session_file_row(source_path)
-            source_module = "" if source_row is None else str(source_row.get("module_name") or "")
+            source_module = (
+                "" if source_row is None else str(source_row.get("module_name") or "")
+            )
             if source_module:
                 source_parts = source_module.split(".")
                 if Path(source_path).stem != "__init__":
@@ -306,7 +384,6 @@ class ImportResolutionMixin:
             candidate = candidate.rsplit(".", 1)[0] if "." in candidate else ""
         return tuple(ordered)
 
-
     def _resolve_python_import_paths(self, source_path: str, target: str) -> list[str]:
         """Resolve only uniquely owned Python module evidence.
 
@@ -314,6 +391,8 @@ class ImportResolutionMixin:
         ambiguity, not deterministic ownership.  Path ordering may stabilize the
         evidence but must never choose an owner.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         for candidate in self._python_import_module_candidates(source_path, target):
             resolved = self._session_module_paths(candidate)
             if resolved:
@@ -322,6 +401,8 @@ class ImportResolutionMixin:
 
     def _python_import_identity_ambiguous(self, source_path: str, target: str) -> bool:
         """Report whether the first resolvable Python module identity has >1 owner."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         for candidate in self._python_import_module_candidates(source_path, target):
             resolved = self._session_module_paths(candidate)
             if resolved:
@@ -330,59 +411,102 @@ class ImportResolutionMixin:
 
     def _resolve_js_import_paths(self, source_path: str, target: str) -> list[str]:
         """Resolve exact in-workspace JS/TS relative-import evidence."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if not target.startswith("."):
             return []
         base = (Path(source_path).parent / target).as_posix()
         normalized = posixpath.normpath(base)
-        if posixpath.isabs(normalized) or normalized in {"", ".", ".."} or normalized.startswith("../"):
+        if (
+            posixpath.isabs(normalized)
+            or normalized in {"", ".", ".."}
+            or normalized.startswith("../")
+        ):
             return []
         if normalized.startswith("./"):
             normalized = normalized[2:]
         candidates = [normalized]
         explicit_suffix = Path(normalized).suffix.lower()
         source_variant_suffixes = {
-            ".js": (".ts", ".tsx"), ".jsx": (".tsx", ".ts"),
-            ".mjs": (".mts", ".ts"), ".cjs": (".cts", ".ts"),
+            ".js": (".ts", ".tsx"),
+            ".jsx": (".tsx", ".ts"),
+            ".mjs": (".mts", ".ts"),
+            ".cjs": (".cts", ".ts"),
         }
         if explicit_suffix in source_variant_suffixes:
             stem = normalized[: -len(explicit_suffix)]
-            candidates.extend(stem + suffix for suffix in source_variant_suffixes[explicit_suffix])
-        candidates.extend(normalized + suffix for suffix in (".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"))
-        candidates.extend(normalized.rstrip("/") + suffix for suffix in (
-            "/index.ts", "/index.tsx", "/index.mts", "/index.cts",
-            "/index.js", "/index.jsx", "/index.mjs", "/index.cjs",
-        ))
+            candidates.extend(
+                stem + suffix for suffix in source_variant_suffixes[explicit_suffix]
+            )
+        candidates.extend(
+            normalized + suffix
+            for suffix in (".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs")
+        )
+        candidates.extend(
+            normalized.rstrip("/") + suffix
+            for suffix in (
+                "/index.ts",
+                "/index.tsx",
+                "/index.mts",
+                "/index.cts",
+                "/index.js",
+                "/index.jsx",
+                "/index.mjs",
+                "/index.cjs",
+            )
+        )
         ordered = list(dict.fromkeys(candidates))
         existing = self._session_file_rows(ordered)
         return [candidate for candidate in ordered if candidate in existing]
 
     def _resolve_go_import_paths(self, target: str) -> list[str]:
         """Resolve Go module/package evidence without broad repository guessing."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         go_mod = self.workspace / "go.mod"
         if not go_mod.is_file():
             return []
         try:
             module_line = next(
-                (line.strip() for line in go_mod.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip().startswith("module ")),
+                (
+                    line.strip()
+                    for line in go_mod.read_text(
+                        encoding="utf-8", errors="replace"
+                    ).splitlines()
+                    if line.strip().startswith("module ")
+                ),
                 "",
             )
         except OSError:
             return []
         module_name = module_line.removeprefix("module ").strip()
-        if not module_name or not (target == module_name or target.startswith(module_name + "/")):
+        if not module_name or not (
+            target == module_name or target.startswith(module_name + "/")
+        ):
             return []
-        rel_dir = target[len(module_name):].lstrip("/")
+        rel_dir = target[len(module_name) :].lstrip("/")
         prefix = rel_dir.rstrip("/")
         package_paths = self.store.paths_under(prefix) if prefix else self.store.paths()
         candidates = [
-            path for path in package_paths
-            if path.endswith(".go") and not path.endswith("_test.go")
-            and ((not prefix and "/" not in path) or (prefix and path.startswith(prefix + "/") and "/" not in path[len(prefix) + 1:]))
+            path
+            for path in package_paths
+            if path.endswith(".go")
+            and not path.endswith("_test.go")
+            and (
+                (not prefix and "/" not in path)
+                or (
+                    prefix
+                    and path.startswith(prefix + "/")
+                    and "/" not in path[len(prefix) + 1 :]
+                )
+            )
         ]
         return sorted(candidates)
 
     def _resolve_import_paths(self, source_path: str, target: str) -> list[str]:
         """Resolve import evidence by language while preserving exact resolver semantics."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         target = target.strip()
         if not target:
             return []
@@ -395,5 +519,3 @@ class ImportResolutionMixin:
         if language == "go":
             return self._resolve_go_import_paths(target)
         return []
-
-

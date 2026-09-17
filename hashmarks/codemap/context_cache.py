@@ -4,19 +4,23 @@ import json
 import sqlite3
 import threading
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from ..cas import CAS
-from ..digest import Digest, hash_bytes
-from ..paths import canonical_host_path
-from ..sqlite_boundary import configure_sqlite_connection
+from hashmarks.cas import CAS
+from hashmarks.digest import Digest, hash_bytes
+from hashmarks.paths import canonical_host_path
+from hashmarks.sqlite_boundary import configure_sqlite_connection
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _CONTEXT_ACTION_DOMAIN = b"hashmarks.context-action.v1\0"
 
 
 def canonical_json_bytes(value: Any) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
 
 
 def context_action_hash(action: dict[str, Any]) -> str:
@@ -43,7 +47,9 @@ class ContextCache:
         self.cas = CAS(root / "context-cas")
         self.db_path = root / "context-cache.sqlite3"
         self._lock = threading.RLock()
-        self._db = sqlite3.connect(self.db_path, check_same_thread=False, isolation_level=None)
+        self._db = sqlite3.connect(
+            self.db_path, check_same_thread=False, isolation_level=None
+        )
         configure_sqlite_connection(self._db)
         self._db.execute(
             """
@@ -74,7 +80,9 @@ class ContextCache:
                 """,
                 (action_hash, digest.hash, digest.size),
             )
-        return CachedContext(action_hash=action_hash, result_digest=digest, payload=payload)
+        return CachedContext(
+            action_hash=action_hash, result_digest=digest, payload=payload
+        )
 
     def get(self, action: dict[str, Any]) -> CachedContext | None:
         action_hash = context_action_hash(action)
@@ -89,14 +97,20 @@ class ContextCache:
         try:
             data = self.cas.get_bytes(digest)
             payload = json.loads(data)
-        except (FileNotFoundError, IOError, json.JSONDecodeError, UnicodeDecodeError):
+        except (OSError, FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
             with self._lock:
-                self._db.execute("DELETE FROM context_cache WHERE action_hash=?", (action_hash,))
+                self._db.execute(
+                    "DELETE FROM context_cache WHERE action_hash=?", (action_hash,)
+                )
             return None
         if not isinstance(payload, dict):
             return None
-        return CachedContext(action_hash=action_hash, result_digest=digest, payload=payload)
+        return CachedContext(
+            action_hash=action_hash, result_digest=digest, payload=payload
+        )
 
     def count(self) -> int:
         with self._lock:
-            return int(self._db.execute("SELECT COUNT(*) FROM context_cache").fetchone()[0])
+            return int(
+                self._db.execute("SELECT COUNT(*) FROM context_cache").fetchone()[0]
+            )

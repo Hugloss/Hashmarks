@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.repository_index_store import default_base_snapshot, git_base_identity
+from hashmarks.codemap.repository_index_store import (
+    default_base_snapshot,
+    git_base_identity,
+)
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 pytestmark = pytest.mark.host_git
 
@@ -17,9 +22,13 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def _repo(tmp_path: Path) -> Path:
-    repo = tmp_path / "repo"; repo.mkdir()
+    repo = tmp_path / "repo"
+    repo.mkdir()
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
-    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@example.invalid"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.email", "t@example.invalid"],
+        check=True,
+    )
     subprocess.run(["git", "-C", str(repo), "config", "user.name", "T"], check=True)
     (repo / "a.py").write_text("def alpha():\n    return 1\n")
     (repo / "b.py").write_text("def beta():\n    return 2\n")
@@ -33,19 +42,35 @@ def test_clean_base_sync_publishes_shared_snapshot(tmp_path: Path, monkeypatch) 
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
         result = codemap.sync()
-    base = git_base_identity(repo); assert base is not None
+    base = git_base_identity(repo)
+    assert base is not None
     snapshot = default_base_snapshot(repo, base)
     assert snapshot.is_file()
     assert result.overlay_paths == 0
 
 
-def test_sibling_worktree_reuses_clean_base_snapshot_and_keeps_dirty_overlay_local(tmp_path: Path, monkeypatch) -> None:
+def test_sibling_worktree_reuses_clean_base_snapshot_and_keeps_dirty_overlay_local(
+    tmp_path: Path, monkeypatch
+) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
         first = codemap.sync()
     sibling = tmp_path / "sibling"
-    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "--detach", str(sibling), "HEAD"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "worktree",
+            "add",
+            "-q",
+            "--detach",
+            str(sibling),
+            "HEAD",
+        ],
+        check=True,
+    )
     # The sibling uses a different workspace DB/state, but same common-dir artifact/base cache.
     with CodeMap(sibling) as codemap:
         reused = codemap.sync()

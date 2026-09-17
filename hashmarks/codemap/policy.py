@@ -9,7 +9,6 @@ from pathlib import Path
 
 from .model import EvidenceVisibility
 
-
 _SECRET_PATTERNS = (
     ".env",
     ".env.*",
@@ -58,7 +57,7 @@ class ContextPolicy:
         self.rules = rules
 
     @classmethod
-    def load(cls, workspace: Path, path: Path | None = None) -> "ContextPolicy":
+    def load(cls, workspace: Path, path: Path | None = None) -> ContextPolicy:
         config = workspace / ".hashmarks-context.toml" if path is None else path
         if not config.exists():
             return cls()
@@ -69,13 +68,23 @@ class ContextPolicy:
         rules: list[_Rule] = []
         for idx, raw in enumerate(raw_rules):
             if not isinstance(raw, dict) or not isinstance(raw.get("pattern"), str):
-                raise ValueError(f".hashmarks-context.toml: rule {idx} needs a string pattern")
+                raise ValueError(
+                    f".hashmarks-context.toml: rule {idx} needs a string pattern"
+                )
             index = raw.get("index")
             if index is not None and not isinstance(index, bool):
-                raise ValueError(f".hashmarks-context.toml: rule {idx} index must be boolean")
+                raise ValueError(
+                    f".hashmarks-context.toml: rule {idx} index must be boolean"
+                )
             visibility_raw = raw.get("visibility")
-            visibility = None if visibility_raw is None else EvidenceVisibility(str(visibility_raw))
-            rules.append(_Rule(pattern=raw["pattern"], index=index, visibility=visibility))
+            visibility = (
+                None
+                if visibility_raw is None
+                else EvidenceVisibility(str(visibility_raw))
+            )
+            rules.append(
+                _Rule(pattern=raw["pattern"], index=index, visibility=visibility)
+            )
         return cls(tuple(rules))
 
     @staticmethod
@@ -100,18 +109,26 @@ class ContextPolicy:
                 {
                     "pattern": rule.pattern,
                     "index": rule.index,
-                    "visibility": None if rule.visibility is None else rule.visibility.value,
+                    "visibility": None
+                    if rule.visibility is None
+                    else rule.visibility.value,
                 }
                 for rule in self.rules
             ],
         }
-        data = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        data = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
         return hashlib.sha256(data).hexdigest()
 
     def decide(self, relpath: str) -> PolicyDecision:
         path = relpath.replace("\\", "/")
         if self._is_builtin_secret_path(path):
-            return PolicyDecision(index=False, evidence_visibility=EvidenceVisibility.DENY, reason="secret-like path")
+            return PolicyDecision(
+                index=False,
+                evidence_visibility=EvidenceVisibility.DENY,
+                reason="secret-like path",
+            )
 
         decision = PolicyDecision()
         for rule in self.rules:
@@ -119,9 +136,15 @@ class ContextPolicy:
                 continue
             decision = PolicyDecision(
                 index=decision.index if rule.index is None else rule.index,
-                evidence_visibility=decision.evidence_visibility if rule.visibility is None else rule.visibility,
+                evidence_visibility=decision.evidence_visibility
+                if rule.visibility is None
+                else rule.visibility,
                 reason=f"context policy: {rule.pattern}",
             )
         if not decision.index:
-            return PolicyDecision(index=False, evidence_visibility=EvidenceVisibility.DENY, reason=decision.reason)
+            return PolicyDecision(
+                index=False,
+                evidence_visibility=EvidenceVisibility.DENY,
+                reason=decision.reason,
+            )
         return decision

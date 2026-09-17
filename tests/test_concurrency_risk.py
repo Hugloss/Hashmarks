@@ -1,49 +1,65 @@
 from hashmarks.codemap import CodeMap
+
+
 def test_rmw_risk_nominates_same_owner_read_then_write(tmp_path):
-    (tmp_path/"store.py").write_text(
-      "def bump(store):\n current=store.get('generation')\n store.set('generation',current+1)\n",encoding="utf-8")
+    (tmp_path / "store.py").write_text(
+        "def bump(store):\n current=store.get('generation')\n store.set('generation',current+1)\n",
+        encoding="utf-8",
+    )
     with CodeMap(tmp_path) as c:
-      c.sync(); result=c.concurrency_risk_findings(["store.py"])
-    f=result["findings"][0]
-    assert f["code"]=="python-read-modify-write-without-visible-guard"
-    assert f["read_call"]=="store.get" and f["write_call"]=="store.set"
-    assert result["summary"]["unguarded"]==1
+        c.sync()
+        result = c.concurrency_risk_findings(["store.py"])
+    f = result["findings"][0]
+    assert f["code"] == "python-read-modify-write-without-visible-guard"
+    assert f["read_call"] == "store.get" and f["write_call"] == "store.set"
+    assert result["summary"]["unguarded"] == 1
+
 
 def test_rmw_risk_recognizes_visible_transaction_guard(tmp_path):
-    (tmp_path/"store.py").write_text(
-      "def bump(store):\n with store.transaction():\n  current=store.get('generation')\n  store.set('generation',current+1)\n",encoding="utf-8")
+    (tmp_path / "store.py").write_text(
+        "def bump(store):\n with store.transaction():\n  current=store.get('generation')\n  store.set('generation',current+1)\n",
+        encoding="utf-8",
+    )
     with CodeMap(tmp_path) as c:
-      c.sync(); result=c.concurrency_risk_findings(["store.py"])
+        c.sync()
+        result = c.concurrency_risk_findings(["store.py"])
     assert result["findings"][0]["guarded"] is True
-    assert result["summary"]["unguarded"]==0
+    assert result["summary"]["unguarded"] == 0
+
 
 def test_os_read_write_different_file_descriptors_are_not_one_rmw_owner(tmp_path):
-    (tmp_path/"copy.py").write_text(
-      "import os\ndef copy(source_fd,destination_fd):\n chunk=os.read(source_fd,4096)\n os.write(destination_fd,chunk)\n",
-      encoding="utf-8")
+    (tmp_path / "copy.py").write_text(
+        "import os\ndef copy(source_fd,destination_fd):\n chunk=os.read(source_fd,4096)\n os.write(destination_fd,chunk)\n",
+        encoding="utf-8",
+    )
     with CodeMap(tmp_path) as c:
-      c.sync(); result=c.concurrency_risk_findings(["copy.py"])
-    assert result["findings"]==[]
+        c.sync()
+        result = c.concurrency_risk_findings(["copy.py"])
+    assert result["findings"] == []
 
 
 def test_os_read_write_same_file_descriptor_remains_rmw_nomination(tmp_path):
-    (tmp_path/"state.py").write_text(
-      "import os\ndef rewrite(fd):\n chunk=os.read(fd,4096)\n os.write(fd,chunk)\n",
-      encoding="utf-8")
+    (tmp_path / "state.py").write_text(
+        "import os\ndef rewrite(fd):\n chunk=os.read(fd,4096)\n os.write(fd,chunk)\n",
+        encoding="utf-8",
+    )
     with CodeMap(tmp_path) as c:
-      c.sync(); result=c.concurrency_risk_findings(["state.py"])
-    finding=result["findings"][0]
-    assert finding["read_call"]=="os.read"
-    assert finding["write_call"]=="os.write"
+        c.sync()
+        result = c.concurrency_risk_findings(["state.py"])
+    finding = result["findings"][0]
+    assert finding["read_call"] == "os.read"
+    assert finding["write_call"] == "os.write"
 
 
 def test_aliased_os_read_write_bind_file_descriptor_owner(tmp_path):
-    (tmp_path/"copy.py").write_text(
-      "import os as operating_system\ndef copy(source_fd,destination_fd):\n chunk=operating_system.read(source_fd,4096)\n operating_system.write(destination_fd,chunk)\n",
-      encoding="utf-8")
+    (tmp_path / "copy.py").write_text(
+        "import os as operating_system\ndef copy(source_fd,destination_fd):\n chunk=operating_system.read(source_fd,4096)\n operating_system.write(destination_fd,chunk)\n",
+        encoding="utf-8",
+    )
     with CodeMap(tmp_path) as c:
-      c.sync(); result=c.concurrency_risk_findings(["copy.py"])
-    assert result["findings"]==[]
+        c.sync()
+        result = c.concurrency_risk_findings(["copy.py"])
+    assert result["findings"] == []
 
 
 def test_rmw_risk_ignores_function_local_fresh_mapping(tmp_path):

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks import CodeMap
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _repo(root: Path) -> str:
@@ -21,7 +24,8 @@ def _repo(root: Path) -> str:
 
 
 def test_identical_task_action_requests_reuse_one_session_composition(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -47,7 +51,8 @@ def test_identical_task_action_requests_reuse_one_session_composition(
 
 
 def test_task_action_reuse_key_includes_task_limit_and_per_role(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -90,7 +95,8 @@ def test_cached_task_action_isolated_from_caller_mutation(tmp_path: Path) -> Non
 
 
 def test_task_action_cache_is_not_reused_across_decision_sessions(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:

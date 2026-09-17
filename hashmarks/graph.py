@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable, Hashable, Iterable
 from dataclasses import dataclass, field
-from typing import Callable, Generic, Hashable, Iterable, TypeVar
+from typing import Generic, TypeVar
 
 K = TypeVar("K", bound=Hashable)
 V = TypeVar("V")

@@ -6,9 +6,9 @@ import hashlib
 import json
 import os
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Mapping, Sequence
 
 from ._version import __version__
 from .digest import hash_file
@@ -39,37 +39,45 @@ EXECUTION_LAYER_AUTHORITIES = (
     "result-authority",
 )
 
-_ENVELOPE_FIELDS = frozenset({"schema", "producer", "repository", "selection", "authority", "envelope_identity"})
-_PRODUCER_FIELDS = frozenset({"name", "version", "algorithm", "implementation_identity", "artifact_identity"})
+_ENVELOPE_FIELDS = frozenset(
+    {"schema", "producer", "repository", "selection", "authority", "envelope_identity"}
+)
+_PRODUCER_FIELDS = frozenset(
+    {"name", "version", "algorithm", "implementation_identity", "artifact_identity"}
+)
 _REPOSITORY_FIELDS = frozenset({"content_identity", "selection_input_identity"})
-_SELECTION_FIELDS = frozenset({"schema", "shard_count", "test_node_count", "shards", "plan_identity"})
+_SELECTION_FIELDS = frozenset(
+    {"schema", "shard_count", "test_node_count", "shards", "plan_identity"}
+)
 _SHARD_FIELDS = frozenset({"index", "nodeids", "weight_bytes", "isolated_process"})
 _AUTHORITY_FIELDS = frozenset({"hashmarks", "execution_layer"})
 
-_FORBIDDEN_EXECUTION_POLICY_KEYS = frozenset({
-    "argv",
-    "command",
-    "commands",
-    "timeout",
-    "timeout_seconds",
-    "deadline",
-    "deadline_seconds",
-    "retry",
-    "retry_count",
-    "retry_delay",
-    "retry_delay_seconds",
-    "workers",
-    "worker_count",
-    "concurrency",
-    "schedule",
-    "machine",
-    "machine_id",
-    "executor",
-    "executor_id",
-    "process",
-    "process_id",
-    "environment_recovery",
-})
+_FORBIDDEN_EXECUTION_POLICY_KEYS = frozenset(
+    {
+        "argv",
+        "command",
+        "commands",
+        "timeout",
+        "timeout_seconds",
+        "deadline",
+        "deadline_seconds",
+        "retry",
+        "retry_count",
+        "retry_delay",
+        "retry_delay_seconds",
+        "workers",
+        "worker_count",
+        "concurrency",
+        "schedule",
+        "machine",
+        "machine_id",
+        "executor",
+        "executor_id",
+        "process",
+        "process_id",
+        "environment_recovery",
+    }
+)
 
 # Static selection evidence for tests that must never share a selected shard.
 #
@@ -94,7 +102,9 @@ EXPENSIVE_BENCHMARK_NODEIDS = (
     "tests/test_agent_metrics_suite.py::test_selective_scout_targets_only_observed_ambiguity",
 )
 
-ISOLATED_NODEIDS = tuple(dict.fromkeys((*PROCESS_SENSITIVE_NODEIDS, *EXPENSIVE_BENCHMARK_NODEIDS)))
+ISOLATED_NODEIDS = tuple(
+    dict.fromkeys((*PROCESS_SENSITIVE_NODEIDS, *EXPENSIVE_BENCHMARK_NODEIDS))
+)
 
 
 @dataclass
@@ -103,7 +113,15 @@ class _ValidationState:
     missing_fields: list[str] = field(default_factory=list)
     unexpected_fields: list[str] = field(default_factory=list)
 
-    def add_fields(self, value: Mapping[str, object], expected: frozenset[str], *, path: str, missing_reason: str, unexpected_reason: str) -> None:
+    def add_fields(
+        self,
+        value: Mapping[str, object],
+        expected: frozenset[str],
+        *,
+        path: str,
+        missing_reason: str,
+        unexpected_reason: str,
+    ) -> None:
         missing, unexpected = _field_set_issues(value, expected, path=path)
         self.missing_fields.extend(missing)
         self.unexpected_fields.extend(unexpected)
@@ -125,8 +143,6 @@ class _ShardValidationState:
     membership_valid: bool = True
 
 
-
-
 def release_correctness_nodeids(root: Path) -> tuple[str, ...]:
     """Return deterministic correctness membership from repository-owned classification."""
     from .qualification_classification import classification_map
@@ -135,11 +151,8 @@ def release_correctness_nodeids(root: Path) -> tuple[str, ...]:
     nodeids = tuple(nodeid for nodeid, _weight in _nodeids(root))
     classes = classification_map(root, nodeids)
     return tuple(
-        nodeid
-        for nodeid in nodeids
-        if classes[nodeid]["kind"] == "release-correctness"
+        nodeid for nodeid in nodeids if classes[nodeid]["kind"] == "release-correctness"
     )
-
 
 
 def _canonical_bytes(value: Mapping[str, object]) -> bytes:
@@ -181,7 +194,8 @@ def _class_test_nodeids(rel: str, node: ast.ClassDef) -> list[str]:
     return [
         f"{rel}::{node.name}::{child.name}"
         for child in node.body
-        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name.startswith("test_")
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and child.name.startswith("test_")
     ]
 
 
@@ -235,9 +249,14 @@ def selection_input_identity(root: Path) -> str:
     return _packet_identity(SELECTION_INPUT_SCHEMA, payload)
 
 
-_REPOSITORY_IDENTITY_EXCLUDED_DIRS = frozenset({
-    ".venv", ".hashmarks", ".pytest_cache", "__pycache__",
-})
+_REPOSITORY_IDENTITY_EXCLUDED_DIRS = frozenset(
+    {
+        ".venv",
+        ".hashmarks",
+        ".pytest_cache",
+        "__pycache__",
+    }
+)
 _REPOSITORY_IDENTITY_EXCLUDED_SUFFIXES = frozenset({".pyc", ".pyo"})
 
 
@@ -309,19 +328,32 @@ def _validate_shard_count(shard_count: int, node_count: int) -> None:
         raise ValueError("shard_count must not exceed test node count")
 
 
-def _isolated_buckets(nodes: list[tuple[str, int]], shard_count: int) -> tuple[list[list[str]], list[int], int]:
+def _isolated_buckets(
+    nodes: list[tuple[str, int]], shard_count: int
+) -> tuple[list[list[str]], list[int], int]:
     by_node = dict(nodes)
     isolated = [nodeid for nodeid in ISOLATED_NODEIDS if nodeid in by_node]
     if len(isolated) >= shard_count:
         raise ValueError("shard_count must leave at least one non-isolated shard")
-    return [[nodeid] for nodeid in isolated], [by_node[nodeid] for nodeid in isolated], len(isolated)
+    return (
+        [[nodeid] for nodeid in isolated],
+        [by_node[nodeid] for nodeid in isolated],
+        len(isolated),
+    )
 
 
-def _least_loaded_bucket(buckets: list[list[str]], weights: list[int], start: int, stop: int) -> int:
-    return min(range(start, stop), key=lambda index: (weights[index], len(buckets[index]), index))
+def _least_loaded_bucket(
+    buckets: list[list[str]], weights: list[int], start: int, stop: int
+) -> int:
+    return min(
+        range(start, stop),
+        key=lambda index: (weights[index], len(buckets[index]), index),
+    )
 
 
-def _balanced_shard_buckets(nodes: list[tuple[str, int]], shard_count: int) -> tuple[list[list[str]], list[int], int]:
+def _balanced_shard_buckets(
+    nodes: list[tuple[str, int]], shard_count: int
+) -> tuple[list[list[str]], list[int], int]:
     buckets, weights, isolated_count = _isolated_buckets(nodes, shard_count)
     while len(buckets) < shard_count:
         buckets.append([])
@@ -336,7 +368,9 @@ def _balanced_shard_buckets(nodes: list[tuple[str, int]], shard_count: int) -> t
     return buckets, weights, isolated_count
 
 
-def _shard_rows(buckets: list[list[str]], weights: list[int], isolated_count: int) -> list[dict[str, object]]:
+def _shard_rows(
+    buckets: list[list[str]], weights: list[int], isolated_count: int
+) -> list[dict[str, object]]:
     return [
         {
             "index": index,
@@ -361,7 +395,9 @@ def plan(root: Path, shard_count: int) -> dict[str, object]:
         "test_node_count": len(nodes),
         "shards": _shard_rows(buckets, weights, isolated_count),
     }
-    payload["plan_identity"] = "sha256:" + hashlib.sha256(_canonical_bytes(payload)).hexdigest()
+    payload["plan_identity"] = (
+        "sha256:" + hashlib.sha256(_canonical_bytes(payload)).hexdigest()
+    )
     return payload
 
 
@@ -415,7 +451,9 @@ def _forbidden_execution_policy_paths(value: object, *, path: str = "$") -> list
             found.extend(_forbidden_execution_policy_paths(child, path=child_path))
     elif isinstance(value, list):
         for index, child in enumerate(value):
-            found.extend(_forbidden_execution_policy_paths(child, path=f"{path}[{index}]"))
+            found.extend(
+                _forbidden_execution_policy_paths(child, path=f"{path}[{index}]")
+            )
     return found
 
 
@@ -478,7 +516,9 @@ def _positive_int(value: object) -> int | None:
     return None
 
 
-def _selection_rows(value: object, shard_count: int | None, state: _ShardValidationState) -> list[object]:
+def _selection_rows(
+    value: object, shard_count: int | None, state: _ShardValidationState
+) -> list[object]:
     if not isinstance(value, list):
         state.validation.reasons.append("invalid-shards")
         return []
@@ -488,7 +528,9 @@ def _selection_rows(value: object, shard_count: int | None, state: _ShardValidat
     return value
 
 
-def _selection_header(value: Mapping[str, object], state: _ShardValidationState) -> tuple[int | None, int | None, list[object]]:
+def _selection_header(
+    value: Mapping[str, object], state: _ShardValidationState
+) -> tuple[int | None, int | None, list[object]]:
     check = state.validation
     check.add_fields(
         value,
@@ -509,7 +551,9 @@ def _selection_header(value: Mapping[str, object], state: _ShardValidationState)
     return shard_count, test_node_count, rows
 
 
-def _validate_nodeid_membership(nodeids: object, state: _ShardValidationState) -> list[str] | None:
+def _validate_nodeid_membership(
+    nodeids: object, state: _ShardValidationState
+) -> list[str] | None:
     if not isinstance(nodeids, list) or not nodeids:
         state.validation.reasons.append("invalid-shard-nodeids")
         state.membership_valid = False
@@ -528,7 +572,9 @@ def _validate_nodeid_membership(nodeids: object, state: _ShardValidationState) -
     return nodeids
 
 
-def _validate_shard_scalars(row: Mapping[str, object], state: _ShardValidationState) -> bool | None:
+def _validate_shard_scalars(
+    row: Mapping[str, object], state: _ShardValidationState
+) -> bool | None:
     index = row.get("index")
     weight = row.get("weight_bytes")
     isolated = row.get("isolated_process")
@@ -544,7 +590,9 @@ def _validate_shard_scalars(row: Mapping[str, object], state: _ShardValidationSt
     return isolated
 
 
-def _record_isolation(nodeids: list[str] | None, isolated: bool | None, state: _ShardValidationState) -> None:
+def _record_isolation(
+    nodeids: list[str] | None, isolated: bool | None, state: _ShardValidationState
+) -> None:
     if isolated is not True or nodeids is None:
         return
     if len(nodeids) != 1:
@@ -553,7 +601,9 @@ def _record_isolation(nodeids: list[str] | None, isolated: bool | None, state: _
         state.isolated_seen.add(nodeids[0])
 
 
-def _validate_shard_row(row: object, row_number: int, state: _ShardValidationState) -> None:
+def _validate_shard_row(
+    row: object, row_number: int, state: _ShardValidationState
+) -> None:
     if not isinstance(row, Mapping):
         state.validation.reasons.append("invalid-shard-row")
         state.membership_valid = False
@@ -570,7 +620,9 @@ def _validate_shard_row(row: object, row_number: int, state: _ShardValidationSta
     _record_isolation(nodeids, isolated, state)
 
 
-def _validate_selection_totals(shard_count: int | None, test_node_count: int | None, state: _ShardValidationState) -> None:
+def _validate_selection_totals(
+    shard_count: int | None, test_node_count: int | None, state: _ShardValidationState
+) -> None:
     if shard_count is not None and sorted(state.indexes) != list(range(shard_count)):
         state.validation.reasons.append("noncontiguous-shard-indexes")
     if test_node_count is not None and len(state.seen) != test_node_count:
@@ -580,7 +632,9 @@ def _validate_selection_totals(shard_count: int | None, test_node_count: int | N
         state.validation.reasons.append("process-isolation-requirements-mismatch")
 
 
-def _selection_identity(value: Mapping[str, object], state: _ShardValidationState) -> str | None:
+def _selection_identity(
+    value: Mapping[str, object], state: _ShardValidationState
+) -> str | None:
     try:
         expected = _plan_identity(value)
     except (TypeError, ValueError):
@@ -591,7 +645,9 @@ def _selection_identity(value: Mapping[str, object], state: _ShardValidationStat
     return expected
 
 
-def _selection_membership(value: Mapping[str, object], state: _ShardValidationState) -> str | None:
+def _selection_membership(
+    value: Mapping[str, object], state: _ShardValidationState
+) -> str | None:
     if not state.membership_valid or not state.seen:
         return None
     try:
@@ -624,7 +680,9 @@ def validate_test_shard_plan(value: Mapping[str, object]) -> dict[str, object]:
     }
 
 
-def _envelope_identity(value: Mapping[str, object], state: _ValidationState) -> str | None:
+def _envelope_identity(
+    value: Mapping[str, object], state: _ValidationState
+) -> str | None:
     state.add_fields(
         value,
         _ENVELOPE_FIELDS,
@@ -651,7 +709,9 @@ def _valid_sha_identity(value: object) -> bool:
     return isinstance(value, str) and _SHA256_IDENTITY.fullmatch(value) is not None
 
 
-def _validate_producer_identities(value: Mapping[str, object], state: _ValidationState) -> None:
+def _validate_producer_identities(
+    value: Mapping[str, object], state: _ValidationState
+) -> None:
     if not _valid_sha_identity(value.get("implementation_identity")):
         state.reasons.append("invalid-producer-implementation-identity")
     artifact = value.get("artifact_identity")
@@ -692,10 +752,14 @@ def _validate_repository(value: object, state: _ValidationState) -> None:
         unexpected_reason="unexpected-repository-field",
     )
     content = value.get("content_identity")
-    if not isinstance(content, str) or not _REPOSITORY_CONTENT_IDENTITY.fullmatch(content):
+    if not isinstance(content, str) or not _REPOSITORY_CONTENT_IDENTITY.fullmatch(
+        content
+    ):
         state.reasons.append("invalid-repository-content-identity")
     selection_input = value.get("selection_input_identity")
-    if not isinstance(selection_input, str) or not _SHA256_IDENTITY.fullmatch(selection_input):
+    if not isinstance(selection_input, str) or not _SHA256_IDENTITY.fullmatch(
+        selection_input
+    ):
         state.reasons.append("invalid-selection-input-identity")
 
 
@@ -712,7 +776,9 @@ def _validate_selection(value: object, state: _ValidationState) -> dict[str, obj
     result = validate_test_shard_plan(value)
     state.reasons.extend(str(reason) for reason in result["reasons"])
     state.missing_fields.extend(str(path) for path in result.get("missing_fields", []))
-    state.unexpected_fields.extend(str(path) for path in result.get("unexpected_fields", []))
+    state.unexpected_fields.extend(
+        str(path) for path in result.get("unexpected_fields", [])
+    )
     return result
 
 
@@ -759,7 +825,6 @@ def validate_work_selection_envelope(value: Mapping[str, object]) -> dict[str, o
     }
 
 
-
 def _unbound_repository_result(structural: Mapping[str, object]) -> dict[str, object]:
     return {
         **structural,
@@ -770,7 +835,9 @@ def _unbound_repository_result(structural: Mapping[str, object]) -> dict[str, ob
     }
 
 
-def _binding_inputs(value: Mapping[str, object]) -> tuple[Mapping[str, object], Mapping[str, object], int] | None:
+def _binding_inputs(
+    value: Mapping[str, object],
+) -> tuple[Mapping[str, object], Mapping[str, object], int] | None:
     repository = value.get("repository")
     selection = value.get("selection")
     if not isinstance(repository, Mapping) or not isinstance(selection, Mapping):
@@ -781,7 +848,9 @@ def _binding_inputs(value: Mapping[str, object]) -> tuple[Mapping[str, object], 
     return repository, selection, shard_count
 
 
-def _current_selection_plan(root: Path, shard_count: int, reasons: list[str]) -> dict[str, object] | None:
+def _current_selection_plan(
+    root: Path, shard_count: int, reasons: list[str]
+) -> dict[str, object] | None:
     try:
         return plan(root, shard_count)
     except ValueError:
@@ -824,7 +893,11 @@ def validate_work_selection_repository_binding(
     current_input = selection_input_identity(root)
     reasons = list(structural["reasons"])
     current_plan = _current_selection_plan(root, shard_count, reasons)
-    reasons.extend(_binding_mismatch_reasons(repository, selection, current_content, current_input, current_plan))
+    reasons.extend(
+        _binding_mismatch_reasons(
+            repository, selection, current_content, current_input, current_plan
+        )
+    )
     reasons = list(dict.fromkeys(str(reason) for reason in reasons))
     return {
         **structural,
@@ -833,7 +906,9 @@ def validate_work_selection_repository_binding(
         "repository_bound": not reasons,
         "current_repository_content_identity": current_content,
         "current_selection_input_identity": current_input,
-        "current_plan_identity": current_plan.get("plan_identity") if current_plan is not None else None,
+        "current_plan_identity": current_plan.get("plan_identity")
+        if current_plan is not None
+        else None,
     }
 
 
@@ -852,7 +927,9 @@ def _validate_shard_index(shard_count: int, shard_index: int) -> None:
         raise ValueError(f"shard_index must be between 0 and {shard_count - 1}")
 
 
-def _selected_shard(payload: Mapping[str, object], shard_count: int, shard_index: int) -> tuple[str, ...]:
+def _selected_shard(
+    payload: Mapping[str, object], shard_count: int, shard_index: int
+) -> tuple[str, ...]:
     _validate_shard_index(shard_count, shard_index)
     row = payload["shards"][shard_index]  # type: ignore[index]
     return tuple(row["nodeids"])  # type: ignore[index]
@@ -864,7 +941,9 @@ def select(root: Path, shard_count: int, shard_index: int) -> tuple[str, ...]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Deterministic pytest test-node shard selector")
+    parser = argparse.ArgumentParser(
+        description="Deterministic pytest test-node shard selector"
+    )
     parser.add_argument("--root", type=Path, default=Path("."))
     parser.add_argument("--shards", type=int, default=16)
     parser.add_argument("--shard", type=int)
@@ -888,22 +967,28 @@ def main() -> int:
             args.shards,
             producer_artifact_identity=args.producer_artifact_identity,
         )
-        print(json.dumps(payload, sort_keys=True) if args.json else json.dumps(payload, indent=2, sort_keys=True))
+        print(  # noqa: T201 - intentional command output
+            json.dumps(payload, sort_keys=True)
+            if args.json
+            else json.dumps(payload, indent=2, sort_keys=True)
+        )
         return 0
     payload = plan(root, args.shards)
     if args.shard is None:
         if args.json:
-            print(json.dumps(payload, sort_keys=True))
+            print(json.dumps(payload, sort_keys=True))  # noqa: T201 - intentional command output
         else:
             for row in payload["shards"]:  # type: ignore[index]
-                print(f"{row['index']}: {len(row['nodeids'])} tests / {row['weight_bytes']} source-weight bytes")
+                print(  # noqa: T201 - intentional command output
+                    f"{row['index']}: {len(row['nodeids'])} tests / {row['weight_bytes']} source-weight bytes"
+                )
         return 0
     try:
         selected = _selected_shard(payload, args.shards, args.shard)
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
     if args.json:
-        print(
+        print(  # noqa: T201 - intentional command output
             json.dumps(
                 {
                     "schema": SCHEMA,
@@ -915,7 +1000,7 @@ def main() -> int:
             )
         )
     else:
-        print(" ".join(selected))
+        print(" ".join(selected))  # noqa: T201 - intentional command output
     return 0
 
 

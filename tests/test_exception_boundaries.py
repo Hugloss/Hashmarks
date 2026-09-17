@@ -48,13 +48,15 @@ def test_repository_cli_boundary_translates_only_expected_request_errors(
     monkeypatch.setattr(repository_cli, "_codemap", lambda args: FakeCodeMap())
 
     with pytest.raises(RepositoryCliError, match="bad query"):
-        repository_cli._call_codemap(object(), lambda codemap: (_ for _ in ()).throw(ValueError("bad query")))
+        repository_cli._call_codemap(
+            object(), lambda codemap: (_ for _ in ()).throw(ValueError("bad query"))
+        )
 
     with pytest.raises(RuntimeError, match="implementation bug"):
         repository_cli._call_codemap(
-            object(), lambda codemap: (_ for _ in ()).throw(RuntimeError("implementation bug"))
+            object(),
+            lambda codemap: (_ for _ in ()).throw(RuntimeError("implementation bug")),
         )
-
 
 
 def test_repository_cli_boundary_retries_known_transient_races_once_centrally(
@@ -116,7 +118,10 @@ def test_mcp_and_cli_share_one_repository_retry_owner() -> None:
     assert "def _retry_transient_repository_race" not in source
     assert "def _retry_transient_repository_race" not in cli_source
 
-def test_top_level_cli_translates_user_facing_error_once(monkeypatch: pytest.MonkeyPatch) -> None:
+
+def test_top_level_cli_translates_user_facing_error_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def fail(args) -> int:
         raise RepositoryCliError("caller-visible failure")
 
@@ -128,7 +133,10 @@ def test_top_level_cli_translates_user_facing_error_once(monkeypatch: pytest.Mon
 
     monkeypatch.setattr(cli, "_add_daemon_cli", add_one)
     monkeypatch.setattr(cli, "_add_identity_cli", lambda sub: None)
-    monkeypatch.setattr("hashmarks.repository_cli.add_repository_cli", lambda sub, add_common_arguments: None)
+    monkeypatch.setattr(
+        "hashmarks.repository_cli.add_repository_cli",
+        lambda sub, add_common_arguments: None,
+    )
     try:
         with pytest.raises(SystemExit, match="caller-visible failure"):
             cli.main(["boundary-test"])
@@ -143,7 +151,11 @@ def test_no_catch_and_immediate_reraise_noise_in_product_python() -> None:
         for node in ast.walk(tree):
             if not isinstance(node, ast.ExceptHandler):
                 continue
-            if len(node.body) == 1 and isinstance(node.body[0], ast.Raise) and node.body[0].exc is None:
+            if (
+                len(node.body) == 1
+                and isinstance(node.body[0], ast.Raise)
+                and node.body[0].exc is None
+            ):
                 violations.append(f"{path.relative_to(ROOT)}:{node.lineno}")
     assert violations == []
 
@@ -156,7 +168,9 @@ def _broad_handler_names(handler: ast.ExceptHandler) -> set[str]:
     return set()
 
 
-def test_broad_exception_handlers_are_restricted_to_explicit_failure_boundaries() -> None:
+def test_broad_exception_handlers_are_restricted_to_explicit_failure_boundaries() -> (
+    None
+):
     allowed = {
         ("hashmarks/codemap/providers.py", "auto"),
         ("hashmarks/codemap/providers.py", "_name_node"),
@@ -212,7 +226,9 @@ def test_local_ipc_request_error_serialization_has_one_owner() -> None:
         "ok": False,
         "error": "RuntimeError: boom",
     }
-    assert dispatch_json_request(b'{"value":1}', lambda request: {"ok": True, **request}) == {
+    assert dispatch_json_request(
+        b'{"value":1}', lambda request: {"ok": True, **request}
+    ) == {
         "ok": True,
         "value": 1,
     }

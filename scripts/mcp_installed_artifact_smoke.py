@@ -54,7 +54,9 @@ async def _exercise(executable: Path, repo: Path, state_dir: Path) -> None:
             tools = await session.list_tools()
             assert [tool.name for tool in tools.tools] == _EXPECTED_TOOLS
 
-            found = await session.call_tool("find", arguments={"query": "flare041", "limit": 5})
+            found = await session.call_tool(
+                "find", arguments={"query": "flare041", "limit": 5}
+            )
             assert found.is_error is not True
             assert found.structured_content is not None
             assert found.structured_content["schema"] == "hashmarks.mcp-find.v1"
@@ -63,7 +65,9 @@ async def _exercise(executable: Path, repo: Path, state_dir: Path) -> None:
                 for row in found.structured_content["results"]
             )
 
-            invalid = await session.call_tool("find", arguments={"query": "", "limit": 5})
+            invalid = await session.call_tool(
+                "find", arguments={"query": "", "limit": 5}
+            )
             assert invalid.is_error is True
             text = "\n".join(getattr(block, "text", "") for block in invalid.content)
             assert "query must not be empty" in text
@@ -82,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     with tempfile.TemporaryDirectory(prefix="hashmarks-mcp-installed-") as raw:
         root = Path(raw)
         asyncio.run(_exercise(executable, _fixture(root), root / "state"))
-    print("Hashmarks installed MCP artifact smoke: PASS")
+    print("Hashmarks installed MCP artifact smoke: PASS")  # noqa: T201 - intentional command output
     return 0
 
 

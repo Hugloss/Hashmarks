@@ -3,7 +3,9 @@ from pathlib import Path
 from hashmarks.codemap import CodeMap
 
 
-def test_qualified_reference_beyond_global_short_name_prefix_remains_direct(tmp_path: Path) -> None:
+def test_qualified_reference_beyond_global_short_name_prefix_remains_direct(
+    tmp_path: Path,
+) -> None:
     src = tmp_path / "src"
     tests = tmp_path / "tests"
     src.mkdir()
@@ -25,7 +27,9 @@ def test_qualified_reference_beyond_global_short_name_prefix_remains_direct(tmp_
         codemap.sync()
         global_prefix = codemap.store.refs_many(["f"], limit_per_target=1024)["f"]
         assert not any(row["path"] == "tests/test_target.py" for row in global_prefix)
-        relevance = codemap.verification_relevance("src/target.py", limit=20, candidate_limit=8)
+        relevance = codemap.verification_relevance(
+            "src/target.py", limit=20, candidate_limit=8
+        )
 
     assert relevance["selected"]["path"] == "tests/test_target.py"
     assert relevance["selected"]["direct_reference"] is True
@@ -33,19 +37,23 @@ def test_qualified_reference_beyond_global_short_name_prefix_remains_direct(tmp_
     assert relevance["selected"]["reference_symbols"] == ["f"]
 
 
-def test_targeted_tail_uses_full_module_identity_when_leaf_names_collide(tmp_path: Path, monkeypatch) -> None:
+def test_targeted_tail_uses_full_module_identity_when_leaf_names_collide(
+    tmp_path: Path, monkeypatch
+) -> None:
     for package in ("pkg_a", "pkg_b"):
         directory = tmp_path / package
         directory.mkdir()
         (directory / "__init__.py").write_text("", encoding="utf-8")
         (directory / "target.py").write_text("def run(): return 1\n", encoding="utf-8")
         (directory / "consumer.py").write_text(
-            f"from {package}.target import run\n\ndef use(): return run()\n", encoding="utf-8"
+            f"from {package}.target import run\n\ndef use(): return run()\n",
+            encoding="utf-8",
         )
     tests = tmp_path / "tests"
     tests.mkdir()
     (tests / "test_target.py").write_text(
-        "from pkg_b.target import run\n\ndef test_run(): assert run() == 1\n", encoding="utf-8"
+        "from pkg_b.target import run\n\ndef test_run(): assert run() == 1\n",
+        encoding="utf-8",
     )
 
     with CodeMap(tmp_path) as codemap:
@@ -68,7 +76,9 @@ def test_targeted_tail_uses_full_module_identity_when_leaf_names_collide(tmp_pat
     assert relevance["selected"]["direct_reference"] is True
 
 
-def test_literal_repository_path_is_not_replaced_by_structural_neighbor(tmp_path: Path) -> None:
+def test_literal_repository_path_is_not_replaced_by_structural_neighbor(
+    tmp_path: Path,
+) -> None:
     pkg = tmp_path / "pkg"
     tests = tmp_path / "tests"
     pkg.mkdir()
@@ -80,7 +90,8 @@ def test_literal_repository_path_is_not_replaced_by_structural_neighbor(tmp_path
         encoding="utf-8",
     )
     (tests / "test_target.py").write_text(
-        "from pkg.target import run\n\ndef test_run(): assert run() == 1\n", encoding="utf-8"
+        "from pkg.target import run\n\ndef test_run(): assert run() == 1\n",
+        encoding="utf-8",
     )
 
     with CodeMap(tmp_path) as codemap:
@@ -88,5 +99,7 @@ def test_literal_repository_path_is_not_replaced_by_structural_neighbor(tmp_path
         action = codemap.task_action_map("change pkg/target.py run behavior", limit=20)
 
     assert action["edit"]["path"] == "pkg/target.py"
-    assert action["verification_relevance"]["selected"]["path"] == "tests/test_target.py"
+    assert (
+        action["verification_relevance"]["selected"]["path"] == "tests/test_target.py"
+    )
     assert action["verification_relevance"]["selected"]["direct_reference"] is True

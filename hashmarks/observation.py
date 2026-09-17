@@ -3,10 +3,13 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING
 
 from .paths import normalize_relative_path
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import Path
 
 
 class UnstableObservationError(RuntimeError):
@@ -71,9 +74,16 @@ class ChangeTracker:
         leaves the newer DIRTY/UNKNOWN state untouched.
         """
         with self._lock:
-            if expected_generation is not None and self._generation != expected_generation:
+            if (
+                expected_generation is not None
+                and self._generation != expected_generation
+            ):
                 return False
-            if self._state is ObservationState.CLEAN and not self._paths and self._reason is None:
+            if (
+                self._state is ObservationState.CLEAN
+                and not self._paths
+                and self._reason is None
+            ):
                 # Re-reading an already reconciled world does not create a new
                 # observation generation. This keeps hot daemon reads truly
                 # read-only while generation changes still represent actual

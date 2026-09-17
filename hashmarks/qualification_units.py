@@ -4,8 +4,8 @@ import hashlib
 import json
 import re
 from collections import defaultdict
-from pathlib import Path
-from typing import Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING
 
 from ._version import __version__
 from .producer_identity import native_producer_implementation_identity
@@ -19,6 +19,9 @@ from .test_shards import (
 )
 from .validation_inputs import require_mapping_for_validation
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 UNIT_SCHEMA = "hashmarks.qualification-owner-unit.v2"
 PLAN_SCHEMA = "hashmarks.qualification-owner-plan.v2"
 COVERAGE_SCHEMA = "hashmarks.external-qualification-coverage.v1"
@@ -26,17 +29,32 @@ COVERAGE_PROVENANCE_SCHEMA = "hashmarks.qualification-coverage-provenance.v1"
 EXTERNAL_RESULT_SCHEMA = "hashmarks.external-qualification-result.v1"
 HANDOFF_SCHEMA = "hashmarks.native-qualification-handoff.v1"
 
-_EXECUTION_FORBIDDEN = frozenset({
-    "timeout", "timeout_seconds", "deadline", "retry", "retry_count",
-    "workers", "worker_count", "concurrency", "schedule", "command", "argv",
-    "process_id", "machine", "executor",
-})
+_EXECUTION_FORBIDDEN = frozenset(
+    {
+        "timeout",
+        "timeout_seconds",
+        "deadline",
+        "retry",
+        "retry_count",
+        "workers",
+        "worker_count",
+        "concurrency",
+        "schedule",
+        "command",
+        "argv",
+        "process_id",
+        "machine",
+        "executor",
+    }
+)
 _SHA256_IDENTITY = re.compile(r"^sha256:[0-9a-f]{64}$")
 _REPOSITORY_IDENTITY = re.compile(r"^sha256:[0-9a-f]{64}:[0-9]+$")
 
 
 def _canonical_bytes(value: Mapping[str, object]) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
 
 
 def _identity(domain: str, value: Mapping[str, object]) -> str:
@@ -81,7 +99,9 @@ def _qualification_owner_units_from_classification(
     classification_identity = str(artifact["classification_identity"])
     rows = artifact.get("classifications")
     if not isinstance(rows, list):
-        raise ValueError("qualification classification artifact requires classifications")
+        raise ValueError(
+            "qualification classification artifact requires classifications"
+        )
     classes = {
         str(row["nodeid"]): row
         for row in rows
@@ -97,22 +117,26 @@ def _qualification_owner_units_from_classification(
         if kind == "release-correctness" and preferred == "file":
             ordinary[_node_file(nodeid)].append(nodeid)
         else:
-            units.append(_unit_row(
-                name=f"{kind}:{nodeid}",
-                kind=kind,
-                nodeids=(nodeid,),
-                preferred_granularity=preferred,
-                classification_identity=classification_identity,
-            ))
+            units.append(
+                _unit_row(
+                    name=f"{kind}:{nodeid}",
+                    kind=kind,
+                    nodeids=(nodeid,),
+                    preferred_granularity=preferred,
+                    classification_identity=classification_identity,
+                )
+            )
 
     for path, members in sorted(ordinary.items()):
-        units.append(_unit_row(
-            name=f"release-correctness:{path}",
-            kind="release-correctness",
-            nodeids=members,
-            preferred_granularity="file",
-            classification_identity=classification_identity,
-        ))
+        units.append(
+            _unit_row(
+                name=f"release-correctness:{path}",
+                kind="release-correctness",
+                nodeids=members,
+                preferred_granularity="file",
+                classification_identity=classification_identity,
+            )
+        )
     return tuple(sorted(units, key=lambda row: str(row["name"])))
 
 
@@ -168,7 +192,9 @@ def _forbidden_execution_fields(value: object) -> list[str]:
     return found
 
 
-def _find_unit(plan: Mapping[str, object], unit_identity: object) -> Mapping[str, object] | None:
+def _find_unit(
+    plan: Mapping[str, object], unit_identity: object
+) -> Mapping[str, object] | None:
     units = plan.get("units")
     if not isinstance(units, list):
         return None
@@ -194,7 +220,10 @@ def _producer_reasons(producer: object) -> list[str]:
         reasons.append("qualification-producer-fields-mismatch")
     if producer.get("name") != "hashmarks":
         reasons.append("invalid-qualification-producer-name")
-    if not isinstance(producer.get("version"), str) or not str(producer.get("version")).strip():
+    if (
+        not isinstance(producer.get("version"), str)
+        or not str(producer.get("version")).strip()
+    ):
         reasons.append("invalid-qualification-producer-version")
     if not _valid_sha256_identity(producer.get("implementation_identity")):
         reasons.append("invalid-qualification-producer-implementation-identity")
@@ -213,9 +242,18 @@ def _unit_reasons(
     if not isinstance(unit, Mapping):
         return ["invalid-qualification-unit"]
     required = {
-        "schema", "name", "kind", "nodeids", "membership_identity",
-        "classification_identity", "preferred_granularity", "execution_authority",
-        "result_authority", "certification_authority", "may_regroup", "unit_identity",
+        "schema",
+        "name",
+        "kind",
+        "nodeids",
+        "membership_identity",
+        "classification_identity",
+        "preferred_granularity",
+        "execution_authority",
+        "result_authority",
+        "certification_authority",
+        "may_regroup",
+        "unit_identity",
     }
     reasons: list[str] = []
     if set(unit) != required:
@@ -231,7 +269,10 @@ def _unit_reasons(
     preferred = unit.get("preferred_granularity")
     if preferred not in {"file", "singleton"}:
         reasons.append("invalid-qualification-unit-granularity")
-    if kind in {"process-sensitive", "empirical-benchmark"} and preferred != "singleton":
+    if (
+        kind in {"process-sensitive", "empirical-benchmark"}
+        and preferred != "singleton"
+    ):
         reasons.append("qualification-unit-isolation-mismatch")
     nodeids = unit.get("nodeids")
     normalized_nodeids: list[str] = []
@@ -255,18 +296,27 @@ def _unit_reasons(
     unit_classification = unit.get("classification_identity")
     if not _valid_sha256_identity(unit_classification):
         reasons.append("invalid-qualification-unit-classification-identity")
-    if classification_identity is not None and unit_classification != classification_identity:
+    if (
+        classification_identity is not None
+        and unit_classification != classification_identity
+    ):
         reasons.append("qualification-unit-classification-identity-mismatch")
     if preferred == "singleton" and normalized_nodeids:
         if len(normalized_nodeids) != 1 or name != f"{kind}:{normalized_nodeids[0]}":
             reasons.append("qualification-unit-singleton-shape-mismatch")
     if preferred == "file" and normalized_nodeids:
         files = {_node_file(nodeid) for nodeid in normalized_nodeids}
-        if kind != "release-correctness" or len(files) != 1 or name != f"release-correctness:{next(iter(files))}":
+        if (
+            kind != "release-correctness"
+            or len(files) != 1
+            or name != f"release-correctness:{next(iter(files))}"
+        ):
             reasons.append("qualification-unit-file-shape-mismatch")
     for field in ("execution_authority", "result_authority", "certification_authority"):
         if unit.get(field) != "external":
-            reasons.append(f"qualification-unit-{field.replace('_', '-')}-must-be-external")
+            reasons.append(
+                f"qualification-unit-{field.replace('_', '-')}-must-be-external"
+            )
     if unit.get("may_regroup") is not True:
         reasons.append("qualification-unit-may-regroup-must-be-true")
     if _forbidden_execution_fields(unit):
@@ -286,9 +336,17 @@ def _qualification_plan_reasons(plan: object) -> list[str]:
     if not isinstance(plan, Mapping):
         return ["invalid-qualification-plan"]
     required = {
-        "schema", "producer", "repository_identity", "membership_identity",
-        "classification_identity", "classification_policy_identity", "unit_count",
-        "test_node_count", "units", "authority", "plan_identity",
+        "schema",
+        "producer",
+        "repository_identity",
+        "membership_identity",
+        "classification_identity",
+        "classification_policy_identity",
+        "unit_count",
+        "test_node_count",
+        "units",
+        "authority",
+        "plan_identity",
     }
     reasons: list[str] = []
     if set(plan) != required:
@@ -297,7 +355,9 @@ def _qualification_plan_reasons(plan: object) -> list[str]:
         reasons.append("unsupported-qualification-plan-schema")
     reasons.extend(_producer_reasons(plan.get("producer")))
     repository_identity = plan.get("repository_identity")
-    if not isinstance(repository_identity, str) or not _REPOSITORY_IDENTITY.fullmatch(repository_identity):
+    if not isinstance(repository_identity, str) or not _REPOSITORY_IDENTITY.fullmatch(
+        repository_identity
+    ):
         reasons.append("invalid-qualification-repository-identity")
     classification_identity = plan.get("classification_identity")
     if not _valid_sha256_identity(classification_identity):
@@ -312,7 +372,9 @@ def _qualification_plan_reasons(plan: object) -> list[str]:
         reasons.append("invalid-qualification-units")
     else:
         for unit in units:
-            reasons.extend(_unit_reasons(unit, classification_identity=classification_identity))
+            reasons.extend(
+                _unit_reasons(unit, classification_identity=classification_identity)
+            )
             if isinstance(unit, Mapping):
                 if isinstance(unit.get("name"), str):
                     unit_names.append(str(unit["name"]))
@@ -320,16 +382,22 @@ def _qualification_plan_reasons(plan: object) -> list[str]:
                     unit_ids.append(str(unit["unit_identity"]))
                 raw_nodeids = unit.get("nodeids")
                 if isinstance(raw_nodeids, list):
-                    nodeids.extend(str(nodeid) for nodeid in raw_nodeids if isinstance(nodeid, str))
+                    nodeids.extend(
+                        str(nodeid) for nodeid in raw_nodeids if isinstance(nodeid, str)
+                    )
         if unit_names != sorted(unit_names) or len(unit_names) != len(set(unit_names)):
             reasons.append("noncanonical-qualification-units")
         if len(unit_ids) != len(set(unit_ids)):
             reasons.append("duplicate-qualification-unit-identity")
         if len(nodeids) != len(set(nodeids)):
             reasons.append("duplicate-qualification-nodeid")
-    if type(plan.get("unit_count")) is not int or plan.get("unit_count") != (len(units) if isinstance(units, list) else 0):
+    if type(plan.get("unit_count")) is not int or plan.get("unit_count") != (
+        len(units) if isinstance(units, list) else 0
+    ):
         reasons.append("qualification-unit-count-mismatch")
-    if type(plan.get("test_node_count")) is not int or plan.get("test_node_count") != len(nodeids):
+    if type(plan.get("test_node_count")) is not int or plan.get(
+        "test_node_count"
+    ) != len(nodeids):
         reasons.append("qualification-test-node-count-mismatch")
     if nodeids:
         try:
@@ -371,10 +439,17 @@ def _executed_membership_identity(coverage: Mapping[str, object]) -> str | None:
 
 def _coverage_shape_reasons(coverage: Mapping[str, object]) -> list[str]:
     required = {
-        "schema", "producer", "repository_identity", "plan_identity",
-        "unit_identity", "membership_identity", "executed_nodeids",
-        "producer_implementation_identity", "provenance_identity",
-        "execution_authority", "result_authority",
+        "schema",
+        "producer",
+        "repository_identity",
+        "plan_identity",
+        "unit_identity",
+        "membership_identity",
+        "executed_nodeids",
+        "producer_implementation_identity",
+        "provenance_identity",
+        "execution_authority",
+        "result_authority",
         "certification_authority",
     }
     reasons: list[str] = []
@@ -419,9 +494,7 @@ def _coverage_plan_reasons(
         ("plan_identity", "plan-identity-mismatch"),
     )
     reasons = [
-        reason
-        for field, reason in checks
-        if coverage.get(field) != plan.get(field)
+        reason for field, reason in checks if coverage.get(field) != plan.get(field)
     ]
     producer = plan.get("producer")
     expected = (
@@ -521,7 +594,12 @@ def external_qualification_result(
 ) -> dict[str, object]:
     if result not in {"pass", "fail", "error", "timeout"}:
         raise ValueError("unsupported external qualification result")
-    if not isinstance(coverage_identity, str) or not coverage_identity.startswith("sha256:") or len(coverage_identity) != 71 or any(char not in "0123456789abcdef" for char in coverage_identity[7:]):
+    if (
+        not isinstance(coverage_identity, str)
+        or not coverage_identity.startswith("sha256:")
+        or len(coverage_identity) != 71
+        or any(char not in "0123456789abcdef" for char in coverage_identity[7:])
+    ):
         raise ValueError("coverage_identity must be sha256:<64 lowercase hex>")
     producer_name = producer.get("name")
     if not isinstance(producer_name, str) or not producer_name.strip():
@@ -529,7 +607,9 @@ def external_qualification_result(
     try:
         json.dumps(producer, sort_keys=True, separators=(",", ":"), allow_nan=False)
     except (TypeError, ValueError) as exc:
-        raise ValueError("external result producer must be strict JSON-portable") from exc
+        raise ValueError(
+            "external result producer must be strict JSON-portable"
+        ) from exc
     payload: dict[str, object] = {
         "schema": EXTERNAL_RESULT_SCHEMA,
         "producer": dict(producer),
@@ -568,7 +648,9 @@ def _handoff_provenance_reasons(handoff: Mapping[str, object]) -> list[str]:
         else None
     )
     reasons: list[str] = []
-    if not isinstance(producer_identity, str) or not producer_identity.startswith("sha256:"):
+    if not isinstance(producer_identity, str) or not producer_identity.startswith(
+        "sha256:"
+    ):
         reasons.append("missing-producer-implementation-identity")
     if not isinstance(provenance, Mapping):
         return [*reasons, "missing-handoff-provenance"]
@@ -577,7 +659,10 @@ def _handoff_provenance_reasons(handoff: Mapping[str, object]) -> list[str]:
         ("repository_identity", handoff.get("repository_identity")),
         ("membership_identity", handoff.get("membership_identity")),
         ("classification_identity", handoff.get("classification_identity")),
-        ("classification_policy_identity", handoff.get("classification_policy_identity")),
+        (
+            "classification_policy_identity",
+            handoff.get("classification_policy_identity"),
+        ),
         ("plan_identity", handoff.get("plan_identity")),
     )
     reasons.extend(
@@ -620,16 +705,28 @@ def validate_native_qualification_handoff(
         *_handoff_authority_reasons(handoff),
     ]
     required = {
-        "schema", "producer", "repository_identity", "membership_identity",
-        "classification_identity", "classification_policy_identity", "plan_identity",
-        "units", "provenance", "execution_authority", "result_authority",
-        "certification_authority", "may_regroup", "handoff_identity",
+        "schema",
+        "producer",
+        "repository_identity",
+        "membership_identity",
+        "classification_identity",
+        "classification_policy_identity",
+        "plan_identity",
+        "units",
+        "provenance",
+        "execution_authority",
+        "result_authority",
+        "certification_authority",
+        "may_regroup",
+        "handoff_identity",
     }
     if set(handoff) != required:
         reasons.append("handoff-fields-mismatch")
     reasons.extend(_producer_reasons(handoff.get("producer")))
     repository_identity = handoff.get("repository_identity")
-    if not isinstance(repository_identity, str) or not _REPOSITORY_IDENTITY.fullmatch(repository_identity):
+    if not isinstance(repository_identity, str) or not _REPOSITORY_IDENTITY.fullmatch(
+        repository_identity
+    ):
         reasons.append("invalid-qualification-repository-identity")
     classification_identity = handoff.get("classification_identity")
     if not _valid_sha256_identity(classification_identity):
@@ -644,7 +741,9 @@ def validate_native_qualification_handoff(
         reasons.append("invalid-qualification-units")
     else:
         for unit in units:
-            reasons.extend(_unit_reasons(unit, classification_identity=classification_identity))
+            reasons.extend(
+                _unit_reasons(unit, classification_identity=classification_identity)
+            )
             if isinstance(unit, Mapping) and isinstance(unit.get("nodeids"), list):
                 nodeids.extend(
                     str(nodeid) for nodeid in unit["nodeids"] if isinstance(nodeid, str)
@@ -663,7 +762,9 @@ def validate_native_qualification_handoff(
     }
 
 
-def _native_qualification_handoff_from_plan(plan: Mapping[str, object]) -> dict[str, object]:
+def _native_qualification_handoff_from_plan(
+    plan: Mapping[str, object],
+) -> dict[str, object]:
     """Project one immutable qualification plan into the native handoff contract."""
     payload: dict[str, object] = {
         "schema": HANDOFF_SCHEMA,
@@ -675,7 +776,9 @@ def _native_qualification_handoff_from_plan(plan: Mapping[str, object]) -> dict[
         "plan_identity": plan["plan_identity"],
         "units": plan["units"],
         "provenance": {
-            "producer_implementation_identity": plan["producer"]["implementation_identity"],
+            "producer_implementation_identity": plan["producer"][
+                "implementation_identity"
+            ],
             "repository_identity": plan["repository_identity"],
             "membership_identity": plan["membership_identity"],
             "classification_identity": plan["classification_identity"],

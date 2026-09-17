@@ -3,9 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Sequence
+from typing import TYPE_CHECKING, cast
 
-from ..symbolic_identity import symbolic_nomination_record, symbolic_task_terms
+from hashmarks.symbolic_identity import symbolic_nomination_record, symbolic_task_terms
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from .engine import CodeMap
 
 
 class WorkContextMixin:
@@ -22,6 +27,8 @@ class WorkContextMixin:
         that fit at a smaller budget. The allocator does not rerank repository
         evidence and does not read SECRET benchmark data.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if token_budget < 1:
             raise ValueError("token_budget must be >= 1")
 
@@ -92,7 +99,9 @@ class WorkContextMixin:
             )
             for role in ("edit", "verify", "contract")
         }
-        supplied_bytes = sum(len(str(item["content"]).encode("utf-8")) for item in selected)
+        supplied_bytes = sum(
+            len(str(item["content"]).encode("utf-8")) for item in selected
+        )
         useful_role_bytes = sum(
             len(str(item["content"]).encode("utf-8"))
             for item in selected
@@ -107,7 +116,8 @@ class WorkContextMixin:
                 duplicate_evidence_bytes += size
             seen_content.add(identity)
         required_roles = [
-            role for role in ("edit", "verify", "contract")
+            role
+            for role in ("edit", "verify", "contract")
             if isinstance(action.get(role), dict)
         ]
         safe = all(role_coverage[role] for role in required_roles)
@@ -124,13 +134,14 @@ class WorkContextMixin:
                 "supplied_bytes": supplied_bytes,
                 "useful_role_bytes": useful_role_bytes,
                 "duplicate_evidence_bytes": duplicate_evidence_bytes,
-                "useful_bytes_ratio": (useful_role_bytes / supplied_bytes) if supplied_bytes else 0.0,
+                "useful_bytes_ratio": (useful_role_bytes / supplied_bytes)
+                if supplied_bytes
+                else 0.0,
                 "tokens_per_safe_packet": used if safe else None,
             },
             "allocation": "mandatory-skeleton-then-discretionary",
             "monotonic_contract": "mandatory membership may only grow with budget",
         }
-
 
     def work_context_budget_sweep(
         self,
@@ -156,13 +167,15 @@ class WorkContextMixin:
                 monotonic = False
             previous_mandatory = mandatory
             metrics = dict(packet["evidence_metrics"])
-            rows.append({
-                "budget": budget,
-                "safe": bool(packet["safe"]),
-                "estimated_tokens": int(packet["estimated_tokens"]),
-                "role_coverage": dict(packet["role_coverage"]),
-                **metrics,
-            })
+            rows.append(
+                {
+                    "budget": budget,
+                    "safe": bool(packet["safe"]),
+                    "estimated_tokens": int(packet["estimated_tokens"]),
+                    "role_coverage": dict(packet["role_coverage"]),
+                    **metrics,
+                }
+            )
         safe_budgets = [int(row["budget"]) for row in rows if bool(row["safe"])]
         return {
             "schema": "hashmarks.work-context-budget-sweep.v1",
@@ -173,8 +186,9 @@ class WorkContextMixin:
             "optimization_target": "minimum-safe-evidence",
         }
 
-
     def _symbolic_task_nomination(self, task: str) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         terms = symbolic_task_terms(task)
         if not terms:
             return symbolic_nomination_record(task=task, terms=(), candidates=())
@@ -184,7 +198,6 @@ class WorkContextMixin:
             terms=terms,
             candidates=candidates,
         )
-
 
     def retrieval_stability(
         self,
@@ -200,6 +213,8 @@ class WorkContextMixin:
         preservation rules are unchanged. This is a diagnostic gate, not a new
         ranker or source of retrieval authority.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if limit < 1:
             raise ValueError("limit must be >= 1")
         if repeats < 2:
@@ -224,12 +239,17 @@ class WorkContextMixin:
                     }
                     for rank, hit in enumerate(hits, 1)
                 ]
-                payload = json.dumps(rows, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
-                snapshots.append({
-                    "replay": replay,
-                    "fingerprint": "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest(),
-                    "rows": rows,
-                })
+                payload = json.dumps(
+                    rows, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+                )
+                snapshots.append(
+                    {
+                        "replay": replay,
+                        "fingerprint": "sha256:"
+                        + hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+                        "rows": rows,
+                    }
+                )
         finally:
             self._task_result_cache.pop(cache_key, None)
             if original_cached is not None:
@@ -250,11 +270,13 @@ class WorkContextMixin:
                 if left != right:
                     first_difference = index + 1
                     break
-            divergences.append({
-                "replay": snapshot["replay"],
-                "fingerprint": snapshot["fingerprint"],
-                "first_different_rank": first_difference,
-            })
+            divergences.append(
+                {
+                    "replay": snapshot["replay"],
+                    "fingerprint": snapshot["fingerprint"],
+                    "first_different_rank": first_difference,
+                }
+            )
 
         return {
             "schema": "hashmarks.retrieval-stability.v1",
@@ -270,14 +292,17 @@ class WorkContextMixin:
             "ranking_effect": "none",
         }
 
-
-    def explain_task_retrieval(self, task: str, *, limit: int = 20) -> dict[str, object]:
+    def explain_task_retrieval(
+        self, task: str, *, limit: int = 20
+    ) -> dict[str, object]:
         """Explain canonical task retrieval without changing its selection semantics.
 
         The explanation recomputes the same bounded task-query views used by
         ``find_task`` and reports path-level RRF contribution/provenance for the
         already-selected canonical result. It is observational only.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if limit < 1:
             raise ValueError("limit must be >= 1")
         selected = self.find_task(task, limit=limit)
@@ -313,13 +338,15 @@ class WorkContextMixin:
                 contribution = weight / (60.0 + rank)
                 totals[hit.path] = totals.get(hit.path, 0.0) + contribution
                 if hit.path in selected_paths:
-                    contributions.setdefault(hit.path, []).append({
-                        "lane": lane,
-                        "query": query,
-                        "path_rank": rank,
-                        "weight": weight,
-                        "rrf_contribution": round(contribution * 1000.0, 6),
-                    })
+                    contributions.setdefault(hit.path, []).append(
+                        {
+                            "lane": lane,
+                            "query": query,
+                            "path_rank": rank,
+                            "weight": weight,
+                            "rrf_contribution": round(contribution * 1000.0, 6),
+                        }
+                    )
 
         ranked_rrf = sorted(totals, key=lambda path: (-totals[path], path))
         ordinary = []
@@ -345,14 +372,16 @@ class WorkContextMixin:
                     reason = "conceptual-scoped-readme-preservation"
                 else:
                     reason = "bounded-post-fusion-preservation"
-            rows.append({
-                "path": hit.path,
-                "final_rank": final_rank,
-                "final_score": round(hit.score, 6),
-                "selection_reason": reason,
-                "rrf_score": round(totals.get(hit.path, 0.0) * 1000.0, 6),
-                "discovered_by": contributions.get(hit.path, []),
-            })
+            rows.append(
+                {
+                    "path": hit.path,
+                    "final_rank": final_rank,
+                    "final_score": round(hit.score, 6),
+                    "selection_reason": reason,
+                    "rrf_score": round(totals.get(hit.path, 0.0) * 1000.0, 6),
+                    "discovered_by": contributions.get(hit.path, []),
+                }
+            )
 
         return {
             "schema": "hashmarks.task-retrieval-provenance.v1",

@@ -13,7 +13,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from mcp_host_gate_common import (
+from mcp_host_gate_common import (  # noqa: E402 - import follows standalone script path setup
     HostGateEnvironmentBlocked,
     HostGateError,
     build_installed_wheel,
@@ -72,7 +72,9 @@ def _mcp_completed(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
             continue
         item_type = item.get("type")
         if item_type in forbidden:
-            raise HostGateError(f"Codex used forbidden built-in tool surface: {item_type}")
+            raise HostGateError(
+                f"Codex used forbidden built-in tool surface: {item_type}"
+            )
         if item_type == "mcp_tool_call":
             completed.append(item)
     return completed
@@ -101,20 +103,30 @@ def _structured_payload(item: dict[str, Any], expected_schema: str) -> dict[str,
 def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     calls = _mcp_completed(events)
     if len(calls) != len(EXPECTED):
-        observed = [(row.get("server"), row.get("tool"), row.get("status")) for row in calls]
-        raise HostGateError(f"Codex did not make exactly two required MCP calls: {observed}")
+        observed = [
+            (row.get("server"), row.get("tool"), row.get("status")) for row in calls
+        ]
+        raise HostGateError(
+            f"Codex did not make exactly two required MCP calls: {observed}"
+        )
     by_tool: dict[str, dict[str, Any]] = {}
     for item in calls:
         if item.get("server") != "hashmarks":
-            raise HostGateError(f"Codex used unexpected MCP server: {item.get('server')!r}")
+            raise HostGateError(
+                f"Codex used unexpected MCP server: {item.get('server')!r}"
+            )
         tool = str(item.get("tool"))
         if tool not in EXPECTED:
             raise HostGateError(f"Codex used unexpected Hashmarks MCP tool: {tool!r}")
         if tool in by_tool:
-            raise HostGateError(f"Codex called Hashmarks MCP tool more than once: {tool}")
+            raise HostGateError(
+                f"Codex called Hashmarks MCP tool more than once: {tool}"
+            )
         by_tool[tool] = _structured_payload(item, EXPECTED[tool])
     if set(by_tool) != set(EXPECTED):
-        raise HostGateError(f"Codex missing required Hashmarks MCP tools: {sorted(set(EXPECTED) - set(by_tool))}")
+        raise HostGateError(
+            f"Codex missing required Hashmarks MCP tools: {sorted(set(EXPECTED) - set(by_tool))}"
+        )
     found = by_tool["find"].get("results")
     if not isinstance(found, list) or not any(
         isinstance(row, dict) and row.get("path") == "src/feature.py" for row in found
@@ -127,7 +139,7 @@ def _looks_like_headless_mcp_approval_block(text: str) -> bool:
     lowered = text.lower()
     markers = (
         "user cancelled mcp tool call",
-        "mcp tool call" ,
+        "mcp tool call",
         "approval",
         "cancelled",
     )
@@ -157,7 +169,16 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
         write_fixture(repo)
         config_path = _write_codex_config(repo, hashmarks)
 
-        argv = [args.codex, "-c", _trust_override(repo), "exec", "--json", "--skip-git-repo-check", "-C", str(repo)]
+        argv = [
+            args.codex,
+            "-c",
+            _trust_override(repo),
+            "exec",
+            "--json",
+            "--skip-git-repo-check",
+            "-C",
+            str(repo),
+        ]
         if args.dangerous_bypass:
             argv.append("--dangerously-bypass-approvals-and-sandbox")
         else:
@@ -170,20 +191,23 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
             argv,
             cwd=repo,
             text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             timeout=900,
             check=False,
         )
         event_log.write_text(result.stdout, encoding="utf-8")
         if result.returncode != 0:
             detail = f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-            if not args.dangerous_bypass and _looks_like_headless_mcp_approval_block(detail):
+            if not args.dangerous_bypass and _looks_like_headless_mcp_approval_block(
+                detail
+            ):
                 raise HostGateEnvironmentBlocked(
                     "Codex exec blocked the MCP call in non-interactive read-only mode. "
                     "The gate does not bypass the sandbox by default. Rerun only if you accept the disposable-repo risk with CODEX_HOST_DANGEROUS=1."
                 )
-            raise HostGateError(f"Codex host process failed ({result.returncode})\n{detail}")
+            raise HostGateError(
+                f"Codex host process failed ({result.returncode})\n{detail}"
+            )
 
         events = parse_jsonl(result.stdout, host="Codex")
         payloads = _validate_events(events)
@@ -208,7 +232,9 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Qualify the installed Hashmarks MCP wheel through Codex CLI.")
+    parser = argparse.ArgumentParser(
+        description="Qualify the installed Hashmarks MCP wheel through Codex CLI."
+    )
     parser.add_argument("--model", default="")
     parser.add_argument("--python", default="3.14")
     parser.add_argument("--uv", default="uv")
@@ -241,10 +267,14 @@ def main(argv: list[str] | None = None) -> int:
     else:
         code = 0
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
-    receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"HASHMARKS CODEX MCP HOST GATE: {receipt['status']}\nreceipt: {receipt_path}")
+    receipt_path.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    print(  # noqa: T201 - intentional command output
+        f"HASHMARKS CODEX MCP HOST GATE: {receipt['status']}\nreceipt: {receipt_path}"
+    )
     if receipt["status"] != "PASS" and receipt.get("error"):
-        print(receipt["error"])
+        print(receipt["error"])  # noqa: T201 - intentional command output
     return code
 
 

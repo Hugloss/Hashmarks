@@ -5,7 +5,10 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,13 +50,14 @@ def _nx_environment() -> dict[str, str]:
     return env
 
 
-def _run_nx_graph(nx: str, workspace: Path, timeout: float) -> tuple[subprocess.CompletedProcess[str] | None, str | None]:
+def _run_nx_graph(
+    nx: str, workspace: Path, timeout: float
+) -> tuple[subprocess.CompletedProcess[str] | None, str | None]:
     try:
         completed = subprocess.run(
             [nx, "graph", "--print"],
             cwd=workspace,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=timeout,
             check=False,
@@ -63,7 +67,11 @@ def _run_nx_graph(nx: str, workspace: Path, timeout: float) -> tuple[subprocess.
         return None, f"nx graph failed: {exc}"
     if completed.returncode == 0:
         return completed, None
-    detail = completed.stderr.strip().splitlines()[-1] if completed.stderr.strip() else f"exit {completed.returncode}"
+    detail = (
+        completed.stderr.strip().splitlines()[-1]
+        if completed.stderr.strip()
+        else f"exit {completed.returncode}"
+    )
     return None, f"nx graph failed: {detail}"
 
 
@@ -128,7 +136,11 @@ def _nx_node(key: object, raw: object) -> NxNodeData | None:
 
 
 def _nx_nodes(raw_nodes: dict[object, object]) -> tuple[list[NxNodeData], set[str]]:
-    nodes = [node for key, raw in raw_nodes.items() if (node := _nx_node(key, raw)) is not None]
+    nodes = [
+        node
+        for key, raw in raw_nodes.items()
+        if (node := _nx_node(key, raw)) is not None
+    ]
     return nodes, {node.name for node in nodes}
 
 
@@ -148,23 +160,33 @@ def _nx_edges(raw_deps: dict[object, object], known: set[str]) -> list[NxEdgeDat
         if source_name not in known or not isinstance(values, list):
             continue
         edges.extend(
-            edge for raw in values
+            edge
+            for raw in values
             if (edge := _nx_dependency_edge(source_name, raw, known)) is not None
         )
     return edges
 
 
-def _collect_nx_payload(nx: str, workspace: Path, timeout: float) -> tuple[dict[str, object] | None, str | None]:
+def _collect_nx_payload(
+    nx: str, workspace: Path, timeout: float
+) -> tuple[dict[str, object] | None, str | None]:
     completed, error = _run_nx_graph(nx, workspace, timeout)
     if completed is None:
         return None, error or "nx graph failed"
     return _nx_payload(completed.stdout)
 
 
-def collect_nx_graph(workspace: Path, *, executable: str | None = None, timeout: float = 30.0) -> NxGraphData:
+def collect_nx_graph(
+    workspace: Path, *, executable: str | None = None, timeout: float = 30.0
+) -> NxGraphData:
     nx = executable or find_nx(workspace)
     if nx is None:
-        return NxGraphData(None, warnings=("nx.json detected but repo-local/global nx executable is unavailable",))
+        return NxGraphData(
+            None,
+            warnings=(
+                "nx.json detected but repo-local/global nx executable is unavailable",
+            ),
+        )
     graph, error = _collect_nx_payload(nx, workspace, timeout)
     if graph is None:
         return NxGraphData(nx, warnings=(error or "nx graph unavailable",))

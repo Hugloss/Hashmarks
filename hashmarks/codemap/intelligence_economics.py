@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, cast
+
 from .decision_session import diagnostic_producer
 
-from collections.abc import Mapping, Sequence
-import json
-from pathlib import Path
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from .engine import CodeMap
 
 
 class IntelligenceEconomicsMixin:
@@ -17,7 +22,9 @@ class IntelligenceEconomicsMixin:
 
     @staticmethod
     def _economics_bytes(value: object) -> int:
-        return len(json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+        return len(
+            json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        )
 
     @staticmethod
     def _economics_bps(saved: int, baseline: int) -> int:
@@ -34,7 +41,9 @@ class IntelligenceEconomicsMixin:
         affected = cls._economics_mapping(snapshot.get("affected"))
         freshness = cls._economics_mapping(snapshot.get("freshness"))
         verification = cls._economics_mapping(snapshot.get("verification"))
-        affected_rows = sum(len(rows) for rows in affected.values() if isinstance(rows, list))
+        affected_rows = sum(
+            len(rows) for rows in affected.values() if isinstance(rows, list)
+        )
         freshness_states: dict[str, int] = {}
         for raw in freshness.values():
             row = cls._economics_mapping(raw)
@@ -62,6 +71,8 @@ class IntelligenceEconomicsMixin:
         impact_limit_per_surface: int = 4,
         max_depth: int = 3,
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if not task.strip():
             raise ValueError("task must not be empty")
         if not changed_paths:
@@ -85,7 +96,9 @@ class IntelligenceEconomicsMixin:
             name: {
                 "serialized_bytes": sizes[name],
                 "saved_vs_audit_bytes": audit_bytes - sizes[name],
-                "saved_vs_audit_bps": self._economics_bps(audit_bytes - sizes[name], audit_bytes),
+                "saved_vs_audit_bps": self._economics_bps(
+                    audit_bytes - sizes[name], audit_bytes
+                ),
                 "profile_identity": profiles[name]["profile_identity"],
             }
             for name in ("compact", "standard", "audit")
@@ -139,10 +152,13 @@ class IntelligenceEconomicsMixin:
                 "delta_bytes": delta_bytes,
                 "retransmit_pair_bytes": pair_bytes,
                 "saved_vs_retransmit_pair_bytes": pair_bytes - delta_bytes,
-                "saved_vs_retransmit_pair_bps": self._economics_bps(pair_bytes - delta_bytes, pair_bytes),
+                "saved_vs_retransmit_pair_bps": self._economics_bps(
+                    pair_bytes - delta_bytes, pair_bytes
+                ),
             }
 
         payload["receipt_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.intelligence-economics-receipt.v1", payload,
+            "hashmarks.intelligence-economics-receipt.v1",
+            payload,
         )
         return payload

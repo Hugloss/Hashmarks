@@ -10,9 +10,22 @@ from .digest import Digest, hash_bytes, hash_file
 from .graph import IdentityCycleError, IdentityGraph
 from .identity import RepositoryIdentity, RepositoryIdentityMode
 from .inputs import InputManifest, resolve_inputs
-from .observation import ChangeSnapshot, ChangeTracker, ObservationState, UnstableObservationError
+from .observation import (
+    ChangeSnapshot,
+    ChangeTracker,
+    ObservationState,
+    UnstableObservationError,
+)
 from .snapshot import Snapshot, SnapshotDiff
-from .specs import Directory, File, Glob, InputSpec, InputValue, patterns_from_inputs, validate_input_values
+from .specs import (
+    Directory,
+    File,
+    Glob,
+    InputSpec,
+    InputValue,
+    patterns_from_inputs,
+    validate_input_values,
+)
 
 __all__ = [
     "__version__",

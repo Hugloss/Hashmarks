@@ -53,7 +53,9 @@ def _configuration_query(token: str, *, prefix: str = "") -> str:
     )
 
 
-def test_omitted_lowercase_alnum_identifier_recovers_task_local_action(tmp_path: Path) -> None:
+def test_omitted_lowercase_alnum_identifier_recovers_task_local_action(
+    tmp_path: Path,
+) -> None:
     tasks = _configuration_siblings(tmp_path)
     target = tasks[-1]
     query = _configuration_query(target["token"])
@@ -62,12 +64,17 @@ def test_omitted_lowercase_alnum_identifier_recovers_task_local_action(tmp_path:
         views = codemap.task_query_views(query)
         action = codemap.task_action_map(query, limit=20, per_role=3)
 
-    assert all(target["token"] not in views[key].split() for key in ("base", "governance", "evidence"))
+    assert all(
+        target["token"] not in views[key].split()
+        for key in ("base", "governance", "evidence")
+    )
     assert action["edit"]["path"] == target["edit"]
     assert action["verify"]["path"] == target["verify"]
 
 
-def test_omitted_identifier_probe_survives_leading_version_protocol_tokens(tmp_path: Path) -> None:
+def test_omitted_identifier_probe_survives_leading_version_protocol_tokens(
+    tmp_path: Path,
+) -> None:
     tasks = _configuration_siblings(tmp_path)
     target = tasks[-1]
     distractors = "python3 http2 sha256 ipv6 x86 utf8 tls13 utf16 http3 sha512 arm64 utf32 tls12 ipv4 python2 x64"
@@ -80,8 +87,12 @@ def test_omitted_identifier_probe_survives_leading_version_protocol_tokens(tmp_p
     assert action["verify"]["path"] == target["verify"]
 
 
-def test_omitted_identifiers_preserve_existing_multi_owner_ambiguity(tmp_path: Path) -> None:
-    _write(tmp_path / "pyproject.toml", "[tool.pytest.ini_options]\ntestpaths=['tests']\n")
+def test_omitted_identifiers_preserve_existing_multi_owner_ambiguity(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path / "pyproject.toml", "[tool.pytest.ini_options]\ntestpaths=['tests']\n"
+    )
     _write(tmp_path / "src/__init__.py", "")
     tokens = ("flare001", "flare002")
     for index, token in enumerate(tokens, start=1):

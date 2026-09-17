@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from .digest import Digest
 from .schema import SNAPSHOT_SCHEMA
+
+if TYPE_CHECKING:
+    from .digest import Digest
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,12 +51,14 @@ class Snapshot:
             "mode": self.mode,
         }
 
-    def diff(self, previous: "Snapshot") -> SnapshotDiff:
+    def diff(self, previous: Snapshot) -> SnapshotDiff:
         changed = self.digest != previous.digest
         if not changed:
             reason = "canonical input identity unchanged"
         elif self.observed_paths:
-            reason = "canonical input identity changed after observed filesystem changes"
+            reason = (
+                "canonical input identity changed after observed filesystem changes"
+            )
         else:
             reason = "canonical input identity changed"
         return SnapshotDiff(
@@ -64,5 +68,3 @@ class Snapshot:
             new_digest=self.digest.as_key(),
             observed_paths=self.observed_paths,
         )
-
-

@@ -55,17 +55,29 @@ def collect(*, files: int = 1000, budget: int = 1000) -> dict[str, object]:
         with CodeMap(root, artifact_db=artifact_db) as codemap:
             cold, cold_s = _timed(codemap.sync)
             hot, hot_s = _timed(codemap.sync)
-            hits, find_s = _timed(lambda: codemap.find("CriticalAuthFlow expired token", limit=10))
-            pack, context_s = _timed(lambda: codemap.context("CriticalAuthFlow expired token", token_budget=budget, limit=10))
+            hits, find_s = _timed(
+                lambda: codemap.find("CriticalAuthFlow expired token", limit=10)
+            )
+            pack, context_s = _timed(
+                lambda: codemap.context(
+                    "CriticalAuthFlow expired token", token_budget=budget, limit=10
+                )
+            )
             target_path = f"src/module_{files // 2:05d}.py"
             target_file = root / target_path
-            target_file.write_text(target_file.read_text(encoding="utf-8") + "\ndef new_branch():\n    return True\n", encoding="utf-8")
+            target_file.write_text(
+                target_file.read_text(encoding="utf-8")
+                + "\ndef new_branch():\n    return True\n",
+                encoding="utf-8",
+            )
             refreshed, edit_s = _timed(lambda: codemap.sync([target_path]))
             stats = codemap.status()
 
         first_hit = hits[0].qualname if hits else None
         target_present = any(hit.qualname == target for hit in hits)
-        ratio = None if pack.estimated_tokens == 0 else repo_tokens / pack.estimated_tokens
+        ratio = (
+            None if pack.estimated_tokens == 0 else repo_tokens / pack.estimated_tokens
+        )
         return {
             "schema": SCHEMA,
             "parameters": {"files": files, "budget": budget},
@@ -102,11 +114,17 @@ def collect(*, files: int = 1000, budget: int = 1000) -> dict[str, object]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Measure Hashmarks CodeMap/agent-context efficiency")
+    parser = argparse.ArgumentParser(
+        description="Measure Hashmarks CodeMap/agent-context efficiency"
+    )
     parser.add_argument("--files", type=int, default=1000)
     parser.add_argument("--budget", type=int, default=1000)
     args = parser.parse_args()
-    print(json.dumps(collect(files=args.files, budget=args.budget), indent=2, sort_keys=True))
+    print(  # noqa: T201 - intentional command output
+        json.dumps(
+            collect(files=args.files, budget=args.budget), indent=2, sort_keys=True
+        )
+    )
 
 
 if __name__ == "__main__":

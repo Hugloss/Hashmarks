@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+    from pathlib import Path
+
+    from .engine import CodeMap
 
 _QUERY_SURFACES = (
     "change-intelligence",
@@ -41,6 +45,8 @@ class RepositoryIntelligenceQueryMixin:
         max_depth: int = 3,
         project_impact_limit: int = 12,
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if surface not in _QUERY_SURFACES:
             raise ValueError(f"surface must be one of {list(_QUERY_SURFACES)}")
         if not task.strip():
@@ -48,11 +54,16 @@ class RepositoryIntelligenceQueryMixin:
 
         if surface == "verification-explanation":
             result = self.explain_verification_selection(
-                task, member_path, limit=limit, candidate_limit=16,
+                task,
+                member_path,
+                limit=limit,
+                candidate_limit=16,
             )
         else:
             if not changed_paths:
-                raise ValueError(f"changed_paths must not be empty for surface {surface}")
+                raise ValueError(
+                    f"changed_paths must not be empty for surface {surface}"
+                )
             common = {
                 "limit": limit,
                 "per_role": per_role,
@@ -70,14 +81,22 @@ class RepositoryIntelligenceQueryMixin:
                     **common,
                 )
             elif surface == "snapshot":
-                result = self.repository_intelligence_snapshot(task, changed_paths, **common)
+                result = self.repository_intelligence_snapshot(
+                    task, changed_paths, **common
+                )
             elif surface == "profile":
                 result = self.repository_intelligence_profile(
-                    task, changed_paths, profile=profile, **common,
+                    task,
+                    changed_paths,
+                    profile=profile,
+                    **common,
                 )
             elif surface == "economics":
                 result = self.intelligence_economics_receipt(
-                    task, changed_paths, previous_snapshot=previous_snapshot, **common,
+                    task,
+                    changed_paths,
+                    previous_snapshot=previous_snapshot,
+                    **common,
                 )
             elif surface == "delta":
                 if previous_snapshot is None:
@@ -107,6 +126,7 @@ class RepositoryIntelligenceQueryMixin:
             "execution_effect": "none",
         }
         envelope["query_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.repository-intelligence-query.v1", envelope,
+            "hashmarks.repository-intelligence-query.v1",
+            envelope,
         )
         return envelope

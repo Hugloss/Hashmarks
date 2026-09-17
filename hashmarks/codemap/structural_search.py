@@ -4,10 +4,12 @@ import json
 import os
 import shutil
 import subprocess
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .providers import ProviderStatus
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class AstGrepSearchProvider:
@@ -19,7 +21,12 @@ class AstGrepSearchProvider:
     """
 
     def __init__(self, workspace: Path) -> None:
-        local = workspace / "node_modules" / ".bin" / ("ast-grep.cmd" if os.name == "nt" else "ast-grep")
+        local = (
+            workspace
+            / "node_modules"
+            / ".bin"
+            / ("ast-grep.cmd" if os.name == "nt" else "ast-grep")
+        )
         if local.is_file():
             self.executable = str(local)
         else:
@@ -76,8 +83,7 @@ class AstGrepSearchProvider:
             completed = subprocess.run(
                 command,
                 cwd=workspace,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
                 timeout=timeout,
                 check=False,
@@ -85,7 +91,11 @@ class AstGrepSearchProvider:
         except (OSError, subprocess.TimeoutExpired) as exc:
             return [], (f"ast-grep search failed: {exc}",)
         if completed.returncode not in {0, 1}:  # 1 may mean no matches in some releases
-            detail = completed.stderr.strip().splitlines()[-1] if completed.stderr.strip() else f"exit {completed.returncode}"
+            detail = (
+                completed.stderr.strip().splitlines()[-1]
+                if completed.stderr.strip()
+                else f"exit {completed.returncode}"
+            )
             return [], (f"ast-grep search failed: {detail}",)
         out: list[dict[str, Any]] = []
         warnings: list[str] = []

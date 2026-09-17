@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, cast
 
 from .model import EvidenceVisibility, SearchHit
 from .query_primitives import _WORD_RE, _query_terms
 from .query_router import QueryRoute, route_query
 from .repository_domains import RepositoryDomain, classify_repository_path
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping, Sequence
+
+    from .engine import CodeMap
+
 
 @dataclass(frozen=True)
 class _FindContext:
@@ -17,14 +23,17 @@ class _FindContext:
     raw_words: tuple[str, ...]
     limit: int
 
+
 @dataclass
 class _FindSelectionState:
     selected: list[SearchHit]
     selected_ids: set[tuple[str, str | None, int | None]]
     seen_paths: set[str]
 
+
 def _optional_str(value: object) -> str | None:
     return None if value is None else str(value)
+
 
 def _optional_int(value: object) -> int | None:
     return None if value is None else int(value)
@@ -35,8 +44,9 @@ class FindEngineMixin:
         """Return the deterministic retrieval route without executing search."""
         return route_query(query)
 
-
     def find(self, query: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         self._ensure_map_ready()
         if not query.strip():
             raise ValueError("query must not be empty")
@@ -48,9 +58,10 @@ class FindEngineMixin:
             query,
             int(limit),
         )
-        result, _shared = self._find_flight.run(key, lambda: self._find_impl(query, limit=limit))
+        result, _shared = self._find_flight.run(
+            key, lambda: self._find_impl(query, limit=limit)
+        )
         return result
-
 
     def _find_context(self, query: str, limit: int) -> _FindContext:
         terms = tuple(_query_terms(query))
@@ -63,18 +74,22 @@ class FindEngineMixin:
             limit=limit,
         )
 
-
     def _find_add_exact_candidates(
         self, ctx: _FindContext, candidates: dict[tuple[str, str, str], dict]
     ) -> None:
-        for row in self._session_exact_symbol_candidates(ctx.terms, limit=max(100, ctx.limit * 8)):
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        for row in self._session_exact_symbol_candidates(
+            ctx.terms, limit=max(100, ctx.limit * 8)
+        ):
             key = (str(row.get("path", "")), str(row.get("qualname", "")), "symbol")
             candidates[key] = row
-
 
     def _find_add_lexical_candidates(
         self, ctx: _FindContext, candidates: dict[tuple[str, str, str], dict]
     ) -> list[dict[str, object]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         lexical_files = self._session_lexical_file_candidates(
             ctx.terms[:16], limit=max(80, ctx.limit * 6)
         )
@@ -90,8 +105,9 @@ class FindEngineMixin:
                 **row,
                 "_relation_boost": min(72.0, float(matches) * 6.0 + coverage * 30.0),
             }
-        return self._find_lexical_symbol_candidates(ctx, candidates, lexical_files, match_by_path)
-
+        return self._find_lexical_symbol_candidates(
+            ctx, candidates, lexical_files, match_by_path
+        )
 
     def _find_lexical_symbol_candidates(
         self,
@@ -100,10 +116,14 @@ class FindEngineMixin:
         lexical_files: Sequence[dict],
         match_by_path: Mapping[str, int],
     ) -> list[dict[str, object]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         candidate_paths = [str(row["path"]) for row in lexical_files]
         bridge_rows: list[dict[str, object]] = []
         bridge_count: dict[str, int] = {}
-        for raw_row in self._session_symbols_for_paths(candidate_paths, limit=max(1000, ctx.limit * 150)):
+        for raw_row in self._session_symbols_for_paths(
+            candidate_paths, limit=max(1000, ctx.limit * 150)
+        ):
             path = str(raw_row.get("path", ""))
             matches = match_by_path.get(path, 0)
             row = dict(raw_row)
@@ -115,32 +135,42 @@ class FindEngineMixin:
                 continue
             key = (path, str(row.get("qualname", "")), "symbol")
             existing = candidates.get(key)
-            if existing is None or float(existing.get("_relation_boost", 0.0) or 0.0) < float(row["_relation_boost"]):
+            if existing is None or float(
+                existing.get("_relation_boost", 0.0) or 0.0
+            ) < float(row["_relation_boost"]):
                 candidates[key] = row
         return bridge_rows
 
-
     @staticmethod
-    def _find_symbol_matches_terms(row: Mapping[str, object], terms: Sequence[str]) -> bool:
+    def _find_symbol_matches_terms(
+        row: Mapping[str, object], terms: Sequence[str]
+    ) -> bool:
         if not terms:
             return True
-        haystack = " ".join((
-            str(row.get("name") or ""),
-            str(row.get("qualname") or ""),
-            str(row.get("signature") or ""),
-        )).lower()
+        haystack = " ".join(
+            (
+                str(row.get("name") or ""),
+                str(row.get("qualname") or ""),
+                str(row.get("signature") or ""),
+            )
+        ).lower()
         return any(term in haystack for term in terms)
-
 
     def _find_add_path_candidates(
         self, ctx: _FindContext, candidates: dict[tuple[str, str, str], dict]
     ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if ctx.route.path_lookup:
-            for row in self.store.path_candidates(ctx.terms[:8], limit=max(50, ctx.limit * 4)):
+            for row in self.store.path_candidates(
+                ctx.terms[:8], limit=max(50, ctx.limit * 4)
+            ):
                 key = (str(row.get("path", "")), "", "file")
                 candidates.setdefault(key, row)
         if len(ctx.raw_words) == 1 and not candidates:
-            for row in self.store.search_candidates(ctx.query, limit=max(50, ctx.limit * 5)):
+            for row in self.store.search_candidates(
+                ctx.query, limit=max(50, ctx.limit * 5)
+            ):
                 key = (
                     str(row.get("path", "")),
                     str(row.get("qualname", "")),
@@ -148,20 +178,30 @@ class FindEngineMixin:
                 )
                 candidates[key] = row
 
-
     def _find_native_rows(self, ctx: _FindContext) -> list[dict]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         rows: list[dict] = []
         for term in (ctx.query, *ctx.raw_words):
             if term.strip():
-                rows.extend(self._fresh_native_definitions(term, limit=max(30, ctx.limit * 3)))
-        return list({
-            (str(row.get("path") or ""), str(row.get("display_name") or ""), int(row.get("line") or 0)): row
-            for row in rows
-        }.values())
-
+                rows.extend(
+                    self._fresh_native_definitions(term, limit=max(30, ctx.limit * 3))
+                )
+        return list(
+            {
+                (
+                    str(row.get("path") or ""),
+                    str(row.get("display_name") or ""),
+                    int(row.get("line") or 0),
+                ): row
+                for row in rows
+            }.values()
+        )
 
     @staticmethod
-    def _find_native_candidate(row: Mapping[str, object], mapped: Mapping[str, object]) -> dict:
+    def _find_native_candidate(
+        row: Mapping[str, object], mapped: Mapping[str, object]
+    ) -> dict:
         return {
             "row_type": "native-definition",
             "path": row["path"],
@@ -175,10 +215,11 @@ class FindEngineMixin:
             "_relation_boost": 24.0,
         }
 
-
     def _find_add_native_candidates(
         self, ctx: _FindContext, candidates: dict[tuple[str, str, str], dict]
     ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if not ctx.route.native_definitions:
             return
         native_rows = self._find_native_rows(ctx)
@@ -191,7 +232,6 @@ class FindEngineMixin:
             candidates[(str(row["path"]), display, "native-definition")] = (
                 self._find_native_candidate(row, mapped)
             )
-
 
     @staticmethod
     def _find_symbol_seed_rows(
@@ -208,7 +248,6 @@ class FindEngineMixin:
             seed_by_identity.setdefault(key, dict(row))
         return list(seed_by_identity.values())
 
-
     @staticmethod
     def _find_named_seed_names(seed_rows: Sequence[dict], seed_limit: int) -> list[str]:
         names: list[str] = []
@@ -218,31 +257,33 @@ class FindEngineMixin:
                 names.append(name)
         return names
 
-
     def _find_caller_seed_names(
         self,
         ctx: _FindContext,
         candidates: Mapping[tuple[str, str, str], dict],
         bridge_rows: Sequence[dict[str, object]],
     ) -> list[str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         seed_rows = self._find_symbol_seed_rows(candidates, bridge_rows)
-        seed_rows.sort(key=lambda row: -self._score(
-            ctx.query, row, tokens=ctx.terms, raw_query=ctx.raw_query
-        ))
+        seed_rows.sort(
+            key=lambda row: (
+                -self._score(ctx.query, row, tokens=ctx.terms, raw_query=ctx.raw_query)
+            )
+        )
         seed_limit = 12 if ctx.route.intent.value == "relationship" else 8
         return self._find_named_seed_names(seed_rows, seed_limit)
 
-
     @staticmethod
     def _find_caller_paths(
-        refs_by_seed: Mapping[str, Sequence[Mapping[str, object]]]
+        refs_by_seed: Mapping[str, Sequence[Mapping[str, object]]],
     ) -> set[str]:
         return {
             str(ref.get("path") or "")
-            for refs in refs_by_seed.values() for ref in refs
+            for refs in refs_by_seed.values()
+            for ref in refs
             if str(ref.get("path") or "")
         }
-
 
     def _find_add_caller_candidates(
         self,
@@ -250,14 +291,17 @@ class FindEngineMixin:
         candidates: dict[tuple[str, str, str], dict],
         bridge_rows: Sequence[dict[str, object]],
     ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if not ctx.route.caller_expansion:
             return
         seed_names = self._find_caller_seed_names(ctx, candidates, bridge_rows)
         refs_by_seed = self._session_refs_many(seed_names, limit_per_target=30)
         caller_files = self._session_file_rows(self._find_caller_paths(refs_by_seed))
         for seed_name in seed_names:
-            self._find_merge_caller_seed(candidates, refs_by_seed.get(seed_name, ()), caller_files)
-
+            self._find_merge_caller_seed(
+                candidates, refs_by_seed.get(seed_name, ()), caller_files
+            )
 
     @staticmethod
     def _find_merge_caller_seed(
@@ -274,9 +318,11 @@ class FindEngineMixin:
             existing = candidates.get(key)
             relation_boost = 30.0 if ref.get("kind") == "call" else 18.0
             value = {"row_type": "file", **file_row, "_relation_boost": relation_boost}
-            if existing is None or float(existing.get("_relation_boost", 0.0) or 0.0) < relation_boost:
+            if (
+                existing is None
+                or float(existing.get("_relation_boost", 0.0) or 0.0) < relation_boost
+            ):
                 candidates[key] = value
-
 
     @staticmethod
     def _find_exact_semantic_seeds(
@@ -290,9 +336,10 @@ class FindEngineMixin:
                 seeds.append(row)
         return seeds
 
-
     @staticmethod
-    def _find_seed_keys(seeds: Sequence[dict], seed_limit: int) -> list[tuple[str, str]]:
+    def _find_seed_keys(
+        seeds: Sequence[dict], seed_limit: int
+    ) -> list[tuple[str, str]]:
         keys: list[tuple[str, str]] = []
         for seed in seeds[:seed_limit]:
             path = str(seed.get("path") or "")
@@ -301,17 +348,21 @@ class FindEngineMixin:
                 keys.append((path, qualname))
         return keys
 
-
     def _find_semantic_seed_keys(
         self, ctx: _FindContext, candidates: Mapping[tuple[str, str, str], dict]
     ) -> list[tuple[str, str]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         seeds = self._find_exact_semantic_seeds(candidates, set(ctx.terms))
-        seeds.sort(key=lambda row: -self._score(
-            ctx.query, row, tokens=ctx.terms, raw_query=ctx.raw_query
-        ))
-        seed_limit = 12 if ctx.route.intent.value in {"relationship", "structural"} else 8
+        seeds.sort(
+            key=lambda row: (
+                -self._score(ctx.query, row, tokens=ctx.terms, raw_query=ctx.raw_query)
+            )
+        )
+        seed_limit = (
+            12 if ctx.route.intent.value in {"relationship", "structural"} else 8
+        )
         return self._find_seed_keys(seeds, seed_limit)
-
 
     def _find_add_semantic_candidates(
         self, ctx: _FindContext, candidates: dict[tuple[str, str, str], dict]
@@ -321,10 +372,11 @@ class FindEngineMixin:
         targets = self._find_semantic_targets(seed_keys, type_kinds)
         return self._find_merge_semantic_targets(candidates, targets)
 
-
     def _find_semantic_targets(
         self, seed_keys: Sequence[tuple[str, str]], type_kinds: set[str]
     ) -> set[str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         targets: set[str] = set()
         edges_by_seed = self._session_edges_from_many(seed_keys, limit_per_seed=24)
         for seed_key in seed_keys:
@@ -336,28 +388,46 @@ class FindEngineMixin:
                     targets.add(target.rsplit(".", 1)[-1])
         return targets
 
-
     def _find_merge_semantic_targets(
         self, candidates: dict[tuple[str, str, str], dict], targets: set[str]
     ) -> set[tuple[str, str]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         protected: set[tuple[str, str]] = set()
         if not targets:
             return protected
-        for related in self._session_exact_symbol_candidates(sorted(targets), limit=max(24, len(targets) * 8)):
+        for related in self._session_exact_symbol_candidates(
+            sorted(targets), limit=max(24, len(targets) * 8)
+        ):
             value = {"row_type": "symbol", **related, "_relation_boost": 42.0}
-            key = (str(related.get("path", "")), str(related.get("qualname", "")), "symbol")
+            key = (
+                str(related.get("path", "")),
+                str(related.get("qualname", "")),
+                "symbol",
+            )
             existing = candidates.get(key)
-            protected.add((str(related.get("path", "")), str(related.get("qualname", ""))))
-            if existing is None or float(existing.get("_relation_boost", 0.0) or 0.0) < 42.0:
+            protected.add(
+                (str(related.get("path", "")), str(related.get("qualname", "")))
+            )
+            if (
+                existing is None
+                or float(existing.get("_relation_boost", 0.0) or 0.0) < 42.0
+            ):
                 candidates[key] = value
         return protected
-
 
     def _find_search_hit(
         self, ctx: _FindContext, row: Mapping[str, object], recent: set[str]
     ) -> SearchHit | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         score = self._score(
-            ctx.query, row, ranks=None, recent=recent, tokens=ctx.terms, raw_query=ctx.raw_query
+            ctx.query,
+            row,
+            ranks=None,
+            recent=recent,
+            tokens=ctx.terms,
+            raw_query=ctx.raw_query,
         )
         if score <= 0:
             return None
@@ -365,20 +435,28 @@ class FindEngineMixin:
         if visibility is EvidenceVisibility.DENY:
             return None
         return SearchHit(
-            path=str(row["path"]), score=score,
+            path=str(row["path"]),
+            score=score,
             kind=str(row.get("kind") or row.get("row_type") or "file"),
-            name=_optional_str(row.get("name")), qualname=_optional_str(row.get("qualname")),
+            name=_optional_str(row.get("name")),
+            qualname=_optional_str(row.get("qualname")),
             signature=_optional_str(row.get("signature")),
-            start_line=_optional_int(row.get("start_line")), end_line=_optional_int(row.get("end_line")),
+            start_line=_optional_int(row.get("start_line")),
+            end_line=_optional_int(row.get("end_line")),
             evidence_visibility=visibility,
         )
-
 
     def _find_rank_candidates(
         self, ctx: _FindContext, candidates: Mapping[tuple[str, str, str], dict]
     ) -> list[SearchHit]:
-        domain_rows = self._apply_repository_domain_hints(tuple(candidates.values()), ctx.route)
-        rerank_rows = self._bounded_rerank_rows(ctx.query, domain_rows, limit=ctx.limit, tokens=ctx.terms)
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        domain_rows = self._apply_repository_domain_hints(
+            tuple(candidates.values()), ctx.route
+        )
+        rerank_rows = self._bounded_rerank_rows(
+            ctx.query, domain_rows, limit=ctx.limit, tokens=ctx.terms
+        )
         recent = self._recent_changed_paths()
         ranked: list[SearchHit] = []
         for row in rerank_rows:
@@ -388,16 +466,19 @@ class FindEngineMixin:
         ranked.sort(key=lambda hit: (-hit.score, hit.path, hit.start_line or 0))
         return ranked
 
-
     @staticmethod
     def _find_control_domains(route: QueryRoute) -> tuple[RepositoryDomain, ...]:
         domains = {
-            RepositoryDomain.ARCHITECTURE, RepositoryDomain.OWNERSHIP, RepositoryDomain.BUILD,
-            RepositoryDomain.PLAN, RepositoryDomain.CONFIG, RepositoryDomain.SCRIPT,
-            RepositoryDomain.CONTRACT, RepositoryDomain.DOC,
+            RepositoryDomain.ARCHITECTURE,
+            RepositoryDomain.OWNERSHIP,
+            RepositoryDomain.BUILD,
+            RepositoryDomain.PLAN,
+            RepositoryDomain.CONFIG,
+            RepositoryDomain.SCRIPT,
+            RepositoryDomain.CONTRACT,
+            RepositoryDomain.DOC,
         }
         return tuple(domain for domain in route.preferred_domains if domain in domains)
-
 
     @staticmethod
     def _find_control_hits(
@@ -408,8 +489,10 @@ class FindEngineMixin:
         covered: set[RepositoryDomain] = set()
         for hit in ranked:
             matches = [
-                domain for domain in wanted
-                if domain in set(classify_repository_path(hit.path)) and domain not in covered
+                domain
+                for domain in wanted
+                if domain in set(classify_repository_path(hit.path))
+                and domain not in covered
             ]
             if not matches or hit.score < 24.0:
                 continue
@@ -419,9 +502,10 @@ class FindEngineMixin:
                 break
         return hits
 
-
     @staticmethod
-    def _find_add_selected(state: _FindSelectionState, hits: Iterable[SearchHit]) -> None:
+    def _find_add_selected(
+        state: _FindSelectionState, hits: Iterable[SearchHit]
+    ) -> None:
         for hit in hits:
             identity = (hit.path, hit.qualname, hit.start_line)
             if identity in state.selected_ids:
@@ -429,7 +513,6 @@ class FindEngineMixin:
             state.selected.append(hit)
             state.selected_ids.add(identity)
             state.seen_paths.add(hit.path)
-
 
     @staticmethod
     def _find_protected_hits(
@@ -443,7 +526,6 @@ class FindEngineMixin:
                     break
         return hits
 
-
     @staticmethod
     def _find_best_file(ranked: Sequence[SearchHit]) -> SearchHit | None:
         first_path = ranked[0].path
@@ -452,19 +534,24 @@ class FindEngineMixin:
                 return hit
         return None
 
-
     def _find_reserve_hits(
-        self, ctx: _FindContext, ranked: Sequence[SearchHit],
-        protected: set[tuple[str, str]], state: _FindSelectionState
+        self,
+        ctx: _FindContext,
+        ranked: Sequence[SearchHit],
+        protected: set[tuple[str, str]],
+        state: _FindSelectionState,
     ) -> None:
-        self._find_add_selected(state, self._find_control_hits(ctx.route, ranked, ctx.limit))
+        self._find_add_selected(
+            state, self._find_control_hits(ctx.route, ranked, ctx.limit)
+        )
         self._find_add_selected(state, self._find_protected_hits(ranked, protected))
         best_file = self._find_best_file(ranked)
         if best_file is not None:
             state.selected.append(best_file)
-            state.selected_ids.add((best_file.path, best_file.qualname, best_file.start_line))
+            state.selected_ids.add(
+                (best_file.path, best_file.qualname, best_file.start_line)
+            )
             state.seen_paths.add(best_file.path)
-
 
     def _find_fill_diverse(
         self, ranked: Sequence[SearchHit], quota: int, state: _FindSelectionState
@@ -475,7 +562,6 @@ class FindEngineMixin:
             self._find_add_selected(state, (hit,))
             if len(state.selected) >= quota:
                 break
-
 
     @staticmethod
     def _find_fill_ranked(
@@ -490,9 +576,11 @@ class FindEngineMixin:
             if len(state.selected) >= limit:
                 break
 
-
     def _find_select_diverse(
-        self, ctx: _FindContext, ranked: Sequence[SearchHit], protected: set[tuple[str, str]]
+        self,
+        ctx: _FindContext,
+        ranked: Sequence[SearchHit],
+        protected: set[tuple[str, str]],
     ) -> tuple[SearchHit, ...]:
         if len(ranked) <= ctx.limit:
             return tuple(ranked)
@@ -502,8 +590,7 @@ class FindEngineMixin:
         self._find_fill_diverse(ranked, quota, state)
         self._find_fill_ranked(ranked, ctx.limit, state)
         state.selected.sort(key=lambda hit: (-hit.score, hit.path, hit.start_line or 0))
-        return tuple(state.selected[:ctx.limit])
-
+        return tuple(state.selected[: ctx.limit])
 
     def _find_impl(self, query: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
         if not query.strip():

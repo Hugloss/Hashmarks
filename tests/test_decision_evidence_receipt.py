@@ -49,12 +49,18 @@ def test_evidence_identity_is_worker_budget_independent(tmp_path: Path) -> None:
     assert len(identities) == 1
 
 
-def test_evidence_identity_changes_with_task_or_repository_authority(tmp_path: Path) -> None:
+def test_evidence_identity_changes_with_task_or_repository_authority(
+    tmp_path: Path,
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        original = _identity(codemap.task_action_brief("Change widget behavior and verify it"))
-        other_task = _identity(codemap.task_action_brief("Inspect widget semantics and verify it"))
+        original = _identity(
+            codemap.task_action_brief("Change widget behavior and verify it")
+        )
+        other_task = _identity(
+            codemap.task_action_brief("Inspect widget semantics and verify it")
+        )
         assert other_task != original
 
         (tmp_path / "src" / "engine.py").write_text(
@@ -62,11 +68,15 @@ def test_evidence_identity_changes_with_task_or_repository_authority(tmp_path: P
             encoding="utf-8",
         )
         codemap.sync()
-        changed_repo = _identity(codemap.task_action_brief("Change widget behavior and verify it"))
+        changed_repo = _identity(
+            codemap.task_action_brief("Change widget behavior and verify it")
+        )
         assert changed_repo != original
 
 
-def test_receipt_is_compact_reference_not_embedded_full_evidence(tmp_path: Path) -> None:
+def test_receipt_is_compact_reference_not_embedded_full_evidence(
+    tmp_path: Path,
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -74,8 +84,12 @@ def test_receipt_is_compact_reference_not_embedded_full_evidence(tmp_path: Path)
     receipt = action["evidence_receipt"]
     assert isinstance(receipt, dict)
     assert set(receipt) == {
-        "schema", "evidence_identity", "repository_identity", "task_identity",
-        "codemap_generation", "stale",
+        "schema",
+        "evidence_identity",
+        "repository_identity",
+        "task_identity",
+        "codemap_generation",
+        "stale",
     }
     assert "verification_relevance" not in receipt
     assert "work_context" not in receipt

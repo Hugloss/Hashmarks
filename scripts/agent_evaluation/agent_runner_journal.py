@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+
 try:
     from scripts._module_loader import import_sibling
 except ModuleNotFoundError:  # direct script execution
     from _module_loader import import_sibling
+import contextlib
 import json
 import os
 import tempfile
@@ -44,10 +46,8 @@ def _atomic_create_json(path: Path, value: dict[str, Any]) -> None:
         except FileExistsError as exc:
             raise ValueError(f"journal member already exists: {path}") from exc
     finally:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             tmp.unlink()
-        except FileNotFoundError:
-            pass
 
 
 def init_journal(
@@ -73,7 +73,9 @@ def init_journal(
     for tool, kind in tool_map.items():
         _nonempty(tool, "tool_map key")
         if kind is not None and kind not in normalizer.ALLOWED_KINDS:
-            raise ValueError(f"unsupported canonical navigation kind for {tool!r}: {kind!r}")
+            raise ValueError(
+                f"unsupported canonical navigation kind for {tool!r}: {kind!r}"
+            )
     header = {
         "schema": JOURNAL_SCHEMA,
         "runner_identity": _nonempty(runner_identity, "runner_identity"),
@@ -83,9 +85,13 @@ def init_journal(
         "mode": mode,
         "run_id": _nonempty(run_id, "run_id"),
         "model_identity": _nonempty(model_identity, "model_identity"),
-        "model_config_identity": _nonempty(model_config_identity, "model_config_identity"),
+        "model_config_identity": _nonempty(
+            model_config_identity, "model_config_identity"
+        ),
         "normalization_policy_schema": normalizer.POLICY_SCHEMA,
-        "normalization_policy_identity": normalizer.normalization_policy_identity(tool_map),
+        "normalization_policy_identity": normalizer.normalization_policy_identity(
+            tool_map
+        ),
         "tool_map": tool_map,
     }
     journal.mkdir(parents=True, exist_ok=True)
@@ -108,17 +114,23 @@ def record_event(journal: Path, event: dict[str, Any]) -> Path:
     tool = _nonempty(event.get("tool"), "event tool")
     tool_map = header.get("tool_map")
     if not isinstance(tool_map, dict) or tool not in tool_map:
-        raise ValueError(f"event tool {tool!r} is not explicitly declared in journal tool_map")
+        raise ValueError(
+            f"event tool {tool!r} is not explicitly declared in journal tool_map"
+        )
     clean: dict[str, Any] = {"sequence": sequence, "tool": tool}
     for field in normalizer.PASSTHROUGH_FIELDS:
         if field in event and event[field] is not None:
-            clean[field] = normalizer._validate_event_value(field, event[field], header_path)
+            clean[field] = normalizer._validate_event_value(
+                field, event[field], header_path
+            )
     target = journal / "events" / f"{sequence:020d}.json"
     _atomic_create_json(target, clean)
     return target
 
 
-def finalize_journal(journal: Path, output: Path, *, normalized_output: Path | None = None) -> dict[str, Any]:
+def finalize_journal(
+    journal: Path, output: Path, *, normalized_output: Path | None = None
+) -> dict[str, Any]:
     normalizer = _load_normalizer()
     header_path = journal / "header.json"
     header = _read_json(header_path)
@@ -133,35 +145,45 @@ def finalize_journal(journal: Path, output: Path, *, normalized_output: Path | N
         if not isinstance(event, dict):
             raise ValueError(f"journal event must be an object: {member}")
         sequence = event.get("sequence")
-        if not isinstance(sequence, int) or isinstance(sequence, bool) or sequence <= last:
+        if (
+            not isinstance(sequence, int)
+            or isinstance(sequence, bool)
+            or sequence <= last
+        ):
             raise ValueError(f"journal sequences must be strictly increasing: {member}")
         if member.name != f"{sequence:020d}.json":
             raise ValueError(f"journal filename/sequence mismatch: {member}")
         expected = len(events)
         if sequence != expected:
-            raise ValueError(f"journal sequence gap: expected {expected}, got {sequence}: {member}")
+            raise ValueError(
+                f"journal sequence gap: expected {expected}, got {sequence}: {member}"
+            )
         last = sequence
         events.append(event)
     raw = {key: value for key, value in header.items() if key != "schema"}
     raw["schema"] = RAW_SCHEMA
     raw["events"] = events
     output.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(prefix=".runner-log-", suffix=".tmp", dir=output.parent)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=".runner-log-", suffix=".tmp", dir=output.parent
+    )
     os.close(fd)
     tmp = Path(tmp_name)
     try:
-        tmp.write_text(json.dumps(raw, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        tmp.write_text(
+            json.dumps(raw, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         normalizer.load_raw(tmp)
         os.replace(tmp, output)
     finally:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             tmp.unlink()
-        except FileNotFoundError:
-            pass
     if normalized_output is not None:
         normalized = normalizer.normalize(output)
         normalized_output.parent.mkdir(parents=True, exist_ok=True)
-        normalized_output.write_text(json.dumps(normalized, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        normalized_output.write_text(
+            json.dumps(normalized, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     return raw
 
 
@@ -173,7 +195,9 @@ def _tool_map(path: Path) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Crash-safe runner-neutral agent navigation journal")
+    parser = argparse.ArgumentParser(
+        description="Crash-safe runner-neutral agent navigation journal"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     init = sub.add_parser("init")
     init.add_argument("journal", type=Path)
@@ -224,18 +248,28 @@ def main() -> None:
         )
     elif args.command == "event":
         event_payload = {
-            "sequence": args.sequence, "tool": args.tool, "query": args.query, "path": args.path,
-            "paths": args.paths, "returned_paths": args.returned_paths, "evidence_paths": args.evidence_paths,
-            "bytes": args.bytes, "estimated_tokens": args.estimated_tokens, "model_input_tokens": args.model_input_tokens,
-            "started_at_ns": args.started_at_ns, "finished_at_ns": args.finished_at_ns,
+            "sequence": args.sequence,
+            "tool": args.tool,
+            "query": args.query,
+            "path": args.path,
+            "paths": args.paths,
+            "returned_paths": args.returned_paths,
+            "evidence_paths": args.evidence_paths,
+            "bytes": args.bytes,
+            "estimated_tokens": args.estimated_tokens,
+            "model_input_tokens": args.model_input_tokens,
+            "started_at_ns": args.started_at_ns,
+            "finished_at_ns": args.finished_at_ns,
         }
         if args.fallback:
             event_payload["fallback"] = True
         target = record_event(args.journal, event_payload)
         payload = {"recorded": str(target)}
     else:
-        payload = finalize_journal(args.journal, args.output, normalized_output=args.normalized_output)
-    print(json.dumps(payload, indent=2, sort_keys=True))
+        payload = finalize_journal(
+            args.journal, args.output, normalized_output=args.normalized_output
+        )
+    print(json.dumps(payload, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
 
 
 if __name__ == "__main__":

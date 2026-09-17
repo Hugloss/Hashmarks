@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -7,16 +8,19 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import TYPE_CHECKING
 
 from .paths import canonical_host_path, normalize_relative_path
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 # Explicit agent-lane helper. It uses documented Vitest/Vite advanced APIs but
 # never invokes Vitest's test runner or imports test/application modules for
 # execution. Vite transforms populate its native module graph and may execute
 # repository config/plugin code, which is why this is never an Identity hot-path
 # operation and is only run from explicit native enrichment/selection.
-_VITEST_VITE_HELPER = r'''import fs from 'node:fs';
+_VITEST_VITE_HELPER = r"""import fs from 'node:fs';
 import path from 'node:path';
 import { createVitest } from 'vitest/node';
 const input = JSON.parse(fs.readFileSync(0, 'utf8'));
@@ -64,7 +68,7 @@ for (const spec of specs) {
 }
 try { await vitest.close(); } catch (_) {}
 process.stdout.write(JSON.stringify({ selected, edges }));
-'''
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,7 +109,9 @@ def _workspace_rel(root: Path, value: str, *, require_file: bool = True) -> str 
     return rel
 
 
-def _normalized_changed_paths(root: Path, changed_paths: Sequence[str]) -> tuple[list[str], list[str]]:
+def _normalized_changed_paths(
+    root: Path, changed_paths: Sequence[str]
+) -> tuple[list[str], list[str]]:
     normalized: list[str] = []
     warnings: list[str] = []
     for raw in changed_paths:
@@ -118,7 +124,9 @@ def _normalized_changed_paths(root: Path, changed_paths: Sequence[str]) -> tuple
         if candidate.exists() and not candidate.is_symlink():
             normalized.append(rel)
         else:
-            warnings.append(f"changed path is missing/symlink and cannot be resolved by Vite: {rel}")
+            warnings.append(
+                f"changed path is missing/symlink and cannot be resolved by Vite: {rel}"
+            )
     return normalized, warnings
 
 
@@ -134,12 +142,19 @@ def _write_vitest_helper(root: Path) -> Path:
     return helper
 
 
-def _run_vitest_helper(argv: tuple[str, ...], root: Path, payload: str, timeout: float) -> tuple[subprocess.CompletedProcess[str] | None, str | None]:
+def _run_vitest_helper(
+    argv: tuple[str, ...], root: Path, payload: str, timeout: float
+) -> tuple[subprocess.CompletedProcess[str] | None, str | None]:
     try:
         completed = subprocess.run(
-            list(argv), cwd=root, input=payload,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, check=False, timeout=timeout, env=os.environ.copy(),
+            list(argv),
+            cwd=root,
+            input=payload,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+            env=os.environ.copy(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return None, f"Vitest/Vite graph unavailable: {exc.__class__.__name__}"
@@ -163,7 +178,9 @@ def _vitest_payload(stdout: str) -> tuple[dict[str, object] | None, str | None]:
 def _selected_paths(root: Path, value: dict[str, object]) -> tuple[str, ...]:
     raw_selected = value.get("selected", ())
     rows = raw_selected if isinstance(raw_selected, list) else ()
-    selected = [rel for raw in rows if (rel := _workspace_rel(root, str(raw))) is not None]
+    selected = [
+        rel for raw in rows if (rel := _workspace_rel(root, str(raw))) is not None
+    ]
     return tuple(sorted(dict.fromkeys(selected)))
 
 
@@ -179,11 +196,17 @@ def _vite_edges(root: Path, value: dict[str, object]) -> tuple[VitestViteEdge, .
         target = _workspace_rel(root, str(row[1]))
         if source is not None and target is not None and source != target:
             edges.append(VitestViteEdge(source=source, target=target))
-    return tuple(sorted(dict.fromkeys(edges), key=lambda edge: (edge.source, edge.target, edge.kind)))
+    return tuple(
+        sorted(
+            dict.fromkeys(edges), key=lambda edge: (edge.source, edge.target, edge.kind)
+        )
+    )
 
 
-def _unavailable_vitest(argv: tuple[str, ...], warnings: list[str], error: str) -> VitestViteGraph:
-    return VitestViteGraph("vitest-vite", (), (), argv, tuple([*warnings, error]))
+def _unavailable_vitest(
+    argv: tuple[str, ...], warnings: list[str], error: str
+) -> VitestViteGraph:
+    return VitestViteGraph("vitest-vite", (), (), argv, (*warnings, error))
 
 
 def _collect_vitest_value(
@@ -191,14 +214,20 @@ def _collect_vitest_value(
 ) -> tuple[dict[str, object] | None, VitestViteGraph | None]:
     completed, error = _run_vitest_helper(argv, root, payload, timeout)
     if completed is None:
-        return None, _unavailable_vitest(argv, warnings, error or "Vitest/Vite graph unavailable")
+        return None, _unavailable_vitest(
+            argv, warnings, error or "Vitest/Vite graph unavailable"
+        )
     value, error = _vitest_payload(completed.stdout)
     if value is None:
-        return None, _unavailable_vitest(argv, warnings, error or "Vitest/Vite graph unavailable")
+        return None, _unavailable_vitest(
+            argv, warnings, error or "Vitest/Vite graph unavailable"
+        )
     return value, None
 
 
-def _vitest_result(root: Path, argv: tuple[str, ...], warnings: list[str], value: dict[str, object]) -> VitestViteGraph:
+def _vitest_result(
+    root: Path, argv: tuple[str, ...], warnings: list[str], value: dict[str, object]
+) -> VitestViteGraph:
     return VitestViteGraph(
         producer="vitest-vite",
         selected=_selected_paths(root, value),
@@ -218,18 +247,26 @@ def collect_vitest_vite_graph(
     root = canonical_host_path(workspace)
     node_exe = node or shutil.which("node")
     if node_exe is None:
-        return VitestViteGraph("vitest-vite", (), (), (), ("node executable not found",))
+        return VitestViteGraph(
+            "vitest-vite", (), (), (), ("node executable not found",)
+        )
     if local_vitest(root) is None:
-        return VitestViteGraph("vitest-vite", (), (), (), ("repository-local Vitest package not found",))
+        return VitestViteGraph(
+            "vitest-vite", (), (), (), ("repository-local Vitest package not found",)
+        )
     normalized, warnings = _normalized_changed_paths(root, changed_paths)
     helper = _write_vitest_helper(root)
     argv = (str(node_exe), str(helper))
     try:
         payload = json.dumps({"root": str(root), "changed": normalized})
-        value, unavailable = _collect_vitest_value(argv, root, payload, timeout, warnings)
-        return unavailable if unavailable is not None else _vitest_result(root, argv, warnings, value or {})
+        value, unavailable = _collect_vitest_value(
+            argv, root, payload, timeout, warnings
+        )
+        return (
+            unavailable
+            if unavailable is not None
+            else _vitest_result(root, argv, warnings, value or {})
+        )
     finally:
-        try:
+        with contextlib.suppress(OSError):
             helper.unlink()
-        except OSError:
-            pass

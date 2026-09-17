@@ -10,7 +10,7 @@ ROOT = Path(__file__).parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import pytest
+import pytest  # noqa: E402 - import follows standalone script path setup
 
 
 @pytest.fixture(scope="session")
@@ -60,4 +60,8 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(pytest.mark.skip(reason=reason))
         for marker, available in capabilities.items():
             if not available and item.get_closest_marker(marker) is not None:
-                item.add_marker(pytest.mark.skip(reason=f"constrained host lacks capability: {marker}"))
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason=f"constrained host lacks capability: {marker}"
+                    )
+                )

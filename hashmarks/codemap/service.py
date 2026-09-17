@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import socket
@@ -33,7 +34,9 @@ class _Handler(socketserver.StreamRequestHandler):
         service: CodeMapService = self.server.codemap_service  # type: ignore[attr-defined]
         raw = self.rfile.readline(MAX_REQUEST + 1)
         if len(raw) > MAX_REQUEST:
-            service._write(self.wfile, {"ok": False, "error": "request exceeded size limit"})
+            service._write(
+                self.wfile, {"ok": False, "error": "request exceeded size limit"}
+            )
             return
         response = dispatch_json_request(raw, service.dispatch)
         service._write(self.wfile, response)
@@ -47,9 +50,15 @@ class CodeMapService:
     local socket backlog instead of creating multiple repository authorities.
     """
 
-    def __init__(self, workspace: str | Path, *, socket_path: str | Path | None = None) -> None:
+    def __init__(
+        self, workspace: str | Path, *, socket_path: str | Path | None = None
+    ) -> None:
         self.workspace = canonical_host_path(workspace)
-        self.socket_path = default_codemap_socket(self.workspace) if socket_path is None else canonical_host_path(socket_path)
+        self.socket_path = (
+            default_codemap_socket(self.workspace)
+            if socket_path is None
+            else canonical_host_path(socket_path)
+        )
         self._codemap: CodeMap | None = None
         self._server: _Server | None = None
         self._requests = 0
@@ -58,7 +67,9 @@ class CodeMapService:
 
     @staticmethod
     def _write(stream, response: dict[str, Any]) -> None:
-        payload = (json.dumps(response, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
+        payload = (
+            json.dumps(response, separators=(",", ":"), sort_keys=True) + "\n"
+        ).encode("utf-8")
         if len(payload) > MAX_RESPONSE:
             payload = b'{"ok":false,"error":"response exceeded size limit"}\n'
         stream.write(payload)
@@ -74,8 +85,16 @@ class CodeMapService:
         paths = request.get("paths")
         if paths is None and not required:
             return None
-        if not isinstance(paths, list) or (required and not paths) or not all(isinstance(path, str) for path in paths):
-            message = "paths must be a non-empty list of strings" if required else "paths must be a list of strings"
+        if (
+            not isinstance(paths, list)
+            or (required and not paths)
+            or not all(isinstance(path, str) for path in paths)
+        ):
+            message = (
+                "paths must be a non-empty list of strings"
+                if required
+                else "paths must be a list of strings"
+            )
             raise ValueError(message)
         return paths
 
@@ -87,16 +106,24 @@ class CodeMapService:
         return task
 
     @staticmethod
-    def _bounded_int(request: dict[str, Any], key: str, default: int, minimum: int, maximum: int) -> int:
+    def _bounded_int(
+        request: dict[str, Any], key: str, default: int, minimum: int, maximum: int
+    ) -> int:
         value = int(request.get(key, default))
         if value < minimum or value > maximum:
             raise ValueError(f"{key} must be between {minimum} and {maximum}")
         return value
 
     @staticmethod
-    def _string_list(request: dict[str, Any], key: str, *, required: bool = False) -> list[str]:
+    def _string_list(
+        request: dict[str, Any], key: str, *, required: bool = False
+    ) -> list[str]:
         value = request.get(key, [])
-        if not isinstance(value, list) or (required and not value) or not all(isinstance(item, str) for item in value):
+        if (
+            not isinstance(value, list)
+            or (required and not value)
+            or not all(isinstance(item, str) for item in value)
+        ):
             qualifier = "a non-empty list" if required else "a list"
             raise ValueError(f"{key} must be {qualifier} of strings")
         return value
@@ -118,6 +145,7 @@ class CodeMapService:
 
     def _sync_response(self, _request: dict[str, Any]) -> dict[str, Any]:
         import time
+
         started = time.perf_counter()
         result = self._map().sync()
         elapsed = (time.perf_counter() - started) * 1000.0
@@ -125,37 +153,71 @@ class CodeMapService:
         return {"ok": True, "elapsed_ms": elapsed, "result": result.as_dict()}
 
     def _repository_findings_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        return {"ok": True, "repository_findings": self._map().repository_findings(self._paths(request))}
+        return {
+            "ok": True,
+            "repository_findings": self._map().repository_findings(
+                self._paths(request)
+            ),
+        }
 
     def _import_ownership_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        return {"ok": True, "import_ownership": self._map().import_ownership_findings(self._paths(request))}
+        return {
+            "ok": True,
+            "import_ownership": self._map().import_ownership_findings(
+                self._paths(request)
+            ),
+        }
 
     def _cache_ownership_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        return {"ok": True, "cache_ownership": self._map().cache_ownership_findings(self._paths(request))}
+        return {
+            "ok": True,
+            "cache_ownership": self._map().cache_ownership_findings(
+                self._paths(request)
+            ),
+        }
 
     def _cache_invalidation_response(self, request: dict[str, Any]) -> dict[str, Any]:
         return {
             "ok": True,
-            "cache_invalidation_ownership": self._map().cache_invalidation_ownership_graph(self._paths(request)),
+            "cache_invalidation_ownership": self._map().cache_invalidation_ownership_graph(
+                self._paths(request)
+            ),
         }
 
     def _authority_ownership_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        return {"ok": True, "authority_ownership": self._map().repository_ownership_graph(self._paths(request))}
+        return {
+            "ok": True,
+            "authority_ownership": self._map().repository_ownership_graph(
+                self._paths(request)
+            ),
+        }
 
     def _concurrency_risk_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        return {"ok": True, "concurrency_risk": self._map().concurrency_risk_findings(self._paths(request))}
+        return {
+            "ok": True,
+            "concurrency_risk": self._map().concurrency_risk_findings(
+                self._paths(request)
+            ),
+        }
 
-    def _verification_ownership_response(self, request: dict[str, Any]) -> dict[str, Any]:
+    def _verification_ownership_response(
+        self, request: dict[str, Any]
+    ) -> dict[str, Any]:
         task = self._task(request)
         limit = self._bounded_int(request, "limit", 20, 1, 100)
         candidate_limit = self._bounded_int(request, "candidate_limit", 8, 1, 16)
-        graph = self._map().verification_ownership_graph(task, limit=limit, candidate_limit=candidate_limit)
+        graph = self._map().verification_ownership_graph(
+            task, limit=limit, candidate_limit=candidate_limit
+        )
         return {"ok": True, "verification_ownership": graph}
 
     def _find_task_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task = self._task(request)
         limit = self._bounded_int(request, "limit", 20, 1, 100)
-        return {"ok": True, "hits": [hit.as_dict() for hit in self._map().find_task(task, limit=limit)]}
+        return {
+            "ok": True,
+            "hits": [hit.as_dict() for hit in self._map().find_task(task, limit=limit)],
+        }
 
     def _task_context(self, request: dict[str, Any]) -> tuple[str, int, int]:
         return (
@@ -169,13 +231,16 @@ class CodeMapService:
         result = self._map().task_action_map(task, limit=limit, per_role=per_role)
         return {"ok": True, "action_map": result}
 
-    def _verification_relevance_response(self, request: dict[str, Any]) -> dict[str, Any]:
+    def _verification_relevance_response(
+        self, request: dict[str, Any]
+    ) -> dict[str, Any]:
         task = self._task(request)
         limit = self._bounded_int(request, "limit", 20, 1, 100)
         candidate_limit = self._bounded_int(request, "candidate_limit", 8, 1, 16)
-        result = self._map().verification_relevance(task, limit=limit, candidate_limit=candidate_limit)
+        result = self._map().verification_relevance(
+            task, limit=limit, candidate_limit=candidate_limit
+        )
         return {"ok": True, "verification_relevance": result}
-
 
     def _ownership_relation_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task = self._task(request)
@@ -183,18 +248,25 @@ class CodeMapService:
         if not isinstance(start_path, str) or not start_path.strip():
             raise ValueError("start_path must be a non-empty string")
         max_depth = int(request.get("max_depth", 2))
-        result = self._map().ownership_relation_graph(task, start_path, max_depth=max_depth)
+        result = self._map().ownership_relation_graph(
+            task, start_path, max_depth=max_depth
+        )
         return {"ok": True, "ownership_relation_graph": result}
 
     def _task_evidence_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task, limit, per_role = self._task_context(request)
         token_budget = self._bounded_int(request, "token_budget", 1536, 1, 100_000)
         result = self._map().task_evidence(
-            task, limit=limit, per_role=per_role, token_budget=token_budget,
+            task,
+            limit=limit,
+            per_role=per_role,
+            token_budget=token_budget,
         )
         return {"ok": True, "task_evidence": result}
 
-    def _changed_context(self, request: dict[str, Any]) -> tuple[str, list[str], int, int, int]:
+    def _changed_context(
+        self, request: dict[str, Any]
+    ) -> tuple[str, list[str], int, int, int]:
         task, limit, per_role = self._task_context(request)
         changed = self._string_list(request, "changed_paths", required=True)
         token_budget = self._bounded_int(request, "token_budget", 512, 1, 100_000)
@@ -223,18 +295,17 @@ class CodeMapService:
         )
         return {"ok": True, "task_change_impact": result}
 
-
-
-
-
-
-    def _repository_intelligence_query_response(self, request: dict[str, Any]) -> dict[str, Any]:
+    def _repository_intelligence_query_response(
+        self, request: dict[str, Any]
+    ) -> dict[str, Any]:
         task = self._task(request)
         surface = request.get("surface")
         if not isinstance(surface, str) or not surface.strip():
             raise ValueError("surface must be a non-empty string")
         changed = self._string_list(request, "changed_paths", required=False)
-        negative_members = self._string_list(request, "negative_members", required=False)
+        negative_members = self._string_list(
+            request, "negative_members", required=False
+        )
         previous_map = request.get("previous_map")
         if previous_map is not None and not isinstance(previous_map, dict):
             raise ValueError("previous_map must be an object or null")
@@ -242,23 +313,30 @@ class CodeMapService:
         if previous_snapshot is not None and not isinstance(previous_snapshot, dict):
             raise ValueError("previous_snapshot must be an object or null")
         member_path = request.get("member_path")
-        if member_path is not None and (not isinstance(member_path, str) or not member_path.strip()):
+        if member_path is not None and (
+            not isinstance(member_path, str) or not member_path.strip()
+        ):
             raise ValueError("member_path must be a non-empty string or null")
         result = self._map().repository_intelligence_query(
-            surface, task, changed, member_path=member_path,
+            surface,
+            task,
+            changed,
+            member_path=member_path,
             profile=str(request.get("profile", "compact")),
-            negative_members=negative_members, previous_map=previous_map,
+            negative_members=negative_members,
+            previous_map=previous_map,
             previous_snapshot=previous_snapshot,
             limit=self._bounded_int(request, "limit", 20, 1, 100),
             per_role=self._bounded_int(request, "per_role", 3, 1, 20),
-            impact_limit_per_surface=self._bounded_int(request, "impact_limit_per_surface", 4, 1, 100),
+            impact_limit_per_surface=self._bounded_int(
+                request, "impact_limit_per_surface", 4, 1, 100
+            ),
             max_depth=self._bounded_int(request, "max_depth", 3, 1, 32),
-            project_impact_limit=self._bounded_int(request, "project_impact_limit", 12, 1, 100000),
+            project_impact_limit=self._bounded_int(
+                request, "project_impact_limit", 12, 1, 100000
+            ),
         )
         return {"ok": True, "repository_intelligence_query": result}
-
-
-
 
     def _post_change_delta_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task, changed, limit, per_role, _budget = self._changed_context(request)
@@ -267,8 +345,12 @@ class CodeMapService:
             raise ValueError("previous_evidence must be an object")
         token_budget = self._bounded_int(request, "token_budget", 1536, 1, 100_000)
         result = self._map().task_post_change_delta(
-            task, changed, previous_evidence=previous_evidence, limit=limit,
-            per_role=per_role, token_budget=token_budget,
+            task,
+            changed,
+            previous_evidence=previous_evidence,
+            limit=limit,
+            per_role=per_role,
+            token_budget=token_budget,
         )
         return {"ok": True, "post_change_delta": result}
 
@@ -279,7 +361,9 @@ class CodeMapService:
             changed,
             previous_edit_path=request.get("previous_edit_path"),
             previous_verify_path=request.get("previous_verify_path"),
-            limit=limit, per_role=per_role, token_budget=budget,
+            limit=limit,
+            per_role=per_role,
+            token_budget=budget,
         )
         return {"ok": True, "refresh_delta": result}
 
@@ -288,7 +372,9 @@ class CodeMapService:
         result = self._map().refresh_after_change_brief(
             task,
             changed,
-            limit=limit, per_role=per_role, token_budget=budget,
+            limit=limit,
+            per_role=per_role,
+            token_budget=budget,
         )
         return {"ok": True, "refresh_brief": result}
 
@@ -297,7 +383,9 @@ class CodeMapService:
         result = self._map().refresh_after_change(
             task,
             changed,
-            limit=limit, per_role=per_role, token_budget=budget,
+            limit=limit,
+            per_role=per_role,
+            token_budget=budget,
         )
         return {"ok": True, "refresh": result}
 
@@ -323,7 +411,11 @@ class CodeMapService:
     def _budget_sweep_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task, limit, per_role = self._task_context(request)
         budgets = request.get("budgets", [64, 128, 192, 256, 384, 512])
-        if not isinstance(budgets, list) or not budgets or not all(isinstance(value, int) for value in budgets):
+        if (
+            not isinstance(budgets, list)
+            or not budgets
+            or not all(isinstance(value, int) for value in budgets)
+        ):
             raise ValueError("budgets must be a non-empty list of integers")
         result = self._map().task_decision_brief_budget_sweep(
             task, budgets=budgets, limit=limit, per_role=per_role
@@ -341,6 +433,7 @@ class CodeMapService:
     def _stop_response(self, _request: dict[str, Any]) -> dict[str, Any]:
         if self._server is not None:
             import threading
+
             threading.Thread(target=self._server.shutdown, daemon=True).start()
         return {"ok": True}
 
@@ -383,10 +476,8 @@ class CodeMapService:
 
     def _prepare_socket(self) -> None:
         self.socket_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
+        with contextlib.suppress(OSError):
             os.chmod(self.socket_path.parent, 0o700)
-        except OSError:
-            pass
         if self.socket_path.exists() or self.socket_path.is_socket():
             probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             try:
@@ -395,12 +486,15 @@ class CodeMapService:
             except OSError:
                 self.socket_path.unlink(missing_ok=True)
             else:
-                raise RuntimeError(f"CodeMap service already running at {self.socket_path}")
+                raise RuntimeError(
+                    f"CodeMap service already running at {self.socket_path}"
+                )
             finally:
                 probe.close()
 
     def serve_forever(self) -> None:
         import time
+
         self._prepare_socket()
         with CodeMap(self.workspace) as codemap:
             self._codemap = codemap
@@ -412,10 +506,8 @@ class CodeMapService:
             server.codemap_service = self  # type: ignore[attr-defined]
             self._server = server
             try:
-                try:
+                with contextlib.suppress(OSError):
                     os.chmod(self.socket_path, 0o600)
-                except OSError:
-                    pass
                 server.serve_forever(poll_interval=0.05)
             finally:
                 server.server_close()
@@ -425,15 +517,28 @@ class CodeMapService:
 
 
 class CodeMapServiceClient:
-    def __init__(self, workspace: str | Path, *, socket_path: str | Path | None = None, timeout: float = 30.0) -> None:
+    def __init__(
+        self,
+        workspace: str | Path,
+        *,
+        socket_path: str | Path | None = None,
+        timeout: float = 30.0,
+    ) -> None:
         self.workspace = canonical_host_path(workspace)
-        self.socket_path = default_codemap_socket(self.workspace) if socket_path is None else canonical_host_path(socket_path)
+        self.socket_path = (
+            default_codemap_socket(self.workspace)
+            if socket_path is None
+            else canonical_host_path(socket_path)
+        )
         self.timeout = timeout
 
     def request(self, op: str, **payload: Any) -> dict[str, Any]:
         message = {"protocol": PROTOCOL, "op": op, **payload}
-        raw = (json.dumps(message, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
+        raw = (
+            json.dumps(message, separators=(",", ":"), sort_keys=True) + "\n"
+        ).encode("utf-8")
         import time
+
         deadline = time.monotonic() + self.timeout
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(self.timeout)
@@ -444,7 +549,9 @@ class CodeMapServiceClient:
                     break
                 except BlockingIOError:
                     if time.monotonic() >= deadline:
-                        raise TimeoutError("timed out waiting for CodeMap service admission")
+                        raise TimeoutError(
+                            "timed out waiting for CodeMap service admission"
+                        ) from None
                     time.sleep(0.005)
             sock.sendall(raw)
             chunks = bytearray()
@@ -462,7 +569,11 @@ class CodeMapServiceClient:
         line = bytes(chunks).split(b"\n", 1)[0]
         response = json.loads(line)
         if not isinstance(response, dict) or not response.get("ok"):
-            raise RuntimeError(str(response.get("error", "CodeMap service request failed")) if isinstance(response, dict) else "invalid CodeMap service response")
+            raise RuntimeError(
+                str(response.get("error", "CodeMap service request failed"))
+                if isinstance(response, dict)
+                else "invalid CodeMap service response"
+            )
         return response
 
     def status(self) -> dict[str, Any]:
@@ -471,31 +582,60 @@ class CodeMapServiceClient:
     def sync(self) -> dict[str, Any]:
         return self.request("sync")
 
-    def repository_findings(self, paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    def repository_findings(
+        self, paths: tuple[str, ...] | list[str] | None = None
+    ) -> dict[str, Any]:
         payload = {} if paths is None else {"paths": list(paths)}
-        return dict(self.request("repository_findings", **payload)["repository_findings"])
+        return dict(
+            self.request("repository_findings", **payload)["repository_findings"]
+        )
 
-    def concurrency_risk_findings(self, paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    def concurrency_risk_findings(
+        self, paths: tuple[str, ...] | list[str] | None = None
+    ) -> dict[str, Any]:
         payload = {} if paths is None else {"paths": list(paths)}
         return dict(self.request("concurrency_risk", **payload)["concurrency_risk"])
 
-    def verification_ownership_graph(self, task: str, *, limit: int = 20, candidate_limit: int = 8) -> dict[str, Any]:
-        return dict(self.request("verification_ownership", task=task, limit=limit, candidate_limit=candidate_limit)["verification_ownership"])
+    def verification_ownership_graph(
+        self, task: str, *, limit: int = 20, candidate_limit: int = 8
+    ) -> dict[str, Any]:
+        return dict(
+            self.request(
+                "verification_ownership",
+                task=task,
+                limit=limit,
+                candidate_limit=candidate_limit,
+            )["verification_ownership"]
+        )
 
-    def repository_ownership_graph(self, paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    def repository_ownership_graph(
+        self, paths: tuple[str, ...] | list[str] | None = None
+    ) -> dict[str, Any]:
         """Return repository ownership evidence over the stable v0.11 wire contract."""
         payload = {} if paths is None else {"paths": list(paths)}
-        return dict(self.request("authority_ownership", **payload)["authority_ownership"])
+        return dict(
+            self.request("authority_ownership", **payload)["authority_ownership"]
+        )
 
-    def cache_ownership_findings(self, paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    def cache_ownership_findings(
+        self, paths: tuple[str, ...] | list[str] | None = None
+    ) -> dict[str, Any]:
         payload = {} if paths is None else {"paths": list(paths)}
         return dict(self.request("cache_ownership", **payload)["cache_ownership"])
 
-    def cache_invalidation_ownership_graph(self, paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    def cache_invalidation_ownership_graph(
+        self, paths: tuple[str, ...] | list[str] | None = None
+    ) -> dict[str, Any]:
         payload = {} if paths is None else {"paths": list(paths)}
-        return dict(self.request("cache_invalidation_ownership", **payload)["cache_invalidation_ownership"])
+        return dict(
+            self.request("cache_invalidation_ownership", **payload)[
+                "cache_invalidation_ownership"
+            ]
+        )
 
-    def import_ownership_findings(self, paths: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
+    def import_ownership_findings(
+        self, paths: tuple[str, ...] | list[str] | None = None
+    ) -> dict[str, Any]:
         payload = {} if paths is None else {"paths": list(paths)}
         return dict(self.request("import_ownership", **payload)["import_ownership"])
 
@@ -505,43 +645,82 @@ class CodeMapServiceClient:
     def task_action_map(
         self, task: str, *, limit: int = 20, per_role: int = 3
     ) -> dict[str, Any]:
-        return dict(self.request(
-            "task_action_map", task=task, limit=limit, per_role=per_role,
-        )["action_map"])
+        return dict(
+            self.request(
+                "task_action_map",
+                task=task,
+                limit=limit,
+                per_role=per_role,
+            )["action_map"]
+        )
 
     def verification_relevance(
         self, task: str, *, limit: int = 20, candidate_limit: int = 8
     ) -> dict[str, Any]:
-        return dict(self.request(
-            "verification_relevance", task=task, limit=limit,
-            candidate_limit=candidate_limit,
-        )["verification_relevance"])
-
+        return dict(
+            self.request(
+                "verification_relevance",
+                task=task,
+                limit=limit,
+                candidate_limit=candidate_limit,
+            )["verification_relevance"]
+        )
 
     def ownership_relation_graph(
         self, task: str, start_path: str, *, max_depth: int = 2
     ) -> dict[str, Any]:
-        return dict(self.request(
-            "ownership_relation_graph", task=task, start_path=start_path, max_depth=max_depth
-        )["ownership_relation_graph"])
+        return dict(
+            self.request(
+                "ownership_relation_graph",
+                task=task,
+                start_path=start_path,
+                max_depth=max_depth,
+            )["ownership_relation_graph"]
+        )
 
     def task_decision_packet(
-        self, task: str, *, limit: int = 20, per_role: int = 3, token_budget: int = 512,
+        self,
+        task: str,
+        *,
+        limit: int = 20,
+        per_role: int = 3,
+        token_budget: int = 512,
     ) -> dict[str, Any]:
-        return dict(self.request(
-            "task_decision_packet", task=task, limit=limit, per_role=per_role, token_budget=token_budget,
-        )["decision_packet"])
+        return dict(
+            self.request(
+                "task_decision_packet",
+                task=task,
+                limit=limit,
+                per_role=per_role,
+                token_budget=token_budget,
+            )["decision_packet"]
+        )
 
     def task_decision_brief(
-        self, task: str, *, limit: int = 20, per_role: int = 3, token_budget: int = 512,
+        self,
+        task: str,
+        *,
+        limit: int = 20,
+        per_role: int = 3,
+        token_budget: int = 512,
     ) -> dict[str, Any]:
-        return dict(self.request(
-            "task_decision_brief", task=task, limit=limit, per_role=per_role, token_budget=token_budget,
-        )["decision_brief"])
-
+        return dict(
+            self.request(
+                "task_decision_brief",
+                task=task,
+                limit=limit,
+                per_role=per_role,
+                token_budget=token_budget,
+            )["decision_brief"]
+        )
 
     def task_action_brief(
-        self, task: str, *, limit: int = 20, per_role: int = 3, token_budget: int | None = None,
+        self,
+        task: str,
+        *,
+        limit: int = 20,
+        per_role: int = 3,
+        token_budget: int | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {"task": task, "limit": limit, "per_role": per_role}
         if token_budget is not None:
@@ -549,41 +728,69 @@ class CodeMapServiceClient:
         return dict(self.request("task_action_brief", **payload)["task_action_brief"])
 
     def task_evidence(
-        self, task: str, *, limit: int = 20, per_role: int = 3, token_budget: int = 1536,
+        self,
+        task: str,
+        *,
+        limit: int = 20,
+        per_role: int = 3,
+        token_budget: int = 1536,
     ) -> dict[str, Any]:
-        return dict(self.request(
-            "task_evidence", task=task, limit=limit, per_role=per_role, token_budget=token_budget,
-        )["task_evidence"])
+        return dict(
+            self.request(
+                "task_evidence",
+                task=task,
+                limit=limit,
+                per_role=per_role,
+                token_budget=token_budget,
+            )["task_evidence"]
+        )
 
     def task_decision_brief_budget_sweep(
-        self, task: str, *, budgets: tuple[int, ...] | list[int] = (64, 128, 192, 256, 384, 512),
-        limit: int = 20, per_role: int = 3,
+        self,
+        task: str,
+        *,
+        budgets: tuple[int, ...] | list[int] = (64, 128, 192, 256, 384, 512),
+        limit: int = 20,
+        per_role: int = 3,
     ) -> dict[str, Any]:
-        return dict(self.request(
-            "task_decision_brief_budget_sweep", task=task, budgets=list(budgets),
-            limit=limit, per_role=per_role,
-        )["budget_sweep"])
-
-
-
-
-
+        return dict(
+            self.request(
+                "task_decision_brief_budget_sweep",
+                task=task,
+                budgets=list(budgets),
+                limit=limit,
+                per_role=per_role,
+            )["budget_sweep"]
+        )
 
     def repository_intelligence_query(
-        self, surface: str, task: str, changed_paths: tuple[str, ...] | list[str] = (), *,
-        member_path: str | None = None, profile: str = "compact",
+        self,
+        surface: str,
+        task: str,
+        changed_paths: tuple[str, ...] | list[str] = (),
+        *,
+        member_path: str | None = None,
+        profile: str = "compact",
         negative_members: tuple[str, ...] | list[str] = (),
         previous_map: dict[str, Any] | None = None,
         previous_snapshot: dict[str, Any] | None = None,
-        limit: int = 20, per_role: int = 3, impact_limit_per_surface: int = 4,
-        max_depth: int = 3, project_impact_limit: int = 12,
+        limit: int = 20,
+        per_role: int = 3,
+        impact_limit_per_surface: int = 4,
+        max_depth: int = 3,
+        project_impact_limit: int = 12,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
-            "surface": surface, "task": task, "changed_paths": list(changed_paths),
-            "profile": profile, "negative_members": list(negative_members),
-            "limit": limit, "per_role": per_role,
+            "surface": surface,
+            "task": task,
+            "changed_paths": list(changed_paths),
+            "profile": profile,
+            "negative_members": list(negative_members),
+            "limit": limit,
+            "per_role": per_role,
             "impact_limit_per_surface": impact_limit_per_surface,
-            "max_depth": max_depth, "project_impact_limit": project_impact_limit,
+            "max_depth": max_depth,
+            "project_impact_limit": project_impact_limit,
         }
         if member_path is not None:
             payload["member_path"] = member_path
@@ -591,71 +798,133 @@ class CodeMapServiceClient:
             payload["previous_map"] = previous_map
         if previous_snapshot is not None:
             payload["previous_snapshot"] = previous_snapshot
-        return dict(self.request(
-            "repository_intelligence_query", **payload,
-        )["repository_intelligence_query"])
-
-
-
+        return dict(
+            self.request(
+                "repository_intelligence_query",
+                **payload,
+            )["repository_intelligence_query"]
+        )
 
     def task_change_impact(
-        self, task: str, changed_paths: tuple[str, ...] | list[str], *,
-        limit: int = 20, per_role: int = 3, impact_limit_per_surface: int = 6,
-        max_depth: int = 4, project_impact_limit: int | None = None,
+        self,
+        task: str,
+        changed_paths: tuple[str, ...] | list[str],
+        *,
+        limit: int = 20,
+        per_role: int = 3,
+        impact_limit_per_surface: int = 6,
+        max_depth: int = 4,
+        project_impact_limit: int | None = None,
         project_impact_encoding: str = "verbose",
     ) -> dict[str, Any]:
-        return dict(self.request(
-            "task_change_impact", task=task, changed_paths=list(changed_paths),
-            limit=limit, per_role=per_role,
-            impact_limit_per_surface=impact_limit_per_surface, max_depth=max_depth,
-            project_impact_limit=project_impact_limit,
-            project_impact_encoding=project_impact_encoding,
-        )["task_change_impact"])
+        return dict(
+            self.request(
+                "task_change_impact",
+                task=task,
+                changed_paths=list(changed_paths),
+                limit=limit,
+                per_role=per_role,
+                impact_limit_per_surface=impact_limit_per_surface,
+                max_depth=max_depth,
+                project_impact_limit=project_impact_limit,
+                project_impact_encoding=project_impact_encoding,
+            )["task_change_impact"]
+        )
 
     def task_post_change_delta(
-        self, task: str, changed_paths: tuple[str, ...] | list[str], *,
-        previous_evidence: dict[str, Any], limit: int = 20, per_role: int = 3, token_budget: int = 1536,
+        self,
+        task: str,
+        changed_paths: tuple[str, ...] | list[str],
+        *,
+        previous_evidence: dict[str, Any],
+        limit: int = 20,
+        per_role: int = 3,
+        token_budget: int = 1536,
     ) -> dict[str, Any]:
-        return dict(self.request(
-            "task_post_change_delta", task=task, changed_paths=list(changed_paths),
-            previous_evidence=previous_evidence, limit=limit, per_role=per_role, token_budget=token_budget,
-        )["post_change_delta"])
+        return dict(
+            self.request(
+                "task_post_change_delta",
+                task=task,
+                changed_paths=list(changed_paths),
+                previous_evidence=previous_evidence,
+                limit=limit,
+                per_role=per_role,
+                token_budget=token_budget,
+            )["post_change_delta"]
+        )
 
     def refresh_after_change_delta(
-        self, task: str, changed_paths: tuple[str, ...] | list[str], *,
-        previous_edit_path: str | None = None, previous_verify_path: str | None = None,
-        limit: int = 20, per_role: int = 3,
+        self,
+        task: str,
+        changed_paths: tuple[str, ...] | list[str],
+        *,
+        previous_edit_path: str | None = None,
+        previous_verify_path: str | None = None,
+        limit: int = 20,
+        per_role: int = 3,
         token_budget: int = 512,
     ) -> dict[str, Any]:
-        return dict(self.request(
-            "refresh_after_change_delta", task=task, changed_paths=list(changed_paths),
-            previous_edit_path=previous_edit_path, previous_verify_path=previous_verify_path,
-            limit=limit, per_role=per_role,
-            token_budget=token_budget,
-        )["refresh_delta"])
+        return dict(
+            self.request(
+                "refresh_after_change_delta",
+                task=task,
+                changed_paths=list(changed_paths),
+                previous_edit_path=previous_edit_path,
+                previous_verify_path=previous_verify_path,
+                limit=limit,
+                per_role=per_role,
+                token_budget=token_budget,
+            )["refresh_delta"]
+        )
 
     def refresh_after_change_brief(
-        self, task: str, changed_paths: tuple[str, ...] | list[str], *, limit: int = 20, per_role: int = 3, token_budget: int = 512,
+        self,
+        task: str,
+        changed_paths: tuple[str, ...] | list[str],
+        *,
+        limit: int = 20,
+        per_role: int = 3,
+        token_budget: int = 512,
     ) -> dict[str, Any]:
-        return dict(self.request(
-            "refresh_after_change_brief", task=task, changed_paths=list(changed_paths), limit=limit,
-            per_role=per_role, token_budget=token_budget,
-        )["refresh_brief"])
+        return dict(
+            self.request(
+                "refresh_after_change_brief",
+                task=task,
+                changed_paths=list(changed_paths),
+                limit=limit,
+                per_role=per_role,
+                token_budget=token_budget,
+            )["refresh_brief"]
+        )
 
     def refresh_after_change(
-        self, task: str, changed_paths: tuple[str, ...] | list[str], *, limit: int = 20, per_role: int = 3, token_budget: int = 512,
+        self,
+        task: str,
+        changed_paths: tuple[str, ...] | list[str],
+        *,
+        limit: int = 20,
+        per_role: int = 3,
+        token_budget: int = 512,
     ) -> dict[str, Any]:
-        return dict(self.request(
-            "refresh_after_change", task=task, changed_paths=list(changed_paths), limit=limit, per_role=per_role,
-            token_budget=token_budget,
-        )["refresh"])
+        return dict(
+            self.request(
+                "refresh_after_change",
+                task=task,
+                changed_paths=list(changed_paths),
+                limit=limit,
+                per_role=per_role,
+                token_budget=token_budget,
+            )["refresh"]
+        )
 
     def stop(self) -> None:
         self.request("stop")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Serve one warm Hashmarks CodeMap to many local consumers")
+    parser = argparse.ArgumentParser(
+        description="Serve one warm Hashmarks CodeMap to many local consumers"
+    )
     parser.add_argument("--workspace", type=Path, default=Path.cwd())
     parser.add_argument("--socket", type=Path)
     args = parser.parse_args()

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Protocol, TypeAlias
+from typing import TYPE_CHECKING, Protocol, TypeAlias
 
 from .paths import has_glob, normalize_relative_pattern
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 class InputSpec(Protocol):
@@ -73,7 +76,9 @@ def _validate_file_input(root: Path, value: File, require_matches: bool) -> str:
     return pattern
 
 
-def _validate_directory_input(root: Path, value: Directory, require_matches: bool) -> str:
+def _validate_directory_input(
+    root: Path, value: Directory, require_matches: bool
+) -> str:
     pattern = value.as_pattern()
     target = root / pattern
     if not os.path.lexists(target):
@@ -83,7 +88,9 @@ def _validate_directory_input(root: Path, value: Directory, require_matches: boo
     return pattern
 
 
-def _validated_input_pattern(root: Path, value: InputValue, require_matches: bool) -> str:
+def _validated_input_pattern(
+    root: Path, value: InputValue, require_matches: bool
+) -> str:
     if isinstance(value, File):
         return _validate_file_input(root, value, require_matches)
     if isinstance(value, Directory):
@@ -100,4 +107,6 @@ def validate_input_values(
     require_matches: bool = True,
 ) -> tuple[str, ...]:
     root = Path(workspace)
-    return tuple(_validated_input_pattern(root, value, require_matches) for value in values)
+    return tuple(
+        _validated_input_pattern(root, value, require_matches) for value in values
+    )

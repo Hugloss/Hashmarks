@@ -1,88 +1,56 @@
 from __future__ import annotations
 
-from .query_primitives import _TASK_STOPWORDS
-from .task_action_evidence import TaskActionEvidenceMixin
-from .task_action_projection import TaskActionProjectionMixin
-from .task_action_types import _TaskActionAmbiguityPayloadState, _TaskActionConfigState, _TaskActionCues, _TaskActionDiscriminationState, _TaskActionProjectionState, _TaskActionSurface
 import re
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import TYPE_CHECKING, cast
+
+from hashmarks.ownership_decision import (
+    OwnershipDecisionState,
+    ownership_authority_contract,
+    ownership_decision_trace,
+)
 
 from .model import EvidenceVisibility, SearchHit
-from .repository_domains import RepositoryDomain, classify_repository_path, is_test_path
-from ..ownership_decision import OwnershipDecisionState, ownership_authority_contract, ownership_decision_trace
+from .query_primitives import _TASK_STOPWORDS
+from .repository_domains import RepositoryDomain, classify_repository_path
+from .task_action_evidence import TaskActionEvidenceMixin
+from .task_action_projection import TaskActionProjectionMixin
+from .task_action_types import (
+    _TaskActionAmbiguityPayloadState,
+    _TaskActionDiscriminationState,
+    _TaskActionProjectionState,
+)
+
+if TYPE_CHECKING:
+    from .engine import CodeMap
 
 _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-_QUALIFIED_IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+")
-
-
-
-
-
-
-
-
-
-
+_QUALIFIED_IDENTIFIER_RE = re.compile(
+    r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+"
+)
 
 
 class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     def _task_action_discrimination_state(
         self, task: str, rows: Sequence[dict[str, object]]
     ) -> _TaskActionDiscriminationState:
         task_terms = [
-            value.lower() for value in _WORD_RE.findall(task)
+            value.lower()
+            for value in _WORD_RE.findall(task)
             if len(value) >= 4 and value.lower() not in _TASK_STOPWORDS
         ]
         row_text = {id(row): self._task_action_discrimination_text(row) for row in rows}
         term_rows = {
-            term: sum(term in text for text in row_text.values())
-            for term in task_terms
+            term: sum(term in text for text in row_text.values()) for term in task_terms
         }
         return _TaskActionDiscriminationState(
             task_terms=task_terms, row_text=row_text, term_rows=term_rows
         )
 
     def _task_action_discrimination_text(self, row: dict[str, object]) -> str:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         metadata = " ".join(
             str(row.get(key) or "").lower()
             for key in ("path", "name", "qualname", "signature")
@@ -126,7 +94,9 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         )
 
     def _has_identifier_anchor(
-        self, row: dict[str, object], state: _TaskActionDiscriminationState,
+        self,
+        row: dict[str, object],
+        state: _TaskActionDiscriminationState,
         verification_anchor_tokens: Sequence[str],
     ) -> bool:
         if not verification_anchor_tokens:
@@ -144,7 +114,9 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
 
     @classmethod
     def _task_action_is_archive_path(cls, path: str) -> bool:
-        return bool(set(Path(path).parts).intersection(cls._task_action_archive_parts()))
+        return bool(
+            set(Path(path).parts).intersection(cls._task_action_archive_parts())
+        )
 
     def _task_action_is_live_anchored_edit(
         self,
@@ -154,12 +126,15 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         verification_anchor_tokens: Sequence[str],
     ) -> bool:
         path = str(row.get("path") or "")
-        if "edit" not in row.get("roles", []) or path in failed or self._task_action_is_archive_path(path):
+        if (
+            "edit" not in row.get("roles", [])
+            or path in failed
+            or self._task_action_is_archive_path(path)
+        ):
             return False
-        return (
-            self._has_identifier_anchor(row, discrimination, verification_anchor_tokens)
-            or self._has_distinctive_task_anchor(row, discrimination)
-        )
+        return self._has_identifier_anchor(
+            row, discrimination, verification_anchor_tokens
+        ) or self._has_distinctive_task_anchor(row, discrimination)
 
     def _task_action_live_anchored_edits(
         self,
@@ -169,7 +144,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         verification_anchor_tokens: Sequence[str],
     ) -> list[dict[str, object]]:
         return [
-            row for row in rows
+            row
+            for row in rows
             if self._task_action_is_live_anchored_edit(
                 row, failed, discrimination, verification_anchor_tokens
             )
@@ -199,7 +175,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         discrimination: _TaskActionDiscriminationState,
     ) -> dict[str, object] | None:
         candidates = [
-            row for row in rows
+            row
+            for row in rows
             if self._has_distinctive_task_anchor(row, discrimination)
             and RepositoryDomain.TEST.value in row["domains"]
         ]
@@ -218,8 +195,11 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         rows: Sequence[dict[str, object]],
         discrimination: _TaskActionDiscriminationState,
     ) -> dict[str, object] | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         candidates = [
-            row for row in rows
+            row
+            for row in rows
             if self._has_distinctive_task_anchor(row, discrimination)
             and ("edit" in row["roles"] or "related" in row["roles"])
         ][:8]
@@ -255,7 +235,11 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
     def _task_action_local_island(
         self, task: str, hits: Sequence[SearchHit], limit: int
     ) -> bool:
-        island_paths = [hit.path for hit in self._task_local_lexical_island_hits(task, limit=limit)]
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        island_paths = [
+            hit.path for hit in self._task_local_lexical_island_hits(task, limit=limit)
+        ]
         return bool(island_paths) and island_paths == [hit.path for hit in hits]
 
     @staticmethod
@@ -277,7 +261,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             return []
         verify_parent = Path(verify_path).parent
         return [
-            row for row in rows
+            row
+            for row in rows
             if cls._task_action_is_go_package_row(row, verify_parent)
         ]
 
@@ -287,7 +272,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         discrimination: _TaskActionDiscriminationState,
     ) -> dict[str, object] | None:
         specific_rows = [
-            row for row in package_rows
+            row
+            for row in package_rows
             if self._task_action_specificity(row, discrimination) > 0.0
         ]
         return max(
@@ -323,10 +309,9 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         path = str(edit.get("path") or "")
         if not path or self._task_action_is_archive_path(path):
             return False
-        return (
-            self._has_identifier_anchor(edit, discrimination, verification_anchor_tokens)
-            or self._has_distinctive_task_anchor(edit, discrimination)
-        )
+        return self._has_identifier_anchor(
+            edit, discrimination, verification_anchor_tokens
+        ) or self._has_distinctive_task_anchor(edit, discrimination)
 
     def _task_action_projected_owner_row(
         self,
@@ -335,6 +320,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         rows: list[dict[str, object]],
         limit: int,
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         existing = next(
             (row for row in rows if str(row.get("path")) == owner_path),
             None,
@@ -348,7 +335,9 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             "path": owner_path,
             "canonical_rank": limit + int(resolved["depth"]),
             "canonical_score": 0.0,
-            "domains": [domain.value for domain in classify_repository_path(owner_path)],
+            "domains": [
+                domain.value for domain in classify_repository_path(owner_path)
+            ],
             "roles": ["edit", "related"],
             "name": symbol.get("name"),
             "qualname": symbol.get("qualname"),
@@ -357,7 +346,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             "end_line": symbol.get("end_line"),
             "evidence_visibility": (
                 str(file_row["evidence_visibility"])
-                if file_row is not None else EvidenceVisibility.SOURCE.value
+                if file_row is not None
+                else EvidenceVisibility.SOURCE.value
             ),
             "structural_projection": True,
         }
@@ -415,7 +405,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
     ) -> dict[str, object] | None:
         return next(
             (
-                row for row in rows
+                row
+                for row in rows
                 if "contract" in row["roles"]
                 and RepositoryDomain.DOC.value not in row["domains"]
                 and RepositoryDomain.TEST.value not in row["domains"]
@@ -428,10 +419,18 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
     @staticmethod
     def _task_action_locality_parts(path: str) -> set[str]:
         generic = {
-            "src", "tests", "test", "checks", "frontend", "backend", "lib", "app"
+            "src",
+            "tests",
+            "test",
+            "checks",
+            "frontend",
+            "backend",
+            "lib",
+            "app",
         }
         return {
-            part.lower() for part in Path(path).parent.parts
+            part.lower()
+            for part in Path(path).parent.parts
             if part.lower() not in generic
         }
 
@@ -469,6 +468,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         rows: list[dict[str, object]],
         limit: int,
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         existing = next(
             (row for row in rows if str(row.get("path") or "") == selected_path),
             None,
@@ -493,7 +494,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             "end_line": symbol.get("end_line"),
             "evidence_visibility": (
                 str(file_row["evidence_visibility"])
-                if file_row is not None else EvidenceVisibility.SOURCE.value
+                if file_row is not None
+                else EvidenceVisibility.SOURCE.value
             ),
             "verification_projection": True,
         }
@@ -533,7 +535,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         discrimination: _TaskActionDiscriminationState,
     ) -> list[dict[str, object]]:
         return [
-            row for row in rows
+            row
+            for row in rows
             if RepositoryDomain.TEST.value in row.get("domains", [])
             and any(
                 term in self._task_action_row_text(row, discrimination)
@@ -550,6 +553,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         limit: int,
         primary_origin: Mapping[str, object] | None = None,
     ) -> tuple[str, dict[str, object], dict[str, object]] | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         origin_path = str(origin.get("path") or "")
         if not origin_path:
             return None
@@ -603,12 +608,11 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         for value in qualified:
             masked = masked.replace(value, " ")
         standalone = [
-            token for token in _WORD_RE.findall(masked)
+            token
+            for token in _WORD_RE.findall(masked)
             if cls._is_task_identifier_anchor(token)
         ]
-        return list(dict.fromkeys(
-            value.lower() for value in [*qualified, *standalone]
-        ))
+        return list(dict.fromkeys(value.lower() for value in [*qualified, *standalone]))
 
     def _task_action_reference_backed_source_projection(
         self,
@@ -624,6 +628,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         production modules such as qualification helpers to prove their actual
         implementation role.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         path = str(row.get("path") or "")
         domains = set(map(str, row.get("domains") or ()))
         if (
@@ -673,6 +679,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         canonical retrieval. Test-only, archived, failed, lexical/comment-only,
         and merely substring-related evidence cannot become exact edit authority.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         terms = set(self._task_action_exact_identifier_terms(task))
         # A plain method name can still be an exact identifier even when it lacks
         # underscore/case cues (for example ``close`` or ``resolve``).  Promote
@@ -681,7 +689,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         # symbol name.  This adds no discovery/ranking authority and prevents
         # lexical order from manufacturing a unique edit owner.
         plain_tokens = {
-            token.lower() for token in _WORD_RE.findall(task)
+            token.lower()
+            for token in _WORD_RE.findall(task)
             if len(token) >= 4 and token.lower() not in _TASK_STOPWORDS
         }
         exact_row_paths: dict[str, set[str]] = {}
@@ -709,17 +718,17 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             if not path or path in failed or self._task_action_is_archive_path(path):
                 continue
             matches = [
-                symbol for symbol in self._session_symbols_for_path(path)
+                symbol
+                for symbol in self._session_symbols_for_path(path)
                 if str(symbol.get("name") or "").lower() in terms
                 or str(symbol.get("qualname") or "").lower() in terms
             ]
             if not matches:
                 continue
             candidate_row = row
-            if (
-                "edit" not in row.get("roles", [])
-                or RepositoryDomain.TEST.value in row.get("domains", [])
-            ):
+            if "edit" not in row.get(
+                "roles", []
+            ) or RepositoryDomain.TEST.value in row.get("domains", []):
                 symbol_names = {
                     str(symbol.get("name") or "")
                     for symbol in matches
@@ -739,15 +748,17 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                     -int(value.get("start_line") or 0),
                 ),
             )
-            candidates.append({
-                **candidate_row,
-                "name": symbol.get("name"),
-                "qualname": symbol.get("qualname"),
-                "signature": symbol.get("signature"),
-                "start_line": symbol.get("start_line"),
-                "end_line": symbol.get("end_line"),
-                "exact_identifier_projection": True,
-            })
+            candidates.append(
+                {
+                    **candidate_row,
+                    "name": symbol.get("name"),
+                    "qualname": symbol.get("qualname"),
+                    "signature": symbol.get("signature"),
+                    "start_line": symbol.get("start_line"),
+                    "end_line": symbol.get("end_line"),
+                    "exact_identifier_projection": True,
+                }
+            )
         return candidates
 
     def _task_action_structural_exact_identifier_owner(
@@ -764,13 +775,16 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         contains both the facade and implementation owner rather than one exact
         source path.
         """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         selected_path = str(resolved.get("path") or "")
         source_path = str(resolved.get("source_path") or "")
         if not selected_path or not source_path:
             return None
         selected = next(
             (
-                row for row in exact_identifier_edits
+                row
+                for row in exact_identifier_edits
                 if str(row.get("path") or "") == selected_path
             ),
             None,
@@ -825,7 +839,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         verification_anchor_tokens: Sequence[str],
     ) -> list[dict[str, object]]:
         return [
-            row for row in rows[:8]
+            row
+            for row in rows[:8]
             if "edit" in row.get("roles", [])
             and RepositoryDomain.TEST.value not in row.get("domains", [])
             and str(row.get("path") or "") not in failed
@@ -858,10 +873,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         return bool(
             verification_relevance.get("selection_changed")
             and isinstance(selected, dict)
-            and (
-                selected.get("direct_reference")
-                or selected.get("indirect_reference")
-            )
+            and (selected.get("direct_reference") or selected.get("indirect_reference"))
             and not verification_identity_ambiguity
         )
 
@@ -884,9 +896,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         repository_rare_anchor: bool,
         decisive_qualified_verification: bool,
     ) -> bool:
-        selected_roles = (
-            set(edit.get("roles", [])) if isinstance(edit, dict) else set()
-        )
+        selected_roles = set(edit.get("roles", [])) if isinstance(edit, dict) else set()
         unanchored_contract = bool(
             edit is not None
             and "contract" in selected_roles
@@ -957,14 +967,16 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
     ) -> list[dict[str, object]]:
         candidates: list[dict[str, object]] = []
         if edit is not None:
-            candidates.append({
-                **edit,
-                "plausibility": "current-best-edit-authority",
-                "discriminator": (
-                    "inspect ownership/definition evidence and verify whether this "
-                    "path owns the requested behavior"
-                ),
-            })
+            candidates.append(
+                {
+                    **edit,
+                    "plausibility": "current-best-edit-authority",
+                    "discriminator": (
+                        "inspect ownership/definition evidence and verify whether this "
+                        "path owns the requested behavior"
+                    ),
+                }
+            )
         remaining = max(0, per_role - len(candidates))
         candidates.extend(
             cls._task_action_competing_ambiguity_candidate(row)
@@ -989,9 +1001,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         return "competing-action-roles" if ambiguous else "resolved-by-role"
 
     @staticmethod
-    def _task_action_bounds_payload(
-        limit: int, per_role: int
-    ) -> dict[str, int]:
+    def _task_action_bounds_payload(limit: int, per_role: int) -> dict[str, int]:
         return {"limit": limit, "per_role": per_role}
 
     @staticmethod
@@ -1028,22 +1038,20 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             "schema": "hashmarks.action-ambiguity.v2",
             "ambiguous": state.ambiguous,
             "reason": state.reason,
-            "candidates": (
-                list(state.candidates) if state.ambiguous else []
-            ),
+            "candidates": (list(state.candidates) if state.ambiguous else []),
             "alternatives": list(state.alternatives),
             "task_local_structural_owners": sorted(state.structural_owners),
             "task_local_verification_origins": (
-                cls._task_action_sorted_verification_origins(
-                    state.verification_origins
-                )
-                if state.multi_structural_owner_ambiguity else []
+                cls._task_action_sorted_verification_origins(state.verification_origins)
+                if state.multi_structural_owner_ambiguity
+                else []
             ),
             "discrimination_question": (
                 "Which worker-visible path actually owns the requested behavior, "
                 "and what repository evidence distinguishes ownership from "
                 "verification or compatibility surfaces?"
-                if state.ambiguous else None
+                if state.ambiguous
+                else None
             ),
             "secret_knowledge_used": False,
         }
@@ -1056,7 +1064,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         if edit is None:
             return []
         return [
-            row for row in rows[:5]
+            row
+            for row in rows[:5]
             if row["path"] != edit["path"]
             and (
                 "edit" in row["roles"]
@@ -1102,5 +1111,3 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             "ownership_decision_trace": trace,
             "ownership_authority": ownership_authority_contract(trace),
         }
-
-

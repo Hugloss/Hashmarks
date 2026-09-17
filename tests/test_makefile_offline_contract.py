@@ -19,17 +19,20 @@ def test_test_owner_consumes_project_owned_pytest_group() -> None:
     assert "uv pip install pytest" not in makefile
 
 
-
 def test_profile_is_the_single_full_qualification_owner() -> None:
     makefile = Path("Makefile").read_text(encoding="utf-8")
     assert "test-fast:" not in makefile
-    profile = makefile.split("test-profile: qualification-preflight", 1)[1].split("\ntest-shard-plan:", 1)[0]
+    profile = makefile.split("test-profile: qualification-preflight", 1)[1].split(
+        "\ntest-shard-plan:", 1
+    )[0]
     assert "python -m pytest -q --durations=25 --durations-min=1.0" in profile
     assert "--offline --frozen --no-sync --group test" in profile
 
 
 def test_profile_warns_about_windows_mounted_wsl_timing_surface() -> None:
     makefile = Path("Makefile").read_text(encoding="utf-8")
-    profile = makefile.split("test-profile: qualification-preflight", 1)[1].split("\ntest-shard-plan:", 1)[0]
+    profile = makefile.split("test-profile: qualification-preflight", 1)[1].split(
+        "\ntest-shard-plan:", 1
+    )[0]
     assert "python scripts/qualification_filesystem.py" in profile
     assert "--offline --frozen --no-sync --group test" in profile

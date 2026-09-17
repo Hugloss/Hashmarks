@@ -21,4 +21,3 @@ NO CHANGE; existing freshness-bound AST/reference reuse is the correct authority
 - scale selection correctness: **4/4**
 - unsafe regressions: **0**
 - 501-surface action sample: **293.26 ms**
-

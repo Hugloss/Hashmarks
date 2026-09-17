@@ -31,7 +31,11 @@ def test_work_context_preserves_mandatory_roles_monotonically() -> None:
     for budget in (128, 192, 256, 384, 512, 640, 768, 1024, 1280, 1536, 1800):
         packet = codemap.work_context(_action(), token_budget=budget)
         assert packet["safe"] is True
-        assert packet["role_coverage"] == {"edit": True, "verify": True, "contract": True}
+        assert packet["role_coverage"] == {
+            "edit": True,
+            "verify": True,
+            "contract": True,
+        }
         mandatory = {
             (str(item["role"]), str(item["path"]))
             for item in packet["items"]
@@ -62,7 +66,9 @@ def test_tiny_budget_reports_missing_roles_instead_of_claiming_safety() -> None:
 
 def test_budget_sweep_finds_smallest_safe_budget_and_density() -> None:
     codemap = object.__new__(CodeMap)
-    sweep = codemap.work_context_budget_sweep(_action(), budgets=(64, 128, 192, 256, 384, 512))
+    sweep = codemap.work_context_budget_sweep(
+        _action(), budgets=(64, 128, 192, 256, 384, 512)
+    )
     assert sweep["mandatory_monotonic"] is True
     assert sweep["smallest_safe_budget"] is not None
     rows = sweep["rows"]
@@ -71,7 +77,9 @@ def test_budget_sweep_finds_smallest_safe_budget_and_density() -> None:
     assert all(0.0 <= row["useful_bytes_ratio"] <= 1.0 for row in rows)
     safe_rows = [row for row in rows if row["safe"]]
     assert safe_rows
-    assert all(row["tokens_per_safe_packet"] == row["estimated_tokens"] for row in safe_rows)
+    assert all(
+        row["tokens_per_safe_packet"] == row["estimated_tokens"] for row in safe_rows
+    )
 
 
 def test_same_path_can_cover_multiple_mandatory_roles_without_false_unsafe() -> None:

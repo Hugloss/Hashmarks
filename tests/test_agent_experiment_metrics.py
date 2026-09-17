@@ -2,24 +2,34 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
-_MODULE = __import__("scripts.agent_evaluation.metrics_agent_experiment", fromlist=["*"])
+_MODULE = __import__(
+    "scripts.agent_evaluation.metrics_agent_experiment", fromlist=["*"]
+)
 
 
 def _load():
     return _MODULE
 
+
 def _digest(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _experiment(tmp_path: Path, *, mismatch: tuple[str, str] | None = None, omit_raw: bool = False) -> Path:
+def _experiment(
+    tmp_path: Path, *, mismatch: tuple[str, str] | None = None, omit_raw: bool = False
+) -> Path:
     runs = []
-    for mode, run_id, tokens in (("baseline", "run-base", 10000), ("hashmarks", "run-hm", 6000)):
+    for mode, run_id, tokens in (
+        ("baseline", "run-base", 10000),
+        ("hashmarks", "run-hm", 6000),
+    ):
         raw_grader = tmp_path / f"{mode}.grader.raw"
         raw_provider = tmp_path / f"{mode}.provider.raw"
         raw_grader.write_bytes(f"grader:{mode}".encode())
@@ -27,49 +37,93 @@ def _experiment(tmp_path: Path, *, mismatch: tuple[str, str] | None = None, omit
         subject = tmp_path / f"{mode}.patch"
         subject.write_bytes(f"patch:{mode}".encode())
         trace = {
-            "schema": "hashmarks.agent-trace.v2", "task_id": "t1", "task_revision": "task-v1",
-            "repository_identity": "sha256:repo", "mode": mode, "run_id": run_id,
-            "model_identity": "model-x", "model_config_identity": "sha256:model-config",
+            "schema": "hashmarks.agent-trace.v2",
+            "task_id": "t1",
+            "task_revision": "task-v1",
+            "repository_identity": "sha256:repo",
+            "mode": mode,
+            "run_id": run_id,
+            "model_identity": "model-x",
+            "model_config_identity": "sha256:model-config",
             "runner_identity": "runner:test",
-            "model_input_tokens_source": "external-provider-usage-required", "events": [],
+            "model_input_tokens_source": "external-provider-usage-required",
+            "events": [],
         }
         if mismatch and mismatch[0] == mode:
             trace["repository_identity"] = mismatch[1]
         trace_path = tmp_path / f"{mode}.trace.json"
         trace_path.write_text(json.dumps(trace))
         verdict_path = tmp_path / f"{mode}.verdict.json"
-        verdict_path.write_text(json.dumps({
-            "schema": "hashmarks.agent-verdict.v1", "task_id": "t1", "mode": mode, "run_id": run_id,
-            "grader_identity": "grader:test:v1", "evidence_digest": _digest(raw_grader),
-            "subject_digest": _digest(subject), "success": True, "patch_correct": True,
-        }))
+        verdict_path.write_text(
+            json.dumps(
+                {
+                    "schema": "hashmarks.agent-verdict.v1",
+                    "task_id": "t1",
+                    "mode": mode,
+                    "run_id": run_id,
+                    "grader_identity": "grader:test:v1",
+                    "evidence_digest": _digest(raw_grader),
+                    "subject_digest": _digest(subject),
+                    "success": True,
+                    "patch_correct": True,
+                }
+            )
+        )
         usage_path = tmp_path / f"{mode}.usage.json"
-        usage_path.write_text(json.dumps({
-            "schema": "hashmarks.agent-model-usage.v1", "task_id": "t1", "mode": mode, "run_id": run_id,
-            "provider_identity": "provider:test:v1", "evidence_digest": _digest(raw_provider),
-            "model_input_tokens": tokens,
-        }))
+        usage_path.write_text(
+            json.dumps(
+                {
+                    "schema": "hashmarks.agent-model-usage.v1",
+                    "task_id": "t1",
+                    "mode": mode,
+                    "run_id": run_id,
+                    "provider_identity": "provider:test:v1",
+                    "evidence_digest": _digest(raw_provider),
+                    "model_input_tokens": tokens,
+                }
+            )
+        )
         run = {
-            "task_id": "t1", "task_revision": "task-v1", "repository_identity": "sha256:repo",
-            "mode": mode, "run_id": run_id,
-            "trace": trace_path.name, "verdict": verdict_path.name, "usage": usage_path.name,
+            "task_id": "t1",
+            "task_revision": "task-v1",
+            "repository_identity": "sha256:repo",
+            "mode": mode,
+            "run_id": run_id,
+            "trace": trace_path.name,
+            "verdict": verdict_path.name,
+            "usage": usage_path.name,
             "subject": subject.name,
         }
         if not omit_raw:
-            run.update({"grader_evidence": raw_grader.name, "provider_evidence": raw_provider.name})
+            run.update(
+                {
+                    "grader_evidence": raw_grader.name,
+                    "provider_evidence": raw_provider.name,
+                }
+            )
         runs.append(run)
     manifest = tmp_path / "experiment.json"
-    manifest.write_text(json.dumps({
-        "schema": "hashmarks.agent-experiment.v1", "experiment_id": "experiment-1",
-        "model_identity": "model-x", "model_config_identity": "sha256:model-config",
-        "runner_identity": "runner:test", "runner_version": "1.0",
-        "grader_identity": "grader:test:v1", "provider_identity": "provider:test:v1",
-        "runs": runs,
-    }))
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "hashmarks.agent-experiment.v1",
+                "experiment_id": "experiment-1",
+                "model_identity": "model-x",
+                "model_config_identity": "sha256:model-config",
+                "runner_identity": "runner:test",
+                "runner_version": "1.0",
+                "grader_identity": "grader:test:v1",
+                "provider_identity": "provider:test:v1",
+                "runs": runs,
+            }
+        )
+    )
     return manifest
 
 
-def test_manifest_validates_complete_experiment_and_raw_evidence(tmp_path: Path) -> None:
+def test_manifest_validates_complete_experiment_and_raw_evidence(
+    tmp_path: Path,
+) -> None:
     module = _load()
     report = module.run_experiment(_experiment(tmp_path), strict_raw_evidence=True)
     assert report["schema"] == "hashmarks.agent-experiment-report.v1"
@@ -82,7 +136,9 @@ def test_manifest_validates_complete_experiment_and_raw_evidence(tmp_path: Path)
 def test_manifest_rejects_trace_identity_drift(tmp_path: Path) -> None:
     module = _load()
     with pytest.raises(ValueError, match="trace repository_identity mismatch"):
-        module.run_experiment(_experiment(tmp_path, mismatch=("hashmarks", "sha256:wrong")))
+        module.run_experiment(
+            _experiment(tmp_path, mismatch=("hashmarks", "sha256:wrong"))
+        )
 
 
 def test_manifest_rejects_raw_evidence_digest_mismatch(tmp_path: Path) -> None:
@@ -96,7 +152,9 @@ def test_manifest_rejects_raw_evidence_digest_mismatch(tmp_path: Path) -> None:
 def test_strict_raw_evidence_requires_retained_raw_files(tmp_path: Path) -> None:
     module = _load()
     with pytest.raises(ValueError, match="requires grader_evidence"):
-        module.run_experiment(_experiment(tmp_path, omit_raw=True), strict_raw_evidence=True)
+        module.run_experiment(
+            _experiment(tmp_path, omit_raw=True), strict_raw_evidence=True
+        )
 
 
 def test_manifest_rejects_unpaired_expected_task(tmp_path: Path) -> None:

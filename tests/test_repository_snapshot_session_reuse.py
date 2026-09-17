@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from hashmarks import CodeMap
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _repo(root: Path) -> tuple[str, list[str]]:
@@ -21,7 +24,8 @@ def _repo(root: Path) -> tuple[str, list[str]]:
 
 
 def test_identical_snapshot_requests_reuse_one_generation_bound_composition(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     task, paths = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -43,7 +47,9 @@ def test_identical_snapshot_requests_reuse_one_generation_bound_composition(
 
         with codemap.decision_session():
             first = codemap.repository_intelligence_snapshot(task, paths)
-            profile = codemap.repository_intelligence_profile(task, paths, profile="compact")
+            profile = codemap.repository_intelligence_profile(
+                task, paths, profile="compact"
+            )
             economics = codemap.intelligence_economics_receipt(task, paths)
             repeated = codemap.repository_intelligence_snapshot(task, paths)
             stats = codemap.decision_session_stats()
@@ -56,7 +62,9 @@ def test_identical_snapshot_requests_reuse_one_generation_bound_composition(
         assert stats["snapshot_hit"] == 3
 
 
-def test_snapshot_reuse_key_includes_task_paths_and_all_bounds(tmp_path: Path, monkeypatch) -> None:
+def test_snapshot_reuse_key_includes_task_paths_and_all_bounds(
+    tmp_path: Path, monkeypatch
+) -> None:
     task, paths = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -72,10 +80,14 @@ def test_snapshot_reuse_key_includes_task_paths_and_all_bounds(tmp_path: Path, m
         with codemap.decision_session():
             codemap.repository_intelligence_snapshot(task, paths)
             codemap.repository_intelligence_snapshot(task + " safely", paths)
-            codemap.repository_intelligence_snapshot(task, [*paths, "tests/test_owner.py"])
+            codemap.repository_intelligence_snapshot(
+                task, [*paths, "tests/test_owner.py"]
+            )
             codemap.repository_intelligence_snapshot(task, paths, limit=21)
             codemap.repository_intelligence_snapshot(task, paths, per_role=4)
-            codemap.repository_intelligence_snapshot(task, paths, impact_limit_per_surface=5)
+            codemap.repository_intelligence_snapshot(
+                task, paths, impact_limit_per_surface=5
+            )
             codemap.repository_intelligence_snapshot(task, paths, max_depth=4)
             codemap.repository_intelligence_snapshot(task, paths)
             stats = codemap.decision_session_stats()
@@ -101,7 +113,9 @@ def test_cached_snapshot_isolated_from_caller_mutation(tmp_path: Path) -> None:
         assert "src/owner.py" in second["paths"]
 
 
-def test_snapshot_cache_is_not_reused_across_decision_sessions(tmp_path: Path, monkeypatch) -> None:
+def test_snapshot_cache_is_not_reused_across_decision_sessions(
+    tmp_path: Path, monkeypatch
+) -> None:
     task, paths = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()

@@ -13,8 +13,8 @@ def test_hashmarks_owns_minimum_supported_tool_versions_without_upper_caps() -> 
     root = Path(__file__).resolve().parents[1]
     config = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     assert config["dependency-groups"]["test"] == ["pytest>=8.4"]
+    assert config["dependency-groups"]["lint"] == ["ruff>=0.12.0"]
     assert config["tool"]["hashmarks"]["qualification"] == {"pytest-min": "8.4"}
-    assert config["tool"]["hashmarks"]["diagnostics"] == {"ruff-min": "0.12"}
     assert config["tool"]["uv"]["required-version"] == ">=0.10.0"
 
 
@@ -35,7 +35,9 @@ def test_pytest_and_ruff_boundaries_accept_versions_above_old_ceilings() -> None
     pytest_requirement = config["dependency-groups"]["test"][0]
     assert pytest_requirement.startswith("pytest")
     pytest_spec = SpecifierSet(pytest_requirement.removeprefix("pytest"))
-    ruff_spec = SpecifierSet(f'>={config["tool"]["hashmarks"]["diagnostics"]["ruff-min"]}')
+    ruff_requirement = config["dependency-groups"]["lint"][0]
+    assert ruff_requirement.startswith("ruff")
+    ruff_spec = SpecifierSet(ruff_requirement.removeprefix("ruff"))
 
     assert Version("8.3.99") not in pytest_spec
     assert Version("8.4.0") in pytest_spec
@@ -129,7 +131,10 @@ def test_current_contributor_policy_matches_minimum_only_tool_contract() -> None
     assert "Newer releases are accepted by default" in agents
     assert "pytest **9.x**" not in agents
     assert "expected Ruff diagnostic version" not in agents
-    assert "upper bound or exact-version requirement only after a concrete incompatibility" in agents
+    assert (
+        "upper bound or exact-version requirement only after a concrete incompatibility"
+        in agents
+    )
 
 
 def test_uv_lock_is_local_gitignored_state_not_release_identity() -> None:

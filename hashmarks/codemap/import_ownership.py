@@ -10,8 +10,10 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass
 from pathlib import PurePosixPath
-from typing import Iterable
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 _DYNAMIC_SPEC = "spec_from_file_location"
 _DYNAMIC_MODULE = "module_from_spec"
@@ -45,25 +47,39 @@ def _literal_path_parts(value: ast.Constant) -> tuple[str, ...]:
     return tuple(piece for piece in raw.split("/") if piece and piece != ".")
 
 
-def _bound_path_parts(value: ast.Name, *, bound: dict[str, ast.AST], resolving: set[str], depth: int) -> tuple[str, ...]:
+def _bound_path_parts(
+    value: ast.Name, *, bound: dict[str, ast.AST], resolving: set[str], depth: int
+) -> tuple[str, ...]:
     if value.id not in bound or value.id in resolving:
         return ()
     resolving.add(value.id)
     try:
-        return _collect_path_parts(bound[value.id], bound=bound, resolving=resolving, depth=depth + 1)
+        return _collect_path_parts(
+            bound[value.id], bound=bound, resolving=resolving, depth=depth + 1
+        )
     finally:
         resolving.remove(value.id)
 
 
-def _sequence_path_parts(values: tuple[ast.AST, ...] | list[ast.AST], *, bound: dict[str, ast.AST], resolving: set[str], depth: int) -> tuple[str, ...]:
+def _sequence_path_parts(
+    values: tuple[ast.AST, ...] | list[ast.AST],
+    *,
+    bound: dict[str, ast.AST],
+    resolving: set[str],
+    depth: int,
+) -> tuple[str, ...]:
     return tuple(
         part
         for item in values
-        for part in _collect_path_parts(item, bound=bound, resolving=resolving, depth=depth + 1)
+        for part in _collect_path_parts(
+            item, bound=bound, resolving=resolving, depth=depth + 1
+        )
     )
 
 
-def _collect_path_parts(value: ast.AST, *, bound: dict[str, ast.AST], resolving: set[str], depth: int) -> tuple[str, ...]:
+def _collect_path_parts(
+    value: ast.AST, *, bound: dict[str, ast.AST], resolving: set[str], depth: int
+) -> tuple[str, ...]:
     if depth > 8:
         result = ()
     elif isinstance(value, ast.Name):
@@ -71,11 +87,17 @@ def _collect_path_parts(value: ast.AST, *, bound: dict[str, ast.AST], resolving:
     elif isinstance(value, ast.Constant):
         result = _literal_path_parts(value)
     elif isinstance(value, ast.BinOp) and isinstance(value.op, ast.Div):
-        result = _sequence_path_parts((value.left, value.right), bound=bound, resolving=resolving, depth=depth)
+        result = _sequence_path_parts(
+            (value.left, value.right), bound=bound, resolving=resolving, depth=depth
+        )
     elif isinstance(value, (ast.List, ast.Tuple)):
-        result = _sequence_path_parts(value.elts, bound=bound, resolving=resolving, depth=depth)
+        result = _sequence_path_parts(
+            value.elts, bound=bound, resolving=resolving, depth=depth
+        )
     elif isinstance(value, ast.Call):
-        result = _sequence_path_parts(_path_call_args(value), bound=bound, resolving=resolving, depth=depth)
+        result = _sequence_path_parts(
+            _path_call_args(value), bound=bound, resolving=resolving, depth=depth
+        )
     else:
         result = ()
     return result
@@ -89,7 +111,11 @@ def _string_path_parts(
     return _collect_path_parts(node, bound=bindings or {}, resolving=set(), depth=0)
 
 
-def _resolve_target_path(path_expr: ast.AST, repository_paths: set[str], bindings: dict[str, ast.AST] | None = None) -> str | None:
+def _resolve_target_path(
+    path_expr: ast.AST,
+    repository_paths: set[str],
+    bindings: dict[str, ast.AST] | None = None,
+) -> str | None:
     parts = _string_path_parts(path_expr, bindings)
     if not parts:
         return None
@@ -100,7 +126,9 @@ def _resolve_target_path(path_expr: ast.AST, repository_paths: set[str], binding
         suffix = "/".join(parts[offset:])
         if suffix in repository_paths:
             return suffix
-        matches = sorted(path for path in repository_paths if path.endswith("/" + suffix))
+        matches = sorted(
+            path for path in repository_paths if path.endswith("/" + suffix)
+        )
         if len(matches) == 1:
             return matches[0]
     return None
@@ -110,14 +138,19 @@ def _package_parts(path: PurePosixPath, repository_paths: set[str]) -> tuple[str
     parent = path.parent
     parts: list[str] = []
     while str(parent) not in {".", ""}:
-        if not ({str(parent / "__init__.py"), str(parent / "__init__.pyi")} & repository_paths):
+        if not (
+            {str(parent / "__init__.py"), str(parent / "__init__.pyi")}
+            & repository_paths
+        ):
             break
         parts.append(parent.name)
         parent = parent.parent
     return tuple(reversed(parts))
 
 
-def _importable_module(target_path: str | None, repository_paths: set[str]) -> str | None:
+def _importable_module(
+    target_path: str | None, repository_paths: set[str]
+) -> str | None:
     if not target_path or not target_path.endswith((".py", ".pyi")):
         return None
     path = PurePosixPath(target_path)
@@ -133,15 +166,28 @@ def _importable_module(target_path: str | None, repository_paths: set[str]) -> s
 def _is_test_path(path: str) -> bool:
     parts = {part.lower() for part in PurePosixPath(path).parts}
     name = PurePosixPath(path).name.lower()
-    return bool(parts & {"test", "tests", "testing"}) or name.startswith("test_") or name.endswith("_test.py")
+    return (
+        bool(parts & {"test", "tests", "testing"})
+        or name.startswith("test_")
+        or name.endswith("_test.py")
+    )
 
 
 def _is_pluginish(path: str, source: str) -> bool:
     lowered = f"{path}\n{source}".lower()
-    return any(token in lowered for token in ("plugin", "extension", "entry_point", "entrypoint"))
+    return any(
+        token in lowered
+        for token in ("plugin", "extension", "entry_point", "entrypoint")
+    )
 
 
-def _finding_code_reason(*, mismatch: bool, registered: bool, target_module: str | None, requested_module: str | None) -> tuple[str, str]:
+def _finding_code_reason(
+    *,
+    mismatch: bool,
+    registered: bool,
+    target_module: str | None,
+    requested_module: str | None,
+) -> tuple[str, str]:
     if mismatch:
         return "python-duplicate-module-identity", (
             f"The loader names repository module '{target_module}' as '{requested_module}'. "
@@ -158,7 +204,13 @@ def _finding_code_reason(*, mismatch: bool, registered: bool, target_module: str
     )
 
 
-def _finding_recommendation(*, target_module: str | None, requested_module: str | None, mismatch: bool, registered: bool) -> str:
+def _finding_recommendation(
+    *,
+    target_module: str | None,
+    requested_module: str | None,
+    mismatch: bool,
+    registered: bool,
+) -> str:
     if target_module and mismatch:
         return f"Use the canonical package identity '{target_module}' or a normal package import; do not load the same repository file under '{requested_module}'."
     if target_module and not registered:
@@ -180,7 +232,11 @@ class ImportOwnershipFinding:
 
     def as_dict(self) -> dict[str, object]:
         registered = self.explicit_sys_modules_registration
-        mismatch = bool(self.target_module and self.requested_module and self.target_module != self.requested_module)
+        mismatch = bool(
+            self.target_module
+            and self.requested_module
+            and self.target_module != self.requested_module
+        )
         code, reason = _finding_code_reason(
             mismatch=mismatch,
             registered=registered,
@@ -194,18 +250,26 @@ class ImportOwnershipFinding:
             registered=registered,
         )
         return {
-            "path": self.path, "line": self.line, "code": code,
-            "severity": self.severity, "confidence": self.confidence, "domain": self.domain,
+            "path": self.path,
+            "line": self.line,
+            "code": code,
+            "severity": self.severity,
+            "confidence": self.confidence,
+            "domain": self.domain,
             "calls": [_DYNAMIC_SPEC, _DYNAMIC_MODULE, _DYNAMIC_EXEC],
-            "target_path": self.target_path, "target_module": self.target_module,
-            "requested_module": self.requested_module, "module_identity_mismatch": mismatch,
-            "explicit_sys_modules_registration": registered, "reason": reason,
+            "target_path": self.target_path,
+            "target_module": self.target_module,
+            "requested_module": self.requested_module,
+            "module_identity_mismatch": mismatch,
+            "explicit_sys_modules_registration": registered,
+            "reason": reason,
             "recommendation": recommendation,
         }
 
 
-
-def _finding_domain_severity(path: str, source: str, target_path: str | None, registered: bool) -> tuple[str, str, str]:
+def _finding_domain_severity(
+    path: str, source: str, target_path: str | None, registered: bool
+) -> tuple[str, str, str]:
     test_path = _is_test_path(path)
     pluginish = _is_pluginish(path, source)
     domain = "test" if test_path else ("plugin" if pluginish else "source")
@@ -248,16 +312,31 @@ class _DynamicLoaderVisitor(ast.NodeVisitor):
                 names.append(target.id)
         return tuple(names)
 
-    def _record_spec(self, assigned: tuple[str, ...], node: ast.AST, value: ast.Call) -> None:
-        requested = value.args[0].value if isinstance(value.args[0], ast.Constant) and isinstance(value.args[0].value, str) else None
-        spec = (int(getattr(value, "lineno", getattr(node, "lineno", 1))), value.args[1], requested)
+    def _record_spec(
+        self, assigned: tuple[str, ...], node: ast.AST, value: ast.Call
+    ) -> None:
+        requested = (
+            value.args[0].value
+            if isinstance(value.args[0], ast.Constant)
+            and isinstance(value.args[0].value, str)
+            else None
+        )
+        spec = (
+            int(getattr(value, "lineno", getattr(node, "lineno", 1))),
+            value.args[1],
+            requested,
+        )
         self.specs.update(dict.fromkeys(assigned, spec))
 
-    def _record_dynamic_module(self, assigned: tuple[str, ...], value: ast.Call) -> None:
+    def _record_dynamic_module(
+        self, assigned: tuple[str, ...], value: ast.Call
+    ) -> None:
         if value.args and isinstance(value.args[0], ast.Name):
             self.modules.update(dict.fromkeys(assigned, value.args[0].id))
 
-    def _record_assignment(self, node: ast.Assign | ast.AnnAssign, value: ast.AST | None) -> None:
+    def _record_assignment(
+        self, node: ast.Assign | ast.AnnAssign, value: ast.AST | None
+    ) -> None:
         assigned = self._assigned_names(node)
         if value is not None:
             self.path_bindings.update(dict.fromkeys(assigned, value))
@@ -273,16 +352,26 @@ class _DynamicLoaderVisitor(ast.NodeVisitor):
         if not isinstance(target, ast.Subscript):
             return False
         name = _call_name(target.value) or ""
-        return name == "sys.modules" or name.endswith(".sys.modules") or name in self.sys_modules_aliases
+        return (
+            name == "sys.modules"
+            or name.endswith(".sys.modules")
+            or name in self.sys_modules_aliases
+        )
 
     def _record_sys_modules_aliases(self, node: ast.Assign) -> None:
         value_name = _call_name(node.value) or ""
         if value_name != "sys.modules" and value_name not in self.sys_modules_aliases:
             return
-        self.sys_modules_aliases.update(target.id for target in node.targets if isinstance(target, ast.Name))
+        self.sys_modules_aliases.update(
+            target.id for target in node.targets if isinstance(target, ast.Name)
+        )
 
-    def _record_sys_modules_value(self, value: ast.AST, targets: list[ast.expr]) -> None:
-        if isinstance(value, ast.Name) and any(self._is_sys_modules_target(target) for target in targets):
+    def _record_sys_modules_value(
+        self, value: ast.AST, targets: list[ast.expr]
+    ) -> None:
+        if isinstance(value, ast.Name) and any(
+            self._is_sys_modules_target(target) for target in targets
+        ):
             self.sys_modules_values.add(value.id)
 
     def visit_Assign(self, node: ast.Assign) -> None:
@@ -293,16 +382,26 @@ class _DynamicLoaderVisitor(ast.NodeVisitor):
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         self._record_assignment(node, node.value)
-        if isinstance(node.value, ast.Name) and self._is_sys_modules_target(node.target):
+        if isinstance(node.value, ast.Name) and self._is_sys_modules_target(
+            node.target
+        ):
             self.sys_modules_values.add(node.value.id)
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call) -> None:
         call = self._resolved_call(node.func)
         if call.endswith(_DYNAMIC_EXEC):
-            module_name = node.args[0].id if node.args and isinstance(node.args[0], ast.Name) else None
+            module_name = (
+                node.args[0].id
+                if node.args and isinstance(node.args[0], ast.Name)
+                else None
+            )
             self.exec_modules.append((int(getattr(node, "lineno", 1)), module_name))
-        elif call.endswith("sys.modules.setdefault") and len(node.args) >= 2 and isinstance(node.args[1], ast.Name):
+        elif (
+            call.endswith("sys.modules.setdefault")
+            and len(node.args) >= 2
+            and isinstance(node.args[1], ast.Name)
+        ):
             self.sys_modules_values.add(node.args[1].id)
         self.generic_visit(node)
 
@@ -314,16 +413,24 @@ class _DynamicLoaderVisitor(ast.NodeVisitor):
         if spec is None:
             return None
         spec_line, path_expr, requested_module = spec
-        target_path = _resolve_target_path(path_expr, self.repository_paths, self.path_bindings)
+        target_path = _resolve_target_path(
+            path_expr, self.repository_paths, self.path_bindings
+        )
         target_module = _importable_module(target_path, self.repository_paths)
         registered = module_name in self.sys_modules_values
         domain, severity, confidence = _finding_domain_severity(
             self.path, self.source, target_path, registered
         )
         return ImportOwnershipFinding(
-            path=self.path, line=spec_line, target_path=target_path, target_module=target_module,
-            requested_module=requested_module, explicit_sys_modules_registration=registered,
-            domain=domain, severity=severity, confidence=confidence,
+            path=self.path,
+            line=spec_line,
+            target_path=target_path,
+            target_module=target_module,
+            requested_module=requested_module,
+            explicit_sys_modules_registration=registered,
+            domain=domain,
+            severity=severity,
+            confidence=confidence,
         )
 
     def findings(self) -> tuple[ImportOwnershipFinding, ...]:
@@ -342,7 +449,11 @@ class _DynamicLoaderVisitor(ast.NodeVisitor):
 
 
 def analyze_python_import_ownership(
-    *, path: str, source: str, repository_paths: Iterable[str], tree: ast.Module | None = None
+    *,
+    path: str,
+    source: str,
+    repository_paths: Iterable[str],
+    tree: ast.Module | None = None,
 ) -> tuple[ImportOwnershipFinding, ...]:
     """Return high-signal module-ownership findings without executing code."""
 

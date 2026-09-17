@@ -17,7 +17,6 @@ from pathlib import Path
 import hashmarks
 from hashmarks import CodeMap, File, RepositoryIdentity
 
-
 REQUIRED_PUBLIC = {
     "CodeMap",
     "Digest",
@@ -46,7 +45,9 @@ def _check_public_surface() -> None:
         raise RuntimeError(f"installed public API is missing: {sorted(missing)}")
     leaked = FORBIDDEN_BOUNDARY_DEBT & exported
     if leaked:
-        raise RuntimeError(f"removed boundary debt leaked into public API: {sorted(leaked)}")
+        raise RuntimeError(
+            f"removed boundary debt leaked into public API: {sorted(leaked)}"
+        )
     for name in REQUIRED_PUBLIC:
         getattr(hashmarks, name)
     if not importlib.resources.files("hashmarks").joinpath("py.typed").is_file():
@@ -63,11 +64,15 @@ def _check_repository_intelligence() -> None:
         with RepositoryIdentity(root, mode="local") as identity:
             snapshot = identity.snapshot(File("sample.py"))
             if not snapshot.hash:
-                raise RuntimeError("installed RepositoryIdentity produced an empty hash")
+                raise RuntimeError(
+                    "installed RepositoryIdentity produced an empty hash"
+                )
         with CodeMap(root) as codemap:
             result = codemap.sync()
             if result.discovered < 1:
-                raise RuntimeError("installed CodeMap did not discover the smoke repository")
+                raise RuntimeError(
+                    "installed CodeMap did not discover the smoke repository"
+                )
             hits = codemap.find_task("answer", limit=5)
             if not any(hit.path == "sample.py" for hit in hits):
                 raise RuntimeError("installed CodeMap did not retrieve sample.py")
@@ -80,7 +85,9 @@ def _console_script() -> Path:
         candidate = directory / name
         if candidate.is_file():
             return candidate
-    raise RuntimeError(f"installed hashmarks console script not found beside {sys.executable}")
+    raise RuntimeError(
+        f"installed hashmarks console script not found beside {sys.executable}"
+    )
 
 
 def _run_cli(*args: str) -> dict[str, object]:
@@ -92,7 +99,9 @@ def _run_cli(*args: str) -> dict[str, object]:
     )
     payload = json.loads(completed.stdout)
     if not isinstance(payload, dict):
-        raise RuntimeError(f"installed CLI did not return a JSON object for: {' '.join(args)}")
+        raise RuntimeError(
+            f"installed CLI did not return a JSON object for: {' '.join(args)}"
+        )
     return payload
 
 
@@ -109,10 +118,15 @@ def _check_cli() -> None:
         )
         doctor = _run_cli("--workspace", str(root), "doctor", "--mode", "local")
         if doctor.get("workspace") != str(root.resolve()):
-            raise RuntimeError("installed doctor did not bind to the requested workspace")
+            raise RuntimeError(
+                "installed doctor did not bind to the requested workspace"
+            )
 
         sync = _run_cli("--workspace", str(root), "map", "sync")
-        if sync.get("schema") != "hashmarks.codemap.v1" or sync.get("build_state") != "COMPLETE":
+        if (
+            sync.get("schema") != "hashmarks.codemap.v1"
+            or sync.get("build_state") != "COMPLETE"
+        ):
             raise RuntimeError("installed map sync returned an unexpected contract")
 
         orientation = _run_cli("--workspace", str(root), "orient")
@@ -121,8 +135,12 @@ def _check_cli() -> None:
 
         found = _run_cli("--workspace", str(root), "find", "answer")
         hits = found.get("hits")
-        if found.get("schema") != "hashmarks.find.v1" or not isinstance(hits, list) or not any(
-            isinstance(row, dict) and row.get("path") == "sample.py" for row in hits
+        if (
+            found.get("schema") != "hashmarks.find.v1"
+            or not isinstance(hits, list)
+            or not any(
+                isinstance(row, dict) and row.get("path") == "sample.py" for row in hits
+            )
         ):
             raise RuntimeError("installed find did not retrieve sample.py")
 
@@ -131,7 +149,7 @@ def main() -> int:
     _check_public_surface()
     _check_repository_intelligence()
     _check_cli()
-    print(f"installed Hashmarks {hashmarks.__version__}: PASS")
+    print(f"installed Hashmarks {hashmarks.__version__}: PASS")  # noqa: T201 - intentional command output
     return 0
 
 

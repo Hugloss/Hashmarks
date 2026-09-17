@@ -64,11 +64,13 @@ def ownership_decision_trace(
     selected = _candidate_identity(state.edit) if state.edit is not None else None
     candidates: list[dict[str, object]] = []
     if selected is not None:
-        candidates.append({
-            **selected,
-            "disposition": "selected" if status == "resolved" else "provisional",
-            "rejection_reason": None,
-        })
+        candidates.append(
+            {
+                **selected,
+                "disposition": "selected" if status == "resolved" else "provisional",
+                "rejection_reason": None,
+            }
+        )
     candidates.extend(
         {
             **_candidate_identity(row),

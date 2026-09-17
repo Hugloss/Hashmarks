@@ -14,7 +14,9 @@ def _root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def test_repository_classification_is_deterministic_identity_bound_and_inspectable() -> None:
+def test_repository_classification_is_deterministic_identity_bound_and_inspectable() -> (
+    None
+):
     root = _root()
     nodeids = [nodeid for nodeid, _weight in _nodeids(root)]
     first = classify_nodeids(root, nodeids)
@@ -42,7 +44,10 @@ def test_classification_policy_change_changes_plan_identity(tmp_path: Path) -> N
     original_artifact = classify_nodeids(root, nodeids)
     mutated_artifact = classify_nodeids(copy_root, nodeids)
     assert original_artifact["policy_identity"] != mutated_artifact["policy_identity"]
-    assert original_artifact["classification_identity"] != mutated_artifact["classification_identity"]
+    assert (
+        original_artifact["classification_identity"]
+        != mutated_artifact["classification_identity"]
+    )
 
 
 def test_runtime_measurement_cannot_mutate_authoritative_classification() -> None:
@@ -61,12 +66,18 @@ def test_policy_classifies_process_and_empirical_without_python_constants() -> N
     root = _root()
     nodeids = [nodeid for nodeid, _weight in _nodeids(root)]
     classes = classification_map(root, nodeids)
-    assert classes[
-        "tests/test_codemap.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon"
-    ]["kind"] == "process-sensitive"
-    assert classes[
-        "tests/test_agent_metrics_suite.py::test_blind_worker_ab_is_reproducible_and_scores_both_workers"
-    ]["kind"] == "empirical-benchmark"
+    assert (
+        classes[
+            "tests/test_codemap.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon"
+        ]["kind"]
+        == "process-sensitive"
+    )
+    assert (
+        classes[
+            "tests/test_agent_metrics_suite.py::test_blind_worker_ab_is_reproducible_and_scores_both_workers"
+        ]["kind"]
+        == "empirical-benchmark"
+    )
     plan = qualification_owner_plan(root)
     assert plan["classification_identity"].startswith("sha256:")
     assert plan["classification_policy_identity"].startswith("sha256:")
@@ -88,15 +99,18 @@ def test_unmatched_new_test_node_fails_closed(tmp_path: Path) -> None:
 
 def test_classification_policy_rejects_nonportable_json_scalars(tmp_path: Path) -> None:
     from hashmarks.qualification_classification import load_classification_policy
+
     policy = {
         "schema": "hashmarks.qualification-classification-policy.v1",
         "unmatched_node_policy": "fail-closed",
         "node_overrides": [],
-        "path_rules": [{
-            "path_prefix": "tests/",
-            "kind": "release-correctness",
-            "reason": float("nan"),
-        }],
+        "path_rules": [
+            {
+                "path_prefix": "tests/",
+                "kind": "release-correctness",
+                "reason": float("nan"),
+            }
+        ],
     }
     (tmp_path / "qualification-classification.json").write_text(
         json.dumps(policy), encoding="utf-8"

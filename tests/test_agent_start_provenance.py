@@ -20,7 +20,9 @@ def _task() -> str:
     return "Change cobalt_value from old to new and verify cobalt_value"
 
 
-def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_freshness(tmp_path: Path) -> None:
+def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_freshness(
+    tmp_path: Path,
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -36,12 +38,16 @@ def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_fre
     assert "freshness_reason" not in provenance
 
 
-def test_task_evidence_maps_generation_bound_continuity_to_proven(tmp_path: Path, monkeypatch) -> None:
+def test_task_evidence_maps_generation_bound_continuity_to_proven(
+    tmp_path: Path, monkeypatch
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         generation = codemap.store.generation()
-        monkeypatch.setattr(codemap, "_generation_status", lambda: (generation, 71, False))
+        monkeypatch.setattr(
+            codemap, "_generation_status", lambda: (generation, 71, False)
+        )
         start = codemap.task_evidence(_task(), token_budget=512)
 
     provenance = start["provenance"]
@@ -50,12 +56,16 @@ def test_task_evidence_maps_generation_bound_continuity_to_proven(tmp_path: Path
     assert "freshness_reason" not in provenance
 
 
-def test_task_evidence_reports_stale_when_continuity_reports_change(tmp_path: Path, monkeypatch) -> None:
+def test_task_evidence_reports_stale_when_continuity_reports_change(
+    tmp_path: Path, monkeypatch
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         generation = codemap.store.generation()
-        monkeypatch.setattr(codemap, "_generation_status", lambda: (generation, 72, True))
+        monkeypatch.setattr(
+            codemap, "_generation_status", lambda: (generation, 72, True)
+        )
         start = codemap.task_evidence(_task(), token_budget=512)
 
     assert start["status"] == "safe-stale"
@@ -63,7 +73,9 @@ def test_task_evidence_reports_stale_when_continuity_reports_change(tmp_path: Pa
     assert start["provenance"]["freshness_reason"] == "continuity-reported-change"
 
 
-def test_task_evidence_marks_action_stale_if_selected_source_refresh_changes_generation(tmp_path: Path, monkeypatch) -> None:
+def test_task_evidence_marks_action_stale_if_selected_source_refresh_changes_generation(
+    tmp_path: Path, monkeypatch
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -71,10 +83,15 @@ def test_task_evidence_marks_action_stale_if_selected_source_refresh_changes_gen
 
         def mutate_then_project(row, *, role, token_budget, task=""):
             path = tmp_path / str(row["path"])
-            path.write_text(path.read_text(encoding="utf-8") + "# changed during packet\n", encoding="utf-8")
+            path.write_text(
+                path.read_text(encoding="utf-8") + "# changed during packet\n",
+                encoding="utf-8",
+            )
             return original(row, role=role, token_budget=token_budget, task=task)
 
-        monkeypatch.setattr(codemap, "_task_evidence_evidence_item", mutate_then_project)
+        monkeypatch.setattr(
+            codemap, "_task_evidence_evidence_item", mutate_then_project
+        )
         start = codemap.task_evidence(_task(), token_budget=512)
 
     assert start["status"] == "safe-stale"
@@ -92,6 +109,7 @@ def test_config_projection_provenance_stays_post_selection(tmp_path: Path) -> No
     secret = tmp_path / "secret.json"
     generate(repo, public, secret, cases_per_category=1)
     import json
+
     tasks = json.loads(public.read_text(encoding="utf-8"))["tasks"]
     task = next(row for row in tasks if row["id"] == "hard-004")
     with CodeMap(repo) as codemap:
@@ -104,11 +122,16 @@ def test_config_projection_provenance_stays_post_selection(tmp_path: Path) -> No
     assert len(start["provenance"]["revision"]) == 64
 
 
-def test_task_evidence_context_identity_is_budget_independent_and_revision_bound(tmp_path: Path) -> None:
+def test_task_evidence_context_identity_is_budget_independent_and_revision_bound(
+    tmp_path: Path,
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        starts = [codemap.task_evidence(_task(), token_budget=budget) for budget in (1, 32, 512)]
+        starts = [
+            codemap.task_evidence(_task(), token_budget=budget)
+            for budget in (1, 32, 512)
+        ]
         identities = {str(start["provenance"]["context_identity"]) for start in starts}
         assert len(identities) == 1
         assert next(iter(identities)).startswith("sha256:")
@@ -121,20 +144,29 @@ def test_task_evidence_context_identity_is_budget_independent_and_revision_bound
     assert changed["provenance"]["context_identity"] not in identities
 
 
-def test_task_evidence_context_identity_changes_with_freshness_authority(tmp_path: Path, monkeypatch) -> None:
+def test_task_evidence_context_identity_changes_with_freshness_authority(
+    tmp_path: Path, monkeypatch
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         unknown = codemap.task_evidence(_task(), token_budget=32)
         generation = codemap.store.generation()
-        monkeypatch.setattr(codemap, "_generation_status", lambda: (generation, 91, False))
+        monkeypatch.setattr(
+            codemap, "_generation_status", lambda: (generation, 91, False)
+        )
         proven = codemap.task_evidence(_task(), token_budget=32)
     assert unknown["provenance"]["freshness"] == "unknown"
     assert proven["provenance"]["freshness"] == "proven"
-    assert unknown["provenance"]["context_identity"] != proven["provenance"]["context_identity"]
+    assert (
+        unknown["provenance"]["context_identity"]
+        != proven["provenance"]["context_identity"]
+    )
 
 
-def test_task_evidence_marks_stale_when_selected_verification_contents_change_after_sync(tmp_path: Path) -> None:
+def test_task_evidence_marks_stale_when_selected_verification_contents_change_after_sync(
+    tmp_path: Path,
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -145,30 +177,47 @@ def test_task_evidence_marks_stale_when_selected_verification_contents_change_af
     assert start["status"] == "safe-stale"
     assert start["verify_path"] == "tests/test_engine.py"
     assert start["provenance"]["freshness"] == "stale"
-    assert start["provenance"]["freshness_reason"] == "verification-changed-since-selection"
+    assert (
+        start["provenance"]["freshness_reason"]
+        == "verification-changed-since-selection"
+    )
 
 
-def test_task_evidence_marks_stale_when_selected_verification_is_deleted_after_sync(tmp_path: Path) -> None:
+def test_task_evidence_marks_stale_when_selected_verification_is_deleted_after_sync(
+    tmp_path: Path,
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         (tmp_path / "tests" / "test_engine.py").unlink()
         start = codemap.task_evidence(_task(), token_budget=512)
     assert start["status"] == "safe-stale"
-    assert start["provenance"]["freshness_reason"] == "verification-changed-since-selection"
+    assert (
+        start["provenance"]["freshness_reason"]
+        == "verification-changed-since-selection"
+    )
 
 
-def test_task_evidence_marks_stale_when_selected_verification_is_renamed_after_sync(tmp_path: Path) -> None:
+def test_task_evidence_marks_stale_when_selected_verification_is_renamed_after_sync(
+    tmp_path: Path,
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        (tmp_path / "tests" / "test_engine.py").rename(tmp_path / "tests" / "test_engine_renamed.py")
+        (tmp_path / "tests" / "test_engine.py").rename(
+            tmp_path / "tests" / "test_engine_renamed.py"
+        )
         start = codemap.task_evidence(_task(), token_budget=512)
     assert start["status"] == "safe-stale"
-    assert start["provenance"]["freshness_reason"] == "verification-changed-since-selection"
+    assert (
+        start["provenance"]["freshness_reason"]
+        == "verification-changed-since-selection"
+    )
 
 
-def test_task_evidence_closing_fence_catches_verification_mutation_during_packet_projection(tmp_path: Path, monkeypatch) -> None:
+def test_task_evidence_closing_fence_catches_verification_mutation_during_packet_projection(
+    tmp_path: Path, monkeypatch
+) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -180,7 +229,12 @@ def test_task_evidence_closing_fence_catches_verification_mutation_during_packet
             )
             return original(row, role=role, token_budget=token_budget, task=task)
 
-        monkeypatch.setattr(codemap, "_task_evidence_evidence_item", mutate_verification_then_project)
+        monkeypatch.setattr(
+            codemap, "_task_evidence_evidence_item", mutate_verification_then_project
+        )
         start = codemap.task_evidence(_task(), token_budget=512)
     assert start["status"] == "safe-stale"
-    assert start["provenance"]["freshness_reason"] == "verification-changed-since-selection"
+    assert (
+        start["provenance"]["freshness_reason"]
+        == "verification-changed-since-selection"
+    )

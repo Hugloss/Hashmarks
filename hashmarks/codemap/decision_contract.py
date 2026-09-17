@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
-from ..generation_domain import require_generation
+from hashmarks.generation_domain import require_generation
 
 DECISION_PACKET_SCHEMA = "hashmarks.task-decision-packet.v2"
 DECISION_CONTRACT_SCHEMA = "hashmarks.task-decision-contract.v1"
@@ -14,14 +15,16 @@ class DecisionSelection:
     path: str | None
 
     @classmethod
-    def from_value(cls, value: object) -> "DecisionSelection":
+    def from_value(cls, value: object) -> DecisionSelection:
         if value is None:
             return cls(path=None)
         if not isinstance(value, Mapping):
             raise ValueError("decision selection must be an object or null")
         path = value.get("path")
         if path is not None and (not isinstance(path, str) or not path.strip()):
-            raise ValueError("decision selection path must be a nonblank string or null")
+            raise ValueError(
+                "decision selection path must be a nonblank string or null"
+            )
         return cls(path=path)
 
 
@@ -45,7 +48,7 @@ class DecisionPacketContract:
     canonical_generation: int
 
     @classmethod
-    def parse(cls, packet: Mapping[str, Any]) -> "DecisionPacketContract":
+    def parse(cls, packet: Mapping[str, Any]) -> DecisionPacketContract:
         schema = packet.get("schema")
         if schema != DECISION_PACKET_SCHEMA:
             raise ValueError(f"unsupported decision packet schema: {schema!r}")
@@ -61,17 +64,24 @@ class DecisionPacketContract:
         if not isinstance(discrimination.get("needed"), bool):
             raise ValueError("decision packet discrimination.needed must be boolean")
         if not isinstance(identity.get("codemap_complete"), bool):
-            raise ValueError("decision packet identity.codemap_complete must be boolean")
+            raise ValueError(
+                "decision packet identity.codemap_complete must be boolean"
+            )
         if not isinstance(identity.get("stale"), bool):
             raise ValueError("decision packet identity.stale must be boolean")
         generation = require_generation(
-            packet.get("canonical_generation"), field="decision packet canonical_generation"
+            packet.get("canonical_generation"),
+            field="decision packet canonical_generation",
         )
         ambiguity = discrimination.get("ambiguity")
         if ambiguity is not None and not isinstance(ambiguity, Mapping):
-            raise ValueError("decision packet discrimination.ambiguity must be an object or null")
+            raise ValueError(
+                "decision packet discrimination.ambiguity must be an object or null"
+            )
         if ambiguity is not None and type(ambiguity.get("ambiguous")) is not bool:
-            raise ValueError("decision packet discrimination.ambiguity.ambiguous must be boolean")
+            raise ValueError(
+                "decision packet discrimination.ambiguity.ambiguous must be boolean"
+            )
         return cls(
             schema=DECISION_CONTRACT_SCHEMA,
             task=task,

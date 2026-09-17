@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import errno
 import os
@@ -8,11 +9,14 @@ import struct
 import sys
 import threading
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import TYPE_CHECKING
 
-from .observation import ChangeTracker
 from .paths import canonical_event_relative_path, canonical_host_path
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from .observation import ChangeTracker
 
 # Linux inotify constants from <sys/inotify.h>.
 _IN_MODIFY = 0x00000002
@@ -213,7 +217,9 @@ class NativeLinuxBatchWatcher(_BatchedWatcherBase):
         self._add_watch(absolute, rel)
         try:
             with os.scandir(absolute) as entries:
-                children = [entry for entry in entries if entry.is_dir(follow_symlinks=False)]
+                children = [
+                    entry for entry in entries if entry.is_dir(follow_symlinks=False)
+                ]
         except (FileNotFoundError, NotADirectoryError, PermissionError):
             return
         for entry in children:
@@ -236,7 +242,10 @@ class NativeLinuxBatchWatcher(_BatchedWatcherBase):
                 self._rel_to_wd.pop(path, None)
                 self._wd_to_rel.pop(wd, None)
                 result = self._rm_watch_fn(self._fd, wd)
-                if result < 0 and ctypes.get_errno() not in (errno.EINVAL, errno.ENOENT):
+                if result < 0 and ctypes.get_errno() not in (
+                    errno.EINVAL,
+                    errno.ENOENT,
+                ):
                     self.mark_unknown("failed to remove inotify watch")
 
     def _event_path(self, wd: int, name: str) -> tuple[str, Path] | None:
@@ -331,7 +340,10 @@ class NativeLinuxBatchWatcher(_BatchedWatcherBase):
             return False
         self._drain_ready()
         self._flush_now()
-        return self.change_tracker is None or self.change_tracker.snapshot().state.value != "unknown"
+        return (
+            self.change_tracker is None
+            or self.change_tracker.snapshot().state.value != "unknown"
+        )
 
     def _read_loop(self) -> None:
         assert self._fd is not None
@@ -368,16 +380,16 @@ class NativeLinuxBatchWatcher(_BatchedWatcherBase):
             daemon=True,
         )
         self._thread.start()
-        self._start_flush_thread(observer_alive=lambda: bool(self._thread and self._thread.is_alive()))
+        self._start_flush_thread(
+            observer_alive=lambda: bool(self._thread and self._thread.is_alive())
+        )
 
     def stop(self) -> None:
         self.mark_unknown("watcher stopped")
         self._stop.set()
         if self._fd is not None:
-            try:
+            with contextlib.suppress(OSError):
                 os.close(self._fd)
-            except OSError:
-                pass
             self._fd = None
         if self._thread is not None:
             self._thread.join(timeout=1)
@@ -409,7 +421,10 @@ class WatchdogBatchWatcher(_BatchedWatcherBase):
                     is_directory=bool(getattr(event, "is_directory", False)),
                 ):
                     return
-                for raw in (getattr(event, "src_path", None), getattr(event, "dest_path", None)):
+                for raw in (
+                    getattr(event, "src_path", None),
+                    getattr(event, "dest_path", None),
+                ):
                     if not raw:
                         continue
                     rel = canonical_event_relative_path(owner.root, raw)
@@ -421,7 +436,9 @@ class WatchdogBatchWatcher(_BatchedWatcherBase):
         observer.schedule(Handler(), str(self.root), recursive=True)
         observer.start()
         self._observer = observer
-        self._start_flush_thread(observer_alive=lambda: bool(self._observer and self._observer.is_alive()))
+        self._start_flush_thread(
+            observer_alive=lambda: bool(self._observer and self._observer.is_alive())
+        )
 
     def stop(self) -> None:
         self.mark_unknown("watcher stopped")
@@ -446,11 +463,11 @@ def create_default_watcher(
     platforms use watchdog when installed; otherwise daemon startup fails with
     a precise message rather than silently falling back to an unsafe observer.
     """
-    kwargs = dict(
-        debounce_seconds=debounce_seconds,
-        change_tracker=change_tracker,
-        exclude_relative_paths=exclude_relative_paths,
-    )
+    kwargs = {
+        "debounce_seconds": debounce_seconds,
+        "change_tracker": change_tracker,
+        "exclude_relative_paths": exclude_relative_paths,
+    }
     if sys.platform.startswith("linux"):
         return NativeLinuxBatchWatcher(root, callback, **kwargs)
     try:

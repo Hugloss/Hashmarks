@@ -16,17 +16,39 @@ def _base(repo: Path) -> None:
 
 def test_dual_live_task_local_owners_require_discrimination(tmp_path: Path) -> None:
     _base(tmp_path)
-    _write(tmp_path / "src/feature/engine_a.py", "def transform(value: str) -> str:\n    return value + '-a'\n")
-    _write(tmp_path / "src/feature/engine_b.py", "def transform(value: str) -> str:\n    return value + '-b'\n")
-    _write(tmp_path / "src/feature/api_a.py", "from .engine_a import transform\ndef handle_quartz_dual(value: str) -> str:\n    return transform(value)\n")
-    _write(tmp_path / "src/feature/api_b.py", "from .engine_b import transform\ndef handle_quartz_dual_b(value: str) -> str:\n    return transform(value)\n")
-    _write(tmp_path / "tests/test_a.py", "from src.feature.api_a import handle_quartz_dual\ndef test_quartz_dual_a():\n    assert handle_quartz_dual('x') == 'x-a'\n")
-    _write(tmp_path / "tests/test_b.py", "from src.feature.api_b import handle_quartz_dual_b\ndef test_quartz_dual_b():\n    assert handle_quartz_dual_b('x') == 'x-b'\n")
+    _write(
+        tmp_path / "src/feature/engine_a.py",
+        "def transform(value: str) -> str:\n    return value + '-a'\n",
+    )
+    _write(
+        tmp_path / "src/feature/engine_b.py",
+        "def transform(value: str) -> str:\n    return value + '-b'\n",
+    )
+    _write(
+        tmp_path / "src/feature/api_a.py",
+        "from .engine_a import transform\ndef handle_quartz_dual(value: str) -> str:\n    return transform(value)\n",
+    )
+    _write(
+        tmp_path / "src/feature/api_b.py",
+        "from .engine_b import transform\ndef handle_quartz_dual_b(value: str) -> str:\n    return transform(value)\n",
+    )
+    _write(
+        tmp_path / "tests/test_a.py",
+        "from src.feature.api_a import handle_quartz_dual\ndef test_quartz_dual_a():\n    assert handle_quartz_dual('x') == 'x-a'\n",
+    )
+    _write(
+        tmp_path / "tests/test_b.py",
+        "from src.feature.api_b import handle_quartz_dual_b\ndef test_quartz_dual_b():\n    assert handle_quartz_dual_b('x') == 'x-b'\n",
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        action = codemap.task_action_map("Fix quartz_dual transform behavior across both active product paths")
-        packet = codemap.task_decision_packet("Fix quartz_dual transform behavior across both active product paths")
+        action = codemap.task_action_map(
+            "Fix quartz_dual transform behavior across both active product paths"
+        )
+        packet = codemap.task_decision_packet(
+            "Fix quartz_dual transform behavior across both active product paths"
+        )
 
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-task-local-structural-owners"
@@ -35,12 +57,23 @@ def test_dual_live_task_local_owners_require_discrimination(tmp_path: Path) -> N
     assert packet["discrimination"]["reason"] == "competing-action-roles"
 
 
-def test_multiple_task_local_tests_for_same_owner_remain_resolved(tmp_path: Path) -> None:
+def test_multiple_task_local_tests_for_same_owner_remain_resolved(
+    tmp_path: Path,
+) -> None:
     _base(tmp_path)
-    _write(tmp_path / "src/feature/engine.py", "def transform(value: str) -> str:\n    return value + '-ok'\n")
-    _write(tmp_path / "src/feature/api.py", "from .engine import transform\ndef handle_quartz_single(value: str) -> str:\n    return transform(value)\n")
+    _write(
+        tmp_path / "src/feature/engine.py",
+        "def transform(value: str) -> str:\n    return value + '-ok'\n",
+    )
+    _write(
+        tmp_path / "src/feature/api.py",
+        "from .engine import transform\ndef handle_quartz_single(value: str) -> str:\n    return transform(value)\n",
+    )
     for name in ("a", "b"):
-        _write(tmp_path / f"tests/test_{name}.py", f"from src.feature.api import handle_quartz_single\ndef test_quartz_single_{name}():\n    assert handle_quartz_single('x') == 'x-ok'\n")
+        _write(
+            tmp_path / f"tests/test_{name}.py",
+            f"from src.feature.api import handle_quartz_single\ndef test_quartz_single_{name}():\n    assert handle_quartz_single('x') == 'x-ok'\n",
+        )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -48,5 +81,7 @@ def test_multiple_task_local_tests_for_same_owner_remain_resolved(tmp_path: Path
         packet = codemap.task_decision_packet("Fix quartz_single transform behavior")
 
     assert action["ambiguity"]["ambiguous"] is False
-    assert action["ambiguity"]["task_local_structural_owners"] == ["src/feature/engine.py"]
+    assert action["ambiguity"]["task_local_structural_owners"] == [
+        "src/feature/engine.py"
+    ]
     assert packet["discrimination"]["needed"] is False

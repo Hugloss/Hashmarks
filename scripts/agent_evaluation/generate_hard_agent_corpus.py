@@ -27,7 +27,9 @@ def _digest(payload: object) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
-def generate(repo: Path, public_path: Path, secret_path: Path, *, cases_per_category: int = 10) -> dict[str, object]:
+def generate(
+    repo: Path, public_path: Path, secret_path: Path, *, cases_per_category: int = 10
+) -> dict[str, object]:
     if cases_per_category < 1:
         raise ValueError("cases_per_category must be >= 1")
     repo = repo.resolve()
@@ -39,18 +41,23 @@ def generate(repo: Path, public_path: Path, secret_path: Path, *, cases_per_cate
         except ValueError:
             pass
         else:
-            raise ValueError("PUBLIC and SECRET corpus files must live outside the worker repository")
+            raise ValueError(
+                "PUBLIC and SECRET corpus files must live outside the worker repository"
+            )
     if repo.exists():
         shutil.rmtree(repo)
     repo.mkdir(parents=True)
     _write(repo / "pyproject.toml", "[tool.pytest.ini_options]\ntestpaths=['tests']\n")
-    _write(repo / "README.md", "# Generated archaeology challenge\nNo benchmark answer keys live in this repository.\n")
+    _write(
+        repo / "README.md",
+        "# Generated archaeology challenge\nNo benchmark answer keys live in this repository.\n",
+    )
 
     public: list[dict[str, str]] = []
     secret: list[dict[str, object]] = []
     index = 0
     for category in CATEGORIES:
-        for variant in range(cases_per_category):
+        for _variant in range(cases_per_category):
             task_id = f"hard-{index:03d}"
             ns = f"case_{index:03d}"
             behavior = f"ember{index:03d}"
@@ -89,16 +96,20 @@ def generate(repo: Path, public_path: Path, secret_path: Path, *, cases_per_cate
                 legacy_text += f"\ndef apply_{ns}(value: str) -> str:\n    return value + '-duplicate'\n"
             elif category == "dead-code-decoy":
                 legacy_text = (
-                    f"# exact symptom wording: {query}\n" + legacy_text +
-                    "\nENABLED = False  # dead compatibility surface\n"
+                    f"# exact symptom wording: {query}\n"
+                    + legacy_text
+                    + "\nENABLED = False  # dead compatibility surface\n"
                 )
             elif category == "cross-layer-ownership":
-                _write(repo / f"frontend/{ns}/client.ts", (
-                    f"export async function submit{index}(value: string) {{\n"
-                    f"  // UI names {behavior}; backend owns transformation.\n"
-                    f"  return fetch('/api/{behavior}?value=' + value);\n"
-                    f"}}\n"
-                ))
+                _write(
+                    repo / f"frontend/{ns}/client.ts",
+                    (
+                        f"export async function submit{index}(value: string) {{\n"
+                        f"  // UI names {behavior}; backend owns transformation.\n"
+                        f"  return fetch('/api/{behavior}?value=' + value);\n"
+                        f"}}\n"
+                    ),
+                )
                 query = f"The {behavior} frontend request returns the wrong accepted response; fix the behavior owner"
             elif category == "configuration-ownership":
                 _write(repo / config, f"mode = 'active'\nfeature = '{behavior}'\n")
@@ -131,22 +142,28 @@ def generate(repo: Path, public_path: Path, secret_path: Path, *, cases_per_cate
             _write(repo / "src/__init__.py", "")
 
             public.append({"id": task_id, "query": query})
-            secret.append({
-                "id": task_id,
-                "category": category,
-                "expected_edit_path": expected_edit,
-                "expected_verify_path": verify,
-                "expected_contract_path": expected_contract,
-                "expected_safe": True,
-            })
+            secret.append(
+                {
+                    "id": task_id,
+                    "category": category,
+                    "expected_edit_path": expected_edit,
+                    "expected_verify_path": verify,
+                    "expected_contract_path": expected_contract,
+                    "expected_safe": True,
+                }
+            )
             index += 1
 
     public_payload = {"schema": SCHEMA, "tasks": public}
     secret_payload = {"schema": SCHEMA, "tasks": secret}
     public_path.parent.mkdir(parents=True, exist_ok=True)
     secret_path.parent.mkdir(parents=True, exist_ok=True)
-    public_path.write_text(json.dumps(public_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    secret_path.write_text(json.dumps(secret_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    public_path.write_text(
+        json.dumps(public_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    secret_path.write_text(
+        json.dumps(secret_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     manifest = {
         "schema": "hashmarks.hard-agent-corpus-manifest.v1",
         "tasks": len(public),
@@ -167,12 +184,14 @@ def main() -> None:
     parser.add_argument("--cases-per-category", type=int, default=10)
     parser.add_argument("--manifest", type=Path)
     args = parser.parse_args()
-    manifest = generate(args.repo, args.public, args.secret, cases_per_category=args.cases_per_category)
+    manifest = generate(
+        args.repo, args.public, args.secret, cases_per_category=args.cases_per_category
+    )
     rendered = json.dumps(manifest, indent=2, sort_keys=True)
     if args.manifest:
         args.manifest.parent.mkdir(parents=True, exist_ok=True)
         args.manifest.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)
+    print(rendered)  # noqa: T201 - intentional command output
 
 
 if __name__ == "__main__":

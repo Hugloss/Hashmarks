@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 from scripts.benchmark_shards_lib import (
@@ -18,7 +17,9 @@ from scripts.benchmark_shards_lib import (
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Deterministic resumable benchmark shard runner")
+    parser = argparse.ArgumentParser(
+        description="Deterministic resumable benchmark shard runner"
+    )
     sub = parser.add_subparsers(dest="command_name", required=True)
 
     plan = sub.add_parser("plan", help="Create or verify an immutable shard plan")
@@ -27,8 +28,14 @@ def _parser() -> argparse.ArgumentParser:
     plan.add_argument("--output-dir", type=Path, required=True)
     plan.add_argument("--id-field", default="id")
     plan.add_argument("--run-identity", required=True)
-    plan.add_argument("--warmup-json", help="JSON array command executed once before shards")
-    plan.add_argument("command", nargs=argparse.REMAINDER, help="Child command; supports {start} {end} {output} {index}")
+    plan.add_argument(
+        "--warmup-json", help="JSON array command executed once before shards"
+    )
+    plan.add_argument(
+        "command",
+        nargs=argparse.REMAINDER,
+        help="Child command; supports {start} {end} {output} {index}",
+    )
 
     warm = sub.add_parser("warm", help="Execute and seal the planned warmup once")
     warm.add_argument("--output-dir", type=Path, required=True)
@@ -56,22 +63,31 @@ def main(argv: list[str] | None = None) -> int:
         if not command:
             raise SystemExit("plan requires a child command after --")
         warmup = json.loads(args.warmup_json) if args.warmup_json else None
-        if warmup is not None and (not isinstance(warmup, list) or not all(isinstance(x, str) for x in warmup)):
+        if warmup is not None and (
+            not isinstance(warmup, list) or not all(isinstance(x, str) for x in warmup)
+        ):
             raise SystemExit("--warmup-json must be a JSON array of strings")
-        manifest = create_manifest(total=args.total, shard_size=args.shard_size, command=command, id_field=args.id_field, warmup_command=warmup, run_identity=args.run_identity)
+        manifest = create_manifest(
+            total=args.total,
+            shard_size=args.shard_size,
+            command=command,
+            id_field=args.id_field,
+            warmup_command=warmup,
+            run_identity=args.run_identity,
+        )
         path = write_manifest(args.output_dir, manifest)
-        print(path)
+        print(path)  # noqa: T201 - intentional command output
         return 0
     if args.command_name == "warm":
         changed = run_warmup(args.output_dir, timeout_seconds=args.timeout_seconds)
-        print("warmed" if changed else "already-warm")
+        print("warmed" if changed else "already-warm")  # noqa: T201 - intentional command output
         return 0
     if args.command_name == "next":
         shard = run_next(args.output_dir, timeout_seconds=args.timeout_seconds)
         if shard is None:
-            print("complete")
+            print("complete")  # noqa: T201 - intentional command output
         else:
-            print(f"sealed {shard.key} ({shard.count} rows)")
+            print(f"sealed {shard.key} ({shard.count} rows)")  # noqa: T201 - intentional command output
         return 0
     if args.command_name == "status":
         manifest = load_manifest(args.output_dir)
@@ -87,11 +103,11 @@ def main(argv: list[str] | None = None) -> int:
             "next": pending[0].key if pending else None,
             "warmup_complete": warmup_complete(args.output_dir, manifest),
         }
-        print(json.dumps(result, sort_keys=True))
+        print(json.dumps(result, sort_keys=True))  # noqa: T201 - intentional command output
         return 0
     if args.command_name == "merge":
         path = merge_shards(args.output_dir, aggregate_name=args.aggregate_name)
-        print(path)
+        print(path)  # noqa: T201 - intentional command output
         return 0
     raise AssertionError(args.command_name)
 

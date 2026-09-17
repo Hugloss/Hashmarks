@@ -61,6 +61,10 @@ make compile
 make test
 make test-shard-plan
 make test-shard TEST_SHARD=0
+make ruff-min
+make ruff-latest
+make typecheck
+make precommit
 ```
 
 For native full-suite qualification:
@@ -107,3 +111,5 @@ Avoid unrelated refactors in the same change unless they are required to make ow
 ## Qualification-tool compatibility
 
 The compatibility envelope for pytest and Ruff is documented in [`docs/qualification/TOOL_COMPATIBILITY.md`](../docs/qualification/TOOL_COMPATIBILITY.md). Widening a range requires boundary-version proof; it must not be done as an incidental dependency update.
+
+`make hooks-install` installs the Git pre-commit hook. The hooks use project dependency groups through `uv`; `make init` prepares the local gitignored `uv.lock` checked by the lock hook. Type and format checks cover live repository Python and exclude retained benchmark fixture repositories.

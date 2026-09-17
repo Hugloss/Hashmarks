@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from pathlib import Path
-from typing import Iterable, Mapping
+from typing import TYPE_CHECKING
 
 from .client import DaemonCompatibilityError, DaemonUnavailableError, IdentityClient
 from .digest import Digest
@@ -11,6 +10,10 @@ from .inputs import InputManifest
 from .schema import IDENTITY_SCHEMA
 from .snapshot import Snapshot
 from .specs import InputValue, validate_input_values
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+    from pathlib import Path
 
 
 class RepositoryIdentityMode(str, Enum):
@@ -60,7 +63,7 @@ class RepositoryIdentity:
             self.client.status()
             self._daemon_confirmed = True
 
-    def __enter__(self) -> "RepositoryIdentity":
+    def __enter__(self) -> RepositoryIdentity:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -96,20 +99,27 @@ class RepositoryIdentity:
     def _prepare_local_read(self) -> IdentityEngine:
         engine = self._local()
         if self.local_observer == "reconcile":
-            engine.mark_observer_unknown("local facade configured for per-read reconciliation")
+            engine.mark_observer_unknown(
+                "local facade configured for per-read reconciliation"
+            )
         elif self.local_observer == "watcher":
             watcher = self._local_watcher
-            synchronize = None if watcher is None else getattr(watcher, "synchronize", None)
+            synchronize = (
+                None if watcher is None else getattr(watcher, "synchronize", None)
+            )
             if synchronize is None or not bool(synchronize()):
-                engine.mark_observer_unknown("local watcher has no request-time observation barrier")
+                engine.mark_observer_unknown(
+                    "local watcher has no request-time observation barrier"
+                )
         # manual is an explicit expert mode: the caller owns record_changes().
         return engine
 
     def record_changes(self, paths: Iterable[str | Path]) -> None:
         if self.local_observer != "manual":
-            raise RuntimeError("record_changes is only valid with local_observer='manual'")
+            raise RuntimeError(
+                "record_changes is only valid with local_observer='manual'"
+            )
         self._local().record_changes(paths)
-
 
     def _daemon_available(self) -> bool:
         if self.mode is RepositoryIdentityMode.LOCAL:
@@ -134,8 +144,12 @@ class RepositoryIdentity:
         return Snapshot(
             digest=Digest(hash=str(response["hash"]), size=int(response["size"])),
             manifest_fingerprint=str(response["manifest"]),
-            generation=None if response.get("generation") is None else int(response["generation"]),
-            observed_paths=tuple(str(path) for path in response.get("observed_paths", [])),
+            generation=None
+            if response.get("generation") is None
+            else int(response["generation"]),
+            observed_paths=tuple(
+                str(path) for path in response.get("observed_paths", [])
+            ),
             mode=str(response.get("mode", "daemon")),
         )
 
@@ -177,7 +191,9 @@ class RepositoryIdentity:
         manifest = engine.manifest(patterns, require_matches=require_matches)
         return engine.snapshot(manifest, verify=verify)
 
-    def snapshot_manifest(self, manifest: InputManifest, *, verify: bool = False) -> Snapshot:
+    def snapshot_manifest(
+        self, manifest: InputManifest, *, verify: bool = False
+    ) -> Snapshot:
         if self._daemon_available():
             try:
                 handle = self._manifest_handles.get(manifest.fingerprint)
@@ -191,7 +207,6 @@ class RepositoryIdentity:
                     raise
                 self._daemon_confirmed = False
         return self._prepare_local_read().snapshot(manifest, verify=verify)
-
 
     def code_map(self):
         """Return the lazily-created derived CodeMap for repository-intelligence queries.
@@ -228,7 +243,10 @@ class RepositoryIdentity:
             "workspace": str(self.workspace),
             "state_dir": str(self.state_dir),
             "requested_mode": self.mode.value,
-            "active_mode": "daemon" if daemon_status is not None and self.mode is not RepositoryIdentityMode.LOCAL else "local",
+            "active_mode": "daemon"
+            if daemon_status is not None
+            and self.mode is not RepositoryIdentityMode.LOCAL
+            else "local",
             "daemon": daemon_status,
             "daemon_error": daemon_error,
         }

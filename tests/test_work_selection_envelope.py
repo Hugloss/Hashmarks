@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -14,6 +13,9 @@ from hashmarks.test_shards import (
     work_selection_envelope,
 )
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 def _write_repo(root: Path) -> None:
     tests = root / "tests"
@@ -25,7 +27,9 @@ def _write_repo(root: Path) -> None:
     (root / "src.py").write_text("VALUE = 1\n", encoding="utf-8")
 
 
-def test_envelope_binds_v3_plan_repository_and_producer_without_execution_policy(tmp_path: Path) -> None:
+def test_envelope_binds_v3_plan_repository_and_producer_without_execution_policy(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     artifact = "sha256:" + "a" * 64
     envelope = work_selection_envelope(tmp_path, 2, producer_artifact_identity=artifact)
@@ -51,12 +55,20 @@ def test_envelope_binds_v3_plan_repository_and_producer_without_execution_policy
                 yield from keys(child)
 
     forbidden_keys = {
-        "timeout", "retry_count", "workers", "concurrency", "schedule", "machine", "argv"
+        "timeout",
+        "retry_count",
+        "workers",
+        "concurrency",
+        "schedule",
+        "machine",
+        "argv",
     }
     assert forbidden_keys.isdisjoint(set(keys(envelope)))
 
 
-def test_non_test_repository_change_invalidates_outer_envelope_not_inner_membership(tmp_path: Path) -> None:
+def test_non_test_repository_change_invalidates_outer_envelope_not_inner_membership(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     before = work_selection_envelope(tmp_path, 2)
     before_plan = before["selection"]
@@ -67,11 +79,16 @@ def test_non_test_repository_change_invalidates_outer_envelope_not_inner_members
 
     assert after["selection"] == before_plan
     assert after["repository"]["selection_input_identity"] == before_input
-    assert after["repository"]["content_identity"] != before["repository"]["content_identity"]
+    assert (
+        after["repository"]["content_identity"]
+        != before["repository"]["content_identity"]
+    )
     assert after["envelope_identity"] != before["envelope_identity"]
 
 
-def test_test_source_change_invalidates_selection_input_and_plan_identity(tmp_path: Path) -> None:
+def test_test_source_change_invalidates_selection_input_and_plan_identity(
+    tmp_path: Path,
+) -> None:
     _write_repo(tmp_path)
     before = work_selection_envelope(tmp_path, 2)
     (tmp_path / "tests" / "test_a.py").write_text(
@@ -80,7 +97,10 @@ def test_test_source_change_invalidates_selection_input_and_plan_identity(tmp_pa
     )
     after = work_selection_envelope(tmp_path, 2)
 
-    assert after["repository"]["selection_input_identity"] != before["repository"]["selection_input_identity"]
+    assert (
+        after["repository"]["selection_input_identity"]
+        != before["repository"]["selection_input_identity"]
+    )
     assert after["selection"]["plan_identity"] != before["selection"]["plan_identity"]
     assert after["envelope_identity"] != before["envelope_identity"]
 
@@ -98,4 +118,6 @@ def test_envelope_validation_rejects_tampered_shard_membership(tmp_path: Path) -
 def test_envelope_rejects_invalid_artifact_identity(tmp_path: Path) -> None:
     _write_repo(tmp_path)
     with pytest.raises(ValueError, match="producer_artifact_identity"):
-        work_selection_envelope(tmp_path, 2, producer_artifact_identity="sha256:not-a-digest")
+        work_selection_envelope(
+            tmp_path, 2, producer_artifact_identity="sha256:not-a-digest"
+        )

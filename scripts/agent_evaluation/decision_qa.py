@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
-
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 SAFETY_CLASSES = ("correct-safe", "false-safe", "correct-unsafe", "false-unsafe")
 
@@ -35,15 +34,26 @@ def _covered_roles(packet: Mapping[str, Any]) -> set[str]:
 
 def packet_consistency(packet: Mapping[str, Any]) -> dict[str, Any]:
     """Check worker-visible packet semantics without using grading truth."""
-    context = packet.get("work_context") if isinstance(packet.get("work_context"), Mapping) else {}
-    budget = packet.get("context_budget") if isinstance(packet.get("context_budget"), Mapping) else {}
+    context = (
+        packet.get("work_context")
+        if isinstance(packet.get("work_context"), Mapping)
+        else {}
+    )
+    budget = (
+        packet.get("context_budget")
+        if isinstance(packet.get("context_budget"), Mapping)
+        else {}
+    )
     covered = _covered_roles(packet)
     required = {
-        role for role in ("edit", "verify", "contract")
+        role
+        for role in ("edit", "verify", "contract")
         if isinstance(packet.get(role), Mapping) and packet[role].get("path")
     }
     missing_from_items = sorted(required - covered)
-    declared_missing = sorted(str(role) for role in (context.get("missing_roles") or []))
+    declared_missing = sorted(
+        str(role) for role in (context.get("missing_roles") or [])
+    )
     context_safe = bool(context.get("safe"))
     budget_safe = bool(budget.get("safe"))
     expected_safe_from_items = not missing_from_items
@@ -80,7 +90,11 @@ def evaluate_decision_packet(
     """
     actual_edit = _path(packet.get("edit"))
     actual_verify = _path(packet.get("verify"))
-    context = packet.get("work_context") if isinstance(packet.get("work_context"), Mapping) else {}
+    context = (
+        packet.get("work_context")
+        if isinstance(packet.get("work_context"), Mapping)
+        else {}
+    )
     actual_safe = bool(context.get("safe"))
     if actual_safe and expected_safe:
         safety_class = "correct-safe"
@@ -111,14 +125,17 @@ def evaluate_decision_packet(
         ),
         "packet_consistent": bool(consistency["consistent"]),
         "packet_issues": consistency["issues"],
-        "fully_correct": edit_correct and verify_correct and safety_class in {"correct-safe", "correct-unsafe"} and bool(consistency["consistent"]),
+        "fully_correct": edit_correct
+        and verify_correct
+        and safety_class in {"correct-safe", "correct-unsafe"}
+        and bool(consistency["consistent"]),
         "secret_knowledge_used_by_worker": False,
         "grading_scope": "authority-side-after-freeze",
     }
 
 
 def summarize_decision_qa(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    counts = {name: 0 for name in SAFETY_CLASSES}
+    counts = dict.fromkeys(SAFETY_CLASSES, 0)
     for row in rows:
         label = str(row.get("safety_class") or "")
         if label not in counts:

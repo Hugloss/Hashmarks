@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+
 try:
     from scripts._module_loader import import_sibling
 except ModuleNotFoundError:  # direct script execution
@@ -33,12 +34,16 @@ def _resolve_member(base: Path, raw: Any, field: str, manifest_path: Path) -> Pa
     text = _nonempty(raw, field, manifest_path).replace("\\", "/")
     member = Path(text)
     if member.is_absolute() or ".." in member.parts:
-        raise ValueError(f"{field} must stay inside the suite directory: {manifest_path}")
+        raise ValueError(
+            f"{field} must stay inside the suite directory: {manifest_path}"
+        )
     resolved = (base / member).resolve()
     try:
         resolved.relative_to(base.resolve())
     except ValueError as exc:
-        raise ValueError(f"{field} escapes the suite directory: {manifest_path}") from exc
+        raise ValueError(
+            f"{field} escapes the suite directory: {manifest_path}"
+        ) from exc
     return resolved
 
 
@@ -62,13 +67,24 @@ def analyze(manifest_path: Path) -> dict[str, Any]:
     for index, entry in enumerate(manifest["entries"]):
         if not isinstance(entry, dict):
             raise ValueError(f"entry {index} must be an object: {manifest_path}")
-        trace_path = _resolve_member(base, entry.get("trace"), f"entries[{index}].trace", manifest_path)
-        evidence_path = _resolve_member(base, entry.get("evidence"), f"entries[{index}].evidence", manifest_path)
-        for member_path, field in ((trace_path, "trace_sha256"), (evidence_path, "evidence_sha256")):
-            expected = _nonempty(entry.get(field), f"entries[{index}].{field}", manifest_path)
+        trace_path = _resolve_member(
+            base, entry.get("trace"), f"entries[{index}].trace", manifest_path
+        )
+        evidence_path = _resolve_member(
+            base, entry.get("evidence"), f"entries[{index}].evidence", manifest_path
+        )
+        for member_path, field in (
+            (trace_path, "trace_sha256"),
+            (evidence_path, "evidence_sha256"),
+        ):
+            expected = _nonempty(
+                entry.get(field), f"entries[{index}].{field}", manifest_path
+            )
             actual = _digest_bytes(member_path)
             if expected != actual:
-                raise ValueError(f"entry {index} {field} mismatch: expected {expected}, got {actual}")
+                raise ValueError(
+                    f"entry {index} {field} mismatch: expected {expected}, got {actual}"
+                )
         report = regret.analyze(trace_path, evidence_path)
         key = (str(report["task_id"]), str(report["mode"]))
         if key in seen:
@@ -80,7 +96,7 @@ def analyze(manifest_path: Path) -> dict[str, Any]:
     for report in reports:
         by_task[str(report["task_id"])][str(report["mode"])] = report
     comparisons: list[dict[str, Any]] = []
-    for task_id, modes in sorted(by_task.items()):
+    for _task_id, modes in sorted(by_task.items()):
         if set(modes) == {"baseline", "hashmarks"}:
             comparisons.append(regret.compare(modes["baseline"], modes["hashmarks"]))
 
@@ -119,7 +135,9 @@ def analyze(manifest_path: Path) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Aggregate independently grounded retrieval-regret traces into an optimization triage report")
+    parser = argparse.ArgumentParser(
+        description="Aggregate independently grounded retrieval-regret traces into an optimization triage report"
+    )
     parser.add_argument("suite", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -128,7 +146,7 @@ def main() -> None:
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)
+    print(rendered)  # noqa: T201 - intentional command output
 
 
 if __name__ == "__main__":

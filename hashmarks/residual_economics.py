@@ -36,7 +36,9 @@ def changed_impact_economics_receipt(
     """Measure changed-impact repository intelligence without mutating or executing work."""
     if not task.strip():
         raise ValueError("task must be nonblank")
-    normalized = tuple(dict.fromkeys(path.strip() for path in changed_paths if path.strip()))
+    normalized = tuple(
+        dict.fromkeys(path.strip() for path in changed_paths if path.strip())
+    )
     if not normalized:
         raise ValueError("changed_paths must be nonempty")
     from .codemap import CodeMap
@@ -44,13 +46,17 @@ def changed_impact_economics_receipt(
     workspace_path = Path(workspace)
     with tempfile.TemporaryDirectory(prefix="hashmarks-residual-impact-") as temp:
         state = Path(temp)
-        with CodeMap(workspace_path, state_dir=state, artifact_db=state / "artifacts.sqlite3") as codemap:
+        with CodeMap(
+            workspace_path, state_dir=state, artifact_db=state / "artifacts.sqlite3"
+        ) as codemap:
             sync = codemap.sync()
             started = time.perf_counter_ns()
             result = codemap.task_change_impact(task, normalized)
             elapsed = time.perf_counter_ns() - started
     project = result.get("project_impact") if isinstance(result, Mapping) else None
-    total_affected = project.get("total_affected") if isinstance(project, Mapping) else None
+    total_affected = (
+        project.get("total_affected") if isinstance(project, Mapping) else None
+    )
     return {
         "schema": CHANGED_IMPACT_ECONOMICS_SCHEMA,
         "task": task,
@@ -66,7 +72,9 @@ def changed_impact_economics_receipt(
     }
 
 
-def _isolated_query_receipts(workspace: Path, task: str, limit: int) -> dict[str, dict[str, object]]:
+def _isolated_query_receipts(
+    workspace: Path, task: str, limit: int
+) -> dict[str, dict[str, object]]:
     return {
         query: repository_query_runtime_diagnostics(
             workspace, query=query, task=task, limit=limit
@@ -75,7 +83,9 @@ def _isolated_query_receipts(workspace: Path, task: str, limit: int) -> dict[str
     }
 
 
-def _isolated_totals(receipts: Mapping[str, Mapping[str, object]]) -> dict[str, int | float]:
+def _isolated_totals(
+    receipts: Mapping[str, Mapping[str, object]],
+) -> dict[str, int | float]:
     query_work = [row["query_work"] for row in receipts.values()]
     return {
         "wall_time_ns": sum(int(row["wall_time_ns"]) for row in query_work),
@@ -109,7 +119,9 @@ def residual_repository_economics_report(
         else None
     )
     impact = (
-        changed_impact_economics_receipt(workspace_path, task=task, changed_paths=changed_paths)
+        changed_impact_economics_receipt(
+            workspace_path, task=task, changed_paths=changed_paths
+        )
         if changed_paths
         else None
     )
@@ -120,8 +132,12 @@ def residual_repository_economics_report(
         "scale": scale,
         "isolated_queries": isolated,
         "isolated_query_totals": _isolated_totals(isolated),
-        "related_query_reuse": related_query_reuse_receipt(workspace_path, task=task, limit=limit),
-        "bounded_top_n": bounded_top_n_candidate_profile(workspace_path, task=task, limits=(5, 10, limit)),
+        "related_query_reuse": related_query_reuse_receipt(
+            workspace_path, task=task, limit=limit
+        ),
+        "bounded_top_n": bounded_top_n_candidate_profile(
+            workspace_path, task=task, limits=(5, 10, limit)
+        ),
         "changed_impact": impact,
         "qualification_classification": qualification,
         "boundary": "repository-intelligence-economics-only",

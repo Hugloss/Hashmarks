@@ -4,7 +4,9 @@ from hashmarks.codemap.engine import CodeMap
 from hashmarks.codemap.indexing_lifecycle import _DiscoveredFile
 
 
-def test_preflight_scale_ladder_classifies_repository_shape_without_predicting_timeout(tmp_path: Path) -> None:
+def test_preflight_scale_ladder_classifies_repository_shape_without_predicting_timeout(
+    tmp_path: Path,
+) -> None:
     # Cheap QA for the scale contract. Real performance qualification may use
     # larger corpora, but unit QA must not itself become an execution timeout.
     cases = ((100, "small"), (500, "medium"), (1500, "large"), (5001, "very-large"))
@@ -13,7 +15,13 @@ def test_preflight_scale_ladder_classifies_repository_shape_without_predicting_t
         for count, expected in cases:
             visibility = codemap.policy.decide("src/f.py").evidence_visibility
             discovered = [
-                _DiscoveredFile(f"src/f{i}.py", tmp_path / f"missing-{i}.py", "python", visibility, 0)
+                _DiscoveredFile(
+                    f"src/f{i}.py",
+                    tmp_path / f"missing-{i}.py",
+                    "python",
+                    visibility,
+                    0,
+                )
                 for i in range(count)
             ]
             # Missing paths deliberately make bytes zero: this proves file-count
