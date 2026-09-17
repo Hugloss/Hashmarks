@@ -93,9 +93,12 @@ jobs:
       - run: uv sync --group test --python 3.11
       - run: make ruff
       - name: Exact structural debt baseline
-        run: |
-          uv run --offline --frozen --no-sync --group test python scripts/ruff_debt.py --write-baseline /tmp/ruff-debt-current.json --summary-only
-          cat /tmp/ruff-debt-current.json
+        run: uv run --offline --frozen --no-sync --group test python scripts/ruff_debt.py --write-baseline ruff-debt-current.json --summary-only
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ruff-debt-current
+          path: ruff-debt-current.json
+          if-no-files-found: error
       - run: make lint-debt-gate
 
   precommit:
