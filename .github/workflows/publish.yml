@@ -29,8 +29,8 @@ jobs:
         run: uv run --no-sync python scripts/release_contract.py validate-tag --tag "${{ github.event.release.tag_name }}"
       - name: Run native release tests
         run: make test
-      - name: Run exact Ruff minimum contract
-        run: make ruff-min
+      - name: Run canonical Ruff check
+        run: make ruff
       - name: Run MCP concurrency stress
         run: make mcp-concurrency-stress
       - name: Build exact release artifacts once
