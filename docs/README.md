@@ -24,8 +24,9 @@ Hashmarks documentation is split into **public/current contracts** and **histori
 
 ## Qualification
 
-- [`qualification/TOOL_COMPATIBILITY.md`](qualification/TOOL_COMPATIBILITY.md) — minimum pytest/Ruff/uv tool versions versus the exact locked Python dependency supply.
 - [`qualification/TEST_RUNTIME_ECONOMICS.md`](qualification/TEST_RUNTIME_ECONOMICS.md) — test-proof scope and runtime-economics guidance.
+
+Development-tool dependencies and configuration are owned directly by `pyproject.toml`; contributor commands are documented in [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md).
 
 ## Historical development record
 
