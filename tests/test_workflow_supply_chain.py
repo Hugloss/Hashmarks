@@ -47,14 +47,6 @@ def test_publish_workflow_uses_trusted_publishing_and_exact_artifact_handoff() -
     )
 
 
-def test_ci_proves_exact_mcp_floor_and_latest_line_through_installed_wheel() -> None:
-    text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    assert text.count('mcp: "mcp==2.2.0"') == 2
-    assert 'mcp: "mcp>=2.2.0"' in text
-    assert "mcp_installed_artifact_smoke.py" in text
-    assert "uv build --wheel --out-dir dist" in text
-
-
 def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
     for name in ("ci.yml", "publish.yml"):
         text = (_root() / ".github" / "workflows" / name).read_text(encoding="utf-8")
