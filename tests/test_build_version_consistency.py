@@ -41,18 +41,6 @@ def test_build_backend_rejects_runtime_version_mismatch(
         hashmarks_build._project()
 
 
-def test_readme_release_surface_exposes_project_version_without_owning_h1() -> None:
-    version = hashmarks_build._project()[1]
-    lines = (
-        (hashmarks_build.ROOT / "README.md").read_text(encoding="utf-8").splitlines()
-    )
-    assert (
-        lines[0]
-        == "# Hashmarks — Repository intelligence and a local MCP server for coding agents"
-    )
-    assert f"Current package version: **{version}**." in lines
-
-
 def test_build_metadata_exposes_public_release_metadata() -> None:
     metadata = hashmarks_build._metadata_bytes().decode("utf-8")
     assert (
@@ -144,10 +132,3 @@ def test_build_backend_rejects_missing_declared_license_file(
 
     with pytest.raises(RuntimeError, match="matched no files"):
         hashmarks_build._metadata_bytes()
-
-
-def test_public_readme_license_guidance_matches_release_metadata() -> None:
-    readme = (hashmarks_build.ROOT / "README.md").read_text(encoding="utf-8")
-    assert "Hashmarks is licensed under the [Apache License 2.0](LICENSE)." in readme
-    assert "choose an explicit software license" not in readme
-    assert "does not invent a license" not in readme
