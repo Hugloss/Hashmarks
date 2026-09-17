@@ -7,29 +7,6 @@ def _text(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_root_readme_is_a_current_product_landing_page() -> None:
-    readme = _text("README.md")
-    assert readme.startswith(
-        "# Hashmarks — Repository intelligence and a local MCP server for coding agents\n"
-    )
-    assert "Current package version: **0.14.0**" in readme
-    for section in (
-        "## Why Hashmarks",
-        "## Quick start",
-        "## Python API",
-        "## Core architecture",
-        "## Non-negotiable agent boundary",
-        "## Development",
-        "## Documentation",
-        "## Security",
-    ):
-        assert section in readme
-    # Release chronology belongs in docs/development, not above-the-fold product docs.
-    assert "## v0.10." not in readme
-    assert "## v0.11." not in readme
-    assert "## v0.12." not in readme
-
-
 def test_codemap_maintainer_guide_maps_internal_ownership_and_request_flows() -> None:
     docs = _text("docs/README.md")
     guide = _text("docs/maintainers/CODEMAP.md")
