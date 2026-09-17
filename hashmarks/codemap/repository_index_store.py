@@ -506,6 +506,11 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     def _discard_incompatible_schema(self) -> None:
         """Discard generated CodeMap state instead of migrating historical local schemas."""
         with sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
+            # Recheck only after acquiring SQLite writer authority. Another
+            # connection may have been creating the current schema when the
+            # optimistic pre-lock check observed a partial table set.
+            if self._schema_is_current():
+                return
             rows = self._db.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
