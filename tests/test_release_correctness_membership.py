@@ -22,10 +22,6 @@ def test_release_correctness_membership_matches_repository_classification_policy
     }
     assert selected == expected
     assert (
-        "tests/test_ruff_policy.py::test_clean_code_rule_contract_is_explicit_and_version_independent"
-        in selected
-    )
-    assert (
         "tests/test_product_acceptance.py::test_executable_acceptance_suite_passes_small_repository"
         in selected
     )
