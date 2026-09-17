@@ -1,0 +1,11 @@
+{
+  "schema": "hashmarks.selective-scout-output.v1",
+  "tasks": [
+    {
+      "id": "ts-vite",
+      "reason": "public-task-role-cue",
+      "resolved": true,
+      "target": "vite.config.ts"
+    }
+  ]
+}

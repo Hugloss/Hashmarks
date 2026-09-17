@@ -1,0 +1,202 @@
+{
+  "schema": "hashmarks.agent-task-corpus.v1",
+  "tasks": [
+    {
+      "id": "daemon-compatibility",
+      "query": "DaemonCompatibilityError protocol capabilities observer barrier",
+      "expected_files": [
+        "hashmarks/client.py",
+        "hashmarks/daemon.py"
+      ],
+      "expected_symbols": [
+        "DaemonCompatibilityError"
+      ]
+    },
+    {
+      "id": "pass-promotion",
+      "query": "PassPromotion post run WorkIdentity promotion",
+      "expected_files": [
+        "hashmarks/impact/engine.py",
+        "hashmarks/impact/core.py"
+      ],
+      "expected_symbols": [
+        "PassPromotion"
+      ]
+    },
+    {
+      "id": "codemap-context",
+      "query": "CodeMap context token budget retrieval confidence",
+      "expected_files": [
+        "hashmarks/codemap/engine.py",
+        "hashmarks/codemap/model.py"
+      ],
+      "expected_symbols": [
+        "CodeMap",
+        "ContextPack"
+      ]
+    },
+    {
+      "id": "registered-manifest",
+      "query": "registered manifest handle refcount daemon",
+      "expected_files": [
+        "hashmarks/daemon.py",
+        "hashmarks/client.py"
+      ],
+      "expected_symbols": []
+    },
+    {
+      "id": "impact-trust",
+      "query": "ImpactTrustPolicy trusted producers complete evidence",
+      "expected_files": [
+        "hashmarks/impact/policy.py",
+        "hashmarks/impact/engine.py"
+      ],
+      "expected_symbols": [
+        "ImpactTrustPolicy"
+      ]
+    },
+    {
+      "id": "source-visibility",
+      "query": "AgentVisibility outline source deny context policy",
+      "expected_files": [
+        "hashmarks/codemap/policy.py",
+        "hashmarks/codemap/model.py"
+      ],
+      "expected_symbols": [
+        "AgentVisibility"
+      ]
+    },
+    {
+      "id": "native-selection",
+      "query": "SelectionResult positive only native selector omitted tests reuse authority",
+      "expected_files": [
+        "hashmarks/impact/selection.py",
+        "hashmarks/impact/selectors.py"
+      ],
+      "expected_symbols": [
+        "SelectionResult"
+      ]
+    },
+    {
+      "id": "testmon-selector",
+      "query": "TestmonSelector testmon nocollect public CLI selected work ids",
+      "expected_files": [
+        "hashmarks/impact/selectors.py"
+      ],
+      "expected_symbols": [
+        "TestmonSelector"
+      ]
+    },
+    {
+      "id": "cross-project-links",
+      "query": "DeclaredProjectLinksProvider shared input cross ecosystem project links",
+      "expected_files": [
+        "hashmarks/codemap/project_graph.py"
+      ],
+      "expected_symbols": [
+        "DeclaredProjectLinksProvider"
+      ]
+    },
+    {
+      "id": "typescript-resolution",
+      "query": "TypeScript native resolver tsconfig path aliases native file edges",
+      "expected_files": [
+        "hashmarks/codemap/typescript_resolver.py",
+        "hashmarks/codemap/engine.py"
+      ],
+      "expected_symbols": [
+        "TypeScriptResolverProvider"
+      ]
+    },
+    {
+      "id": "scip-import",
+      "query": "SCIP import native definitions references freshness generation",
+      "expected_files": [
+        "hashmarks/codemap/scip_adapter.py",
+        "hashmarks/codemap/engine.py"
+      ],
+      "expected_symbols": []
+    },
+    {
+      "id": "tree-sitter-provider",
+      "query": "TreeSitterRangeProvider optional structural symbol body ranges",
+      "expected_files": [
+        "hashmarks/codemap/providers.py"
+      ],
+      "expected_symbols": [
+        "TreeSitterRangeProvider"
+      ]
+    },
+    {
+      "id": "nx-impact",
+      "query": "NxImpactAdapter native project graph transitive test work unit",
+      "expected_files": [
+        "hashmarks/impact/adapters/nx.py"
+      ],
+      "expected_symbols": [
+        "NxImpactAdapter"
+      ]
+    },
+    {
+      "id": "cargo-impact",
+      "query": "CargoImpactAdapter cargo metadata transitive workspace crate inputs",
+      "expected_files": [
+        "hashmarks/impact/adapters/cargo.py"
+      ],
+      "expected_symbols": [
+        "CargoImpactAdapter"
+      ]
+    },
+    {
+      "id": "go-impact",
+      "query": "GoImpactAdapter go list transitive package inputs",
+      "expected_files": [
+        "hashmarks/impact/adapters/go.py"
+      ],
+      "expected_symbols": [
+        "GoImpactAdapter"
+      ]
+    },
+    {
+      "id": "maven-impact",
+      "query": "MavenImpactAdapter reactor module dependencies test work units",
+      "expected_files": [
+        "hashmarks/impact/adapters/maven.py"
+      ],
+      "expected_symbols": [
+        "MavenImpactAdapter"
+      ]
+    },
+    {
+      "id": "gradle-impact",
+      "query": "GradleImpactAdapter project dependencies native init script test tasks",
+      "expected_files": [
+        "hashmarks/impact/adapters/gradle.py"
+      ],
+      "expected_symbols": [
+        "GradleImpactAdapter"
+      ]
+    },
+    {
+      "id": "depfile-impact",
+      "query": "DepfileImpactAdapter compiler depfile C C++ declared work partial evidence",
+      "expected_files": [
+        "hashmarks/impact/adapters/depfile.py"
+      ],
+      "expected_symbols": [
+        "DepfileImpactAdapter"
+      ]
+    },
+    {
+      "id": "pyright-typeserver",
+      "query": "PyrightTypeServerProvider resolveImport snapshot protocol Python native import resolution",
+      "expected_files": [
+        "hashmarks/codemap/pyright_type_server.py",
+        "hashmarks/codemap/engine.py"
+      ],
+      "expected_symbols": [
+        "PyrightTypeServerProvider"
+      ]
+    }
+  ]
+}

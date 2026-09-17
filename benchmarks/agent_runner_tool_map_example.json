@@ -1,0 +1,9 @@
+{
+  "edit": null,
+  "hashmarks_context": "hashmarks_context",
+  "hashmarks_find": "hashmarks_find",
+  "hashmarks_source": "hashmarks_source",
+  "read_file": "file_read",
+  "search_repo": "repository_search",
+  "shell": null
+}

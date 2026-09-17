@@ -1,0 +1,59 @@
+name: Bug report
+description: Report incorrect, stale, unsafe, or inconsistent Hashmarks behavior
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a Hashmarks defect. For sensitive security issues, follow `.github/SECURITY.md` instead of filing a public issue.
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: What did Hashmarks return or do?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What repository-derived result or invariant did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include commands, repository shape, and relevant files without private data.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Hashmarks version / commit
+      placeholder: "0.13.0 / commit SHA"
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Python / OS
+      placeholder: "Python 3.14, Linux/WSL"
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Identity / hashing
+        - Observation / freshness
+        - CodeMap / retrieval
+        - Ownership / impact
+        - Verification relevance
+        - Cache / worktree isolation
+        - Producer / consumer validation
+        - CLI / packaging
+        - Documentation
+        - Other
+    validations:
+      required: true

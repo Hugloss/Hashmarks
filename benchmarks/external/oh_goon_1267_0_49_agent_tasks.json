@@ -1,0 +1,25 @@
+{
+  "schema": "hashmarks.agent-task-corpus.v1",
+  "tasks": [
+    {"id":"sqlite-journal-authority","query":"SQLite journal mode filesystem safety WAL rollback", "expected_files":["backend/src/oh_goon/runtime/database.py"], "expected_symbols":["sqlite_journal_mode_for_path"]},
+    {"id":"execution-coordinator","query":"ExecutionCoordinator active lease cancellation ownership", "expected_files":["backend/src/oh_goon/runtime/execution/coordinator.py"], "expected_symbols":["ExecutionCoordinator"]},
+    {"id":"sqlite-execution-lease","query":"SQLiteExecutionLeaseStore lease token process birth identity cancellation", "expected_files":["backend/src/oh_goon/runtime/execution/sqlite_lease.py"], "expected_symbols":["SQLiteExecutionLeaseStore"]},
+    {"id":"launch-manifest","query":"LaunchManifest lifecycle generation intent endpoint", "expected_files":["backend/src/oh_goon/core/launch_manifest.py"], "expected_symbols":["LaunchManifest"]},
+    {"id":"storage-lifecycle","query":"storage_inventory local storage cleanup durability retention", "expected_files":["backend/src/oh_goon/runtime/storage_lifecycle.py"], "expected_symbols":["storage_inventory"]},
+    {"id":"game-tape-failure","query":"GameTapeFailureAnalysis failure sample sequence history", "expected_files":["backend/src/oh_goon/core/game_tape_failure_analysis.py"], "expected_symbols":["GameTapeFailureAnalysis"]},
+    {"id":"fleet-plan-resolver","query":"FleetPlanResolver resolve plan source template", "expected_files":["backend/src/oh_goon/services/fleet_plan_resolver.py"], "expected_symbols":["FleetPlanResolver"]},
+    {"id":"dependency-bootstrap","query":"dependency resolution bootstrap uv lock native bootstrap", "expected_files":["backend/src/oh_goon/repository_tooling/dependency_resolution_bootstrap.py"], "expected_symbols":["command_bootstrap_lock"]},
+    {"id":"self-verify-cli","query":"oh-goon self verify canonical plan command", "expected_files":["backend/src/oh_goon/cli_self.py"], "expected_symbols":["run_self_command"]},
+    {"id":"run-review-hash","query":"runReviewHash run review URL state", "expected_files":["frontend/src/app/pages/runReviewState.ts"], "expected_symbols":["runReviewHash"]},
+    {"id":"fleet-cancel-frontend","query":"cancelFleet cancelFleetRun FleetRunProvider cancellation", "expected_files":["frontend/src/app/FleetRunProvider.tsx"], "expected_symbols":["cancelFleet"]},
+    {"id":"read-resources","query":"READ_RESOURCES ReadScope invalidation frontend reads", "expected_files":["frontend/src/domain/reads/readResources.ts"], "expected_symbols":["ReadScope"]},
+    {"id":"shared-runs-page","query":"SharedRunsPage repository results shared runs", "expected_files":["frontend/src/app/pages/SharedRunsPage.tsx"], "expected_symbols":[]},
+    {"id":"launch-binding","query":"LocalLaunchBindingStore binding manifest workspace identity", "expected_files":["backend/src/oh_goon/runtime/local_launch_binding.py"], "expected_symbols":["LocalLaunchBindingStore"]},
+    {"id":"certification-dependency-supply","query":"CertificationDependencyPaths sealed supply acquisition cache", "expected_files":["backend/src/oh_goon/integrations/certification_dependency_supply.py"], "expected_symbols":["CertificationDependencyPaths"]},
+    {"id":"scout-aggregation","query":"ScoutStepObservation peer sample floor repository medians", "expected_files":["backend/src/oh_goon/core/scout_aggregation.py"], "expected_symbols":["_peer_sample_floor"]},
+    {"id":"structural-authority","query":"structural authority contract launch manifest cancellation frontend", "expected_files":["backend/src/oh_goon/repository_tooling/architecture/structural_authority_contract.py"], "expected_symbols":[]},
+    {"id":"make-bootstrap","query":"DEPENDENCY_RESOLUTION_RUNNER make init bootstrap", "expected_files":["Makefile"], "expected_symbols":[]},
+    {"id":"fleet-runs-api-game-tape","query":"game_tape_performance game tape fleet runs API", "expected_files":["backend/src/oh_goon/api/routes/fleet_runs.py"], "expected_symbols":["game_tape_performance"]},
+    {"id":"local-launch-state","query":"LocalLaunchState manifest launch state lifecycle", "expected_files":["backend/src/oh_goon/runtime/local_launch_state.py"], "expected_symbols":[]}
+  ]
+}

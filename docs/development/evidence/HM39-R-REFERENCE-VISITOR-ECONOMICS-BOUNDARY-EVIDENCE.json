@@ -1,0 +1,21 @@
+{
+  "action": "Do not fuse verification-specific reference semantics into the generic Python parser.",
+  "decision": "REJECT-FUSION",
+  "evidence": "After duplicate-read removal, reference-index projection is about 0.067 s cumulative for 664 first-touch candidates. This is real work, but fusing product-specific reachable-reference semantics into python_ast_cache would blur ownership for modest residual cost.",
+  "parent_sha256": "a1821a821fe0f30c001bcdff352270188a41eae3e0c21c47838bc28dc80d4d03",
+  "phase": "HM39-R",
+  "profile": {
+    "baseline_501_ms": 287.7475990003404,
+    "baseline_read_python_ast_calls": 1328,
+    "candidate_rows": 664,
+    "post_hm32_501_ms": 269.8866480000106,
+    "post_hm32_read_python_ast_calls": 664
+  },
+  "qualification": {
+    "compileall": "PASS",
+    "focused_ring": "51/51 PASS",
+    "selected_correct": "4/4",
+    "unsafe_regressions": 0
+  },
+  "schema": "hashmarks.phase-evidence.v1"
+}

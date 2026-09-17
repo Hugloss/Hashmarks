@@ -1,0 +1,21 @@
+{
+  "parent": {"artifact": "hashmarks-hm145.zip", "sha256": "8752f63178f3f257e49db37e4ad1d459a1108f03a17e740d4171229431edd33d"},
+  "rule": "Empirical failures admit product changes; passing discovery lanes do not manufacture work.",
+  "phases": [
+    {"phase":"HM146-R","topic":"verification freshness reproduction","decision":"IMPLEMENT","evidence":"Exact HM145 emitted safe-fresh with the previously selected verification path after that test file was changed, deleted, or renamed after sync."},
+    {"phase":"HM147-R","topic":"freshness authority trace","decision":"IMPLEMENT","evidence":"Agent-start closing provenance fenced selected edit evidence/generation continuity but did not directly validate the selected verification file revision."},
+    {"phase":"HM148-R","topic":"single closing freshness cut","decision":"IMPLEMENT","evidence":"Added a bounded closing fence against the existing indexed verification file_digest; no second repository freshness registry or rescan was introduced."},
+    {"phase":"HM149-R","topic":"deleted verification target","decision":"IMPLEMENT","evidence":"Deletion now yields safe-stale with verification-changed-since-selection."},
+    {"phase":"HM150-R","topic":"renamed verification target","decision":"IMPLEMENT","evidence":"Rename now yields safe-stale with verification-changed-since-selection."},
+    {"phase":"HM151-R","topic":"changed verification contents","decision":"IMPLEMENT","evidence":"Content mutation now yields safe-stale even when the selected path still exists."},
+    {"phase":"HM152-R","topic":"packet-construction interleaving","decision":"IMPLEMENT","evidence":"Regression mutates the selected verification file during edit evidence projection; the closing fence catches it before safe-fresh can escape."},
+    {"phase":"HM153-R","topic":"verification symbol mutation","decision":"CLOSED_BY_DIGEST","evidence":"Any selected verification file content change changes its canonical file digest, conservatively invalidating symbol-level selection without a second parse/search."},
+    {"phase":"HM154-R","topic":"non-standard verification roots","decision":"NO_SPECIAL_CASE","evidence":"Fence is path/digest based and independent of tests/ naming; no root-specific authority was added."},
+    {"phase":"HM155-R","topic":"freshness economics","decision":"IMPLEMENT","evidence":"Closing work hashes only the already-selected verification file; it does not sync, rescan, rerank, or re-index the repository."},
+    {"phase":"HM156-R","topic":"ownership/retrieval","decision":"NO_CHANGE","evidence":"Freshness defect does not justify changing selection ownership or retrieval."},
+    {"phase":"HM157-R","topic":"qualified identity","decision":"NO_CHANGE","evidence":"No identity collision was required to reproduce the defect."},
+    {"phase":"HM158-R","topic":"SQLite/store","decision":"NO_CHANGE","evidence":"Existing indexed file_digest remains the comparison authority; no new persisted state is required."},
+    {"phase":"HM159-R","topic":"consumer contract","decision":"NO_SCHEMA_CHANGE","evidence":"Existing safe-stale and provenance freshness_reason semantics can represent the closure without a new packet schema."},
+    {"phase":"HM160-R","topic":"closure","decision":"CLOSE","evidence":"Affected source ring passed 75/75 before packaging; exact-ZIP qualification and deterministic rebuild are promotion checks for this tranche."}
+  ]
+}

@@ -1,0 +1,136 @@
+{
+  "policy": "inspect-then-resolve",
+  "schema": "hashmarks.worker-inspection-output.v1",
+  "tasks": [
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 2,
+          "path": "contracts/release.schema.json",
+          "role": "contract"
+        }
+      ],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [
+        "contract"
+      ],
+      "ambiguous": false,
+      "first_role": "contract",
+      "id": "rel-schema",
+      "inspected": false,
+      "query": "ReleaseManifest artifact sha256 contract schema",
+      "resolution_reason": null,
+      "resolved_after_inspection": false,
+      "target": "contracts/release.schema.json"
+    },
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 2,
+          "path": "Makefile",
+          "role": "config_build"
+        }
+      ],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [
+        "config_build"
+      ],
+      "ambiguous": false,
+      "first_role": "implementation",
+      "id": "rel-package",
+      "inspected": false,
+      "query": "package_release artifact packaging",
+      "resolution_reason": null,
+      "resolved_after_inspection": false,
+      "target": "scripts/package_release.py"
+    },
+    {
+      "action": "edit",
+      "alternatives": [],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [],
+      "ambiguous": false,
+      "first_role": "implementation",
+      "id": "rel-checksum",
+      "inspected": false,
+      "query": "verify_checksum expected observed",
+      "resolution_reason": null,
+      "resolved_after_inspection": false,
+      "target": "scripts/verify_checksum.py"
+    },
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 1,
+          "path": "tests/test_release_contract.py",
+          "role": "contract"
+        },
+        {
+          "canonical_rank": 1,
+          "path": "tests/test_release_contract.py",
+          "role": "verification"
+        }
+      ],
+      "ambiguity_reason": "resolved-by-distinctive-role-anchor",
+      "ambiguity_roles": [
+        "contract",
+        "verification"
+      ],
+      "ambiguous": false,
+      "first_role": "contract",
+      "id": "rel-test",
+      "inspected": false,
+      "query": "test_release_checksum_contract checksum contract test",
+      "resolution_reason": null,
+      "resolved_after_inspection": false,
+      "target": "tests/test_release_contract.py"
+    },
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 1,
+          "path": "Makefile",
+          "role": "config_build"
+        }
+      ],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [
+        "config_build"
+      ],
+      "ambiguous": false,
+      "first_role": "config_build",
+      "id": "rel-make",
+      "inspected": false,
+      "query": "release verify Makefile targets",
+      "resolution_reason": null,
+      "resolved_after_inspection": false,
+      "target": "Makefile"
+    },
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 1,
+          "path": "config/release.toml",
+          "role": "config_build"
+        }
+      ],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [
+        "config_build"
+      ],
+      "ambiguous": false,
+      "first_role": "config_build",
+      "id": "rel-config",
+      "inspected": false,
+      "query": "require_checksum release manifest configuration",
+      "resolution_reason": null,
+      "resolved_after_inspection": false,
+      "target": "config/release.toml"
+    }
+  ]
+}

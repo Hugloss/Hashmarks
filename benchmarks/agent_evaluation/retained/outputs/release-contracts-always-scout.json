@@ -1,0 +1,41 @@
+{
+  "schema": "hashmarks.selective-scout-output.v1",
+  "tasks": [
+    {
+      "id": "rel-schema",
+      "reason": "no-competing-evidence",
+      "resolved": false,
+      "target": "contracts/release.schema.json"
+    },
+    {
+      "id": "rel-package",
+      "reason": "no-competing-evidence",
+      "resolved": false,
+      "target": "scripts/package_release.py"
+    },
+    {
+      "id": "rel-checksum",
+      "reason": "no-competing-evidence",
+      "resolved": false,
+      "target": "scripts/verify_checksum.py"
+    },
+    {
+      "id": "rel-test",
+      "reason": "no-competing-evidence",
+      "resolved": false,
+      "target": "tests/test_release_contract.py"
+    },
+    {
+      "id": "rel-make",
+      "reason": "no-competing-evidence",
+      "resolved": false,
+      "target": "Makefile"
+    },
+    {
+      "id": "rel-config",
+      "reason": "no-competing-evidence",
+      "resolved": false,
+      "target": "config/release.toml"
+    }
+  ]
+}

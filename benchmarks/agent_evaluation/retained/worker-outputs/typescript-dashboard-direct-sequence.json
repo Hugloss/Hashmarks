@@ -1,0 +1,130 @@
+{
+  "policy": "direct-sequence",
+  "schema": "hashmarks.worker-multistep-output.v1",
+  "tasks": [
+    {
+      "ambiguous": false,
+      "edit_target": "src/api/metrics.ts",
+      "evidence_read": {
+        "approx_tokens": 53,
+        "bytes": 208,
+        "files": 2,
+        "paths": [
+          "src/api/metrics.ts",
+          "tests/MetricsPanel.test.tsx"
+        ]
+      },
+      "first_hypothesis": "src/api/metrics.ts",
+      "id": "ts-api",
+      "inspection_paths": [],
+      "query": "loadMetrics API adapter",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/MetricsPanel.test.tsx"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "src/components/MetricsPanel.tsx",
+      "evidence_read": {
+        "approx_tokens": 70,
+        "bytes": 279,
+        "files": 2,
+        "paths": [
+          "src/components/MetricsPanel.tsx",
+          "tests/MetricsPanel.test.tsx"
+        ]
+      },
+      "first_hypothesis": "src/components/MetricsPanel.tsx",
+      "id": "ts-panel",
+      "inspection_paths": [],
+      "query": "MetricsPanel component loadMetrics",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/MetricsPanel.test.tsx"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "src/state/selection.ts",
+      "evidence_read": {
+        "approx_tokens": 58,
+        "bytes": 228,
+        "files": 2,
+        "paths": [
+          "src/state/selection.ts",
+          "tests/MetricsPanel.test.tsx"
+        ]
+      },
+      "first_hypothesis": "src/state/selection.ts",
+      "id": "ts-selection",
+      "inspection_paths": [],
+      "query": "normalizeSelection state selection",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 2,
+      "verification_target": "tests/MetricsPanel.test.tsx"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "tests/MetricsPanel.test.tsx",
+      "evidence_read": {
+        "approx_tokens": 33,
+        "bytes": 131,
+        "files": 1,
+        "paths": [
+          "tests/MetricsPanel.test.tsx"
+        ]
+      },
+      "first_hypothesis": "tests/MetricsPanel.test.tsx",
+      "id": "ts-test",
+      "inspection_paths": [],
+      "query": "testMetricsPanel MetricsPanel test",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/MetricsPanel.test.tsx"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "package.json",
+      "evidence_read": {
+        "approx_tokens": 48,
+        "bytes": 190,
+        "files": 2,
+        "paths": [
+          "package.json",
+          "tests/MetricsPanel.test.tsx"
+        ]
+      },
+      "first_hypothesis": "package.json",
+      "id": "ts-package",
+      "inspection_paths": [],
+      "query": "fresh-dashboard vitest package scripts",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/MetricsPanel.test.tsx"
+    },
+    {
+      "ambiguous": true,
+      "edit_target": "tests/MetricsPanel.test.tsx",
+      "evidence_read": {
+        "approx_tokens": 33,
+        "bytes": 131,
+        "files": 1,
+        "paths": [
+          "tests/MetricsPanel.test.tsx"
+        ]
+      },
+      "first_hypothesis": "tests/MetricsPanel.test.tsx",
+      "id": "ts-vite",
+      "inspection_paths": [],
+      "query": "jsdom vite test environment",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/MetricsPanel.test.tsx"
+    }
+  ]
+}

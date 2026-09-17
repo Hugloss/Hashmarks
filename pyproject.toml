@@ -1,0 +1,123 @@
+[build-system]
+requires = []
+build-backend = "hashmarks_build"
+backend-path = ["."]
+
+[project]
+name = "hashmarks"
+version = "0.14.0"
+description = "Local repository intelligence and a read-only MCP server for coding agents: codebase search, repository context, code navigation, ownership, change impact, freshness, and verification evidence."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = []
+keywords = [
+    "repository-intelligence",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "coding-agents",
+    "ai-coding",
+    "ai-agents",
+    "codebase-search",
+    "code-navigation",
+    "code-analysis",
+    "code-intelligence",
+    "repository-analysis",
+    "repository-context",
+    "codebase-context",
+    "code-ownership",
+    "local-mcp-server",
+    "verification-evidence",
+    "change-impact",
+    "impact-analysis",
+    "dependency-analysis",
+    "codemap",
+    "developer-tools",
+    "static-analysis",
+    "provenance",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.optional-dependencies]
+mcp = ["mcp>=2.2.0"]
+
+[dependency-groups]
+test = ["pytest>=8.4"]
+
+[tool.hashmarks.qualification]
+pytest-min = "8.4"
+
+[tool.hashmarks.diagnostics]
+ruff-min = "0.12"
+
+[tool.uv]
+required-version = ">=0.10.0"
+
+[project.scripts]
+hashmarks = "hashmarks.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "certification: native/release authority tests excluded from constrained-host diagnostics",
+    "host_dns: requires external DNS/network access",
+    "host_mcp_sdk: requires the optional official MCP SDK",
+    "host_console_script: requires the Hashmarks console script installed beside the test interpreter",
+    "host_git: requires the git executable",
+    "slow: intentionally slow diagnostic or empirical test",
+    "scale: intentionally large scale/benchmark test",
+]
+
+[tool.ruff.lint]
+# Keep the rule contract explicit. Ruff defaults changed materially in 0.16.x,
+# so compatibility must never inherit version-dependent defaults.
+select = [
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "B",
+    "I",
+    "UP",
+    "FAST",
+    "SIM",
+    "C4",
+    "TID25",
+    "T20",
+    "G",
+    "TC",
+    "C901",
+    "PLR0911",
+    "PLR0912",
+    "PLR0913",
+    "PLR0914",
+    "PLR0915",
+    "PLR0916",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.ruff.lint.pylint]
+max-branches = 8
+max-returns = 6
+max-args = 6
+max-statements = 40
+max-locals = 15
+max-bool-expr = 5

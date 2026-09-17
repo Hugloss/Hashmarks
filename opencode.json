@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "hashmarks": {
+      "type": "local",
+      "command": [
+        "uv",
+        "run",
+        "--no-sync",
+        "hashmarks",
+        "--workspace",
+        ".",
+        "mcp"
+      ],
+      "cwd": ".",
+      "enabled": true
+    }
+  }
+}

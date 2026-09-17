@@ -1,0 +1,98 @@
+{
+  "parent": {
+    "artifact": "hashmarks-hm115.zip",
+    "sha256": "5efd05de65b9d9e506683c09069db5c4ae6c0e2315905a8ff8188464220ff125"
+  },
+  "phases": [
+    {
+      "phase": "HM116-R",
+      "topic": "repository surface historical evidence ownership",
+      "decision": "IMPLEMENT",
+      "proof": "root retained 30+ historical HM evidence artifacts with no runtime/test references; move them under docs/development/evidence and handoffs"
+    },
+    {
+      "phase": "HM117-R",
+      "topic": "repository root contract",
+      "decision": "IMPLEMENT",
+      "proof": "add regression preventing historical HM json/txt/md artifacts from returning to root"
+    },
+    {
+      "phase": "HM118-R",
+      "topic": "large-file responsibility audit",
+      "decision": "NO_CHANGE",
+      "proof": "AST audit shows largest files do not contain the largest functions; line count alone still does not prove mixed responsibility"
+    },
+    {
+      "phase": "HM119-R",
+      "topic": "large-function responsibility audit",
+      "decision": "MEASURE_ONLY",
+      "proof": "task_action_map is 197 lines and several functions exceed 100 lines; requires responsibility/complexity evidence before extraction"
+    },
+    {
+      "phase": "HM120-R",
+      "topic": "dataclass authority audit",
+      "decision": "NO_CHANGE",
+      "proof": "declarations are distributed by domain; count alone provides no duplicate-authority proof"
+    },
+    {
+      "phase": "HM121-R",
+      "topic": "qualification classification authority",
+      "decision": "NO_CHANGE",
+      "proof": "repository-owned classification remains single metadata authority"
+    },
+    {
+      "phase": "HM122-R",
+      "topic": "retrieval residual",
+      "decision": "NO_CHANGE",
+      "proof": "no new localization miss or unsafe target evidence"
+    },
+    {
+      "phase": "HM123-R",
+      "topic": "qualified identity",
+      "decision": "NO_CHANGE",
+      "proof": "no new alias/re-export/import identity failure"
+    },
+    {
+      "phase": "HM124-R",
+      "topic": "freshness mutation",
+      "decision": "NO_CHANGE",
+      "proof": "no stale evidence defect"
+    },
+    {
+      "phase": "HM125-R",
+      "topic": "consumer conformance",
+      "decision": "NO_CHANGE",
+      "proof": "no consumer contract failure"
+    },
+    {
+      "phase": "HM126-R",
+      "topic": "negative evidence",
+      "decision": "NO_CHANGE",
+      "proof": "evidence remains advisory; no retry/execution authority admitted"
+    },
+    {
+      "phase": "HM127-R",
+      "topic": "SQLite/store economics",
+      "decision": "REJECT_CHANGE",
+      "proof": "no profile evidence of storage dominance"
+    },
+    {
+      "phase": "HM128-R",
+      "topic": "worker packet economics",
+      "decision": "NO_CHANGE",
+      "proof": "no new packet expansion or duplicated authoritative state demonstrated"
+    },
+    {
+      "phase": "HM129-R",
+      "topic": "Hashmarks/Oh-Goon boundary",
+      "decision": "NO_CHANGE",
+      "proof": "repository intelligence boundary remains intact"
+    },
+    {
+      "phase": "HM130-R",
+      "topic": "15-phase proof-gated closure",
+      "decision": "CLOSE",
+      "proof": "repository-surface ownership defect fixed; all other changes rejected or deferred without proof"
+    }
+  ]
+}

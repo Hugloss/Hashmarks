@@ -1,0 +1,20 @@
+{
+  "schema": "hashmarks.repository-evaluation-cases.v1",
+  "suite": "exact-identifier-ownership",
+  "cases": [
+    {
+      "id": "exact-method-paths-under",
+      "operation": "task_action_map",
+      "task": "optimize WorkspaceMapStore.paths_under",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "exact-method-sync-remove-stale-paths",
+      "operation": "task_action_map",
+      "task": "optimize _sync_remove_stale_paths",
+      "limit": 20,
+      "per_role": 3
+    }
+  ]
+}

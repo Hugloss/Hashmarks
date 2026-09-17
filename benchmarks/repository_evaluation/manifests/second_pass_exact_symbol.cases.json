@@ -1,0 +1,755 @@
+{
+  "cases": [
+    {
+      "id": "workspace-map-paths-under-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix WorkspaceMapStore.paths_under"
+    },
+    {
+      "id": "workspace-map-paths-under-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize WorkspaceMapStore.paths_under"
+    },
+    {
+      "id": "workspace-map-paths-under-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change WorkspaceMapStore.paths_under"
+    },
+    {
+      "id": "workspace-map-paths-under-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate WorkspaceMapStore.paths_under implementation"
+    },
+    {
+      "id": "workspace-map-paths-under-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in WorkspaceMapStore.paths_under"
+    },
+    {
+      "id": "workspace-map-paths-under-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/repository_index_store.py WorkspaceMapStore.paths_under"
+    },
+    {
+      "id": "sync-remove-stale-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix _sync_remove_stale_paths"
+    },
+    {
+      "id": "sync-remove-stale-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize _sync_remove_stale_paths"
+    },
+    {
+      "id": "sync-remove-stale-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change _sync_remove_stale_paths"
+    },
+    {
+      "id": "sync-remove-stale-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate _sync_remove_stale_paths implementation"
+    },
+    {
+      "id": "sync-remove-stale-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in _sync_remove_stale_paths"
+    },
+    {
+      "id": "sync-remove-stale-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/indexing_lifecycle.py _sync_remove_stale_paths"
+    },
+    {
+      "id": "find-impl-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix _find_impl"
+    },
+    {
+      "id": "find-impl-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize _find_impl"
+    },
+    {
+      "id": "find-impl-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change _find_impl"
+    },
+    {
+      "id": "find-impl-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate _find_impl implementation"
+    },
+    {
+      "id": "find-impl-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in _find_impl"
+    },
+    {
+      "id": "find-impl-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/find_engine.py _find_impl"
+    },
+    {
+      "id": "query-terms-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix _query_terms"
+    },
+    {
+      "id": "query-terms-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize _query_terms"
+    },
+    {
+      "id": "query-terms-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change _query_terms"
+    },
+    {
+      "id": "query-terms-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate _query_terms implementation"
+    },
+    {
+      "id": "query-terms-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in _query_terms"
+    },
+    {
+      "id": "query-terms-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/query_primitives.py _query_terms"
+    },
+    {
+      "id": "select-ownership-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix _select_ownership_candidate"
+    },
+    {
+      "id": "select-ownership-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize _select_ownership_candidate"
+    },
+    {
+      "id": "select-ownership-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change _select_ownership_candidate"
+    },
+    {
+      "id": "select-ownership-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate _select_ownership_candidate implementation"
+    },
+    {
+      "id": "select-ownership-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in _select_ownership_candidate"
+    },
+    {
+      "id": "select-ownership-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/ownership_graph.py _select_ownership_candidate"
+    },
+    {
+      "id": "classify-repository-path-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix classify_repository_path"
+    },
+    {
+      "id": "classify-repository-path-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize classify_repository_path"
+    },
+    {
+      "id": "classify-repository-path-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change classify_repository_path"
+    },
+    {
+      "id": "classify-repository-path-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate classify_repository_path implementation"
+    },
+    {
+      "id": "classify-repository-path-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in classify_repository_path"
+    },
+    {
+      "id": "classify-repository-path-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/repository_domains.py classify_repository_path"
+    },
+    {
+      "id": "indexed-path-current-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix _indexed_path_current"
+    },
+    {
+      "id": "indexed-path-current-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize _indexed_path_current"
+    },
+    {
+      "id": "indexed-path-current-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change _indexed_path_current"
+    },
+    {
+      "id": "indexed-path-current-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate _indexed_path_current implementation"
+    },
+    {
+      "id": "indexed-path-current-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in _indexed_path_current"
+    },
+    {
+      "id": "indexed-path-current-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/indexing_lifecycle.py _indexed_path_current"
+    },
+    {
+      "id": "verification-relevance-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix _verification_relevance"
+    },
+    {
+      "id": "verification-relevance-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize _verification_relevance"
+    },
+    {
+      "id": "verification-relevance-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change _verification_relevance"
+    },
+    {
+      "id": "verification-relevance-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate _verification_relevance implementation"
+    },
+    {
+      "id": "verification-relevance-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in _verification_relevance"
+    },
+    {
+      "id": "verification-relevance-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/evidence_verification.py _verification_relevance"
+    },
+    {
+      "id": "producer-identity-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix native_producer_implementation_identity"
+    },
+    {
+      "id": "producer-identity-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize native_producer_implementation_identity"
+    },
+    {
+      "id": "producer-identity-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change native_producer_implementation_identity"
+    },
+    {
+      "id": "producer-identity-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate native_producer_implementation_identity implementation"
+    },
+    {
+      "id": "producer-identity-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in native_producer_implementation_identity"
+    },
+    {
+      "id": "producer-identity-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/producer_identity.py native_producer_implementation_identity"
+    },
+    {
+      "id": "decision-session-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix decision_session"
+    },
+    {
+      "id": "decision-session-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize decision_session"
+    },
+    {
+      "id": "decision-session-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change decision_session"
+    },
+    {
+      "id": "decision-session-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate decision_session implementation"
+    },
+    {
+      "id": "decision-session-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in decision_session"
+    },
+    {
+      "id": "decision-session-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/decision_session.py decision_session"
+    },
+    {
+      "id": "repository-content-identity-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix repository_content_identity"
+    },
+    {
+      "id": "repository-content-identity-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize repository_content_identity"
+    },
+    {
+      "id": "repository-content-identity-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change repository_content_identity"
+    },
+    {
+      "id": "repository-content-identity-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate repository_content_identity implementation"
+    },
+    {
+      "id": "repository-content-identity-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in repository_content_identity"
+    },
+    {
+      "id": "repository-content-identity-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/test_shards.py repository_content_identity"
+    },
+    {
+      "id": "exact-identifier-candidates-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix _task_action_exact_identifier_edit_candidates"
+    },
+    {
+      "id": "exact-identifier-candidates-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize _task_action_exact_identifier_edit_candidates"
+    },
+    {
+      "id": "exact-identifier-candidates-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change _task_action_exact_identifier_edit_candidates"
+    },
+    {
+      "id": "exact-identifier-candidates-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate _task_action_exact_identifier_edit_candidates implementation"
+    },
+    {
+      "id": "exact-identifier-candidates-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in _task_action_exact_identifier_edit_candidates"
+    },
+    {
+      "id": "exact-identifier-candidates-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/repository_task_action.py _task_action_exact_identifier_edit_candidates"
+    },
+    {
+      "id": "resolve-import-owner-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix _resolve_import_owner_evidence"
+    },
+    {
+      "id": "resolve-import-owner-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize _resolve_import_owner_evidence"
+    },
+    {
+      "id": "resolve-import-owner-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change _resolve_import_owner_evidence"
+    },
+    {
+      "id": "resolve-import-owner-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate _resolve_import_owner_evidence implementation"
+    },
+    {
+      "id": "resolve-import-owner-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in _resolve_import_owner_evidence"
+    },
+    {
+      "id": "resolve-import-owner-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/import_resolution.py _resolve_import_owner_evidence"
+    },
+    {
+      "id": "session-refs-many-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix _session_refs_many"
+    },
+    {
+      "id": "session-refs-many-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize _session_refs_many"
+    },
+    {
+      "id": "session-refs-many-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change _session_refs_many"
+    },
+    {
+      "id": "session-refs-many-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate _session_refs_many implementation"
+    },
+    {
+      "id": "session-refs-many-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in _session_refs_many"
+    },
+    {
+      "id": "session-refs-many-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/decision_session.py _session_refs_many"
+    },
+    {
+      "id": "classify-nodeids-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix classify_nodeids"
+    },
+    {
+      "id": "classify-nodeids-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize classify_nodeids"
+    },
+    {
+      "id": "classify-nodeids-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change classify_nodeids"
+    },
+    {
+      "id": "classify-nodeids-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate classify_nodeids implementation"
+    },
+    {
+      "id": "classify-nodeids-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in classify_nodeids"
+    },
+    {
+      "id": "classify-nodeids-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/qualification_classification.py classify_nodeids"
+    },
+    {
+      "id": "native-ruff-gate-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix native_ruff_promotion_gate"
+    },
+    {
+      "id": "native-ruff-gate-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize native_ruff_promotion_gate"
+    },
+    {
+      "id": "native-ruff-gate-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change native_ruff_promotion_gate"
+    },
+    {
+      "id": "native-ruff-gate-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate native_ruff_promotion_gate implementation"
+    },
+    {
+      "id": "native-ruff-gate-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in native_ruff_promotion_gate"
+    },
+    {
+      "id": "native-ruff-gate-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/promotion_receipt.py native_ruff_promotion_gate"
+    },
+    {
+      "id": "store-has-files-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix WorkspaceMapStore.has_files"
+    },
+    {
+      "id": "store-has-files-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize WorkspaceMapStore.has_files"
+    },
+    {
+      "id": "store-has-files-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change WorkspaceMapStore.has_files"
+    },
+    {
+      "id": "store-has-files-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate WorkspaceMapStore.has_files implementation"
+    },
+    {
+      "id": "store-has-files-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in WorkspaceMapStore.has_files"
+    },
+    {
+      "id": "store-has-files-path-qualified",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix hashmarks/codemap/repository_index_store.py WorkspaceMapStore.has_files"
+    },
+    {
+      "id": "ambiguous-close-fix",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "fix close"
+    },
+    {
+      "id": "ambiguous-close-optimize",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize close"
+    },
+    {
+      "id": "ambiguous-close-change",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "change close"
+    },
+    {
+      "id": "ambiguous-close-investigate",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "investigate close implementation"
+    },
+    {
+      "id": "ambiguous-close-update",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "update behavior in close"
+    }
+  ],
+  "schema": "hashmarks.repository-evaluation-cases.v1",
+  "suite": "second-pass-exact-symbol-authority"
+}

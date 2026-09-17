@@ -1,0 +1,21 @@
+{
+  "action": "Close the ten-phase tranche with only the one source optimization supported by current measurements.",
+  "decision": "CLOSE",
+  "evidence": "HM32-R had direct duplicate-work proof and was implemented. HM33-R through HM40-R were measured/reviewed and intentionally avoided speculative changes. Focused ring 51/51 PASS; compileall PASS; 4/4 correct; zero unsafe regressions.",
+  "parent_sha256": "8ce223652c191d423c20b595365a4595f797d0732504c3802d47a3f259c9da50",
+  "phase": "HM41-R",
+  "profile": {
+    "baseline_501_ms": 287.7475990003404,
+    "baseline_read_python_ast_calls": 1328,
+    "candidate_rows": 664,
+    "post_hm32_501_ms": 269.8866480000106,
+    "post_hm32_read_python_ast_calls": 664
+  },
+  "qualification": {
+    "compileall": "PASS",
+    "focused_ring": "51/51 PASS",
+    "selected_correct": "4/4",
+    "unsafe_regressions": 0
+  },
+  "schema": "hashmarks.phase-evidence.v1"
+}

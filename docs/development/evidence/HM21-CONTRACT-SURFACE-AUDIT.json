@@ -1,0 +1,13 @@
+{
+  "schema": "hashmarks.hm21-contract-surface-audit.v1",
+  "parent": "BA-HM19-HM20",
+  "multi_version_families": [
+    {"family":"agent-trace","versions":[1,2],"decision":"retain-v1-reader-prefer-v2","breaking_change":false},
+    {"family":"agent-experiment-set","versions":[1,2],"decision":"retain-v1-reader-prefer-v2","breaking_change":false},
+    {"family":"agent-experiment-set-report","versions":[1,2],"decision":"preserve-input-selected-report-version","breaking_change":false}
+  ],
+  "consolidation": "descriptive-metadata-only",
+  "silent_schema_rewriting": false,
+  "v0_12_justified": false,
+  "reason": "coexisting versions have explicit backward-compatible or input-selected semantics; no incompatible public semantic requirement was found"
+}

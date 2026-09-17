@@ -1,0 +1,35 @@
+{
+  "decision": "NO_HASHMARKS_ORCHESTRATION",
+  "guardrail": "No source change without current-parent proof; Hashmarks remains repository intelligence and does not acquire execution/orchestration authority.",
+  "metrics": {
+    "worker_multistep_ab": {
+      "sha256": "7e8e02562984bfbb35397f2983bcdf60213f56f6e6c569f6c0dbd01f332012c5",
+      "summary": {
+        "direct_correct_edits": 16,
+        "direct_correct_verifications": 18,
+        "direct_evidence_approx_tokens": 979,
+        "direct_evidence_bytes_read": 3878,
+        "direct_evidence_files_read": 31,
+        "direct_unsafe_wrong_edits": 2,
+        "direct_verification_candidates_examined": 19,
+        "guided_correct_edits": 18,
+        "guided_correct_verifications": 18,
+        "guided_deferrals": 0,
+        "guided_evidence_approx_tokens": 1005,
+        "guided_evidence_bytes_read": 3980,
+        "guided_evidence_files_read": 33,
+        "guided_recovered_wrong_first_hypotheses": 2,
+        "guided_unsafe_wrong_edits": 0,
+        "guided_verification_candidates_examined": 19,
+        "repositories": 3,
+        "tasks": 18,
+        "unsafe_wrong_edits_prevented": 2
+      }
+    }
+  },
+  "parent_sha256": "d80687b68f8dcaae4d0edab6d3bbb6a092850d4315951bc58ea3656391d90f34",
+  "phase": "HM48-R",
+  "rationale": "Uncertainty-aware worker behavior reaches 18/18 correct edits and 18/18 verification with zero unsafe edits. This proves consumer behavior, not a reason to put planning/orchestration inside Hashmarks.",
+  "schema": "hashmarks.proof-gated-phase-evidence.v1",
+  "source_change": false
+}

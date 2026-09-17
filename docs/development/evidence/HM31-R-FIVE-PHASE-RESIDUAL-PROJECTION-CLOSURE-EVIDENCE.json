@@ -1,0 +1,23 @@
+{
+  "decision": "CLOSE HM27-R..HM31-R; next target HM32-R structural verification projection economics.",
+  "findings": [
+    "The five-phase tranche closes without speculative semantic shortcuts.",
+    "The measured 501-surface action remains correct with zero unsafe regressions; focused affected ring is 57/57 PASS and compileall PASS.",
+    "The remaining justified research target is first-touch verification projection cost itself: experiment with parse/index fusion or a repository-owned structural reference projection that preserves exact freshness and reachable-reference semantics, rather than filtering candidates."
+  ],
+  "measurement": {
+    "max_action_ms": 293.25991500013515,
+    "max_candidate_count": 501,
+    "scale_result_identity": "sha256:b8a5aedb49e891459774165da63a1bf619d6d8c61f7652e63b2f4e26ee650126",
+    "selected_correct_rate": 1.0,
+    "unsafe_regressions": 0
+  },
+  "parent_sha256": "e0b58a1bc823489a93e19ae49d9342f5ab476e5560fe622b0615f37ce930adfb",
+  "phase": "HM31-R",
+  "qualification": {
+    "compileall": "PASS",
+    "focused_affected_ring": "57/57 PASS"
+  },
+  "schema": "hashmarks.hm31r.five-phase-residual-projection-closure.v1",
+  "source_change": "none; evidence/qualification checkpoint only"
+}

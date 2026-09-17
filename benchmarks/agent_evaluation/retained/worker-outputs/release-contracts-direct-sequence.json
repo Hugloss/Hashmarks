@@ -1,0 +1,131 @@
+{
+  "policy": "direct-sequence",
+  "schema": "hashmarks.worker-multistep-output.v1",
+  "tasks": [
+    {
+      "ambiguous": false,
+      "edit_target": "contracts/release.schema.json",
+      "evidence_read": {
+        "approx_tokens": 48,
+        "bytes": 189,
+        "files": 2,
+        "paths": [
+          "contracts/release.schema.json",
+          "tests/test_release_contract.py"
+        ]
+      },
+      "first_hypothesis": "contracts/release.schema.json",
+      "id": "rel-schema",
+      "inspection_paths": [],
+      "query": "ReleaseManifest artifact sha256 contract schema",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/test_release_contract.py"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "scripts/package_release.py",
+      "evidence_read": {
+        "approx_tokens": 56,
+        "bytes": 223,
+        "files": 2,
+        "paths": [
+          "scripts/package_release.py",
+          "tests/test_release_contract.py"
+        ]
+      },
+      "first_hypothesis": "scripts/package_release.py",
+      "id": "rel-package",
+      "inspection_paths": [],
+      "query": "package_release artifact packaging",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/test_release_contract.py"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "scripts/verify_checksum.py",
+      "evidence_read": {
+        "approx_tokens": 55,
+        "bytes": 219,
+        "files": 2,
+        "paths": [
+          "scripts/verify_checksum.py",
+          "tests/test_release_contract.py"
+        ]
+      },
+      "first_hypothesis": "scripts/verify_checksum.py",
+      "id": "rel-checksum",
+      "inspection_paths": [],
+      "query": "verify_checksum expected observed",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/test_release_contract.py"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "tests/test_release_contract.py",
+      "evidence_read": {
+        "approx_tokens": 32,
+        "bytes": 128,
+        "files": 1,
+        "paths": [
+          "tests/test_release_contract.py"
+        ]
+      },
+      "first_hypothesis": "tests/test_release_contract.py",
+      "id": "rel-test",
+      "inspection_paths": [],
+      "query": "test_release_checksum_contract checksum contract test",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/test_release_contract.py"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "Makefile",
+      "evidence_read": {
+        "approx_tokens": 54,
+        "bytes": 215,
+        "files": 2,
+        "paths": [
+          "Makefile",
+          "tests/test_release_contract.py"
+        ]
+      },
+      "first_hypothesis": "Makefile",
+      "id": "rel-make",
+      "inspection_paths": [],
+      "query": "release verify Makefile targets",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/test_release_contract.py"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "config/release.toml",
+      "evidence_read": {
+        "approx_tokens": 51,
+        "bytes": 201,
+        "files": 2,
+        "paths": [
+          "config/release.toml",
+          "tests/test_release_contract.py"
+        ]
+      },
+      "first_hypothesis": "config/release.toml",
+      "id": "rel-config",
+      "inspection_paths": [],
+      "query": "require_checksum release manifest configuration",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/test_release_contract.py"
+    }
+  ]
+}

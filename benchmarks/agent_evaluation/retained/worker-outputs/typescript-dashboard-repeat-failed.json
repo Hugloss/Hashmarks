@@ -1,0 +1,72 @@
+{
+  "policy": "repeat-failed",
+  "schema": "hashmarks.worker-failed-verification-output.v1",
+  "tasks": [
+    {
+      "changed_target": false,
+      "failed_edit_target": "docs/historical-search-notes/ts-api.md",
+      "id": "ts-api",
+      "query": "loadMetrics API adapter",
+      "recovery_candidates_examined": 0,
+      "recovery_reason": "repeat-prior-edit",
+      "recovery_target": "docs/historical-search-notes/ts-api.md",
+      "verification_outcome": "failed",
+      "verification_target": "tests/MetricsPanel.test.tsx"
+    },
+    {
+      "changed_target": false,
+      "failed_edit_target": "tests/MetricsPanel.test.tsx",
+      "id": "ts-panel",
+      "query": "MetricsPanel component loadMetrics",
+      "recovery_candidates_examined": 0,
+      "recovery_reason": "repeat-prior-edit",
+      "recovery_target": "tests/MetricsPanel.test.tsx",
+      "verification_outcome": "failed",
+      "verification_target": "tests/MetricsPanel.test.tsx"
+    },
+    {
+      "changed_target": false,
+      "failed_edit_target": "docs/historical-search-notes/ts-selection.md",
+      "id": "ts-selection",
+      "query": "normalizeSelection state selection",
+      "recovery_candidates_examined": 0,
+      "recovery_reason": "repeat-prior-edit",
+      "recovery_target": "docs/historical-search-notes/ts-selection.md",
+      "verification_outcome": "failed",
+      "verification_target": "tests/MetricsPanel.test.tsx"
+    },
+    {
+      "changed_target": false,
+      "failed_edit_target": "docs/historical-search-notes/ts-test.md",
+      "id": "ts-test",
+      "query": "testMetricsPanel MetricsPanel test",
+      "recovery_candidates_examined": 0,
+      "recovery_reason": "repeat-prior-edit",
+      "recovery_target": "docs/historical-search-notes/ts-test.md",
+      "verification_outcome": "failed",
+      "verification_target": "tests/MetricsPanel.test.tsx"
+    },
+    {
+      "changed_target": false,
+      "failed_edit_target": "docs/historical-search-notes/ts-package.md",
+      "id": "ts-package",
+      "query": "fresh-dashboard vitest package scripts",
+      "recovery_candidates_examined": 0,
+      "recovery_reason": "repeat-prior-edit",
+      "recovery_target": "docs/historical-search-notes/ts-package.md",
+      "verification_outcome": "failed",
+      "verification_target": "tests/MetricsPanel.test.tsx"
+    },
+    {
+      "changed_target": false,
+      "failed_edit_target": "tests/MetricsPanel.test.tsx",
+      "id": "ts-vite",
+      "query": "jsdom vite test environment",
+      "recovery_candidates_examined": 0,
+      "recovery_reason": "repeat-prior-edit",
+      "recovery_target": "tests/MetricsPanel.test.tsx",
+      "verification_outcome": "failed",
+      "verification_target": "tests/MetricsPanel.test.tsx"
+    }
+  ]
+}

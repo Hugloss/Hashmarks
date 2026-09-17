@@ -1,0 +1,63 @@
+{
+  "schema": "hashmarks.agent-task-corpus.v1",
+  "tasks": [
+    {
+      "expected_files": [
+        "src/orders/service.py"
+      ],
+      "expected_symbols": [
+        "OrderService",
+        "submit_order"
+      ],
+      "id": "py-service",
+      "query": "OrderService submit_order implementation"
+    },
+    {
+      "expected_files": [
+        "src/orders/storage.py"
+      ],
+      "expected_symbols": [
+        "OrderStore",
+        "save_order"
+      ],
+      "id": "py-storage",
+      "query": "OrderStore save_order persistence"
+    },
+    {
+      "expected_files": [
+        "src/orders/validation.py"
+      ],
+      "expected_symbols": [
+        "validate_order_id"
+      ],
+      "id": "py-validation",
+      "query": "validate_order_id validation"
+    },
+    {
+      "expected_files": [
+        "tests/test_orders.py"
+      ],
+      "expected_symbols": [
+        "test_submit_order"
+      ],
+      "id": "py-test",
+      "query": "test_submit_order order test"
+    },
+    {
+      "expected_files": [
+        "pyproject.toml"
+      ],
+      "expected_symbols": [],
+      "id": "py-config",
+      "query": "fresh-orders project pyproject configuration"
+    },
+    {
+      "expected_files": [
+        "AGENTS.md"
+      ],
+      "expected_symbols": [],
+      "id": "py-authority",
+      "query": "Python order service validate changes tests AGENTS"
+    }
+  ]
+}

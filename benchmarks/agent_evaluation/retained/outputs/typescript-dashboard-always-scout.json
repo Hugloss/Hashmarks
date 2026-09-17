@@ -1,0 +1,41 @@
+{
+  "schema": "hashmarks.selective-scout-output.v1",
+  "tasks": [
+    {
+      "id": "ts-api",
+      "reason": "no-competing-evidence",
+      "resolved": false,
+      "target": "src/api/metrics.ts"
+    },
+    {
+      "id": "ts-panel",
+      "reason": "no-competing-evidence",
+      "resolved": false,
+      "target": "src/components/MetricsPanel.tsx"
+    },
+    {
+      "id": "ts-selection",
+      "reason": "no-competing-evidence",
+      "resolved": false,
+      "target": "src/state/selection.ts"
+    },
+    {
+      "id": "ts-test",
+      "reason": "no-competing-evidence",
+      "resolved": false,
+      "target": "tests/MetricsPanel.test.tsx"
+    },
+    {
+      "id": "ts-package",
+      "reason": "no-competing-evidence",
+      "resolved": false,
+      "target": "package.json"
+    },
+    {
+      "id": "ts-vite",
+      "reason": "public-task-role-cue",
+      "resolved": true,
+      "target": "vite.config.ts"
+    }
+  ]
+}

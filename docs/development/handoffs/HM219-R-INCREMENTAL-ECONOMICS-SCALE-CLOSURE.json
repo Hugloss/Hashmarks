@@ -1,0 +1,16 @@
+{
+  "schema": "hashmarks.development-phase.v1",
+  "phase": "HM219-R",
+  "parent": "HM218",
+  "parent_sha256": "467947f43fc4401cd4f2ce4b0ff03c03ed7c396f6e6c568ec0957e0be3978e6b",
+  "decision": "IMPLEMENT_INCREMENTAL_ECONOMICS_SCALE_FIX",
+  "evidence": {
+    "hm218_60k_one_edit_seconds": 0.6975,
+    "hm218_60k_economics_seconds": 0.5311,
+    "hm219_10k_one_edit_seconds": 0.0161,
+    "hm219_10k_economics_seconds": 0.00247,
+    "hm219_50k_one_edit_seconds": 0.0890,
+    "hm219_50k_economics_seconds": 0.01395
+  },
+  "boundary": "repository-intelligence-economics-only"
+}
