@@ -341,7 +341,7 @@ make mcp-opencode-check
 
 The normal OSS test surface does not require an external coding-agent host. `make mcp-host-status` inspects project-local MCP registration/readiness; `make mcp-opencode-check` is the real OpenCode release host gate. Native release qualification and the other real-host MCP gates are documented separately.
 
-See [Contributing](.github/CONTRIBUTING.md), [Qualification tool compatibility](docs/qualification/TOOL_COMPATIBILITY.md), and the [MCP integration guide](docs/integration/MCP.md).
+See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs/integration/MCP.md).
 
 ## Documentation
 
@@ -351,7 +351,6 @@ See [Contributing](.github/CONTRIBUTING.md), [Qualification tool compatibility](
 - [Product boundary](docs/reference/PRODUCT_BOUNDARY.md)
 - [Normative invariants](docs/reference/INVARIANTS.md)
 - [Public API and stability policy](docs/reference/API_STABILITY.md)
-- [Qualification tool compatibility](docs/qualification/TOOL_COMPATIBILITY.md)
 - [Changelog](CHANGELOG.md)
 
 ## Project status
