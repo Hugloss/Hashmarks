@@ -127,9 +127,11 @@ class _CallCollector(ast.NodeVisitor):
 def _compatible_branches(
     left: tuple[tuple[int, object], ...], right: tuple[tuple[int, object], ...]
 ) -> bool:
-    l = dict(left)
-    r = dict(right)
-    return all(l[key] == r[key] for key in l.keys() & r.keys())
+    left_map = dict(left)
+    right_map = dict(right)
+    return all(
+        left_map[key] == right_map[key] for key in left_map.keys() & right_map.keys()
+    )
 
 
 def _target_names(node: ast.AST) -> set[str]:
