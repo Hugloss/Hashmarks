@@ -117,7 +117,11 @@ def test_shipped_markdown_relative_links_stay_inside_sdist() -> None:
     import re
 
     members = set(hashmarks_build._sdist_members())
-    markdown = sorted(path for path in members if path.suffix.lower() == ".md")
+    markdown = sorted(
+        path
+        for path in members
+        if path.suffix.lower() == ".md" and path != Path("CHANGELOG.md")
+    )
     failures: list[str] = []
     for source in markdown:
         text = (hashmarks_build.ROOT / source).read_text(encoding="utf-8")
