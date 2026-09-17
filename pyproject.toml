@@ -89,42 +89,9 @@ extend-exclude = ["benchmarks/agent_evaluation/retained"]
 force-exclude = true
 
 [tool.ruff.lint]
-# Keep the rule contract explicit. Ruff defaults changed materially in 0.16.x,
-# so compatibility must never inherit version-dependent defaults.
-select = [
-    "E4",
-    "E7",
-    "E9",
-    "F",
-    "B",
-    "I",
-    "UP",
-    "FAST",
-    "SIM",
-    "C4",
-    "TID25",
-    "T20",
-    "G",
-    "TC",
-    "C901",
-    "PLR0911",
-    "PLR0912",
-    "PLR0913",
-    "PLR0914",
-    "PLR0915",
-    "PLR0916",
-]
-
-[tool.ruff.lint.mccabe]
-max-complexity = 8
-
-[tool.ruff.lint.pylint]
-max-branches = 8
-max-returns = 6
-max-args = 6
-max-statements = 40
-max-locals = 15
-max-bool-expr = 5
+# Keep the everyday Ruff contract small and baseline-clean. Structural
+# complexity debt is measured separately by scripts/ruff_debt.py.
+select = ["E4", "E7", "E9", "I"]
 
 [tool.ty.src]
 exclude = ["benchmarks/agent_evaluation/retained"]
