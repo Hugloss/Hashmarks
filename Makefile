@@ -30,7 +30,7 @@ DIAGNOSTIC_BATCH_LIMIT ?= 8
 DIAGNOSTIC_SHARD ?= 0
 DIAGNOSTIC_EXTRA_MARKER ?=
 
-.PHONY: help evaluation-help lock init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help qualification-preflight lint ruff typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-gate test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
+.PHONY: help evaluation-help lock init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help lint ruff typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-gate test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
 
 help:
 	@printf '%s\n' \
@@ -154,10 +154,6 @@ map-watch:
 agent-runner-journal-help: bootstrap
 	@$(UV) run --offline python -m scripts.agent_evaluation.agent_runner_journal --help
 
-qualification-preflight:
-	@test -f uv.lock || (echo "local uv.lock is missing; run: make init" >&2; exit 2)
-	@$(UV) run --offline --frozen --no-sync --group test python scripts/qualification_environment.py pytest
-
 ruff:
 	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint ruff check .
 	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint ruff format --check .
@@ -196,7 +192,7 @@ test:
 		$(MAKE) --no-print-directory test-native; \
 	fi
 
-test-native: qualification-preflight
+test-native:
 	@$(UV) run --offline --frozen --no-sync --group test python -m pytest -q
 
 test-diagnostic-capabilities:
@@ -222,14 +218,14 @@ test-diagnostic-shard:
 	  --limit 1 \
 	  --extra-marker '$(DIAGNOSTIC_EXTRA_MARKER)'
 
-test-profile: qualification-preflight
+test-profile:
 	@$(UV) run --offline --frozen --no-sync --group test python scripts/qualification_filesystem.py
 	@$(UV) run --offline --frozen --no-sync --group test python -m pytest -q --durations=25 --durations-min=1.0
 
 test-shard-plan:
 	@$(UV) run --offline python scripts/test_shards.py --shards $(TEST_SHARDS)
 
-test-shard: qualification-preflight
+test-shard:
 	@test -n "$$TEST_SHARD" || (echo "TEST_SHARD is required (0-based)" >&2; exit 2)
 	@FILES=`$(UV) run --offline python scripts/test_shards.py --shards $(TEST_SHARDS) --shard $$TEST_SHARD`; \
 	$(UV) run --offline --frozen --no-sync --group test python -m pytest -q $$FILES
