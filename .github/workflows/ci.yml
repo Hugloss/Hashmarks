@@ -125,18 +125,10 @@ jobs:
       - name: Smoke installed wheel through official MCP SDK
         run: .mcp-venv/bin/python -I scripts/mcp_installed_artifact_smoke.py --hashmarks "$PWD/.mcp-venv/bin/hashmarks"
 
-  ruff-compatibility:
-    name: ${{ matrix.label }} explicit rule contract
+  ruff:
+    name: Ruff
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: ruff-min
-            label: "Ruff minimum line"
-          - target: ruff-latest
-            label: "Ruff latest supported"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -144,7 +136,8 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
-      - run: make ${{ matrix.target }}
+      - run: uv run --only-group lint ruff check .
+      - run: uv run --only-group lint ruff format --check .
 
   precommit:
     name: Pre-commit checks
@@ -158,4 +151,4 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.11
-      - run: make precommit
+      - run: uv run --only-group hooks pre-commit run --all-files
