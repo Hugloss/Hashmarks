@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.python_ast_cache import read_python_ast
 
+from .python_exports import static_string_names
+
 if TYPE_CHECKING:
     from .engine import CodeMap
 
@@ -148,18 +150,6 @@ class ImportResolutionMixin:
         except (OSError, UnicodeError, SyntaxError, ValueError):
             return None
 
-        def static_names(value: ast.expr | None) -> list[str] | None:
-            if not isinstance(value, (ast.List, ast.Tuple, ast.Set)):
-                return None
-            names: list[str] = []
-            for item in value.elts:
-                if not isinstance(item, ast.Constant) or not isinstance(
-                    item.value, str
-                ):
-                    return None
-                names.append(item.value)
-            return names
-
         all_values: list[str] | None = None
         saw_all = False
         for node in tree.body:
@@ -177,7 +167,7 @@ class ImportResolutionMixin:
                 assigned_value = node.value
             if assigned_value is not None:
                 saw_all = True
-                names = static_names(assigned_value)
+                names = static_string_names(assigned_value)
                 if names is None:
                     return None
                 all_values = names
@@ -191,7 +181,7 @@ class ImportResolutionMixin:
                 saw_all = True
                 if not isinstance(node.op, ast.Add) or all_values is None:
                     return None
-                names = static_names(node.value)
+                names = static_string_names(node.value)
                 if names is None:
                     return None
                 all_values.extend(names)
@@ -217,7 +207,7 @@ class ImportResolutionMixin:
                             return None
                         all_values.append(arg.value)
                     else:
-                        names = static_names(call.args[0])
+                        names = static_string_names(call.args[0])
                         if names is None:
                             return None
                         all_values.extend(names)
@@ -440,7 +430,16 @@ class ImportResolutionMixin:
             )
         candidates.extend(
             normalized + suffix
-            for suffix in (".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs")
+            for suffix in (
+                ".ts",
+                ".tsx",
+                ".mts",
+                ".cts",
+                ".js",
+                ".jsx",
+                ".mjs",
+                ".cjs",
+            )
         )
         candidates.extend(
             normalized.rstrip("/") + suffix
