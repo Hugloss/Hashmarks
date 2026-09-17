@@ -101,11 +101,12 @@ def derive_file_nodes(path: str, artifact: ParsedArtifact) -> tuple[DerivedNode,
         (content.identity, symbols.identity),
     )
 
-    outline_id = _identity(
-        "hashmarks.codemap-derived.outline-surface.v1", artifact.outline
-    )
     outline = DerivedNode(
-        path, "outline_surface", outline_id, (symbols.node_id,), (symbols.identity,)
+        path,
+        "outline_surface",
+        _identity("hashmarks.codemap-derived.outline-surface.v1", artifact.outline),
+        (symbols.node_id,),
+        (symbols.identity,),
     )
 
     lexical_value = [

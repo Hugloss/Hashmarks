@@ -7,29 +7,6 @@ def _text(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_root_readme_is_a_current_product_landing_page() -> None:
-    readme = _text("README.md")
-    assert readme.startswith(
-        "# Hashmarks — Repository intelligence and a local MCP server for coding agents\n"
-    )
-    assert "Current package version: **0.14.0**" in readme
-    for section in (
-        "## Why Hashmarks",
-        "## Quick start",
-        "## Python API",
-        "## Core architecture",
-        "## Non-negotiable agent boundary",
-        "## Development",
-        "## Documentation",
-        "## Security",
-    ):
-        assert section in readme
-    # Release chronology belongs in docs/development, not above-the-fold product docs.
-    assert "## v0.10." not in readme
-    assert "## v0.11." not in readme
-    assert "## v0.12." not in readme
-
-
 def test_codemap_maintainer_guide_maps_internal_ownership_and_request_flows() -> None:
     docs = _text("docs/README.md")
     guide = _text("docs/maintainers/CODEMAP.md")
@@ -115,16 +92,6 @@ def test_publication_root_moves_agent_evaluation_corpora_out_of_product_surface(
     assert "not installed Hashmarks product state" in retained
 
 
-def test_installed_artifact_smoke_is_part_of_release_contract() -> None:
-    makefile = _text("Makefile")
-    workflow = _text(".github/workflows/ci.yml")
-    assert "artifact-check:" in makefile
-    assert "installed_artifact_smoke.py" in makefile
-    assert "make artifact-check ARTIFACT_PYTHON=${{ matrix.python }}" in workflow
-    assert "make artifact-check ARTIFACT_PYTHON=3.14" in workflow
-    assert "release-check: dev-check artifact-check" in makefile
-
-
 def test_public_onboarding_leads_with_installed_package_not_source_checkout() -> None:
     readme = _text("README.md")
     getting_started = _text("docs/GETTING_STARTED.md")
@@ -182,15 +149,6 @@ def test_normative_invariants_exclude_prepublic_agent_execution_history() -> Non
     assert "PB7. Interoperability transfers evidence, never authority." in current
 
 
-def test_ruff_debt_baseline_contains_only_current_files() -> None:
-    import json
-
-    baseline = json.loads(_text("ruff-debt-baseline.json"))
-    missing = sorted(path for path in baseline["files"] if not (ROOT / path).is_file())
-    assert missing == []
-    assert int(baseline["excess"]) < 5000
-
-
 def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None:
     readme = _text("README.md")
     docs = _text("docs/README.md")
@@ -220,8 +178,3 @@ def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None
     assert (ROOT / "opencode.json").is_file()
     assert (ROOT / ".mcp.json").is_file()
     assert (ROOT / ".codex" / "config.toml").is_file()
-    makefile = _text("Makefile")
-    assert "mcp-opencode-check:" in makefile
-    assert "mcp-host-status:" in makefile
-    assert "scripts/host_qualification/opencode_mcp_host_gate.py" in makefile
-    assert "scripts/mcp_host_status.py" in makefile

@@ -481,24 +481,33 @@ class FindEngineMixin:
         return tuple(domain for domain in route.preferred_domains if domain in domains)
 
     @staticmethod
+    def _find_control_matches(
+        hit: SearchHit,
+        wanted: Sequence[RepositoryDomain],
+        covered: set[RepositoryDomain],
+    ) -> tuple[RepositoryDomain, ...]:
+        if hit.score < 24.0:
+            return ()
+        domains = set(classify_repository_path(hit.path))
+        return tuple(
+            domain for domain in wanted if domain in domains and domain not in covered
+        )
+
+    @staticmethod
     def _find_control_hits(
         route: QueryRoute, ranked: Sequence[SearchHit], limit: int
     ) -> list[SearchHit]:
         wanted = FindEngineMixin._find_control_domains(route)
         hits: list[SearchHit] = []
         covered: set[RepositoryDomain] = set()
+        quota = min(4, max(1, limit // 5))
         for hit in ranked:
-            matches = [
-                domain
-                for domain in wanted
-                if domain in set(classify_repository_path(hit.path))
-                and domain not in covered
-            ]
-            if not matches or hit.score < 24.0:
+            matches = FindEngineMixin._find_control_matches(hit, wanted, covered)
+            if not matches:
                 continue
             hits.append(hit)
             covered.update(matches)
-            if len(hits) >= min(4, max(1, limit // 5)):
+            if len(hits) >= quota:
                 break
         return hits
 
