@@ -89,9 +89,26 @@ extend-exclude = [
 force-exclude = true
 
 [tool.ruff.lint]
-# Keep the everyday Ruff contract small and baseline-clean. Structural
-# complexity debt is measured separately by scripts/ruff_debt.py.
-select = ["E4", "E7", "E9", "I"]
+# Fast, baseline-clean rules run on every Ruff/pre-commit invocation. Legacy
+# structural debt is enforced separately as a no-growth budget by make lint.
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.ruff.lint.pylint]
+max-returns = 6
+max-branches = 8
+max-args = 6
+max-locals = 15
+max-statements = 40
+max-bool-expr = 5
+
+[tool.hashmarks.quality]
+# Ruff has function-complexity rules but no repository module-length rule.
+# Start with a hard ceiling above the current largest production module and
+# ratchet it downward as large modules are split.
+max-python-file-lines = 1600
 
 [tool.ty.src]
 exclude = ["benchmarks/agent_evaluation/retained"]
