@@ -29,7 +29,10 @@ def _enable_wal_with_bounded_retry(
             return
         except sqlite3.OperationalError as exc:
             message = str(exc).lower()
-            if "database is locked" not in message and "database is busy" not in message:
+            if (
+                "database is locked" not in message
+                and "database is busy" not in message
+            ):
                 raise
             remaining = deadline - time.monotonic()
             if remaining <= 0:
