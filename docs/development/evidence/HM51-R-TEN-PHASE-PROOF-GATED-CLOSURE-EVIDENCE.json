@@ -1,0 +1,213 @@
+{
+  "decision": "CLOSE",
+  "guardrail": "No source change without current-parent proof; Hashmarks remains repository intelligence and does not acquire execution/orchestration authority.",
+  "metrics": {
+    "fresh": {
+      "sha256": "1244da9a007ba77635a692e2cf6018a5f1b27fc8c079c75518a781e4db34b9f7",
+      "summary": {
+        "average_candidate_file_reduction": 0.253968253968254,
+        "average_context_ms": 2.5937149445477794,
+        "average_context_tokens": 82.38888888888889,
+        "average_find_ms": 1.5764388888581178,
+        "fallback_search_rate": 0.0,
+        "file_recall": 1.0,
+        "first_query_hit_rate": 0.8888888888888888,
+        "max_repo_p95_context_ms": 6.190230999891355,
+        "max_repo_p95_find_ms": 5.376088999582862,
+        "seconds": 0.2336264219993609,
+        "selected_file_tokens_avoided": 891,
+        "symbol_recall": 1.0
+      }
+    },
+    "negative": {
+      "sha256": "29e66b92be9907db435d5c73fa00c83f59d60ae15aeca828f6bd56091de0aeda",
+      "summary": {
+        "fresh_correct_recoveries": 10,
+        "fresh_different_wrong_edits": 0,
+        "fresh_repeated_failed_edits": 8,
+        "guided_correct_recoveries": 18,
+        "guided_different_wrong_edits": 0,
+        "guided_recovery_candidates_examined": 19,
+        "guided_repeated_failed_edits": 0,
+        "injected_failed_edits": 18,
+        "receipt_resume_correct_recoveries": 10,
+        "receipt_resume_repeated_failed_edits": 0,
+        "receipt_resume_tasks": 18,
+        "repeat_correct_recoveries": 0,
+        "repeat_repeated_failed_edits": 18,
+        "repositories": 3,
+        "tasks": 18
+      }
+    },
+    "paired": {
+      "sha256": "c443390b39a077ffb0cb9bda929004eb5b55e9d5aadac88baae6bdafea1f7253",
+      "summary": {
+        "hashmarks_cold_setup_ms": 78.66696599967327,
+        "hashmarks_correct_first_edits": 16.0,
+        "hashmarks_correct_verifications": 18.0,
+        "hashmarks_evidence_approx_tokens": 1937.0,
+        "hashmarks_evidence_bytes_read": 7746.0,
+        "hashmarks_evidence_files_read": 55.0,
+        "hashmarks_repository_scan_bytes": 0.0,
+        "hashmarks_repository_scan_files": 0.0,
+        "hashmarks_search_ms": 66.62286599839717,
+        "hashmarks_verification_candidates_examined": 19.0,
+        "hashmarks_wrong_first_edits": 2.0,
+        "native_cold_setup_ms": 0.0,
+        "native_correct_first_edits": 6.0,
+        "native_correct_verifications": 18.0,
+        "native_evidence_approx_tokens": 1500.0,
+        "native_evidence_bytes_read": 5998.0,
+        "native_evidence_files_read": 33.0,
+        "native_repository_scan_bytes": 81804.0,
+        "native_repository_scan_files": 468.0,
+        "native_search_ms": 25.833071000306518,
+        "native_verification_candidates_examined": 36.0,
+        "native_wrong_first_edits": 12.0,
+        "repositories": 3,
+        "tasks": 18
+      }
+    },
+    "retrieval": {
+      "sha256": "059f2979baab3a852e768c79fb2ce2c9bc79c9f1113ff68345a7503dce9080fc",
+      "summary": {
+        "embedding_admission": false,
+        "ngram_admission": false,
+        "recommended_next_lane": "cheap-ambiguity-inspection",
+        "repositories": 3,
+        "residual_counts": {
+          "deep-ranking-miss": 0,
+          "discovery-miss": 0,
+          "none": 16,
+          "role-authority-ambiguity": 2,
+          "shallow-ranking-miss": 0
+        },
+        "retrieval_subagent_admission": true,
+        "tasks": 18,
+        "top1_correct": 16,
+        "top20_all_expected": 18,
+        "top5_any_expected": 18
+      }
+    },
+    "scout": {
+      "sha256": "9591fa20d34477272e0d7dc613e84942dea933e917e0fc5032bc2efe9043fa53",
+      "summary": {
+        "always_extra_spawns_vs_selective": 16.0,
+        "always_scout_correct_final": 18.0,
+        "always_scout_scout_evidence_approx_tokens": 103.0,
+        "always_scout_scout_evidence_bytes": 408.0,
+        "always_scout_scout_evidence_files": 4.0,
+        "always_scout_scout_spawns": 18.0,
+        "always_scout_scout_subprocess_ms": 1840.9479430001738,
+        "always_scout_wrong_final": 0.0,
+        "no_scout_correct_final": 16.0,
+        "no_scout_scout_evidence_approx_tokens": 0.0,
+        "no_scout_scout_evidence_bytes": 0.0,
+        "no_scout_scout_evidence_files": 0.0,
+        "no_scout_scout_spawns": 0.0,
+        "no_scout_scout_subprocess_ms": 0.0,
+        "no_scout_wrong_final": 2.0,
+        "repositories": 3,
+        "selective_correctness_gain": 2.0,
+        "selective_scout_correct_final": 18.0,
+        "selective_scout_scout_evidence_approx_tokens": 103.0,
+        "selective_scout_scout_evidence_bytes": 408.0,
+        "selective_scout_scout_evidence_files": 4.0,
+        "selective_scout_scout_spawns": 2.0,
+        "selective_scout_scout_subprocess_ms": 1167.4048919999223,
+        "selective_scout_wrong_final": 0.0,
+        "selective_spawn_rate": 0.1111111111111111,
+        "tasks": 18
+      }
+    },
+    "verification": {
+      "sha256": "258eb9c7819016d648051c16dabc4644031e39663ee2b9f1100c0dd9717f3271",
+      "summary": {}
+    },
+    "worker_behavior_ab": {
+      "sha256": "da8a8079b757227b611d6bc7258ff8a5589487955b38e33c87917ea0069cf423",
+      "summary": {
+        "correct_immediate_edits_deferred": 0,
+        "direct_correct_immediate_edit_rate": 0.8888888888888888,
+        "direct_correct_immediate_edits": 16,
+        "direct_unsafe_wrong_first_edit_rate": 0.1111111111111111,
+        "direct_unsafe_wrong_first_edits": 2,
+        "extra_inspections_per_prevented_wrong_edit": 1.0,
+        "gated_correct_immediate_edit_rate": 0.8888888888888888,
+        "gated_correct_immediate_edits": 16,
+        "gated_inspection_rate": 0.1111111111111111,
+        "gated_inspections": 2,
+        "gated_unsafe_wrong_first_edit_rate": 0.0,
+        "gated_unsafe_wrong_first_edits": 0,
+        "repositories": 3,
+        "tasks": 18,
+        "unsafe_wrong_first_edit_reduction": 1.0,
+        "unsafe_wrong_first_edits_prevented": 2
+      }
+    },
+    "worker_failed_verification_ab": {
+      "sha256": "7eb96c036664624bd523fb00dfac8c9f41d18b9285878d3d1afe536429498cd7",
+      "summary": {
+        "fresh_correct_recoveries": 10,
+        "fresh_different_wrong_edits": 0,
+        "fresh_repeated_failed_edits": 8,
+        "guided_correct_recoveries": 18,
+        "guided_different_wrong_edits": 0,
+        "guided_recovery_candidates_examined": 19,
+        "guided_repeated_failed_edits": 0,
+        "injected_failed_edits": 18,
+        "repeat_correct_recoveries": 0,
+        "repeat_repeated_failed_edits": 18,
+        "repositories": 3,
+        "tasks": 18
+      }
+    },
+    "worker_inspection_ab": {
+      "sha256": "cfebbf3f8b412e0f2170bc4b1197000abc11f66d081d5fafd72a034b2955bb5a",
+      "summary": {
+        "defer_only_correct_final_edits": 16,
+        "defer_only_deferrals": 2,
+        "defer_only_unsafe_wrong_final_edits": 0,
+        "inspection_recovery_rate": 1.0,
+        "inspections": 2,
+        "recovered_after_inspection": 2,
+        "repositories": 3,
+        "residual_deferral_rate": 0.0,
+        "residual_wrong_edit_rate": 0.0,
+        "resolved_correct_final_edits": 18,
+        "resolved_deferrals": 0,
+        "resolved_unsafe_wrong_final_edits": 0,
+        "tasks": 18
+      }
+    },
+    "worker_multistep_ab": {
+      "sha256": "7e8e02562984bfbb35397f2983bcdf60213f56f6e6c569f6c0dbd01f332012c5",
+      "summary": {
+        "direct_correct_edits": 16,
+        "direct_correct_verifications": 18,
+        "direct_evidence_approx_tokens": 979,
+        "direct_evidence_bytes_read": 3878,
+        "direct_evidence_files_read": 31,
+        "direct_unsafe_wrong_edits": 2,
+        "direct_verification_candidates_examined": 19,
+        "guided_correct_edits": 18,
+        "guided_correct_verifications": 18,
+        "guided_deferrals": 0,
+        "guided_evidence_approx_tokens": 1005,
+        "guided_evidence_bytes_read": 3980,
+        "guided_evidence_files_read": 33,
+        "guided_recovered_wrong_first_hypotheses": 2,
+        "guided_unsafe_wrong_edits": 0,
+        "guided_verification_candidates_examined": 19,
+        "repositories": 3,
+        "tasks": 18,
+        "unsafe_wrong_edits_prevented": 2
+      }
+    }
+  },
+  "parent_sha256": "560585b8fed7a0ac6281c6a6a2bd4df2bcc00c7ac7b181d74ae50f8e5ebfaedd",
+  "phase": "HM51-R",
+  "rationale": "Across HM42-R through HM50-R, current-parent evidence admits no further source optimization. The only newly admitted development lane is broader role/authority ambiguity corpus expansion before any resolver implementation.",
+  "schema": "hashmarks.proof-gated-phase-evidence.v1",
+  "source_change": false
+}

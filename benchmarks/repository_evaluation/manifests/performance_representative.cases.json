@@ -1,0 +1,34 @@
+{
+  "cases": [
+    {
+      "id": "ownership-heavy",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize _select_ownership_candidate"
+    },
+    {
+      "id": "import-heavy",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize _resolve_import_owner_evidence"
+    },
+    {
+      "id": "verification-heavy",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize _verification_relevance"
+    },
+    {
+      "id": "exact-identifier-control",
+      "limit": 20,
+      "operation": "task_action_map",
+      "per_role": 3,
+      "task": "optimize WorkspaceMapStore.paths_under"
+    }
+  ],
+  "schema": "hashmarks.repository-evaluation-cases.v1",
+  "suite": "representative-action-performance"
+}

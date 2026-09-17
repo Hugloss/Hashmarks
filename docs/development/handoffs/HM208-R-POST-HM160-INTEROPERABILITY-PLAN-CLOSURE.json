@@ -1,0 +1,36 @@
+{
+  "schema": "hashmarks.development-phase-closure.v1",
+  "phase": "HM208-R",
+  "parent": {
+    "artifact": "hashmarks-hm207.zip",
+    "sha256": "14659b682198a2d19d359bade93a3090fa5c4c1ee78fbb553b20fe59c6b21abe"
+  },
+  "source_plan": "HASHMARKS-TEAM-POST-HM160-PHASES.md",
+  "decision": "IMPLEMENT_MISSING_CONSUMER_CONTRACT_GAPS",
+  "findings": [
+    "Previous-packet continuity, freshness, producer differential identity, cross-generation continuity, impact completeness, product boundary, and bounded qualification were already covered by HM160-HM207 evidence.",
+    "The verification-selection consumer boundary still accepted unknown schema-controlled fields when a caller recomputed the unkeyed envelope identity.",
+    "The consumer validator did not expose a small normalized validated repository-intelligence projection.",
+    "Freshness was visible but consumers had no producer-owned require-fresh validation switch."
+  ],
+  "changes": [
+    "Fail closed on unsupported/unknown fields at envelope, producer, repository, membership, and member schema levels.",
+    "Validate native envelope schema and repository generation/stale field types.",
+    "Add require_fresh to validate_native_consumer_bundle().",
+    "Return normalized repository-intelligence facts from successful/failed validation without execution policy.",
+    "Document canonical consumer-contract authority invariants.",
+    "Add regressions for recomputed identities carrying timeout/workers/retry/execution-shaped fields and unsupported schema versions."
+  ],
+  "non_goals_preserved": [
+    "no execution DTO",
+    "no timeout/retry/worker/scheduling/process authority",
+    "no second freshness registry",
+    "no repository-wide rescan/rerank in closing freshness fence",
+    "no Oh-Goon runtime dependency"
+  ],
+  "qualification": {
+    "focused_authority_ring": "70/70 PASS",
+    "full_suite": "NOT_CLAIMED: exceeded 300-second local execution window before completion",
+    "source_compileall": "PASS"
+  }
+}

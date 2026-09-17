@@ -1,0 +1,61 @@
+{
+  "findings": [
+    "candidate membership grows linearly with relevant verification surfaces in the adversarial scale corpus",
+    "the dominant residual is per-candidate verification projection/reference-strength work, not repository-path classification or final top-N sorting",
+    "symbols_for_paths_many is already one bounded batched store read for the candidate set; replacing it with per-path reads would regress store economics",
+    "classify_repository_path is already bounded process-local lru_cache path-only derived metadata",
+    "historical AST reuse and pytest projection reuse from HM25-R remain justified and effective",
+    "no safe additional cache/batching change is admitted from this measurement alone because reducing candidate evaluation requires a semantics-preserving cheap prefilter proof"
+  ],
+  "measurement": {
+    "profile_501": {
+      "find_task_cum_s": 0.092,
+      "read_python_ast_calls": 1002,
+      "read_python_ast_cum_s": 0.143,
+      "sqlite_execute_calls": 5669,
+      "sqlite_execute_cum_s": 0.133,
+      "task_action_map_cum_s": 0.544,
+      "verification_candidate_row_calls": 501,
+      "verification_candidate_rows_cum_s": 0.341,
+      "verification_candidates_cum_s": 0.359,
+      "verification_reference_strength_calls": 501,
+      "verification_reference_strength_cum_s": 0.231,
+      "verification_relevance_cum_s": 0.438
+    },
+    "scale": [
+      [
+        11,
+        25.669894999964527,
+        11
+      ],
+      [
+        51,
+        60.794121000071755,
+        51
+      ],
+      [
+        101,
+        92.41759899987301,
+        101
+      ],
+      [
+        501,
+        282.25167100004,
+        501
+      ]
+    ],
+    "selected_correct_rate": 1.0,
+    "unsafe_regressions": 0
+  },
+  "next_phase": "HM27-R \u2014 candidate admission/prefilter equivalence proof: determine whether expensive reference-strength evaluation can be restricted to a provably complete candidate subset without changing selection, ambiguity, or fail-closed behavior.",
+  "parent": {
+    "label": "HM25-R",
+    "sha256": "d3ab0ef5a72f35dc7ed3373628a2a4df768683cb115e84d981f28fb24cefa771"
+  },
+  "qualification": {
+    "compileall": "PASS",
+    "focused_residual_ring": "54/54 PASS"
+  },
+  "schema": "hashmarks.hm26r.residual-candidate-store-classification-ranking-economics.v1",
+  "source_change": "none; measurement-only checkpoint plus evidence/handoff"
+}

@@ -1,0 +1,41 @@
+{
+  "events": [
+    {
+      "estimated_tokens": 80,
+      "query": "example",
+      "returned_paths": [
+        "src/example.py"
+      ],
+      "sequence": 0,
+      "tool": "search_repo"
+    },
+    {
+      "bytes": 1400,
+      "estimated_tokens": 350,
+      "path": "src/example.py",
+      "sequence": 1,
+      "tool": "read_file"
+    },
+    {
+      "path": "src/example.py",
+      "sequence": 2,
+      "tool": "edit"
+    }
+  ],
+  "mode": "baseline",
+  "model_config_identity": "sha256:example-model-config",
+  "model_identity": "example-model",
+  "normalization_policy_identity": "sha256:56452068e0ca3811c309d1fe123a0309a2984edf4258ef31a781f822226edf11",
+  "normalization_policy_schema": "hashmarks.agent-trace-normalization-policy.v1",
+  "repository_identity": "sha256:example-repository",
+  "run_id": "run-example-baseline",
+  "runner_identity": "example-runner:v1",
+  "schema": "hashmarks.agent-runner-log.v1",
+  "task_id": "example-localization",
+  "task_revision": "v1",
+  "tool_map": {
+    "edit": null,
+    "read_file": "file_read",
+    "search_repo": "repository_search"
+  }
+}

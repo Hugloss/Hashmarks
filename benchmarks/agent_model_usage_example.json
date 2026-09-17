@@ -1,0 +1,10 @@
+{
+  "schema": "hashmarks.agent-model-usage.v1",
+  "task_id": "example-localization",
+  "mode": "hashmarks",
+  "run_id": "run-example-hashmarks",
+  "provider_identity": "example-provider-api:v1",
+  "evidence_digest": "sha256:example-provider-usage-evidence",
+  "model_input_tokens": 4200,
+  "model_output_tokens": 900
+}

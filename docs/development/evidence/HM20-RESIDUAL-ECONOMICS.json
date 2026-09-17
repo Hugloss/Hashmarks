@@ -1,0 +1,16 @@
+{
+  "boundary": "repository-intelligence-only",
+  "decision": "no-hot-path-change-warranted",
+  "iterations_per_repeat": 1000,
+  "median_microseconds_per_validation": 116.0244820000571,
+  "median_seconds_per_1000": 0.1160244820000571,
+  "p95_seconds_per_1000": 0.12389591299995573,
+  "repeats": 15,
+  "schema": "hashmarks.hm20-residual-economics.v1",
+  "serialized_bytes": {
+    "authority_receipt": 217,
+    "contract": 856,
+    "envelope": 1081,
+    "provenance": 235
+  }
+}

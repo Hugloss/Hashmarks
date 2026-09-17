@@ -1,0 +1,27 @@
+{
+  "parent": {"artifact": "hashmarks-hm85.zip", "sha256": "313b6c80bf5537aceea22f34a5e587f75c59895db5bdb9ac6251ba4fe83d927a"},
+  "native_evidence": {
+    "hm85_mnt_c_seconds": 709.23,
+    "hm85_native_linux_seconds": 115.24,
+    "hm70_native_linux_seconds": 117.95,
+    "tests": 915,
+    "finding": "The apparent HM85 regression was filesystem/environment attribution, not a Hashmarks product regression. Exact HM85 was 6.15x faster on native WSL storage than /mnt/c and 2.3% faster than HM70 on the comparable native surface."
+  },
+  "phases": [
+    {"phase":"HM86-R","topic":"filesystem performance attribution","decision":"IMPLEMENT","proof":"709.23s /mnt/c vs 115.24s native WSL for exact HM85"},
+    {"phase":"HM87-R","topic":"profile environment observability","decision":"IMPLEMENT","proof":"timing conclusions require visible warning on known Windows-mounted WSL paths"},
+    {"phase":"HM88-R","topic":"correctness/performance authority separation","decision":"IMPLEMENT_DOCS","proof":"915/915 passed on both surfaces; only economics comparability changed"},
+    {"phase":"HM89-R","topic":"automatic hard failure on /mnt","decision":"REJECT_CHANGE","proof":"/mnt correctness is valid; failing would reject supported developer workflows"},
+    {"phase":"HM90-R","topic":"filesystem-specific product optimization","decision":"REJECT_CHANGE","proof":"native HM85 is healthy and no product bottleneck is demonstrated"},
+    {"phase":"HM91-R","topic":"agent benchmark residual","decision":"NO_CHANGE","proof":"native worker tests are 1.78-5.18s; no new dominant defect"},
+    {"phase":"HM92-R","topic":"qualification classification residual","decision":"NO_CHANGE","proof":"native run removed apparent classification slowdown"},
+    {"phase":"HM93-R","topic":"SQLite/storage economics","decision":"REJECT_CHANGE","proof":"no native profile evidence identifies SQLite as dominant"},
+    {"phase":"HM94-R","topic":"retrieval expansion","decision":"NO_CHANGE","proof":"no new retrieval miss class supplied by native qualification"},
+    {"phase":"HM95-R","topic":"qualified identity adversarial expansion","decision":"NO_CHANGE","proof":"no identity failure in 915-test native proof"},
+    {"phase":"HM96-R","topic":"freshness mutation expansion","decision":"NO_CHANGE","proof":"no freshness failure in 915-test native proof"},
+    {"phase":"HM97-R","topic":"consumer conformance","decision":"NO_CHANGE","proof":"no consumer-boundary defect observed"},
+    {"phase":"HM98-R","topic":"packet/data-model reduction","decision":"NO_CHANGE","proof":"filesystem attribution does not establish duplicate authoritative state"},
+    {"phase":"HM99-R","topic":"Oh-Goon boundary","decision":"NO_CHANGE","proof":"environment warning is Hashmarks qualification observability, not execution authority"},
+    {"phase":"HM100-R","topic":"15-phase proof-gated closure","decision":"CLOSE","proof":"only evidence-backed filesystem observability/docs changes admitted"}
+  ]
+}

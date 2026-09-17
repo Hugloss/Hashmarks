@@ -1,0 +1,128 @@
+{
+  "policy": "defer-only",
+  "schema": "hashmarks.worker-inspection-output.v1",
+  "tasks": [
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 3,
+          "path": "src/orders/service.py",
+          "role": "implementation"
+        }
+      ],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [
+        "implementation"
+      ],
+      "ambiguous": false,
+      "first_role": "implementation",
+      "id": "py-service",
+      "inspected": false,
+      "query": "OrderService submit_order implementation",
+      "resolution_reason": null,
+      "resolved_after_inspection": false,
+      "target": "src/orders/service.py"
+    },
+    {
+      "action": "edit",
+      "alternatives": [],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [],
+      "ambiguous": false,
+      "first_role": "implementation",
+      "id": "py-storage",
+      "inspected": false,
+      "query": "OrderStore save_order persistence",
+      "resolution_reason": null,
+      "resolved_after_inspection": false,
+      "target": "src/orders/storage.py"
+    },
+    {
+      "action": "edit",
+      "alternatives": [],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [],
+      "ambiguous": false,
+      "first_role": "implementation",
+      "id": "py-validation",
+      "inspected": false,
+      "query": "validate_order_id validation",
+      "resolution_reason": null,
+      "resolved_after_inspection": false,
+      "target": "src/orders/validation.py"
+    },
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 1,
+          "path": "tests/test_orders.py",
+          "role": "verification"
+        }
+      ],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [
+        "verification"
+      ],
+      "ambiguous": false,
+      "first_role": "verification",
+      "id": "py-test",
+      "inspected": false,
+      "query": "test_submit_order order test",
+      "resolution_reason": null,
+      "resolved_after_inspection": false,
+      "target": "tests/test_orders.py"
+    },
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 1,
+          "path": "pyproject.toml",
+          "role": "config_build"
+        }
+      ],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [
+        "config_build"
+      ],
+      "ambiguous": false,
+      "first_role": "config_build",
+      "id": "py-config",
+      "inspected": false,
+      "query": "fresh-orders project pyproject configuration",
+      "resolution_reason": null,
+      "resolved_after_inspection": false,
+      "target": "pyproject.toml"
+    },
+    {
+      "action": "inspect-competing-evidence",
+      "alternatives": [
+        {
+          "canonical_rank": 1,
+          "path": "tests/test_orders.py",
+          "role": "verification"
+        },
+        {
+          "canonical_rank": 4,
+          "path": "AGENTS.md",
+          "role": "authority"
+        }
+      ],
+      "ambiguity_reason": "multiple-explicit-role-cues",
+      "ambiguity_roles": [
+        "authority",
+        "verification"
+      ],
+      "ambiguous": true,
+      "first_role": "verification",
+      "id": "py-authority",
+      "inspected": true,
+      "query": "Python order service validate changes tests AGENTS",
+      "resolution_reason": null,
+      "resolved_after_inspection": false,
+      "target": null
+    }
+  ]
+}

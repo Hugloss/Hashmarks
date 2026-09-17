@@ -1,0 +1,29 @@
+{
+  "schema": "hashmarks.blind-worker-tasks.v1",
+  "tasks": [
+    {
+      "id": "rel-schema",
+      "query": "ReleaseManifest artifact sha256 contract schema"
+    },
+    {
+      "id": "rel-package",
+      "query": "package_release artifact packaging"
+    },
+    {
+      "id": "rel-checksum",
+      "query": "verify_checksum expected observed"
+    },
+    {
+      "id": "rel-test",
+      "query": "test_release_checksum_contract checksum contract test"
+    },
+    {
+      "id": "rel-make",
+      "query": "release verify Makefile targets"
+    },
+    {
+      "id": "rel-config",
+      "query": "require_checksum release manifest configuration"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "parent": {"artifact":"hashmarks-hm100.zip","sha256":"0821806422a78146a7cfc9e86fc81be952160538c39e94ca9f5ba63b4a0bc3ae"},
+  "qualification_rule": "single native make test-profile result; no historical performance comparison required",
+  "phases": [
+    {"phase":"HM101-R","topic":"native qualification authority","decision":"CLOSE","proof":"HM85 established native WSL as authoritative economics surface; HM100 encoded observability"},
+    {"phase":"HM102-R","topic":"qualification command duplication","decision":"NO_CHANGE","proof":"test-profile is already the single requested native qualification command; no second routine lane remains"},
+    {"phase":"HM103-R","topic":"agent benchmark runtime","decision":"NO_CHANGE","proof":"latest native profile showed worker metrics in low-single-digit seconds and no correctness failure"},
+    {"phase":"HM104-R","topic":"qualification classification economics","decision":"NO_CHANGE","proof":"prior apparent slowdown was filesystem attribution; no native defect remains"},
+    {"phase":"HM105-R","topic":"retrieval residual","decision":"NO_CHANGE","proof":"no new miss class or unsafe localization evidence was supplied"},
+    {"phase":"HM106-R","topic":"qualified identity","decision":"NO_CHANGE","proof":"no alias/re-export/import-form identity defect observed in current qualification evidence"},
+    {"phase":"HM107-R","topic":"freshness authority","decision":"NO_CHANGE","proof":"no stale decision or mutation failure observed"},
+    {"phase":"HM108-R","topic":"negative evidence","decision":"NO_CHANGE","proof":"existing evidence boundary remains valid; no execution/retry authority admitted"},
+    {"phase":"HM109-R","topic":"consumer conformance","decision":"NO_CHANGE","proof":"no consumer contract defect observed"},
+    {"phase":"HM110-R","topic":"changed-impact economics","decision":"NO_CHANGE","proof":"no changed-impact bottleneck or correctness defect demonstrated"},
+    {"phase":"HM111-R","topic":"SQLite/storage optimization","decision":"REJECT_CHANGE","proof":"no current profile evidence makes storage a dominant cost"},
+    {"phase":"HM112-R","topic":"large-file responsibility audit","decision":"MEASURE_ONLY","proof":"largest modules are 1253/1018/929/905 lines, but line count alone is not evidence of mixed responsibility"},
+    {"phase":"HM113-R","topic":"dataclass/DTO reduction","decision":"MEASURE_ONLY","proof":"107 dataclass declarations exist, but count alone does not prove duplicate authoritative representations"},
+    {"phase":"HM114-R","topic":"Hashmarks/Oh-Goon product boundary","decision":"NO_CHANGE","proof":"no new execution authority or orchestration requirement emerged"},
+    {"phase":"HM115-R","topic":"15-phase proof-gated closure","decision":"CLOSE","proof":"no product code change admitted without fresh defect evidence; only the identity-bound phase ledger was added"}
+  ]
+}

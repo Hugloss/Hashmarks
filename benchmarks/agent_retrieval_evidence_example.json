@@ -1,0 +1,10 @@
+{
+  "schema": "hashmarks.agent-retrieval-evidence.v1",
+  "task_id": "example-localization",
+  "task_revision": "v1",
+  "repository_identity": "sha256:example-repository",
+  "evidence_authority_identity": "grader:required-evidence:v1",
+  "required_paths": [
+    "src/example.py"
+  ]
+}

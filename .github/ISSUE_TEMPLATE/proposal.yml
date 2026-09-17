@@ -1,0 +1,52 @@
+name: Product proposal
+description: Propose a Hashmarks capability after checking product ownership
+title: "proposal: "
+labels: ["proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Hashmarks is repository intelligence. A useful feature is not automatically a Hashmarks feature. Please read `docs/reference/PRODUCT_BOUNDARY.md` before proposing new production behavior.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Repository-intelligence problem
+      description: What repository understanding, freshness, ownership, impact, provenance, or evidence-economics problem needs solving?
+    validations:
+      required: true
+  - type: textarea
+    id: authority
+    attributes:
+      label: Repository source of authority
+      description: What repository bytes/topology/index/metadata/relationship makes the proposed result true?
+    validations:
+      required: true
+  - type: textarea
+    id: owner
+    attributes:
+      label: Why Hashmarks is the narrowest correct owner
+      description: Why should this live in Hashmarks rather than the agent/IDE/human or an execution/certification system?
+    validations:
+      required: true
+  - type: textarea
+    id: state
+    attributes:
+      label: New state or cache
+      description: What persistent/cached state would be introduced, if any, and why is it repository state rather than consumer workflow state?
+  - type: textarea
+    id: oracle
+    attributes:
+      label: Semantic oracle / proof
+      description: How can correctness be checked against fresh reconciled/cold repository truth?
+    validations:
+      required: true
+  - type: dropdown
+    id: decision
+    attributes:
+      label: Proposed boundary decision
+      options:
+        - ADMIT — repository-intelligence capability
+        - SPLIT — keep only a neutral repository primitive in Hashmarks
+        - UNSURE — needs boundary review before design
+    validations:
+      required: true

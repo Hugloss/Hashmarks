@@ -1,0 +1,648 @@
+{
+  "cases": {
+    "ambiguous-close-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "",
+      "expected_edit_qualname": "",
+      "must_be_ambiguous": true
+    },
+    "ambiguous-close-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "",
+      "expected_edit_qualname": "",
+      "must_be_ambiguous": true
+    },
+    "ambiguous-close-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "",
+      "expected_edit_qualname": "",
+      "must_be_ambiguous": true
+    },
+    "ambiguous-close-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "",
+      "expected_edit_qualname": "",
+      "must_be_ambiguous": true
+    },
+    "ambiguous-close-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "",
+      "expected_edit_qualname": "",
+      "must_be_ambiguous": true
+    },
+    "classify-nodeids-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/qualification_classification.py",
+      "expected_edit_qualname": "classify_nodeids",
+      "must_be_ambiguous": false
+    },
+    "classify-nodeids-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/qualification_classification.py",
+      "expected_edit_qualname": "classify_nodeids",
+      "must_be_ambiguous": false
+    },
+    "classify-nodeids-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/qualification_classification.py",
+      "expected_edit_qualname": "classify_nodeids",
+      "must_be_ambiguous": false
+    },
+    "classify-nodeids-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/qualification_classification.py",
+      "expected_edit_qualname": "classify_nodeids",
+      "must_be_ambiguous": false
+    },
+    "classify-nodeids-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/qualification_classification.py",
+      "expected_edit_qualname": "classify_nodeids",
+      "must_be_ambiguous": false
+    },
+    "classify-nodeids-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/qualification_classification.py",
+      "expected_edit_qualname": "classify_nodeids",
+      "must_be_ambiguous": false
+    },
+    "classify-repository-path-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_domains.py",
+      "expected_edit_qualname": "classify_repository_path",
+      "must_be_ambiguous": false
+    },
+    "classify-repository-path-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_domains.py",
+      "expected_edit_qualname": "classify_repository_path",
+      "must_be_ambiguous": false
+    },
+    "classify-repository-path-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_domains.py",
+      "expected_edit_qualname": "classify_repository_path",
+      "must_be_ambiguous": false
+    },
+    "classify-repository-path-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_domains.py",
+      "expected_edit_qualname": "classify_repository_path",
+      "must_be_ambiguous": false
+    },
+    "classify-repository-path-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_domains.py",
+      "expected_edit_qualname": "classify_repository_path",
+      "must_be_ambiguous": false
+    },
+    "classify-repository-path-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_domains.py",
+      "expected_edit_qualname": "classify_repository_path",
+      "must_be_ambiguous": false
+    },
+    "decision-session-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/decision_session.py",
+      "expected_edit_qualname": "DecisionSessionMixin.decision_session",
+      "must_be_ambiguous": false
+    },
+    "decision-session-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/decision_session.py",
+      "expected_edit_qualname": "DecisionSessionMixin.decision_session",
+      "must_be_ambiguous": false
+    },
+    "decision-session-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/decision_session.py",
+      "expected_edit_qualname": "DecisionSessionMixin.decision_session",
+      "must_be_ambiguous": false
+    },
+    "decision-session-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/decision_session.py",
+      "expected_edit_qualname": "DecisionSessionMixin.decision_session",
+      "must_be_ambiguous": false
+    },
+    "decision-session-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/decision_session.py",
+      "expected_edit_qualname": "DecisionSessionMixin.decision_session",
+      "must_be_ambiguous": false
+    },
+    "decision-session-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/decision_session.py",
+      "expected_edit_qualname": "DecisionSessionMixin.decision_session",
+      "must_be_ambiguous": false
+    },
+    "exact-identifier-candidates-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_task_action.py",
+      "expected_edit_qualname": "TaskActionMixin._task_action_exact_identifier_edit_candidates",
+      "must_be_ambiguous": false
+    },
+    "exact-identifier-candidates-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_task_action.py",
+      "expected_edit_qualname": "TaskActionMixin._task_action_exact_identifier_edit_candidates",
+      "must_be_ambiguous": false
+    },
+    "exact-identifier-candidates-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_task_action.py",
+      "expected_edit_qualname": "TaskActionMixin._task_action_exact_identifier_edit_candidates",
+      "must_be_ambiguous": false
+    },
+    "exact-identifier-candidates-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_task_action.py",
+      "expected_edit_qualname": "TaskActionMixin._task_action_exact_identifier_edit_candidates",
+      "must_be_ambiguous": false
+    },
+    "exact-identifier-candidates-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_task_action.py",
+      "expected_edit_qualname": "TaskActionMixin._task_action_exact_identifier_edit_candidates",
+      "must_be_ambiguous": false
+    },
+    "exact-identifier-candidates-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_task_action.py",
+      "expected_edit_qualname": "TaskActionMixin._task_action_exact_identifier_edit_candidates",
+      "must_be_ambiguous": false
+    },
+    "find-impl-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/find_engine.py",
+      "expected_edit_qualname": "FindEngineMixin._find_impl",
+      "must_be_ambiguous": false
+    },
+    "find-impl-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/find_engine.py",
+      "expected_edit_qualname": "FindEngineMixin._find_impl",
+      "must_be_ambiguous": false
+    },
+    "find-impl-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/find_engine.py",
+      "expected_edit_qualname": "FindEngineMixin._find_impl",
+      "must_be_ambiguous": false
+    },
+    "find-impl-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/find_engine.py",
+      "expected_edit_qualname": "FindEngineMixin._find_impl",
+      "must_be_ambiguous": false
+    },
+    "find-impl-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/find_engine.py",
+      "expected_edit_qualname": "FindEngineMixin._find_impl",
+      "must_be_ambiguous": false
+    },
+    "find-impl-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/find_engine.py",
+      "expected_edit_qualname": "FindEngineMixin._find_impl",
+      "must_be_ambiguous": false
+    },
+    "indexed-path-current-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._indexed_path_current",
+      "must_be_ambiguous": false
+    },
+    "indexed-path-current-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._indexed_path_current",
+      "must_be_ambiguous": false
+    },
+    "indexed-path-current-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._indexed_path_current",
+      "must_be_ambiguous": false
+    },
+    "indexed-path-current-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._indexed_path_current",
+      "must_be_ambiguous": false
+    },
+    "indexed-path-current-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._indexed_path_current",
+      "must_be_ambiguous": false
+    },
+    "indexed-path-current-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._indexed_path_current",
+      "must_be_ambiguous": false
+    },
+    "native-ruff-gate-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/promotion_receipt.py",
+      "expected_edit_qualname": "native_ruff_promotion_gate",
+      "must_be_ambiguous": false
+    },
+    "native-ruff-gate-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/promotion_receipt.py",
+      "expected_edit_qualname": "native_ruff_promotion_gate",
+      "must_be_ambiguous": false
+    },
+    "native-ruff-gate-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/promotion_receipt.py",
+      "expected_edit_qualname": "native_ruff_promotion_gate",
+      "must_be_ambiguous": false
+    },
+    "native-ruff-gate-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/promotion_receipt.py",
+      "expected_edit_qualname": "native_ruff_promotion_gate",
+      "must_be_ambiguous": false
+    },
+    "native-ruff-gate-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/promotion_receipt.py",
+      "expected_edit_qualname": "native_ruff_promotion_gate",
+      "must_be_ambiguous": false
+    },
+    "native-ruff-gate-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/promotion_receipt.py",
+      "expected_edit_qualname": "native_ruff_promotion_gate",
+      "must_be_ambiguous": false
+    },
+    "producer-identity-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/producer_identity.py",
+      "expected_edit_qualname": "native_producer_implementation_identity",
+      "must_be_ambiguous": false
+    },
+    "producer-identity-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/producer_identity.py",
+      "expected_edit_qualname": "native_producer_implementation_identity",
+      "must_be_ambiguous": false
+    },
+    "producer-identity-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/producer_identity.py",
+      "expected_edit_qualname": "native_producer_implementation_identity",
+      "must_be_ambiguous": false
+    },
+    "producer-identity-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/producer_identity.py",
+      "expected_edit_qualname": "native_producer_implementation_identity",
+      "must_be_ambiguous": false
+    },
+    "producer-identity-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/producer_identity.py",
+      "expected_edit_qualname": "native_producer_implementation_identity",
+      "must_be_ambiguous": false
+    },
+    "producer-identity-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/producer_identity.py",
+      "expected_edit_qualname": "native_producer_implementation_identity",
+      "must_be_ambiguous": false
+    },
+    "query-terms-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/query_primitives.py",
+      "expected_edit_qualname": "_query_terms",
+      "must_be_ambiguous": false
+    },
+    "query-terms-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/query_primitives.py",
+      "expected_edit_qualname": "_query_terms",
+      "must_be_ambiguous": false
+    },
+    "query-terms-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/query_primitives.py",
+      "expected_edit_qualname": "_query_terms",
+      "must_be_ambiguous": false
+    },
+    "query-terms-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/query_primitives.py",
+      "expected_edit_qualname": "_query_terms",
+      "must_be_ambiguous": false
+    },
+    "query-terms-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/query_primitives.py",
+      "expected_edit_qualname": "_query_terms",
+      "must_be_ambiguous": false
+    },
+    "query-terms-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/query_primitives.py",
+      "expected_edit_qualname": "_query_terms",
+      "must_be_ambiguous": false
+    },
+    "repository-content-identity-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/test_shards.py",
+      "expected_edit_qualname": "repository_content_identity",
+      "must_be_ambiguous": false
+    },
+    "repository-content-identity-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/test_shards.py",
+      "expected_edit_qualname": "repository_content_identity",
+      "must_be_ambiguous": false
+    },
+    "repository-content-identity-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/test_shards.py",
+      "expected_edit_qualname": "repository_content_identity",
+      "must_be_ambiguous": false
+    },
+    "repository-content-identity-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/test_shards.py",
+      "expected_edit_qualname": "repository_content_identity",
+      "must_be_ambiguous": false
+    },
+    "repository-content-identity-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/test_shards.py",
+      "expected_edit_qualname": "repository_content_identity",
+      "must_be_ambiguous": false
+    },
+    "repository-content-identity-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/test_shards.py",
+      "expected_edit_qualname": "repository_content_identity",
+      "must_be_ambiguous": false
+    },
+    "resolve-import-owner-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/import_resolution.py",
+      "expected_edit_qualname": "ImportResolutionMixin._resolve_import_owner_evidence",
+      "must_be_ambiguous": false
+    },
+    "resolve-import-owner-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/import_resolution.py",
+      "expected_edit_qualname": "ImportResolutionMixin._resolve_import_owner_evidence",
+      "must_be_ambiguous": false
+    },
+    "resolve-import-owner-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/import_resolution.py",
+      "expected_edit_qualname": "ImportResolutionMixin._resolve_import_owner_evidence",
+      "must_be_ambiguous": false
+    },
+    "resolve-import-owner-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/import_resolution.py",
+      "expected_edit_qualname": "ImportResolutionMixin._resolve_import_owner_evidence",
+      "must_be_ambiguous": false
+    },
+    "resolve-import-owner-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/import_resolution.py",
+      "expected_edit_qualname": "ImportResolutionMixin._resolve_import_owner_evidence",
+      "must_be_ambiguous": false
+    },
+    "resolve-import-owner-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/import_resolution.py",
+      "expected_edit_qualname": "ImportResolutionMixin._resolve_import_owner_evidence",
+      "must_be_ambiguous": false
+    },
+    "select-ownership-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/ownership_graph.py",
+      "expected_edit_qualname": "OwnershipGraphMixin._select_ownership_candidate",
+      "must_be_ambiguous": false
+    },
+    "select-ownership-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/ownership_graph.py",
+      "expected_edit_qualname": "OwnershipGraphMixin._select_ownership_candidate",
+      "must_be_ambiguous": false
+    },
+    "select-ownership-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/ownership_graph.py",
+      "expected_edit_qualname": "OwnershipGraphMixin._select_ownership_candidate",
+      "must_be_ambiguous": false
+    },
+    "select-ownership-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/ownership_graph.py",
+      "expected_edit_qualname": "OwnershipGraphMixin._select_ownership_candidate",
+      "must_be_ambiguous": false
+    },
+    "select-ownership-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/ownership_graph.py",
+      "expected_edit_qualname": "OwnershipGraphMixin._select_ownership_candidate",
+      "must_be_ambiguous": false
+    },
+    "select-ownership-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/ownership_graph.py",
+      "expected_edit_qualname": "OwnershipGraphMixin._select_ownership_candidate",
+      "must_be_ambiguous": false
+    },
+    "session-refs-many-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/decision_session.py",
+      "expected_edit_qualname": "DecisionSessionMixin._session_refs_many",
+      "must_be_ambiguous": false
+    },
+    "session-refs-many-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/decision_session.py",
+      "expected_edit_qualname": "DecisionSessionMixin._session_refs_many",
+      "must_be_ambiguous": false
+    },
+    "session-refs-many-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/decision_session.py",
+      "expected_edit_qualname": "DecisionSessionMixin._session_refs_many",
+      "must_be_ambiguous": false
+    },
+    "session-refs-many-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/decision_session.py",
+      "expected_edit_qualname": "DecisionSessionMixin._session_refs_many",
+      "must_be_ambiguous": false
+    },
+    "session-refs-many-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/decision_session.py",
+      "expected_edit_qualname": "DecisionSessionMixin._session_refs_many",
+      "must_be_ambiguous": false
+    },
+    "session-refs-many-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/decision_session.py",
+      "expected_edit_qualname": "DecisionSessionMixin._session_refs_many",
+      "must_be_ambiguous": false
+    },
+    "store-has-files-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.has_files",
+      "must_be_ambiguous": false
+    },
+    "store-has-files-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.has_files",
+      "must_be_ambiguous": false
+    },
+    "store-has-files-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.has_files",
+      "must_be_ambiguous": false
+    },
+    "store-has-files-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.has_files",
+      "must_be_ambiguous": false
+    },
+    "store-has-files-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.has_files",
+      "must_be_ambiguous": false
+    },
+    "store-has-files-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.has_files",
+      "must_be_ambiguous": false
+    },
+    "sync-remove-stale-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._sync_remove_stale_paths",
+      "must_be_ambiguous": false
+    },
+    "sync-remove-stale-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._sync_remove_stale_paths",
+      "must_be_ambiguous": false
+    },
+    "sync-remove-stale-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._sync_remove_stale_paths",
+      "must_be_ambiguous": false
+    },
+    "sync-remove-stale-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._sync_remove_stale_paths",
+      "must_be_ambiguous": false
+    },
+    "sync-remove-stale-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._sync_remove_stale_paths",
+      "must_be_ambiguous": false
+    },
+    "sync-remove-stale-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._sync_remove_stale_paths",
+      "must_be_ambiguous": false
+    },
+    "verification-relevance-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/evidence_verification.py",
+      "expected_edit_qualname": "VerificationMixin._verification_relevance",
+      "must_be_ambiguous": false
+    },
+    "verification-relevance-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/evidence_verification.py",
+      "expected_edit_qualname": "VerificationMixin._verification_relevance",
+      "must_be_ambiguous": false
+    },
+    "verification-relevance-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/evidence_verification.py",
+      "expected_edit_qualname": "VerificationMixin._verification_relevance",
+      "must_be_ambiguous": false
+    },
+    "verification-relevance-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/evidence_verification.py",
+      "expected_edit_qualname": "VerificationMixin._verification_relevance",
+      "must_be_ambiguous": false
+    },
+    "verification-relevance-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/evidence_verification.py",
+      "expected_edit_qualname": "VerificationMixin._verification_relevance",
+      "must_be_ambiguous": false
+    },
+    "verification-relevance-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/evidence_verification.py",
+      "expected_edit_qualname": "VerificationMixin._verification_relevance",
+      "must_be_ambiguous": false
+    },
+    "workspace-map-paths-under-change": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.paths_under",
+      "must_be_ambiguous": false
+    },
+    "workspace-map-paths-under-fix": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.paths_under",
+      "must_be_ambiguous": false
+    },
+    "workspace-map-paths-under-investigate": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.paths_under",
+      "must_be_ambiguous": false
+    },
+    "workspace-map-paths-under-optimize": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.paths_under",
+      "must_be_ambiguous": false
+    },
+    "workspace-map-paths-under-path-qualified": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.paths_under",
+      "must_be_ambiguous": false
+    },
+    "workspace-map-paths-under-update": {
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT",
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.paths_under",
+      "must_be_ambiguous": false
+    }
+  },
+  "schema": "hashmarks.repository-evaluation-grader.v1",
+  "suite": "second-pass-exact-symbol-authority"
+}

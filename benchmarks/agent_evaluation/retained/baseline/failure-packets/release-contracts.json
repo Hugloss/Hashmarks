@@ -1,0 +1,47 @@
+{
+  "schema": "hashmarks.worker-failed-verification-input.v1",
+  "tasks": [
+    {
+      "failed_edit_target": "docs/historical-search-notes/rel-schema.md",
+      "id": "rel-schema",
+      "query": "ReleaseManifest artifact sha256 contract schema",
+      "verification_outcome": "failed",
+      "verification_target": "tests/test_release_contract.py"
+    },
+    {
+      "failed_edit_target": "Makefile",
+      "id": "rel-package",
+      "query": "package_release artifact packaging",
+      "verification_outcome": "failed",
+      "verification_target": "tests/test_release_contract.py"
+    },
+    {
+      "failed_edit_target": "tests/test_release_contract.py",
+      "id": "rel-checksum",
+      "query": "verify_checksum expected observed",
+      "verification_outcome": "failed",
+      "verification_target": "tests/test_release_contract.py"
+    },
+    {
+      "failed_edit_target": "docs/historical-search-notes/rel-test.md",
+      "id": "rel-test",
+      "query": "test_release_checksum_contract checksum contract test",
+      "verification_outcome": "failed",
+      "verification_target": "tests/test_release_contract.py"
+    },
+    {
+      "failed_edit_target": "scripts/package_release.py",
+      "id": "rel-make",
+      "query": "release verify Makefile targets",
+      "verification_outcome": "failed",
+      "verification_target": "tests/test_release_contract.py"
+    },
+    {
+      "failed_edit_target": "tests/test_release_contract.py",
+      "id": "rel-config",
+      "query": "require_checksum release manifest configuration",
+      "verification_outcome": "failed",
+      "verification_target": "tests/test_release_contract.py"
+    }
+  ]
+}

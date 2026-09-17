@@ -1,0 +1,34 @@
+{
+  "schema": "hashmarks.selective-scout-input.v1",
+  "tasks": [
+    {
+      "alternatives": [
+        {
+          "canonical_rank": 1,
+          "domains": [
+            "test",
+            "source"
+          ],
+          "path": "tests/MetricsPanel.test.tsx",
+          "role": "verification",
+          "role_quality": 0,
+          "role_symbol_specificity": 0
+        },
+        {
+          "canonical_rank": 3,
+          "domains": [
+            "source"
+          ],
+          "path": "vite.config.ts",
+          "role": "config_build",
+          "role_quality": 0,
+          "role_symbol_specificity": 0
+        }
+      ],
+      "ambiguous": true,
+      "first_path": "tests/MetricsPanel.test.tsx",
+      "id": "ts-vite",
+      "query": "jsdom vite test environment"
+    }
+  ]
+}

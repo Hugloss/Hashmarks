@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+import json
+from threading import RLock
+from typing import Any, Callable, TypeVar
+
+from .codemap import CodeMap
+from .repository_retry import retry_transient_repository_race
+
+
+_MAX_QUERY_CHARS = 8_192
+_MAX_TASK_CHARS = 16_384
+_MAX_CHANGED_PATHS = 256
+_MAX_LIMIT = 50
+_MAX_TOKEN_BUDGET = 8_192
+_MAX_PREVIOUS_EVIDENCE_BYTES = 262_144
+
+_T = TypeVar("_T")
+
+
+class McpSurfaceError(ValueError):
+    """Invalid consumer input at the Hashmarks MCP boundary."""
+
+
+def _bounded_text(value: str, *, name: str, maximum: int, allow_empty: bool = False) -> str:
+    if not isinstance(value, str):
+        raise McpSurfaceError(f"{name} must be a string")
+    text = value.strip()
+    if not text and not allow_empty:
+        raise McpSurfaceError(f"{name} must not be empty")
+    if len(text) > maximum:
+        raise McpSurfaceError(f"{name} exceeds {maximum} characters")
+    return text
+
+
+def _bounded_int(value: int, *, name: str, minimum: int, maximum: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise McpSurfaceError(f"{name} must be an integer")
+    if value < minimum or value > maximum:
+        raise McpSurfaceError(f"{name} must be between {minimum} and {maximum}")
+    return value
+
+
+def _previous_evidence(value: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise McpSurfaceError("previous_evidence must be an object")
+    try:
+        encoded = json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise McpSurfaceError("previous_evidence must contain JSON-compatible values") from exc
+    if len(encoded) > _MAX_PREVIOUS_EVIDENCE_BYTES:
+        raise McpSurfaceError(
+            f"previous_evidence exceeds {_MAX_PREVIOUS_EVIDENCE_BYTES} encoded bytes"
+        )
+    return value
+
+
+def _changed_paths(values: list[str]) -> list[str]:
+    if not isinstance(values, list) or not values:
+        raise McpSurfaceError("changed_paths must contain at least one repository-relative path")
+    if len(values) > _MAX_CHANGED_PATHS:
+        raise McpSurfaceError(f"changed_paths exceeds {_MAX_CHANGED_PATHS} entries")
+    return [_bounded_text(str(value), name="changed path", maximum=4_096) for value in values]
+
+
+class HashmarksMcpSurface:
+    """Small read-only MCP projection over one workspace-bound CodeMap.
+
+    The gate serializes repository refresh and evidence reads so MCP consumers
+    never observe the CodeMap's transient BUILDING generation. It does not add
+    another freshness authority: CodeMap remains the owner of reconciliation.
+    """
+
+    def __init__(self, workspace: str = ".", *, state_dir: str | None = None) -> None:
+        self._map = CodeMap(workspace, state_dir=state_dir)
+        self._gate = RLock()
+
+    def close(self) -> None:
+        self._map.close()
+
+    def _read(self, operation: Callable[[], _T]) -> _T:
+        with self._gate:
+            return retry_transient_repository_race(operation)
+
+    def repository_context(self, *, max_areas: int = 12) -> dict[str, object]:
+        max_areas = _bounded_int(max_areas, name="max_areas", minimum=1, maximum=32)
+        return self._read(lambda: self._map.orient(max_areas=max_areas))
+
+    def find(self, query: str, *, limit: int = 20) -> dict[str, object]:
+        query = _bounded_text(query, name="query", maximum=_MAX_QUERY_CHARS)
+        limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
+        hits = self._read(lambda: self._map.find(query, limit=limit + 1))
+        visible = hits[:limit]
+        return {
+            "schema": "hashmarks.mcp-find.v1",
+            "query": query,
+            "results": [hit.as_dict() for hit in visible],
+            "truncated": len(hits) > limit,
+        }
+
+    def task_evidence(
+        self,
+        task: str,
+        *,
+        limit: int = 20,
+        per_role: int = 3,
+        token_budget: int = 1536,
+    ) -> dict[str, object]:
+        task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
+        limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
+        per_role = _bounded_int(per_role, name="per_role", minimum=1, maximum=8)
+        token_budget = _bounded_int(
+            token_budget, name="token_budget", minimum=1, maximum=_MAX_TOKEN_BUDGET
+        )
+        return self._read(
+            lambda: self._map.task_evidence(
+                task, limit=limit, per_role=per_role, token_budget=token_budget
+            )
+        )
+
+    def change_impact(
+        self, task: str, changed_paths: list[str], *, max_depth: int = 4
+    ) -> dict[str, object]:
+        task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
+        paths = _changed_paths(changed_paths)
+        max_depth = _bounded_int(max_depth, name="max_depth", minimum=1, maximum=12)
+        return self._read(
+            lambda: self._map.task_change_impact(
+                task,
+                paths,
+                limit=20,
+                per_role=3,
+                impact_limit_per_surface=6,
+                max_depth=max_depth,
+                project_impact_encoding="compact",
+            )
+        )
+
+    def post_change(
+        self,
+        task: str,
+        changed_paths: list[str],
+        previous_evidence: dict[str, Any],
+        *,
+        token_budget: int = 1536,
+    ) -> dict[str, object]:
+        task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
+        paths = _changed_paths(changed_paths)
+        previous_evidence = _previous_evidence(previous_evidence)
+        token_budget = _bounded_int(
+            token_budget, name="token_budget", minimum=1, maximum=_MAX_TOKEN_BUDGET
+        )
+        return self._read(
+            lambda: self._map.task_post_change_delta(
+                task,
+                paths,
+                previous_evidence=previous_evidence,
+                limit=20,
+                per_role=3,
+                token_budget=token_budget,
+            )
+        )

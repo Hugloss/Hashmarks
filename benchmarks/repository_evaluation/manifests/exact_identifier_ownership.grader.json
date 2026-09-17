@@ -1,0 +1,18 @@
+{
+  "schema": "hashmarks.repository-evaluation-grader.v1",
+  "suite": "exact-identifier-ownership",
+  "cases": {
+    "exact-method-paths-under": {
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "expected_edit_qualname": "WorkspaceMapStore.paths_under",
+      "must_be_ambiguous": false,
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT"
+    },
+    "exact-method-sync-remove-stale-paths": {
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "expected_edit_qualname": "IndexingLifecycleMixin._sync_remove_stale_paths",
+      "must_be_ambiguous": false,
+      "classification_on_wrong_resolved_edit": "FALSE_SAFE_EDIT"
+    }
+  }
+}

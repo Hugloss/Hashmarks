@@ -1,0 +1,14 @@
+{
+  "schema": "fastidentity.observed-dependencies.v1",
+  "producer": "example-runner",
+  "work": [
+    {
+      "id": "test:example",
+      "kind": "test",
+      "inputs": ["hashmarks/identity.py", "tests/test_developer_api.py"],
+      "command": ["python", "-m", "pytest", "tests/test_developer_api.py"],
+      "complete": false,
+      "detail": "Example only: mark complete only when the producer can prove the set is complete."
+    }
+  ]
+}

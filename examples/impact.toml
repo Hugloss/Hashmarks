@@ -1,0 +1,15 @@
+[[work]]
+id = "unit-tests"
+kind = "test"
+inputs = ["hashmarks/**", "tests/**", "pyproject.toml"]
+complete = true
+execution_complete = true
+command = ["python", "-m", "pytest", "-q"]
+
+[[work]]
+id = "compile-check"
+kind = "build"
+inputs = ["hashmarks/**", "pyproject.toml"]
+complete = true
+execution_complete = true
+command = ["python", "-m", "compileall", "-q", "hashmarks"]

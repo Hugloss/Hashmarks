@@ -1,0 +1,59 @@
+{
+  "schema": "hashmarks.agent-task-corpus.v1",
+  "tasks": [
+    {
+      "expected_files": [
+        "contracts/release.schema.json"
+      ],
+      "expected_symbols": [],
+      "id": "rel-schema",
+      "query": "ReleaseManifest artifact sha256 contract schema"
+    },
+    {
+      "expected_files": [
+        "scripts/package_release.py"
+      ],
+      "expected_symbols": [
+        "package_release"
+      ],
+      "id": "rel-package",
+      "query": "package_release artifact packaging"
+    },
+    {
+      "expected_files": [
+        "scripts/verify_checksum.py"
+      ],
+      "expected_symbols": [
+        "verify_checksum"
+      ],
+      "id": "rel-checksum",
+      "query": "verify_checksum expected observed"
+    },
+    {
+      "expected_files": [
+        "tests/test_release_contract.py"
+      ],
+      "expected_symbols": [
+        "test_release_checksum_contract"
+      ],
+      "id": "rel-test",
+      "query": "test_release_checksum_contract checksum contract test"
+    },
+    {
+      "expected_files": [
+        "Makefile"
+      ],
+      "expected_symbols": [],
+      "id": "rel-make",
+      "query": "release verify Makefile targets"
+    },
+    {
+      "expected_files": [
+        "config/release.toml"
+      ],
+      "expected_symbols": [],
+      "id": "rel-config",
+      "query": "require_checksum release manifest configuration"
+    }
+  ]
+}

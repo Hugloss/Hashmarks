@@ -1,0 +1,60 @@
+{
+  "decision": "PROVEN_BEHAVIOR_NO_PRODUCT_CHANGE",
+  "guardrail": "No source change without current-parent proof; Hashmarks remains repository intelligence and does not acquire execution/orchestration authority.",
+  "metrics": {
+    "scout": {
+      "sha256": "9591fa20d34477272e0d7dc613e84942dea933e917e0fc5032bc2efe9043fa53",
+      "summary": {
+        "always_extra_spawns_vs_selective": 16.0,
+        "always_scout_correct_final": 18.0,
+        "always_scout_scout_evidence_approx_tokens": 103.0,
+        "always_scout_scout_evidence_bytes": 408.0,
+        "always_scout_scout_evidence_files": 4.0,
+        "always_scout_scout_spawns": 18.0,
+        "always_scout_scout_subprocess_ms": 1840.9479430001738,
+        "always_scout_wrong_final": 0.0,
+        "no_scout_correct_final": 16.0,
+        "no_scout_scout_evidence_approx_tokens": 0.0,
+        "no_scout_scout_evidence_bytes": 0.0,
+        "no_scout_scout_evidence_files": 0.0,
+        "no_scout_scout_spawns": 0.0,
+        "no_scout_scout_subprocess_ms": 0.0,
+        "no_scout_wrong_final": 2.0,
+        "repositories": 3,
+        "selective_correctness_gain": 2.0,
+        "selective_scout_correct_final": 18.0,
+        "selective_scout_scout_evidence_approx_tokens": 103.0,
+        "selective_scout_scout_evidence_bytes": 408.0,
+        "selective_scout_scout_evidence_files": 4.0,
+        "selective_scout_scout_spawns": 2.0,
+        "selective_scout_scout_subprocess_ms": 1167.4048919999223,
+        "selective_scout_wrong_final": 0.0,
+        "selective_spawn_rate": 0.1111111111111111,
+        "tasks": 18
+      }
+    },
+    "worker_inspection_ab": {
+      "sha256": "cfebbf3f8b412e0f2170bc4b1197000abc11f66d081d5fafd72a034b2955bb5a",
+      "summary": {
+        "defer_only_correct_final_edits": 16,
+        "defer_only_deferrals": 2,
+        "defer_only_unsafe_wrong_final_edits": 0,
+        "inspection_recovery_rate": 1.0,
+        "inspections": 2,
+        "recovered_after_inspection": 2,
+        "repositories": 3,
+        "residual_deferral_rate": 0.0,
+        "residual_wrong_edit_rate": 0.0,
+        "resolved_correct_final_edits": 18,
+        "resolved_deferrals": 0,
+        "resolved_unsafe_wrong_final_edits": 0,
+        "tasks": 18
+      }
+    }
+  },
+  "parent_sha256": "36840d2eb954c4f423dadaadb62cf0dc9560734b7075fdf6c1cc34e0c41efe59",
+  "phase": "HM45-R",
+  "rationale": "Selective inspection triggers on 2/18 tasks and recovers both to 18/18, while always-inspect creates 16 unnecessary extra spawns. The ambiguity signal is useful; subprocess/scout execution remains external-agent authority.",
+  "schema": "hashmarks.proof-gated-phase-evidence.v1",
+  "source_change": false
+}

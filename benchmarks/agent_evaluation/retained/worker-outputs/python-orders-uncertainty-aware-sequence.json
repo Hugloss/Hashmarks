@@ -1,0 +1,134 @@
+{
+  "policy": "uncertainty-aware-sequence",
+  "schema": "hashmarks.worker-multistep-output.v1",
+  "tasks": [
+    {
+      "ambiguous": false,
+      "edit_target": "src/orders/service.py",
+      "evidence_read": {
+        "approx_tokens": 100,
+        "bytes": 396,
+        "files": 2,
+        "paths": [
+          "src/orders/service.py",
+          "tests/test_orders.py"
+        ]
+      },
+      "first_hypothesis": "src/orders/service.py",
+      "id": "py-service",
+      "inspection_paths": [],
+      "query": "OrderService submit_order implementation",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/test_orders.py"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "src/orders/storage.py",
+      "evidence_read": {
+        "approx_tokens": 70,
+        "bytes": 276,
+        "files": 2,
+        "paths": [
+          "src/orders/storage.py",
+          "tests/test_orders.py"
+        ]
+      },
+      "first_hypothesis": "src/orders/storage.py",
+      "id": "py-storage",
+      "inspection_paths": [],
+      "query": "OrderStore save_order persistence",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/test_orders.py"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "src/orders/validation.py",
+      "evidence_read": {
+        "approx_tokens": 68,
+        "bytes": 268,
+        "files": 2,
+        "paths": [
+          "src/orders/validation.py",
+          "tests/test_orders.py"
+        ]
+      },
+      "first_hypothesis": "src/orders/validation.py",
+      "id": "py-validation",
+      "inspection_paths": [],
+      "query": "validate_order_id validation",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/test_orders.py"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "tests/test_orders.py",
+      "evidence_read": {
+        "approx_tokens": 44,
+        "bytes": 175,
+        "files": 1,
+        "paths": [
+          "tests/test_orders.py"
+        ]
+      },
+      "first_hypothesis": "tests/test_orders.py",
+      "id": "py-test",
+      "inspection_paths": [],
+      "query": "test_submit_order order test",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/test_orders.py"
+    },
+    {
+      "ambiguous": false,
+      "edit_target": "pyproject.toml",
+      "evidence_read": {
+        "approx_tokens": 62,
+        "bytes": 246,
+        "files": 2,
+        "paths": [
+          "pyproject.toml",
+          "tests/test_orders.py"
+        ]
+      },
+      "first_hypothesis": "pyproject.toml",
+      "id": "py-config",
+      "inspection_paths": [],
+      "query": "fresh-orders project pyproject configuration",
+      "recovered_from_first_hypothesis": false,
+      "resolution_reason": null,
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/test_orders.py"
+    },
+    {
+      "ambiguous": true,
+      "edit_target": "AGENTS.md",
+      "evidence_read": {
+        "approx_tokens": 57,
+        "bytes": 226,
+        "files": 2,
+        "paths": [
+          "tests/test_orders.py",
+          "AGENTS.md"
+        ]
+      },
+      "first_hypothesis": "tests/test_orders.py",
+      "id": "py-authority",
+      "inspection_paths": [
+        "tests/test_orders.py",
+        "AGENTS.md"
+      ],
+      "query": "Python order service validate changes tests AGENTS",
+      "recovered_from_first_hypothesis": true,
+      "resolution_reason": "public-task-role-cue",
+      "verification_candidates_examined": 1,
+      "verification_target": "tests/test_orders.py"
+    }
+  ]
+}

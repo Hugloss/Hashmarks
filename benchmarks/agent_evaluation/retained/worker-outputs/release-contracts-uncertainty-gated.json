@@ -1,0 +1,118 @@
+{
+  "policy": "uncertainty-gated",
+  "schema": "hashmarks.worker-behavior-output.v1",
+  "tasks": [
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 2,
+          "path": "contracts/release.schema.json",
+          "role": "contract"
+        }
+      ],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [
+        "contract"
+      ],
+      "ambiguous": false,
+      "first_role": "contract",
+      "id": "rel-schema",
+      "query": "ReleaseManifest artifact sha256 contract schema",
+      "target": "contracts/release.schema.json"
+    },
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 2,
+          "path": "Makefile",
+          "role": "config_build"
+        }
+      ],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [
+        "config_build"
+      ],
+      "ambiguous": false,
+      "first_role": "implementation",
+      "id": "rel-package",
+      "query": "package_release artifact packaging",
+      "target": "scripts/package_release.py"
+    },
+    {
+      "action": "edit",
+      "alternatives": [],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [],
+      "ambiguous": false,
+      "first_role": "implementation",
+      "id": "rel-checksum",
+      "query": "verify_checksum expected observed",
+      "target": "scripts/verify_checksum.py"
+    },
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 1,
+          "path": "tests/test_release_contract.py",
+          "role": "contract"
+        },
+        {
+          "canonical_rank": 1,
+          "path": "tests/test_release_contract.py",
+          "role": "verification"
+        }
+      ],
+      "ambiguity_reason": "resolved-by-distinctive-role-anchor",
+      "ambiguity_roles": [
+        "contract",
+        "verification"
+      ],
+      "ambiguous": false,
+      "first_role": "contract",
+      "id": "rel-test",
+      "query": "test_release_checksum_contract checksum contract test",
+      "target": "tests/test_release_contract.py"
+    },
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 1,
+          "path": "Makefile",
+          "role": "config_build"
+        }
+      ],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [
+        "config_build"
+      ],
+      "ambiguous": false,
+      "first_role": "config_build",
+      "id": "rel-make",
+      "query": "release verify Makefile targets",
+      "target": "Makefile"
+    },
+    {
+      "action": "edit",
+      "alternatives": [
+        {
+          "canonical_rank": 1,
+          "path": "config/release.toml",
+          "role": "config_build"
+        }
+      ],
+      "ambiguity_reason": "single-or-no-explicit-role-cue",
+      "ambiguity_roles": [
+        "config_build"
+      ],
+      "ambiguous": false,
+      "first_role": "config_build",
+      "id": "rel-config",
+      "query": "require_checksum release manifest configuration",
+      "target": "config/release.toml"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "phase": "HM228-R",
+  "parent": "HM227-R",
+  "purpose": "re-export binding ownership ambiguity closure",
+  "evidence": {
+    "independent_oracle_cases": 120,
+    "false_results": 0,
+    "focused_source_tests": 123
+  },
+  "authority": [
+    "single unconditional local-vs-reexport binding order may be proven statically",
+    "multiple reexports remain ambiguous",
+    "unproven leaves fail closed"
+  ],
+  "canonical_remains": "HM218",
+  "latest_native_qualified_parent": "HM227: 975/975"
+}

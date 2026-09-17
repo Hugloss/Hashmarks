@@ -1,0 +1,32 @@
+{
+  "decision": "REJECT_CHANGE",
+  "guardrail": "No source change without current-parent proof; Hashmarks remains repository intelligence and does not acquire execution/orchestration authority.",
+  "metrics": {
+    "retrieval": {
+      "sha256": "059f2979baab3a852e768c79fb2ce2c9bc79c9f1113ff68345a7503dce9080fc",
+      "summary": {
+        "embedding_admission": false,
+        "ngram_admission": false,
+        "recommended_next_lane": "cheap-ambiguity-inspection",
+        "repositories": 3,
+        "residual_counts": {
+          "deep-ranking-miss": 0,
+          "discovery-miss": 0,
+          "none": 16,
+          "role-authority-ambiguity": 2,
+          "shallow-ranking-miss": 0
+        },
+        "retrieval_subagent_admission": true,
+        "tasks": 18,
+        "top1_correct": 16,
+        "top20_all_expected": 18,
+        "top5_any_expected": 18
+      }
+    }
+  },
+  "parent_sha256": "4a537f734cc300cb07c9ae4fc84efe23fc0a2eea43043350d52825dc8964604b",
+  "phase": "HM43-R",
+  "rationale": "18/18 expected files are present by top20 and top5 has expected evidence for 18/18. There are zero discovery/deep/shallow ranking misses. New ngram/vector recall indexes are not admitted.",
+  "schema": "hashmarks.proof-gated-phase-evidence.v1",
+  "source_change": false
+}

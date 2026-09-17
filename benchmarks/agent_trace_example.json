@@ -1,0 +1,25 @@
+{
+  "schema": "hashmarks.agent-trace.v2",
+  "task_id": "example-localization",
+  "task_revision": "v1",
+  "mode": "hashmarks",
+  "run_id": "run-example-hashmarks",
+  "repository_identity": "sha256:example-repository",
+  "model_identity": "example-model",
+  "model_config_identity": "sha256:example-model-config",
+  "model_input_tokens_source": "external-provider-usage-required",
+  "events": [
+    {
+      "kind": "hashmarks_context",
+      "query": "example",
+      "estimated_tokens": 900,
+      "bytes": 3600
+    },
+    {
+      "kind": "hashmarks_source",
+      "path": "src/example.py",
+      "estimated_tokens": 350,
+      "bytes": 1400
+    }
+  ]
+}

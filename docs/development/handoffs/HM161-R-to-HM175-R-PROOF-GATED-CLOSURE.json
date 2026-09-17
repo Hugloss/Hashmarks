@@ -1,0 +1,20 @@
+{
+  "parent": {"artifact": "hashmarks-hm160.zip", "sha256": "acd56c8e6b02ba85b330779ec8161579dd0055750282eb574d887eba3487693f", "status": "canonical"},
+  "phases": [
+    {"phase":"HM161-R","decision":"NO_CHANGE","subject":"consumer receipt vs final freshness authority","evidence":"existing conformance APIs intentionally separate self-consistent evidence from execution safety"},
+    {"phase":"HM162-R","decision":"IMPLEMENT","subject":"post-edit previous-start continuity","evidence":"foreign repository packet produced false unchanged/reused continuity"},
+    {"phase":"HM163-R","decision":"IMPLEMENT","subject":"repository binding","evidence":"previous authority receipt repository identity must match current repository before reuse"},
+    {"phase":"HM164-R","decision":"IMPLEMENT","subject":"task binding","evidence":"post-edit continuity is meaningful only for the same task identity"},
+    {"phase":"HM165-R","decision":"IMPLEMENT","subject":"generation binding","evidence":"previous start must bind the pre-sync generation; older-generation packets cannot claim reuse"},
+    {"phase":"HM166-R","decision":"IMPLEMENT","subject":"context identity validation","evidence":"existing evidence-context identity detects tampered/unbound provenance without new authority"},
+    {"phase":"HM167-R","decision":"IMPLEMENT","subject":"missing provenance fail-closed","evidence":"reuse requires a bound receipt+provenance pair"},
+    {"phase":"HM168-R","decision":"NO_CHANGE","subject":"new persisted continuity identity","evidence":"existing receipt, task/repository/generation and context identity are sufficient"},
+    {"phase":"HM169-R","decision":"NO_CHANGE","subject":"execution authority","evidence":"fix remains repository-intelligence validation only"},
+    {"phase":"HM170-R","decision":"NO_CHANGE","subject":"SQLite/store authority","evidence":"defect occurs before sync/reuse classification and needs no store redesign"},
+    {"phase":"HM171-R","decision":"NO_CHANGE","subject":"retrieval/ranking","evidence":"no retrieval failure observed"},
+    {"phase":"HM172-R","decision":"NO_CHANGE","subject":"qualified identity","evidence":"existing repository/task identities are reused rather than replaced"},
+    {"phase":"HM173-R","decision":"NO_CHANGE","subject":"consumer schema","evidence":"no public result schema expansion required; invalid continuity fails closed"},
+    {"phase":"HM174-R","decision":"QUALIFIED_BOUNDED","subject":"affected qualification","evidence":"31 focused tests pass plus source/tests compileall; wider metrics invocation hit outer execution-window timeout without assertion failure"},
+    {"phase":"HM175-R","decision":"CLOSE","subject":"post-edit continuity authority closure","evidence":"foreign/cross-task/old-generation/tampered/unbound previous starts fail before reuse"}
+  ]
+}

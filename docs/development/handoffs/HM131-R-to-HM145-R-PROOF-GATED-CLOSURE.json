@@ -1,0 +1,21 @@
+{
+  "parent": {"artifact": "hashmarks-hm130.zip", "sha256": "30759b88b07e273c48a7bdc1e9e514a6fb599f76083b43f7b4dbe72790485f86"},
+  "rule": "Responsibility/dataflow evidence is required before refactoring; file length and dataclass count are diagnostics only.",
+  "phases": [
+    {"phase":"HM131-R","topic":"large-module responsibility map","decision":"MEASURE_ONLY","evidence":"evidence_verification.py is 1253 lines but 1133 lines belong to one VerificationMixin authority surface; size alone does not prove a safe ownership split."},
+    {"phase":"HM132-R","topic":"agent evidence packet responsibility","decision":"MEASURE_ONLY","evidence":"evidence_packet.py is 1018 lines and AgentPacketMixin is 996 lines; methods form decision brief, agent-start evidence, config evidence and budget projection, but no duplicate writer was proven."},
+    {"phase":"HM133-R","topic":"qualification shard responsibility","decision":"NO_CHANGE","evidence":"test_shards.py contains selection, identity, validation and CLI projection around the same qualification-selection contract; no second authoritative membership writer was found."},
+    {"phase":"HM134-R","topic":"task action responsibility","decision":"MEASURE_ONLY","evidence":"repository_task_action.py is dominated by TaskActionMixin; method groups are broad but still participate in one task-action decision pipeline."},
+    {"phase":"HM135-R","topic":"dataclass authority audit","decision":"NO_CHANGE","evidence":"dataclass count alone does not establish duplicate authoritative state; inspected declarations are predominantly immutable evidence/value contracts or local validation state."},
+    {"phase":"HM136-R","topic":"receipt duplication","decision":"NO_CHANGE","evidence":"no newly proven pair of independently persisted receipts owns the same fact."},
+    {"phase":"HM137-R","topic":"qualification classification handoffs","decision":"NO_CHANGE","evidence":"release-correctness membership remains derived from repository-owned classification rather than separately authored membership."},
+    {"phase":"HM138-R","topic":"verification projection handoffs","decision":"NO_CHANGE","evidence":"prior AST snapshot reuse remains intact; no fresh duplicate projection defect was proven."},
+    {"phase":"HM139-R","topic":"repository identity state","decision":"NO_CHANGE","evidence":"no duplicate repository identity writer was proven."},
+    {"phase":"HM140-R","topic":"retrieval ownership","decision":"REJECT_CHANGE","evidence":"no new miss class or ambiguity regression justifies retrieval expansion."},
+    {"phase":"HM141-R","topic":"SQLite/store ownership","decision":"REJECT_CHANGE","evidence":"no current profile evidence identifies storage as a dominant bottleneck or duplicate authority."},
+    {"phase":"HM142-R","topic":"consumer contract reduction","decision":"NO_CHANGE","evidence":"no redundant externally consumed representation was proven safe to remove."},
+    {"phase":"HM143-R","topic":"negative evidence authority","decision":"NO_CHANGE","evidence":"negative evidence remains repository evidence and does not become retry/execution authority."},
+    {"phase":"HM144-R","topic":"Oh-Goon boundary","decision":"NO_CHANGE","evidence":"Hashmarks remains repository intelligence; execution/certification ownership remains external."},
+    {"phase":"HM145-R","topic":"15-phase closure","decision":"CLOSE","evidence":"No product refactor admitted without a proven duplicate writer, mixed authority defect, correctness defect, or measured dominant cost."}
+  ]
+}

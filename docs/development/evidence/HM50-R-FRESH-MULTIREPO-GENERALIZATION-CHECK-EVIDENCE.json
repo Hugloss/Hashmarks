@@ -1,0 +1,28 @@
+{
+  "decision": "REJECT_NEW_RETRIEVAL_TECH",
+  "guardrail": "No source change without current-parent proof; Hashmarks remains repository intelligence and does not acquire execution/orchestration authority.",
+  "metrics": {
+    "fresh": {
+      "sha256": "1244da9a007ba77635a692e2cf6018a5f1b27fc8c079c75518a781e4db34b9f7",
+      "summary": {
+        "average_candidate_file_reduction": 0.253968253968254,
+        "average_context_ms": 2.5937149445477794,
+        "average_context_tokens": 82.38888888888889,
+        "average_find_ms": 1.5764388888581178,
+        "fallback_search_rate": 0.0,
+        "file_recall": 1.0,
+        "first_query_hit_rate": 0.8888888888888888,
+        "max_repo_p95_context_ms": 6.190230999891355,
+        "max_repo_p95_find_ms": 5.376088999582862,
+        "seconds": 0.2336264219993609,
+        "selected_file_tokens_avoided": 891,
+        "symbol_recall": 1.0
+      }
+    }
+  },
+  "parent_sha256": "83e79107f5e82c2e7288c29cb834aa660f89612009731e9b612aa6ca7b89829e",
+  "phase": "HM50-R",
+  "rationale": "Fresh multi-repository corpus continues to show full file/symbol recall on the measured fixtures and no fallback pressure that would justify a new retrieval index. Keep current retrieval architecture.",
+  "schema": "hashmarks.proof-gated-phase-evidence.v1",
+  "source_change": false
+}

@@ -1,0 +1,586 @@
+from __future__ import annotations
+
+import ast
+import heapq
+import hashlib
+import json
+import math
+import os
+import posixpath
+import re
+import time
+import tomllib
+from contextlib import nullcontext
+from dataclasses import dataclass, replace
+from functools import lru_cache
+from pathlib import Path, PurePosixPath
+from typing import Iterable, Mapping, Sequence
+
+from ..client import (DaemonCompatibilityError, DaemonProtocolError, DaemonUnavailableError, IdentityClient, RepositoryObservation, default_state_dir)
+from ..file_store import FileDigestStore, UnstableFileError
+from ..paths import canonical_host_path, normalize_relative_path
+from ..python_ast_cache import read_python_ast
+from ..evidence_context import evidence_context_identity
+from ..native_vitest import collect_vitest_vite_graph, local_vitest
+from .model import EvidenceVisibility, ContextDisclosure, ContextItem, ContextPack, SearchHit, SyncResult
+from .context_cache import ContextCache
+from .import_ownership import analyze_python_import_ownership
+from .cache_ownership import analyze_python_cache_ownership
+from .cache_invalidation import analyze_python_cache_invalidators
+from .concurrency_risk import analyze_python_concurrency_risk
+from .singleflight import SingleFlight
+from .policy import ContextPolicy
+from .project_impact_codec import compact_project_impact
+from .python_ast import estimate_tokens, identifier_terms
+from .parsers import artifact_key_for, parse_source
+from .providers import TreeSitterRangeProvider
+from .project_graph import default_project_graph_providers
+from .query_router import QueryRoute, route_query
+from .repository_domains import RepositoryDomain, classify_repository_path, is_test_path
+from .structural_search import AstGrepSearchProvider
+from .scip_adapter import load_scip_json
+from .typescript_resolver import TypeScriptResolverProvider
+from ..verification_selection import VerificationSelectionEnvelopeState, downstream_consumption_contract, verification_membership_from_selection, verification_selection_envelope
+from ..ownership_decision import OwnershipDecisionState, ownership_authority_contract, ownership_decision_trace
+from ..symbolic_identity import symbolic_nomination_record, symbolic_task_terms
+from .pyright_type_server import PyrightTypeServerProvider
+from .repository_index_store import ArtifactStore, WorkspaceMapStore, default_artifact_db, default_base_snapshot, git_base_identity, git_overlay_paths
+from .decision_session import DecisionSessionMixin
+from .evidence_packet import TaskEvidencePacketMixin
+from .post_change import PostChangeMixin
+from .change_intelligence import ChangeIntelligenceMixin
+from .freshness_map import EvidenceFreshnessMapMixin
+from .repository_delta import RepositoryDeltaMixin
+from .evidence_profiles import EvidenceProfilesMixin
+from .cross_repository_evidence import CrossRepositoryEvidenceMixin
+from .repository_intelligence_query import RepositoryIntelligenceQueryMixin
+from .intelligence_economics import IntelligenceEconomicsMixin
+from .verification_explanation import VerificationExplanationMixin
+from .repository_task_action import TaskActionMixin
+from .query_primitives import _TASK_EVIDENCE_FAMILIES, _TASK_GOVERNANCE_CUES, _TASK_STOPWORDS, _WORD_RE, _query_terms
+from .evidence_verification import VerificationMixin, _VerificationSelectionState
+from .relationships import RelationshipsMixin
+from .evidence_graph import EvidenceGraphMixin
+from .import_resolution import ImportResolutionMixin
+from .evidence_freshness import EvidenceFreshnessMixin
+from .repository_context import ContextPlanningMixin
+from .ownership_analysis import OwnershipAnalysisMixin
+from .query_surface import QuerySurfaceMixin
+from .work_context import WorkContextMixin
+from .indexing_lifecycle import IndexingLifecycleMixin, _python_source_roots, _MAX_INDEX_BYTES
+from .task_retrieval import TaskRetrievalMixin
+from .ownership_graph import OwnershipGraphMixin
+from .find_engine import FindEngineMixin
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Generic repository evidence families. These are query-formulation hints only:
+# they never name project-specific files, never grant authority, and are emitted
+# only when candidate-visible task wording supplies a family cue.  The purpose is
+# to bridge ordinary task language to semantically named repository control
+# surfaces (for example PRIVACY.md or CI_CD_CONTRACT.md) without globally boosting
+# documentation.
+
+
+
+
+
+
+
+
+
+
+
+
+
+class CodeMap(TaskEvidencePacketMixin, ChangeIntelligenceMixin, EvidenceFreshnessMapMixin, RepositoryDeltaMixin, EvidenceProfilesMixin, CrossRepositoryEvidenceMixin, RepositoryIntelligenceQueryMixin, IntelligenceEconomicsMixin, VerificationExplanationMixin, PostChangeMixin, TaskActionMixin, VerificationMixin, RelationshipsMixin, ImportResolutionMixin, EvidenceFreshnessMixin, EvidenceGraphMixin, ContextPlanningMixin, OwnershipAnalysisMixin, QuerySurfaceMixin, WorkContextMixin, IndexingLifecycleMixin, TaskRetrievalMixin, OwnershipGraphMixin, FindEngineMixin, DecisionSessionMixin):
+    """Derived repository-intelligence map.
+
+    This subsystem is intentionally outside the Identity import graph. It may
+    scan/parse/index in the background or on demand, but none of those actions
+    participate in canonical identity or hot daemon response latency.
+    """
+
+    def __init__(
+        self,
+        workspace: str | Path = ".",
+        *,
+        state_dir: str | Path | None = None,
+        artifact_db: str | Path | None = None,
+        policy_path: str | Path | None = None,
+        max_index_bytes: int = _MAX_INDEX_BYTES,
+    ) -> None:
+        self.workspace = canonical_host_path(workspace)
+        if state_dir is None:
+            self.state_dir = default_state_dir(self.workspace)
+        else:
+            raw_state = Path(state_dir)
+            if not raw_state.is_absolute():
+                raw_state = self.workspace / raw_state
+            self.state_dir = canonical_host_path(raw_state)
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self._state_rel = self.state_dir.relative_to(self.workspace).as_posix().strip("/")
+        except ValueError:
+            self._state_rel = None
+        store = WorkspaceMapStore(self.state_dir / "codemap.sqlite3")
+        store.bind_workspace(
+            self.workspace,
+            allow_unbound_existing=self._state_rel is not None,
+        )
+        self.store = store
+        self.file_store = FileDigestStore(self.state_dir / "identity.sqlite3")
+        # Protocol v3 is the compatibility fence. Reuse one stateless IPC client
+        # so repository observations validate daemon compatibility once rather
+        # than spending an extra status round-trip on every freshness sample.
+        self._identity_client = IdentityClient(self.workspace, state_dir=self.state_dir, timeout=0.1)
+        artifact_path = default_artifact_db(self.workspace) if artifact_db is None else canonical_host_path(artifact_db)
+        self.artifacts = ArtifactStore(artifact_path)
+        config = None
+        if policy_path is not None:
+            config = Path(policy_path)
+            if not config.is_absolute():
+                config = self.workspace / config
+            config = canonical_host_path(config)
+        self._policy_config_path, self.policy = config, ContextPolicy.load(self.workspace, config)
+        self.context_cache = ContextCache(self.state_dir)
+        self._find_flight: SingleFlight[tuple[SearchHit, ...]] = SingleFlight()
+        self._context_flight: SingleFlight[ContextPack] = SingleFlight()
+        self.max_index_bytes = int(max_index_bytes)
+        self._python_import_roots = _python_source_roots(self.workspace)
+        # Optional structural precision lives entirely in the CodeMap lane.
+        # Missing tree-sitter support is expected and never affects Identity.
+        self.range_provider = TreeSitterRangeProvider.auto()
+        self.structural_search_provider = AstGrepSearchProvider(self.workspace)
+        self.project_graph_providers = default_project_graph_providers()
+        self.typescript_resolver = TypeScriptResolverProvider()
+        self.pyright_type_server = PyrightTypeServerProvider()
+        self._reverse_file_graph_cache: tuple[int, dict[str, set[str]]] | None = None
+        # Canonical task retrieval is composed by multiple additive CodeMap surfaces.
+        # Keep a small generation-bound result cache so those surfaces reuse the exact
+        # same selected evidence instead of replaying 2-3 query lanes each time.
+        self._task_result_cache: dict[tuple[int, str, int], tuple[SearchHit, ...]] = {}
+        # Structural ownership may select an authority path that is not present in
+        # the canonical retrieval rows. Remember those selected paths separately
+        # so an unsignaled byte change is reconciled before the next decision.
+        self._task_authority_paths_cache: dict[tuple[int, str, int], tuple[str, ...]] = {}
+        # Retain a bounded task-local history of authority-contributing paths.
+        # This is freshness evidence only: it lets a later ABA restoration or
+        # path replacement be reconciled even after an intermediate decision
+        # became unsafe and no longer selected the old owner.
+        self._task_recent_authority_paths: dict[tuple[str, int], tuple[str, ...]] = {}
+        # Read-only generation-bound decision-session caches. These cache only
+        # immutable evidence primitives, never final task decisions. Outside an
+        # explicit decision_session() they are bypassed.
+        self._decision_session_depth = 0
+        self._decision_session_generation: int | None = None
+        self._decision_session_observation: RepositoryObservation | None = None
+        self._decision_symbols_cache: dict[tuple[int, str], list[dict[str, object]]] = {}
+        self._decision_file_row_cache: dict[tuple[int, str], dict[str, object] | None] = {}
+        self._decision_module_paths_cache: dict[tuple[int, str], tuple[str, ...]] = {}
+        self._decision_exact_symbols_cache: dict[tuple[int, tuple[str, ...]], tuple[int, tuple[dict[str, object], ...]]] = {}
+        # Reverse-reference semantics are keyed by target_short in the store;
+        # qualified aliases with the same short name therefore share one cache.
+        self._decision_refs_cache: dict[tuple[int, str], tuple[int, tuple[dict[str, object], ...]]] = {}
+        self._decision_edges_from_cache: dict[tuple[int, str, str], tuple[int, tuple[dict[str, object], ...]]] = {}
+        self._decision_edges_for_path_cache: dict[tuple[int, str], tuple[int, tuple[dict[str, object], ...]]] = {}
+        self._decision_df_cache: dict[tuple[int, tuple[str, ...]], tuple[int, dict[str, int]]] = {}
+        self._decision_candidates_cache: dict[tuple[int, tuple[str, ...], int], list[dict[str, object]]] = {}
+        self._decision_repository_identity_cache: tuple[int, str] | None = None
+        # Complete repository-intelligence snapshots are expensive compositions of
+        # already generation-bound evidence. Reuse them only inside one explicit
+        # decision session and only for an exact request identity.
+        self._decision_snapshot_cache: dict[
+            tuple[int, str, tuple[str, ...], int, int, int, int], dict[str, object]
+        ] = {}
+        # Complete task-action projections are expensive compositions over already
+        # generation-bound retrieval/ownership evidence. Reuse only exact request
+        # identities inside one explicit decision session.
+        self._decision_task_action_cache: dict[
+            tuple[int, str, int, int], dict[str, object]
+        ] = {}
+        # Owner-chain reconstruction can traverse the bounded ownership relation
+        # graph repeatedly while several impact-derived surfaces share one task
+        # action projection. Reuse only the exact generation/task/action-bounds
+        # derivation inside one explicit decision session.
+        self._decision_change_impact_owner_chain_cache: dict[
+            tuple[int, str, int, int],
+            tuple[str, dict[str, object] | None, str, list[str], dict[tuple[str, str], str]],
+        ] = {}
+        self._decision_ownership_import_paths_cache: dict[
+            tuple[int, str, str], tuple[str, ...]
+        ] = {}
+        self._decision_session_stats = {"task_result_hit": 0, "task_result_miss": 0, "symbols_hit": 0, "symbols_miss": 0, "file_row_hit": 0, "file_row_miss": 0, "module_paths_hit": 0, "module_paths_miss": 0, "exact_symbols_hit": 0, "exact_symbols_miss": 0, "refs_hit": 0, "refs_miss": 0, "edges_from_hit": 0, "edges_from_miss": 0, "edges_for_path_hit": 0, "edges_for_path_miss": 0, "df_hit": 0, "df_miss": 0, "candidates_hit": 0, "candidates_miss": 0, "snapshot_hit": 0, "snapshot_miss": 0, "task_action_hit": 0, "task_action_miss": 0, "impact_owner_chain_hit": 0, "impact_owner_chain_miss": 0, "ownership_import_paths_hit": 0, "ownership_import_paths_miss": 0}
+        self._decision_diagnostics_enabled = False
+        self._decision_diagnostics_started_ns = 0
+        self._decision_diagnostics_sequence = 0
+        self._decision_diagnostics_stack: list[dict[str, object]] = []
+        self._decision_diagnostics_spans: list[dict[str, object]] = []
+        self._decision_diagnostics_producers: dict[str, dict[str, object]] = {}
+        self._decision_diagnostics_last: dict[str, object] | None = None
+
+    def __enter__(self) -> "CodeMap":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+    def close(self) -> None:
+        self.context_cache.close()
+        self.store.close()
+        self.artifacts.close()
+        self.file_store.close()
+
+
+
+    def _daemon_observation(self) -> RepositoryObservation | None:
+        try:
+            return self._identity_client.repository_observation()
+        except (DaemonUnavailableError, DaemonCompatibilityError, DaemonProtocolError, OSError):
+            return None
+
+    def _internal_path(self, rel: str) -> bool:
+        clean = rel.strip("/")
+        state = self._state_rel
+        return bool(state and (clean == state or clean.startswith(state + "/")))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def outline(self, relpath: str) -> dict[str, object]:
+        self._ensure_map_ready()
+        rel = normalize_relative_path(relpath, allow_root=False)
+        self._ensure_path_current(rel)
+        row = self.store.outline(rel)
+        if row is None:
+            raise FileNotFoundError(f"not indexed: {rel}")
+        visibility = EvidenceVisibility(str(row["evidence_visibility"]))
+        if visibility is EvidenceVisibility.DENY:
+            raise PermissionError(f"repository evidence denied by context policy: {rel}")
+        generation, identity_generation, stale = self._generation_status()
+        return {
+            "schema": "hashmarks.outline.v1",
+            "path": rel,
+            "language": row["language"],
+            "file_digest": row["file_digest"],
+            "full_tokens": row["full_tokens"],
+            "outline_tokens": estimate_tokens(str(row["outline"])),
+            "outline": row["outline"],
+            "symbols": self._session_symbols_for_path(rel),
+            "parse_error": row["parse_error"],
+            "evidence_visibility": visibility.value,
+            "generation": generation,
+            "identity_generation": identity_generation,
+            "stale": stale,
+        }
+
+    def _ensure_map_ready(
+        self, *, _allow_incomplete: bool = False
+    ) -> RepositoryObservation | None:
+        # An active decision session already established repository readiness and
+        # is generation-bound. Nested retrieval surfaces must reuse that exact
+        # freshness sample rather than crossing the daemon boundary again.
+        if self._decision_session_depth > 0:
+            return self._decision_session_observation
+        # A durable BUILDING marker means a prior sync did not finish. Query
+        # paths must not silently turn that incomplete generation into fresh
+        # authority by auto-rebuilding it; the caller/execution layer decides
+        # when another sync attempt is appropriate.
+        if self.store.meta("sync.build_state") == "BUILDING":
+            if _allow_incomplete:
+                return None
+            raise RuntimeError(
+                "CodeMap generation is incomplete (BUILDING); run sync() before querying repository intelligence"
+            )
+        # Context policy is live repository admission authority, not a
+        # construction-time snapshot. Stable policy checks are one exact-file
+        # read; semantic changes reconcile once before persisted evidence returns.
+        self._reconcile_context_policy_for_query()
+        self._reconcile_persisted_analysis_scope()
+        if not self.store.has_files():
+            self.sync()
+            return self._daemon_observation()
+        synced_raw = self.store.meta("identity_generation", "") or ""
+        observation = self._daemon_observation()
+        if observation is not None and not synced_raw:
+            # A daemon/barrier is now available but this map was built without
+            # generation-bound freshness evidence. Reconcile in the evidence lane.
+            self.sync()
+            return observation
+        if observation is None or not synced_raw:
+            return observation
+        synced = int(synced_raw)
+        if observation.generation == synced:
+            return observation
+        if observation.can_incrementally_reconcile:
+            self.sync(observation.dirty_paths)
+            return observation
+        self.sync()
+        return observation
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
