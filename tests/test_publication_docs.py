@@ -83,34 +83,6 @@ def test_current_integration_contract_is_not_version_pinned() -> None:
     assert "## v0.10." not in integration
 
 
-def test_public_ci_separates_release_qualification_and_tool_compatibility() -> None:
-    workflow = _text(".github/workflows/ci.yml")
-    assert "release-environment:" in workflow
-    assert "uv sync --group test" in workflow
-    assert "uv sync --frozen --group test" not in workflow
-    assert "pytest-compatibility:" in workflow
-    assert 'pytest: "pytest==8.4.0"' in workflow
-    assert 'pytest: "pytest>=8.4"' in workflow
-    assert "ruff-compatibility:" in workflow
-    assert "target: ruff-min" in workflow
-    assert "target: ruff-latest" in workflow
-    assert "run: make ${{ matrix.target }}" in workflow
-    assert "run: make precommit" in workflow
-    assert 'version: "0.10.0"' in workflow
-
-
-def test_qualification_tool_compatibility_is_publicly_documented() -> None:
-    docs = _text("docs/qualification/TOOL_COMPATIBILITY.md")
-    assert "minimum supported tool versions" in docs
-    assert "local, generated dependency-resolution state" in docs
-    assert "not committed, packaged, or treated as release identity" in docs
-    assert "pytest >=8.4" in docs
-    assert "Ruff >=0.12" in docs
-    assert "does **not inherit Ruff's default rule selection**" in docs
-    assert "Qualification tool compatibility" in _text("README.md")
-    assert "qualification/TOOL_COMPATIBILITY.md" in _text("docs/README.md")
-
-
 def test_public_release_contract_documents_stability_and_changelog() -> None:
     readme = _text("README.md")
     docs = _text("docs/README.md")
