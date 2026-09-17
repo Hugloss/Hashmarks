@@ -56,7 +56,7 @@ Install the lightweight Git pre-commit hook once per clone:
 make hooks-install
 ```
 
-The commit hook only performs fast file hygiene: whitespace/end-of-file checks, YAML/TOML/merge-conflict checks, large-file protection, Ruff fixes, and Ruff formatting. Repository-wide type checking, Ruff compatibility qualification, lock validation, and tests remain explicit developer or CI checks.
+The commit hook performs fast file hygiene: whitespace/end-of-file checks, YAML/TOML/merge-conflict checks, large-file protection, Ruff fixes, and Ruff formatting. It uses the same project Ruff dependency and `pyproject.toml` configuration as CI. Type checking, lock validation, tests, and qualification remain explicit checks.
 
 Run the normal bounded development check:
 
@@ -71,8 +71,8 @@ make compile
 make test
 make test-shard-plan
 make test-shard TEST_SHARD=0
-make ruff-min
-make ruff-latest
+make ruff
+make lint-debt
 make typecheck
 make precommit
 ```
@@ -99,6 +99,7 @@ Hosted diagnostics never mutate the native release contract. They exclude extern
 - Incremental/cached behavior should be compared against a fresh reconciled/cold oracle for semantic authority.
 - Unknown or incomplete evidence should fail closed rather than being coerced into stronger authority.
 - Benchmarks measure behavior; they do not automatically authorize product expansion.
+- Avoid tests that only prove duplicated tool-policy plumbing. Prefer one project-owned configuration plus tests of real Hashmarks behavior.
 
 ## Documentation
 
@@ -118,8 +119,8 @@ A focused pull request should explain:
 
 Avoid unrelated refactors in the same change unless they are required to make ownership clearer.
 
-## Qualification-tool compatibility
+## Development-tool policy
 
-The compatibility envelope for pytest and Ruff is documented in [`docs/qualification/TOOL_COMPATIBILITY.md`](../docs/qualification/TOOL_COMPATIBILITY.md). Widening a range requires boundary-version proof; it must not be done as an incidental dependency update.
+Pytest and uv minimums that materially affect qualification remain documented in [`docs/qualification/TOOL_COMPATIBILITY.md`](../docs/qualification/TOOL_COMPATIBILITY.md). Ruff is configured once in the project: `make ruff`, pre-commit, and CI consume the same `pyproject.toml` rule contract instead of maintaining minimum/latest Ruff compatibility lanes.
 
-`make hooks-install` installs the Git pre-commit hook. The hook owns only fast commit-time hygiene and uses pinned upstream pre-commit hook revisions. `make ruff-min`, `make ruff-latest`, `make typecheck`, and the test/qualification targets remain separate so commit-time editing does not become qualification authority. Retained benchmark fixture repositories remain excluded from live-repository formatting and linting.
+`make hooks-install` installs the Git pre-commit hook. The hook owns only fast commit-time hygiene; `make typecheck`, `make lint-debt`, and test/qualification targets remain separate so commit-time editing does not become qualification authority. Retained benchmark fixture repositories remain excluded from live-repository formatting and linting.
