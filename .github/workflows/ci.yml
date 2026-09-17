@@ -92,6 +92,8 @@ jobs:
           enable-cache: true
       - run: uv sync --group test --python 3.11
       - run: make ruff
+      - name: Current structural debt snapshot
+        run: uv run --offline --frozen --no-sync --group test python scripts/ruff_debt.py --json || true
       - run: make lint-debt-gate
 
   precommit:
