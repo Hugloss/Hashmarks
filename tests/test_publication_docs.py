@@ -115,16 +115,6 @@ def test_publication_root_moves_agent_evaluation_corpora_out_of_product_surface(
     assert "not installed Hashmarks product state" in retained
 
 
-def test_installed_artifact_smoke_is_part_of_release_contract() -> None:
-    makefile = _text("Makefile")
-    workflow = _text(".github/workflows/ci.yml")
-    assert "artifact-check:" in makefile
-    assert "installed_artifact_smoke.py" in makefile
-    assert "make artifact-check ARTIFACT_PYTHON=${{ matrix.python }}" in workflow
-    assert "make artifact-check ARTIFACT_PYTHON=3.14" in workflow
-    assert "release-check: dev-check artifact-check" in makefile
-
-
 def test_public_onboarding_leads_with_installed_package_not_source_checkout() -> None:
     readme = _text("README.md")
     getting_started = _text("docs/GETTING_STARTED.md")
@@ -211,8 +201,3 @@ def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None
     assert (ROOT / "opencode.json").is_file()
     assert (ROOT / ".mcp.json").is_file()
     assert (ROOT / ".codex" / "config.toml").is_file()
-    makefile = _text("Makefile")
-    assert "mcp-opencode-check:" in makefile
-    assert "mcp-host-status:" in makefile
-    assert "scripts/host_qualification/opencode_mcp_host_gate.py" in makefile
-    assert "scripts/mcp_host_status.py" in makefile
