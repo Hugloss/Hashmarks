@@ -1,5 +1,6 @@
 .venv/
 .ruff-venv/
+.pre-commit-venv/
 .hashmarks/
 .pytest_cache/
 __pycache__/
