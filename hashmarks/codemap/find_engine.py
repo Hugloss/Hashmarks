@@ -489,7 +489,9 @@ class FindEngineMixin:
         if hit.score < 24.0:
             return ()
         domains = set(classify_repository_path(hit.path))
-        return tuple(domain for domain in wanted if domain in domains and domain not in covered)
+        return tuple(
+            domain for domain in wanted if domain in domains and domain not in covered
+        )
 
     @staticmethod
     def _find_control_hits(
