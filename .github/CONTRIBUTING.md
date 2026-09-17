@@ -56,7 +56,7 @@ Install the lightweight Git pre-commit hook once per clone:
 make hooks-install
 ```
 
-The commit hook performs fast file hygiene: whitespace/end-of-file checks, YAML/TOML/merge-conflict checks, large-file protection, Ruff fixes, and Ruff formatting. It uses the same project Ruff dependency and `pyproject.toml` configuration as CI. Type checking, lock validation, tests, and qualification remain explicit checks.
+The commit hook performs fast file hygiene: whitespace/end-of-file checks, YAML/TOML/merge-conflict checks, large-file protection, Ruff fixes, and Ruff formatting. It uses the same project Ruff dependency and `pyproject.toml` configuration as CI. Type checking, tests, and qualification remain explicit checks.
 
 Run the normal bounded development check:
 
@@ -121,6 +121,6 @@ Avoid unrelated refactors in the same change unless they are required to make ow
 
 ## Development-tool policy
 
-Pytest and uv minimums that materially affect qualification remain documented in [`docs/qualification/TOOL_COMPATIBILITY.md`](../docs/qualification/TOOL_COMPATIBILITY.md). Ruff is configured once in the project: `make ruff`, pre-commit, and CI consume the same `pyproject.toml` rule contract instead of maintaining minimum/latest Ruff compatibility lanes.
+`pyproject.toml` is the authority for development-tool dependencies and configuration. We do not maintain separate CI lanes whose only purpose is proving pytest, Ruff, or uv version envelopes. Python-version tests exercise the supported runtime, and MCP interop tests exercise a real product integration boundary.
 
-`make hooks-install` installs the Git pre-commit hook. The hook owns only fast commit-time hygiene; `make typecheck`, `make lint-debt`, and test/qualification targets remain separate so commit-time editing does not become qualification authority. Retained benchmark fixture repositories remain excluded from live-repository formatting and linting.
+`make hooks-install` installs the Git pre-commit hook. The hook owns only fast commit-time hygiene; `make ruff`, `make typecheck`, `make lint-debt`, and test/qualification targets remain separate so commit-time editing does not become qualification authority. Retained benchmark fixture repositories remain excluded from live-repository formatting and linting.
