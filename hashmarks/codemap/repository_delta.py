@@ -186,6 +186,125 @@ class RepositoryDeltaMixin:
             }
         return rows
 
+
+    @staticmethod
+    def _diagnostic_identity(row: Mapping[str, object]) -> str:
+        """Canonical diagnostic identity independent of aggregate count/order."""
+        import hashlib
+        import json
+
+        identity_fields = {
+            key: row.get(key)
+            for key in ("tool", "rule", "path", "symbol", "line", "column", "message")
+            if row.get(key) is not None
+        }
+        raw = json.dumps(
+            identity_fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+        return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+    @classmethod
+    def external_diagnostic_observation(
+        cls,
+        *,
+        producer: str,
+        repository_identity: str,
+        codemap_generation: int,
+        diagnostics: Sequence[Mapping[str, object]],
+        outcome: str,
+        environment_identity: str | None = None,
+    ) -> dict[str, object]:
+        """Normalize externally produced diagnostics without executing the tool."""
+        allowed_outcomes = {
+            "pass",
+            "fail",
+            "not-run",
+            "blocked-environment",
+            "blocked-supply",
+            "blocked-permission",
+            "invalid-baseline",
+            "stale",
+        }
+        if outcome not in allowed_outcomes:
+            raise ValueError("unsupported external observation outcome")
+        rows = []
+        for raw in diagnostics:
+            row = dict(raw)
+            row["identity"] = cls._diagnostic_identity(row)
+            rows.append(row)
+        rows.sort(key=lambda row: str(row["identity"]))
+        return {
+            "schema": "hashmarks.external-diagnostic-observation.v1",
+            "producer": producer,
+            "repository_identity": repository_identity,
+            "codemap_generation": int(codemap_generation),
+            "environment_identity": environment_identity,
+            "outcome": outcome,
+            "diagnostics": rows,
+            "diagnostic_count": len(rows),
+            "authority": "observation-only",
+            "execution_effect": "none",
+        }
+
+    @staticmethod
+    def diagnostic_observation_delta(
+        before: Mapping[str, object],
+        after: Mapping[str, object],
+        *,
+        changed_paths: Sequence[str] = (),
+    ) -> dict[str, object]:
+        """Compare diagnostic identities; counts alone are never delta authority."""
+        def indexed(packet: Mapping[str, object]) -> dict[str, Mapping[str, object]]:
+            rows = packet.get("diagnostics")
+            if not isinstance(rows, list):
+                return {}
+            return {
+                str(row["identity"]): row
+                for row in rows
+                if isinstance(row, Mapping) and row.get("identity")
+            }
+
+        old = indexed(before)
+        new = indexed(after)
+        old_ids = set(old)
+        new_ids = set(new)
+        added_ids = sorted(new_ids - old_ids)
+        removed_ids = sorted(old_ids - new_ids)
+        scope = {str(path) for path in changed_paths}
+        added = [deepcopy(new[identity]) for identity in added_ids]
+        removed = [deepcopy(old[identity]) for identity in removed_ids]
+        added_in_changed_scope = [
+            row for row in added if str(row.get("path") or "") in scope
+        ]
+        return {
+            "schema": "hashmarks.diagnostic-observation-delta.v1",
+            "producer": after.get("producer"),
+            "repository": {
+                "before": before.get("repository_identity"),
+                "after": after.get("repository_identity"),
+                "changed": before.get("repository_identity")
+                != after.get("repository_identity"),
+            },
+            "generation": {
+                "before": before.get("codemap_generation"),
+                "after": after.get("codemap_generation"),
+            },
+            "outcome": {
+                "before": before.get("outcome"),
+                "after": after.get("outcome"),
+            },
+            "diagnostics": {
+                "before_count": len(old),
+                "after_count": len(new),
+                "added": added,
+                "removed": removed,
+                "unchanged_count": len(old_ids & new_ids),
+                "added_in_changed_scope": added_in_changed_scope,
+            },
+            "authority": "observation-only",
+            "execution_effect": "none",
+        }
+
     @diagnostic_producer
     def repository_intelligence_snapshot(
         self,
