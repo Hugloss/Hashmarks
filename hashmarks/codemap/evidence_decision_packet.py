@@ -107,7 +107,7 @@ class DecisionPacketMixin:
         if not bool(build.get("complete")):
             needed, reason = True, "codemap-generation-incomplete"
         elif edit is None:
-            needed, reason = True, "no-safe-edit-candidate"
+            needed, reason = True, "no-supported-owner-candidate"
         elif bool(ambiguity.get("ambiguous")):
             needed, reason = True, "competing-action-roles"
         elif verify is None:
@@ -118,6 +118,7 @@ class DecisionPacketMixin:
             "candidates": self._decision_packet_candidates(action, edit, verify),
             "ambiguity": ambiguity if bool(ambiguity.get("ambiguous")) else None,
             "candidate_scope": "repository-evidence-only",
+            "interpretation": "evidence-discrimination-only",
             "consumer_action": "external",
         }
 
@@ -275,6 +276,8 @@ class DecisionPacketMixin:
                 "safe": bool(work_context["safe"]) and bool(build.get("complete")),
                 "missing_roles": work_context["missing_roles"],
             },
+            "authority": "repository-observation-only",
+            "consumer_action": "external",
             "ranking_effect": "none",
             "discovery_effect": action.get("discovery_effect", "none"),
             "decision_metrics": timing.as_payload(
