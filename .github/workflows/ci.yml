@@ -27,11 +27,21 @@ jobs:
         run: |
           git init .agent-economics
           git -C .agent-economics remote add origin https://github.com/Hugloss/agentsCookbook.git
-          git -C .agent-economics fetch --depth 1 origin 3eaf2c56f3e773e2659345232c0128b26e78a660
+          git -C .agent-economics fetch --depth 1 origin 353c6f2ff1b74f34aee94b4ff5e5fe4e4247722d
           git -C .agent-economics checkout --detach FETCH_HEAD
-          test "$(git -C .agent-economics rev-parse HEAD)" = "3eaf2c56f3e773e2659345232c0128b26e78a660"
+          test "$(git -C .agent-economics rev-parse HEAD)" = "353c6f2ff1b74f34aee94b4ff5e5fe4e4247722d"
       - name: Prove Agent Economics Ruff debt measurement parity
         run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --only-group lint python -m scripts.agent_evaluation.ruff_debt_agent_economics_parity
+      - name: Dogfood Agent Economics test-before-edit handoff
+        run: |
+          PYTHONPATH="$PWD/.agent-economics:$PWD" uv run --no-sync python -m scripts.agent_economics test-focus \
+            --repository-root . \
+            --source-root hashmarks \
+            --tests-root tests \
+            --package-name hashmarks \
+            --tests-package-name tests \
+            --changed-path hashmarks/codemap/task_action_projection.py \
+            --artifact .agent-artifacts/task-action-projection-test-focus.json
       - run: make compile
       - name: Prove workspace-state authority before heavy qualification
         run: uv run --no-sync python -m pytest -q tests/test_codemap_state_binding.py
