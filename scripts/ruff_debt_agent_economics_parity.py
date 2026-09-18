@@ -8,9 +8,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 _RUFF_DEBT_PATH = ROOT / "scripts" / "ruff_debt.py"
-_RUFF_DEBT_SPEC = importlib.util.spec_from_file_location("hashmarks_ruff_debt", _RUFF_DEBT_PATH)
+_RUFF_DEBT_SPEC = importlib.util.spec_from_file_location(
+    "hashmarks_ruff_debt", _RUFF_DEBT_PATH
+)
 if _RUFF_DEBT_SPEC is None or _RUFF_DEBT_SPEC.loader is None:
-    raise RuntimeError(f"cannot load Hashmarks Ruff debt implementation: {_RUFF_DEBT_PATH}")
+    raise RuntimeError(
+        f"cannot load Hashmarks Ruff debt implementation: {_RUFF_DEBT_PATH}"
+    )
 ruff_debt = importlib.util.module_from_spec(_RUFF_DEBT_SPEC)
 _RUFF_DEBT_SPEC.loader.exec_module(ruff_debt)
 AGENT_ECONOMICS = ROOT / ".agent-economics" / "scripts"
