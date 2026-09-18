@@ -3,11 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def index_surface_for_path(path: str) -> str:
-    """Classify one indexed repository path for measurement-only economics."""
-    lower = path.lower()
-    name = Path(lower).name
-    suffix = Path(lower).suffix
+def _special_index_surface(
+    lower: str, name: str, suffix: str, parts: set[str]
+) -> str | None:
+    """Classify artifact surfaces that take precedence over file roles."""
     if name in {
         "package-lock.json",
         "pnpm-lock.yaml",
@@ -17,22 +16,33 @@ def index_surface_for_path(path: str) -> str:
         "cargo.lock",
         "go.sum",
     } or name.endswith(".lock"):
-        return "lockfile"
-    if "openapi" in name or "swagger" in name:
-        return "openapi"
-    if any(
-        part in lower.split("/") for part in ("generated", "gen", "dist", "build")
-    ) or name.endswith((".generated.ts", ".generated.js", "_generated.py")):
-        return "generated"
-    if "snapshot" in lower or suffix == ".snap":
-        return "snapshot"
-    if any(part in lower.split("/") for part in ("fixtures", "fixture", "testdata")):
-        return "fixture"
-    if any(
-        part in lower.split("/")
-        for part in ("locales", "locale", "i18n", "translations")
+        surface = "lockfile"
+    elif "openapi" in name or "swagger" in name:
+        surface = "openapi"
+    elif parts.intersection({"generated", "gen", "dist", "build"}) or name.endswith(
+        (".generated.ts", ".generated.js", "_generated.py")
     ):
-        return "translation"
+        surface = "generated"
+    elif "snapshot" in lower or suffix == ".snap":
+        surface = "snapshot"
+    elif parts.intersection({"fixtures", "fixture", "testdata"}):
+        surface = "fixture"
+    elif parts.intersection({"locales", "locale", "i18n", "translations"}):
+        surface = "translation"
+    else:
+        surface = None
+    return surface
+
+
+def index_surface_for_path(path: str) -> str:
+    """Classify one indexed repository path for measurement-only economics."""
+    lower = path.lower()
+    name = Path(lower).name
+    suffix = Path(lower).suffix
+    parts = set(lower.split("/"))
+    special = _special_index_surface(lower, name, suffix, parts)
+    if special is not None:
+        return special
     if (
         lower.startswith(("tests/", "test/"))
         or "/tests/" in lower

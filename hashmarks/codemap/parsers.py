@@ -81,11 +81,75 @@ def _symbol(
     )
 
 
+def _node_declaration(stripped: str, line_no: int) -> SymbolRecord | None:
+    """Classify one advisory JS/TS declaration without inferring its RHS."""
+    match = re.match(
+        r"^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)",
+        stripped,
+    )
+    if match:
+        return _symbol(
+            name=match.group(1),
+            kind="function",
+            signature=stripped.split("{")[0].rstrip(),
+            line=line_no,
+        )
+    match = re.match(
+        r"^(?:export\s+)?(?:default\s+)?class\s+([A-Za-z_$][\w$]*)\b", stripped
+    )
+    if match:
+        return _symbol(
+            name=match.group(1),
+            kind="class",
+            signature=stripped.split("{")[0].rstrip(),
+            line=line_no,
+        )
+    match = re.match(
+        r"^(?:export\s+)?(?:interface|type|enum)\s+([A-Za-z_$][\w$]*)\b", stripped
+    )
+    if match:
+        keyword = (
+            stripped.split(None, 2)[1]
+            if stripped.startswith("export ")
+            else stripped.split(None, 1)[0]
+        )
+        return _symbol(
+            name=match.group(1),
+            kind=keyword,
+            signature=stripped.split("{")[0].rstrip(),
+            line=line_no,
+        )
+    match = re.match(
+        r"^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>",
+        stripped,
+    )
+    if match:
+        return _symbol(
+            name=match.group(1),
+            kind="function",
+            signature=stripped.split("=>", 1)[0].rstrip() + " =>",
+            line=line_no,
+        )
+    # React/hooks and modern TypeScript expose code landmarks as const
+    # bindings. Keep them as advisory structure without inferring the RHS.
+    match = re.match(
+        r"^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=", stripped
+    )
+    if match:
+        prefix = stripped.split("=", 1)[0].rstrip()
+        return _symbol(
+            name=match.group(1),
+            kind="binding",
+            signature=prefix + " = …",
+            line=line_no,
+        )
+    return None
+
+
 def _node_outline(source: str, *, file_digest: str, language: str) -> ParsedArtifact:
     symbols: list[SymbolRecord] = []
     edges: list[EdgeRecord] = []
-    lines = source.splitlines()
-    for line_no, raw in enumerate(lines, 1):
+    for line_no, raw in enumerate(source.splitlines(), 1):
         stripped = raw.strip()
         if not stripped:
             continue
@@ -98,82 +162,9 @@ def _node_outline(source: str, *, file_digest: str, language: str) -> ParsedArti
                 edges.append(
                     EdgeRecord(None, "import", match.group(1), line_no, "lexical")
                 )
-        match = re.match(
-            r"^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)",
-            stripped,
-        )
-        if match:
-            symbols.append(
-                _symbol(
-                    name=match.group(1),
-                    kind="function",
-                    signature=stripped.split("{")[0].rstrip(),
-                    line=line_no,
-                )
-            )
-            continue
-        match = re.match(
-            r"^(?:export\s+)?(?:default\s+)?class\s+([A-Za-z_$][\w$]*)\b", stripped
-        )
-        if match:
-            symbols.append(
-                _symbol(
-                    name=match.group(1),
-                    kind="class",
-                    signature=stripped.split("{")[0].rstrip(),
-                    line=line_no,
-                )
-            )
-            continue
-        match = re.match(
-            r"^(?:export\s+)?(?:interface|type|enum)\s+([A-Za-z_$][\w$]*)\b", stripped
-        )
-        if match:
-            keyword = (
-                stripped.split(None, 2)[1]
-                if stripped.startswith("export ")
-                else stripped.split(None, 1)[0]
-            )
-            symbols.append(
-                _symbol(
-                    name=match.group(1),
-                    kind=keyword,
-                    signature=stripped.split("{")[0].rstrip(),
-                    line=line_no,
-                )
-            )
-            continue
-        match = re.match(
-            r"^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>",
-            stripped,
-        )
-        if match:
-            symbols.append(
-                _symbol(
-                    name=match.group(1),
-                    kind="function",
-                    signature=stripped.split("=>", 1)[0].rstrip() + " =>",
-                    line=line_no,
-                )
-            )
-            continue
-        # React/hooks and modern TypeScript frequently expose important code
-        # landmarks as const bindings rather than declarations (for example
-        # ``const cancel = useCallback(...)``). Keep the binding as advisory
-        # structure without pretending to infer the RHS type or call graph.
-        match = re.match(
-            r"^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=", stripped
-        )
-        if match:
-            prefix = stripped.split("=", 1)[0].rstrip()
-            symbols.append(
-                _symbol(
-                    name=match.group(1),
-                    kind="binding",
-                    signature=prefix + " = …",
-                    line=line_no,
-                )
-            )
+        symbol = _node_declaration(stripped, line_no)
+        if symbol is not None:
+            symbols.append(symbol)
 
     outline = "\n".join(
         f"{symbol.signature}  [{symbol.start_line}]" for symbol in symbols

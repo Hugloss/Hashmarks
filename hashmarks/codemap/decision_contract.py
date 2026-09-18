@@ -10,6 +10,27 @@ DECISION_PACKET_SCHEMA = "hashmarks.task-decision-packet.v2"
 DECISION_CONTRACT_SCHEMA = "hashmarks.task-decision-contract.v1"
 
 
+def _required_boolean_field(value: Mapping[str, Any], field: str, label: str) -> bool:
+    if not isinstance(value.get(field), bool):
+        raise ValueError(f"decision packet {label} must be boolean")
+    return value[field]
+
+
+def _ambiguity_flag(discrimination: Mapping[str, Any]) -> bool:
+    ambiguity = discrimination.get("ambiguity")
+    if ambiguity is None:
+        return False
+    if not isinstance(ambiguity, Mapping):
+        raise ValueError(
+            "decision packet discrimination.ambiguity must be an object or null"
+        )
+    if type(ambiguity.get("ambiguous")) is not bool:
+        raise ValueError(
+            "decision packet discrimination.ambiguity.ambiguous must be boolean"
+        )
+    return ambiguity["ambiguous"]
+
+
 @dataclass(frozen=True)
 class DecisionSelection:
     path: str | None
@@ -61,36 +82,27 @@ class DecisionPacketContract:
             raise ValueError("decision packet discrimination must be an object")
         if not isinstance(identity, Mapping):
             raise ValueError("decision packet identity must be an object")
-        if not isinstance(discrimination.get("needed"), bool):
-            raise ValueError("decision packet discrimination.needed must be boolean")
-        if not isinstance(identity.get("codemap_complete"), bool):
-            raise ValueError(
-                "decision packet identity.codemap_complete must be boolean"
-            )
-        if not isinstance(identity.get("stale"), bool):
-            raise ValueError("decision packet identity.stale must be boolean")
+        needed = _required_boolean_field(
+            discrimination, "needed", "discrimination.needed"
+        )
+        complete = _required_boolean_field(
+            identity, "codemap_complete", "identity.codemap_complete"
+        )
+        stale = _required_boolean_field(identity, "stale", "identity.stale")
         generation = require_generation(
             packet.get("canonical_generation"),
             field="decision packet canonical_generation",
         )
-        ambiguity = discrimination.get("ambiguity")
-        if ambiguity is not None and not isinstance(ambiguity, Mapping):
-            raise ValueError(
-                "decision packet discrimination.ambiguity must be an object or null"
-            )
-        if ambiguity is not None and type(ambiguity.get("ambiguous")) is not bool:
-            raise ValueError(
-                "decision packet discrimination.ambiguity.ambiguous must be boolean"
-            )
+        ambiguous = _ambiguity_flag(discrimination)
         return cls(
             schema=DECISION_CONTRACT_SCHEMA,
             task=task,
             edit=DecisionSelection.from_value(packet.get("edit")),
             verify=DecisionSelection.from_value(packet.get("verify")),
-            discrimination_needed=bool(discrimination["needed"]),
+            discrimination_needed=needed,
             discrimination_reason=str(discrimination.get("reason") or ""),
-            ambiguous=False if ambiguity is None else ambiguity["ambiguous"],
-            codemap_complete=bool(identity["codemap_complete"]),
-            stale=bool(identity["stale"]),
+            ambiguous=ambiguous,
+            codemap_complete=complete,
+            stale=stale,
             canonical_generation=generation,
         )
