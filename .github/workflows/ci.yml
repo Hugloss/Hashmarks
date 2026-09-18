@@ -23,18 +23,20 @@ jobs:
       - run: uv sync --group test --python 3.11
       - run: make ruff
       - run: make lint-debt-gate
-      - name: Materialize Agent Economics quality-debt supply
+      - name: Materialize exact Agent Economics supply
         run: |
-          git init .agent-economics
-          git -C .agent-economics remote add origin https://github.com/Hugloss/agentsCookbook.git
-          git -C .agent-economics fetch --depth 1 origin 353c6f2ff1b74f34aee94b4ff5e5fe4e4247722d
-          git -C .agent-economics checkout --detach FETCH_HEAD
-          test "$(git -C .agent-economics rev-parse HEAD)" = "353c6f2ff1b74f34aee94b4ff5e5fe4e4247722d"
+          bootstrap="$(mktemp)"
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/Hugloss/agentsCookbook/46415f12f877850dbc6ae542414b2e7287a3ce58/scripts/bootstrap-agent-economics.sh \
+            --output "$bootstrap"
+          sh "$bootstrap" \
+            --revision 46415f12f877850dbc6ae542414b2e7287a3ce58 \
+            --destination .agent-economics
       - name: Prove Agent Economics Ruff debt measurement parity
         run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --only-group lint python -m scripts.agent_evaluation.ruff_debt_agent_economics_parity
       - name: Dogfood Agent Economics test-before-edit handoff
         run: |
-          PYTHONPATH="$PWD/.agent-economics:$PWD" uv run --no-sync python -m agent_economics test-focus \
+          PYTHONPATH="$PWD/.agent-economics/scripts:$PWD" uv run --no-sync python -m agent_economics test-focus \
             --repository-root . \
             --source-root hashmarks \
             --tests-root tests \
