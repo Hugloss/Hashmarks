@@ -152,11 +152,13 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 ## Product-boundary constitution
 
+Hashmarks is a repository observer that exposes repository intelligence, not an autonomous coding agent, policy engine, or execution engine.
+
 **PB1. Consumer workflow history is never repository authority.** What a consumer attempted, decided, executed, observed at runtime, or plans next cannot silently become repository truth.
 
 **PB2. Equal repository state must not depend on hidden prior consumer workflow.** Cache history may change latency and cost, never semantic authority.
 
-**PB3. Repository evidence may describe choices; consumer policy remains external.** Ranking, ambiguity, discriminating evidence, repair-surface nomination, and verification relevance do not transfer final action authority.
+**PB3. Repository evidence may describe choices; consumer policy remains external.** Ranking, ambiguity, discriminating evidence, candidate repository-surface nomination, and verification relevance do not transfer final action authority.
 
 **PB4. Repository relevance and runtime outcome authority are separate.** Execution, retries/resume, environment recovery, runtime outcomes, and certification remain external.
 

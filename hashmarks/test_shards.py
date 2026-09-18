@@ -940,6 +940,17 @@ def select(root: Path, shard_count: int, shard_index: int) -> tuple[str, ...]:
     return _selected_shard(plan(root, shard_count), shard_count, shard_index)
 
 
+def _emit_shard_plan(payload: Mapping[str, object], *, as_json: bool) -> None:
+    """Render immutable shard membership for the selection CLI."""
+    if as_json:
+        print(json.dumps(payload, sort_keys=True))  # noqa: T201 - intentional command output
+        return
+    for row in payload["shards"]:  # type: ignore[union-attr]
+        print(  # noqa: T201 - intentional command output
+            f"{row['index']}: {len(row['nodeids'])} tests / {row['weight_bytes']} source-weight bytes"
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Deterministic pytest test-node shard selector"
@@ -975,13 +986,7 @@ def main() -> int:
         return 0
     payload = plan(root, args.shards)
     if args.shard is None:
-        if args.json:
-            print(json.dumps(payload, sort_keys=True))  # noqa: T201 - intentional command output
-        else:
-            for row in payload["shards"]:  # type: ignore[index]
-                print(  # noqa: T201 - intentional command output
-                    f"{row['index']}: {len(row['nodeids'])} tests / {row['weight_bytes']} source-weight bytes"
-                )
+        _emit_shard_plan(payload, as_json=args.json)
         return 0
     try:
         selected = _selected_shard(payload, args.shards, args.shard)

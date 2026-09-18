@@ -26,6 +26,11 @@ def test_query_router_classifies_strong_intents() -> None:
     assert route_query("strange mixed words").intent is QueryIntent.HYBRID
 
 
+def test_query_router_rejects_empty_query() -> None:
+    with pytest.raises(ValueError, match="query must not be empty"):
+        route_query("  \t ")
+
+
 def test_path_config_and_test_routes_prune_native_definition_expansion() -> None:
     for query in ("src/app.ts", "pyproject config", "pytest fixture"):
         route = route_query(query)

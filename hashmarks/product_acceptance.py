@@ -55,7 +55,7 @@ def _ownership_check(action: Mapping[str, object]) -> bool:
         return False
     return (
         authority.get("status") == "resolved"
-        or authority.get("authoritative_edit") is None
+        or authority.get("resolved_owner") is None
     )
 
 

@@ -50,3 +50,28 @@ def test_decision_generation_accepts_zero_and_portable_maximum():
         value_packet = packet()
         value_packet["canonical_generation"] = value
         assert DecisionPacketContract.parse(value_packet).canonical_generation == value
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("schema", "unknown", "unsupported decision packet schema"),
+        ("task", "", "task must be a non-empty string"),
+        ("discrimination", None, "discrimination must be an object"),
+        ("identity", None, "identity must be an object"),
+        ("discrimination.needed", 1, "discrimination.needed must be boolean"),
+        ("identity.codemap_complete", 1, "identity.codemap_complete must be boolean"),
+        ("identity.stale", None, "identity.stale must be boolean"),
+        ("discrimination.ambiguity", [], "ambiguity must be an object or null"),
+        ("edit", [], "evidence selection must be an object or null"),
+    ],
+)
+def test_decision_packet_rejects_invalid_contract_fields(field, value, message):
+    value_packet = packet()
+    if "." in field:
+        parent, child = field.split(".", 1)
+        value_packet[parent][child] = value
+    else:
+        value_packet[field] = value
+    with pytest.raises(ValueError, match=message):
+        DecisionPacketContract.parse(value_packet)

@@ -1,33 +1,24 @@
 # Hashmarks agent instructions
 
-## Product admission comes before implementation
+## Observer constitution comes before implementation
 
-The normative product/feature-admission contract is [`docs/reference/PRODUCT_BOUNDARY.md`](docs/reference/PRODUCT_BOUNDARY.md).
+The normative product constitution is [`docs/reference/PRODUCT_BOUNDARY.md`](docs/reference/PRODUCT_BOUNDARY.md).
 
-**Every proposed new capability must be checked against the Hashmarks product profile before design or coding starts.** This applies even when the proposal comes from the user, a benchmark, a failing experiment, an integration request, or existing code.
+**Hashmarks is a repository observer.** Before adding a new production responsibility, apply one direct test:
 
-Do not assume that making an agent more capable means the capability belongs in Hashmarks. Hashmarks is repository intelligence for consumers; it is not the consumer's reasoning, workflow, memory, execution, or orchestration layer.
+> Does this describe repository state/evidence—identity, structure, relationships, provenance, completeness, freshness, uncertainty, capability, or delta—or does it decide/control what a consumer or executor should do?
 
-For every new product proposal, classify it first:
+Repository observation belongs in Hashmarks. Consumer reasoning/policy and execution/certification do not.
 
-- **ADMIT** — repository intelligence is the primary purpose and source of authority;
-- **SPLIT** — keep only the neutral repository-evidence primitive in Hashmarks and route workflow/runtime behavior outward;
-- **REJECT** — the proposal primarily belongs to the consumer or execution layer.
+Use **OBSERVER** when the repository observer is the clear owner, **SPLIT** when only a neutral observation primitive belongs here, and **OUTSIDE** when the semantic result is primarily a recommendation, sufficiency decision, workflow action, execution control, retry/recovery rule, or certification decision.
 
-A finding is not automatically a requirement. For **every** result or proposed improvement, first decide whether it is:
+Do not build a policy engine to enforce this policy. Do not add policy-of-policy schemas, admission databases, runtime governance state, recommendation rules, or workflow gates merely to keep Hashmarks in profile. The boundary is maintained through architecture, names, types, tests, documentation, and removal of misplaced responsibility.
 
-- an in-profile defect to repair;
-- an in-profile optimization;
-- a missing repository primitive that needs admission review;
-- consumer/runtime behavior that must be routed outward;
-- existing boundary debt to simplify/remove; or
-- measurement-only infrastructure that must stay outside production semantics.
+Defect repairs, refactors, tests, documentation, and semantics-preserving optimizations do not need an admission ceremony. New production responsibility needs only the short observer ownership note defined in `PRODUCT_BOUNDARY.md`.
 
-The agent must apply this test to **its own ideas**. Do not implement a proposal merely because it sounds useful, improves an end-to-end agent benchmark, or was explicitly suggested. Product ownership is decided by the Hashmarks profile.
+A finding is not automatically a requirement. Real-world traces and benchmarks may reveal observer defects or missing observer primitives, but agent/execution behavior discovered by those traces stays with the consumer/execution layer.
 
-Use the mandatory admission gate and proposal record in `PRODUCT_BOUNDARY.md`. If ownership is unclear, prefer the smaller Hashmarks and gather evidence before expanding its responsibility.
-
-Existing APIs, experiments, compatibility surfaces, and historical benchmarks are not architectural precedent. Boundary debt must not be used to justify more boundary debt.
+Existing APIs and historical experiments are not precedent. Prefer extending the existing identity/CodeMap/evidence/freshness/delta owners over creating parallel graphs, generations, caches, policy engines, or workflow state.
 
 ## Evidence authority is non-strengthening
 

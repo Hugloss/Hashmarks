@@ -62,8 +62,8 @@ def _child(parent: ET.Element | None, name: str) -> ET.Element | None:
     )
 
 
-def collect_maven_modules(workspace: Path) -> MavenSnapshot:
-    warnings: list[str] = []
+def _maven_manifests(workspace: Path) -> list[Path]:
+    """Find repository-owned POMs without descending into generated trees."""
     manifests: list[Path] = []
     for current, dirs, files in os.walk(workspace, topdown=True, followlinks=False):
         dirs[:] = sorted(name for name in dirs if name not in _PRUNE)
@@ -71,8 +71,49 @@ def collect_maven_modules(workspace: Path) -> MavenSnapshot:
             manifest = Path(current) / "pom.xml"
             if not manifest.is_symlink():
                 manifests.append(manifest)
+    return sorted(manifests)
+
+
+def _maven_dependencies(root: ET.Element) -> tuple[tuple[str, str], ...]:
+    deps_parent = _child(root, "dependencies")
+    if deps_parent is None:
+        return ()
+    dependencies: list[tuple[str, str]] = []
+    for dep in deps_parent:
+        if dep.tag.rsplit("}", 1)[-1] != "dependency":
+            continue
+        dep_group = _text(dep, "groupId") or ""
+        dep_artifact = _text(dep, "artifactId") or ""
+        if dep_artifact:
+            dependencies.append((dep_group, dep_artifact))
+    return tuple(dependencies)
+
+
+def _maven_module(
+    root: ET.Element, manifest: Path, workspace: Path
+) -> MavenModuleData | None:
+    parent = _child(root, "parent")
+    group_id = _text(root, "groupId") or _text(parent, "groupId") or ""
+    artifact_id = _text(root, "artifactId") or ""
+    if not artifact_id:
+        return None
+    rel_root = manifest.parent.relative_to(workspace).as_posix() or "."
+    rel_manifest = manifest.relative_to(workspace).as_posix()
+    module_id = f"{group_id}:{artifact_id}" if group_id else artifact_id
+    return MavenModuleData(
+        module_id,
+        group_id,
+        artifact_id,
+        rel_root,
+        rel_manifest,
+        _maven_dependencies(root),
+    )
+
+
+def collect_maven_modules(workspace: Path) -> MavenSnapshot:
+    warnings: list[str] = []
     modules: list[MavenModuleData] = []
-    for manifest in sorted(manifests):
+    for manifest in _maven_manifests(workspace):
         try:
             root = ET.parse(manifest).getroot()
         except (ET.ParseError, OSError) as exc:
@@ -80,32 +121,7 @@ def collect_maven_modules(workspace: Path) -> MavenSnapshot:
                 f"cannot parse {manifest.relative_to(workspace).as_posix()}: {exc}"
             )
             continue
-        parent = _child(root, "parent")
-        group_id = _text(root, "groupId") or _text(parent, "groupId") or ""
-        artifact_id = _text(root, "artifactId") or ""
-        if not artifact_id:
-            continue
-        deps_parent = _child(root, "dependencies")
-        dependencies: list[tuple[str, str]] = []
-        if deps_parent is not None:
-            for dep in deps_parent:
-                if dep.tag.rsplit("}", 1)[-1] != "dependency":
-                    continue
-                dep_group = _text(dep, "groupId") or ""
-                dep_artifact = _text(dep, "artifactId") or ""
-                if dep_artifact:
-                    dependencies.append((dep_group, dep_artifact))
-        rel_root = manifest.parent.relative_to(workspace).as_posix() or "."
-        rel_manifest = manifest.relative_to(workspace).as_posix()
-        module_id = f"{group_id}:{artifact_id}" if group_id else artifact_id
-        modules.append(
-            MavenModuleData(
-                module_id,
-                group_id,
-                artifact_id,
-                rel_root,
-                rel_manifest,
-                tuple(dependencies),
-            )
-        )
+        module = _maven_module(root, manifest, workspace)
+        if module is not None:
+            modules.append(module)
     return MavenSnapshot(find_maven(workspace), tuple(modules), tuple(warnings))

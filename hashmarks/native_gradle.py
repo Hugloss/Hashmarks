@@ -62,6 +62,56 @@ def _manifest_candidates(workspace: Path, project_root: Path) -> tuple[str, ...]
     return tuple(dict.fromkeys(values))
 
 
+def _gradle_report_payload(stdout: str) -> tuple[list[object] | None, str | None]:
+    """Read the last marked project report without treating other output as evidence."""
+    payload = None
+    for line in stdout.splitlines():
+        if line.startswith(_MARKER):
+            try:
+                payload = json.loads(line[len(_MARKER) :])
+            except json.JSONDecodeError:
+                return None, "Gradle project report returned invalid JSON"
+    if not isinstance(payload, list):
+        return None, "Gradle project report marker was not emitted"
+    return payload, None
+
+
+def _gradle_project_rows(
+    workspace: Path, payload: list[object]
+) -> tuple[GradleProjectData, ...]:
+    """Keep only projects whose resolved directory belongs to this workspace."""
+    projects: list[GradleProjectData] = []
+    for raw in payload:
+        if not isinstance(raw, dict):
+            continue
+        project_dir = Path(str(raw.get("projectDir") or "")).resolve(strict=False)
+        try:
+            root = project_dir.relative_to(workspace).as_posix() or "."
+        except ValueError:
+            continue
+        path = str(raw.get("path") or ":")
+        name = str(raw.get("name") or path.strip(":") or workspace.name)
+        deps = tuple(
+            str(value)
+            for value in raw.get("dependencies") or ()
+            if isinstance(value, str)
+        )
+        tasks = tuple(
+            str(value) for value in raw.get("tasks") or () if isinstance(value, str)
+        )
+        projects.append(
+            GradleProjectData(
+                path,
+                name,
+                root,
+                deps,
+                tasks,
+                _manifest_candidates(workspace, project_dir),
+            )
+        )
+    return tuple(projects)
+
+
 def collect_gradle_projects(
     workspace: Path, *, executable: str | None = None, timeout: float = 60.0
 ) -> GradleSnapshot:
@@ -131,46 +181,8 @@ gradle.projectsEvaluated {
         return GradleSnapshot(
             gradle, warnings=(f"Gradle project report failed: {detail}",)
         )
-    payload = None
-    for line in completed.stdout.splitlines():
-        if line.startswith(_MARKER):
-            try:
-                payload = json.loads(line[len(_MARKER) :])
-            except json.JSONDecodeError:
-                return GradleSnapshot(
-                    gradle, warnings=("Gradle project report returned invalid JSON",)
-                )
-    if not isinstance(payload, list):
-        return GradleSnapshot(
-            gradle, warnings=("Gradle project report marker was not emitted",)
-        )
-    projects: list[GradleProjectData] = []
-    for raw in payload:
-        if not isinstance(raw, dict):
-            continue
-        project_dir = Path(str(raw.get("projectDir") or "")).resolve(strict=False)
-        try:
-            root = project_dir.relative_to(workspace).as_posix() or "."
-        except ValueError:
-            continue
-        path = str(raw.get("path") or ":")
-        name = str(raw.get("name") or path.strip(":") or workspace.name)
-        deps = tuple(
-            str(value)
-            for value in raw.get("dependencies") or ()
-            if isinstance(value, str)
-        )
-        tasks = tuple(
-            str(value) for value in raw.get("tasks") or () if isinstance(value, str)
-        )
-        projects.append(
-            GradleProjectData(
-                path,
-                name,
-                root,
-                deps,
-                tasks,
-                _manifest_candidates(workspace, project_dir),
-            )
-        )
-    return GradleSnapshot(gradle, tuple(projects))
+    payload, warning = _gradle_report_payload(completed.stdout)
+    if warning is not None:
+        return GradleSnapshot(gradle, warnings=(warning,))
+    assert payload is not None
+    return GradleSnapshot(gradle, _gradle_project_rows(workspace, payload))

@@ -73,22 +73,12 @@ class WorkContextMixin:
 
         selected: list[dict[str, object]] = []
         used = 0
-        missing_roles: list[str] = []
         # Skeleton first. If the caller gives a pathologically tiny budget, retain
-        # priority order and report which mandatory roles could not be admitted.
+        # priority order. Missing roles are derived from coverage below so a single
+        # path that owns multiple mandatory roles cannot hide an uncovered role.
         for item in mandatory:
             cost = int(item["estimated_tokens"])
             if used + cost <= token_budget:
-                selected.append(item)
-                used += cost
-            else:
-                missing_roles.append(str(item["role"]))
-
-        if not missing_roles:
-            for item in optional:
-                cost = int(item["estimated_tokens"])
-                if used + cost > token_budget:
-                    continue
                 selected.append(item)
                 used += cost
 
@@ -99,6 +89,20 @@ class WorkContextMixin:
             )
             for role in ("edit", "verify", "contract")
         }
+        required_roles = [
+            role
+            for role in ("edit", "verify", "contract")
+            if isinstance(action.get(role), dict)
+        ]
+        missing_roles = [role for role in required_roles if not role_coverage[role]]
+
+        if not missing_roles:
+            for item in optional:
+                cost = int(item["estimated_tokens"])
+                if used + cost > token_budget:
+                    continue
+                selected.append(item)
+                used += cost
         supplied_bytes = sum(
             len(str(item["content"]).encode("utf-8")) for item in selected
         )
@@ -115,12 +119,7 @@ class WorkContextMixin:
             if identity in seen_content:
                 duplicate_evidence_bytes += size
             seen_content.add(identity)
-        required_roles = [
-            role
-            for role in ("edit", "verify", "contract")
-            if isinstance(action.get(role), dict)
-        ]
-        safe = all(role_coverage[role] for role in required_roles)
+        safe = not missing_roles
         return {
             "schema": "hashmarks.agent-work-context.v1",
             "budget": token_budget,

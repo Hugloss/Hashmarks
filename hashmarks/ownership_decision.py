@@ -125,8 +125,10 @@ def ownership_authority_contract(
     return {
         "schema": AUTHORITY_SCHEMA,
         "status": status,
-        "safe_to_edit": safe,
-        "authoritative_edit": selected_path if safe else None,
-        "candidate_edit": selected_path or None,
+        "owner_resolved": safe,
+        "resolved_owner": selected_path if safe else None,
+        "candidate_owner": selected_path or None,
         "reason": reason,
+        "authority": "repository-ownership-only",
+        "consumer_action": "external",
     }

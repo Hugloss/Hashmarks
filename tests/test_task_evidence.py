@@ -107,7 +107,7 @@ def test_task_evidence_fails_closed_before_disclosing_evidence_without_edit_auth
     assert start["status"] == "unsafe"
     assert start["edit_evidence"] is None
     assert start["next_read"] is None
-    assert start["discrimination"] == "no-safe-edit-candidate"
+    assert start["discrimination"] == "no-supported-owner-candidate"
 
 
 def test_task_evidence_computes_action_map_once(tmp_path: Path) -> None:

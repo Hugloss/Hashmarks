@@ -14,6 +14,28 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+OBSERVATION_STATES = frozenset(
+    {"known-present", "known-absent", "unknown", "incomplete", "stale", "unsupported"}
+)
+
+
+def _observer_descriptor() -> dict[str, object]:
+    """Describe the observer capability separately from repository identity."""
+    return {
+        "producer": "hashmarks",
+        "surface": "repository-intelligence",
+        "schema": "hashmarks.repository-observer.v1",
+        "capabilities": [
+            "affected",
+            "dependencies",
+            "freshness",
+            "ownership",
+            "symbols",
+            "verification",
+        ],
+    }
+
+
 class RepositoryDeltaMixin:
     """Bounded semantic snapshots and deltas over repository intelligence.
 
@@ -23,6 +45,18 @@ class RepositoryDeltaMixin:
     ownership/impact/verification/freshness authority and emits only changed
     facts plus compact semantic summaries.
     """
+
+    @staticmethod
+    def _evidence_identity(schema: str, value: Mapping[str, object]) -> str:
+        """Return a deterministic domain-separated identity for observer evidence."""
+        import hashlib
+        import json
+
+        raw = json.dumps(
+            value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+        digest = hashlib.sha256(schema.encode("utf-8") + b"\0" + raw).hexdigest()
+        return f"sha256:{digest}"
 
     @staticmethod
     def _delta_mapping(value: object, *, field: str) -> Mapping[str, object]:
@@ -58,9 +92,27 @@ class RepositoryDeltaMixin:
             symbols = sorted(
                 (
                     {
-                        key: str(symbol[key])
-                        for key in ("name", "qualname", "kind")
-                        if symbol.get(key) is not None and str(symbol.get(key) or "")
+                        **{
+                            key: str(symbol[key])
+                            for key in ("name", "qualname", "kind")
+                            if symbol.get(key) is not None and str(symbol.get(key) or "")
+                        },
+                        "identity": self._evidence_identity(
+                            "hashmarks.symbol-evidence.v1",
+                            {
+                                "path": path,
+                                **{
+                                    key: str(symbol[key])
+                                    for key in ("name", "qualname", "kind")
+                                    if symbol.get(key) is not None
+                                    and str(symbol.get(key) or "")
+                                },
+                            },
+                        ),
+                        "provenance": {
+                            "source": "codemap-symbol-index",
+                            "path": path,
+                        },
                     }
                     for symbol in symbols_by_path.get(path, ())
                 ),
@@ -73,9 +125,27 @@ class RepositoryDeltaMixin:
             dependencies = sorted(
                 (
                     {
-                        key: str(edge[key])
-                        for key in ("source", "kind", "target", "confidence")
-                        if edge.get(key) is not None and str(edge.get(key) or "")
+                        **{
+                            key: str(edge[key])
+                            for key in ("source", "kind", "target", "confidence")
+                            if edge.get(key) is not None and str(edge.get(key) or "")
+                        },
+                        "identity": self._evidence_identity(
+                            "hashmarks.relationship-evidence.v1",
+                            {
+                                "path": path,
+                                **{
+                                    key: str(edge[key])
+                                    for key in ("source", "kind", "target", "confidence")
+                                    if edge.get(key) is not None
+                                    and str(edge.get(key) or "")
+                                },
+                            },
+                        ),
+                        "provenance": {
+                            "source": "codemap-edge-index",
+                            "path": path,
+                        },
                     }
                     for edge in edges_by_path.get(path, ())
                     if edge.get("kind") and edge.get("target")
@@ -127,6 +197,208 @@ class RepositoryDeltaMixin:
                 if field in entry
             }
         return rows
+
+
+    @staticmethod
+    def _diagnostic_identity(row: Mapping[str, object]) -> str:
+        """Canonical diagnostic identity independent of aggregate count/order."""
+        import hashlib
+        import json
+
+        identity_fields = {
+            key: row.get(key)
+            for key in ("tool", "rule", "path", "symbol", "line", "column", "message")
+            if row.get(key) is not None
+        }
+        raw = json.dumps(
+            identity_fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+        return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+    @classmethod
+    def external_diagnostic_observation(
+        cls,
+        *,
+        producer: str,
+        repository_identity: str,
+        codemap_generation: int,
+        diagnostics: Sequence[Mapping[str, object]],
+        outcome: str,
+        environment_identity: str | None = None,
+        scope_paths: Sequence[str] = (),
+    ) -> dict[str, object]:
+        """Normalize externally produced diagnostics without executing the tool."""
+        allowed_outcomes = {
+            "pass",
+            "fail",
+            "not-run",
+            "blocked-environment",
+            "blocked-supply",
+            "blocked-permission",
+            "invalid-baseline",
+            "stale",
+        }
+        if outcome not in allowed_outcomes:
+            raise ValueError("unsupported external observation outcome")
+        rows = []
+        for raw in diagnostics:
+            row = dict(raw)
+            row["identity"] = cls._diagnostic_identity(row)
+            rows.append(row)
+        rows.sort(key=lambda row: str(row["identity"]))
+        return {
+            "schema": "hashmarks.external-diagnostic-observation.v1",
+            "producer": producer,
+            "repository_identity": repository_identity,
+            "codemap_generation": int(codemap_generation),
+            "environment_identity": environment_identity,
+            "scope_paths": sorted({str(path) for path in scope_paths}),
+            "outcome": outcome,
+            "diagnostics": rows,
+            "diagnostic_count": len(rows),
+            "authority": "observation-only",
+            "execution_effect": "none",
+        }
+
+    def verification_relationship_evidence(
+        self,
+        *,
+        source: str,
+        target: str,
+        classification: str,
+        relation_kind: str,
+        provenance: str,
+    ) -> dict[str, object]:
+        """Describe an objective repository relationship without consumer policy."""
+        if classification not in {"direct", "related", "unknown"}:
+            raise ValueError("unsupported verification relationship classification")
+        if not relation_kind.strip():
+            raise ValueError("verification relationship kind must be nonblank")
+        payload = {
+            "source": source,
+            "target": target,
+            "classification": classification,
+            "relation_kind": relation_kind,
+            "provenance": provenance,
+        }
+        return {
+            **payload,
+            "evidence_identity": self._evidence_identity(
+                "hashmarks.verification-relationship.v1", payload
+            ),
+            "authority": "repository-relationship-only",
+            "execution_effect": "none",
+        }
+
+    @staticmethod
+    def external_observation_freshness(
+        observation: Mapping[str, object],
+        *,
+        current_repository_identity: str,
+        current_generation: int,
+        changed_paths: Sequence[str] = (),
+        dependency_paths: Sequence[str] = (),
+    ) -> dict[str, object]:
+        """Evaluate scoped freshness without making every generation globally stale."""
+        observed_repository = str(observation.get("repository_identity") or "")
+        observed_generation = observation.get("codemap_generation")
+        raw_scope = observation.get("scope_paths")
+        scope = (
+            {str(path) for path in raw_scope}
+            if isinstance(raw_scope, list)
+            else set()
+        )
+        relevant = scope | {str(path) for path in dependency_paths}
+        changed = {str(path) for path in changed_paths}
+        intersection = sorted(relevant & changed)
+        repository_changed = observed_repository != current_repository_identity
+        generation_changed = observed_generation != current_generation
+
+        if not repository_changed and not generation_changed:
+            state = "fresh"
+            reason = "repository-and-generation-unchanged"
+        elif not relevant:
+            state = "stale"
+            reason = "repository-changed-without-declared-observation-scope"
+        elif intersection:
+            state = "stale"
+            reason = "relevant-repository-evidence-changed"
+        else:
+            state = "fresh"
+            reason = "changed-paths-proven-outside-observation-scope"
+
+        return {
+            "schema": "hashmarks.external-observation-freshness.v1",
+            "state": state,
+            "reason": reason,
+            "repository_changed": repository_changed,
+            "generation_changed": generation_changed,
+            "observation_scope": sorted(scope),
+            "dependency_scope": sorted({str(path) for path in dependency_paths}),
+            "changed_paths": sorted(changed),
+            "intersection": intersection,
+            "authority": "observation-freshness-only",
+            "execution_effect": "none",
+        }
+
+    @staticmethod
+    def diagnostic_observation_delta(
+        before: Mapping[str, object],
+        after: Mapping[str, object],
+        *,
+        changed_paths: Sequence[str] = (),
+    ) -> dict[str, object]:
+        """Compare diagnostic identities; counts alone are never delta authority."""
+        def indexed(packet: Mapping[str, object]) -> dict[str, Mapping[str, object]]:
+            rows = packet.get("diagnostics")
+            if not isinstance(rows, list):
+                return {}
+            return {
+                str(row["identity"]): row
+                for row in rows
+                if isinstance(row, Mapping) and row.get("identity")
+            }
+
+        old = indexed(before)
+        new = indexed(after)
+        old_ids = set(old)
+        new_ids = set(new)
+        added_ids = sorted(new_ids - old_ids)
+        removed_ids = sorted(old_ids - new_ids)
+        scope = {str(path) for path in changed_paths}
+        added = [deepcopy(new[identity]) for identity in added_ids]
+        removed = [deepcopy(old[identity]) for identity in removed_ids]
+        added_in_changed_scope = [
+            row for row in added if str(row.get("path") or "") in scope
+        ]
+        return {
+            "schema": "hashmarks.diagnostic-observation-delta.v1",
+            "producer": after.get("producer"),
+            "repository": {
+                "before": before.get("repository_identity"),
+                "after": after.get("repository_identity"),
+                "changed": before.get("repository_identity")
+                != after.get("repository_identity"),
+            },
+            "generation": {
+                "before": before.get("codemap_generation"),
+                "after": after.get("codemap_generation"),
+            },
+            "outcome": {
+                "before": before.get("outcome"),
+                "after": after.get("outcome"),
+            },
+            "diagnostics": {
+                "before_count": len(old),
+                "after_count": len(new),
+                "added": added,
+                "removed": removed,
+                "unchanged_count": len(old_ids & new_ids),
+                "added_in_changed_scope": added_in_changed_scope,
+            },
+            "authority": "observation-only",
+            "execution_effect": "none",
+        }
 
     @diagnostic_producer
     def repository_intelligence_snapshot(
@@ -184,8 +456,14 @@ class RepositoryDeltaMixin:
             impact_limit_per_surface=impact_limit_per_surface,
             max_depth=max_depth,
         )
+        observer = _observer_descriptor()
         payload: dict[str, object] = {
             "schema": "hashmarks.repository-intelligence-snapshot.v1",
+            "observer": {
+                **observer,
+                "identity": "sha256:"
+                + self._packet_digest("hashmarks.repository-observer.v1", observer),
+            },
             "repository": deepcopy(brief["repository"]),
             "task_identity": brief["task_identity"],
             "paths": self._snapshot_paths(changed_paths),
@@ -194,7 +472,11 @@ class RepositoryDeltaMixin:
             "verification": self._snapshot_verification(brief),
             "freshness": self._snapshot_freshness(freshness),
             "bounds": deepcopy(brief.get("bounds") or {}),
-            "completeness": "bounded-explicit-change-set",
+            "completeness": {
+                "state": "known-present",
+                "scope": "bounded-explicit-change-set",
+                "dynamic_runtime_relationships": "unknown",
+            },
             "storage": "derived-not-persisted",
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
@@ -284,7 +566,13 @@ class RepositoryDeltaMixin:
         if not isinstance(values, list):
             return set()
         return {
-            tuple(sorted((str(k), str(v)) for k, v in item.items()))
+            tuple(
+                sorted(
+                    (str(k), str(v))
+                    for k, v in item.items()
+                    if k not in {"identity", "provenance"}
+                )
+            )
             for item in values
             if isinstance(item, Mapping)
         }
@@ -325,7 +613,7 @@ class RepositoryDeltaMixin:
                 {"path": path, **self._decode_row(value)}
                 for value in sorted(old_dependencies - new_dependencies)
             )
-        moved: list[dict[str, object]] = []
+        possible_moves: list[dict[str, object]] = []
         removed_by_symbol = {
             (row.get("qualname") or row.get("name"), row.get("kind")): row
             for row in symbols_removed
@@ -334,19 +622,22 @@ class RepositoryDeltaMixin:
             key = (added.get("qualname") or added.get("name"), added.get("kind"))
             removed = removed_by_symbol.get(key)
             if removed is not None and removed["path"] != added["path"]:
-                moved.append(
+                possible_moves.append(
                     {
                         "name": added.get("qualname") or added.get("name"),
                         "kind": added.get("kind"),
                         "from": removed["path"],
                         "to": added["path"],
+                        "state": "possible",
+                        "provenance": "same-qualified-name-and-kind",
+                        "identity_authority": False,
                     }
                 )
         result: dict[str, object] = {}
         for key, rows in (
             ("symbols_added", symbols_added),
             ("symbols_removed", symbols_removed),
-            ("symbols_moved", moved),
+            ("possible_symbol_moves", possible_moves),
             ("dependencies_added", dependencies_added),
             ("dependencies_removed", dependencies_removed),
         ):
@@ -413,6 +704,18 @@ class RepositoryDeltaMixin:
                 if isinstance(row.get("path"), list) and row["path"]
             }
         )
+        previous_observer = self._delta_mapping(
+            previous_snapshot.get("observer"), field="previous_snapshot.observer"
+        )
+        current_observer = self._delta_mapping(
+            current.get("observer"), field="current.observer"
+        )
+        previous_completeness = self._delta_mapping(
+            previous_snapshot.get("completeness"), field="previous_snapshot.completeness"
+        )
+        current_completeness = self._delta_mapping(
+            current.get("completeness"), field="current.completeness"
+        )
         payload: dict[str, object] = {
             "schema": "hashmarks.repository-intelligence-delta.v1",
             "repository_identity": repository_identity,
@@ -428,7 +731,17 @@ class RepositoryDeltaMixin:
             "changes": changes,
             "changed_sections": changed_sections,
             "semantic": self._semantic_changes(previous_snapshot, current),
-            "completeness": "bounded-explicit-change-set",
+            "observer": {
+                "before": previous_observer.get("identity"),
+                "after": current_observer.get("identity"),
+                "changed": previous_observer.get("identity")
+                != current_observer.get("identity"),
+            },
+            "completeness": {
+                "before": deepcopy(previous_completeness),
+                "after": deepcopy(current_completeness),
+                "changed": previous_completeness != current_completeness,
+            },
             "storage": "derived-not-persisted",
             "authority": "repository-intelligence-only",
             "execution_effect": "none",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
 from .decision_session import incomplete_decision_scoped
@@ -10,6 +11,59 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from .engine import CodeMap
+
+
+def _append_decision_candidate(
+    row: object, candidates: list[dict[str, object]], seen: set[str]
+) -> None:
+    if not isinstance(row, dict):
+        return
+    path = str(row.get("path") or "")
+    if not path or path in seen:
+        return
+    seen.add(path)
+    candidates.append(
+        {
+            "path": path,
+            "canonical_rank": int(row.get("canonical_rank") or 0),
+            "roles": list(row.get("roles") or []),
+        }
+    )
+
+
+@dataclass
+class _DecisionPacketTiming:
+    """Measure the existing packet phases within one projection call."""
+
+    started: float = field(default_factory=time.perf_counter)
+    phase_started: float = field(init=False)
+    phase_seconds: dict[str, float] = field(default_factory=dict)
+    total_seconds: float = 0.0
+
+    def __post_init__(self) -> None:
+        self.phase_started = self.started
+
+    def begin_phase(self) -> None:
+        self.phase_started = time.perf_counter()
+
+    def record(self, phase: str) -> None:
+        self.phase_seconds[phase] = time.perf_counter() - self.phase_started
+
+    def finish(self) -> None:
+        self.total_seconds = time.perf_counter() - self.started
+
+    def as_payload(self, *, session_active: bool) -> dict[str, object]:
+        return {
+            "schema": "hashmarks.task-decision-metrics.v1",
+            "seconds": {
+                "action_map": self.phase_seconds["action_map"],
+                "work_context": self.phase_seconds["work_context"],
+                "verification_plan": self.phase_seconds["verification_plan"],
+                "packet_assembly": self.phase_seconds["packet_assembly"],
+                "total": self.total_seconds,
+            },
+            "session_active": session_active,
+        }
 
 
 class DecisionPacketMixin:
@@ -23,29 +77,14 @@ class DecisionPacketMixin:
         candidates: list[dict[str, object]] = []
         seen: set[str] = set()
 
-        def add(row: object) -> None:
-            if not isinstance(row, dict):
-                return
-            path = str(row.get("path") or "")
-            if not path or path in seen:
-                return
-            seen.add(path)
-            candidates.append(
-                {
-                    "path": path,
-                    "canonical_rank": int(row.get("canonical_rank") or 0),
-                    "roles": list(row.get("roles") or []),
-                }
-            )
-
         for row in (edit, verify, action.get("contract")):
-            add(row)
+            _append_decision_candidate(row, candidates, seen)
         for key in ("inspect", "related"):
             values = action.get(key)
             if not isinstance(values, list):
                 continue
             for row in values:
-                add(row)
+                _append_decision_candidate(row, candidates, seen)
                 if len(candidates) >= 6:
                     return candidates
         return candidates
@@ -68,7 +107,7 @@ class DecisionPacketMixin:
         if not bool(build.get("complete")):
             needed, reason = True, "codemap-generation-incomplete"
         elif edit is None:
-            needed, reason = True, "no-safe-edit-candidate"
+            needed, reason = True, "no-supported-owner-candidate"
         elif bool(ambiguity.get("ambiguous")):
             needed, reason = True, "competing-action-roles"
         elif verify is None:
@@ -79,6 +118,7 @@ class DecisionPacketMixin:
             "candidates": self._decision_packet_candidates(action, edit, verify),
             "ambiguity": ambiguity if bool(ambiguity.get("ambiguous")) else None,
             "candidate_scope": "repository-evidence-only",
+            "interpretation": "evidence-discrimination-only",
             "consumer_action": "external",
         }
 
@@ -164,14 +204,13 @@ class DecisionPacketMixin:
         """Return bounded repository evidence for one task decision."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        decision_started = time.perf_counter()
-        phase_started = decision_started
+        timing = _DecisionPacketTiming()
         action = self.task_action_map(
             task,
             limit=limit,
             per_role=per_role,
         )
-        action_seconds = time.perf_counter() - phase_started
+        timing.record("action_map")
         edit = action.get("edit") if isinstance(action.get("edit"), dict) else None
         verify = (
             action.get("verify") if isinstance(action.get("verify"), dict) else None
@@ -181,13 +220,13 @@ class DecisionPacketMixin:
             action=action, edit=edit, verify=verify, build=build, limit=limit
         )
 
-        phase_started = time.perf_counter()
+        timing.begin_phase()
         work_context = self.work_context(action, token_budget=token_budget)
-        work_context_seconds = time.perf_counter() - phase_started
-        phase_started = time.perf_counter()
+        timing.record("work_context")
+        timing.begin_phase()
         verification = self._task_decision_verification_plan(verify)
-        verification_seconds = time.perf_counter() - phase_started
-        phase_started = time.perf_counter()
+        timing.record("verification_plan")
+        timing.begin_phase()
         identity, verification_membership, selection_envelope, _decision_generation = (
             self._decision_packet_identity(
                 task=task,
@@ -199,8 +238,8 @@ class DecisionPacketMixin:
             )
         )
         evidence_receipt = self._decision_evidence_receipt(task, action, verification)
-        packet_assembly_seconds = time.perf_counter() - phase_started
-        total_seconds = time.perf_counter() - decision_started
+        timing.record("packet_assembly")
+        timing.finish()
 
         return {
             "schema": "hashmarks.task-decision-packet.v2",
@@ -237,17 +276,11 @@ class DecisionPacketMixin:
                 "safe": bool(work_context["safe"]) and bool(build.get("complete")),
                 "missing_roles": work_context["missing_roles"],
             },
+            "authority": "repository-observation-only",
+            "consumer_action": "external",
             "ranking_effect": "none",
             "discovery_effect": action.get("discovery_effect", "none"),
-            "decision_metrics": {
-                "schema": "hashmarks.task-decision-metrics.v1",
-                "seconds": {
-                    "action_map": action_seconds,
-                    "work_context": work_context_seconds,
-                    "verification_plan": verification_seconds,
-                    "packet_assembly": packet_assembly_seconds,
-                    "total": total_seconds,
-                },
-                "session_active": self._decision_session_depth > 0,
-            },
+            "decision_metrics": timing.as_payload(
+                session_active=self._decision_session_depth > 0
+            ),
         }

@@ -177,13 +177,13 @@ hooks-install:
 	@.pre-commit-venv/bin/pre-commit install
 
 lint-debt:
-	@$(UV) run --offline python scripts/ruff_debt.py
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint python scripts/ruff_debt.py
 
 lint-debt-summary:
-	@$(UV) run --offline python scripts/ruff_debt.py --summary-only
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint python scripts/ruff_debt.py --summary-only
 
 lint-debt-gate:
-	@$(UV) run --offline python scripts/ruff_debt.py --baseline ruff-debt-baseline.json
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint python scripts/ruff_debt.py --baseline ruff-debt-baseline.json
 
 test:
 	@if [ "$${HASHMARKS_CONSTRAINED_HOST:-0}" = "1" ]; then \

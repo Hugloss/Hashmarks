@@ -12,6 +12,28 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+def _parse_ast_grep_stream(
+    stdout: str, limit: int
+) -> tuple[list[dict[str, Any]], tuple[str, ...]]:
+    """Retain bounded JSON object matches and deduplicated format warnings."""
+    out: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            warnings.append("ast-grep emitted non-JSON output")
+            continue
+        if isinstance(value, dict):
+            out.append(value)
+        if len(out) >= limit:
+            break
+    return out, tuple(dict.fromkeys(warnings))
+
+
 class AstGrepSearchProvider:
     """Optional structural-search delegation to ast-grep.
 
@@ -97,19 +119,4 @@ class AstGrepSearchProvider:
                 else f"exit {completed.returncode}"
             )
             return [], (f"ast-grep search failed: {detail}",)
-        out: list[dict[str, Any]] = []
-        warnings: list[str] = []
-        for line in completed.stdout.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                value = json.loads(line)
-            except json.JSONDecodeError:
-                warnings.append("ast-grep emitted non-JSON output")
-                continue
-            if isinstance(value, dict):
-                out.append(value)
-            if len(out) >= limit:
-                break
-        return out, tuple(dict.fromkeys(warnings))
+        return _parse_ast_grep_stream(completed.stdout, limit)

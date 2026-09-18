@@ -100,3 +100,41 @@ def test_same_path_can_cover_multiple_mandatory_roles_without_false_unsafe() -> 
     assert len(shared_items) == 1
     assert shared_items[0]["covered_roles"] == ["edit", "contract"]
     assert packet["evidence_metrics"]["duplicate_evidence_bytes"] == 0
+
+
+def test_optional_duplicate_of_mandatory_path_cannot_change_role_authority() -> None:
+    codemap = object.__new__(CodeMap)
+    action = _action()
+    action["related"] = [
+        _row("pkg/engine.py", 99, "related"),
+        _row("pkg/new_helper.py", 7, "related"),
+    ]
+    packet = codemap.work_context(action, token_budget=1800)
+    engine = [item for item in packet["items"] if item["path"] == "pkg/engine.py"]
+    assert len(engine) == 1
+    assert engine[0]["role"] == "edit"
+    assert engine[0]["mandatory"] is True
+    assert engine[0]["covered_roles"] == ["edit"]
+
+
+def test_shared_mandatory_path_reports_all_uncovered_roles_when_budget_is_tiny() -> (
+    None
+):
+    codemap = object.__new__(CodeMap)
+    shared = _row("pkg/policy.py", 1, "edit")
+    action = {
+        "edit": shared,
+        "verify": _row("tests/test_policy.py", 2, "verify"),
+        "contract": dict(shared),
+        "related": [],
+        "inspect": [],
+    }
+    packet = codemap.work_context(action, token_budget=1)
+    assert packet["safe"] is False
+    assert packet["items"] == []
+    assert packet["missing_roles"] == ["edit", "verify", "contract"]
+    assert packet["role_coverage"] == {
+        "edit": False,
+        "verify": False,
+        "contract": False,
+    }

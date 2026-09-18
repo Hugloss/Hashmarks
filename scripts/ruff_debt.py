@@ -1,20 +1,15 @@
 from __future__ import annotations
 
-import ast
 import json
-import sys
+import re
+import subprocess
 import tomllib
 from collections import Counter
 from pathlib import Path
 
-if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from hashmarks.python_ast_cache import read_python_ast
-
 ROOT = Path(__file__).resolve().parents[1]
 ROOTS = (Path("hashmarks"), Path("scripts"), Path("benchmarks"))
-EXCLUDED_PREFIXES = (Path("benchmarks/agent_evaluation/retained"),)
+_OBSERVED_LIMIT = re.compile(r"\((\d+)\s*(?:>|/)\s*(\d+)\)$")
 
 
 def _quality_config() -> tuple[dict[str, int], int]:
@@ -39,113 +34,39 @@ def _quality_config() -> tuple[dict[str, int], int]:
 LIMITS, MAX_PYTHON_FILE_LINES = _quality_config()
 
 
-class _FunctionBody(ast.NodeVisitor):
-    def __init__(self, root: ast.AST) -> None:
-        self.root = root
-        self.nodes: list[ast.AST] = []
-
-    def generic_visit(self, node: ast.AST) -> None:
-        if node is not self.root and isinstance(
-            node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
-        ):
-            return
-        self.nodes.append(node)
-        super().generic_visit(node)
-
-
-def _complexity(nodes: list[ast.AST]) -> int:
-    score = 1
-    for node in nodes:
-        if isinstance(
-            node, (ast.If, ast.For, ast.AsyncFor, ast.While, ast.IfExp, ast.Assert)
-        ):
-            score += 1
-        elif isinstance(node, ast.BoolOp):
-            score += max(0, len(node.values) - 1)
-        elif isinstance(node, ast.Try):
-            score += len(node.handlers)
-        elif isinstance(node, ast.Match):
-            score += len(node.cases)
-        elif isinstance(
-            node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
-        ):
-            score += sum(1 + len(generator.ifs) for generator in node.generators)
-    return score
-
-
-def _branch_count(nodes: list[ast.AST]) -> int:
-    branch_types = (
-        ast.If,
-        ast.For,
-        ast.AsyncFor,
-        ast.While,
-        ast.Try,
-        ast.Match,
-        ast.IfExp,
-    )
-    return sum(isinstance(item, branch_types) for item in nodes)
-
-
-def _assigned_count(nodes: list[ast.AST]) -> int:
-    return len(
-        {
-            item.id
-            for item in nodes
-            if isinstance(item, ast.Name) and isinstance(item.ctx, (ast.Store, ast.Del))
-        }
-    )
-
-
-def _metrics(node: ast.FunctionDef | ast.AsyncFunctionDef) -> dict[str, int]:
-    visitor = _FunctionBody(node)
-    visitor.visit(node)
-    nodes = visitor.nodes
-    return {
-        "C901": _complexity(nodes),
-        "PLR0911": sum(isinstance(item, ast.Return) for item in nodes),
-        "PLR0912": _branch_count(nodes),
-        "PLR0913": len(node.args.args)
-        + len(node.args.kwonlyargs)
-        + len(node.args.posonlyargs),
-        "PLR0914": _assigned_count(nodes),
-        "PLR0915": sum(isinstance(item, ast.stmt) for item in nodes) - 1,
-        "PLR0916": max(
-            (len(item.values) for item in nodes if isinstance(item, ast.BoolOp)),
-            default=0,
-        ),
-    }
-
-
-def _excluded(path: Path) -> bool:
-    return any(path == prefix or prefix in path.parents for prefix in EXCLUDED_PREFIXES)
-
-
 def inventory() -> list[dict[str, object]]:
-    findings: list[dict[str, object]] = []
-    for root in ROOTS:
-        for path in sorted(root.rglob("*.py")):
-            if _excluded(path):
-                continue
-            tree = read_python_ast(path).tree
-            for node in ast.walk(tree):
-                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    continue
-                metrics = _metrics(node)
-                violations = {
-                    rule: value
-                    for rule, value in metrics.items()
-                    if value > LIMITS[rule]
-                }
-                if violations:
-                    findings.append(
-                        {
-                            "path": path.as_posix(),
-                            "line": node.lineno,
-                            "function": node.name,
-                            "violations": violations,
-                        }
-                    )
-    return findings
+    command = [
+        "ruff",
+        "check",
+        *(str(root) for root in ROOTS),
+        "--preview",
+        "--select",
+        ",".join(LIMITS),
+        "--config",
+        "lint.per-file-ignores = {}",
+        "--output-format",
+        "json",
+    ]
+    result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+    if result.returncode not in (0, 1):
+        raise RuntimeError(f"Ruff inventory failed: {result.stderr.strip()}")
+    grouped: dict[tuple[str, int], dict[str, object]] = {}
+    for diagnostic in json.loads(result.stdout):
+        rule = diagnostic["code"]
+        path = Path(diagnostic["filename"]).relative_to(ROOT).as_posix()
+        line = int(diagnostic["location"]["row"])
+        match = _OBSERVED_LIMIT.search(diagnostic["message"])
+        if match is None or int(match.group(2)) != LIMITS[rule]:
+            raise ValueError(
+                f"unrecognized Ruff {rule} diagnostic: {diagnostic['message']}"
+            )
+        key = (path, line)
+        row = grouped.setdefault(
+            key,
+            {"path": path, "line": line, "violations": {}},
+        )
+        row["violations"][rule] = int(match.group(1))
+    return [grouped[key] for key in sorted(grouped)]
 
 
 def _oversized_production_files() -> dict[str, int]:
@@ -172,7 +93,7 @@ def _summary(findings: list[dict[str, object]]) -> dict[str, object]:
         path.split("/", 1)[0] for path in files for _ in range(files[path]["functions"])
     )
     return {
-        "schema": "hashmarks.ruff-debt.v2",
+        "schema": "hashmarks.ruff-debt.v3",
         "limits": LIMITS,
         "max_python_file_lines": MAX_PYTHON_FILE_LINES,
         "oversized_files": _oversized_production_files(),
@@ -191,6 +112,10 @@ def _summary(findings: list[dict[str, object]]) -> dict[str, object]:
 def _baseline_failures(
     summary: dict[str, object], baseline: dict[str, object]
 ) -> list[str]:
+    if baseline.get("schema") != summary["schema"]:
+        return ["debt baseline schema mismatch; regenerate from exact Ruff inventory"]
+    if baseline.get("limits") != summary["limits"]:
+        return ["Ruff limits changed; review the configured thresholds and baseline"]
     current_files = dict(summary["files"])
     baseline_files = dict(baseline["files"])
     failures: list[str] = []
@@ -218,7 +143,7 @@ def _parse_args():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Conservative local mirror of the strict Ruff debt budget."
+        description="Exact Ruff diagnostic inventory and no-growth budget."
     )
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--summary-only", action="store_true")
@@ -272,7 +197,7 @@ def _report_inventory(
         rules = ", ".join(
             f"{rule}={value}" for rule, value in finding["violations"].items()
         )
-        print(f"{finding['path']}:{finding['line']}:{finding['function']}: {rules}")
+        print(f"{finding['path']}:{finding['line']}: {rules}")
     return 1 if findings or oversized else 0
 
 

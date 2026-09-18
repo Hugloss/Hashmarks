@@ -362,7 +362,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             **resolved,
             "selected": owner_path,
             "secret_knowledge_used": False,
-            "effect": "edit-projection-only",
+            "effect": "repository-owner-projection-only",
+            "consumer_action": "external",
         }
 
     def _task_action_current_edit_has_identifier_anchor(

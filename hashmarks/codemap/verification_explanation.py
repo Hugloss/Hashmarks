@@ -38,6 +38,41 @@ class VerificationExplanationMixin:
             facts.append({"reason": "canonical-rank", "rank": rank})
         return facts
 
+    @staticmethod
+    def _bounded_requested_verification_candidate(
+        relevance: Mapping[str, object], requested: str
+    ) -> Mapping[str, object] | None:
+        candidates = relevance.get("candidates")
+        if not isinstance(candidates, list):
+            return None
+        return next(
+            (
+                row
+                for row in candidates
+                if isinstance(row, Mapping) and str(row.get("path") or "") == requested
+            ),
+            None,
+        )
+
+    def _nonselected_verification_reason(
+        self,
+        selected_row: Mapping[str, object] | None,
+        requested_row: Mapping[str, object],
+    ) -> str:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        selected_score = (
+            self._verification_candidate_score(selected_row)
+            if selected_row is not None
+            else None
+        )
+        requested_score = self._verification_candidate_score(requested_row)
+        return (
+            "lower-bounded-verification-evidence"
+            if selected_score is not None and requested_score < selected_score
+            else "canonical-selection-retained"
+        )
+
     @diagnostic_producer
     def explain_verification_selection(
         self,
@@ -63,14 +98,8 @@ class VerificationExplanationMixin:
             if member_path is not None
             else selected_path
         )
-        candidates = relevance.get("candidates")
-        rows = (
-            [row for row in candidates if isinstance(row, Mapping)]
-            if isinstance(candidates, list)
-            else []
-        )
-        requested_row = next(
-            (row for row in rows if str(row.get("path") or "") == requested), None
+        requested_row = self._bounded_requested_verification_candidate(
+            relevance, requested
         )
 
         if requested and requested == selected_path and selected_row is not None:
@@ -79,17 +108,7 @@ class VerificationExplanationMixin:
             facts = self._verification_reason_facts(selected_row)
         elif requested_row is not None:
             status = "not-selected"
-            selected_score = (
-                self._verification_candidate_score(selected_row)
-                if selected_row is not None
-                else None
-            )
-            requested_score = self._verification_candidate_score(requested_row)
-            reason = (
-                "lower-bounded-verification-evidence"
-                if selected_score is not None and requested_score < selected_score
-                else "canonical-selection-retained"
-            )
+            reason = self._nonselected_verification_reason(selected_row, requested_row)
             facts = self._verification_reason_facts(requested_row)
         else:
             status = "insufficient-evidence"

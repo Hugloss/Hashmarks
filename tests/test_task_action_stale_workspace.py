@@ -27,7 +27,7 @@ def test_deleted_edit_owner_cannot_remain_safe_action_without_watcher(
         (tmp_path / "src/foo.py").unlink()
         after = codemap.task_action_map("fix calculate_total")
     assert after["edit"] is None
-    assert after["ownership_authority"]["safe_to_edit"] is False
+    assert after["ownership_authority"]["owner_resolved"] is False
 
 
 def test_rewritten_edit_owner_cannot_reuse_stale_symbol_evidence(
@@ -48,7 +48,7 @@ def test_rewritten_edit_owner_cannot_reuse_stale_symbol_evidence(
         _write(tmp_path, "src/foo.py", "def unrelated(): return 2\n")
         after = codemap.task_action_map("fix calculate_total")
     assert after["edit"] is None
-    assert after["ownership_authority"]["safe_to_edit"] is False
+    assert after["ownership_authority"]["owner_resolved"] is False
 
 
 def test_cold_map_rejects_module_only_owner_when_imported_symbol_is_gone(
@@ -64,7 +64,7 @@ def test_cold_map_rejects_module_only_owner_when_imported_symbol_is_gone(
         codemap.sync()
         action = codemap.task_action_map("fix calculate_total")
     assert action["edit"] is None
-    assert action["ownership_authority"]["safe_to_edit"] is False
+    assert action["ownership_authority"]["owner_resolved"] is False
 
 
 def test_changed_projected_owner_reconciles_before_cached_authority_is_reused(
@@ -90,10 +90,12 @@ def test_changed_projected_owner_reconciles_before_cached_authority_is_reused(
     assert after["ownership_authority"] == {
         "schema": "hashmarks.ownership-authority.v1",
         "status": "resolved",
-        "safe_to_edit": True,
-        "authoritative_edit": "src/foo.py",
-        "candidate_edit": "src/foo.py",
+        "owner_resolved": True,
+        "resolved_owner": "src/foo.py",
+        "candidate_owner": "src/foo.py",
         "reason": "unique-owner-established",
+        "authority": "repository-ownership-only",
+        "consumer_action": "external",
     }
 
 
@@ -306,7 +308,7 @@ def test_unsignaled_file_symlink_file_transition_recovers_without_following_syml
         restored = codemap.task_action_map("fix calculate_total")
 
     assert restored["edit"]["path"] == "src/foo.py"
-    assert restored["ownership_authority"]["safe_to_edit"] is True
+    assert restored["ownership_authority"]["owner_resolved"] is True
 
 
 def test_missing_resurrection_tombstone_does_not_poll_repository_and_recovers_path_scoped(

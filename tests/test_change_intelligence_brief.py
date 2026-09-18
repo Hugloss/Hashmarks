@@ -5,6 +5,8 @@ import threading
 import time
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
@@ -62,6 +64,29 @@ def test_change_intelligence_brief_is_compact_identity_bound_repository_truth(
     assert '"content"' not in encoded
 
 
+def test_change_intelligence_brief_preserves_project_provenance_and_valid_changed_rows(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        monkeypatch.setattr(
+            codemap,
+            "task_change_impact",
+            lambda *args, **kwargs: {
+                "changed": [{"path": "src/case/engine.py"}, "invalid-row"],
+                "surfaces": {},
+                "bounds": {"limit": 20},
+                "project_impact": {"identity": "sha256:project"},
+            },
+        )
+        brief = codemap.change_intelligence_brief(task, ["src/case/engine.py"])
+    assert len(brief["changed"]) == 1
+    assert brief["changed"][0]["path"] == "src/case/engine.py"
+    assert brief["changed"][0]["revision"]
+    assert brief["project_impact"] == {"identity": "sha256:project"}
+
+
 def test_verification_explanation_selected_and_why_not_are_deterministic(
     tmp_path: Path,
 ) -> None:
@@ -89,14 +114,65 @@ def test_verification_explanation_selected_and_why_not_are_deterministic(
     assert absent["explanation_identity"] != first["explanation_identity"]
 
 
+@pytest.mark.parametrize(
+    ("requested_direct", "expected_reason"),
+    [
+        (False, "lower-bounded-verification-evidence"),
+        (True, "canonical-selection-retained"),
+    ],
+)
+def test_verification_explanation_preserves_bounded_candidate_reason(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    requested_direct: bool,
+    expected_reason: str,
+) -> None:
+    task = _repo(tmp_path)
+    selected = {
+        "path": "tests/test_ember.py",
+        "direct_reference": True,
+        "canonical_rank": 1,
+    }
+    requested = {
+        "path": "tests/test_other.py",
+        "direct_reference": requested_direct,
+        "canonical_rank": 0,
+        "reference_strength": "direct" if requested_direct else "none",
+        "namespace_terms": ["case"],
+        "task_anchor_terms": ["ember"],
+    }
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        monkeypatch.setattr(
+            codemap,
+            "verification_relevance",
+            lambda *args, **kwargs: {
+                "selected": selected,
+                "candidates": [selected, requested],
+                "selection_reason": "qualified-reference",
+            },
+        )
+        explanation = codemap.explain_verification_selection(
+            task, "tests/test_other.py"
+        )
+    assert explanation["status"] == "not-selected"
+    assert explanation["reason"] == expected_reason
+    assert {row["reason"] for row in explanation["facts"]} >= {
+        "namespace-locality",
+        "task-anchor",
+        "canonical-rank",
+    }
+
+
 def _wait(client: CodeMapServiceClient) -> None:
-    for _ in range(100):
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
         try:
             client.status()
             return
         except OSError:
             time.sleep(0.01)
-    raise AssertionError("service did not start")
+    raise AssertionError("service did not become ready")
 
 
 def test_service_exposes_change_brief_and_verification_explanation(

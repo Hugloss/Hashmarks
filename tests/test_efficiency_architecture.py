@@ -267,6 +267,25 @@ def test_decision_session_exact_symbol_cache_reuses_larger_prefix(
         assert codemap._decision_module_paths_cache == {}
 
 
+def test_decision_session_caches_missing_file_rows_and_detaches_sessions(
+    tmp_path: Path,
+) -> None:
+    from hashmarks.codemap.engine import CodeMap
+
+    (tmp_path / "owner.py").write_text("value = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
+        codemap.sync()
+        with codemap.decision_session():
+            first = codemap._session_file_rows(["owner.py", "missing.py", "owner.py"])
+            second = codemap._session_file_rows(["missing.py", "owner.py"])
+            stats = codemap.decision_session_stats()
+        assert set(first) == {"owner.py"}
+        assert second == first
+        assert stats["file_row_miss"] == 2
+        assert stats["file_row_hit"] == 2
+        assert codemap._decision_file_row_cache == {}
+
+
 def test_decision_session_reuses_graph_prefixes_and_file_rows(tmp_path: Path) -> None:
     from hashmarks.codemap.engine import CodeMap
 

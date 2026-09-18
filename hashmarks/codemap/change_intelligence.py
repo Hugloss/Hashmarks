@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
 
 if TYPE_CHECKING:
@@ -14,60 +15,17 @@ if TYPE_CHECKING:
 class ChangeIntelligenceMixin:
     """Compact product projection over existing change/selection authority."""
 
-    @diagnostic_producer
-    def change_intelligence_brief(
-        self,
-        task: str,
-        changed_paths: Sequence[str | Path],
-        *,
-        limit: int = 20,
-        per_role: int = 3,
-        impact_limit_per_surface: int = 4,
-        max_depth: int = 3,
-    ) -> dict[str, object]:
-        """Return bounded repository intelligence for an explicit change set."""
+    def _change_brief_rows(self, raw_changed: object) -> list[dict[str, object]]:
+        """Enrich caller-reported changed paths from one indexed symbol batch."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        impact = self.task_change_impact(
-            task,
-            changed_paths,
-            limit=limit,
-            per_role=per_role,
-            impact_limit_per_surface=impact_limit_per_surface,
-            max_depth=max_depth,
-            project_impact_encoding="compact",
-        )
-        action = self.task_action_map(task, limit=limit, per_role=per_role)
-        verify = (
-            action.get("verify") if isinstance(action.get("verify"), dict) else None
-        )
-        verification_path = str(verify.get("path") or "") if verify else ""
-        explanation = self.explain_verification_selection(
-            task,
-            verification_path or None,
-            limit=limit,
-            candidate_limit=16,
-        )
-        generation, identity_generation, stale = self._generation_status()
-        ownership = action.get("ownership_resolution")
-        ownership_projection = None
-        if isinstance(ownership, dict):
-            ownership_projection = {
-                key: ownership[key]
-                for key in ("selected", "via", "owner_path")
-                if key in ownership
-            }
-        changed_rows = (
-            impact.get("changed") if isinstance(impact.get("changed"), list) else []
-        )
-        changed_paths_normalized = [
+        changed_rows = raw_changed if isinstance(raw_changed, list) else []
+        paths = [
             str(row.get("path") or "")
             for row in changed_rows
             if isinstance(row, dict) and row.get("path")
         ]
-        symbols_by_path = self.store.symbols_for_paths_many(
-            changed_paths_normalized, limit_per_path=16
-        )
+        symbols_by_path = self.store.symbols_for_paths_many(paths, limit_per_path=16)
         changed: list[dict[str, object]] = []
         for row in changed_rows:
             if not isinstance(row, dict):
@@ -89,6 +47,54 @@ class ChangeIntelligenceMixin:
             if symbols:
                 item["symbols"] = symbols
             changed.append(item)
+        return changed
+
+    @diagnostic_producer
+    def change_intelligence_brief(
+        self,
+        task: str,
+        changed_paths: Sequence[str | Path],
+        *,
+        limit: int = 20,
+        per_role: int = 3,
+        impact_limit_per_surface: int = 4,
+        max_depth: int = 3,
+    ) -> dict[str, object]:
+        """Return bounded repository intelligence for an explicit change set."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        impact = self.task_change_impact(
+            task,
+            changed_paths,
+            limit=limit,
+            per_role=per_role,
+            options=ChangeImpactOptions(
+                impact_limit_per_surface=impact_limit_per_surface,
+                max_depth=max_depth,
+                project_impact_encoding="compact",
+            ),
+        )
+        action = self.task_action_map(task, limit=limit, per_role=per_role)
+        verify = (
+            action.get("verify") if isinstance(action.get("verify"), dict) else None
+        )
+        verification_path = str(verify.get("path") or "") if verify else ""
+        explanation = self.explain_verification_selection(
+            task,
+            verification_path or None,
+            limit=limit,
+            candidate_limit=16,
+        )
+        generation, identity_generation, stale = self._generation_status()
+        ownership = action.get("ownership_resolution")
+        ownership_projection = None
+        if isinstance(ownership, dict):
+            ownership_projection = {
+                key: ownership[key]
+                for key in ("selected", "via", "owner_path")
+                if key in ownership
+            }
+        changed = self._change_brief_rows(impact.get("changed"))
         surfaces = (
             impact.get("surfaces") if isinstance(impact.get("surfaces"), dict) else {}
         )

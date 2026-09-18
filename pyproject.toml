@@ -58,7 +58,10 @@ classifiers = [
 mcp = ["mcp>=2.2.0"]
 
 [dependency-groups]
-test = ["pytest>=8.4"]
+test = [
+    "pytest>=8.4",
+    "pytest-cov>=7.0",
+]
 lint = ["ruff>=0.12.0"]
 typing = [{ include-group = "test" }, "ty", "pyright", "mcp>=2.2.0", "watchdog"]
 hooks = ["pre-commit"]
@@ -91,7 +94,20 @@ force-exclude = true
 [tool.ruff.lint]
 # Fast, baseline-clean rules run on every Ruff/pre-commit invocation. Legacy
 # structural debt is enforced separately as a no-growth budget in CI.
-select = ["E4", "E7", "E9", "I"]
+select = [
+    "E4",
+    "E7",
+    "E9",
+    "I",
+    #"C901",  # excessive cyclomatic complexity
+    #"PLR0911",  # too many returns
+    #"PLR0912",  # too many branches
+    #"PLR0913",  # too many arguments
+    "PLR0914",  # too many local variables
+    #"PLR0915",  # too many statements
+    #"PLR0916",  # overly complicated boolean expressions
+    # plus the repository's file-size limit
+]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 8

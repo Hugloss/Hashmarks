@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hashmarks.codemap import CodeMap
+from hashmarks.codemap import ChangeImpactOptions, CodeMap
 from scripts.agent_evaluation.generate_hard_agent_corpus import generate
 
 if TYPE_CHECKING:
@@ -98,8 +98,7 @@ def test_bounded_fanout_never_claims_exhaustive(
         impact = codemap.task_change_impact(
             "change shared implementation",
             ["src/core.py"],
-            impact_limit_per_surface=limit,
-            max_depth=3,
+            options=ChangeImpactOptions(impact_limit_per_surface=limit, max_depth=3),
         )
     implementations = impact["surfaces"]["implementation"]
     assert len(implementations) <= limit

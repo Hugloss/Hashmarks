@@ -318,11 +318,15 @@ class QueryRoute:
         }
 
 
-def route_query(query: str) -> QueryRoute:
+def _required_query_text(query: str) -> str:
     raw = query.strip()
     if not raw:
         raise ValueError("query must not be empty")
-    lower = raw.lower()
+    return raw
+
+
+def route_query(query: str) -> QueryRoute:
+    raw = _required_query_text(query)
     words = {value.lower() for value in _TOKEN.findall(raw)}
     preferred_domains = _preferred_domains(words)
 
@@ -330,89 +334,68 @@ def route_query(query: str) -> QueryRoute:
     # definitions add little for these and are safe to omit; lexical/path
     # indexes still provide the normal hybrid recall floor.
     if _PATHISH.search(raw):
-        return QueryRoute(
+        intent, confidence, native, reason = (
             QueryIntent.PATH,
             "high",
             False,
-            False,
-            True,
-            True,
             "explicit path or filename",
-            preferred_domains,
         )
-    if words & _CONFIG:
-        return QueryRoute(
+    elif words & _CONFIG:
+        intent, confidence, native, reason = (
             QueryIntent.CONFIG,
             "high",
             False,
-            False,
-            True,
-            True,
             "configuration vocabulary",
-            preferred_domains,
         )
-    if words & _TEST:
-        return QueryRoute(
+    elif words & _TEST:
+        intent, confidence, native, reason = (
             QueryIntent.TEST,
             "high",
             False,
-            False,
-            True,
-            True,
             "test vocabulary",
-            preferred_domains,
         )
-    if words & _RELATIONSHIP:
-        return QueryRoute(
+    elif words & _RELATIONSHIP:
+        intent, confidence, native, reason = (
             QueryIntent.RELATIONSHIP,
             "high",
             True,
-            True,
-            True,
-            True,
             "relationship vocabulary",
-            preferred_domains,
         )
-    if words & _STRUCTURAL:
-        return QueryRoute(
+    elif words & _STRUCTURAL:
+        intent, confidence, native, reason = (
             QueryIntent.STRUCTURAL,
             "medium",
             True,
-            True,
-            True,
-            True,
             "structural vocabulary",
-            preferred_domains,
         )
-    if _IDENTIFIER.fullmatch(raw):
-        return QueryRoute(
+    elif _IDENTIFIER.fullmatch(raw):
+        intent, confidence, native, reason = (
             QueryIntent.IDENTIFIER,
             "high",
             True,
-            True,
-            True,
-            True,
             "exact identifier shape",
-            preferred_domains,
         )
-    if words & _CONCEPTUAL:
-        return QueryRoute(
+    elif words & _CONCEPTUAL:
+        intent, confidence, native, reason = (
             QueryIntent.CONCEPTUAL,
             "medium",
             True,
-            True,
-            True,
-            True,
             "conceptual/architecture vocabulary",
-            preferred_domains,
+        )
+    else:
+        intent, confidence, native, reason = (
+            QueryIntent.HYBRID,
+            "low",
+            True,
+            "ambiguous query keeps full hybrid retrieval",
         )
     return QueryRoute(
-        QueryIntent.HYBRID,
-        "low",
+        intent,
+        confidence,
+        native,
+        native,
         True,
         True,
-        True,
-        True,
-        "ambiguous query keeps full hybrid retrieval",
+        reason,
         preferred_domains,
     )

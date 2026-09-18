@@ -717,7 +717,7 @@ class ContextPlanningMixin:
                 identity_generation=identity_generation,
                 stale=stale,
                 warnings=(
-                    "retrieval confidence insufficient; fall back to repository search",
+                    "retrieval confidence insufficient; repository context omitted",
                 ),
             )
 

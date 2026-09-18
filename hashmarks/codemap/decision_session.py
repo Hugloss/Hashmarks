@@ -60,6 +60,85 @@ def diagnostic_producer(method: Callable[_P, _R]) -> Callable[_P, _R]:
 class DecisionSessionMixin:
     """Generation-bound read-only evidence reuse for CodeMap decisions."""
 
+    def _clear_decision_session_caches(self) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        self._decision_symbols_cache.clear()
+        self._decision_file_row_cache.clear()
+        self._decision_module_paths_cache.clear()
+        self._decision_exact_symbols_cache.clear()
+        self._decision_refs_cache.clear()
+        self._decision_edges_from_cache.clear()
+        self._decision_edges_for_path_cache.clear()
+        self._decision_df_cache.clear()
+        self._decision_candidates_cache.clear()
+        self._decision_repository_identity_cache = None
+        self._decision_snapshot_cache.clear()
+        self._decision_task_action_cache.clear()
+        self._decision_change_impact_owner_chain_cache.clear()
+        self._decision_ownership_import_paths_cache.clear()
+
+    def _begin_decision_session(
+        self, *, diagnostics: bool, allow_incomplete: bool
+    ) -> int:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        observation = self._ensure_map_ready(_allow_incomplete=allow_incomplete)
+        self._decision_diagnostics_enabled = bool(diagnostics)
+        self._decision_diagnostics_started_ns = (
+            time.perf_counter_ns() if diagnostics else 0
+        )
+        self._decision_diagnostics_stack.clear()
+        self._decision_diagnostics_spans.clear()
+        self._decision_diagnostics_producers.clear()
+        self._decision_diagnostics_sequence = 0
+        generation = self.store.generation()
+        self._decision_session_observation = observation
+        self._decision_session_generation = generation
+        self._clear_decision_session_caches()
+        self._decision_session_stats = {
+            "task_result_hit": 0,
+            "task_result_miss": 0,
+            "symbols_hit": 0,
+            "symbols_miss": 0,
+            "file_row_hit": 0,
+            "file_row_miss": 0,
+            "module_paths_hit": 0,
+            "module_paths_miss": 0,
+            "exact_symbols_hit": 0,
+            "exact_symbols_miss": 0,
+            "refs_hit": 0,
+            "refs_miss": 0,
+            "edges_from_hit": 0,
+            "edges_from_miss": 0,
+            "edges_for_path_hit": 0,
+            "edges_for_path_miss": 0,
+            "df_hit": 0,
+            "df_miss": 0,
+            "candidates_hit": 0,
+            "candidates_miss": 0,
+            "snapshot_hit": 0,
+            "snapshot_miss": 0,
+            "task_action_hit": 0,
+            "task_action_miss": 0,
+            "impact_owner_chain_hit": 0,
+            "impact_owner_chain_miss": 0,
+            "ownership_import_paths_hit": 0,
+            "ownership_import_paths_miss": 0,
+        }
+        self.store.reset_read_counters()
+        return generation
+
+    def _finish_decision_session(self) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if self._decision_diagnostics_enabled:
+            self._decision_diagnostics_last = self._decision_diagnostics_receipt()
+        self._decision_diagnostics_enabled = False
+        self._decision_session_generation = None
+        self._decision_session_observation = None
+        self._clear_decision_session_caches()
+
     @contextmanager
     def decision_session(
         self, *, diagnostics: bool = False, _allow_incomplete: bool = False
@@ -72,63 +151,9 @@ class DecisionSessionMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if self._decision_session_depth == 0:
-            observation = self._ensure_map_ready(_allow_incomplete=_allow_incomplete)
-            self._decision_diagnostics_enabled = bool(diagnostics)
-            self._decision_diagnostics_started_ns = (
-                time.perf_counter_ns() if diagnostics else 0
+            generation = self._begin_decision_session(
+                diagnostics=diagnostics, allow_incomplete=_allow_incomplete
             )
-            self._decision_diagnostics_stack.clear()
-            self._decision_diagnostics_spans.clear()
-            self._decision_diagnostics_producers.clear()
-            self._decision_diagnostics_sequence = 0
-            generation = self.store.generation()
-            self._decision_session_observation = observation
-            self._decision_session_generation = generation
-            self._decision_symbols_cache.clear()
-            self._decision_file_row_cache.clear()
-            self._decision_module_paths_cache.clear()
-            self._decision_exact_symbols_cache.clear()
-            self._decision_refs_cache.clear()
-            self._decision_edges_from_cache.clear()
-            self._decision_edges_for_path_cache.clear()
-            self._decision_df_cache.clear()
-            self._decision_candidates_cache.clear()
-            self._decision_repository_identity_cache = None
-            self._decision_snapshot_cache.clear()
-            self._decision_task_action_cache.clear()
-            self._decision_change_impact_owner_chain_cache.clear()
-            self._decision_ownership_import_paths_cache.clear()
-            self._decision_session_stats = {
-                "task_result_hit": 0,
-                "task_result_miss": 0,
-                "symbols_hit": 0,
-                "symbols_miss": 0,
-                "file_row_hit": 0,
-                "file_row_miss": 0,
-                "module_paths_hit": 0,
-                "module_paths_miss": 0,
-                "exact_symbols_hit": 0,
-                "exact_symbols_miss": 0,
-                "refs_hit": 0,
-                "refs_miss": 0,
-                "edges_from_hit": 0,
-                "edges_from_miss": 0,
-                "edges_for_path_hit": 0,
-                "edges_for_path_miss": 0,
-                "df_hit": 0,
-                "df_miss": 0,
-                "candidates_hit": 0,
-                "candidates_miss": 0,
-                "snapshot_hit": 0,
-                "snapshot_miss": 0,
-                "task_action_hit": 0,
-                "task_action_miss": 0,
-                "impact_owner_chain_hit": 0,
-                "impact_owner_chain_miss": 0,
-                "ownership_import_paths_hit": 0,
-                "ownership_import_paths_miss": 0,
-            }
-            self.store.reset_read_counters()
         else:
             generation = self.store.generation()
         if (
@@ -146,27 +171,7 @@ class DecisionSessionMixin:
         finally:
             self._decision_session_depth -= 1
             if self._decision_session_depth == 0:
-                if self._decision_diagnostics_enabled:
-                    self._decision_diagnostics_last = (
-                        self._decision_diagnostics_receipt()
-                    )
-                self._decision_diagnostics_enabled = False
-                self._decision_session_generation = None
-                self._decision_session_observation = None
-                self._decision_symbols_cache.clear()
-                self._decision_file_row_cache.clear()
-                self._decision_module_paths_cache.clear()
-                self._decision_exact_symbols_cache.clear()
-                self._decision_refs_cache.clear()
-                self._decision_edges_from_cache.clear()
-                self._decision_edges_for_path_cache.clear()
-                self._decision_df_cache.clear()
-                self._decision_candidates_cache.clear()
-                self._decision_repository_identity_cache = None
-                self._decision_snapshot_cache.clear()
-                self._decision_task_action_cache.clear()
-                self._decision_change_impact_owner_chain_cache.clear()
-                self._decision_ownership_import_paths_cache.clear()
+                self._finish_decision_session()
 
     @staticmethod
     def _diagnostic_normalize(value: object) -> object:
@@ -553,6 +558,16 @@ class DecisionSessionMixin:
             )
         return result
 
+    def _cache_missing_file_rows(self, generation: int, missing: list[str]) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if not missing:
+            return
+        rows = self.store.file_rows(missing)
+        for path in missing:
+            self._decision_file_row_cache[(generation, path)] = rows.get(path)
+            self._decision_session_stats["file_row_miss"] += 1
+
     def _session_file_rows(self, paths: Iterable[str]) -> dict[str, dict[str, object]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -567,11 +582,7 @@ class DecisionSessionMixin:
             for path in unique
             if (generation, path) not in self._decision_file_row_cache
         ]
-        if missing:
-            rows = self.store.file_rows(missing)
-            for path in missing:
-                self._decision_file_row_cache[(generation, path)] = rows.get(path)
-                self._decision_session_stats["file_row_miss"] += 1
+        self._cache_missing_file_rows(generation, missing)
         output: dict[str, dict[str, object]] = {}
         for path in unique:
             value = self._decision_file_row_cache.get((generation, path))

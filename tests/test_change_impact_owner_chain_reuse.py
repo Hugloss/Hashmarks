@@ -111,18 +111,40 @@ def test_owner_chain_cached_result_is_detached(tmp_path: Path) -> None:
         codemap.sync()
         with codemap.decision_session():
             action = codemap.task_action_map(task)
-            _, _, _, _, _, _, visible, _ = codemap._change_impact_surface_state(
+            state = codemap._change_impact_surface_state(
                 tuple(paths),
                 max_depth=4,
                 impact_limit_per_surface=6,
                 effective_project_impact_limit=6,
             )
-            first = codemap._change_impact_owner_chain(
-                task, action, tuple(paths), visible
-            )
+            first = codemap._change_impact_owner_chain(task, action, state.visible)
             first[3].append("mutated.py")
-            second = codemap._change_impact_owner_chain(
-                task, action, tuple(paths), visible
-            )
+            second = codemap._change_impact_owner_chain(task, action, state.visible)
 
     assert "mutated.py" not in second[3]
+
+
+def test_owner_chain_reconstruction_failure_keeps_selected_paths(
+    tmp_path: Path, monkeypatch
+) -> None:
+    task, paths = _go_repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+
+        def unavailable(*_args, **_kwargs):
+            raise ValueError("owner evidence unavailable")
+
+        monkeypatch.setattr(codemap, "ownership_relation_graph", unavailable)
+        action = {
+            "edit": {"path": paths[0]},
+            "verify": {"path": "route/cobaltridgealpha_test.go"},
+        }
+        edit, verify, verify_path, chain, relations = (
+            codemap._change_impact_owner_chain(task, action, lambda _: True)
+        )
+
+    assert edit == "engine/engine.go"
+    assert verify == action["verify"]
+    assert verify_path == "route/cobaltridgealpha_test.go"
+    assert chain == []
+    assert relations == {}

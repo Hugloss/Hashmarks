@@ -2,13 +2,112 @@ from __future__ import annotations
 
 import ast
 import posixpath
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.python_ast_cache import read_python_ast
 
+from .python_exports import (
+    AllExportStatus,
+    python_export_binding,
+    python_reexport_targets,
+    static_all_exports,
+)
+
 if TYPE_CHECKING:
     from .engine import CodeMap
+
+
+@dataclass
+class _OwnerWalk:
+    """Request-local re-export traversal with one ambiguity owner."""
+
+    resolver: ImportResolutionMixin
+    leaves: set[str] = field(default_factory=set)
+    visited: set[tuple[str, str]] = field(default_factory=set)
+    unresolved: bool = False
+
+    def _binding_targets(
+        self, facade_path: str, exported_name: str
+    ) -> list[str] | None:
+        symbols = self.resolver._session_symbols_for_path(facade_path)
+        has_local_symbol = any(
+            str(symbol.get("name") or "") == exported_name for symbol in symbols
+        )
+        kind, binding_targets = self.resolver._python_export_binding(
+            facade_path, exported_name
+        )
+        if kind == "local":
+            self.leaves.add(facade_path)
+            return None
+        targets = (
+            binding_targets
+            if kind in {"reexport", "ambiguous"}
+            else self.resolver._python_reexport_targets(facade_path, exported_name)
+        )
+        if kind == "star" and (
+            not binding_targets
+            or any(
+                self.resolver._python_star_export_authority(
+                    facade_path, target, exported_name
+                )
+                is not True
+                for target in binding_targets
+            )
+        ):
+            self.unresolved = True
+            targets = []
+        if kind == "ambiguous" or (has_local_symbol and kind in {"unknown", "star"}):
+            self.unresolved = True
+        return targets
+
+    def _edge_targets(self, facade_path: str, exported_name: str) -> list[str]:
+        # Compact edges from Python nested scopes cannot prove a re-export.
+        return [
+            str(edge.get("target") or "")
+            for edge in self.resolver.store.edges_from(facade_path)
+            if str(edge.get("kind") or "") == "import"
+            and str(edge.get("target_short") or "") == exported_name
+            and str(edge.get("target") or "")
+        ][:16]
+
+    def _follow_target(self, facade_path: str, target: str, depth: int) -> bool:
+        nested_name = target.lstrip(".").rsplit(".", 1)[-1]
+        owners = self.resolver._resolve_import_paths(facade_path, target)[:20]
+        if len(owners) > 1:
+            self.unresolved = True
+        progress = False
+        for owner in owners:
+            if owner == facade_path:
+                continue
+            progress = True
+            symbols = self.resolver._session_symbols_for_path(owner)
+            if any(str(symbol.get("name") or "") == nested_name for symbol in symbols):
+                self.leaves.add(owner)
+            else:
+                self.visit(owner, nested_name, depth + 1)
+        return progress
+
+    def visit(self, facade_path: str, exported_name: str, depth: int) -> None:
+        key = (facade_path, exported_name)
+        if key in self.visited:
+            self.unresolved = True
+            return
+        self.visited.add(key)
+        targets = self._binding_targets(facade_path, exported_name)
+        if targets is None:
+            return
+        if not targets and not facade_path.endswith((".py", ".pyi")):
+            targets = self._edge_targets(facade_path, exported_name)
+        if not targets or depth >= 8:
+            self.unresolved = True
+            return
+        progress = [
+            self._follow_target(facade_path, target, depth) for target in targets
+        ]
+        if not any(progress):
+            self.unresolved = True
 
 
 class ImportResolutionMixin:
@@ -32,24 +131,7 @@ class ImportResolutionMixin:
             tree = read_python_ast(self.workspace / facade_path).tree
         except (OSError, UnicodeError, SyntaxError, ValueError):
             return []
-        targets: list[str] = []
-        for node in tree.body:
-            if not isinstance(node, ast.ImportFrom):
-                continue
-            prefix = "." * int(node.level) + (node.module or "")
-            for alias in node.names:
-                exposed = alias.asname or alias.name
-                if alias.name == "*":
-                    target = f"{prefix}.{exported_name}" if prefix else exported_name
-                elif exposed == exported_name:
-                    target = f"{prefix}.{alias.name}" if prefix else alias.name
-                else:
-                    continue
-                if target and target not in targets:
-                    targets.append(target)
-                if len(targets) >= 16:
-                    return targets
-        return targets
+        return python_reexport_targets(tree, exported_name)
 
     def _python_export_binding(
         self, facade_path: str, exported_name: str
@@ -69,55 +151,7 @@ class ImportResolutionMixin:
             tree = read_python_ast(self.workspace / facade_path).tree
         except (OSError, UnicodeError, SyntaxError, ValueError):
             return "unknown", []
-        bindings: list[tuple[str, list[str]]] = []
-        reexport_count = 0
-        for node in tree.body:
-            if (
-                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-                and node.name == exported_name
-            ):
-                bindings.append(("local", []))
-                continue
-            if isinstance(node, (ast.Assign, ast.AnnAssign)):
-                targets = (
-                    node.targets if isinstance(node, ast.Assign) else [node.target]
-                )
-                if any(
-                    isinstance(item, ast.Name) and item.id == exported_name
-                    for item in targets
-                ):
-                    bindings.append(("local", []))
-                continue
-            if not isinstance(node, ast.ImportFrom):
-                continue
-            prefix = "." * int(node.level) + (node.module or "")
-            direct: list[str] = []
-            star = False
-            for alias in node.names:
-                exposed = alias.asname or alias.name
-                if alias.name == "*":
-                    star = True
-                    candidate = f"{prefix}.{exported_name}" if prefix else exported_name
-                    if candidate:
-                        direct.append(candidate)
-                elif exposed == exported_name:
-                    candidate = f"{prefix}.{alias.name}" if prefix else alias.name
-                    if candidate:
-                        direct.append(candidate)
-            if direct:
-                reexport_count += 1
-                bindings.append(
-                    ("star" if star else "reexport", list(dict.fromkeys(direct)))
-                )
-        if reexport_count > 1:
-            targets = [
-                target
-                for kind, values in bindings
-                if kind in {"reexport", "star"}
-                for target in values
-            ]
-            return "ambiguous", list(dict.fromkeys(targets))
-        return bindings[-1] if bindings else ("unknown", [])
+        return python_export_binding(tree, exported_name)
 
     def _python_star_export_authority(
         self, facade_path: str, target: str, exported_name: str
@@ -138,98 +172,19 @@ class ImportResolutionMixin:
             else target.rstrip(".")
         )
         owners = self._resolve_import_paths(facade_path, module_target)[:20]
-        if len(owners) != 1:
+        if len(owners) != 1 or not owners[0].endswith((".py", ".pyi")):
             return None
         owner = owners[0]
-        if not owner.endswith((".py", ".pyi")):
-            return None
         try:
             tree = read_python_ast(self.workspace / owner).tree
         except (OSError, UnicodeError, SyntaxError, ValueError):
             return None
 
-        def static_names(value: ast.expr | None) -> list[str] | None:
-            if not isinstance(value, (ast.List, ast.Tuple, ast.Set)):
-                return None
-            names: list[str] = []
-            for item in value.elts:
-                if not isinstance(item, ast.Constant) or not isinstance(
-                    item.value, str
-                ):
-                    return None
-                names.append(item.value)
-            return names
-
-        all_values: list[str] | None = None
-        saw_all = False
-        for node in tree.body:
-            assigned_value: ast.expr | None = None
-            if (
-                isinstance(node, ast.Assign)
-                and any(
-                    isinstance(item, ast.Name) and item.id == "__all__"
-                    for item in node.targets
-                )
-                or isinstance(node, ast.AnnAssign)
-                and isinstance(node.target, ast.Name)
-                and node.target.id == "__all__"
-            ):
-                assigned_value = node.value
-            if assigned_value is not None:
-                saw_all = True
-                names = static_names(assigned_value)
-                if names is None:
-                    return None
-                all_values = names
-                continue
-
-            if (
-                isinstance(node, ast.AugAssign)
-                and isinstance(node.target, ast.Name)
-                and node.target.id == "__all__"
-            ):
-                saw_all = True
-                if not isinstance(node.op, ast.Add) or all_values is None:
-                    return None
-                names = static_names(node.value)
-                if names is None:
-                    return None
-                all_values.extend(names)
-                continue
-
-            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
-                call = node.value
-                func = call.func
-                if (
-                    isinstance(func, ast.Attribute)
-                    and isinstance(func.value, ast.Name)
-                    and func.value.id == "__all__"
-                    and func.attr in {"append", "extend"}
-                ):
-                    saw_all = True
-                    if all_values is None or call.keywords or len(call.args) != 1:
-                        return None
-                    if func.attr == "append":
-                        arg = call.args[0]
-                        if not isinstance(arg, ast.Constant) or not isinstance(
-                            arg.value, str
-                        ):
-                            return None
-                        all_values.append(arg.value)
-                    else:
-                        names = static_names(call.args[0])
-                        if names is None:
-                            return None
-                        all_values.extend(names)
-                    continue
-
-            if isinstance(node, ast.Delete) and any(
-                isinstance(item, ast.Name) and item.id == "__all__"
-                for item in node.targets
-            ):
-                return None
-        if saw_all:
-            return exported_name in (all_values or [])
+        exports = static_all_exports(tree)
+        if exports is AllExportStatus.UNKNOWN:
+            return None
+        if isinstance(exports, list):
+            return exported_name in exports
         symbols = self._session_symbols_for_path(owner)
         return any(str(symbol.get("name") or "") == exported_name for symbol in symbols)
 
@@ -253,131 +208,53 @@ class ImportResolutionMixin:
             ) and self._python_import_identity_ambiguous(source_path, target)
             return resolved, ambiguous
 
-        leaves: set[str] = set()
-        visited: set[tuple[str, str]] = set()
-        unresolved = False
-
-        def walk(facade_path: str, exported_name: str, depth: int) -> None:
-            nonlocal unresolved
-            key = (facade_path, exported_name)
-            if key in visited:
-                unresolved = True
-                return
-            visited.add(key)
-            symbols = self._session_symbols_for_path(facade_path)
-            has_local_symbol = any(
-                str(symbol.get("name") or "") == exported_name for symbol in symbols
-            )
-            binding_kind, binding_targets = self._python_export_binding(
-                facade_path, exported_name
-            )
-            if binding_kind == "local":
-                leaves.add(facade_path)
-                return
-            if binding_kind in {"reexport", "ambiguous"}:
-                nested_targets = binding_targets
-            else:
-                nested_targets = self._python_reexport_targets(
-                    facade_path, exported_name
-                )
-            if binding_kind == "star":
-                authorities = [
-                    self._python_star_export_authority(
-                        facade_path, target, exported_name
-                    )
-                    for target in binding_targets
-                ]
-                if not authorities or any(
-                    authority is not True for authority in authorities
-                ):
-                    unresolved = True
-                    nested_targets = []
-            if binding_kind == "ambiguous" or (
-                has_local_symbol and binding_kind in {"unknown", "star"}
-            ):
-                unresolved = True
-            if not nested_targets and not facade_path.endswith((".py", ".pyi")):
-                # Python AST binding evidence is scope-sensitive.  The compact
-                # edge store intentionally records imports from nested scopes and
-                # conditional blocks as dependency evidence, so using those edges
-                # as a re-export fallback can manufacture a false unique owner
-                # (for example TYPE_CHECKING, ``if False``, or function-local
-                # imports).  For Python facades, absence of a directly provable
-                # top-level binding therefore remains unresolved/fail-closed.
-                nested_targets = [
-                    str(edge.get("target") or "")
-                    for edge in self.store.edges_from(facade_path)
-                    if str(edge.get("kind") or "") == "import"
-                    and str(edge.get("target_short") or "") == exported_name
-                    and str(edge.get("target") or "")
-                ][:16]
-            if not nested_targets:
-                unresolved = True
-                return
-            if depth >= 8:
-                unresolved = True
-                return
-            branch_progress = False
-            for nested_target in nested_targets:
-                nested_name = nested_target.lstrip(".").rsplit(".", 1)[-1]
-                owners = self._resolve_import_paths(facade_path, nested_target)[:20]
-                if len(owners) > 1:
-                    unresolved = True
-                for owner in owners:
-                    if owner == facade_path:
-                        continue
-                    branch_progress = True
-                    owner_symbols = self._session_symbols_for_path(owner)
-                    if any(
-                        str(symbol.get("name") or "") == nested_name
-                        for symbol in owner_symbols
-                    ):
-                        leaves.add(owner)
-                    else:
-                        walk(owner, nested_name, depth + 1)
-            if not branch_progress:
-                unresolved = True
-
+        walk = _OwnerWalk(self)
         for facade_path in resolved[:20]:
-            walk(facade_path, short, 0)
-        if len(leaves) > 1:
-            unresolved = True
-        qualified = sorted(leaves) if len(leaves) == 1 and not unresolved else []
-        return list(dict.fromkeys([*resolved, *qualified])), unresolved
+            walk.visit(facade_path, short, 0)
+        if len(walk.leaves) > 1:
+            walk.unresolved = True
+        qualified = (
+            sorted(walk.leaves) if len(walk.leaves) == 1 and not walk.unresolved else []
+        )
+        return list(dict.fromkeys([*resolved, *qualified])), walk.unresolved
 
     def _resolve_import_owner_paths(self, source_path: str, target: str) -> list[str]:
         """Return bounded concrete import-owner paths without collapsing ambiguity."""
         resolved, _ = self._resolve_import_owner_evidence(source_path, target)
         return resolved
 
+    def _python_relative_module_candidate(
+        self, source_path: str, candidate: str
+    ) -> str:
+        """Resolve a relative module against the indexed source package."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        leading = len(candidate) - len(candidate.lstrip("."))
+        suffix = candidate[leading:]
+        source_row = self._session_file_row(source_path)
+        source_module = (
+            "" if source_row is None else str(source_row.get("module_name") or "")
+        )
+        if source_module:
+            source_parts = source_module.split(".")
+            if Path(source_path).stem != "__init__":
+                source_parts = source_parts[:-1]
+        else:
+            source_parts = list(Path(source_path).with_suffix("").parts[:-1])
+        keep = len(source_parts) - max(0, leading - 1)
+        if keep < 0:
+            return ""
+        return ".".join(source_parts[:keep] + ([suffix] if suffix else []))
+
     def _python_import_module_candidates(
         self, source_path: str, target: str
     ) -> tuple[str, ...]:
         """Return exact Python module candidates in resolver fallback order."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         candidate = target.strip()
+        if candidate.startswith("."):
+            candidate = self._python_relative_module_candidate(source_path, candidate)
         if not candidate:
             return ()
-        if candidate.startswith("."):
-            leading = len(candidate) - len(candidate.lstrip("."))
-            suffix = candidate[leading:]
-            source_row = self._session_file_row(source_path)
-            source_module = (
-                "" if source_row is None else str(source_row.get("module_name") or "")
-            )
-            if source_module:
-                source_parts = source_module.split(".")
-                if Path(source_path).stem != "__init__":
-                    source_parts = source_parts[:-1]
-            else:
-                source_parts = list(Path(source_path).with_suffix("").parts[:-1])
-            keep = len(source_parts) - max(0, leading - 1)
-            if keep < 0:
-                return ()
-            candidate = ".".join(source_parts[:keep] + ([suffix] if suffix else []))
-            if not candidate:
-                return ()
         ordered: list[str] = []
         while candidate:
             ordered.append(candidate)

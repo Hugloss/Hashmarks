@@ -194,3 +194,29 @@ def test_external_promotion_receipt_rejects_rehashed_gate_authority_tampering(
     checked = validate_external_promotion_receipt(gate, receipt)
     assert checked["valid"] is False
     assert "invalid-gate-promotion-authority" in checked["reasons"]
+
+
+def test_receipt_shape_rejects_invalid_producer_and_tool_details(
+    tmp_path: Path,
+) -> None:
+    gate = native_ruff_promotion_gate(tmp_path)
+    receipt = _receipt(gate)
+    receipt["producer"] = {"name": ""}
+    receipt["tool"] = {"name": "other", "version": "invalid", "extra": True}
+
+    reasons = validate_external_promotion_receipt(gate, receipt)["reasons"]
+    assert "invalid-receipt-producer" in reasons
+    assert "invalid-receipt-tool" in reasons
+    assert "unsupported-tool-version" in reasons
+
+
+def test_gate_shape_rejects_rehashed_contract_field_drift(tmp_path: Path) -> None:
+    gate = native_ruff_promotion_gate(tmp_path)
+    gate["command"] = ["other-command"]
+    gate["result_authority"] = "hashmarks"
+    payload = {key: value for key, value in gate.items() if key != "gate_identity"}
+    gate["gate_identity"] = _identity(PROMOTION_GATE_SCHEMA, payload)
+
+    reasons = validate_external_promotion_receipt(gate, _receipt(gate))["reasons"]
+    assert "invalid-gate-command" in reasons
+    assert "invalid-gate-result-authority" in reasons

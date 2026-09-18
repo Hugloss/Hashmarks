@@ -24,9 +24,19 @@ def test_decision_packet_does_not_require_discrimination_when_action_is_resolved
     assert packet["verify"]["path"] == "tests/test_adapter.py"
     assert packet["discrimination"]["needed"] is False
     assert packet["discrimination"]["reason"] == "resolved"
+    metrics = packet["decision_metrics"]
+    assert metrics["schema"] == "hashmarks.task-decision-metrics.v1"
+    assert set(metrics["seconds"]) == {
+        "action_map",
+        "work_context",
+        "verification_plan",
+        "packet_assembly",
+        "total",
+    }
+    assert all(value >= 0 for value in metrics["seconds"].values())
 
 
-def test_decision_packet_requires_discrimination_when_no_safe_edit_exists(
+def test_decision_packet_requires_discrimination_when_no_supported_owner_exists(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "tests").mkdir()
@@ -36,7 +46,7 @@ def test_decision_packet_requires_discrimination_when_no_safe_edit_exists(
         packet = codemap.task_decision_packet("widget test verification", limit=20)
     assert packet["edit"] is None
     assert packet["discrimination"]["needed"] is True
-    assert packet["discrimination"]["reason"] == "no-safe-edit-candidate"
+    assert packet["discrimination"]["reason"] == "no-supported-owner-candidate"
 
 
 def test_structural_owner_resolution_does_not_admit_redundant_discrimination(
@@ -137,3 +147,22 @@ def test_repeated_stable_query_reproduces_selection_identities(tmp_path: Path) -
             packet["downstream_verification_contract"]["provenance_hash"]
             == first["downstream_verification_contract"]["provenance_hash"]
         )
+
+
+
+def test_decision_packet_is_observation_not_consumer_decision(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src" / "adapter.py").write_text("class Adapter:\n    pass\n")
+    (tmp_path / "tests" / "test_adapter.py").write_text(
+        "from src.adapter import Adapter\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_decision_packet("Adapter implementation test", limit=20)
+
+    assert packet["authority"] == "repository-observation-only"
+    assert packet["consumer_action"] == "external"
+    assert packet["discrimination"]["interpretation"] == (
+        "evidence-discrimination-only"
+    )
