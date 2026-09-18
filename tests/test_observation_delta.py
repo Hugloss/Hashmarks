@@ -4,7 +4,7 @@ from hashmarks.codemap.observation_delta import observation_delta
 def _packet(*, repository: str, observer: str, rows: list[dict[str, object]]):
     return {
         "repository": {"identity": repository, "generation": 1},
-        "observer": {"identity": observer},
+        "observer": {"identity": observer},\n        "state": "known-present",
         "observations": rows,
     }
 
@@ -69,3 +69,31 @@ def test_delta_does_not_invent_identity_for_rows_without_one() -> None:
         "changed": [],
         "unchanged": [],
     }
+
+
+def test_delta_preserves_unknown_to_known_absent_as_completeness_change() -> None:
+    before = _packet(repository="repo:a", observer="observer:a", rows=[])
+    before["state"] = "unknown"
+    after = _packet(repository="repo:a", observer="observer:a", rows=[])
+    after["state"] = "known-absent"
+
+    delta = observation_delta(before, after)
+
+    assert delta["completeness"] == {
+        "before": "unknown",
+        "after": "known-absent",
+        "changed": True,
+    }
+    assert delta["observations"]["added"] == []
+    assert delta["observations"]["removed"] == []
+
+
+def test_delta_fails_unknown_for_invalid_completeness_state() -> None:
+    before = _packet(repository="repo:a", observer="observer:a", rows=[])
+    before["state"] = "invented"
+    after = _packet(repository="repo:a", observer="observer:a", rows=[])
+
+    delta = observation_delta(before, after)
+
+    assert delta["completeness"]["before"] == "unknown"
+    assert delta["completeness"]["after"] == "known-present"
