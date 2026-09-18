@@ -34,4 +34,8 @@ Test, lint, type, timing, or other execution results may be imported as observat
 
 ## Current implementation slice
 
-hashmarks.codemap.observation_delta.observation_delta establishes the first anti-drift primitive: repository and observer changes are independent axes; rows match only by explicit stable identity; missing identity is not guessed; and output remains repository-intelligence-only. Further integration should extend existing change-intelligence/evidence projections rather than introducing a parallel owner.
+The canonical implementation owner is `hashmarks.codemap.repository_delta.RepositoryDeltaMixin`. Observer identity, completeness, semantic change, and endpoint delta extend that existing repository-intelligence snapshot/delta lifecycle. There is deliberately no separate observation-delta module, generation, cache, graph, or store.
+
+The current slice keeps observer capability identity separate from repository identity, represents bounded completeness explicitly, and refuses to promote same-name/same-kind symbol disappearance and appearance into proven move identity. Such correlations are emitted only as possible moves with provenance and `identity_authority: false`.
+
+Further work must continue through this owner and the existing change-intelligence/evidence projections.
