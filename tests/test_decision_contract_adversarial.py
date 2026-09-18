@@ -63,7 +63,7 @@ def test_decision_generation_accepts_zero_and_portable_maximum():
         ("identity.codemap_complete", 1, "identity.codemap_complete must be boolean"),
         ("identity.stale", None, "identity.stale must be boolean"),
         ("discrimination.ambiguity", [], "ambiguity must be an object or null"),
-        ("edit", [], "decision selection must be an object or null"),
+        ("edit", [], "evidence selection must be an object or null"),
     ],
 )
 def test_decision_packet_rejects_invalid_contract_fields(field, value, message):
