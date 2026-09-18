@@ -1,6 +1,6 @@
 # Observer and delta model
 
-Hashmarks is a repository observer, not an agent policy engine. This document fixes the ownership boundary for delta work so later features do not create parallel graphs, generations, caches, or decision engines.
+Hashmarks is a repository observer, not an agent policy engine and not a policy engine for policing its own policy. This document fixes the ownership boundary for delta work so later features do not create parallel graphs, generations, caches, or decision engines.
 
 ## Canonical ownership
 
@@ -69,3 +69,8 @@ Dependency scope is supplied by repository-intelligence relationships; it is not
 ## Verification relationship evidence
 
 Hashmarks may classify an observed verification relationship as direct, related, or unknown and gives that relationship a stable evidence identity plus provenance. These are repository relationship facts only. The vocabulary deliberately excludes policy terms such as sufficient or recommended; consumers decide whether a relationship satisfies a risk boundary.
+
+
+## Observer constitution
+
+Observer evolution should add facts or improve the quality of existing facts: identity, relationships, provenance, completeness, freshness, uncertainty, capability, and delta. Boundary protection must not become another runtime policy subsystem. When an implementation needs a recommendation, sufficiency decision, workflow rule, execution choice, or certification rule, keep that decision outside Hashmarks and expose only the repository evidence needed by the consumer.
