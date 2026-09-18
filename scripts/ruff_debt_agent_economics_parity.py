@@ -74,10 +74,7 @@ def main() -> int:
             "files",
         )
     }
-    if measured != expected:
-        print(\n            json.dumps(\n                {"legacy": expected, "agent_economics": measured},\n                indent=2,\n                sort_keys=True,\n            )\n        )
-        return 1
-    print(
+    if measured != expected:\n        print(\n            json.dumps(\n                {"legacy": expected, "agent_economics": measured},\n                indent=2,\n                sort_keys=True,\n            )\n        )\n        return 1\n    print(
         "Agent Economics Ruff debt parity: PASS "
         f"(excess={measured['excess']}, files={len(measured['files'])})"
     )
