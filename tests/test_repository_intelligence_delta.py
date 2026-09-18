@@ -292,3 +292,43 @@ def test_repository_delta_keeps_observer_change_separate_from_repository_change(
     assert delta["observer"]["changed"] is True
     assert delta["observer"]["before"] == "sha256:older-observer"
     assert delta["repository_identity"]
+
+
+def test_snapshot_relationship_rows_have_stable_identity_and_provenance(
+    tmp_path: Path,
+) -> None:
+    _source, task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        first = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        second = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+
+    symbol = first["paths"]["src/owner.py"]["symbols"][0]
+    assert symbol["identity"].startswith("sha256:")
+    assert symbol["provenance"] == {
+        "source": "codemap-symbol-index",
+        "path": "src/owner.py",
+    }
+    assert second["paths"]["src/owner.py"]["symbols"][0]["identity"] == symbol["identity"]
+
+
+def test_relationship_identity_does_not_turn_provenance_into_semantic_delta(
+    tmp_path: Path,
+) -> None:
+    _source, task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        dependencies = previous["paths"]["src/owner.py"]["dependencies"]
+        if dependencies:
+            dependencies[0]["provenance"] = {
+                "source": "older-compatible-observer",
+                "path": "src/owner.py",
+            }
+        previous["snapshot_identity"] = "sha256:caller-retained-provenance-variant"
+        delta = codemap.repository_intelligence_delta(
+            task, ["src/owner.py"], previous_snapshot=previous
+        )
+
+    assert not delta["semantic"].get("dependencies_added")
+    assert not delta["semantic"].get("dependencies_removed")
