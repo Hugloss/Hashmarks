@@ -248,6 +248,34 @@ class RepositoryDeltaMixin:
             "execution_effect": "none",
         }
 
+    def verification_relationship_evidence(
+        self,
+        *,
+        boundary: str,
+        source: str,
+        target: str,
+        classification: str,
+        provenance: str,
+    ) -> dict[str, object]:
+        """Describe a repository evidence relationship without deciding sufficiency."""
+        if classification not in {"direct", "related", "unknown"}:
+            raise ValueError("unsupported verification relationship classification")
+        payload = {
+            "boundary": boundary,
+            "source": source,
+            "target": target,
+            "classification": classification,
+            "provenance": provenance,
+        }
+        return {
+            **payload,
+            "evidence_identity": self._evidence_identity(
+                "hashmarks.verification-relationship.v1", payload
+            ),
+            "authority": "repository-relationship-only",
+            "execution_effect": "none",
+        }
+
     @staticmethod
     def external_observation_freshness(
         observation: Mapping[str, object],
