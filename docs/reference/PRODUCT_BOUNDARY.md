@@ -1,18 +1,24 @@
-# Hashmarks product profile and feature-admission contract
+# Hashmarks observer constitution
 
-**Status: normative.** This document is the primary product-boundary and feature-admission rule for Hashmarks. Every proposed capability, API, state field, cache, receipt, CLI option, service method, benchmark-driven change, or convenience behavior must be evaluated against this contract **before implementation**.
+**Status: normative.** This document defines what Hashmarks is: a repository observer. It is a product constitution, not a second policy engine that must itself be interpreted by another policy layer.
+
+The shortest governing rule is:
+
+> **Observe repository state and evidence. Preserve identity, provenance, completeness, freshness, uncertainty, and change. Never decide the consumer's next action or the execution system's policy.**
+
+New work is checked directly against that rule and the ownership boundaries below. Defect repairs and refactors that do not change product responsibility do not require ceremonial policy records.
 
 Historical behavior is evidence about the codebase, not authority to expand the product boundary. A feature does not belong in Hashmarks merely because it is useful to an agent, improves an agent benchmark, already has partial implementation, or can technically be added.
 
 ## Product profile
 
-Hashmarks is **repository intelligence for agents, tools, and humans**.
+Hashmarks is a **repository observer that exposes repository intelligence for agents, tools, and humans**.
 
 Its job is to turn repository state into compact, freshness-bound, provenance-bearing evidence that helps a consumer understand the repository: identity, topology, symbols, references, ownership, impact, ambiguity, likely repair surfaces, verification relevance, change consequences, and related repository-derived structure.
 
-Hashmarks should be excellent at answering questions of the form:
+Hashmarks should be excellent at answering observer questions of the form:
 
-> **What does the repository indicate, and what evidence supports that conclusion?**
+> **What is observable about this repository, how do we know it, how complete/current is that observation, and what changed?**
 
 Hashmarks must not evolve into the system that decides or performs the consumer's work.
 
@@ -51,9 +57,13 @@ Named external-library findings retained in historical evidence are **characteri
 
 This rule protects both product scope and economics: dependency fan-out must not turn one repository query into recursive ecosystem archaeology.
 
-## Mandatory admission gate for every proposal
+## Direct observer admission test
 
-**Every proposal must be classified before design or coding begins.** This applies equally to ideas from users, coding agents, benchmarks, failing tests, optimization work, integrations, and previous implementation debt.
+A new production responsibility must fit the observer model before implementation. This is a direct ownership check, not a requirement to invent policy about policy.
+
+A change is in profile when its semantic output is an observation or projection of repository state/evidence: identity, structure, relationship, provenance, completeness, freshness, uncertainty, capability, or delta. If its semantic output is a recommendation, sufficiency decision, workflow choice, retry/recovery decision, execution control, or certification decision, that responsibility belongs outside Hashmarks.
+
+The detailed tests below are review aids for ambiguous cases, not independent authorities. The observer constitution above remains the authority.
 
 A proposed capability belongs in Hashmarks only if the answer to the following questions is clear and favorable.
 
@@ -248,25 +258,20 @@ Until migrated or removed:
 
 Compatibility, where intentionally required, means containment. It does not grant architectural ownership.
 
-## Required proposal record
+## Change record
 
-Any proposed **new production capability** must include a short admission record before implementation:
+Only a change that introduces a **new production responsibility** needs a short ownership note. Keep it factual:
 
 ```text
-Product purpose:
-Repository source of authority:
-Neutral inputs:
-New persistent/cached state:
-Semantic cold/reconciled oracle:
-Why Hashmarks is the correct owner:
-What remains owned by the consumer/execution layer:
-Why existing repository-intelligence primitives are insufficient:
-Boundary decision: ADMIT / SPLIT / REJECT
+Observed repository fact/evidence:
+Authority source:
+Completeness/freshness behavior:
+Existing Hashmarks owner extended:
+Consumer/execution responsibility explicitly not acquired:
+Decision: OBSERVER / SPLIT / OUTSIDE
 ```
 
-For a pure refactor or defect repair that adds no product capability, state that explicitly instead of fabricating a feature-admission rationale.
-
-A proposal without a clear admission record must not be implemented as a new Hashmarks product feature.
+Do not create an admission record for ordinary defect repair, refactoring, tests, documentation, or optimization that preserves existing semantics. The record exists to prevent responsibility drift, not to create a governance workflow.
 
 ## Review rule for coding agents
 
