@@ -64,3 +64,8 @@ External observations may declare the repository paths they directly observed. F
 The rule fails closed: an observation with no declared scope becomes stale after repository/generation change. A direct or dependency-scope intersection also makes it stale. This avoids both false reuse and the opposite economics failure where an unrelated documentation edit invalidates a focused test observation.
 
 Dependency scope is supplied by repository-intelligence relationships; it is not inferred by the consumer.
+
+
+## Verification relationship evidence
+
+Hashmarks may classify an observed verification relationship as direct, related, or unknown and gives that relationship a stable evidence identity plus provenance. These are repository relationship facts only. The vocabulary deliberately excludes policy terms such as sufficient or recommended; consumers decide whether a relationship satisfies a risk boundary.
