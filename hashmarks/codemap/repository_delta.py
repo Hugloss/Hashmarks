@@ -213,6 +213,7 @@ class RepositoryDeltaMixin:
         diagnostics: Sequence[Mapping[str, object]],
         outcome: str,
         environment_identity: str | None = None,
+        scope_paths: Sequence[str] = (),
     ) -> dict[str, object]:
         """Normalize externally produced diagnostics without executing the tool."""
         allowed_outcomes = {
@@ -239,10 +240,62 @@ class RepositoryDeltaMixin:
             "repository_identity": repository_identity,
             "codemap_generation": int(codemap_generation),
             "environment_identity": environment_identity,
+            "scope_paths": sorted({str(path) for path in scope_paths}),
             "outcome": outcome,
             "diagnostics": rows,
             "diagnostic_count": len(rows),
             "authority": "observation-only",
+            "execution_effect": "none",
+        }
+
+    @staticmethod
+    def external_observation_freshness(
+        observation: Mapping[str, object],
+        *,
+        current_repository_identity: str,
+        current_generation: int,
+        changed_paths: Sequence[str] = (),
+        dependency_paths: Sequence[str] = (),
+    ) -> dict[str, object]:
+        """Evaluate scoped freshness without making every generation globally stale."""
+        observed_repository = str(observation.get("repository_identity") or "")
+        observed_generation = observation.get("codemap_generation")
+        raw_scope = observation.get("scope_paths")
+        scope = (
+            {str(path) for path in raw_scope}
+            if isinstance(raw_scope, list)
+            else set()
+        )
+        relevant = scope | {str(path) for path in dependency_paths}
+        changed = {str(path) for path in changed_paths}
+        intersection = sorted(relevant & changed)
+        repository_changed = observed_repository != current_repository_identity
+        generation_changed = observed_generation != current_generation
+
+        if not repository_changed and not generation_changed:
+            state = "fresh"
+            reason = "repository-and-generation-unchanged"
+        elif not relevant:
+            state = "stale"
+            reason = "repository-changed-without-declared-observation-scope"
+        elif intersection:
+            state = "stale"
+            reason = "relevant-repository-evidence-changed"
+        else:
+            state = "fresh"
+            reason = "changed-paths-proven-outside-observation-scope"
+
+        return {
+            "schema": "hashmarks.external-observation-freshness.v1",
+            "state": state,
+            "reason": reason,
+            "repository_changed": repository_changed,
+            "generation_changed": generation_changed,
+            "observation_scope": sorted(scope),
+            "dependency_scope": sorted({str(path) for path in dependency_paths}),
+            "changed_paths": sorted(changed),
+            "intersection": intersection,
+            "authority": "observation-freshness-only",
             "execution_effect": "none",
         }
 
