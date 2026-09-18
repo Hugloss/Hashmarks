@@ -14,6 +14,28 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+OBSERVATION_STATES = frozenset(
+    {"known-present", "known-absent", "unknown", "incomplete", "stale", "unsupported"}
+)
+
+
+def _observer_descriptor() -> dict[str, object]:
+    """Describe the observer capability separately from repository identity."""
+    return {
+        "producer": "hashmarks",
+        "surface": "repository-intelligence",
+        "schema": "hashmarks.repository-observer.v1",
+        "capabilities": [
+            "affected",
+            "dependencies",
+            "freshness",
+            "ownership",
+            "symbols",
+            "verification",
+        ],
+    }
+
+
 class RepositoryDeltaMixin:
     """Bounded semantic snapshots and deltas over repository intelligence.
 
@@ -184,8 +206,14 @@ class RepositoryDeltaMixin:
             impact_limit_per_surface=impact_limit_per_surface,
             max_depth=max_depth,
         )
+        observer = _observer_descriptor()
         payload: dict[str, object] = {
             "schema": "hashmarks.repository-intelligence-snapshot.v1",
+            "observer": {
+                **observer,
+                "identity": "sha256:"
+                + self._packet_digest("hashmarks.repository-observer.v1", observer),
+            },
             "repository": deepcopy(brief["repository"]),
             "task_identity": brief["task_identity"],
             "paths": self._snapshot_paths(changed_paths),
@@ -194,7 +222,11 @@ class RepositoryDeltaMixin:
             "verification": self._snapshot_verification(brief),
             "freshness": self._snapshot_freshness(freshness),
             "bounds": deepcopy(brief.get("bounds") or {}),
-            "completeness": "bounded-explicit-change-set",
+            "completeness": {
+                "state": "known-present",
+                "scope": "bounded-explicit-change-set",
+                "dynamic_runtime_relationships": "unknown",
+            },
             "storage": "derived-not-persisted",
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
@@ -325,7 +357,7 @@ class RepositoryDeltaMixin:
                 {"path": path, **self._decode_row(value)}
                 for value in sorted(old_dependencies - new_dependencies)
             )
-        moved: list[dict[str, object]] = []
+        possible_moves: list[dict[str, object]] = []
         removed_by_symbol = {
             (row.get("qualname") or row.get("name"), row.get("kind")): row
             for row in symbols_removed
@@ -334,19 +366,22 @@ class RepositoryDeltaMixin:
             key = (added.get("qualname") or added.get("name"), added.get("kind"))
             removed = removed_by_symbol.get(key)
             if removed is not None and removed["path"] != added["path"]:
-                moved.append(
+                possible_moves.append(
                     {
                         "name": added.get("qualname") or added.get("name"),
                         "kind": added.get("kind"),
                         "from": removed["path"],
                         "to": added["path"],
+                        "state": "possible",
+                        "provenance": "same-qualified-name-and-kind",
+                        "identity_authority": False,
                     }
                 )
         result: dict[str, object] = {}
         for key, rows in (
             ("symbols_added", symbols_added),
             ("symbols_removed", symbols_removed),
-            ("symbols_moved", moved),
+            ("possible_symbol_moves", possible_moves),
             ("dependencies_added", dependencies_added),
             ("dependencies_removed", dependencies_removed),
         ):
@@ -413,6 +448,18 @@ class RepositoryDeltaMixin:
                 if isinstance(row.get("path"), list) and row["path"]
             }
         )
+        previous_observer = self._delta_mapping(
+            previous_snapshot.get("observer"), field="previous_snapshot.observer"
+        )
+        current_observer = self._delta_mapping(
+            current.get("observer"), field="current.observer"
+        )
+        previous_completeness = self._delta_mapping(
+            previous_snapshot.get("completeness"), field="previous_snapshot.completeness"
+        )
+        current_completeness = self._delta_mapping(
+            current.get("completeness"), field="current.completeness"
+        )
         payload: dict[str, object] = {
             "schema": "hashmarks.repository-intelligence-delta.v1",
             "repository_identity": repository_identity,
@@ -428,7 +475,17 @@ class RepositoryDeltaMixin:
             "changes": changes,
             "changed_sections": changed_sections,
             "semantic": self._semantic_changes(previous_snapshot, current),
-            "completeness": "bounded-explicit-change-set",
+            "observer": {
+                "before": previous_observer.get("identity"),
+                "after": current_observer.get("identity"),
+                "changed": previous_observer.get("identity")
+                != current_observer.get("identity"),
+            },
+            "completeness": {
+                "before": deepcopy(previous_completeness),
+                "after": deepcopy(current_completeness),
+                "changed": previous_completeness != current_completeness,
+            },
             "storage": "derived-not-persisted",
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
