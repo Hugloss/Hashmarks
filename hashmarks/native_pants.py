@@ -34,6 +34,40 @@ def find_pants(workspace: Path) -> str | None:
     return shutil.which("pants")
 
 
+def _pants_target_rows(payload: list[object]) -> tuple[PantsTargetData, ...]:
+    """Normalize valid target records from one successful Pants peek result."""
+    rows: list[PantsTargetData] = []
+    for raw in payload:
+        if not isinstance(raw, dict):
+            continue
+        address = str(raw.get("address") or "")
+        if not address:
+            continue
+        dependencies = tuple(
+            str(value)
+            for value in raw.get("dependencies") or ()
+            if isinstance(value, str)
+        )
+        sources = tuple(
+            str(value).replace("\\", "/")
+            for value in raw.get("sources") or ()
+            if isinstance(value, str)
+        )
+        goals = tuple(
+            str(value) for value in raw.get("goals") or () if isinstance(value, str)
+        )
+        rows.append(
+            PantsTargetData(
+                address=address,
+                target_type=str(raw.get("target_type") or "target"),
+                dependencies=dependencies,
+                sources=sources,
+                goals=goals,
+            )
+        )
+    return tuple(rows)
+
+
 def collect_pants_targets(
     workspace: Path, *, executable: str | None = None, timeout: float = 45.0
 ) -> PantsSnapshot:
@@ -71,33 +105,4 @@ def collect_pants_targets(
         return PantsSnapshot(pants, warnings=("pants peek returned invalid JSON",))
     if not isinstance(payload, list):
         return PantsSnapshot(pants, warnings=("pants peek JSON must be a list",))
-    rows: list[PantsTargetData] = []
-    for raw in payload:
-        if not isinstance(raw, dict):
-            continue
-        address = str(raw.get("address") or "")
-        if not address:
-            continue
-        dependencies = tuple(
-            str(value)
-            for value in raw.get("dependencies") or ()
-            if isinstance(value, str)
-        )
-        sources = tuple(
-            str(value).replace("\\", "/")
-            for value in raw.get("sources") or ()
-            if isinstance(value, str)
-        )
-        goals = tuple(
-            str(value) for value in raw.get("goals") or () if isinstance(value, str)
-        )
-        rows.append(
-            PantsTargetData(
-                address=address,
-                target_type=str(raw.get("target_type") or "target"),
-                dependencies=dependencies,
-                sources=sources,
-                goals=goals,
-            )
-        )
-    return PantsSnapshot(pants, tuple(rows))
+    return PantsSnapshot(pants, _pants_target_rows(payload))

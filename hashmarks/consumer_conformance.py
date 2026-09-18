@@ -58,6 +58,35 @@ def _bundle_handoff_reasons(
     return reasons
 
 
+def _normalized_bundle(
+    envelope: Mapping[str, object], producer_identity: object
+) -> dict[str, object]:
+    """Project the validated envelope fields exposed to a consumer."""
+    repository = envelope.get("repository")
+    repository_binding = repository if isinstance(repository, Mapping) else {}
+    producer = envelope.get("producer")
+    producer_binding = producer if isinstance(producer, Mapping) else {}
+    selection = envelope.get("selection")
+    selection_binding = selection if isinstance(selection, Mapping) else {}
+    members = selection_binding.get("members")
+    return {
+        "producer": {
+            "name": producer_binding.get("name"),
+            "version": producer_binding.get("version"),
+            "implementation_identity": producer_identity,
+        },
+        "repository_identity": repository_binding.get("repository_identity"),
+        "source_identity": repository_binding.get("source_identity"),
+        "codemap_generation": repository_binding.get("codemap_generation"),
+        "identity_generation": repository_binding.get("identity_generation"),
+        "stale": repository_binding.get("stale"),
+        "members": list(members) if isinstance(members, list) else [],
+        "membership_identity": selection_binding.get("membership_identity"),
+        "selection_identity": envelope.get("envelope_identity"),
+        "repository_provenance_identity": envelope.get("envelope_identity"),
+    }
+
+
 def validate_native_consumer_bundle(
     envelope: Mapping[str, object],
     contract: Mapping[str, object],
@@ -88,32 +117,9 @@ def validate_native_consumer_bundle(
         and producer_identity != expected_producer_implementation_identity
     ):
         reasons.append("producer-implementation-identity-not-expected")
-    repository = envelope.get("repository")
-    repository_binding = repository if isinstance(repository, Mapping) else {}
-    if require_fresh and repository_binding.get("stale") is not False:
+    normalized = _normalized_bundle(envelope, producer_identity)
+    if require_fresh and normalized["stale"] is not False:
         reasons.append("fresh-evidence-required")
-    producer = envelope.get("producer")
-    producer_binding = producer if isinstance(producer, Mapping) else {}
-    selection = envelope.get("selection")
-    selection_binding = selection if isinstance(selection, Mapping) else {}
-    normalized = {
-        "producer": {
-            "name": producer_binding.get("name"),
-            "version": producer_binding.get("version"),
-            "implementation_identity": producer_identity,
-        },
-        "repository_identity": repository_binding.get("repository_identity"),
-        "source_identity": repository_binding.get("source_identity"),
-        "codemap_generation": repository_binding.get("codemap_generation"),
-        "identity_generation": repository_binding.get("identity_generation"),
-        "stale": repository_binding.get("stale"),
-        "members": list(selection_binding.get("members", []))
-        if isinstance(selection_binding.get("members"), list)
-        else [],
-        "membership_identity": selection_binding.get("membership_identity"),
-        "selection_identity": envelope.get("envelope_identity"),
-        "repository_provenance_identity": envelope.get("envelope_identity"),
-    }
     valid = not reasons
     return {
         "schema": CONSUMER_CONFORMANCE_SCHEMA,
