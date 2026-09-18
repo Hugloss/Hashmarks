@@ -1,14 +1,14 @@
 # Hashmarks architecture
 
-Hashmarks is a repository-intelligence system with a strict separation between **canonical identity**, **derived repository intelligence**, **consumer reasoning**, and **execution/certification**.
+Hashmarks is a repository observer and repository-intelligence system with a strict separation between **canonical identity**, **derived repository intelligence**, **consumer reasoning**, and **execution/certification**.
 
 ## Architectural goal
 
 Repeated repository archaeology should become incremental and reusable without allowing caches, agent history, or execution state to become repository truth.
 
-The core question Hashmarks answers is:
+The core observer question Hashmarks answers is:
 
-> What does the current repository indicate, how fresh is that evidence, and what provenance supports it?
+> What is observable about the current repository, what changed, how complete and fresh is that evidence, and what provenance supports it?
 
 ## Layers
 
@@ -146,3 +146,8 @@ Built-in parsers provide useful structure for Python, JavaScript/TypeScript, Go,
 When a claim requires evidence that Hashmarks cannot prove, the result should become conservative rather than guessed. Typical outcomes are ambiguity, unknown freshness, unresolved ownership, or a request for more repository evidence.
 
 The detailed guarantees are maintained in [`INVARIANTS.md`](INVARIANTS.md).
+
+
+## Policy boundary
+
+Hashmarks has product invariants but is not itself a policy engine. Its product constitution constrains which observations it may own; it does not create runtime governance, recommendation, sufficiency, workflow, or policy-of-policy authority. Architectural enforcement should prefer existing owners, typed evidence, fail-closed semantics, regressions, and deletion of misplaced responsibility over adding governance state.
