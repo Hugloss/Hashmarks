@@ -47,10 +47,16 @@ def _start_daemon(workspace: Path, tmp_path: Path):
     )
     thread = threading.Thread(target=daemon.serve_forever, daemon=True)
     thread.start()
-    deadline = time.monotonic() + 2
-    while not socket_path.exists() and time.monotonic() < deadline:
-        time.sleep(0.01)
-    assert socket_path.exists()
+    client = IdentityClient(workspace, socket_path=socket_path)
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            client.status()
+            break
+        except OSError:
+            time.sleep(0.01)
+    else:
+        raise AssertionError("identity daemon did not become ready")
     return daemon, watcher, socket_path, thread
 
 
