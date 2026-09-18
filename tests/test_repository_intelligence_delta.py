@@ -332,3 +332,75 @@ def test_relationship_identity_does_not_turn_provenance_into_semantic_delta(
 
     assert not delta["semantic"].get("dependencies_added")
     assert not delta["semantic"].get("dependencies_removed")
+
+
+def test_diagnostic_delta_uses_identity_not_aggregate_count() -> None:
+    before = RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="pyright",
+        repository_identity="sha256:repo-a",
+        codemap_generation=41,
+        outcome="fail",
+        diagnostics=[
+            {"tool": "pyright", "rule": "a", "path": "src/a.py", "message": "old"},
+            {"tool": "pyright", "rule": "b", "path": "src/b.py", "message": "stable"},
+        ],
+    )
+    after = RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="pyright",
+        repository_identity="sha256:repo-b",
+        codemap_generation=42,
+        outcome="fail",
+        diagnostics=[
+            {"tool": "pyright", "rule": "c", "path": "src/a.py", "message": "new"},
+            {"tool": "pyright", "rule": "b", "path": "src/b.py", "message": "stable"},
+        ],
+    )
+
+    delta = RepositoryDeltaMixin.diagnostic_observation_delta(
+        before, after, changed_paths=["src/a.py"]
+    )
+
+    assert delta["diagnostics"]["before_count"] == 2
+    assert delta["diagnostics"]["after_count"] == 2
+    assert len(delta["diagnostics"]["added"]) == 1
+    assert len(delta["diagnostics"]["removed"]) == 1
+    assert len(delta["diagnostics"]["added_in_changed_scope"]) == 1
+    assert delta["diagnostics"]["unchanged_count"] == 1
+
+
+def test_blocked_environment_is_observation_not_repository_failure() -> None:
+    observation = RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="pytest",
+        repository_identity="sha256:repo",
+        codemap_generation=42,
+        outcome="blocked-permission",
+        environment_identity="sha256:sandbox",
+        diagnostics=[],
+    )
+
+    assert observation["outcome"] == "blocked-permission"
+    assert observation["authority"] == "observation-only"
+    assert observation["execution_effect"] == "none"
+
+
+def test_external_diagnostic_identity_is_order_stable() -> None:
+    rows = [
+        {"tool": "ruff", "rule": "A", "path": "a.py", "message": "a"},
+        {"tool": "ruff", "rule": "B", "path": "b.py", "message": "b"},
+    ]
+    first = RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="ruff",
+        repository_identity="sha256:repo",
+        codemap_generation=1,
+        outcome="fail",
+        diagnostics=rows,
+    )
+    second = RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="ruff",
+        repository_identity="sha256:repo",
+        codemap_generation=1,
+        outcome="fail",
+        diagnostics=list(reversed(rows)),
+    )
+
+    assert first["diagnostics"] == second["diagnostics"]
