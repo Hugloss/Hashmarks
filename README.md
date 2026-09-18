@@ -269,7 +269,7 @@ For the detailed design, see [Architecture](docs/reference/ARCHITECTURE.md) and 
 
 ## Core architecture
 
-Hashmarks is repository intelligence, not an autonomous coding agent or execution engine. It can tell a consumer what the repository contains, what appears to own a behavior, what may be affected, what evidence is stale or ambiguous, and what verification surfaces are relevant. The consumer remains responsible for reasoning, edits, execution, retries, git/worktrees, and final decisions.
+Hashmarks is a repository observer that exposes repository intelligence, not an autonomous coding agent, policy engine, or execution engine. It can tell a consumer what the repository contains, what appears to own a behavior, what may be affected, what evidence is stale or ambiguous, and what verification surfaces are relevant. The consumer remains responsible for reasoning, edits, execution, retries, git/worktrees, and final decisions.
 
 ## Non-negotiable agent boundary
 
