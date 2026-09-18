@@ -27,10 +27,10 @@ jobs:
         run: |
           bootstrap="$(mktemp)"
           curl --fail --silent --show-error --location \
-            https://raw.githubusercontent.com/Hugloss/agentsCookbook/652fd47f08f66aad3ba3f394b925af515bbba3cd/scripts/bootstrap-agent-economics.sh \
+            https://raw.githubusercontent.com/Hugloss/agentsCookbook/9cf4a02f822710fd9d21265904836a264ba03844/scripts/bootstrap-agent-economics.sh \
             --output "$bootstrap"
           sh "$bootstrap" \
-            --revision 652fd47f08f66aad3ba3f394b925af515bbba3cd \
+            --revision 9cf4a02f822710fd9d21265904836a264ba03844 \
             --destination .agent-economics
       - name: Prove Agent Economics Ruff debt measurement parity
         run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --only-group lint python -m scripts.agent_evaluation.ruff_debt_agent_economics_parity
