@@ -80,9 +80,27 @@ class RepositoryDeltaMixin:
             symbols = sorted(
                 (
                     {
-                        key: str(symbol[key])
-                        for key in ("name", "qualname", "kind")
-                        if symbol.get(key) is not None and str(symbol.get(key) or "")
+                        **{
+                            key: str(symbol[key])
+                            for key in ("name", "qualname", "kind")
+                            if symbol.get(key) is not None and str(symbol.get(key) or "")
+                        },
+                        "identity": self._evidence_identity(
+                            "hashmarks.symbol-evidence.v1",
+                            {
+                                "path": path,
+                                **{
+                                    key: str(symbol[key])
+                                    for key in ("name", "qualname", "kind")
+                                    if symbol.get(key) is not None
+                                    and str(symbol.get(key) or "")
+                                },
+                            },
+                        ),
+                        "provenance": {
+                            "source": "codemap-symbol-index",
+                            "path": path,
+                        },
                     }
                     for symbol in symbols_by_path.get(path, ())
                 ),
@@ -95,9 +113,27 @@ class RepositoryDeltaMixin:
             dependencies = sorted(
                 (
                     {
-                        key: str(edge[key])
-                        for key in ("source", "kind", "target", "confidence")
-                        if edge.get(key) is not None and str(edge.get(key) or "")
+                        **{
+                            key: str(edge[key])
+                            for key in ("source", "kind", "target", "confidence")
+                            if edge.get(key) is not None and str(edge.get(key) or "")
+                        },
+                        "identity": self._evidence_identity(
+                            "hashmarks.relationship-evidence.v1",
+                            {
+                                "path": path,
+                                **{
+                                    key: str(edge[key])
+                                    for key in ("source", "kind", "target", "confidence")
+                                    if edge.get(key) is not None
+                                    and str(edge.get(key) or "")
+                                },
+                            },
+                        ),
+                        "provenance": {
+                            "source": "codemap-edge-index",
+                            "path": path,
+                        },
                     }
                     for edge in edges_by_path.get(path, ())
                     if edge.get("kind") and edge.get("target")
@@ -316,7 +352,13 @@ class RepositoryDeltaMixin:
         if not isinstance(values, list):
             return set()
         return {
-            tuple(sorted((str(k), str(v)) for k, v in item.items()))
+            tuple(
+                sorted(
+                    (str(k), str(v))
+                    for k, v in item.items()
+                    if k not in {"identity", "provenance"}
+                )
+            )
             for item in values
             if isinstance(item, Mapping)
         }
