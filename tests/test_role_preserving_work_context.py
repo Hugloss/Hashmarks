@@ -130,7 +130,7 @@ def test_shared_mandatory_path_reports_all_uncovered_roles_when_budget_is_tiny()
     packet = codemap.work_context(action, token_budget=1)
     assert packet["safe"] is False
     assert packet["items"] == []
-    assert packet["missing_roles"] == ["edit", "contract", "verify"]
+    assert packet["missing_roles"] == ["edit", "verify", "contract"]
     assert packet["role_coverage"] == {
         "edit": False,
         "verify": False,
