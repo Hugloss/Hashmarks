@@ -117,7 +117,9 @@ def test_optional_duplicate_of_mandatory_path_cannot_change_role_authority() -> 
     assert engine[0]["covered_roles"] == ["edit"]
 
 
-def test_shared_mandatory_path_reports_all_uncovered_roles_when_budget_is_tiny() -> (\n    None\n):
+def test_shared_mandatory_path_reports_all_uncovered_roles_when_budget_is_tiny() -> (
+    None
+):
     codemap = object.__new__(CodeMap)
     shared = _row("pkg/policy.py", 1, "edit")
     action = {
