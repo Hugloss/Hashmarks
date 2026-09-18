@@ -34,7 +34,7 @@ jobs:
         run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --only-group lint python -m scripts.agent_evaluation.ruff_debt_agent_economics_parity
       - name: Dogfood Agent Economics test-before-edit handoff
         run: |
-          PYTHONPATH="$PWD/.agent-economics:$PWD" uv run --no-sync python -m scripts.agent_economics test-focus \
+          PYTHONPATH="$PWD/.agent-economics:$PWD" uv run --no-sync python -m agent_economics test-focus \
             --repository-root . \
             --source-root hashmarks \
             --tests-root tests \
