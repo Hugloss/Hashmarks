@@ -490,3 +490,39 @@ def test_dependency_scope_invalidates_observation_without_direct_path_overlap() 
 
     assert freshness["state"] == "stale"
     assert freshness["intersection"] == ["src/owner.py"]
+
+
+def test_verification_relationship_has_provider_identity_without_sufficiency_claim(
+    tmp_path: Path,
+) -> None:
+    _source, _task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        relationship = codemap.verification_relationship_evidence(
+            boundary="behavior",
+            source="src/owner.py",
+            target="tests/test_owner.py",
+            classification="direct",
+            provenance="static-reference",
+        )
+
+    assert relationship["evidence_identity"].startswith("sha256:")
+    assert relationship["classification"] == "direct"
+    assert relationship["authority"] == "repository-relationship-only"
+    assert relationship["execution_effect"] == "none"
+
+
+def test_verification_relationship_rejects_policy_classifications(
+    tmp_path: Path,
+) -> None:
+    _source, _task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="unsupported verification relationship"):
+            codemap.verification_relationship_evidence(
+                boundary="behavior",
+                source="src/owner.py",
+                target="tests/test_owner.py",
+                classification="sufficient",
+                provenance="agent-claim",
+            )
