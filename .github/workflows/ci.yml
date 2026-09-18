@@ -25,8 +25,11 @@ jobs:
       - run: make lint-debt-gate
       - name: Materialize Agent Economics quality-debt supply
         run: |
-          git clone --depth 1 https://github.com/Hugloss/agentsCookbook.git .agent-economics
-          test "$(git -C .agent-economics rev-parse HEAD)" = "22e2ee863d06087099b86378571165768bc3332b"
+          git init .agent-economics
+          git -C .agent-economics remote add origin https://github.com/Hugloss/agentsCookbook.git
+          git -C .agent-economics fetch --depth 1 origin 3eaf2c56f3e773e2659345232c0128b26e78a660
+          git -C .agent-economics checkout --detach FETCH_HEAD
+          test "$(git -C .agent-economics rev-parse HEAD)" = "3eaf2c56f3e773e2659345232c0128b26e78a660"
       - name: Prove Agent Economics Ruff debt measurement parity
         run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --only-group lint python -m scripts.agent_evaluation.ruff_debt_agent_economics_parity
       - run: make compile
