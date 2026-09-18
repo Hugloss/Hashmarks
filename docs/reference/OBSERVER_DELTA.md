@@ -46,3 +46,12 @@ Further work must continue through this owner and the existing change-intelligen
 Snapshot symbol and dependency rows carry deterministic evidence identities and producer provenance. Identity is derived from the repository relationship fact, not from presentation metadata. Provenance therefore remains explainable without causing a false semantic relationship delta when only observer metadata changes.
 
 Stable evidence identity is not a claim of runtime behavior coverage. Static relationship evidence remains bounded by the snapshot completeness declaration, including unknown dynamic-runtime relationships.
+
+
+## External diagnostic observations
+
+Hashmarks can normalize externally produced diagnostic rows without running the producer. Diagnostic identity is based on tool/rule/location/symbol/message facts and is order-independent. Delta compares those identities, so equal aggregate counts do not imply equal evidence.
+
+The projection reports added, removed, unchanged, and newly added diagnostics intersecting an explicitly supplied changed-path scope. Outcomes distinguish pass, fail, not-run, blocked-environment, blocked-supply, blocked-permission, invalid-baseline, and stale. These remain observation-only facts; Hashmarks does not decide whether a dirty repository gate is acceptable.
+
+Environment identity is optional provenance for externally supplied observations and must not be confused with repository identity.
