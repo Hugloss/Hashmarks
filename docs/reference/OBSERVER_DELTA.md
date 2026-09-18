@@ -39,3 +39,10 @@ The canonical implementation owner is `hashmarks.codemap.repository_delta.Reposi
 The current slice keeps observer capability identity separate from repository identity, represents bounded completeness explicitly, and refuses to promote same-name/same-kind symbol disappearance and appearance into proven move identity. Such correlations are emitted only as possible moves with provenance and `identity_authority: false`.
 
 Further work must continue through this owner and the existing change-intelligence/evidence projections.
+
+
+## Relationship evidence identity
+
+Snapshot symbol and dependency rows carry deterministic evidence identities and producer provenance. Identity is derived from the repository relationship fact, not from presentation metadata. Provenance therefore remains explainable without causing a false semantic relationship delta when only observer metadata changes.
+
+Stable evidence identity is not a claim of runtime behavior coverage. Static relationship evidence remains bounded by the snapshot completeness declaration, including unknown dynamic-runtime relationships.
