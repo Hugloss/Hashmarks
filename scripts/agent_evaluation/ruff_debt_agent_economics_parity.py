@@ -60,6 +60,31 @@ def _legacy_shape(summary: dict[str, object]) -> dict[str, object]:
     }
 
 
+def _ranked_hotspots(payload: dict[str, object]) -> list[dict[str, object]]:
+    summary = dict(dict(payload["derived"])["summary"])
+    details = [dict(row) for row in dict(payload["evidence"])["detailed_findings"]]
+    by_path: dict[str, list[dict[str, object]]] = {}
+    for row in details:
+        by_path.setdefault(str(row["path"]), []).append(row)
+    ranked: list[dict[str, object]] = []
+    for path, raw in dict(summary["files"]).items():
+        item = dict(raw)
+        rules = Counter(str(row["rule"]) for row in by_path.get(path, []))
+        ranked.append(
+            {
+                "path": path,
+                "locations": int(item["locations"]),
+                "rule_findings": int(item["rule_findings"]),
+                "excess": int(item["excess"]),
+                "rules": dict(sorted(rules.items())),
+            }
+        )
+    return sorted(
+        ranked,
+        key=lambda row: (-int(row["excess"]), -int(row["rule_findings"]), str(row["path"])),
+    )
+
+
 def main() -> int:
     quality_debt_audit = _load_quality_debt()
     payload = quality_debt_audit(
@@ -92,10 +117,12 @@ def main() -> int:
             )
         )
         return 1
+    ranked = _ranked_hotspots(payload)
     print(
         "Agent Economics Ruff debt parity: PASS "
         f"(excess={measured['excess']}, files={len(measured['files'])})"
     )
+    print(json.dumps({"ranked_hotspots": ranked}, sort_keys=True))
     return 0
 
 
