@@ -43,6 +43,8 @@ jobs:
             --package-name hashmarks \
             --tests-package-name tests \
             --changed-path hashmarks/codemap/task_action_projection.py \
+            --impact-max-depth 2 \
+            --gate "hashmarks-test=make test" \
             --artifact .agent-artifacts/task-action-projection-test-focus.json
       - run: make compile
       - name: Prove workspace-state authority before heavy qualification
