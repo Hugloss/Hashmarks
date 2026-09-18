@@ -90,13 +90,14 @@ def test_verification_explanation_selected_and_why_not_are_deterministic(
 
 
 def _wait(client: CodeMapServiceClient) -> None:
-    for _ in range(100):
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
         try:
             client.status()
             return
         except OSError:
             time.sleep(0.01)
-    raise AssertionError("service did not start")
+    raise AssertionError("service did not become ready")
 
 
 def test_service_exposes_change_brief_and_verification_explanation(
