@@ -53,6 +53,14 @@ def test_repository_observation_returns_typed_atomic_snapshot(
 @pytest.mark.parametrize(
     "payload",
     [
+        {"observation": "dirty", "generation": 2},
+        {
+            "observation": "dirty",
+            "generation": 2,
+            "dirty_paths": 0,
+            "paths": [],
+            "paths_complete": 1,
+        },
         {
             "observation": "dirty",
             "generation": 2,
@@ -87,6 +95,14 @@ def test_repository_observation_returns_typed_atomic_snapshot(
             "dirty_paths": 1,
             "paths": ["a.py"],
             "paths_complete": True,
+        },
+        {
+            "observation": "clean",
+            "generation": 2,
+            "dirty_paths": 0,
+            "paths": [],
+            "paths_complete": True,
+            "reason": 42,
         },
     ],
 )

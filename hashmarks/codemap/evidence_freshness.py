@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from hashmarks.paths import normalize_relative_path
 
@@ -96,9 +96,8 @@ class EvidenceFreshnessMixin:
                 continue
             if str(row.get("kind") or "") != "shared-input":
                 continue
-            metadata = (
-                row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
-            )
+            raw_metadata = row.get("metadata")
+            metadata = raw_metadata if isinstance(raw_metadata, dict) else {}
             if str(metadata.get("path") or row.get("root") or "") == relpath:
                 return True
         return False
@@ -118,6 +117,23 @@ class EvidenceFreshnessMixin:
         )
         return True
 
+    def _generation_snapshot_fresh(
+        self, value: dict[str, object]
+    ) -> tuple[bool, str | None]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        try:
+            recorded_generation = int(cast(Any, value.get("generation")))
+        except (TypeError, ValueError):
+            return False, "invalid generation snapshot"
+        current_generation = self.store.generation()
+        if recorded_generation != current_generation:
+            return (
+                False,
+                f"CodeMap generation changed ({recorded_generation} -> {current_generation})",
+            )
+        return True, None
+
     def _evidence_fresh(self, kind: str, producer: str) -> tuple[bool, str | None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -125,15 +141,9 @@ class EvidenceFreshnessMixin:
         if value is None:
             return False, "no freshness snapshot"
         if bool(value.get("bind_generation", False)):
-            try:
-                recorded_generation = int(value.get("generation"))
-            except (TypeError, ValueError):
-                return False, "invalid generation snapshot"
-            if recorded_generation != self.store.generation():
-                return (
-                    False,
-                    f"CodeMap generation changed ({recorded_generation} -> {self.store.generation()})",
-                )
+            fresh, reason = self._generation_snapshot_fresh(value)
+            if not fresh:
+                return fresh, reason
         manifests = value.get("manifests") or {}
         if not isinstance(manifests, dict):
             return False, "invalid manifest snapshot"
@@ -259,18 +269,7 @@ class EvidenceFreshnessMixin:
         """
         if limit < 1:
             return {"roots": sorted(project_ids), "affected": [], "edges": []}
-        reverse: dict[str, list[dict[str, object]]] = {}
-        for raw in self._fresh_project_edges():
-            edge = dict(raw)
-            reverse.setdefault(str(edge.get("target") or ""), []).append(edge)
-        for rows in reverse.values():
-            rows.sort(
-                key=lambda row: (
-                    str(row.get("source") or ""),
-                    str(row.get("kind") or ""),
-                    str(row.get("producer") or ""),
-                )
-            )
+        reverse = self._reverse_project_edges()
 
         seen = set(project_ids)
         frontier = sorted(project_ids)
@@ -286,24 +285,7 @@ class EvidenceFreshnessMixin:
                         continue
                     seen.add(source)
                     affected.append({"project": source, "depth": depth})
-                    compact = {
-                        "from": source,
-                        "to": str(edge.get("target") or ""),
-                        "kind": str(edge.get("kind") or "declared"),
-                        "producer": str(edge.get("producer") or ""),
-                    }
-                    confidence = str(edge.get("confidence") or "")
-                    if confidence and confidence != "declared":
-                        compact["confidence"] = confidence
-                    key = (
-                        compact["from"],
-                        compact["to"],
-                        compact["kind"],
-                        compact["producer"],
-                    )
-                    if key not in edge_keys:
-                        edge_keys.add(key)
-                        edges.append(compact)
+                    self._append_compact_project_edge(edge, source, edges, edge_keys)
                     if len(affected) >= limit:
                         return {
                             "roots": sorted(project_ids),
@@ -315,6 +297,45 @@ class EvidenceFreshnessMixin:
                 break
             frontier = sorted(nxt)
         return {"roots": sorted(project_ids), "affected": affected, "edges": edges}
+
+    def _reverse_project_edges(self) -> dict[str, list[dict[str, object]]]:
+        reverse: dict[str, list[dict[str, object]]] = {}
+        for raw in self._fresh_project_edges():
+            edge = dict(raw)
+            reverse.setdefault(str(edge.get("target") or ""), []).append(edge)
+        for rows in reverse.values():
+            rows.sort(
+                key=lambda row: (
+                    str(row.get("source") or ""),
+                    str(row.get("kind") or ""),
+                    str(row.get("producer") or ""),
+                )
+            )
+        return reverse
+
+    @staticmethod
+    def _append_compact_project_edge(
+        edge: dict[str, object],
+        source: str,
+        edges: list[dict[str, object]],
+        edge_keys: set[tuple[str, str, str, str]],
+    ) -> None:
+        target = str(edge.get("target") or "")
+        kind = str(edge.get("kind") or "declared")
+        producer = str(edge.get("producer") or "")
+        compact: dict[str, object] = {
+            "from": source,
+            "to": target,
+            "kind": kind,
+            "producer": producer,
+        }
+        confidence = str(edge.get("confidence") or "")
+        if confidence and confidence != "declared":
+            compact["confidence"] = confidence
+        key = (source, target, kind, producer)
+        if key not in edge_keys:
+            edge_keys.add(key)
+            edges.append(compact)
 
     def _native_evidence_status(self) -> list[dict[str, object]]:
         if TYPE_CHECKING:

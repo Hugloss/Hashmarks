@@ -141,7 +141,9 @@ class IdentityClient:
         raw = (
             json.dumps(message, separators=(",", ":"), sort_keys=True) + "\n"
         ).encode("utf-8")
+        return self._decode_response(self._read_response(raw))
 
+    def _read_response(self, raw: bytes) -> bytes:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(self.timeout)
         try:
@@ -166,10 +168,13 @@ class IdentityClient:
             ) from exc
         finally:
             sock.close()
+        return bytes(chunks)
 
+    @staticmethod
+    def _decode_response(chunks: bytes) -> dict[str, Any]:
         if len(chunks) > _MAX_RESPONSE:
             raise DaemonProtocolError("daemon response exceeded size limit")
-        line = bytes(chunks).split(b"\n", 1)[0]
+        line = chunks.split(b"\n", 1)[0]
         if not line:
             raise DaemonProtocolError("daemon returned an empty response")
         try:
@@ -239,6 +244,30 @@ class IdentityClient:
             raise DaemonProtocolError(
                 "daemon returned an invalid repository observation"
             ) from exc
+        paths = self._validated_observation_paths(
+            state, dirty_path_count, paths_complete, raw_paths
+        )
+        reason = response.get("reason")
+        if reason is not None and not isinstance(reason, str):
+            raise DaemonProtocolError(
+                "repository observation reason must be a string or null"
+            )
+        return RepositoryObservation(
+            state=state,
+            generation=generation,
+            dirty_paths=paths,
+            paths_complete=paths_complete,
+            dirty_path_count=dirty_path_count,
+            reason=reason,
+        )
+
+    @staticmethod
+    def _validated_observation_paths(
+        state: ObservationState,
+        dirty_path_count: int,
+        paths_complete: object,
+        raw_paths: object,
+    ) -> tuple[str, ...]:
         if not isinstance(paths_complete, bool):
             raise DaemonProtocolError(
                 "repository observation paths_complete must be boolean"
@@ -266,19 +295,7 @@ class IdentityClient:
             raise DaemonProtocolError(
                 "unknown repository observation cannot authorize dirty paths"
             )
-        reason = response.get("reason")
-        if reason is not None and not isinstance(reason, str):
-            raise DaemonProtocolError(
-                "repository observation reason must be a string or null"
-            )
-        return RepositoryObservation(
-            state=state,
-            generation=generation,
-            dirty_paths=paths,
-            paths_complete=paths_complete,
-            dirty_path_count=dirty_path_count,
-            reason=reason,
-        )
+        return paths
 
     def stats(self) -> dict[str, Any]:
         self._ensure_compatible()

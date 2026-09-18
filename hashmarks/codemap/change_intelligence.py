@@ -15,6 +15,40 @@ if TYPE_CHECKING:
 class ChangeIntelligenceMixin:
     """Compact product projection over existing change/selection authority."""
 
+    def _change_brief_rows(self, raw_changed: object) -> list[dict[str, object]]:
+        """Enrich caller-reported changed paths from one indexed symbol batch."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        changed_rows = raw_changed if isinstance(raw_changed, list) else []
+        paths = [
+            str(row.get("path") or "")
+            for row in changed_rows
+            if isinstance(row, dict) and row.get("path")
+        ]
+        symbols_by_path = self.store.symbols_for_paths_many(paths, limit_per_path=16)
+        changed: list[dict[str, object]] = []
+        for row in changed_rows:
+            if not isinstance(row, dict):
+                continue
+            path = str(row.get("path") or "")
+            file_row = self._session_file_row(path)
+            revision = (
+                None
+                if file_row is None or not file_row["file_digest"]
+                else str(file_row["file_digest"])
+            )
+            symbols = [
+                str(symbol.get("qualname") or symbol.get("name") or "")
+                for symbol in symbols_by_path.get(path, ())
+                if str(symbol.get("qualname") or symbol.get("name") or "")
+            ]
+            item = dict(row)
+            item["revision"] = revision
+            if symbols:
+                item["symbols"] = symbols
+            changed.append(item)
+        return changed
+
     @diagnostic_producer
     def change_intelligence_brief(
         self,
@@ -60,38 +94,7 @@ class ChangeIntelligenceMixin:
                 for key in ("selected", "via", "owner_path")
                 if key in ownership
             }
-        changed_rows = (
-            impact.get("changed") if isinstance(impact.get("changed"), list) else []
-        )
-        changed_paths_normalized = [
-            str(row.get("path") or "")
-            for row in changed_rows
-            if isinstance(row, dict) and row.get("path")
-        ]
-        symbols_by_path = self.store.symbols_for_paths_many(
-            changed_paths_normalized, limit_per_path=16
-        )
-        changed: list[dict[str, object]] = []
-        for row in changed_rows:
-            if not isinstance(row, dict):
-                continue
-            path = str(row.get("path") or "")
-            file_row = self._session_file_row(path)
-            revision = (
-                None
-                if file_row is None or not file_row["file_digest"]
-                else str(file_row["file_digest"])
-            )
-            symbols = [
-                str(symbol.get("qualname") or symbol.get("name") or "")
-                for symbol in symbols_by_path.get(path, ())
-                if str(symbol.get("qualname") or symbol.get("name") or "")
-            ]
-            item = dict(row)
-            item["revision"] = revision
-            if symbols:
-                item["symbols"] = symbols
-            changed.append(item)
+        changed = self._change_brief_rows(impact.get("changed"))
         surfaces = (
             impact.get("surfaces") if isinstance(impact.get("surfaces"), dict) else {}
         )

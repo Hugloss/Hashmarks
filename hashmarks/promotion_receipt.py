@@ -110,6 +110,33 @@ def native_ruff_promotion_gate(root: Path) -> dict[str, object]:
     return payload
 
 
+def _receipt_producer_reasons(producer: object) -> list[str]:
+    reasons: list[str] = []
+    if not isinstance(producer, Mapping):
+        return ["invalid-receipt-producer"]
+    name = producer.get("name")
+    try:
+        _canonical_bytes(producer)
+    except (TypeError, ValueError):
+        reasons.append("invalid-receipt-producer")
+    if not isinstance(name, str) or not name.strip():
+        reasons.append("invalid-receipt-producer")
+    return reasons
+
+
+def _receipt_tool_reasons(tool: object) -> list[str]:
+    reasons: list[str] = []
+    if not isinstance(tool, Mapping):
+        return ["invalid-receipt-tool"]
+    if set(tool) != {"name", "version"}:
+        reasons.append("invalid-receipt-tool")
+    if tool.get("name") != RUFF_TOOL:
+        reasons.append("invalid-receipt-tool")
+    if not _ruff_version_supported(tool.get("version")):
+        reasons.append("unsupported-tool-version")
+    return reasons
+
+
 def _receipt_shape_reasons(receipt: Mapping[str, object]) -> list[str]:
     required = {
         "schema",
@@ -132,27 +159,34 @@ def _receipt_shape_reasons(receipt: Mapping[str, object]) -> list[str]:
         reasons.append("result-authority-must-be-external")
     if receipt.get("result") != "pass":
         reasons.append("promotion-gate-not-passed")
-    producer = receipt.get("producer")
-    if not isinstance(producer, Mapping):
-        reasons.append("invalid-receipt-producer")
-    else:
-        name = producer.get("name")
-        try:
-            _canonical_bytes(producer)
-        except (TypeError, ValueError):
-            reasons.append("invalid-receipt-producer")
-        if not isinstance(name, str) or not name.strip():
-            reasons.append("invalid-receipt-producer")
-    tool = receipt.get("tool")
-    if not isinstance(tool, Mapping):
-        reasons.append("invalid-receipt-tool")
-    else:
-        if set(tool) != {"name", "version"}:
-            reasons.append("invalid-receipt-tool")
-        if tool.get("name") != RUFF_TOOL:
-            reasons.append("invalid-receipt-tool")
-        if not _ruff_version_supported(tool.get("version")):
-            reasons.append("unsupported-tool-version")
+    reasons.extend(_receipt_producer_reasons(receipt.get("producer")))
+    reasons.extend(_receipt_tool_reasons(receipt.get("tool")))
+    return reasons
+
+
+def _gate_selection_reasons(gate: Mapping[str, object]) -> list[str]:
+    reasons: list[str] = []
+    if gate.get("gate") != "ruff-diagnostic":
+        reasons.append("invalid-gate-name")
+    if gate.get("tool") != {"name": RUFF_TOOL, "version_spec": RUFF_VERSION_SPEC}:
+        reasons.append("invalid-gate-tool")
+    if gate.get("rules") != list(RUFF_RULES):
+        reasons.append("invalid-gate-rules")
+    if gate.get("command") != list(RUFF_COMMAND):
+        reasons.append("invalid-gate-command")
+    if gate.get("expected_result") != "pass":
+        reasons.append("invalid-gate-expected-result")
+    return reasons
+
+
+def _gate_authority_reasons(gate: Mapping[str, object]) -> list[str]:
+    reasons: list[str] = []
+    if gate.get("promotion_authority") != "diagnostic-only":
+        reasons.append("invalid-gate-promotion-authority")
+    if gate.get("execution_authority") != "external":
+        reasons.append("invalid-gate-execution-authority")
+    if gate.get("result_authority") != "external":
+        reasons.append("invalid-gate-result-authority")
     return reasons
 
 
@@ -183,22 +217,8 @@ def _gate_shape_reasons(gate: Mapping[str, object]) -> list[str]:
         repository_identity
     ):
         reasons.append("invalid-gate-repository-identity")
-    if gate.get("gate") != "ruff-diagnostic":
-        reasons.append("invalid-gate-name")
-    if gate.get("tool") != {"name": RUFF_TOOL, "version_spec": RUFF_VERSION_SPEC}:
-        reasons.append("invalid-gate-tool")
-    if gate.get("rules") != list(RUFF_RULES):
-        reasons.append("invalid-gate-rules")
-    if gate.get("command") != list(RUFF_COMMAND):
-        reasons.append("invalid-gate-command")
-    if gate.get("expected_result") != "pass":
-        reasons.append("invalid-gate-expected-result")
-    if gate.get("promotion_authority") != "diagnostic-only":
-        reasons.append("invalid-gate-promotion-authority")
-    if gate.get("execution_authority") != "external":
-        reasons.append("invalid-gate-execution-authority")
-    if gate.get("result_authority") != "external":
-        reasons.append("invalid-gate-result-authority")
+    reasons.extend(_gate_selection_reasons(gate))
+    reasons.extend(_gate_authority_reasons(gate))
     payload = {key: value for key, value in gate.items() if key != "gate_identity"}
     try:
         expected = _identity(PROMOTION_GATE_SCHEMA, payload)

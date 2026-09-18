@@ -11,6 +11,18 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 TREE_SITTER_RANGE_SCHEMA = "hashmarks.tree-sitter-ranges.v1"
+_IDENTIFIER_TYPES = frozenset(
+    {"identifier", "type_identifier", "property_identifier", "field_identifier"}
+)
+
+
+def _identifier_node_or_child(value: Any) -> Any | None:
+    if getattr(value, "type", "") in _IDENTIFIER_TYPES:
+        return value
+    for child in getattr(value, "children", ()):
+        if getattr(child, "type", "") in _IDENTIFIER_TYPES:
+            return child
+    return None
 
 
 @dataclass(frozen=True)
@@ -143,28 +155,11 @@ class TreeSitterRangeProvider:
                     value = None
                 if value is not None:
                     # Declarators may contain the identifier rather than being it.
-                    if getattr(value, "type", "") in {
-                        "identifier",
-                        "type_identifier",
-                        "property_identifier",
-                        "field_identifier",
-                    }:
-                        return value
-                    for child in getattr(value, "children", ()):
-                        if getattr(child, "type", "") in {
-                            "identifier",
-                            "type_identifier",
-                            "property_identifier",
-                            "field_identifier",
-                        }:
-                            return child
+                    identifier = _identifier_node_or_child(value)
+                    if identifier is not None:
+                        return identifier
         for child in getattr(node, "children", ()):
-            if getattr(child, "type", "") in {
-                "identifier",
-                "type_identifier",
-                "property_identifier",
-                "field_identifier",
-            }:
+            if getattr(child, "type", "") in _IDENTIFIER_TYPES:
                 return child
         return None
 
@@ -174,6 +169,42 @@ class TreeSitterRangeProvider:
             "utf-8", errors="replace"
         )
 
+    def _symbol_from_tree_node(
+        self, node: Any, parent: str | None, source_bytes: bytes
+    ) -> SymbolRecord | None:
+        node_type = str(getattr(node, "type", ""))
+        if node_type not in self._SYMBOL_TYPES:
+            return None
+        name_node = self._name_node(node)
+        if name_node is None:
+            return None
+        name = self._text(source_bytes, name_node).strip()
+        if not name:
+            return None
+        kind = self._SYMBOL_TYPES[node_type]
+        qualname = name if parent is None else f"{parent}.{name}"
+        start_line = int(node.start_point[0]) + 1
+        end_line = int(node.end_point[0]) + 1
+        full = self._text(source_bytes, node)
+        header = full.split("{", 1)[0].split(":\n", 1)[0].strip()
+        if "\n" in header:
+            header = " ".join(
+                part.strip() for part in header.splitlines() if part.strip()
+            )
+        if len(header) > 400:
+            header = header[:397] + "..."
+        return SymbolRecord(
+            name=name,
+            qualname=qualname,
+            kind=kind,
+            signature=header or name,
+            start_line=start_line,
+            end_line=end_line,
+            signature_tokens=estimate_tokens(header or name),
+            body_tokens=estimate_tokens(full),
+            parent=parent,
+        )
+
     def _collect(self, source: str, language: str) -> list[SymbolRecord]:
         parser = self._parser(language)
         source_bytes = source.encode("utf-8")
@@ -181,43 +212,12 @@ class TreeSitterRangeProvider:
         found: list[SymbolRecord] = []
 
         def visit(node: Any, parent: str | None = None) -> None:
-            node_type = str(getattr(node, "type", ""))
             current_parent = parent
-            if node_type in self._SYMBOL_TYPES:
-                name_node = self._name_node(node)
-                if name_node is not None:
-                    name = self._text(source_bytes, name_node).strip()
-                    if name:
-                        kind = self._SYMBOL_TYPES[node_type]
-                        qualname = name if parent is None else f"{parent}.{name}"
-                        start_line = int(node.start_point[0]) + 1
-                        end_line = int(node.end_point[0]) + 1
-                        full = self._text(source_bytes, node)
-                        # Keep only the declaration/header for the compact outline.
-                        header = full.split("{", 1)[0].split(":\n", 1)[0].strip()
-                        if "\n" in header:
-                            header = " ".join(
-                                part.strip()
-                                for part in header.splitlines()
-                                if part.strip()
-                            )
-                        if len(header) > 400:
-                            header = header[:397] + "..."
-                        found.append(
-                            SymbolRecord(
-                                name=name,
-                                qualname=qualname,
-                                kind=kind,
-                                signature=header or name,
-                                start_line=start_line,
-                                end_line=end_line,
-                                signature_tokens=estimate_tokens(header or name),
-                                body_tokens=estimate_tokens(full),
-                                parent=parent,
-                            )
-                        )
-                        if kind in {"class", "interface", "trait", "struct", "enum"}:
-                            current_parent = qualname
+            symbol = self._symbol_from_tree_node(node, parent, source_bytes)
+            if symbol is not None:
+                found.append(symbol)
+                if symbol.kind in {"class", "interface", "trait", "struct", "enum"}:
+                    current_parent = symbol.qualname
             for child in getattr(node, "named_children", getattr(node, "children", ())):
                 visit(child, current_parent)
 

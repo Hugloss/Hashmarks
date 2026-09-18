@@ -613,36 +613,35 @@ class OwnershipGraphMixin:
                 self._decision_session_stats["ownership_import_paths_hit"] += 1
                 return list(cached)
             self._decision_session_stats["ownership_import_paths_miss"] += 1
+        result = self._uncached_exact_ownership_import_paths(source_path, target)
+        if cache_key is not None:
+            self._decision_ownership_import_paths_cache[cache_key] = tuple(result)
+        return result
+
+    def _uncached_exact_ownership_import_paths(
+        self, source_path: str, target: str
+    ) -> list[str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         source_row = self._session_file_row(source_path)
         language = None if source_row is None else str(source_row["language"] or "")
         if language != "python":
-            result = self._visible_resolved_import_paths(source_path, target)
-            if cache_key is not None:
-                self._decision_ownership_import_paths_cache[cache_key] = tuple(result)
-            return result
+            return self._visible_resolved_import_paths(source_path, target)
         candidates = self._python_import_module_candidates(source_path, target)
         if candidates:
             direct = self._session_module_paths(candidates[0])
             if direct:
-                result = (
+                return (
                     [path for path in direct if self._ownership_evidence_visible(path)]
                     if len(direct) == 1
                     else []
                 )
-                if cache_key is not None:
-                    self._decision_ownership_import_paths_cache[cache_key] = tuple(
-                        result
-                    )
-                return result
         resolved, unresolved = self._resolve_import_owner_evidence(source_path, target)
-        result = (
+        return (
             []
             if unresolved
             else [path for path in resolved if self._ownership_evidence_visible(path)]
         )
-        if cache_key is not None:
-            self._decision_ownership_import_paths_cache[cache_key] = tuple(result)
-        return result
 
     @staticmethod
     def _ownership_call_shorts(expandable, edge_map) -> list[str]:

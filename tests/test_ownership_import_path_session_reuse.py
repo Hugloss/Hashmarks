@@ -87,6 +87,22 @@ def test_cached_ownership_import_paths_are_detached_from_caller_mutation(
         assert second == expected and "mutated.py" not in second
 
 
+def test_exact_ownership_import_paths_preserves_direct_and_missing_module_evidence(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with codemap.decision_session():
+            direct = codemap._exact_ownership_import_paths("consumer.py", "pkg.owner")
+            missing = codemap._exact_ownership_import_paths("consumer.py", "pkg.absent")
+            empty = codemap._exact_ownership_import_paths("consumer.py", "")
+            stats = codemap.decision_session_stats()
+        assert direct == ["pkg/owner.py"]
+        assert missing == [] and empty == []
+        assert stats["ownership_import_paths_miss"] == 2
+
+
 def test_ownership_import_path_cache_is_not_reused_across_sessions(
     tmp_path: Path, monkeypatch
 ) -> None:

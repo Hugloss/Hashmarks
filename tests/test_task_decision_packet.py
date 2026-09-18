@@ -24,6 +24,16 @@ def test_decision_packet_does_not_require_discrimination_when_action_is_resolved
     assert packet["verify"]["path"] == "tests/test_adapter.py"
     assert packet["discrimination"]["needed"] is False
     assert packet["discrimination"]["reason"] == "resolved"
+    metrics = packet["decision_metrics"]
+    assert metrics["schema"] == "hashmarks.task-decision-metrics.v1"
+    assert set(metrics["seconds"]) == {
+        "action_map",
+        "work_context",
+        "verification_plan",
+        "packet_assembly",
+        "total",
+    }
+    assert all(value >= 0 for value in metrics["seconds"].values())
 
 
 def test_decision_packet_requires_discrimination_when_no_safe_edit_exists(
