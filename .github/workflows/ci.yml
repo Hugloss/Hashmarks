@@ -23,6 +23,12 @@ jobs:
       - run: uv sync --group test --python 3.11
       - run: make ruff
       - run: make lint-debt-gate
+      - name: Materialize Agent Economics quality-debt supply
+        run: |
+          git clone --depth 1 https://github.com/Hugloss/agentsCookbook.git .agent-economics
+          test "$(git -C .agent-economics rev-parse HEAD)" = "22e2ee863d06087099b86378571165768bc3332b"
+      - name: Prove Agent Economics Ruff debt measurement parity
+        run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --only-group lint python scripts/ruff_debt_agent_economics_parity.py
       - run: make compile
       - name: Prove workspace-state authority before heavy qualification
         run: uv run --no-sync python -m pytest -q tests/test_codemap_state_binding.py
