@@ -6,7 +6,6 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 _RUFF_DEBT_PATH = ROOT / "scripts" / "ruff_debt.py"
 _RUFF_DEBT_SPEC = importlib.util.spec_from_file_location("hashmarks_ruff_debt", _RUFF_DEBT_PATH)
