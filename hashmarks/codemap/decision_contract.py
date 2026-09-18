@@ -32,19 +32,19 @@ def _ambiguity_flag(discrimination: Mapping[str, Any]) -> bool:
 
 
 @dataclass(frozen=True)
-class DecisionSelection:
+class EvidenceSelection:
     path: str | None
 
     @classmethod
-    def from_value(cls, value: object) -> DecisionSelection:
+    def from_value(cls, value: object) -> EvidenceSelection:
         if value is None:
             return cls(path=None)
         if not isinstance(value, Mapping):
-            raise ValueError("decision selection must be an object or null")
+            raise ValueError("evidence selection must be an object or null")
         path = value.get("path")
         if path is not None and (not isinstance(path, str) or not path.strip()):
             raise ValueError(
-                "decision selection path must be a nonblank string or null"
+                "evidence selection path must be a nonblank string or null"
             )
         return cls(path=path)
 
@@ -54,13 +54,14 @@ class DecisionPacketContract:
     """Strict public projection used by benchmarks and integrations.
 
     Consumers must parse through this contract rather than guessing internal
-    dictionary nesting. Unknown schemas fail closed.
+    dictionary nesting. The contract exposes repository evidence selections;
+    it does not grant edit/verification authority. Unknown schemas fail closed.
     """
 
     schema: str
     task: str
-    edit: DecisionSelection
-    verify: DecisionSelection
+    edit: EvidenceSelection
+    verify: EvidenceSelection
     discrimination_needed: bool
     discrimination_reason: str
     ambiguous: bool
@@ -97,8 +98,8 @@ class DecisionPacketContract:
         return cls(
             schema=DECISION_CONTRACT_SCHEMA,
             task=task,
-            edit=DecisionSelection.from_value(packet.get("edit")),
-            verify=DecisionSelection.from_value(packet.get("verify")),
+            edit=EvidenceSelection.from_value(packet.get("edit")),
+            verify=EvidenceSelection.from_value(packet.get("verify")),
             discrimination_needed=needed,
             discrimination_reason=str(discrimination.get("reason") or ""),
             ambiguous=ambiguous,
