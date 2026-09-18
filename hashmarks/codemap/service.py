@@ -13,6 +13,7 @@ from hashmarks.client import default_runtime_dir
 from hashmarks.ipc_boundary import dispatch_json_request
 from hashmarks.paths import canonical_host_path
 
+from .change_impact import ChangeImpactOptions
 from .engine import CodeMap
 
 PROTOCOL = "hashmarks.codemap-service.v2"
@@ -288,10 +289,12 @@ class CodeMapService:
             changed,
             limit=limit,
             per_role=per_role,
-            impact_limit_per_surface=impact_limit,
-            max_depth=max_depth,
-            project_impact_limit=project_limit,
-            project_impact_encoding=encoding,
+            options=ChangeImpactOptions(
+                impact_limit_per_surface=impact_limit,
+                max_depth=max_depth,
+                project_impact_limit=project_limit,
+                project_impact_encoding=encoding,
+            ),
         )
         return {"ok": True, "task_change_impact": result}
 
@@ -812,10 +815,7 @@ class CodeMapServiceClient:
         *,
         limit: int = 20,
         per_role: int = 3,
-        impact_limit_per_surface: int = 6,
-        max_depth: int = 4,
-        project_impact_limit: int | None = None,
-        project_impact_encoding: str = "verbose",
+        options: ChangeImpactOptions = ChangeImpactOptions(),
     ) -> dict[str, Any]:
         return dict(
             self.request(
@@ -824,10 +824,10 @@ class CodeMapServiceClient:
                 changed_paths=list(changed_paths),
                 limit=limit,
                 per_role=per_role,
-                impact_limit_per_surface=impact_limit_per_surface,
-                max_depth=max_depth,
-                project_impact_limit=project_impact_limit,
-                project_impact_encoding=project_impact_encoding,
+                impact_limit_per_surface=options.impact_limit_per_surface,
+                max_depth=options.max_depth,
+                project_impact_limit=options.project_impact_limit,
+                project_impact_encoding=options.project_impact_encoding,
             )["task_change_impact"]
         )
 

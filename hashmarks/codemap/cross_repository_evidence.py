@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
+from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
 from .project_impact_codec import expand_project_impact
 
@@ -42,10 +43,12 @@ class CrossRepositoryEvidenceMixin:
             changed_paths,
             limit=limit,
             per_role=per_role,
-            impact_limit_per_surface=impact_limit_per_surface,
-            max_depth=max_depth,
-            project_impact_limit=project_impact_limit,
-            project_impact_encoding="compact",
+            options=ChangeImpactOptions(
+                impact_limit_per_surface=impact_limit_per_surface,
+                max_depth=max_depth,
+                project_impact_limit=project_impact_limit,
+                project_impact_encoding="compact",
+            ),
         )
         action = self.task_action_map(task, limit=limit, per_role=per_role)
         freshness = self.evidence_freshness_map(

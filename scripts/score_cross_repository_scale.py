@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from hashmarks import __version__
-from hashmarks.codemap import CodeMap, expand_project_impact
+from hashmarks.codemap import ChangeImpactOptions, CodeMap, expand_project_impact
 from scripts.agent_evaluation.experimentability import (
     EvidenceEconomics,
     experiment_environment,
@@ -269,10 +269,12 @@ def run(
             packet = codemap.task_change_impact(
                 task["query"],
                 [task["changed"]],
-                max_depth=int(task["max_depth"]),
-                impact_limit_per_surface=6,
-                project_impact_limit=provenance_limit,
-                project_impact_encoding=provenance_encoding,
+                options=ChangeImpactOptions(
+                    max_depth=int(task["max_depth"]),
+                    impact_limit_per_surface=6,
+                    project_impact_limit=provenance_limit,
+                    project_impact_encoding=provenance_encoding,
+                ),
             )
             elapsed = time.perf_counter_ns() - t1
             economics = meter.finish(

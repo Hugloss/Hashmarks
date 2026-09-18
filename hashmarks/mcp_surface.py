@@ -4,7 +4,7 @@ import json
 from threading import RLock
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from .codemap import CodeMap
+from .codemap import ChangeImpactOptions, CodeMap
 from .repository_retry import retry_transient_repository_race
 
 if TYPE_CHECKING:
@@ -143,9 +143,11 @@ class HashmarksMcpSurface:
                 paths,
                 limit=20,
                 per_role=3,
-                impact_limit_per_surface=6,
-                max_depth=max_depth,
-                project_impact_encoding="compact",
+                options=ChangeImpactOptions(
+                    impact_limit_per_surface=6,
+                    max_depth=max_depth,
+                    project_impact_encoding="compact",
+                ),
             )
         )
 

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 
 
@@ -288,3 +290,80 @@ def test_mixed_direct_and_star_reexports_do_not_invent_unique_owner(
     # most importantly, Hashmarks must not manufacture a unique leaf owner.
     assert owners == ["pkg/__init__.py"]
     assert ambiguous is True
+
+
+@pytest.mark.parametrize(
+    ("declaration", "authority"),
+    [
+        pytest.param("", True, id="implicit-symbol"),
+        pytest.param("__all__: list[str]", True, id="annotation-without-value"),
+        pytest.param("__all__: list[str] = ['Public']", True, id="annotated-value"),
+        pytest.param("other = __all__ = ['Public']", True, id="chained-assignment"),
+        pytest.param("__all__ = ('Public',)", True, id="tuple"),
+        pytest.param("__all__ = {'Public'}", True, id="set"),
+        pytest.param("__all__ = []", False, id="empty-excludes-symbol"),
+        pytest.param("__all__ = ['Other']", False, id="other-name-excludes-symbol"),
+        pytest.param("__all__ = ['Public', 1]", None, id="mixed-literal"),
+        pytest.param("__all__ = ['Public', *names]", None, id="unpacked-value"),
+        pytest.param("__all__ = ['Public']\n__all__ = []", False, id="replacement"),
+        pytest.param("__all__ = []\n__all__ = ['Public']", True, id="later-inclusion"),
+        pytest.param(
+            "__all__ = dynamic\n__all__ = ['Public']", None, id="unknown-is-terminal"
+        ),
+        pytest.param(
+            "__all__ = ['Public']\ndel __all__\n__all__ = ['Public']",
+            None,
+            id="deletion-is-terminal",
+        ),
+        pytest.param("__all__ += ['Public']", None, id="augment-without-base"),
+        pytest.param("__all__ = ['Public']\n__all__ *= 1", None, id="non-add-augment"),
+        pytest.param("__all__.append('Public')", None, id="append-without-base"),
+        pytest.param("__all__.extend(['Public'])", None, id="extend-without-base"),
+        pytest.param("__all__ = []\n__all__.append()", None, id="append-no-argument"),
+        pytest.param(
+            "__all__ = []\n__all__.append(name='Public')", None, id="append-keyword"
+        ),
+        pytest.param("__all__ = []\n__all__.append(1)", None, id="append-non-string"),
+        pytest.param("__all__ = []\n__all__.extend()", None, id="extend-no-argument"),
+        pytest.param(
+            "__all__ = []\n__all__.extend(['Public'], ['Other'])",
+            None,
+            id="extend-extra-argument",
+        ),
+        pytest.param(
+            "__all__ = []\n__all__.extend(names=['Public'])", None, id="extend-keyword"
+        ),
+        pytest.param(
+            "__all__ = []\n__all__.extend('Public')", None, id="extend-scalar-string"
+        ),
+        pytest.param(
+            "__all__ = []\n__all__.append('Other')\n__all__.extend(('Public',))",
+            True,
+            id="ordered-static-mutations",
+        ),
+    ],
+)
+def test_star_export_declaration_authority(
+    tmp_path: Path, declaration: str, authority: bool | None
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "from .impl import *\n")
+    _write(tmp_path, "pkg/impl.py", f"{declaration}\ndef Public(): pass\n")
+    _write(tmp_path, "tests/test_public.py", "from pkg import Public\n")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        assert (
+            codemap._python_star_export_authority(
+                "pkg/__init__.py", ".impl.Public", "Public"
+            )
+            is authority
+        )
+        owners, unresolved = codemap._resolve_import_owner_evidence(
+            "tests/test_public.py", "pkg.Public"
+        )
+
+    expected_owners = ["pkg/__init__.py"]
+    if authority is True:
+        expected_owners.append("pkg/impl.py")
+    assert owners == expected_owners
+    assert unresolved is (authority is not True)

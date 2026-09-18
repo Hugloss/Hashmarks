@@ -5,6 +5,7 @@ explicitly or use the CLI when repository orientation, search, evidence, or
 change analysis is needed.
 """
 
+from .change_impact import ChangeImpactOptions
 from .engine import CodeMap
 from .model import (
     ContextDisclosure,
@@ -24,6 +25,7 @@ from .worktree_overlay import WorktreeOverlay
 
 __all__ = [
     "CodeMap",
+    "ChangeImpactOptions",
     "CodeMapService",
     "CodeMapServiceClient",
     "default_codemap_socket",

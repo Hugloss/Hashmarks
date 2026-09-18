@@ -5,8 +5,10 @@ import threading
 import time
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks import cli
-from hashmarks.codemap import CodeMap
+from hashmarks.codemap import ChangeImpactOptions, CodeMap
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
 if TYPE_CHECKING:
@@ -113,8 +115,7 @@ def test_task_change_impact_bounded_fanout_never_claims_complete_impact(
         impact = codemap.task_change_impact(
             "change shared implementation",
             ["src/core.py"],
-            impact_limit_per_surface=3,
-            max_depth=3,
+            options=ChangeImpactOptions(impact_limit_per_surface=3, max_depth=3),
         )
     assert len(impact["surfaces"]["implementation"]) == 3
     assert impact["bounds"]["per_surface"] == 3
@@ -126,7 +127,9 @@ def test_task_change_impact_bounds_surfaces(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         impact = codemap.task_change_impact(
-            task, ["src/case/engine.py"], impact_limit_per_surface=1, max_depth=2
+            task,
+            ["src/case/engine.py"],
+            options=ChangeImpactOptions(impact_limit_per_surface=1, max_depth=2),
         )
     assert all(len(rows) <= 1 for rows in impact["surfaces"].values())
     assert impact["bounds"]["per_surface"] == 1
@@ -193,8 +196,9 @@ def test_service_task_change_impact(tmp_path: Path) -> None:
         impact = client.task_change_impact(
             task,
             ["src/case/engine.py"],
-            project_impact_limit=20,
-            project_impact_encoding="compact",
+            options=ChangeImpactOptions(
+                project_impact_limit=20, project_impact_encoding="compact"
+            ),
         )
         assert impact["schema"] == "hashmarks.task-change-impact.v1"
         assert impact["owner"] == "external"
@@ -427,7 +431,9 @@ def test_task_change_impact_project_provenance_is_bounded(tmp_path: Path) -> Non
         codemap.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
         impact = codemap.task_change_impact(
-            "root value change", ["root/value.ts"], impact_limit_per_surface=3
+            "root value change",
+            ["root/value.ts"],
+            options=ChangeImpactOptions(impact_limit_per_surface=3),
         )
     assert len(impact["project_impact"]["affected"]) == 3
     assert len(impact["projects"]) == 8
@@ -477,16 +483,16 @@ def test_project_impact_limit_is_independent_and_reports_truncation(tmp_path: Pa
         bounded = codemap.task_change_impact(
             "update scale root",
             ["p0/src/index.ts"],
-            max_depth=20,
-            impact_limit_per_surface=2,
-            project_impact_limit=3,
+            options=ChangeImpactOptions(
+                max_depth=20, impact_limit_per_surface=2, project_impact_limit=3
+            ),
         )
         complete = codemap.task_change_impact(
             "update scale root",
             ["p0/src/index.ts"],
-            max_depth=20,
-            impact_limit_per_surface=2,
-            project_impact_limit=20,
+            options=ChangeImpactOptions(
+                max_depth=20, impact_limit_per_surface=2, project_impact_limit=20
+            ),
         )
     assert bounded["bounds"]["per_surface"] == 2
     assert bounded["bounds"]["project_impact"] == 3
@@ -650,13 +656,16 @@ def test_task_change_impact_compact_project_provenance_round_trips(
         codemap.sync()
         codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
         verbose = codemap.task_change_impact(
-            "root value change", ["root/value.ts"], project_impact_limit=20
+            "root value change",
+            ["root/value.ts"],
+            options=ChangeImpactOptions(project_impact_limit=20),
         )
         compact = codemap.task_change_impact(
             "root value change",
             ["root/value.ts"],
-            project_impact_limit=20,
-            project_impact_encoding="compact",
+            options=ChangeImpactOptions(
+                project_impact_limit=20, project_impact_encoding="compact"
+            ),
         )
 
     assert compact["project_impact"]["schema"] == COMPACT_PROJECT_IMPACT_SCHEMA
@@ -674,9 +683,30 @@ def test_task_change_impact_rejects_unknown_project_impact_encoding(
         codemap.sync()
         try:
             codemap.task_change_impact(
-                "ember", ["src/case/engine.py"], project_impact_encoding="magic"
+                "ember",
+                ["src/case/engine.py"],
+                options=ChangeImpactOptions(project_impact_encoding="magic"),
             )
         except ValueError as exc:
             assert str(exc) == "project_impact_encoding must be verbose or compact"
         else:
             raise AssertionError("unknown encoding must fail closed")
+
+
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({"impact_limit_per_surface": 0}, "impact_limit_per_surface must be >= 1"),
+        ({"max_depth": 0}, "max_depth must be >= 1"),
+        ({"project_impact_limit": 0}, "project_impact_limit must be >= 1"),
+    ],
+)
+def test_task_change_impact_rejects_invalid_bounds_before_refresh(
+    tmp_path: Path, options: dict[str, int], message: str
+) -> None:
+    task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        with pytest.raises(ValueError, match=message):
+            codemap.task_change_impact(
+                task, ["src/case/engine.py"], options=ChangeImpactOptions(**options)
+            )

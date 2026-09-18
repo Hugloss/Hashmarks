@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
 
 if TYPE_CHECKING:
@@ -33,9 +34,11 @@ class ChangeIntelligenceMixin:
             changed_paths,
             limit=limit,
             per_role=per_role,
-            impact_limit_per_surface=impact_limit_per_surface,
-            max_depth=max_depth,
-            project_impact_encoding="compact",
+            options=ChangeImpactOptions(
+                impact_limit_per_surface=impact_limit_per_surface,
+                max_depth=max_depth,
+                project_impact_encoding="compact",
+            ),
         )
         action = self.task_action_map(task, limit=limit, per_role=per_role)
         verify = (

@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
+from .codemap.change_impact import ChangeImpactOptions
 from .errors import RepositoryCliError
 from .repository_retry import (
     is_transient_repository_race,
@@ -320,10 +321,12 @@ def _change_impact_code(args) -> int:
             args.changed,
             limit=args.limit,
             per_role=args.per_role,
-            impact_limit_per_surface=args.impact_limit,
-            max_depth=args.max_depth,
-            project_impact_limit=args.project_impact_limit,
-            project_impact_encoding=args.project_impact_encoding,
+            options=ChangeImpactOptions(
+                impact_limit_per_surface=args.impact_limit,
+                max_depth=args.max_depth,
+                project_impact_limit=args.project_impact_limit,
+                project_impact_encoding=args.project_impact_encoding,
+            ),
         ),
     )
     _print(value)

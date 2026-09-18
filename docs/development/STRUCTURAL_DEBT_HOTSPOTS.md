@@ -310,3 +310,57 @@ Preferred final state for this branch:
 - `hashmarks/codemap/task_action_projection.py`: 0 excess
 
 If one file cannot safely reach zero in this branch, stop at the last qualified downward ratchet and document the remaining concrete ownership problem rather than forcing a cosmetic split.
+
+## Current bounded step — static `__all__` interpretation
+
+Parent: `0e7fe16` (`Format shared export parser integration`). This is a pure
+refactor of existing repository evidence, classified as an in-profile
+maintainability optimization; it adds no product capability.
+
+Responsibility decision: **EXTRACT RESPONSIBILITY**. The observed problem was
+that `_python_star_export_authority` combined repository/module lookup and
+symbol fallback with ordered AST assignment/mutation interpretation (C901 45,
+21 branches, 13 returns, 60 statements). Static export interpretation now lives
+beside static collection parsing in `python_exports.py`, whose name identifies
+the syntax responsibility. Dependency direction is import resolution → Python
+exports; the parser has no CodeMap, filesystem, cache, or runtime dependency.
+
+Import resolution retains module identity, cached file reading, ambiguity,
+private-name rejection, and implicit-symbol authority. The parser distinguishes
+absent `__all__` from unknown `__all__`; unknown/deleted declarations remain
+terminal, and an empty static declaration does not trigger symbol fallback.
+Parser state is invocation-local. Public signatures, payloads, ordering,
+exception handling, freshness, cache ownership, and traversal bounds are
+unchanged.
+
+Behavior was tested before moving production code:
+
+- The existing import/authority/exception ring passed: **81 tests**.
+- Added **26** characterization cases covering absent/annotated/chained
+  assignments, literal forms, exclusion, reassignment order, terminal unknown
+  and deletion, mutation without a base, invalid argument forms, and ordered
+  static mutations. The expanded export/adversarial ring passed against the
+  original implementation: **50 tests**.
+- After extraction, the expanded import ring passed: **107 tests**. A downstream
+  ownership/decision/freshness/product-boundary ring passed: **56 tests**.
+- `make ruff`, `make lint-debt-gate`, and `make compile` passed. The extracted
+  parser also passed all seven strict structural Ruff rules with preview enabled.
+
+Local tests used Python 3.11 and a writable temporary `XDG_CACHE_HOME`; the first
+attempt using the sandbox's read-only default cache failed during database
+setup and is not counted as behavioral qualification.
+
+Measured debt:
+
+| Surface | Before | After |
+| --- | ---: | ---: |
+| `import_resolution.py` excess | 194 | 121 |
+| `python_exports.py` excess | 0 | 0 |
+| Repository total excess | 5638 | 5565 |
+
+The remaining star-authority adapter is C901 12 with 7 returns; the parser adds
+no structural debt, including under Ruff's actual strict rules. Other production
+files gained no debt. The baseline remains unchanged pending the plan's required
+CI proof on the exact commit; local proof does not claim Python-matrix,
+artifact, or MCP qualification. After that gate passes, ratchet the measured
+baseline in its own qualified commit before selecting another production change.

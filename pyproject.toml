@@ -58,7 +58,10 @@ classifiers = [
 mcp = ["mcp>=2.2.0"]
 
 [dependency-groups]
-test = ["pytest>=8.4"]
+test = [
+    "pytest>=8.4",
+    "pytest-cov>=7.0",
+]
 lint = ["ruff>=0.12.0"]
 typing = [{ include-group = "test" }, "ty", "pyright", "mcp>=2.2.0", "watchdog"]
 hooks = ["pre-commit"]
