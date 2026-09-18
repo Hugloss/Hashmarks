@@ -14,7 +14,7 @@ Historical behavior is evidence about the codebase, not authority to expand the 
 
 Hashmarks is a **repository observer that exposes repository intelligence for agents, tools, and humans**.
 
-Its job is to turn repository state into compact, freshness-bound, provenance-bearing evidence that helps a consumer understand the repository: identity, topology, symbols, references, ownership, impact, ambiguity, likely repair surfaces, verification relevance, change consequences, and related repository-derived structure.
+Its job is to turn repository state into compact, freshness-bound, provenance-bearing evidence that helps a consumer understand the repository: identity, topology, symbols, references, ownership, impact, ambiguity, candidate repository surfaces, verification relationships, change consequences, and related repository-derived structure.
 
 Hashmarks should be excellent at answering observer questions of the form:
 
@@ -111,7 +111,7 @@ A Hashmarks primitive may be optimized for agent consumption, but its meaning mu
 
 Does the capability **describe repository evidence**, or does it **control what the consumer should do next**?
 
-Hashmarks may rank, nominate, qualify, or explain repository-derived candidates. The consumer remains responsible for turning that evidence into an action.
+Hashmarks may rank, nominate, qualify, or explain repository-derived evidence candidates. Those labels describe evidence strength or relationship, never a recommended consumer action. The consumer remains responsible for turning that evidence into an action.
 
 ### 5. State-ownership test
 
@@ -187,7 +187,7 @@ The following categories fit the product profile when they remain repository-der
 - impact and dependency relationships;
 - task-local repository retrieval and bounded progressive disclosure;
 - ambiguity, competing repository candidates, and discriminating repository evidence;
-- likely repair-surface nomination derived from repository evidence;
+- candidate repository-surface nomination derived from repository evidence;
 - verification relevance, test-surface relationships, and mechanically derived repository-bound verification descriptions;
 - freshness, invalidation, observation identity, negative repository evidence, and reconciliation;
 - deterministic repository-derived membership/selection contracts;
@@ -222,7 +222,7 @@ A request-local projection must not become hidden persistent state, and removing
 
 ## Repository evidence versus consumer conclusions
 
-Hashmarks may expose strong evidence and even a best repository-derived candidate. That does not transfer final reasoning authority.
+Hashmarks may expose strong evidence and a uniquely supported repository-derived owner/candidate when repository evidence proves uniqueness. That does not transfer final reasoning authority.
 
 For example, Hashmarks may say that one file is the uniquely supported owner under current repository evidence, that several candidates remain ambiguous, or that a set of tests is structurally relevant. It must not reinterpret consumer outcomes as new repository truth unless a corresponding repository change or repository-derived observation supports that conclusion.
 
