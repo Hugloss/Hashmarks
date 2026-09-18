@@ -8,6 +8,7 @@ Key rules:
 
 - Hashmarks production code must not import this package.
 - A benchmark result is evidence about Hashmarks, not automatic admission for a new product feature.
+- Cross-repository dogfood and parity probes belong here as measurement infrastructure; they do not become Hashmarks acceptance authority.
 - Agent workflow, attempt history, recovery, delegation, model routing, edits, and verification execution remain external responsibilities.
 - New production behavior discovered through these experiments must pass `docs/reference/PRODUCT_BOUNDARY.md` before implementation.
 - Invoke executable evaluation modules from the repository root with `python -m scripts.agent_evaluation.<module>` (normally through `make evaluation-help` targets), so package ownership and imports remain explicit.
