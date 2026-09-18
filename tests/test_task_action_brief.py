@@ -252,7 +252,7 @@ def test_task_action_brief_never_claims_safe_without_edit_target(
         )
         assert brief["status"] == "unsafe"
         assert "edit" not in brief
-        assert brief["discrimination"] == "no-safe-edit-candidate"
+        assert brief["discrimination"] == "no-supported-owner-candidate"
     finally:
         codemap.close()
 

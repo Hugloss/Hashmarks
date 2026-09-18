@@ -47,6 +47,18 @@ class RepositoryDeltaMixin:
     """
 
     @staticmethod
+    def _evidence_identity(schema: str, value: Mapping[str, object]) -> str:
+        """Return a deterministic domain-separated identity for observer evidence."""
+        import hashlib
+        import json
+
+        raw = json.dumps(
+            value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+        digest = hashlib.sha256(schema.encode("utf-8") + b"\0" + raw).hexdigest()
+        return f"sha256:{digest}"
+
+    @staticmethod
     def _delta_mapping(value: object, *, field: str) -> Mapping[str, object]:
         if not isinstance(value, Mapping):
             raise ValueError(f"{field} must be an object")
@@ -251,20 +263,22 @@ class RepositoryDeltaMixin:
     def verification_relationship_evidence(
         self,
         *,
-        boundary: str,
         source: str,
         target: str,
         classification: str,
+        relation_kind: str,
         provenance: str,
     ) -> dict[str, object]:
-        """Describe a repository evidence relationship without deciding sufficiency."""
+        """Describe an objective repository relationship without consumer policy."""
         if classification not in {"direct", "related", "unknown"}:
             raise ValueError("unsupported verification relationship classification")
+        if not relation_kind.strip():
+            raise ValueError("verification relationship kind must be nonblank")
         payload = {
-            "boundary": boundary,
             "source": source,
             "target": target,
             "classification": classification,
+            "relation_kind": relation_kind,
             "provenance": provenance,
         }
         return {

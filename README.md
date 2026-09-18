@@ -11,6 +11,8 @@ Use Hashmarks with **Claude Code, Codex, OpenCode, Pi**, other stdio MCP clients
 **Works with:** Claude Code · Codex · OpenCode · Pi · stdio MCP clients
 **Use it as:** CLI · Python library · local MCP server
 
+Install from PyPI: `pip install hashmarks`
+
 ## Why Hashmarks
 
 Coding agents repeatedly spend context and tool calls rediscovering the same codebase. Hashmarks keeps useful repository knowledge available as bounded, freshness-aware evidence.
@@ -19,16 +21,11 @@ Coding agents repeatedly spend context and tool calls rediscovering the same cod
 - **Repository context before source reads.** Start with languages, projects, repository areas, ownership, and structural outlines before opening implementation bodies.
 - **Change impact analysis.** See reverse dependencies, affected files/projects, and structurally related tests before or after a change.
 - **Code navigation and ownership.** Trace symbols, references, imports, callers, project boundaries, and likely implementation owners.
-- **Freshness-aware evidence.** Distinguish current, stale, and unknown repository evidence instead of silently serving an old index as truth.\n- **Observer-aware deltas.** Keep repository change separate from observer-capability change, and compare stable evidence identities instead of treating every newly visible fact as a repository edit.
+- **Freshness-aware evidence.** Distinguish current, stale, and unknown repository evidence instead of silently serving an old index as truth.
+- **Observer-aware deltas.** Keep repository change separate from observer-capability change, and compare stable evidence identities instead of treating every newly visible fact as a repository edit.
 - **Local and read-only for agent consumers.** Hashmarks maintains disposable derived state, while editing, execution, git, planning, and model decisions stay with the caller.
 
 ## Quick start
-
-Install Hashmarks from PyPI:
-
-```bash
-pip install hashmarks
-```
 
 Run it inside any repository:
 

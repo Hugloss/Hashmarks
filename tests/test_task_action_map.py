@@ -226,8 +226,8 @@ def test_task_action_map_exposes_resolved_ownership_trace_and_authority(
     authority = action["ownership_authority"]
     assert trace["status"] == "resolved"
     assert trace["selected"]["path"] == action["edit"]["path"]
-    assert authority["safe_to_edit"] is True
-    assert authority["authoritative_edit"] == action["edit"]["path"]
+    assert authority["owner_resolved"] is True
+    assert authority["resolved_owner"] == action["edit"]["path"]
 
 
 def test_task_action_map_no_edit_fails_closed(tmp_path: Path) -> None:
@@ -239,8 +239,8 @@ def test_task_action_map_no_edit_fails_closed(tmp_path: Path) -> None:
 
     assert action["edit"] is None
     assert action["ownership_decision_trace"]["status"] == "unresolved"
-    assert action["ownership_authority"]["safe_to_edit"] is False
-    assert action["ownership_authority"]["authoritative_edit"] is None
+    assert action["ownership_authority"]["owner_resolved"] is False
+    assert action["ownership_authority"]["resolved_owner"] is None
 
 
 def test_task_action_map_reuses_primary_structural_owner_for_ambiguity(

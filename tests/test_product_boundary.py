@@ -186,7 +186,10 @@ def test_agents_file_freezes_hashmarks_oh_goon_execution_boundary() -> None:
 
 
 def test_exact_repository_intelligence_execution_constitution_is_frozen() -> None:
-    constitution = "Hashmarks tells the agent what the repository means, who owns what, what is risky, what should probably change, and what should verify it. Oh-Goon decides whether execution is admitted, runs it safely, manages processes/timeouts/recovery, and certifies the result."
+    constitution = (
+        "Hashmarks is a repository observer that exposes repository intelligence, "
+        "not an autonomous coding agent, policy engine, or execution engine."
+    )
     assert constitution in _text("README.md")
     assert constitution in _text("docs/reference/INVARIANTS.md")
 

@@ -171,7 +171,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         ambiguity = action.get("ambiguity")
         ambiguity = ambiguity if isinstance(ambiguity, dict) else {}
         if edit is None:
-            return "no-safe-edit-candidate"
+            return "no-supported-owner-candidate"
         if bool(ambiguity.get("ambiguous")):
             return "competing-action-roles"
         if verify is None:

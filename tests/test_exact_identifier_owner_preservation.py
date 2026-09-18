@@ -89,7 +89,7 @@ def test_duplicate_exact_identifiers_fail_closed(tmp_path: Path) -> None:
 
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-exact-identifier-edit-owners"
-    assert action["ownership_authority"]["safe_to_edit"] is False
+    assert action["ownership_authority"]["owner_resolved"] is False
 
 
 def test_generic_task_keeps_structural_owner_resolution(tmp_path: Path) -> None:
@@ -184,7 +184,7 @@ def test_reexport_with_duplicate_exact_source_owners_stays_ambiguous(
 
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-exact-identifier-edit-owners"
-    assert action["ownership_authority"]["safe_to_edit"] is False
+    assert action["ownership_authority"]["owner_resolved"] is False
 
 
 def test_comment_only_lexical_match_cannot_override_active_exact_symbol(
@@ -219,7 +219,7 @@ def test_test_shaped_source_without_production_import_stays_verification_only(
     assert action["edit"] is None
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "no-edit-candidate"
-    assert action["ownership_authority"]["safe_to_edit"] is False
+    assert action["ownership_authority"]["owner_resolved"] is False
 
 
 def test_test_shaped_source_can_recover_edit_authority_from_exact_production_import(
@@ -242,7 +242,7 @@ def test_test_shaped_source_can_recover_edit_authority_from_exact_production_imp
     assert action["edit"]["reference_backed_source_projection"] is True
     assert action["edit"]["reference_backed_source_path"] == "pkg/consumer.py"
     assert action["ambiguity"]["ambiguous"] is False
-    assert action["ownership_authority"]["safe_to_edit"] is True
+    assert action["ownership_authority"]["owner_resolved"] is True
 
 
 def test_unqualified_duplicate_plain_method_name_fails_closed(tmp_path: Path) -> None:
@@ -255,7 +255,7 @@ def test_unqualified_duplicate_plain_method_name_fails_closed(tmp_path: Path) ->
 
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-exact-identifier-edit-owners"
-    assert action["ownership_authority"]["safe_to_edit"] is False
+    assert action["ownership_authority"]["owner_resolved"] is False
 
 
 def test_literal_path_constrains_exact_method_within_that_file(tmp_path: Path) -> None:
@@ -278,7 +278,7 @@ def test_literal_path_constrains_exact_method_within_that_file(tmp_path: Path) -
     assert action["edit"]["qualname"] == "Store.paths_under"
     assert action["edit"]["exact_identifier_projection"] is True
     assert action["ambiguity"]["ambiguous"] is False
-    assert action["ownership_authority"]["safe_to_edit"] is True
+    assert action["ownership_authority"]["owner_resolved"] is True
 
 
 def test_unique_exact_callable_can_discriminate_competing_verification_rows(
@@ -304,4 +304,4 @@ def test_unique_exact_callable_can_discriminate_competing_verification_rows(
     assert action["edit"]["exact_identifier_projection"] is True
     assert action["ownership_resolution"] is None
     assert action["ambiguity"]["ambiguous"] is False
-    assert action["ownership_authority"]["safe_to_edit"] is True
+    assert action["ownership_authority"]["owner_resolved"] is True

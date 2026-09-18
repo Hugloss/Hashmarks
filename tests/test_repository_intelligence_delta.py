@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks import CodeMap
+from hashmarks.codemap.repository_delta import RepositoryDeltaMixin
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
 if TYPE_CHECKING:
@@ -18,8 +19,7 @@ def _repo(root: Path) -> tuple[Path, str]:
     (root / "src").mkdir(parents=True)
     (root / "tests").mkdir()
     source = root / "src" / "owner.py"
-    source.write_text("def widget(): return 'old'
-", encoding="utf-8")
+    source.write_text("def widget(): return 'old'\n", encoding="utf-8")
     (root / "tests" / "test_owner.py").write_text(
         "from src.owner import widget
 def test_widget(): assert widget() == 'new'
@@ -71,8 +71,7 @@ def test_repository_delta_is_smaller_and_exactly_reconstructs_current_snapshot(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
-        source.write_text("def widget(): return 'new'
-", encoding="utf-8")
+        source.write_text("def widget(): return 'new'\n", encoding="utf-8")
         codemap.sync(["src/owner.py"])
         delta = codemap.repository_intelligence_delta(
             task, ["src/owner.py"], previous_snapshot=previous
@@ -97,23 +96,19 @@ def test_repository_delta_reports_dependency_change(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src" / "a.py").write_text(
-        "def widget(): return 'a'
-", encoding="utf-8"
+        "def widget(): return 'a'\n", encoding="utf-8"
     )
     (tmp_path / "src" / "b.py").write_text(
-        "def widget(): return 'b'
-", encoding="utf-8"
+        "def widget(): return 'b'\n", encoding="utf-8"
     )
     route = tmp_path / "src" / "route.py"
     route.write_text(
-        "from src.a import widget
-def route(): return widget()
-", encoding="utf-8"
+        "from src.a import widget\n"
+        "def route(): return widget()\n", encoding="utf-8"
     )
     (tmp_path / "tests" / "test_route.py").write_text(
-        "from src.route import route
-def test_route(): assert route() == 'b'
-",
+        "from src.route import route\n"
+        "def test_route(): assert route() == 'b'\n",
         encoding="utf-8",
     )
     task = "change route widget behavior and verify route test"
@@ -121,9 +116,8 @@ def test_route(): assert route() == 'b'
         codemap.sync()
         previous = codemap.repository_intelligence_snapshot(task, ["src/route.py"])
         route.write_text(
-            "from src.b import widget
-def route(): return widget()
-", encoding="utf-8"
+            "from src.b import widget\n"
+            "def route(): return widget()\n", encoding="utf-8"
         )
         codemap.sync(["src/route.py"])
         delta = codemap.repository_intelligence_delta(
@@ -146,14 +140,11 @@ def test_repository_delta_does_not_promote_name_similarity_to_move_identity(tmp_
     (tmp_path / "tests").mkdir()
     left = tmp_path / "src" / "left.py"
     right = tmp_path / "src" / "right.py"
-    left.write_text("def widget(): return 1
-", encoding="utf-8")
-    right.write_text("def helper(): return 2
-", encoding="utf-8")
+    left.write_text("def widget(): return 1\n", encoding="utf-8")
+    right.write_text("def helper(): return 2\n", encoding="utf-8")
     (tmp_path / "tests" / "test_left.py").write_text(
-        "from src.left import widget
-def test_widget(): assert widget()==1
-",
+        "from src.left import widget\n"
+        "def test_widget(): assert widget()==1\n",
         encoding="utf-8",
     )
     task = "change widget and verify widget test"
@@ -164,9 +155,8 @@ def test_widget(): assert widget()==1
         )
         left.write_text("", encoding="utf-8")
         right.write_text(
-            "def helper(): return 2
-def widget(): return 1
-", encoding="utf-8"
+            "def helper(): return 2\n"
+            "def widget(): return 1\n", encoding="utf-8"
         )
         codemap.sync(["src/left.py", "src/right.py"])
         delta = codemap.repository_intelligence_delta(
@@ -243,8 +233,7 @@ def test_repository_snapshot_and_delta_service_surface(tmp_path: Path) -> None:
         previous = client.repository_intelligence_query(
             "snapshot", task, ["src/owner.py"]
         )["result"]
-        source.write_text("def widget(): return 'new'
-", encoding="utf-8")
+        source.write_text("def widget(): return 'new'\n", encoding="utf-8")
         client.sync()
         delta = client.repository_intelligence_query(
             "delta", task, ["src/owner.py"], previous_snapshot=previous
@@ -499,7 +488,7 @@ def test_verification_relationship_has_provider_identity_without_sufficiency_cla
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         relationship = codemap.verification_relationship_evidence(
-            boundary="behavior",
+            relation_kind="behavioral-verification",
             source="src/owner.py",
             target="tests/test_owner.py",
             classification="direct",
@@ -508,8 +497,44 @@ def test_verification_relationship_has_provider_identity_without_sufficiency_cla
 
     assert relationship["evidence_identity"].startswith("sha256:")
     assert relationship["classification"] == "direct"
+    assert "boundary" not in relationship
+    assert relationship["relation_kind"] == "behavioral-verification"
     assert relationship["authority"] == "repository-relationship-only"
     assert relationship["execution_effect"] == "none"
+
+
+def test_verification_relationship_identity_is_deterministic_and_policy_free(
+    tmp_path: Path,
+) -> None:
+    _source, _task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        first = codemap.verification_relationship_evidence(
+            source="src/owner.py", target="tests/test_owner.py",
+            classification="direct", relation_kind="behavioral-verification",
+            provenance="static-reference",
+        )
+        second = codemap.verification_relationship_evidence(
+            source="src/owner.py", target="tests/test_owner.py",
+            classification="direct", relation_kind="behavioral-verification",
+            provenance="static-reference",
+        )
+    assert first == second
+    assert "boundary" not in first
+    assert "sufficient" not in first
+    assert "recommended" not in first
+
+
+def test_verification_relationship_rejects_blank_relation_kind(tmp_path: Path) -> None:
+    _source, _task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="relationship kind must be nonblank"):
+            codemap.verification_relationship_evidence(
+                source="src/owner.py", target="tests/test_owner.py",
+                classification="direct", relation_kind=" ",
+                provenance="static-reference",
+            )
 
 
 def test_verification_relationship_rejects_policy_classifications(
@@ -520,7 +545,7 @@ def test_verification_relationship_rejects_policy_classifications(
         codemap.sync()
         with pytest.raises(ValueError, match="unsupported verification relationship"):
             codemap.verification_relationship_evidence(
-                boundary="behavior",
+                relation_kind="behavioral-verification",
                 source="src/owner.py",
                 target="tests/test_owner.py",
                 classification="sufficient",
