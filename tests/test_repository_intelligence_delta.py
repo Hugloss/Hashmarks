@@ -404,3 +404,89 @@ def test_external_diagnostic_identity_is_order_stable() -> None:
     )
 
     assert first["diagnostics"] == second["diagnostics"]
+
+
+def test_external_observation_stales_on_relevant_edit() -> None:
+    observation = RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="pytest",
+        repository_identity="sha256:repo-a",
+        codemap_generation=41,
+        outcome="pass",
+        scope_paths=["src/owner.py", "tests/test_owner.py"],
+        diagnostics=[],
+    )
+
+    freshness = RepositoryDeltaMixin.external_observation_freshness(
+        observation,
+        current_repository_identity="sha256:repo-b",
+        current_generation=42,
+        changed_paths=["src/owner.py"],
+    )
+
+    assert freshness["state"] == "stale"
+    assert freshness["reason"] == "relevant-repository-evidence-changed"
+    assert freshness["intersection"] == ["src/owner.py"]
+
+
+def test_unrelated_edit_does_not_destroy_scoped_observation_freshness() -> None:
+    observation = RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="pytest",
+        repository_identity="sha256:repo-a",
+        codemap_generation=41,
+        outcome="pass",
+        scope_paths=["src/owner.py", "tests/test_owner.py"],
+        diagnostics=[],
+    )
+
+    freshness = RepositoryDeltaMixin.external_observation_freshness(
+        observation,
+        current_repository_identity="sha256:repo-b",
+        current_generation=42,
+        changed_paths=["docs/guide.md"],
+    )
+
+    assert freshness["state"] == "fresh"
+    assert freshness["reason"] == "changed-paths-proven-outside-observation-scope"
+    assert freshness["intersection"] == []
+
+
+def test_unscoped_external_observation_fails_closed_after_repository_change() -> None:
+    observation = RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="ruff",
+        repository_identity="sha256:repo-a",
+        codemap_generation=41,
+        outcome="pass",
+        diagnostics=[],
+    )
+
+    freshness = RepositoryDeltaMixin.external_observation_freshness(
+        observation,
+        current_repository_identity="sha256:repo-b",
+        current_generation=42,
+        changed_paths=["docs/guide.md"],
+    )
+
+    assert freshness["state"] == "stale"
+    assert freshness["reason"] == "repository-changed-without-declared-observation-scope"
+
+
+def test_dependency_scope_invalidates_observation_without_direct_path_overlap() -> None:
+    observation = RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="pytest",
+        repository_identity="sha256:repo-a",
+        codemap_generation=41,
+        outcome="pass",
+        scope_paths=["tests/test_owner.py"],
+        diagnostics=[],
+    )
+
+    freshness = RepositoryDeltaMixin.external_observation_freshness(
+        observation,
+        current_repository_identity="sha256:repo-b",
+        current_generation=42,
+        changed_paths=["src/owner.py"],
+        dependency_paths=["src/owner.py"],
+    )
+
+    assert freshness["state"] == "stale"
+    assert freshness["intersection"] == ["src/owner.py"]
