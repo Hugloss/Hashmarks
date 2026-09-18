@@ -81,7 +81,11 @@ def _ranked_hotspots(payload: dict[str, object]) -> list[dict[str, object]]:
         )
     return sorted(
         ranked,
-        key=lambda row: (-int(row["excess"]), -int(row["rule_findings"]), str(row["path"])),
+        key=lambda row: (
+            -int(row["excess"]),
+            -int(row["rule_findings"]),
+            str(row["path"]),
+        ),
     )
 
 
