@@ -75,7 +75,7 @@ def main() -> int:
         )
     }
     if measured != expected:
-        print(json.dumps({"legacy": expected, "agent_economics": measured}, indent=2, sort_keys=True))
+        print(\n            json.dumps(\n                {"legacy": expected, "agent_economics": measured},\n                indent=2,\n                sort_keys=True,\n            )\n        )
         return 1
     print(
         "Agent Economics Ruff debt parity: PASS "
