@@ -7,6 +7,13 @@ OBSERVATION_STATES = frozenset(
 )
 
 
+def _observation_state(packet: Mapping[str, object]) -> str:
+    state = packet.get("state", "unknown")
+    if not isinstance(state, str) or state not in OBSERVATION_STATES:
+        return "unknown"
+    return state
+
+
 def _stable_rows(rows: object) -> dict[str, Mapping[str, object]]:
     if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)):
         return {}
@@ -38,6 +45,9 @@ def observation_delta(
     repository_changed = before_repository != after_repository
     observer_changed = before_observer != after_observer
 
+    before_state = _observation_state(before)
+    after_state = _observation_state(after)
+
     before_rows = _stable_rows(before.get("observations"))
     after_rows = _stable_rows(after.get("observations"))
     before_ids = set(before_rows)
@@ -64,6 +74,11 @@ def observation_delta(
             "before": before_observer,
             "after": after_observer,
             "changed": observer_changed,
+        },
+        "completeness": {
+            "before": before_state,
+            "after": after_state,
+            "changed": before_state != after_state,
         },
         "observations": {
             "added": added,
