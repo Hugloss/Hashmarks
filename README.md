@@ -348,6 +348,7 @@ See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs
 - [Getting started with Hashmarks repository intelligence](docs/GETTING_STARTED.md)
 - [Hashmarks MCP server for coding agents](docs/integration/MCP.md)
 - [Architecture](docs/reference/ARCHITECTURE.md)
+- [Observer and delta model](docs/reference/OBSERVER_DELTA.md)
 - [Product boundary](docs/reference/PRODUCT_BOUNDARY.md)
 - [Normative invariants](docs/reference/INVARIANTS.md)
 - [Public API and stability policy](docs/reference/API_STABILITY.md)
