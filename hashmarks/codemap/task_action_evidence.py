@@ -520,7 +520,8 @@ class TaskActionEvidenceMixin:
             "relation_graph_schema": "hashmarks.ownership-relation-graph.v1",
             "selected": owner_path,
             "secret_knowledge_used": False,
-            "effect": "edit-projection-only",
+            "effect": "repository-owner-projection-only",
+            "consumer_action": "external",
         }
         return existing, owner
 
