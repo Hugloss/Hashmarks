@@ -129,7 +129,7 @@ def test_repository_delta_reports_dependency_change(tmp_path: Path) -> None:
     )
 
 
-def test_repository_delta_reports_symbol_add_remove_and_move(tmp_path: Path) -> None:
+def test_repository_delta_does_not_promote_name_similarity_to_move_identity(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     left = tmp_path / "src" / "left.py"
@@ -166,8 +166,7 @@ def test_repository_delta_reports_symbol_add_remove_and_move(tmp_path: Path) -> 
         row.get("name") == "widget"
         and row["from"] == "src/left.py"
         and row["to"] == "src/right.py"
-        for row in delta["semantic"]["symbols_moved"]
-    )
+        and row["state"] == "possible"\n        and row["identity_authority"] is False\n        for row in delta["semantic"]["possible_symbol_moves"]\n    )
 
 
 def test_repository_delta_rejects_foreign_repository_other_task_and_wrong_schema(
@@ -233,3 +232,41 @@ def test_repository_snapshot_and_delta_service_surface(tmp_path: Path) -> None:
     finally:
         client.stop()
         thread.join(timeout=5)
+
+
+def test_repository_snapshot_exposes_observer_and_explicit_completeness(
+    tmp_path: Path,
+) -> None:
+    _source, task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        snapshot = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+
+    assert snapshot["observer"]["identity"].startswith("sha256:")
+    assert snapshot["observer"]["producer"] == "hashmarks"
+    assert snapshot["completeness"] == {
+        "state": "known-present",
+        "scope": "bounded-explicit-change-set",
+        "dynamic_runtime_relationships": "unknown",
+    }
+
+
+def test_repository_delta_keeps_observer_change_separate_from_repository_change(
+    tmp_path: Path,
+) -> None:
+    _source, task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        previous["observer"] = {
+            **previous["observer"],
+            "identity": "sha256:older-observer",
+        }
+        previous["snapshot_identity"] = "sha256:caller-retained-older-observer"
+        delta = codemap.repository_intelligence_delta(
+            task, ["src/owner.py"], previous_snapshot=previous
+        )
+
+    assert delta["observer"]["changed"] is True
+    assert delta["observer"]["before"] == "sha256:older-observer"
+    assert delta["repository_identity"]
