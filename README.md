@@ -19,7 +19,7 @@ Coding agents repeatedly spend context and tool calls rediscovering the same cod
 - **Repository context before source reads.** Start with languages, projects, repository areas, ownership, and structural outlines before opening implementation bodies.
 - **Change impact analysis.** See reverse dependencies, affected files/projects, and structurally related tests before or after a change.
 - **Code navigation and ownership.** Trace symbols, references, imports, callers, project boundaries, and likely implementation owners.
-- **Freshness-aware evidence.** Distinguish current, stale, and unknown repository evidence instead of silently serving an old index as truth.
+- **Freshness-aware evidence.** Distinguish current, stale, and unknown repository evidence instead of silently serving an old index as truth.\n- **Observer-aware deltas.** Keep repository change separate from observer-capability change, and compare stable evidence identities instead of treating every newly visible fact as a repository edit.
 - **Local and read-only for agent consumers.** Hashmarks maintains disposable derived state, while editing, execution, git, planning, and model decisions stay with the caller.
 
 ## Quick start
@@ -277,7 +277,7 @@ The normative contract is [`docs/reference/PRODUCT_BOUNDARY.md`](docs/reference/
 
 **Usefulness is not ownership.** A capability does not belong in Hashmarks merely because it would help a coding agent or execution system.
 
-> **Hashmarks tells the agent what the repository means, who owns what, what is risky, what should probably change, and what should verify it. Oh-Goon decides whether execution is admitted, runs it safely, manages processes/timeouts/recovery, and certifies the result.**
+> **Hashmarks owns repository facts, relationships, observations, provenance, completeness, freshness, and deltas. Consumers own reasoning, edits, execution, retries, and final decisions. Hashmarks does not choose the consumer's next action.**
 
 `AGENTS.md` is the contributor/agent-facing guardrail for this boundary. Public consumers do not need Oh-Goon; the important product rule is that Hashmarks transfers repository evidence, never execution authority.
 
