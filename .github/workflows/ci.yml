@@ -45,7 +45,10 @@ jobs:
             --changed-path hashmarks/codemap/task_action_projection.py \
             --impact-max-depth 2 \
             --gate "hashmarks-test=make test" \
-            --artifact .agent-artifacts/task-action-projection-test-focus.json\n      - name: Explain recovered test-before-edit evidence\n        run: |\n          PYTHONPATH="$PWD/.agent-economics/scripts:$PWD" uv run --no-sync python -m agent_economics explain \
+            --artifact .agent-artifacts/task-action-projection-test-focus.json
+      - name: Explain recovered test-before-edit evidence
+        run: |
+          PYTHONPATH="$PWD/.agent-economics/scripts:$PWD" uv run --no-sync python -m agent_economics explain \
             .agent-artifacts/task-action-projection-test-focus.json \
             --target hashmarks/codemap/task_action_projection.py
       - run: make compile
