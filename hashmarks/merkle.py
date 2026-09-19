@@ -35,6 +35,13 @@ _T = TypeVar("_T")
 
 
 @dataclass(frozen=True, slots=True)
+class MerklePathScope:
+    walk_ignore_names: Iterable[str] = DEFAULT_WALK_IGNORE_NAMES
+    mandatory_exclude_names: Iterable[str] = ()
+    exclude_paths: Iterable[str | Path] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class _Node:
     kind: bytes
     name: bytes
@@ -221,19 +228,18 @@ class MerkleTree:
         *,
         directory_store: DirectoryDigestStore | None = None,
         change_tracker: ChangeTracker | None = None,
-        walk_ignore_names: Iterable[str] = DEFAULT_WALK_IGNORE_NAMES,
-        mandatory_exclude_names: Iterable[str] = (),
-        exclude_paths: Iterable[str | Path] = (),
+        path_scope: MerklePathScope | None = None,
     ):
+        scope = path_scope if path_scope is not None else MerklePathScope()
         self.workspace = canonical_host_path(workspace)
         self.file_store = file_store
         self.directory_store = directory_store
         self.change_tracker = change_tracker
-        self.walk_ignore_names = frozenset(walk_ignore_names)
+        self.walk_ignore_names = frozenset(scope.walk_ignore_names)
         self.mandatory_exclude_names = DEFAULT_MANDATORY_EXCLUDE_NAMES | frozenset(
-            mandatory_exclude_names
+            scope.mandatory_exclude_names
         )
-        self._excluded_paths = self._build_excluded_paths(exclude_paths)
+        self._excluded_paths = self._build_excluded_paths(scope.exclude_paths)
         self._dir_cache: dict[str, Digest] = {}
         self._dirty_dirs: set[str] = {""}
         # Direct selected-file/symlink nodes are hot observation state too.
@@ -408,16 +414,19 @@ class MerkleTree:
             return True
         return self.change_tracker.mark_reconciled(expected_generation=generation)
 
+    def _discard_failed_reconciliation(self, reason: str) -> None:
+        if self.directory_store is not None:
+            self.directory_store.discard_pending()
+        if self.change_tracker is not None:
+            self.change_tracker.mark_unknown(reason)
+
     def _run_reconciled(self, operation: Callable[[], _T]) -> _T:
         for _ in range(_MAX_RECONCILE_ATTEMPTS):
             generation = self._prepare_observation()
             try:
                 result = operation()
             except Exception:
-                if self.directory_store is not None:
-                    self.directory_store.discard_pending()
-                if self.change_tracker is not None:
-                    self.change_tracker.mark_unknown("reconciliation failed")
+                self._discard_failed_reconciliation("reconciliation failed")
                 raise
 
             if self._finish_observation(generation):
@@ -425,12 +434,9 @@ class MerkleTree:
                     self.directory_store.flush()
                 return result
 
-        if self.directory_store is not None:
-            self.directory_store.discard_pending()
-        if self.change_tracker is not None:
-            self.change_tracker.mark_unknown(
-                "filesystem changed continuously during reconciliation"
-            )
+        self._discard_failed_reconciliation(
+            "filesystem changed continuously during reconciliation"
+        )
         raise UnstableObservationError(
             "filesystem changed continuously during identity reconciliation"
         )
@@ -541,6 +547,52 @@ class MerkleTree:
         rel = self._relative(path)
         return self._run_reconciled(lambda: self._directory_digest(rel, verify=verify))
 
+    def _directory_file_items(
+        self, rel: str, entries: list[os.DirEntry[str]]
+    ) -> list[tuple[Path, str]]:
+        file_items: list[tuple[Path, str]] = []
+        for entry in entries:
+            child_rel = f"{rel}/{entry.name}" if rel else entry.name
+            if self._should_skip_during_walk(child_rel):
+                continue
+            if entry.is_file(follow_symlinks=False) and not entry.is_symlink():
+                file_items.append((Path(entry.path), child_rel))
+        return file_items
+
+    def _directory_nodes(
+        self,
+        rel: str,
+        entries: list[os.DirEntry[str]],
+        file_info: dict[str, tuple[Digest, bool]],
+        *,
+        verify: bool,
+    ) -> list[_Node]:
+        nodes: list[_Node] = []
+        for entry in entries:
+            child_rel = f"{rel}/{entry.name}" if rel else entry.name
+            if self._should_skip_during_walk(child_rel):
+                continue
+            if entry.is_symlink():
+                nodes.append(self._symlink_node(Path(entry.path), entry.name))
+            elif entry.is_file(follow_symlinks=False):
+                nodes.append(
+                    _Node(
+                        kind=b"F",
+                        name=self._entry_name(entry.name),
+                        digest=file_info[child_rel][0],
+                        executable=file_info[child_rel][1],
+                    )
+                )
+            elif entry.is_dir(follow_symlinks=False):
+                nodes.append(
+                    _Node(
+                        kind=b"D",
+                        name=self._entry_name(entry.name),
+                        digest=self._directory_digest(child_rel, verify=verify),
+                    )
+                )
+        return nodes
+
     def _directory_digest(self, rel: str, *, verify: bool) -> Digest:
         if self._is_mandatory_excluded(rel):
             raise ValueError(f"input path is excluded from identity: {rel}")
@@ -561,47 +613,12 @@ class MerkleTree:
             raise NotADirectoryError(absolute)
 
         entries = self._sorted_scandir(absolute)
-        file_items: list[tuple[Path, str]] = []
-
-        for entry in entries:
-            child_rel = f"{rel}/{entry.name}" if rel else entry.name
-            if self._should_skip_during_walk(child_rel):
-                continue
-            if entry.is_file(follow_symlinks=False) and not entry.is_symlink():
-                file_items.append((Path(entry.path), child_rel))
-
         file_info = self.file_store.digest_many_info(
-            file_items,
+            self._directory_file_items(rel, entries),
             workspace=self.workspace,
             force=verify,
         )
-
-        nodes: list[_Node] = []
-        for entry in entries:
-            child_rel = f"{rel}/{entry.name}" if rel else entry.name
-            if self._should_skip_during_walk(child_rel):
-                continue
-
-            if entry.is_symlink():
-                nodes.append(self._symlink_node(Path(entry.path), entry.name))
-            elif entry.is_file(follow_symlinks=False):
-                nodes.append(
-                    _Node(
-                        kind=b"F",
-                        name=self._entry_name(entry.name),
-                        digest=file_info[child_rel][0],
-                        executable=file_info[child_rel][1],
-                    )
-                )
-            elif entry.is_dir(follow_symlinks=False):
-                nodes.append(
-                    _Node(
-                        kind=b"D",
-                        name=self._entry_name(entry.name),
-                        digest=self._directory_digest(child_rel, verify=verify),
-                    )
-                )
-
+        nodes = self._directory_nodes(rel, entries, file_info, verify=verify)
         digest = self._hash_nodes(nodes, domain=DIR_DOMAIN)
         with self._lock:
             self._dir_cache[rel] = digest
@@ -633,21 +650,25 @@ class MerkleTree:
         assert node.digest is not None
         return node.kind, node.digest, node.executable
 
-    def _prime_manifest_terminals(self, rels: tuple[str, ...], *, verify: bool) -> None:
-        """Batch-populate direct file/symlink nodes needed by a manifest update."""
+    def _manifest_terminal_needs_observation(self, rel: str, *, verify: bool) -> bool:
+        with self._lock:
+            if verify:
+                # Strong verification must classify the current leaf type too.
+                self._path_cache.pop(rel, None)
+            elif rel in self._path_cache:
+                return False
+        return True
+
+    def _manifest_terminal_items(
+        self, rels: tuple[str, ...], *, verify: bool
+    ) -> tuple[list[tuple[Path, str]], dict[str, bytes]]:
         file_items: list[tuple[Path, str]] = []
         symlinks: dict[str, bytes] = {}
         for rel in rels:
             if self._is_mandatory_excluded(rel):
                 raise ValueError(f"input path is excluded from identity: {rel}")
-            with self._lock:
-                if verify:
-                    # Strong verification must classify the current leaf type
-                    # too, so stale direct-node kind cannot survive a missed
-                    # observation or direct-Merkle use without a tracker.
-                    self._path_cache.pop(rel, None)
-                elif rel in self._path_cache:
-                    continue
+            if not self._manifest_terminal_needs_observation(rel, verify=verify):
+                continue
             absolute = self.workspace / rel
             if absolute.is_symlink():
                 symlinks[rel] = os.readlink(absolute).encode(
@@ -660,7 +681,11 @@ class MerkleTree:
                 continue
             else:
                 raise FileNotFoundError(absolute)
+        return file_items, symlinks
 
+    def _prime_manifest_terminals(self, rels: tuple[str, ...], *, verify: bool) -> None:
+        """Batch-populate direct file/symlink nodes needed by a manifest update."""
+        file_items, symlinks = self._manifest_terminal_items(rels, verify=verify)
         file_info = self.file_store.digest_many_info(
             file_items,
             workspace=self.workspace,

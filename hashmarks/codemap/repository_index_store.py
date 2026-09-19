@@ -94,6 +94,36 @@ def default_base_snapshot(workspace: Path, base_identity: str) -> Path:
     )
 
 
+def _parse_git_overlay_paths(output: bytes) -> set[str] | None:
+    out: set[str] = set()
+    records = output.split(b"\0")
+    i = 0
+    while i < len(records):
+        record = records[i]
+        i += 1
+        if not record:
+            continue
+        if len(record) < 4:
+            return None
+        status = record[:2]
+        raw = record[3:]
+        # Rename/copy porcelain -z uses an additional NUL-delimited origin path.
+        if b"R" in status or b"C" in status:
+            if i >= len(records):
+                return None
+            origin = records[i]
+            i += 1
+            if origin:
+                out.add(os.fsdecode(origin).replace("\\", "/"))
+        out.add(os.fsdecode(raw).replace("\\", "/"))
+    return {
+        path
+        for path in out
+        if path not in {".hashmarks", ".fastidentity"}
+        and not path.startswith((".hashmarks/", ".fastidentity/"))
+    }
+
+
 def git_overlay_paths(workspace: Path) -> set[str] | None:
     """Return paths that differ from HEAD, including staged/untracked/deleted paths.
 
@@ -120,33 +150,7 @@ def git_overlay_paths(workspace: Path) -> set[str] | None:
         return None
     if completed.returncode != 0:
         return None
-    out: set[str] = set()
-    records = completed.stdout.split(b"\0")
-    i = 0
-    while i < len(records):
-        record = records[i]
-        i += 1
-        if not record:
-            continue
-        if len(record) < 4:
-            return None
-        status = record[:2]
-        raw = record[3:]
-        # Rename/copy porcelain -z uses an additional NUL-delimited origin path.
-        if b"R" in status or b"C" in status:
-            if i >= len(records):
-                return None
-            origin = records[i]
-            i += 1
-            if origin:
-                out.add(os.fsdecode(origin).replace("\\", "/"))
-        out.add(os.fsdecode(raw).replace("\\", "/"))
-    return {
-        path
-        for path in out
-        if path not in {".hashmarks", ".fastidentity"}
-        and not path.startswith((".hashmarks/", ".fastidentity/"))
-    }
+    return _parse_git_overlay_paths(completed.stdout)
 
 
 def _symbol_from(value: dict) -> SymbolRecord:
@@ -394,17 +398,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     def read_counters(self) -> dict[str, int]:
         return dict(self._read_counters)
 
-    @contextmanager
-    def bulk_file_writes(
-        self, *, batch_size: int = 32, on_commit: Callable[[int], None] | None = None
-    ):
-        """Bound cold-sync write amplification without changing file semantics.
-
-        Each completed chunk is committed independently, so an interruption can
-        lose at most the current bounded chunk rather than the entire sync.  The
-        ordinary ``set_file`` contract remains one-file/one-transaction outside
-        this explicit context.
-        """
+    def _begin_bulk_file_writes(
+        self, batch_size: int, on_commit: Callable[[int], None] | None
+    ) -> None:
         if batch_size < 1:
             raise ValueError("batch_size must be >= 1")
         with self._lock:
@@ -416,18 +412,23 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             self._bulk_file_write_count = 0
             self._bulk_file_write_committed = 0
             self._bulk_file_write_on_commit = on_commit
-        try:
-            yield
-        except Exception:
-            with self._lock:
+
+    def _clear_bulk_file_write_state(self) -> None:
+        self._bulk_file_write_batch_size = 0
+        self._bulk_file_write_count = 0
+        self._bulk_file_write_on_commit = None
+
+    def _rollback_bulk_file_writes(self) -> None:
+        with self._lock:
+            try:
                 if self._db.in_transaction:
                     self._db.execute("ROLLBACK")
-                self._bulk_file_write_batch_size = 0
-                self._bulk_file_write_count = 0
-                self._bulk_file_write_on_commit = None
-            raise
-        else:
-            with self._lock:
+            finally:
+                self._clear_bulk_file_write_state()
+
+    def _commit_bulk_file_writes(self) -> None:
+        with self._lock:
+            try:
                 if self._db.in_transaction:
                     pending = self._bulk_file_write_count
                     self._db.execute("COMMIT")
@@ -435,9 +436,28 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                     callback = self._bulk_file_write_on_commit
                     if callback is not None and pending:
                         callback(self._bulk_file_write_committed)
-                self._bulk_file_write_batch_size = 0
-                self._bulk_file_write_count = 0
-                self._bulk_file_write_on_commit = None
+            finally:
+                self._clear_bulk_file_write_state()
+
+    @contextmanager
+    def bulk_file_writes(
+        self, *, batch_size: int = 32, on_commit: Callable[[int], None] | None = None
+    ):
+        """Bound cold-sync write amplification without changing file semantics.
+
+        Each completed chunk is committed independently, so an interruption can
+        lose at most the current bounded chunk rather than the entire sync.  The
+        ordinary ``set_file`` contract remains one-file/one-transaction outside
+        this explicit context.
+        """
+        self._begin_bulk_file_writes(batch_size, on_commit)
+        try:
+            yield
+        except Exception:
+            self._rollback_bulk_file_writes()
+            raise
+        else:
+            self._commit_bulk_file_writes()
 
     _CURRENT_TABLES = frozenset(
         {

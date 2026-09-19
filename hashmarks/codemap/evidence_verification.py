@@ -316,6 +316,22 @@ class VerificationMixin:
             else set()
         )
 
+    def _verification_resolved_import_paths(
+        self, state: _VerificationRelevanceState, ref_path: str, target: str
+    ) -> set[str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        resolved_paths, unresolved_identity = self._resolve_import_owner_evidence(
+            ref_path, target
+        )
+        if unresolved_identity and RepositoryDomain.TEST in set(
+            classify_repository_path(ref_path)
+        ):
+            state.unresolved_import_identity_paths.add(ref_path)
+        if not resolved_paths:
+            resolved_paths = self._verification_relative_import_paths(ref_path, target)
+        return set(resolved_paths)
+
     def _verification_exact_import_paths(
         self,
         state: _VerificationRelevanceState,
@@ -332,17 +348,9 @@ class VerificationMixin:
             target = str(ref.get("target") or "")
             if not ref_path or not target:
                 continue
-            resolved_paths, unresolved_identity = self._resolve_import_owner_evidence(
-                ref_path, target
+            resolved_paths = self._verification_resolved_import_paths(
+                state, ref_path, target
             )
-            if unresolved_identity and RepositoryDomain.TEST in set(
-                classify_repository_path(ref_path)
-            ):
-                state.unresolved_import_identity_paths.add(ref_path)
-            if not resolved_paths:
-                resolved_paths = self._verification_relative_import_paths(
-                    ref_path, target
-                )
             if resolved_paths:
                 import_resolution_available = True
             if state.edit_path in resolved_paths:
@@ -501,26 +509,10 @@ class VerificationMixin:
             return None
         return scored[0][1] if scored[0][0] > 0 or len(scored) == 1 else None
 
-    def _verification_reference_strength(
-        self, path: str, symbols: Sequence[str]
+    @staticmethod
+    def _verification_index_strength(
+        index: _VerificationReferenceIndex, symbols: Sequence[str]
     ) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if not path.endswith(".py") or not symbols:
-            strength = "syntactic" if symbols else "none"
-            return {
-                "syntactic_reference": bool(symbols),
-                "reference_strength": strength,
-            }
-        try:
-            snapshot = read_python_ast(self.workspace / path)
-            index = _verification_reference_index(
-                os.path.abspath(os.fspath(self.workspace / path)),
-                snapshot.identity,
-                snapshot.tree,
-            )
-        except (OSError, SyntaxError):
-            return {"syntactic_reference": True, "reference_strength": "syntactic"}
         symbol_set = set(symbols)
         bindings = [
             (bound_name, guard)
@@ -557,6 +549,28 @@ class VerificationMixin:
             "reachable_symbol_use": symbol_use,
             "reference_strength": strength,
         }
+
+    def _verification_reference_strength(
+        self, path: str, symbols: Sequence[str]
+    ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if not path.endswith(".py") or not symbols:
+            strength = "syntactic" if symbols else "none"
+            return {
+                "syntactic_reference": bool(symbols),
+                "reference_strength": strength,
+            }
+        try:
+            snapshot = read_python_ast(self.workspace / path)
+            index = _verification_reference_index(
+                os.path.abspath(os.fspath(self.workspace / path)),
+                snapshot.identity,
+                snapshot.tree,
+            )
+        except (OSError, SyntaxError):
+            return {"syntactic_reference": True, "reference_strength": "syntactic"}
+        return self._verification_index_strength(index, symbols)
 
     def _verification_candidate_row(
         self,
@@ -1149,6 +1163,25 @@ class VerificationMixin:
             "scope": "typescript-project",
         }
 
+    def _polyglot_verification_plan(self, rel: str, target: Path) -> dict[str, object]:
+        plan = self._go_verification_plan(rel, target)
+        if plan is not None:
+            return plan
+        js_exts = {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}
+        if target.suffix.lower() in js_exts:
+            plan = self._javascript_verification_plan(rel, target)
+            if plan is not None:
+                return plan
+            plan = self._typescript_verification_plan(rel, target)
+            if plan is not None:
+                return plan
+        return {
+            "schema": "hashmarks.verification-plan.v1",
+            "path": rel,
+            "available": False,
+            "reason": "unsupported-test-runner",
+        }
+
     def verification_plan(
         self, path: str, *, symbol: str | None = None, qualname: str | None = None
     ) -> dict[str, object]:
@@ -1174,23 +1207,7 @@ class VerificationMixin:
             }
         if target.suffix.lower() == ".py":
             return self._python_verification_plan(rel, symbol, qualname)
-        plan = self._go_verification_plan(rel, target)
-        if plan is not None:
-            return plan
-        js_exts = {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}
-        if target.suffix.lower() in js_exts:
-            plan = self._javascript_verification_plan(rel, target)
-            if plan is not None:
-                return plan
-            plan = self._typescript_verification_plan(rel, target)
-            if plan is not None:
-                return plan
-        return {
-            "schema": "hashmarks.verification-plan.v1",
-            "path": rel,
-            "available": False,
-            "reason": "unsupported-test-runner",
-        }
+        return self._polyglot_verification_plan(rel, target)
 
     @staticmethod
     def _packet_digest(domain: str, payload: object) -> str:

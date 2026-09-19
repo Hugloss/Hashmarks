@@ -2175,6 +2175,67 @@ def test_bulk_file_writes_commit_completed_chunks_and_rollback_only_current_chun
     assert paths == ["a.py", "b.py"]
 
 
+def test_bulk_file_writes_commits_final_chunk_and_reports_durable_count(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "codemap.sqlite3"
+    store = WorkspaceMapStore(db_path)
+    commits: list[int] = []
+    artifact = parse_source(
+        "def alpha():\n    return 1\n",
+        file_digest="digest-alpha",
+        language="python",
+    )
+    try:
+        with store.bulk_file_writes(batch_size=2, on_commit=commits.append):
+            store.set_file(
+                "a.py",
+                artifact,
+                module_name="a",
+                visibility=EvidenceVisibility.SOURCE,
+            )
+        assert commits == [1]
+        with sqlite3.connect(db_path) as observer:
+            assert observer.execute("SELECT COUNT(*) FROM file_map").fetchone()[0] == 1
+        with pytest.raises(RuntimeError, match="nested bulk file writes"):
+            with store.bulk_file_writes():
+                with store.bulk_file_writes():
+                    pass
+        with pytest.raises(ValueError, match="batch_size"):
+            with store.bulk_file_writes(batch_size=0):
+                pass
+    finally:
+        store.close()
+
+
+def test_bulk_file_writes_releases_batch_state_after_commit_callback_failure(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceMapStore(tmp_path / "codemap.sqlite3")
+
+    def fail_after_commit(_count: int) -> None:
+        raise RuntimeError("callback failed")
+
+    artifact = parse_source(
+        "def alpha():\n    return 1\n",
+        file_digest="digest-alpha",
+        language="python",
+    )
+    try:
+        with pytest.raises(RuntimeError, match="callback failed"):
+            with store.bulk_file_writes(batch_size=2, on_commit=fail_after_commit):
+                store.set_file(
+                    "a.py",
+                    artifact,
+                    module_name="a",
+                    visibility=EvidenceVisibility.SOURCE,
+                )
+        with store.bulk_file_writes():
+            pass
+    finally:
+        store.close()
+
+
 def test_codemap_indexes_bounded_repository_docs_and_scripts_as_control_surfaces(
     tmp_path: Path,
 ) -> None:

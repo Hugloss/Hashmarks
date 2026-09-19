@@ -118,13 +118,7 @@ class CodeMap(
         max_index_bytes: int = _MAX_INDEX_BYTES,
     ) -> None:
         self.workspace = canonical_host_path(workspace)
-        if state_dir is None:
-            self.state_dir = default_state_dir(self.workspace)
-        else:
-            raw_state = Path(state_dir)
-            if not raw_state.is_absolute():
-                raw_state = self.workspace / raw_state
-            self.state_dir = canonical_host_path(raw_state)
+        self.state_dir = self._resolve_state_dir(state_dir)
         self.state_dir.mkdir(parents=True, exist_ok=True)
         try:
             self._state_rel = (
@@ -189,6 +183,17 @@ class CodeMap(
         # path replacement be reconciled even after an intermediate decision
         # became unsafe and no longer selected the old owner.
         self._task_recent_authority_paths: dict[tuple[str, int], tuple[str, ...]] = {}
+        self._init_decision_session_state()
+
+    def _resolve_state_dir(self, state_dir: str | Path | None) -> Path:
+        if state_dir is None:
+            return default_state_dir(self.workspace)
+        raw_state = Path(state_dir)
+        if not raw_state.is_absolute():
+            raw_state = self.workspace / raw_state
+        return canonical_host_path(raw_state)
+
+    def _init_decision_session_state(self) -> None:
         # Read-only generation-bound decision-session caches. These cache only
         # immutable evidence primitives, never final task decisions. Outside an
         # explicit decision_session() they are bypassed.
@@ -375,18 +380,23 @@ class CodeMap(
             return self._daemon_observation()
         synced_raw = self.store.meta("identity_generation", "") or ""
         observation = self._daemon_observation()
+        self._reconcile_daemon_generation(observation, synced_raw)
+        return observation
+
+    def _reconcile_daemon_generation(
+        self, observation: RepositoryObservation | None, synced_raw: str
+    ) -> None:
         if observation is not None and not synced_raw:
             # A daemon/barrier is now available but this map was built without
             # generation-bound freshness evidence. Reconcile in the evidence lane.
             self.sync()
-            return observation
+            return
         if observation is None or not synced_raw:
-            return observation
+            return
         synced = int(synced_raw)
         if observation.generation == synced:
-            return observation
+            return
         if observation.can_incrementally_reconcile:
             self.sync(observation.dirty_paths)
-            return observation
+            return
         self.sync()
-        return observation

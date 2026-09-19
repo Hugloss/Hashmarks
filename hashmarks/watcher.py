@@ -267,55 +267,55 @@ class NativeLinuxBatchWatcher(_BatchedWatcherBase):
             raw_name = data[offset : offset + name_len]
             offset += name_len
             name = os.fsdecode(raw_name.split(b"\0", 1)[0]) if name_len else ""
-
-            if mask & _IN_Q_OVERFLOW:
-                self.mark_unknown("inotify queue overflow")
+            if self._handle_watch_state_event(wd, mask, name):
                 continue
-            if mask & _IN_IGNORED:
-                with self._watch_lock:
-                    old_rel = self._wd_to_rel.pop(wd, None)
-                    if old_rel is not None:
-                        self._rel_to_wd.pop(old_rel, None)
-                if old_rel == "" and not self._stop.is_set():
-                    self.mark_unknown("workspace root inotify watch was lost")
-                continue
-            if name == "" and mask & (_IN_DELETE_SELF | _IN_MOVE_SELF):
-                with self._watch_lock:
-                    watched_rel = self._wd_to_rel.get(wd)
-                if watched_rel == "":
-                    self.mark_unknown("workspace root moved or deleted")
-                    continue
-
             item = self._event_path(wd, name)
             if item is None:
                 continue
-            rel, absolute = item
-            is_dir = bool(mask & _IN_ISDIR)
+            if not self._handle_path_event(*item, mask):
+                return
 
-            if mask & (_IN_CREATE | _IN_MOVED_TO):
-                self._batch.add(rel)
-                if is_dir:
-                    try:
-                        self._add_recursive(absolute, rel)
-                    except RuntimeError:
-                        self.mark_unknown("failed to extend recursive inotify coverage")
-                        return
-                continue
+    def _handle_watch_state_event(self, wd: int, mask: int, name: str) -> bool:
+        if mask & _IN_Q_OVERFLOW:
+            self.mark_unknown("inotify queue overflow")
+            return True
+        if mask & _IN_IGNORED:
+            with self._watch_lock:
+                old_rel = self._wd_to_rel.pop(wd, None)
+                if old_rel is not None:
+                    self._rel_to_wd.pop(old_rel, None)
+            if old_rel == "" and not self._stop.is_set():
+                self.mark_unknown("workspace root inotify watch was lost")
+            return True
+        if name == "" and mask & (_IN_DELETE_SELF | _IN_MOVE_SELF):
+            with self._watch_lock:
+                watched_rel = self._wd_to_rel.get(wd)
+            if watched_rel == "":
+                self.mark_unknown("workspace root moved or deleted")
+                return True
+        return False
 
-            if mask & (_IN_DELETE | _IN_MOVED_FROM):
-                self._batch.add(rel)
-                if is_dir:
-                    self._remove_prefix_watches(rel)
-                continue
+    def _handle_path_event(self, rel: str, absolute: Path, mask: int) -> bool:
+        is_dir = bool(mask & _IN_ISDIR)
+        if mask & (_IN_CREATE | _IN_MOVED_TO):
+            self._batch.add(rel)
+            if is_dir:
+                try:
+                    self._add_recursive(absolute, rel)
+                except RuntimeError:
+                    self.mark_unknown("failed to extend recursive inotify coverage")
+                    return False
+            return True
 
-            if mask & (_IN_DELETE_SELF | _IN_MOVE_SELF):
-                self._batch.add(rel)
-                if is_dir:
-                    self._remove_prefix_watches(rel)
-                continue
+        if mask & (_IN_DELETE | _IN_MOVED_FROM | _IN_DELETE_SELF | _IN_MOVE_SELF):
+            self._batch.add(rel)
+            if is_dir:
+                self._remove_prefix_watches(rel)
+            return True
 
-            if not is_dir and mask & (_IN_MODIFY | _IN_ATTRIB | _IN_CLOSE_WRITE):
-                self._batch.add(rel)
+        if not is_dir and mask & (_IN_MODIFY | _IN_ATTRIB | _IN_CLOSE_WRITE):
+            self._batch.add(rel)
+        return True
 
     def _drain_ready(self) -> None:
         if self._fd is None:

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+from .change_impact import ChangeImpactOptions
+
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from pathlib import Path
@@ -111,8 +113,14 @@ class RepositoryIntelligenceQueryMixin:
                 result = self.cross_repository_evidence_packet(
                     task,
                     changed_paths,
-                    project_impact_limit=project_impact_limit,
-                    **common,
+                    limit=limit,
+                    per_role=per_role,
+                    options=ChangeImpactOptions(
+                        impact_limit_per_surface=impact_limit_per_surface,
+                        max_depth=max_depth,
+                        project_impact_limit=project_impact_limit,
+                        project_impact_encoding="compact",
+                    ),
                 )
 
         producer_schema = str(result.get("schema") or "")

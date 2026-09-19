@@ -149,7 +149,6 @@ def test_repeated_stable_query_reproduces_selection_identities(tmp_path: Path) -
         )
 
 
-
 def test_decision_packet_is_observation_not_consumer_decision(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()

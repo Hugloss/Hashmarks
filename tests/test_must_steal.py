@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from hashmarks.cas import CAS
 from hashmarks.directory_store import DirectoryDigestStore
 from hashmarks.engine import IdentityEngine
 from hashmarks.file_store import FileDigestStore
 from hashmarks.inputs import InputManifest
-from hashmarks.merkle import MerkleTree
+from hashmarks.merkle import MerkleTree, UnstableObservationError
 from hashmarks.observation import ChangeTracker, ObservationState
 
 
@@ -71,6 +73,64 @@ def test_reconciliation_generation_cannot_erase_newer_event():
     after = tracker.snapshot()
     assert after.state is ObservationState.DIRTY
     assert after.paths == ("src/a.py",)
+
+
+def test_merkle_reconciliation_marks_unknown_after_operation_failure(
+    tmp_path: Path,
+) -> None:
+    tracker = ChangeTracker()
+    store = FileDigestStore(tmp_path / "files.sqlite3")
+    tree = MerkleTree(tmp_path, store, change_tracker=tracker)
+
+    def fail() -> None:
+        raise ValueError("failed to observe")
+
+    try:
+        with pytest.raises(ValueError, match="failed to observe"):
+            tree._run_reconciled(fail)
+        assert tracker.snapshot().state is ObservationState.UNKNOWN
+    finally:
+        store.close()
+
+
+def test_merkle_reconciliation_fails_closed_when_generation_never_stabilizes(
+    tmp_path: Path, monkeypatch
+) -> None:
+    tracker = ChangeTracker()
+    store = FileDigestStore(tmp_path / "files.sqlite3")
+    tree = MerkleTree(tmp_path, store, change_tracker=tracker)
+    monkeypatch.setattr(tracker, "mark_reconciled", lambda **_kwargs: False)
+
+    try:
+        with pytest.raises(UnstableObservationError, match="changed continuously"):
+            tree._run_reconciled(lambda: "observed")
+        assert tracker.snapshot().state is ObservationState.UNKNOWN
+    finally:
+        store.close()
+
+
+def test_merkle_directory_and_manifest_include_nested_file_and_symlink(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "repo"
+    nested = workspace / "pkg"
+    nested.mkdir(parents=True)
+    target = nested / "owner.py"
+    target.write_text("value = 1\n", encoding="utf-8")
+    (workspace / "alias.py").symlink_to("pkg/owner.py")
+    store = FileDigestStore(tmp_path / "files.sqlite3")
+    tree = MerkleTree(workspace, store)
+
+    try:
+        directory_before = tree.directory_digest("")
+        manifest_before = tree.digest_selected(["pkg", "alias.py"])
+        target.write_text("value = 2\n", encoding="utf-8")
+        directory_after = tree.directory_digest("", verify=True)
+        manifest_after = tree.digest_selected(["pkg", "alias.py"], verify=True)
+        assert directory_after != directory_before
+        assert manifest_after != manifest_before
+    finally:
+        store.close()
 
 
 def test_verify_rehashes_bytes_but_preserves_canonical_identity(

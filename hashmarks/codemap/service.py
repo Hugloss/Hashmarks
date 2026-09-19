@@ -6,6 +6,7 @@ import json
 import os
 import socket
 import socketserver
+import time
 from pathlib import Path
 from typing import Any
 
@@ -535,27 +536,28 @@ class CodeMapServiceClient:
         )
         self.timeout = timeout
 
+    def _connect_to_service(self, sock: socket.socket) -> None:
+        deadline = time.monotonic() + self.timeout
+        while True:
+            try:
+                sock.connect(str(self.socket_path))
+                return
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(
+                        "timed out waiting for CodeMap service admission"
+                    ) from None
+                time.sleep(0.005)
+
     def request(self, op: str, **payload: Any) -> dict[str, Any]:
         message = {"protocol": PROTOCOL, "op": op, **payload}
         raw = (
             json.dumps(message, separators=(",", ":"), sort_keys=True) + "\n"
         ).encode("utf-8")
-        import time
-
-        deadline = time.monotonic() + self.timeout
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(self.timeout)
         try:
-            while True:
-                try:
-                    sock.connect(str(self.socket_path))
-                    break
-                except BlockingIOError:
-                    if time.monotonic() >= deadline:
-                        raise TimeoutError(
-                            "timed out waiting for CodeMap service admission"
-                        ) from None
-                    time.sleep(0.005)
+            self._connect_to_service(sock)
             sock.sendall(raw)
             chunks = bytearray()
             while len(chunks) <= MAX_RESPONSE:

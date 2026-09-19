@@ -54,8 +54,7 @@ def _ownership_check(action: Mapping[str, object]) -> bool:
     if not isinstance(authority, Mapping):
         return False
     return (
-        authority.get("status") == "resolved"
-        or authority.get("resolved_owner") is None
+        authority.get("status") == "resolved" or authority.get("resolved_owner") is None
     )
 
 

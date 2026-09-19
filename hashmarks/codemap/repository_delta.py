@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
@@ -17,6 +18,12 @@ if TYPE_CHECKING:
 OBSERVATION_STATES = frozenset(
     {"known-present", "known-absent", "unknown", "incomplete", "stale", "unsupported"}
 )
+
+
+@dataclass(frozen=True, slots=True)
+class RepositoryGenerationBinding:
+    repository_identity: str
+    codemap_generation: int
 
 
 def _observer_descriptor() -> dict[str, object]:
@@ -95,7 +102,8 @@ class RepositoryDeltaMixin:
                         **{
                             key: str(symbol[key])
                             for key in ("name", "qualname", "kind")
-                            if symbol.get(key) is not None and str(symbol.get(key) or "")
+                            if symbol.get(key) is not None
+                            and str(symbol.get(key) or "")
                         },
                         "identity": self._evidence_identity(
                             "hashmarks.symbol-evidence.v1",
@@ -136,7 +144,12 @@ class RepositoryDeltaMixin:
                                 "path": path,
                                 **{
                                     key: str(edge[key])
-                                    for key in ("source", "kind", "target", "confidence")
+                                    for key in (
+                                        "source",
+                                        "kind",
+                                        "target",
+                                        "confidence",
+                                    )
                                     if edge.get(key) is not None
                                     and str(edge.get(key) or "")
                                 },
@@ -198,7 +211,6 @@ class RepositoryDeltaMixin:
             }
         return rows
 
-
     @staticmethod
     def _diagnostic_identity(row: Mapping[str, object]) -> str:
         """Canonical diagnostic identity independent of aggregate count/order."""
@@ -220,8 +232,7 @@ class RepositoryDeltaMixin:
         cls,
         *,
         producer: str,
-        repository_identity: str,
-        codemap_generation: int,
+        binding: RepositoryGenerationBinding,
         diagnostics: Sequence[Mapping[str, object]],
         outcome: str,
         environment_identity: str | None = None,
@@ -249,8 +260,8 @@ class RepositoryDeltaMixin:
         return {
             "schema": "hashmarks.external-diagnostic-observation.v1",
             "producer": producer,
-            "repository_identity": repository_identity,
-            "codemap_generation": int(codemap_generation),
+            "repository_identity": binding.repository_identity,
+            "codemap_generation": int(binding.codemap_generation),
             "environment_identity": environment_identity,
             "scope_paths": sorted({str(path) for path in scope_paths}),
             "outcome": outcome,
@@ -304,9 +315,7 @@ class RepositoryDeltaMixin:
         observed_generation = observation.get("codemap_generation")
         raw_scope = observation.get("scope_paths")
         scope = (
-            {str(path) for path in raw_scope}
-            if isinstance(raw_scope, list)
-            else set()
+            {str(path) for path in raw_scope} if isinstance(raw_scope, list) else set()
         )
         relevant = scope | {str(path) for path in dependency_paths}
         changed = {str(path) for path in changed_paths}
@@ -349,6 +358,7 @@ class RepositoryDeltaMixin:
         changed_paths: Sequence[str] = (),
     ) -> dict[str, object]:
         """Compare diagnostic identities; counts alone are never delta authority."""
+
         def indexed(packet: Mapping[str, object]) -> dict[str, Mapping[str, object]]:
             rows = packet.get("diagnostics")
             if not isinstance(rows, list):
@@ -711,7 +721,8 @@ class RepositoryDeltaMixin:
             current.get("observer"), field="current.observer"
         )
         previous_completeness = self._delta_mapping(
-            previous_snapshot.get("completeness"), field="previous_snapshot.completeness"
+            previous_snapshot.get("completeness"),
+            field="previous_snapshot.completeness",
         )
         current_completeness = self._delta_mapping(
             current.get("completeness"), field="current.completeness"

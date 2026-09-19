@@ -77,6 +77,41 @@ def test_selection_envelope_binds_repository_source_owner_and_evidence_hashes() 
     assert validate_verification_selection_envelope(envelope)["valid"] is True
 
 
+def test_selection_validator_rejects_nonportable_owner_and_invalid_hash_entries() -> (
+    None
+):
+    membership = verification_membership([verification_member("tests/test_a.py")])
+    envelope = verification_selection_envelope(
+        VerificationSelectionEnvelopeState(
+            repository_identity="git-tree:abc",
+            source_identity="sha256:" + "1" * 64,
+            codemap_generation=7,
+            identity_generation=None,
+            stale=False,
+            membership=membership,
+            owner_evidence={},
+            evidence_hashes={},
+        )
+    )
+    envelope["owner_evidence"] = {"unportable": object()}
+    envelope["evidence_hashes"] = {42: "bad"}
+
+    reasons = validate_verification_selection_envelope(envelope)["reasons"]
+    assert "invalid-owner-evidence" in reasons
+    assert "invalid-evidence-hash-key" in reasons
+    assert "invalid-evidence-hash" in reasons
+    assert "nonportable-envelope-payload" in reasons
+
+
+def test_membership_validator_rejects_member_schema_drift() -> None:
+    membership = verification_membership([verification_member("tests/test_a.py")])
+    membership["members"][0]["schema"] = "unsupported"
+
+    reasons = validate_verification_membership(membership)["reasons"]
+    assert "unsupported-member-schema" in reasons
+    assert "member-payload-identity-mismatch" in reasons
+
+
 def test_selection_envelope_rejects_membership_and_provenance_tampering() -> None:
     membership = verification_membership(
         [

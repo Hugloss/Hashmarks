@@ -643,22 +643,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         refs = self._session_refs_many(sorted(symbol_names), limit_per_target=128)
         for symbol_name in sorted(symbol_names):
             for ref in refs.get(symbol_name, ()):
-                if str(ref.get("kind") or "") != "import":
-                    continue
-                source_path = str(ref.get("path") or "")
-                target = str(ref.get("target") or "")
-                if not source_path or not target or source_path == path:
-                    continue
-                source_domains = set(classify_repository_path(source_path))
-                if (
-                    RepositoryDomain.TEST in source_domains
-                    or RepositoryDomain.SOURCE not in source_domains
-                ):
-                    continue
-                owners, ambiguous = self._resolve_import_owner_evidence(
-                    source_path, target
-                )
-                if not ambiguous and list(dict.fromkeys(owners)) == [path]:
+                source_path = self._task_action_proven_source_import(ref, path)
+                if source_path is not None:
                     roles = list(dict.fromkeys([*(row.get("roles") or ()), "edit"]))
                     return {
                         **row,
@@ -667,6 +653,52 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                         "reference_backed_source_path": source_path,
                     }
         return None
+
+    def _task_action_proven_source_import(
+        self, ref: Mapping[str, object], owner_path: str
+    ) -> str | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if str(ref.get("kind") or "") != "import":
+            return None
+        source_path = str(ref.get("path") or "")
+        target = str(ref.get("target") or "")
+        if not source_path or not target or source_path == owner_path:
+            return None
+        source_domains = set(classify_repository_path(source_path))
+        if (
+            RepositoryDomain.TEST in source_domains
+            or RepositoryDomain.SOURCE not in source_domains
+        ):
+            return None
+        owners, ambiguous = self._resolve_import_owner_evidence(source_path, target)
+        if not ambiguous and list(dict.fromkeys(owners)) == [owner_path]:
+            return source_path
+        return None
+
+    def _task_action_ambiguous_plain_identifiers(
+        self, task: str, rows: Sequence[dict[str, object]], failed: set[str]
+    ) -> set[str]:
+        plain_tokens = {
+            token.lower()
+            for token in _WORD_RE.findall(task)
+            if len(token) >= 4 and token.lower() not in _TASK_STOPWORDS
+        }
+        exact_row_paths: dict[str, set[str]] = {}
+        for row in rows:
+            path = str(row.get("path") or "")
+            if (
+                not path
+                or path in failed
+                or "edit" not in row.get("roles", [])
+                or RepositoryDomain.TEST.value in row.get("domains", [])
+                or self._task_action_is_archive_path(path)
+            ):
+                continue
+            name = str(row.get("name") or "").lower()
+            if name in plain_tokens:
+                exact_row_paths.setdefault(name, set()).add(path)
+        return {token for token, paths in exact_row_paths.items() if len(paths) > 1}
 
     def _task_action_exact_identifier_edit_candidates(
         self,
@@ -689,28 +721,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         # already contains at least two live source definitions with that exact
         # symbol name.  This adds no discovery/ranking authority and prevents
         # lexical order from manufacturing a unique edit owner.
-        plain_tokens = {
-            token.lower()
-            for token in _WORD_RE.findall(task)
-            if len(token) >= 4 and token.lower() not in _TASK_STOPWORDS
-        }
-        exact_row_paths: dict[str, set[str]] = {}
-        for row in rows:
-            path = str(row.get("path") or "")
-            if (
-                not path
-                or path in failed
-                or "edit" not in row.get("roles", [])
-                or RepositoryDomain.TEST.value in row.get("domains", [])
-                or self._task_action_is_archive_path(path)
-            ):
-                continue
-            name = str(row.get("name") or "").lower()
-            if name in plain_tokens:
-                exact_row_paths.setdefault(name, set()).add(path)
-        terms.update(
-            token for token, paths in exact_row_paths.items() if len(paths) > 1
-        )
+        terms.update(self._task_action_ambiguous_plain_identifiers(task, rows, failed))
         if not terms:
             return []
         candidates: list[dict[str, object]] = []
@@ -803,6 +814,18 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         # resolution.  Preserve that language-native proof when its final hop is
         # the exact source -> selected import edge.  Python continues through the
         # import-owner frontier below so facade/re-export ambiguity stays closed.
+        if self._task_action_polyglot_import_proves_owner(
+            resolved, source_path, selected_path
+        ) or self._task_action_python_import_proves_owner(
+            source_path, selected_path, symbol_names
+        ):
+            return selected_path
+        return None
+
+    @staticmethod
+    def _task_action_polyglot_import_proves_owner(
+        resolved: Mapping[str, object], source_path: str, selected_path: str
+    ) -> bool:
         source_suffix = Path(source_path).suffix.lower()
         corroboration = set(map(str, resolved.get("corroboration") or ()))
         owner_path = list(resolved.get("owner_path") or ())
@@ -818,7 +841,14 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 and str(final_hop.get("to") or "") == selected_path
                 and str(final_hop.get("relation") or "") == "imports"
             ):
-                return selected_path
+                return True
+        return False
+
+    def _task_action_python_import_proves_owner(
+        self, source_path: str, selected_path: str, symbol_names: set[str]
+    ) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         for edge in self.store.edges_from(source_path):
             if str(edge.get("kind") or "") != "import":
                 continue
@@ -829,8 +859,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 continue
             owners, ambiguous = self._resolve_import_owner_evidence(source_path, target)
             if not ambiguous and list(dict.fromkeys(owners)) == [selected_path]:
-                return selected_path
-        return None
+                return True
+        return False
 
     def _task_action_identifier_edit_candidates(
         self,

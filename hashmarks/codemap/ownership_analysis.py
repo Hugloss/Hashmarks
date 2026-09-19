@@ -350,16 +350,36 @@ class OwnershipAnalysisMixin:
             return None
         # Package components above a non-top-level module must be backed by
         # __init__.py/__init__.pyi; otherwise do not invent import identity.
-        if len(parts) > 1:
-            current = PurePosixPath()
-            for package in parts[:-1]:
-                current = current / package
-                if not (
-                    (self.workspace / current / "__init__.py").is_file()
-                    or (self.workspace / current / "__init__.pyi").is_file()
-                ):
-                    return None
+        if len(parts) > 1 and not self._python_package_chain_exists(parts[:-1]):
+            return None
         return ".".join(parts)
+
+    def _python_package_chain_exists(self, packages: list[str]) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        current = PurePosixPath()
+        for package in packages:
+            current = current / package
+            if not (
+                (self.workspace / current / "__init__.py").is_file()
+                or (self.workspace / current / "__init__.pyi").is_file()
+            ):
+                return False
+        return True
+
+    @staticmethod
+    def _ast_imports_owner(tree: ast.AST, module: str, owner_name: str) -> bool:
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module == module:
+                for alias in node.names:
+                    if alias.name == owner_name:
+                        return True
+            elif isinstance(node, ast.Import):
+                if any(alias.name == module for alias in node.names):
+                    # Import identity is proven; refs(owner_name) already proves
+                    # the symbol is present in this reader.
+                    return True
+        return False
 
     def _reader_imports_cache_owner(
         self, reader: str, owner_path: str, owner_name: str
@@ -373,17 +393,7 @@ class OwnershipAnalysisMixin:
             tree = read_python_ast(self.workspace / reader, errors="replace").tree
         except (OSError, UnicodeError, SyntaxError, ValueError):
             return False
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module == module:
-                for alias in node.names:
-                    if alias.name == owner_name:
-                        return True
-            elif isinstance(node, ast.Import):
-                if any(alias.name == module for alias in node.names):
-                    # Import identity is proven; refs(owner_name) already proves
-                    # the symbol is present in this reader.
-                    return True
-        return False
+        return self._ast_imports_owner(tree, module, owner_name)
 
     @staticmethod
     def _ownership_add_imports(nodes, edges, findings) -> None:
@@ -557,13 +567,9 @@ class OwnershipAnalysisMixin:
             unguarded += int(not bool(finding["guarded"]))
         return unguarded
 
-    def repository_ownership_graph(
-        self, paths: Sequence[str] | None = None
-    ) -> dict[str, object]:
-        """Compose repository ownership evidence without inventing runtime authority."""
+    def _ownership_graph_sources(self, paths: Sequence[str] | None):
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._ensure_map_ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
         import_result = self._import_ownership_findings(normalized, all_rows)
         repository_import_result = (
@@ -585,6 +591,18 @@ class OwnershipAnalysisMixin:
             normalized, all_rows, repository_cache_result
         )
         concurrency_result = self._concurrency_risk_findings(normalized, all_rows)
+        return import_result, cache_result, invalidation_result, concurrency_result
+
+    def repository_ownership_graph(
+        self, paths: Sequence[str] | None = None
+    ) -> dict[str, object]:
+        """Compose repository ownership evidence without inventing runtime authority."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        self._ensure_map_ready()
+        import_result, cache_result, invalidation_result, concurrency_result = (
+            self._ownership_graph_sources(paths)
+        )
         nodes: dict[tuple[str, str, str], dict[str, object]] = {}
         edges: list[dict[str, object]] = []
         self._ownership_add_imports(nodes, edges, import_result["findings"])

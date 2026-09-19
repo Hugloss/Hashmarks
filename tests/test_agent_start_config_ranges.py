@@ -82,6 +82,22 @@ def test_json_key_range_uses_valid_json_and_one_key_line(tmp_path: Path) -> None
     assert evidence["config"]["format"] == "json"
 
 
+def test_json_nested_value_range_ignores_brackets_inside_strings(
+    tmp_path: Path,
+) -> None:
+    _repo(
+        tmp_path,
+        "policy.json",
+        '{\n  "response": {\n    "note": "brace } and bracket ]",\n'
+        '    "modes": [\n      "active"\n    ]\n  },\n  "other": true\n}\n',
+    )
+    start = _start(tmp_path, "Inspect the ember response config")
+    evidence = start["edit_evidence"]
+    assert evidence["config"]["name"] == "response"
+    assert evidence["lines"] == [2, 7]
+    assert '"other": true' not in evidence["content"]
+
+
 def test_yaml_nested_key_range_uses_task_supported_path(tmp_path: Path) -> None:
     _repo(
         tmp_path,
