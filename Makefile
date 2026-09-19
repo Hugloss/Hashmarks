@@ -30,7 +30,7 @@ DIAGNOSTIC_BATCH_LIMIT ?= 8
 DIAGNOSTIC_SHARD ?= 0
 DIAGNOSTIC_EXTRA_MARKER ?=
 
-.PHONY: help evaluation-help lock init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help lint ruff typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-gate test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
+.PHONY: help evaluation-help lock init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help lint ruff ruff-check ruff-format-check typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-gate test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
 
 help:
 	@printf '%s\n' \
@@ -56,7 +56,9 @@ help:
 	  '  make map-status     Show CodeMap generation/staleness' \
 	  '  make map-watch      Maintain CodeMap incrementally in foreground' \
 	  '  make lint           Run the canonical project Ruff check' \
-	  '  make ruff           Run Ruff check + format check using the project lint group/config' \
+	  '  make ruff           Run all Ruff diagnostics locally (check + format)' \
+	  '  make ruff-check     Run blocking Ruff correctness/import checks' \
+	  '  make ruff-format-check  Run non-blocking Ruff formatting diagnostic' \
 	  '  make typecheck      Run ty and Pyright on live repository Python' \
 	  '  make precommit      Run all configured pre-commit hooks on tracked files' \
 	  '  make hooks-install  Install the local Git pre-commit hook' \
@@ -154,9 +156,13 @@ map-watch:
 agent-runner-journal-help: bootstrap
 	@$(UV) run --offline python -m scripts.agent_evaluation.agent_runner_journal --help
 
-ruff:
+ruff-check:
 	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint ruff check .
+
+ruff-format-check:
 	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint ruff format --check .
+
+ruff: ruff-check ruff-format-check
 
 lint: ruff
 
