@@ -42,78 +42,74 @@ class RepositoryEvidenceBindingsMixin:
             raise ValueError("evidence span requires 1 <= start_line <= end_line")
         return EvidenceSpan(path, start, end)
 
+    @staticmethod
+    def _physical_lines(raw: bytes) -> list[bytes]:
+        """Split physical repository lines only on LF while preserving exact bytes."""
+        if not raw:
+            return []
+        parts = raw.split(b"\n")
+        lines = [part + b"\n" for part in parts[:-1]]
+        if parts[-1]:
+            lines.append(parts[-1])
+        return lines
+
     def _observe_span(self, span: EvidenceSpan) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        path = self.workspace / span.path
-        # Evidence identity is lexical repository evidence. Never follow a symlink
-        # leaf or a symlinked ancestor into another filesystem authority.
-        cursor = self.workspace
-        symlinked = False
-        for part in span.path.split("/"):
-            cursor = cursor / part
-            if cursor.is_symlink():
-                symlinked = True
-                break
-        if symlinked:
-            return {
-                "path": span.path,
-                "start_line": span.start_line,
-                "end_line": span.end_line,
-                "state": "unsupported",
-                "reason": "symlink-evidence-not-observed",
-            }
-        try:
-            raw = path.read_bytes()
-        except FileNotFoundError:
-            return {
-                "path": span.path,
-                "start_line": span.start_line,
-                "end_line": span.end_line,
-                "state": "known-absent",
-                "reason": "member-not-present",
-            }
-        except OSError:
-            return {
-                "path": span.path,
-                "start_line": span.start_line,
-                "end_line": span.end_line,
-                "state": "unknown",
-                "reason": "member-unreadable",
-            }
-        try:
-            text = raw.decode("utf-8")
-        except UnicodeDecodeError:
-            return {
-                "path": span.path,
-                "start_line": span.start_line,
-                "end_line": span.end_line,
-                "state": "unsupported",
-                "reason": "member-not-utf8-text",
-                "member_identity": "sha256:" + hashlib.sha256(raw).hexdigest(),
-            }
-        lines = text.splitlines(keepends=True)
-        if span.end_line > len(lines):
-            return {
-                "path": span.path,
-                "start_line": span.start_line,
-                "end_line": span.end_line,
-                "state": "known-absent",
-                "reason": "declared-span-outside-member",
-                "member_identity": "sha256:" + hashlib.sha256(raw).hexdigest(),
-            }
-        # splitlines(keepends=True) plus UTF-8 re-encoding preserves the exact
-        # selected bytes for valid UTF-8, including CRLF/LF and a missing final newline.
-        selected = b"".join(
-            line.encode("utf-8") for line in lines[span.start_line - 1 : span.end_line]
+        member, raw = self._repository_member_observation(
+            span.path, include_bytes=True
         )
-        return {
+        base: dict[str, object] = {
             "path": span.path,
             "start_line": span.start_line,
             "end_line": span.end_line,
+            "member_state": member["state"],
+        }
+        for key in ("member_identity", "evidence_visibility"):
+            if key in member:
+                base[key] = member[key]
+
+        if member["state"] != "known-present" or raw is None:
+            state = str(member["state"])
+            return {
+                **base,
+                "state": state,
+                "locator_state": state,
+                "content_state": state,
+                **({"reason": member["reason"]} if member.get("reason") else {}),
+            }
+
+        try:
+            raw.decode("utf-8")
+        except UnicodeDecodeError:
+            return {
+                **base,
+                "state": "unsupported",
+                "locator_state": "unsupported",
+                "content_state": "unsupported",
+                "reason": "member-not-utf8-text",
+            }
+
+        lines = self._physical_lines(raw)
+        if span.end_line > len(lines):
+            return {
+                **base,
+                "state": "known-absent",
+                "locator_state": "known-absent",
+                "content_state": "known-absent",
+                "reason": "declared-span-outside-member",
+            }
+
+        selected = b"".join(lines[span.start_line - 1 : span.end_line])
+        digest = hashlib.sha256(
+            b"hashmarks.repository-evidence-span.v1\0" + selected
+        ).hexdigest()
+        return {
+            **base,
             "state": "known-present",
-            "member_identity": "sha256:" + hashlib.sha256(raw).hexdigest(),
-            "span_identity": "sha256:" + hashlib.sha256(selected).hexdigest(),
+            "locator_state": "known-present",
+            "content_state": "known-present",
+            "span_identity": "sha256:" + digest,
             "byte_length": len(selected),
         }
 
@@ -203,19 +199,29 @@ class RepositoryEvidenceBindingsMixin:
                     for path in (dependency_paths or {}).get(binding_id, ())
                 }
             )
-            dependency_rows = self._session_file_rows(declared_dependencies)
-            dependencies = [
-                {
-                    "path": path,
-                    "state": "known-present" if path in dependency_rows else "known-absent",
-                    **(
-                        {"member_identity": str(dependency_rows[path].get("file_digest") or "")}
-                        if path in dependency_rows
-                        else {}
-                    ),
-                }
-                for path in declared_dependencies
-            ]
+            dependencies = []
+            for path in declared_dependencies:
+                member, _raw = self._repository_member_observation(path)
+                dependencies.append(member)
+
+            definition_payload = {
+                "binding_id": binding_id,
+                "evidence": [
+                    {
+                        "path": row.path,
+                        "start_line": row.start_line,
+                        "end_line": row.end_line,
+                    }
+                    for row in (
+                        self._binding_span(raw)
+                        for raw in raw_evidence
+                        if isinstance(raw, Mapping)
+                    )
+                ],
+                "dependencies": declared_dependencies,
+                "include_relationships": include_relationships,
+                "relationship_limit_per_path": relationship_limit_per_path,
+            }
             binding_payload = {
                 "binding_id": binding_id,
                 "evidence": evidence,
@@ -236,9 +242,15 @@ class RepositoryEvidenceBindingsMixin:
             rows.append(
                 {
                     **binding_payload,
-                    "binding_identity": "sha256:"
+                    "binding_definition_identity": "sha256:"
                     + self._packet_digest(
-                        "hashmarks.repository-evidence-binding.v1", binding_payload
+                        "hashmarks.repository-evidence-binding-definition.v1",
+                        definition_payload,
+                    ),
+                    "binding_observation_identity": "sha256:"
+                    + self._packet_digest(
+                        "hashmarks.repository-evidence-binding-observation.v1",
+                        binding_payload,
                     ),
                 }
             )
@@ -249,7 +261,13 @@ class RepositoryEvidenceBindingsMixin:
                 "repository_identity": self._repository_packet_identity(),
                 "codemap_generation": generation,
                 "identity_generation": identity_generation,
-                "stale": stale is not False,
+                "freshness": (
+                    "stale"
+                    if stale is True
+                    else "current"
+                    if stale is False
+                    else "unknown"
+                ),
             },
             "bindings": rows,
             "completeness": {
