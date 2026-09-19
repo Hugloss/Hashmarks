@@ -42,6 +42,41 @@ class RepositoryEvidenceBindingDeltaMixin:
             result[key] = row
         return result
 
+    @staticmethod
+    def _dependency_index(binding: Mapping[str, object]) -> dict[str, Mapping[str, object]]:
+        rows = binding.get("dependencies")
+        if not isinstance(rows, list):
+            return {}
+        return {
+            str(row["path"]): row
+            for row in rows
+            if isinstance(row, Mapping) and row.get("path")
+        }
+
+    @classmethod
+    def _dependency_changes(cls, before: Mapping[str, object], after: Mapping[str, object]) -> list[dict[str, object]]:
+        old = cls._dependency_index(before)
+        new = cls._dependency_index(after)
+        changes: list[dict[str, object]] = []
+        for path in sorted(set(old) | set(new)):
+            previous = old.get(path)
+            current = new.get(path)
+            if previous is None:
+                changes.append({"path": path, "state": "added"})
+            elif current is None:
+                changes.append({"path": path, "state": "removed"})
+            elif (
+                previous.get("member_identity") != current.get("member_identity")
+                or previous.get("state") != current.get("state")
+            ):
+                changes.append({
+                    "path": path,
+                    "state": "changed",
+                    "member_changed": previous.get("member_identity") != current.get("member_identity"),
+                    "observation_state_changed": previous.get("state") != current.get("state"),
+                })
+        return changes
+
     @classmethod
     def _binding_change(cls, before: Mapping[str, object], after: Mapping[str, object]) -> dict[str, object]:
         old = cls._evidence_index(before)
@@ -70,9 +105,17 @@ class RepositoryEvidenceBindingDeltaMixin:
                         "observation_state_changed": state_changed,
                     }
                 )
+        dependency_changes = cls._dependency_changes(before, after)
         return {
-            "state": "changed" if changes else "preserved",
-            "evidence_changes": changes,
+            "state": "changed" if changes or dependency_changes else "preserved",
+            "direct_evidence": {
+                "state": "changed" if changes else "preserved",
+                "changes": changes,
+            },
+            "semantic_dependencies": {
+                "state": "affected" if dependency_changes else "unaffected",
+                "changes": dependency_changes,
+            },
         }
 
     def repository_evidence_binding_delta(
