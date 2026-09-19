@@ -236,11 +236,11 @@ class RepositoryDeltaMixin:
         edges_by_path = self._session_edges_for_paths_many(paths, limit_per_path=32)
         rows: dict[str, dict[str, object]] = {}
         for path in paths:
-            file_row = self._session_file_row(path)
+            member, _raw = self._repository_member_observation(path)
             revision = (
-                None
-                if file_row is None or not file_row["file_digest"]
-                else str(file_row["file_digest"])
+                str(member.get("member_identity") or "")
+                if member.get("state") == "known-present"
+                else None
             )
             symbols = sorted(
                 (
@@ -317,6 +317,7 @@ class RepositoryDeltaMixin:
                 ),
             )
             rows[path] = {
+                "member_state": member["state"],
                 "revision": revision,
                 "symbols": symbols,
                 "dependencies": dependencies,
