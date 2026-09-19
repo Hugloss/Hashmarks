@@ -5,9 +5,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
-from .decision_session import decision_scoped
-
 from hashmarks.paths import normalize_relative_path
+
+from .decision_session import decision_scoped
 
 if TYPE_CHECKING:
     from .engine import CodeMap
