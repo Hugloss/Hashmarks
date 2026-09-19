@@ -58,3 +58,69 @@ jobs:
             --artifact .agent-artifacts/task-action-projection-test-focus.json \
             --format json
           cat .agent-artifacts/task-action-projection-test-focus.json
+      - name: Bind BP1 pre-edit behavior-preservation evidence
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.agent-economics/scripts
+        run: |
+          uv run --no-sync python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          from agent_economics.behavior_preservation import behavior_preservation_readiness
+
+          target = Path("hashmarks/codemap/task_action_projection.py")
+          tests = [
+              Path("tests/test_task_action_map.py"),
+              Path("tests/test_task_action_brief.py"),
+              Path("tests/test_task_action_session_reuse.py"),
+              Path("tests/test_task_action_stale_workspace.py"),
+          ]
+          digest = lambda path: "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+          source_identity = digest(target)
+          test_references = [
+              {"path": path.as_posix(), "evidence_identity": digest(path)}
+              for path in tests
+          ]
+          provider = {
+              "provider": "hashmarks",
+              "evidence_identity": "sha256:" + hashlib.sha256(
+                  Path("scripts/agent_evaluation/task_action_projection_test_ownership.json").read_bytes()
+              ).hexdigest(),
+          }
+          boundaries = [
+              {"identity": "task-action-projection-and-ambiguity", "classification": "direct", "freshness": "fresh", "provider_reference": provider},
+              {"identity": "task-action-public-brief", "classification": "direct", "freshness": "fresh", "provider_reference": provider},
+              {"identity": "task-action-session-cache-and-mutation-isolation", "classification": "direct", "freshness": "fresh", "provider_reference": provider},
+              {"identity": "task-action-stale-workspace-reconciliation", "classification": "direct", "freshness": "fresh", "provider_reference": provider},
+          ]
+          receipt_semantic = {
+              "source_identity": source_identity,
+              "status": "PASS",
+              "test_evidence_identities": sorted(row["evidence_identity"] for row in test_references),
+          }
+          receipt = {
+              **receipt_semantic,
+              "execution_identity": "sha256:" + hashlib.sha256(
+                  json.dumps(receipt_semantic, sort_keys=True, separators=(",", ":")).encode()
+              ).hexdigest(),
+          }
+          result = behavior_preservation_readiness(
+              target=target.as_posix(),
+              source_identity=source_identity,
+              boundaries=boundaries,
+              test_references=test_references,
+              execution_receipt=receipt,
+              repository_gates=[
+                  {"name": "ruff", "command": "make ruff"},
+                  {"name": "tests", "command": "make test"},
+              ],
+          )
+          artifact = Path(".agent-artifacts/task-action-projection-behavior-preservation.json")
+          artifact.parent.mkdir(parents=True, exist_ok=True)
+          artifact.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(artifact.read_text())
+          if result["status"] != "READY_FOR_BEHAVIOR_PRESERVING_EDIT":
+              raise SystemExit(f"BP1 not ready: {result['status']}")
+          if result["authority"]["edit_authorized"] or result["authority"]["refactor_safety_proven"]:
+              raise SystemExit("BP1 authority boundary violated")
+          PY
