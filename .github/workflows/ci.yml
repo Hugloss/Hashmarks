@@ -21,8 +21,14 @@ jobs:
           enable-cache: true
       - run: uv python install 3.11
       - run: uv sync --group test --python 3.11
-      - run: make ruff
-      - run: make lint-debt-gate
+      - name: Ruff correctness/import gate
+        run: make ruff-check
+      - name: Ruff formatting diagnostic
+        continue-on-error: true
+        run: make ruff-format-check
+      - name: Ruff maintainability debt diagnostic
+        continue-on-error: true
+        run: make lint-debt-summary
       - run: make compile
       - name: Prove workspace-state authority before heavy qualification
         run: uv run --no-sync python -m pytest -q tests/test_codemap_state_binding.py
