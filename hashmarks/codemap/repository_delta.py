@@ -36,6 +36,7 @@ def _observer_descriptor() -> dict[str, object]:
         "capabilities": [
             "affected",
             "dependencies",
+            "evidence-bindings",
             "freshness",
             "ownership",
             "symbols",
