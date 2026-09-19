@@ -107,11 +107,30 @@ class RepositoryEvidenceBindingDeltaMixin:
                 )
         dependency_changes = cls._dependency_changes(before, after)
         relationship_changed = before.get("relationships") != after.get("relationships")
+        member_changes = [
+            {
+                "evidence": list(key),
+                "state": "changed",
+                "member_changed": True,
+            }
+            for key in keys
+            if key in old
+            and key in new
+            and old[key].get("member_identity") != new[key].get("member_identity")
+        ]
         return {
-            "state": "changed" if changes or dependency_changes or relationship_changed else "preserved",
+            "state": (
+                "changed"
+                if changes or member_changes or dependency_changes or relationship_changed
+                else "preserved"
+            ),
             "direct_evidence": {
                 "state": "changed" if changes else "preserved",
                 "changes": changes,
+            },
+            "member_evidence": {
+                "state": "changed" if member_changes else "preserved",
+                "changes": member_changes,
             },
             "semantic_dependencies": {
                 "state": "affected" if dependency_changes else "unaffected",
