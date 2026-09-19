@@ -106,7 +106,38 @@ class RepositoryEvidenceBindingDeltaMixin:
                     }
                 )
         dependency_changes = cls._dependency_changes(before, after)
-        relationship_changed = before.get("relationships") != after.get("relationships")
+        before_relationships = before.get("relationships")
+        after_relationships = after.get("relationships")
+        before_rows = (
+            before_relationships.get("relationships")
+            if isinstance(before_relationships, Mapping)
+            else []
+        )
+        after_rows = (
+            after_relationships.get("relationships")
+            if isinstance(after_relationships, Mapping)
+            else []
+        )
+        old_relationships = {
+            str(row.get("identity")): row
+            for row in before_rows
+            if isinstance(row, Mapping) and row.get("identity")
+        } if isinstance(before_rows, list) else {}
+        new_relationships = {
+            str(row.get("identity")): row
+            for row in after_rows
+            if isinstance(row, Mapping) and row.get("identity")
+        } if isinstance(after_rows, list) else {}
+        relationship_added = [
+            deepcopy(new_relationships[key])
+            for key in sorted(set(new_relationships) - set(old_relationships))
+        ]
+        relationship_removed = [
+            deepcopy(old_relationships[key])
+            for key in sorted(set(old_relationships) - set(new_relationships))
+        ]
+        relationship_changed = bool(relationship_added or relationship_removed)
+        relationship_observation_changed = before_relationships != after_relationships
         member_changes = [
             {
                 "evidence": list(key),
@@ -121,7 +152,14 @@ class RepositoryEvidenceBindingDeltaMixin:
         return {
             "state": (
                 "changed"
-                if changes or member_changes or dependency_changes or relationship_changed
+                if (
+                    changes
+                    or member_changes
+                    or dependency_changes
+                    or relationship_changed
+                    or before.get("binding_definition_identity")
+                    != after.get("binding_definition_identity")
+                )
                 else "preserved"
             ),
             "direct_evidence": {
@@ -132,17 +170,34 @@ class RepositoryEvidenceBindingDeltaMixin:
                 "state": "changed" if member_changes else "preserved",
                 "changes": member_changes,
             },
-            "semantic_dependencies": {
+            "declared_dependencies": {
                 "state": "affected" if dependency_changes else "unaffected",
                 "changes": dependency_changes,
             },
             "relationship_evidence": {
                 "state": "changed" if relationship_changed else "unchanged",
+                "added": relationship_added,
+                "removed": relationship_removed,
                 "completeness": (
-                    after.get("relationships", {}).get("completeness", "unknown")
-                    if isinstance(after.get("relationships"), Mapping)
+                    after_relationships.get("completeness", "unknown")
+                    if isinstance(after_relationships, Mapping)
                     else "unknown"
                 ),
+                "observation": {
+                    "changed": relationship_observation_changed,
+                    "before": deepcopy(before_relationships),
+                    "after": deepcopy(after_relationships),
+                },
+            },
+            "definition": {
+                "state": (
+                    "preserved"
+                    if before.get("binding_definition_identity")
+                    == after.get("binding_definition_identity")
+                    else "changed"
+                ),
+                "before": before.get("binding_definition_identity"),
+                "after": after.get("binding_definition_identity"),
             },
         }
 
