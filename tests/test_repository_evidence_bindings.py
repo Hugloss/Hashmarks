@@ -225,8 +225,11 @@ def test_relationship_change_does_not_masquerade_as_direct_content_change(tmp_pa
         delta = codemap.repository_evidence_binding_delta(before, after)
     changed = delta["bindings"]["changed"][0]
     assert changed["direct_evidence"]["state"] == "preserved"
-    assert changed["relationship_evidence"]["state"] == "changed"
-    assert changed["relationship_evidence"]["completeness"] == "bounded-not-claimed"
+    relationships = changed["relationship_evidence"]
+    assert relationships["state"] == "changed"
+    assert relationships["comparability"] == "comparable"
+    assert relationships["facts"]["state"] == "changed"
+    assert relationships["completeness"] == "bounded-not-claimed"
 
 
 def test_complete_change_set_can_prove_outside_declared_bindings(tmp_path: Path) -> None:
@@ -531,8 +534,12 @@ def test_binding_definition_change_is_not_relationship_content_change(
     )
     changed = delta["bindings"]["changed"][0]
     assert changed["definition"]["state"] == "changed"
-    assert changed["relationship_evidence"]["state"] == "unchanged"
-    assert changed["relationship_evidence"]["observation"]["changed"] is True
+    relationships = changed["relationship_evidence"]
+    assert relationships["state"] == "unknown"
+    assert relationships["comparability"] == "observation-configuration-changed"
+    assert relationships["facts"]["state"] == "unknown"
+    assert relationships["locators"]["state"] == "unknown"
+    assert relationships["observation"]["changed"] is True
 
 
 def test_observer_proven_change_set_keeps_completeness_provenance(
@@ -817,3 +824,39 @@ def test_whole_member_binding_cannot_bypass_pruned_analysis_scope(tmp_path: Path
     assert evidence["state"] == "unsupported"
     assert evidence["reason"] == "repository-evidence-not-admitted"
     assert "member_revision" not in evidence
+
+
+def test_relationship_locator_change_is_separate_from_relationship_fact_change(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.py"
+    dependency = tmp_path / "dependency.py"
+    dependency.write_text("VALUE = 1\n", encoding="utf-8")
+    source.write_text(
+        "from dependency import VALUE\nPAD = 0\nKEEP = 1\n",
+        encoding="utf-8",
+    )
+    binding = [{
+        "binding_id": "relationship-locator",
+        "evidence": [{"path": "source.py", "start_line": 3, "end_line": 3}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(binding)
+        source.write_text(
+            "PAD = 0\nfrom dependency import VALUE\nKEEP = 1\n",
+            encoding="utf-8",
+        )
+        codemap.sync(["source.py"])
+        after = codemap.repository_evidence_bindings(binding)
+        delta = codemap.repository_evidence_binding_delta(before, after)
+
+    changed = delta["bindings"]["changed"][0]
+    assert changed["direct_evidence"]["state"] == "preserved"
+    relationships = changed["relationship_evidence"]
+    assert relationships["state"] == "changed"
+    assert relationships["facts"]["state"] == "unchanged"
+    assert relationships["facts"]["added"] == []
+    assert relationships["facts"]["removed"] == []
+    assert relationships["locators"]["state"] == "changed"
+    assert len(relationships["locators"]["changes"]) >= 1
