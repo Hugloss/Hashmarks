@@ -40,6 +40,12 @@ The current slice keeps observer capability identity separate from repository id
 
 Further work must continue through this owner and the existing change-intelligence/evidence projections.
 
+## Repository evidence bindings
+
+Opaque repository evidence bindings are a consumer-facing projection over the same member revision, relationship, freshness, completeness, and repository-delta authorities. They may own binding-definition and binding-impact projection shape, but they do not introduce another repository generation, member revision model, relationship graph, freshness authority, or generic change-set authority.
+
+Binding deltas keep direct range/member evidence, declared dependencies, relationship evidence, and binding-definition change separate. Coverage may consume either caller-asserted changed paths or an atomic `RepositoryObservation`, and it must preserve which source established change-set completeness. See [`REPOSITORY_EVIDENCE_BINDINGS.md`](REPOSITORY_EVIDENCE_BINDINGS.md).
+
 
 ## Relationship evidence identity
 
