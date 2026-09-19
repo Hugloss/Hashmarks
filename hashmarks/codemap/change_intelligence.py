@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, cast
 
 from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
+from .evidence_freshness import freshness_state
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -125,13 +126,7 @@ class ChangeIntelligenceMixin:
                 "facts": explanation["facts"],
             },
             "freshness": {
-                "state": (
-                    "stale"
-                    if stale is True
-                    else "current"
-                    if stale is False
-                    else "unknown"
-                ),
+                "state": freshness_state(stale),
                 "generation_bound": True,
             },
             "bounds": dict(impact.get("bounds") or {}),
