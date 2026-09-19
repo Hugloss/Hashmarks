@@ -32,13 +32,14 @@ jobs:
           test "$(git -C "$AE_ROOT" rev-parse HEAD)" = "$AE_REVISION"
           PYTHONPATH="$AE_ROOT/scripts" uv run --no-sync python - <<'PY'
           import json
+          from pathlib import Path
           from agent_economics.quality_debt import quality_debt_audit
           limits = {
               "C901": 8, "PLR0911": 6, "PLR0912": 8, "PLR0913": 6,
               "PLR0914": 15, "PLR0915": 40, "PLR0916": 5,
           }
           result = quality_debt_audit(
-              repository_root=".",
+              repository_root=Path("."),
               roots=("hashmarks", "scripts", "benchmarks"),
               excludes=("benchmarks/agent_evaluation/retained",),
               limits=limits,
