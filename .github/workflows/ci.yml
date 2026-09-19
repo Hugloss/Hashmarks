@@ -30,16 +30,32 @@ jobs:
           git clone --quiet https://github.com/Hugloss/agentsCookbook.git "$AE_ROOT"
           git -C "$AE_ROOT" checkout --quiet --detach "$AE_REVISION"
           test "$(git -C "$AE_ROOT" rev-parse HEAD)" = "$AE_REVISION"
-          UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --only-group lint --python 3.11\n          RUFF_EXECUTABLE="$PWD/.ruff-venv/bin/ruff"\n          test -x "$RUFF_EXECUTABLE"\n          PYTHONPATH="$AE_ROOT/scripts" uv run --no-sync python - "$RUFF_EXECUTABLE" <<'PY'
-          import json\n          import sys\n          from pathlib import Path\n          from agent_economics.quality_debt import quality_debt_audit
-          analyzer = sys.argv[1]\n          limits = {\n              "C901": 8, "PLR0911": 6, "PLR0912": 8, "PLR0913": 6,
-              "PLR0914": 15, "PLR0915": 40, "PLR0916": 5,
+          UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --only-group lint --python 3.11
+          RUFF_EXECUTABLE="$PWD/.ruff-venv/bin/ruff"
+          test -x "$RUFF_EXECUTABLE"
+          PYTHONPATH="$AE_ROOT/scripts" uv run --no-sync python - "$RUFF_EXECUTABLE" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from agent_economics.quality_debt import quality_debt_audit
+
+          analyzer = sys.argv[1]
+          limits = {
+              "C901": 8,
+              "PLR0911": 6,
+              "PLR0912": 8,
+              "PLR0913": 6,
+              "PLR0914": 15,
+              "PLR0915": 40,
+              "PLR0916": 5,
           }
           result = quality_debt_audit(
               repository_root=Path("."),
               roots=("hashmarks", "scripts", "benchmarks"),
               excludes=("benchmarks/agent_evaluation/retained",),
-              limits=limits,\n              analyzer=analyzer,\n          )
+              limits=limits,
+              analyzer=analyzer,
+          )
           argv = result["evidence"]["analyzer"]["analysis_argv"]
           expected = {
               "lint.mccabe.max-complexity = 8",
@@ -55,7 +71,7 @@ jobs:
               raise SystemExit(f"missing explicit Ruff threshold authority: {missing}")
           print(json.dumps({
               "status": "PASS",
-              "agent_economics_revision": AE_REVISION if False else "9943404998f1650c7e289a9f7d6eb76a5cbdb3be",
+              "agent_economics_revision": "9943404998f1650c7e289a9f7d6eb76a5cbdb3be",
               "configured_plr0913_limit": limits["PLR0913"],
               "findings": len(result["evidence"]["detailed_findings"]),
               "explicit_thresholds": sorted(expected),
