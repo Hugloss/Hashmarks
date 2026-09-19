@@ -34,3 +34,18 @@ jobs:
         run: |
           export PATH="$PWD/.ruff-venv/bin:$PATH"
           uv run --no-sync python scripts/agent_evaluation/ruff_debt_agent_economics_parity.py
+      - name: Resolve test-focus evidence for first production candidate
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.agent-economics/scripts
+        run: |
+          uv run --no-sync python -m agent_economics.test_focus_cli \
+            --repository-root . \
+            --source-root hashmarks \
+            --tests-root tests \
+            --package-name hashmarks \
+            --changed-path hashmarks/codemap/task_action_projection.py \
+            --gate 'ruff=make ruff' \
+            --gate 'tests=make test' \
+            --artifact .agent-artifacts/task-action-projection-test-focus.json \
+            --format json
+          cat .agent-artifacts/task-action-projection-test-focus.json
