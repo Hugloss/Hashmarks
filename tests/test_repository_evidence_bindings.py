@@ -330,3 +330,17 @@ def test_path_only_coverage_refuses_to_infer_range_impact(tmp_path: Path) -> Non
     assert coverage["classification"]["changed_elsewhere_in_bound_member"] == []
     assert coverage["classification"]["bound_member_precision_unknown"] == ["source.py"]
     assert coverage["precision"]["bound_range"] == "unknown"
+
+
+def test_relationship_projection_can_be_skipped_without_changing_evidence_authority(tmp_path: Path) -> None:
+    (tmp_path / "source.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [{"binding_id": "cheap", "evidence": [{"path": "source.py", "start_line": 1, "end_line": 1}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+    row = packet["bindings"][0]
+    assert row["evidence"][0]["state"] == "known-present"
+    assert row["relationships"]["state"] == "not-requested"
+    assert row["relationships"]["completeness"] == "not-observed"
