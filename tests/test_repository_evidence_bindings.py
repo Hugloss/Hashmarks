@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import pytest
@@ -32,6 +33,9 @@ def test_repository_evidence_bindings_are_generic_deterministic_repository_facts
     assert first["schema"] == "hashmarks.repository-evidence-bindings.v1"
     assert first["authority"] == "repository-intelligence-only"
     assert first["execution_effect"] == "none"
+    assert first["observer"]["identity"].startswith("sha256:")
+    assert "evidence-bindings" in first["observer"]["capabilities"]
+    assert first["repository"]["source_identity"].startswith("sha256:")
     row = first["bindings"][0]
     assert row["binding_id"] == "consumer:a"
     assert row["evidence"][0]["state"] == "known-present"
@@ -1038,3 +1042,48 @@ def test_bindings_are_language_neutral_for_typescript_and_config(
     assert [row["path"] for row in evidence] == ["src.ts", "settings.json"]
     assert all(row["state"] == "known-present" for row in evidence)
     assert packet["completeness"]["state"] == "complete"
+
+
+def test_binding_delta_keeps_observer_change_separate_from_repository_change(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [{
+        "binding_id": "observer-separation",
+        "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(binding)
+        after = deepcopy(before)
+        after["observer"] = {
+            **after["observer"],
+            "identity": "sha256:" + "a" * 64,
+        }
+        after["bindings_identity"] = "sha256:" + "b" * 64
+        delta = codemap.repository_evidence_binding_delta(before, after)
+
+    assert delta["observer"]["changed"] is True
+    assert delta["bindings"]["preserved"] == ["observer-separation"]
+    assert delta["bindings"]["changed"] == []
+
+
+def test_binding_delta_rejects_cross_repository_comparison(tmp_path: Path) -> None:
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.mkdir()
+    right.mkdir()
+    (left / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (right / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [{
+        "binding_id": "repository-bound",
+        "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(left) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(binding)
+    with CodeMap(right) as codemap:
+        codemap.sync()
+        after = codemap.repository_evidence_bindings(binding)
+        with pytest.raises(ValueError, match="repository-mismatch"):
+            codemap.repository_evidence_binding_delta(before, after)
