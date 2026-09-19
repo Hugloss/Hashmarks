@@ -13,6 +13,13 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+_MAX_BINDINGS = 256
+_MAX_EVIDENCE_PER_BINDING = 256
+_MAX_DEPENDENCIES_PER_BINDING = 512
+_MAX_UNIQUE_PATHS = 2048
+_MAX_RELATIONSHIPS_PER_PATH = 1000
+
+
 @dataclass(frozen=True, slots=True)
 class EvidenceSpan:
     """One exact repository-text span, expressed as one-based inclusive lines."""
@@ -51,6 +58,12 @@ class RepositoryEvidenceBindingsMixin:
         if start < 1 or end < start:
             raise ValueError("evidence span requires 1 <= start_line <= end_line")
         return EvidenceSpan(path, start, end)
+
+    @staticmethod
+    def _reference_sort_key(ref: EvidenceReference) -> tuple[str, str, int, int]:
+        if isinstance(ref, EvidenceSpan):
+            return ("lines", ref.path, ref.start_line, ref.end_line)
+        return ("member", ref.path, 0, 0)
 
     @classmethod
     def _binding_reference(cls, raw: Mapping[str, object]) -> EvidenceReference:
@@ -232,12 +245,38 @@ class RepositoryEvidenceBindingsMixin:
         """Return deterministic exact-span evidence for opaque consumer bindings."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        if relationship_limit_per_path < 1:
-            raise ValueError("relationship_limit_per_path must be >= 1")
+        if not isinstance(bindings, Sequence) or isinstance(bindings, (str, bytes)):
+            raise ValueError("bindings must be a sequence")
+        if len(bindings) > _MAX_BINDINGS:
+            raise ValueError(f"bindings exceeds {_MAX_BINDINGS} entries")
+        if not 1 <= relationship_limit_per_path <= _MAX_RELATIONSHIPS_PER_PATH:
+            raise ValueError(
+                "relationship_limit_per_path must be between 1 and "
+                f"{_MAX_RELATIONSHIPS_PER_PATH}"
+            )
+        if any(not isinstance(raw, Mapping) for raw in bindings):
+            raise ValueError("each binding must be an object")
+
+        declared_ids = {
+            str(raw.get("binding_id") or "").strip()
+            for raw in bindings
+            if isinstance(raw, Mapping)
+        }
+        unknown_dependency_bindings = (
+            set(dependency_paths or {}) - declared_ids
+        )
+        if unknown_dependency_bindings:
+            raise ValueError(
+                "dependency_paths contains unknown binding ids: "
+                + ", ".join(sorted(unknown_dependency_bindings))
+            )
+
         generation, identity_generation, stale = self._generation_status()
         rows: list[dict[str, object]] = []
         seen: set[str] = set()
+        unique_paths: set[str] = set()
         for raw_binding in bindings:
+            assert isinstance(raw_binding, Mapping)
             binding_id = str(raw_binding.get("binding_id") or "").strip()
             if not binding_id:
                 raise ValueError("binding_id must not be empty")
@@ -249,6 +288,11 @@ class RepositoryEvidenceBindingsMixin:
                 raw_evidence, (str, bytes)
             ):
                 raise ValueError("binding evidence must be a sequence")
+            if len(raw_evidence) > _MAX_EVIDENCE_PER_BINDING:
+                raise ValueError(
+                    "binding evidence exceeds "
+                    f"{_MAX_EVIDENCE_PER_BINDING} entries"
+                )
             references = [
                 self._binding_reference(raw)
                 for raw in raw_evidence
@@ -256,6 +300,7 @@ class RepositoryEvidenceBindingsMixin:
             ]
             if len(references) != len(raw_evidence):
                 raise ValueError("each evidence item must be an object")
+            references.sort(key=self._reference_sort_key)
             evidence = [self._observe_reference(ref) for ref in references]
             declared_dependencies = sorted(
                 {
@@ -263,6 +308,18 @@ class RepositoryEvidenceBindingsMixin:
                     for path in (dependency_paths or {}).get(binding_id, ())
                 }
             )
+            if len(declared_dependencies) > _MAX_DEPENDENCIES_PER_BINDING:
+                raise ValueError(
+                    "binding dependencies exceeds "
+                    f"{_MAX_DEPENDENCIES_PER_BINDING} entries"
+                )
+            unique_paths.update(ref.path for ref in references)
+            unique_paths.update(declared_dependencies)
+            if len(unique_paths) > _MAX_UNIQUE_PATHS:
+                raise ValueError(
+                    f"binding request exceeds {_MAX_UNIQUE_PATHS} unique paths"
+                )
+
             dependencies = []
             for path in declared_dependencies:
                 member, _raw = self._repository_member_observation(path)
