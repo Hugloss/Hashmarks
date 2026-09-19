@@ -89,6 +89,34 @@ class RepositoryEvidenceBindingDeltaMixin:
                 })
         return changes
 
+    @staticmethod
+    def _relationship_observation_config(value: object) -> dict[str, object]:
+        if not isinstance(value, Mapping):
+            return {
+                "state": "unknown",
+                "scope_paths": [],
+                "limit_per_path": None,
+                "completeness": "unknown",
+            }
+        bounds = value.get("bounds")
+        return {
+            "state": str(value.get("state") or "unknown"),
+            "scope_paths": sorted(
+                str(path)
+                for path in (
+                    value.get("scope_paths")
+                    if isinstance(value.get("scope_paths"), list)
+                    else []
+                )
+            ),
+            "limit_per_path": (
+                bounds.get("limit_per_path")
+                if isinstance(bounds, Mapping)
+                else None
+            ),
+            "completeness": str(value.get("completeness") or "unknown"),
+        }
+
     @classmethod
     def _binding_change(cls, before: Mapping[str, object], after: Mapping[str, object]) -> dict[str, object]:
         old = cls._evidence_index(before)
@@ -128,6 +156,8 @@ class RepositoryEvidenceBindingDeltaMixin:
         dependency_changes = cls._dependency_changes(before, after)
         before_relationships = before.get("relationships")
         after_relationships = after.get("relationships")
+        before_config = cls._relationship_observation_config(before_relationships)
+        after_config = cls._relationship_observation_config(after_relationships)
         before_rows = (
             before_relationships.get("relationships")
             if isinstance(before_relationships, Mapping)
@@ -148,16 +178,70 @@ class RepositoryEvidenceBindingDeltaMixin:
             for row in after_rows
             if isinstance(row, Mapping) and row.get("identity")
         } if isinstance(after_rows, list) else {}
-        relationship_added = [
-            deepcopy(new_relationships[key])
-            for key in sorted(set(new_relationships) - set(old_relationships))
-        ]
-        relationship_removed = [
-            deepcopy(old_relationships[key])
-            for key in sorted(set(old_relationships) - set(new_relationships))
-        ]
-        relationship_changed = bool(relationship_added or relationship_removed)
-        relationship_observation_changed = before_relationships != after_relationships
+
+        both_not_requested = (
+            before_config["state"] == "not-requested"
+            and after_config["state"] == "not-requested"
+        )
+        relationships_comparable = (
+            before_config == after_config
+            and before_config["state"] == "observed"
+        )
+        if relationships_comparable:
+            relationship_added = [
+                deepcopy(new_relationships[key])
+                for key in sorted(set(new_relationships) - set(old_relationships))
+            ]
+            relationship_removed = [
+                deepcopy(old_relationships[key])
+                for key in sorted(set(old_relationships) - set(new_relationships))
+            ]
+            relationship_locator_changes = [
+                {
+                    "identity": key,
+                    "path": new_relationships[key].get("path"),
+                    "before_line": old_relationships[key].get("line"),
+                    "after_line": new_relationships[key].get("line"),
+                }
+                for key in sorted(set(old_relationships) & set(new_relationships))
+                if old_relationships[key].get("line")
+                != new_relationships[key].get("line")
+            ]
+            relationship_changed = bool(
+                relationship_added
+                or relationship_removed
+                or relationship_locator_changes
+            )
+            relationship_state = "changed" if relationship_changed else "unchanged"
+            facts_state = (
+                "changed"
+                if relationship_added or relationship_removed
+                else "unchanged"
+            )
+            locator_state = (
+                "changed" if relationship_locator_changes else "unchanged"
+            )
+            comparability = "comparable"
+        elif both_not_requested:
+            relationship_added = []
+            relationship_removed = []
+            relationship_locator_changes = []
+            relationship_changed = False
+            relationship_state = "not-observed"
+            facts_state = "not-observed"
+            locator_state = "not-observed"
+            comparability = "not-observed"
+        else:
+            relationship_added = []
+            relationship_removed = []
+            relationship_locator_changes = []
+            relationship_changed = False
+            relationship_state = "unknown"
+            facts_state = "unknown"
+            locator_state = "unknown"
+            comparability = "observation-configuration-changed"
+
+        relationship_observation_changed = before_config != after_config
         member_changes = [
             {
                 "scope": key[0],
@@ -196,18 +280,22 @@ class RepositoryEvidenceBindingDeltaMixin:
                 "changes": dependency_changes,
             },
             "relationship_evidence": {
-                "state": "changed" if relationship_changed else "unchanged",
-                "added": relationship_added,
-                "removed": relationship_removed,
-                "completeness": (
-                    after_relationships.get("completeness", "unknown")
-                    if isinstance(after_relationships, Mapping)
-                    else "unknown"
-                ),
+                "state": relationship_state,
+                "comparability": comparability,
+                "facts": {
+                    "state": facts_state,
+                    "added": relationship_added,
+                    "removed": relationship_removed,
+                },
+                "locators": {
+                    "state": locator_state,
+                    "changes": relationship_locator_changes,
+                },
+                "completeness": str(after_config["completeness"]),
                 "observation": {
                     "changed": relationship_observation_changed,
-                    "before": deepcopy(before_relationships),
-                    "after": deepcopy(after_relationships),
+                    "before": before_config,
+                    "after": after_config,
                 },
             },
             "definition": {
