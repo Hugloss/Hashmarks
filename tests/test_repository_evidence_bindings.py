@@ -142,3 +142,49 @@ def test_binding_observation_is_decision_session_scoped(tmp_path: Path) -> None:
                 [{"binding_id": "stable", "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}]}]
             )
             assert packet["repository"]["codemap_generation"] == codemap.store.generation()
+
+
+def test_dependency_change_is_separate_from_unchanged_direct_evidence(tmp_path: Path) -> None:
+    source = tmp_path / "source.py"
+    dependency = tmp_path / "dependency.py"
+    source.write_text("stable\n", encoding="utf-8")
+    dependency.write_text("VALUE = 1\n", encoding="utf-8")
+    bindings = [{"binding_id": "generic:binding", "evidence": [{"path": "source.py", "start_line": 1, "end_line": 1}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(
+            bindings, dependency_paths={"generic:binding": ["dependency.py"]}
+        )
+        dependency.write_text("VALUE = 2\n", encoding="utf-8")
+        codemap.sync(["dependency.py"])
+        after = codemap.repository_evidence_bindings(
+            bindings, dependency_paths={"generic:binding": ["dependency.py"]}
+        )
+        delta = codemap.repository_evidence_binding_delta(before, after)
+
+    changed = delta["bindings"]["changed"][0]
+    assert changed["direct_evidence"]["state"] == "preserved"
+    assert changed["semantic_dependencies"]["state"] == "affected"
+    assert changed["semantic_dependencies"]["changes"][0]["path"] == "dependency.py"
+
+
+def test_unrelated_change_does_not_affect_declared_dependency(tmp_path: Path) -> None:
+    (tmp_path / "source.py").write_text("stable\n", encoding="utf-8")
+    (tmp_path / "dependency.py").write_text("VALUE = 1\n", encoding="utf-8")
+    unrelated = tmp_path / "other.py"
+    unrelated.write_text("OTHER = 1\n", encoding="utf-8")
+    bindings = [{"binding_id": "generic:binding", "evidence": [{"path": "source.py", "start_line": 1, "end_line": 1}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(
+            bindings, dependency_paths={"generic:binding": ["dependency.py"]}
+        )
+        unrelated.write_text("OTHER = 2\n", encoding="utf-8")
+        codemap.sync(["other.py"])
+        after = codemap.repository_evidence_bindings(
+            bindings, dependency_paths={"generic:binding": ["dependency.py"]}
+        )
+        delta = codemap.repository_evidence_binding_delta(before, after)
+
+    assert delta["bindings"]["preserved"] == ["generic:binding"]
+    assert delta["bindings"]["changed"] == []
