@@ -1,5 +1,13 @@
 # Hashmarks — Repository intelligence and a local MCP server for coding agents
 
+> [!IMPORTANT]
+> **Temporary retained evidence branch — do not delete or merge.**
+>
+> Branch `dogfood-agent-economics-ruff-thresholds-v2` is intentionally retained as reproducible consumer-side evidence for the Agent Economics explicit Ruff-threshold experiment. Its exact proof head is `e4752ef7e9fb70d2dd9658c6102e37539777ebea`, which demonstrated that Hashmarks-owned Ruff limits can be transferred explicitly into an isolated Agent Economics measurement while preserving Hashmarks as the policy owner.
+>
+> This branch is **not product authority** and its temporary Agent Economics bootstrap/workflow must not be merged into Hashmarks `main`. Keep it until the wider baseline-vs-bridge empirical Agent Economics campaign and final evidence convergence are complete. Only then should this branch be considered for deletion.
+
+
 **Give AI coding agents a fast, local map of a codebase before they start reading everything.**
 
 Hashmarks is **local repository intelligence** and a read-only **Model Context Protocol (MCP) server for coding agents**. It provides **codebase search for agents**, repository context, code navigation, symbols and references, code ownership, dependency relationships, **change impact analysis**, freshness, and verification evidence from the repository itself.
