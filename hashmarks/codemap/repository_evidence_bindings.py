@@ -374,8 +374,14 @@ class RepositoryEvidenceBindingsMixin:
         rows.sort(key=lambda row: str(row["binding_id"]))
         payload: dict[str, object] = {
             "schema": "hashmarks.repository-evidence-bindings.v1",
+            "observer": self._repository_observer_packet(),
             "repository": {
                 "repository_identity": self._repository_packet_identity(),
+                "source_identity": self._source_packet_identity(
+                    generation=generation,
+                    identity_generation=identity_generation,
+                    stale=stale,
+                ),
                 "codemap_generation": generation,
                 "identity_generation": identity_generation,
                 "freshness": freshness_state(stale),
