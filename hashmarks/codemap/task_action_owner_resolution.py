@@ -204,4 +204,3 @@ class TaskActionOwnerResolutionMixin:
             "exact_identifier_displacement_guard": exact_identifier_displacement_guard,
             "exact_identifier_surface_selected": exact_identifier_surface_selected,
         }
-
