@@ -60,7 +60,7 @@ def test_client_request_sends_protocol_and_reads_success(
     ("chunks", "message"),
     [
         ([b'{"ok":false,"error":"bad request"}\n'], "bad request"),
-        ([b'[]\n'], "invalid CodeMap service response"),
+        ([b"[]\n"], "invalid CodeMap service response"),
     ],
 )
 def test_client_request_rejects_error_responses(

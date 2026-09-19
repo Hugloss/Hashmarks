@@ -69,7 +69,9 @@ def test_inotify_event_buffer_marks_overflow_and_root_watch_loss(
     assert watcher._rel_to_wd == {}
 
 
-def test_inotify_root_move_marks_observation_unknown(tmp_path: Path, monkeypatch) -> None:
+def test_inotify_root_move_marks_observation_unknown(
+    tmp_path: Path, monkeypatch
+) -> None:
     watcher = _watcher(tmp_path)
     reasons: list[str] = []
     monkeypatch.setattr(watcher, "mark_unknown", reasons.append)
