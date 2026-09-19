@@ -67,6 +67,7 @@ jobs:
           import json
           from pathlib import Path
           from agent_economics.behavior_preservation import behavior_preservation_readiness
+from agent_economics.probe_contract import sha256_identity
 
           target = Path("hashmarks/codemap/task_action_projection.py")
           source_identity = "sha256:" + hashlib.sha256(target.read_bytes()).hexdigest()
@@ -84,7 +85,7 @@ jobs:
               for path in test_paths
           ]
           test_focus = json.loads(Path(".agent-artifacts/task-action-projection-test-focus.json").read_text())
-          test_focus_identity = test_focus["evidence_identity"]
+          test_focus_identity = sha256_identity(test_focus)
           boundaries = [
               "task-action-projection-and-ambiguity",
               "public-task-action-brief",
