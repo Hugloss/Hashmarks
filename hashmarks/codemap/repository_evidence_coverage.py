@@ -94,7 +94,16 @@ class RepositoryEvidenceCoverageMixin:
                 relationships = detail.get("relationship_evidence")
                 definition = detail.get("definition")
                 if isinstance(direct, Mapping) and direct.get("state") == "changed":
-                    reasons.add("bound-range-content-changed")
+                    direct_changes = direct.get("changes")
+                    scopes = {
+                        str(change.get("scope") or "lines")
+                        for change in direct_changes
+                        if isinstance(change, Mapping)
+                    } if isinstance(direct_changes, list) else {"lines"}
+                    if "member" in scopes:
+                        reasons.add("bound-member-content-changed")
+                    if "lines" in scopes:
+                        reasons.add("bound-range-content-changed")
                 if isinstance(member, Mapping) and member.get("state") == "changed":
                     reasons.add("bound-member-changed")
                 if isinstance(declared, Mapping) and declared.get("state") == "affected":
