@@ -65,7 +65,7 @@ class RepositoryEvidenceBindingsMixin:
             "end_line": span.end_line,
             "member_state": member["state"],
         }
-        for key in ("member_identity", "evidence_visibility"):
+        for key in ("member_revision", "evidence_visibility"):
             if key in member:
                 base[key] = member[key]
 
