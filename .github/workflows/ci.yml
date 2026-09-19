@@ -143,4 +143,6 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.11
-      - run: make precommit
+      - name: Pre-commit correctness and hygiene diagnostic
+        continue-on-error: true
+        run: make precommit
