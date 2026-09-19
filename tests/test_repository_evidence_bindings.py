@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks import CodeMap
+from hashmarks.client import RepositoryObservation
+from hashmarks.observation import ObservationState
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -397,3 +399,195 @@ def test_deleted_bound_member_is_first_class_delta(tmp_path: Path) -> None:
     change = delta["bindings"]["changed"][0]["direct_evidence"]["changes"][0]
     assert change["observation_state_changed"] is True
     assert after["bindings"][0]["evidence"][0]["state"] == "known-absent"
+
+
+def test_exact_span_uses_physical_lf_lines_not_unicode_line_separators(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "unicode.py"
+    first_line = "alpha\u2028beta\n".encode()
+    source.write_bytes(first_line + b"gamma\n")
+    binding = [{
+        "binding_id": "physical-lines",
+        "evidence": [{"path": "unicode.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+    evidence = packet["bindings"][0]["evidence"][0]
+    assert evidence["state"] == "known-present"
+    assert evidence["byte_length"] == len(first_line)
+
+
+def test_exact_span_preserves_utf8_bom_as_repository_bytes(tmp_path: Path) -> None:
+    source = tmp_path / "bom.py"
+    source.write_bytes(b"\xef\xbb\xbfvalue = 1\n")
+    binding = [{
+        "binding_id": "bom",
+        "evidence": [{"path": "bom.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+    assert packet["bindings"][0]["evidence"][0]["byte_length"] == len(
+        b"\xef\xbb\xbfvalue = 1\n"
+    )
+
+
+def test_binding_obeys_context_policy_source_disclosure(tmp_path: Path) -> None:
+    hidden = tmp_path / "hidden.py"
+    hidden.write_text("SECRET_VALUE = 'do-not-disclose'\n", encoding="utf-8")
+    (tmp_path / ".hashmarks-context.toml").write_text(
+        '[[rule]]\npattern = "hidden.py"\nvisibility = "deny"\n',
+        encoding="utf-8",
+    )
+    binding = [{
+        "binding_id": "hidden",
+        "evidence": [{"path": "hidden.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+    evidence = packet["bindings"][0]["evidence"][0]
+    assert evidence["state"] == "unsupported"
+    assert evidence["reason"] == "repository-evidence-denied"
+    assert "do-not-disclose" not in repr(packet)
+
+
+def test_outline_visibility_does_not_become_raw_source_binding(tmp_path: Path) -> None:
+    source = tmp_path / "outline.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    (tmp_path / ".hashmarks-context.toml").write_text(
+        '[[rule]]\npattern = "outline.py"\nvisibility = "outline"\n',
+        encoding="utf-8",
+    )
+    binding = [{
+        "binding_id": "outline",
+        "evidence": [{"path": "outline.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+    evidence = packet["bindings"][0]["evidence"][0]
+    assert evidence["state"] == "unsupported"
+    assert evidence["reason"] == "source-evidence-not-visible"
+    assert "span_identity" not in evidence
+
+
+def test_unsignaled_member_edit_fails_closed_against_indexed_revision(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "owner.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [{
+        "binding_id": "stable-read",
+        "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        source.write_text("VALUE = 2\n", encoding="utf-8")
+        packet = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+    evidence = packet["bindings"][0]["evidence"][0]
+    assert evidence["state"] == "unknown"
+    assert evidence["reason"] == "member-revision-mismatch"
+    assert "span_identity" not in evidence
+
+
+def test_binding_definition_change_is_not_relationship_content_change(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "owner.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [{
+        "binding_id": "definition",
+        "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(
+            binding, relationship_limit_per_path=8
+        )
+        after = codemap.repository_evidence_bindings(
+            binding, relationship_limit_per_path=16
+        )
+        delta = codemap.repository_evidence_binding_delta(before, after)
+
+    before_row = before["bindings"][0]
+    after_row = after["bindings"][0]
+    assert (
+        before_row["binding_definition_identity"]
+        != after_row["binding_definition_identity"]
+    )
+    changed = delta["bindings"]["changed"][0]
+    assert changed["definition"]["state"] == "changed"
+    assert changed["relationship_evidence"]["state"] == "unchanged"
+    assert changed["relationship_evidence"]["observation"]["changed"] is True
+
+
+def test_observer_proven_change_set_keeps_completeness_provenance(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [{
+        "binding_id": "observer",
+        "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(binding)
+        observation = RepositoryObservation(
+            state=ObservationState.DIRTY,
+            generation=7,
+            dirty_paths=("owner.py",),
+            paths_complete=True,
+            dirty_path_count=1,
+        )
+        coverage = codemap.repository_evidence_coverage(
+            packet,
+            repository_observation=observation,
+        )
+    assert coverage["changed_paths"] == ["owner.py"]
+    assert coverage["coverage"]["state"] == "complete"
+    assert coverage["coverage"]["source"] == "repository-observer"
+    assert coverage["change_set"]["generation"] == 7
+
+
+def test_coverage_reports_binding_ids_and_stable_impact_reasons(tmp_path: Path) -> None:
+    source = tmp_path / "owner.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [{
+        "binding_id": "consumer:owner",
+        "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(binding)
+        source.write_text("VALUE = 2\n", encoding="utf-8")
+        codemap.sync(["owner.py"])
+        after = codemap.repository_evidence_bindings(binding)
+        delta = codemap.repository_evidence_binding_delta(before, after)
+        coverage = codemap.repository_evidence_coverage(
+            after,
+            changed_paths=["owner.py"],
+            change_set_complete=True,
+            binding_delta=delta,
+        )
+    assert coverage["binding_impacts"] == [
+        {
+            "binding_id": "consumer:owner",
+            "reasons": [
+                "bound-member-changed",
+                "bound-range-content-changed",
+            ],
+        }
+    ]
