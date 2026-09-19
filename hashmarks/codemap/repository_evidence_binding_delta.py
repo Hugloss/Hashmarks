@@ -139,11 +139,31 @@ class RepositoryEvidenceBindingDeltaMixin:
             "completeness": str(value.get("completeness") or "unknown"),
         }
 
+    @staticmethod
+    def _observer_identity(packet: Mapping[str, object]) -> str:
+        observer = packet.get("observer")
+        return (
+            str(observer.get("identity") or "")
+            if isinstance(observer, Mapping)
+            else ""
+        )
+
+    @staticmethod
+    def _repository_identity(packet: Mapping[str, object]) -> str:
+        repository = packet.get("repository")
+        return (
+            str(repository.get("repository_identity") or "")
+            if isinstance(repository, Mapping)
+            else ""
+        )
+
     @classmethod
     def _binding_change(
         cls,
         before: Mapping[str, object],
         after: Mapping[str, object],
+        *,
+        observer_changed: bool,
     ) -> dict[str, object]:
         old = cls._evidence_index(before)
         new = cls._evidence_index(after)
@@ -274,7 +294,8 @@ class RepositoryEvidenceBindingDeltaMixin:
             and after_config["state"] == "not-requested"
         )
         relationships_comparable = (
-            before_config == after_config
+            not observer_changed
+            and before_config == after_config
             and before_config["state"] == "observed"
         )
         if relationships_comparable:
@@ -329,9 +350,15 @@ class RepositoryEvidenceBindingDeltaMixin:
             relationship_state = "unknown"
             facts_state = "unknown"
             relationship_locator_state = "unknown"
-            comparability = "observation-configuration-changed"
+            comparability = (
+                "observer-changed"
+                if observer_changed
+                else "observation-configuration-changed"
+            )
 
-        relationship_observation_changed = before_config != after_config
+        relationship_observation_changed = (
+            observer_changed or before_config != after_config
+        )
         definition_changed = (
             before.get("binding_definition_identity")
             != after.get("binding_definition_identity")
@@ -399,6 +426,15 @@ class RepositoryEvidenceBindingDeltaMixin:
         for name, packet in (("before", before), ("after", after)):
             if packet.get("schema") != "hashmarks.repository-evidence-bindings.v1":
                 raise ValueError(f"{name} must be a repository evidence bindings packet")
+            if not packet.get("bindings_identity"):
+                raise ValueError(f"{name} must contain bindings_identity")
+        before_repository = self._repository_identity(before)
+        after_repository = self._repository_identity(after)
+        if not before_repository or before_repository != after_repository:
+            raise ValueError("repository evidence bindings repository-mismatch")
+        before_observer = self._observer_identity(before)
+        after_observer = self._observer_identity(after)
+        observer_changed = before_observer != after_observer
         old = self._binding_index(before)
         new = self._binding_index(after)
         added = sorted(set(new) - set(old))
@@ -407,7 +443,11 @@ class RepositoryEvidenceBindingDeltaMixin:
         changed: list[dict[str, object]] = []
         preserved: list[str] = []
         for binding_id in common:
-            row = self._binding_change(old[binding_id], new[binding_id])
+            row = self._binding_change(
+                old[binding_id],
+                new[binding_id],
+                observer_changed=observer_changed,
+            )
             if row["state"] == "preserved":
                 preserved.append(binding_id)
             else:
@@ -421,6 +461,11 @@ class RepositoryEvidenceBindingDeltaMixin:
             "bindings_identity": {
                 "before": before.get("bindings_identity"),
                 "after": after.get("bindings_identity"),
+            },
+            "observer": {
+                "before": before_observer or None,
+                "after": after_observer or None,
+                "changed": observer_changed,
             },
             "bindings": {
                 "added": added,
