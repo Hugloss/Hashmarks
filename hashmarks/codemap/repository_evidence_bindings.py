@@ -333,7 +333,9 @@ class RepositoryEvidenceBindingsMixin:
                 ],
                 "dependencies": declared_dependencies,
                 "include_relationships": include_relationships,
-                "relationship_limit_per_path": relationship_limit_per_path,
+                "relationship_limit_per_path": (
+                    relationship_limit_per_path if include_relationships else None
+                ),
             }
             binding_payload = {
                 "binding_id": binding_id,
