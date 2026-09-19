@@ -81,7 +81,7 @@ Each binding carries two different identities:
 
 Changing a declaration or relationship bound is definition/observation-configuration change. It is not silently reported as repository content change.
 
-The complete packet uses schema **hashmarks.repository-evidence-bindings.v1** and carries **bindings_identity**, repository identity, CodeMap generation, identity generation, and canonical **current | stale | unknown** freshness.
+The complete packet uses schema **hashmarks.repository-evidence-bindings.v1** and carries **bindings_identity**, repository identity, source identity, CodeMap generation, identity generation, canonical observer capability identity, and **current | stale | unknown** freshness.
 
 ## Declared dependencies
 
@@ -124,7 +124,7 @@ member_evidence.state = changed
 
 without falsely claiming the bound line range changed.
 
-Relationship facts are compared by their repository relationship evidence identities. Observation bounds/configuration are reported separately.
+Relationship facts are compared by their repository relationship evidence identities. Relationship locator movement, observation bounds/configuration, and observer-capability change are reported separately. When observer capability or relationship observation configuration differs, relationship facts are conservatively non-comparable rather than manufactured as repository additions/removals.
 
 ## Change coverage and per-binding impact
 
