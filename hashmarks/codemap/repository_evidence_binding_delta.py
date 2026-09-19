@@ -25,17 +25,18 @@ class RepositoryEvidenceBindingDeltaMixin:
     @staticmethod
     def _evidence_index(
         binding: Mapping[str, object],
-    ) -> dict[tuple[str, str, int, int], Mapping[str, object]]:
+    ) -> dict[tuple[str, str, int, int, int], Mapping[str, object]]:
         rows = binding.get("evidence")
         if not isinstance(rows, list):
             return {}
-        result: dict[tuple[str, str, int, int], Mapping[str, object]] = {}
+        result: dict[tuple[str, str, int, int, int], Mapping[str, object]] = {}
+        occurrences: dict[tuple[str, str, int, int], int] = {}
         for row in rows:
             if not isinstance(row, Mapping):
                 continue
             scope = str(row.get("scope") or "lines")
             try:
-                key = (
+                locator = (
                     scope,
                     str(row.get("path") or ""),
                     int(row.get("start_line") or 0),
@@ -43,12 +44,14 @@ class RepositoryEvidenceBindingDeltaMixin:
                 )
             except (TypeError, ValueError):
                 continue
-            result[key] = row
+            occurrence = occurrences.get(locator, 0)
+            occurrences[locator] = occurrence + 1
+            result[(*locator, occurrence)] = row
         return result
 
     @staticmethod
-    def _evidence_locator(key: tuple[str, str, int, int]) -> list[object]:
-        scope, path, start, end = key
+    def _evidence_locator(key: tuple[str, str, int, int, int]) -> list[object]:
+        scope, path, start, end, _occurrence = key
         return [path] if scope == "member" else [path, start, end]
 
     @staticmethod
@@ -247,6 +250,10 @@ class RepositoryEvidenceBindingDeltaMixin:
             "repository": {
                 "before": deepcopy(before.get("repository")),
                 "after": deepcopy(after.get("repository")),
+            },
+            "bindings_identity": {
+                "before": before.get("bindings_identity"),
+                "after": after.get("bindings_identity"),
             },
             "bindings": {
                 "added": added,
