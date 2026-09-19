@@ -95,6 +95,15 @@ class RepositoryDeltaMixin:
                 },
                 None,
             )
+        if not self._path_admitted_for_analysis(rel):
+            return (
+                {
+                    **base,
+                    "state": "unsupported",
+                    "reason": "repository-evidence-not-admitted",
+                },
+                None,
+            )
 
         cursor = self.workspace
         for part in rel.split("/"):
