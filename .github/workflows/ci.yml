@@ -37,6 +37,7 @@ jobs:
     name: Consumer wheel artifact
     needs: fast-gate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,7 +50,7 @@ jobs:
           git rev-parse HEAD > dist/HASHMARKS_GIT_COMMIT
           git rev-parse HEAD^{tree} > dist/HASHMARKS_GIT_TREE
           sha256sum dist/*.whl > dist/SHA256SUMS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hashmarks-wheel-${{ github.sha }}
           path: dist/
