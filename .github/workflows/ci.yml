@@ -21,6 +21,49 @@ jobs:
           enable-cache: true
       - run: uv python install 3.11
       - run: uv sync --group test --python 3.11
+      - name: Dogfood Agent Economics explicit Ruff threshold authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          AE_REVISION=9943404998f1650c7e289a9f7d6eb76a5cbdb3be
+          AE_ROOT="$RUNNER_TEMP/agent-economics"
+          git clone --quiet https://github.com/Hugloss/agentsCookbook.git "$AE_ROOT"
+          git -C "$AE_ROOT" checkout --quiet --detach "$AE_REVISION"
+          test "$(git -C "$AE_ROOT" rev-parse HEAD)" = "$AE_REVISION"
+          PYTHONPATH="$AE_ROOT/scripts" uv run --no-sync python - <<'PY'
+          import json
+          from agent_economics.quality_debt import quality_debt_audit
+          limits = {
+              "C901": 8, "PLR0911": 6, "PLR0912": 8, "PLR0913": 6,
+              "PLR0914": 15, "PLR0915": 40, "PLR0916": 5,
+          }
+          result = quality_debt_audit(
+              repository_root=".",
+              roots=("hashmarks", "scripts", "benchmarks"),
+              excludes=("benchmarks/agent_evaluation/retained",),
+              limits=limits,
+          )
+          argv = result["evidence"]["analyzer"]["analysis_argv"]
+          expected = {
+              "lint.mccabe.max-complexity = 8",
+              "lint.pylint.max-returns = 6",
+              "lint.pylint.max-branches = 8",
+              "lint.pylint.max-args = 6",
+              "lint.pylint.max-locals = 15",
+              "lint.pylint.max-statements = 40",
+              "lint.pylint.max-bool-expr = 5",
+          }
+          missing = sorted(expected - set(argv))
+          if missing:
+              raise SystemExit(f"missing explicit Ruff threshold authority: {missing}")
+          print(json.dumps({
+              "status": "PASS",
+              "agent_economics_revision": AE_REVISION if False else "9943404998f1650c7e289a9f7d6eb76a5cbdb3be",
+              "configured_plr0913_limit": limits["PLR0913"],
+              "findings": len(result["evidence"]["detailed_findings"]),
+              "explicit_thresholds": sorted(expected),
+          }, sort_keys=True))
+          PY
       - run: make ruff
       - run: make lint-debt-gate
       - run: make compile
