@@ -81,4 +81,4 @@ def test_completeness_is_not_mixed_with_availability_or_freshness() -> None:
     assert "OBSERVATION_STATES" not in delta
     assert '"state": "complete"' in delta
     assert '"state": "complete"' in bindings
-    assert "complete/incomplete/unknown" in state_doc
+    assert "exactly `complete`, `incomplete`, or `unknown`" in state_doc
