@@ -22,6 +22,16 @@ class EvidenceSpan:
     end_line: int
 
 
+@dataclass(frozen=True, slots=True)
+class EvidenceMember:
+    """One whole repository member with no text-locator assumption."""
+
+    path: str
+
+
+EvidenceReference = EvidenceSpan | EvidenceMember
+
+
 class RepositoryEvidenceBindingsMixin:
     """Observe opaque consumer bindings to exact repository evidence.
 
@@ -41,6 +51,19 @@ class RepositoryEvidenceBindingsMixin:
         if start < 1 or end < start:
             raise ValueError("evidence span requires 1 <= start_line <= end_line")
         return EvidenceSpan(path, start, end)
+
+    @classmethod
+    def _binding_reference(cls, raw: Mapping[str, object]) -> EvidenceReference:
+        scope = str(raw.get("scope") or "lines")
+        if scope == "member":
+            if "start_line" in raw or "end_line" in raw:
+                raise ValueError("member evidence must not declare line bounds")
+            return EvidenceMember(
+                normalize_relative_path(str(raw.get("path") or ""), allow_root=False)
+            )
+        if scope != "lines":
+            raise ValueError("evidence scope must be 'lines' or 'member'")
+        return cls._binding_span(raw)
 
     @staticmethod
     def _physical_lines(raw: bytes) -> list[bytes]:
@@ -112,6 +135,27 @@ class RepositoryEvidenceBindingsMixin:
             "span_identity": "sha256:" + digest,
             "byte_length": len(selected),
         }
+
+    def _observe_reference(self, ref: EvidenceReference) -> dict[str, object]:
+        if isinstance(ref, EvidenceSpan):
+            return self._observe_span(ref)
+        member, _raw = self._repository_member_observation(ref.path)
+        return {
+            "scope": "member",
+            **member,
+            "member_state": member["state"],
+        }
+
+    @staticmethod
+    def _reference_definition(ref: EvidenceReference) -> dict[str, object]:
+        if isinstance(ref, EvidenceSpan):
+            return {
+                "scope": "lines",
+                "path": ref.path,
+                "start_line": ref.start_line,
+                "end_line": ref.end_line,
+            }
+        return {"scope": "member", "path": ref.path}
 
     def _binding_relationships(
         self, evidence: Sequence[Mapping[str, object]], *, limit_per_path: int
@@ -204,13 +248,14 @@ class RepositoryEvidenceBindingsMixin:
                 raw_evidence, (str, bytes)
             ):
                 raise ValueError("binding evidence must be a sequence")
-            evidence = [
-                self._observe_span(self._binding_span(raw))
+            references = [
+                self._binding_reference(raw)
                 for raw in raw_evidence
                 if isinstance(raw, Mapping)
             ]
-            if len(evidence) != len(raw_evidence):
+            if len(references) != len(raw_evidence):
                 raise ValueError("each evidence item must be an object")
+            evidence = [self._observe_reference(ref) for ref in references]
             declared_dependencies = sorted(
                 {
                     normalize_relative_path(path, allow_root=False)
@@ -225,16 +270,7 @@ class RepositoryEvidenceBindingsMixin:
             definition_payload = {
                 "binding_id": binding_id,
                 "evidence": [
-                    {
-                        "path": row.path,
-                        "start_line": row.start_line,
-                        "end_line": row.end_line,
-                    }
-                    for row in (
-                        self._binding_span(raw)
-                        for raw in raw_evidence
-                        if isinstance(raw, Mapping)
-                    )
+                    self._reference_definition(ref) for ref in references
                 ],
                 "dependencies": declared_dependencies,
                 "include_relationships": include_relationships,
