@@ -188,3 +188,40 @@ def test_unrelated_change_does_not_affect_declared_dependency(tmp_path: Path) ->
 
     assert delta["bindings"]["preserved"] == ["generic:binding"]
     assert delta["bindings"]["changed"] == []
+
+
+def test_indexed_relationship_evidence_is_bounded_and_non_authoritative(tmp_path: Path) -> None:
+    source = tmp_path / "source.py"
+    dependency = tmp_path / "dependency.py"
+    dependency.write_text("VALUE = 1\n", encoding="utf-8")
+    source.write_text("from dependency import VALUE\nresult = VALUE\n", encoding="utf-8")
+    binding = [{"binding_id": "graph", "evidence": [{"path": "source.py", "start_line": 1, "end_line": 2}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            binding, relationship_limit_per_path=8
+        )
+    relationships = packet["bindings"][0]["relationships"]
+    assert relationships["state"] == "observed"
+    assert relationships["completeness"] == "bounded-not-claimed"
+    assert relationships["bounds"]["limit_per_path"] == 8
+    assert any(row.get("target") for row in relationships["relationships"])
+
+
+def test_relationship_change_does_not_masquerade_as_direct_content_change(tmp_path: Path) -> None:
+    source = tmp_path / "source.py"
+    source.write_text("from alpha import VALUE\nKEEP = 1\n", encoding="utf-8")
+    (tmp_path / "alpha.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (tmp_path / "beta.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [{"binding_id": "graph", "evidence": [{"path": "source.py", "start_line": 2, "end_line": 2}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(binding)
+        source.write_text("from beta import VALUE\nKEEP = 1\n", encoding="utf-8")
+        codemap.sync(["source.py"])
+        after = codemap.repository_evidence_bindings(binding)
+        delta = codemap.repository_evidence_binding_delta(before, after)
+    changed = delta["bindings"]["changed"][0]
+    assert changed["direct_evidence"]["state"] == "preserved"
+    assert changed["relationship_evidence"]["state"] == "changed"
+    assert changed["relationship_evidence"]["completeness"] == "bounded-not-claimed"
