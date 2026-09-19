@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import os
+import zipfile
 from pathlib import Path
 
 from hashmarks.producer_identity import (
     PRODUCER_IDENTITY_PROVENANCE_SCHEMA,
+    _producer_implementation_identity_from_resource,
     native_producer_implementation_identity,
     producer_implementation_provenance,
 )
@@ -70,6 +72,23 @@ def test_producer_identity_provenance_ignores_inode_and_mtime_churn(
     after = producer_implementation_provenance(package)
 
     assert after == before
+
+
+def test_producer_identity_is_identical_for_filesystem_and_zip_resources(
+    tmp_path: Path,
+) -> None:
+    package = _package(tmp_path / "package")
+    expected = native_producer_implementation_identity(package)
+    archive = tmp_path / "hashmarks-wheel.zip"
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as output:
+        for path in sorted(package.rglob("*.py")):
+            output.write(path, f"hashmarks/{path.relative_to(package).as_posix()}")
+
+    with zipfile.ZipFile(archive) as zipped:
+        resource_root = zipfile.Path(zipped, at="hashmarks/")
+        observed = _producer_implementation_identity_from_resource(resource_root)
+
+    assert observed == expected
 
 
 def test_producer_identity_provenance_is_relative_bounded_metadata() -> None:
