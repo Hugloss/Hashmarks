@@ -30,20 +30,16 @@ jobs:
           git clone --quiet https://github.com/Hugloss/agentsCookbook.git "$AE_ROOT"
           git -C "$AE_ROOT" checkout --quiet --detach "$AE_REVISION"
           test "$(git -C "$AE_ROOT" rev-parse HEAD)" = "$AE_REVISION"
-          PYTHONPATH="$AE_ROOT/scripts" uv run --no-sync python - <<'PY'
-          import json
-          from pathlib import Path
-          from agent_economics.quality_debt import quality_debt_audit
-          limits = {
-              "C901": 8, "PLR0911": 6, "PLR0912": 8, "PLR0913": 6,
+          UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --only-group lint --python 3.11\n          RUFF_EXECUTABLE="$PWD/.ruff-venv/bin/ruff"\n          test -x "$RUFF_EXECUTABLE"\n          PYTHONPATH="$AE_ROOT/scripts" uv run --no-sync python - "$RUFF_EXECUTABLE" <<'PY'
+          import json\n          import sys\n          from pathlib import Path\n          from agent_economics.quality_debt import quality_debt_audit
+          analyzer = sys.argv[1]\n          limits = {\n              "C901": 8, "PLR0911": 6, "PLR0912": 8, "PLR0913": 6,
               "PLR0914": 15, "PLR0915": 40, "PLR0916": 5,
           }
           result = quality_debt_audit(
               repository_root=Path("."),
               roots=("hashmarks", "scripts", "benchmarks"),
               excludes=("benchmarks/agent_evaluation/retained",),
-              limits=limits,
-          )
+              limits=limits,\n              analyzer=analyzer,\n          )
           argv = result["evidence"]["analyzer"]["analysis_argv"]
           expected = {
               "lint.mccabe.max-complexity = 8",
