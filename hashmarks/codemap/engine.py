@@ -52,6 +52,7 @@ from .query_surface import QuerySurfaceMixin
 from .relationships import RelationshipsMixin
 from .repository_context import ContextPlanningMixin
 from .repository_delta import RepositoryDeltaMixin
+from .repository_evidence_binding_delta import RepositoryEvidenceBindingDeltaMixin
 from .repository_evidence_bindings import RepositoryEvidenceBindingsMixin
 from .repository_index_store import (
     ArtifactStore,
@@ -81,6 +82,7 @@ class CodeMap(
     EvidenceFreshnessMapMixin,
     RepositoryDeltaMixin,
     RepositoryEvidenceBindingsMixin,
+    RepositoryEvidenceBindingDeltaMixin,
     EvidenceProfilesMixin,
     CrossRepositoryEvidenceMixin,
     RepositoryIntelligenceQueryMixin,
