@@ -133,7 +133,7 @@ class RepositoryEvidenceBindingsMixin:
             return {
                 **base,
                 "state": "known-absent",
-                "locator_state": "known-absent",
+                "locator_state": "outside-member",
                 "content_state": "known-absent",
                 "reason": "declared-span-outside-member",
             }
@@ -382,7 +382,7 @@ class RepositoryEvidenceBindingsMixin:
             },
             "bindings": rows,
             "completeness": {
-                "state": "known-present",
+                "state": "complete",
                 "scope": "explicit-declared-evidence",
             },
             "storage": "derived-not-persisted",
