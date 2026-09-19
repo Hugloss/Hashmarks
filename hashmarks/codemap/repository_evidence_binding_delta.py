@@ -140,47 +140,110 @@ class RepositoryEvidenceBindingDeltaMixin:
         }
 
     @classmethod
-    def _binding_change(cls, before: Mapping[str, object], after: Mapping[str, object]) -> dict[str, object]:
+    def _binding_change(
+        cls,
+        before: Mapping[str, object],
+        after: Mapping[str, object],
+    ) -> dict[str, object]:
         old = cls._evidence_index(before)
         new = cls._evidence_index(after)
-        keys = sorted(set(old) | set(new))
-        changes: list[dict[str, object]] = []
-        for key in keys:
-            previous = old.get(key)
-            current = new.get(key)
-            if previous is None:
-                changes.append({"evidence": cls._evidence_locator(key), "state": "added"})
-                continue
-            if current is None:
-                changes.append({"evidence": cls._evidence_locator(key), "state": "removed"})
-                continue
+        common_keys = sorted(set(old) & set(new))
+
+        direct_changes: list[dict[str, object]] = []
+        locator_changes: list[dict[str, object]] = []
+        member_changes: list[dict[str, object]] = []
+
+        for key in common_keys:
+            previous = old[key]
+            current = new[key]
             scope = key[0]
-            direct_changed = (
-                previous.get("member_revision") != current.get("member_revision")
+            previous_direct = (
+                previous.get("member_revision")
                 if scope == "member"
-                else previous.get("span_identity") != current.get("span_identity")
+                else previous.get("span_identity")
             )
-            member_changed = (
-                previous.get("member_revision") != current.get("member_revision")
+            current_direct = (
+                current.get("member_revision")
+                if scope == "member"
+                else current.get("span_identity")
             )
-            state_changed = previous.get("state") != current.get("state")
-            if direct_changed or state_changed:
-                changes.append(
+            if (
+                previous_direct
+                and current_direct
+                and previous_direct != current_direct
+            ):
+                direct_changes.append(
                     {
                         "scope": scope,
                         "evidence": cls._evidence_locator(key),
                         "state": "changed",
-                        "direct_content_changed": direct_changed,
-                        "member_changed": member_changed,
-                        "observation_state_changed": state_changed,
+                        "before": previous_direct,
+                        "after": current_direct,
                     }
                 )
+
+            if scope == "lines":
+                previous_locator = str(previous.get("locator_state") or "unknown")
+                current_locator = str(current.get("locator_state") or "unknown")
+                if previous_locator != current_locator:
+                    locator_changes.append(
+                        {
+                            "evidence": cls._evidence_locator(key),
+                            "state": "changed",
+                            "before": previous_locator,
+                            "after": current_locator,
+                        }
+                    )
+
+            previous_member_state = str(
+                previous.get("member_state") or previous.get("state") or "unknown"
+            )
+            current_member_state = str(
+                current.get("member_state") or current.get("state") or "unknown"
+            )
+            previous_revision = previous.get("member_revision")
+            current_revision = current.get("member_revision")
+            revision_changed = (
+                bool(previous_revision)
+                and bool(current_revision)
+                and previous_revision != current_revision
+            )
+            member_state_changed = previous_member_state != current_member_state
+            if revision_changed or member_state_changed:
+                if (
+                    previous_member_state == "known-present"
+                    and current_member_state == "known-absent"
+                ):
+                    transition = "removed"
+                elif (
+                    previous_member_state == "known-absent"
+                    and current_member_state == "known-present"
+                ):
+                    transition = "added"
+                elif member_state_changed:
+                    transition = "state-changed"
+                else:
+                    transition = "changed"
+                member_changes.append(
+                    {
+                        "scope": scope,
+                        "evidence": cls._evidence_locator(key),
+                        "state": transition,
+                        "revision_changed": revision_changed,
+                        "observation_state_changed": member_state_changed,
+                        "before_state": previous_member_state,
+                        "after_state": current_member_state,
+                    }
+                )
+
         dependency_delta = cls._dependency_delta(before, after)
+        dependency_observations = dependency_delta.get("observations")
         dependency_observation_changes = (
-            dependency_delta["observations"]["changes"]
-            if isinstance(dependency_delta.get("observations"), Mapping)
+            dependency_observations.get("changes")
+            if isinstance(dependency_observations, Mapping)
             else []
         )
+
         before_relationships = before.get("relationships")
         after_relationships = after.get("relationships")
         before_config = cls._relationship_observation_config(before_relationships)
@@ -245,7 +308,7 @@ class RepositoryEvidenceBindingDeltaMixin:
                 if relationship_added or relationship_removed
                 else "unchanged"
             )
-            locator_state = (
+            relationship_locator_state = (
                 "changed" if relationship_locator_changes else "unchanged"
             )
             comparability = "comparable"
@@ -256,7 +319,7 @@ class RepositoryEvidenceBindingDeltaMixin:
             relationship_changed = False
             relationship_state = "not-observed"
             facts_state = "not-observed"
-            locator_state = "not-observed"
+            relationship_locator_state = "not-observed"
             comparability = "not-observed"
         else:
             relationship_added = []
@@ -265,38 +328,35 @@ class RepositoryEvidenceBindingDeltaMixin:
             relationship_changed = False
             relationship_state = "unknown"
             facts_state = "unknown"
-            locator_state = "unknown"
+            relationship_locator_state = "unknown"
             comparability = "observation-configuration-changed"
 
         relationship_observation_changed = before_config != after_config
-        member_changes = [
-            {
-                "scope": key[0],
-                "evidence": cls._evidence_locator(key),
-                "state": "changed",
-                "member_changed": True,
-            }
-            for key in keys
-            if key in old
-            and key in new
-            and old[key].get("member_revision") != new[key].get("member_revision")
-        ]
+        definition_changed = (
+            before.get("binding_definition_identity")
+            != after.get("binding_definition_identity")
+        )
+
         return {
             "state": (
                 "changed"
                 if (
-                    changes
+                    direct_changes
+                    or locator_changes
                     or member_changes
                     or dependency_observation_changes
                     or relationship_changed
-                    or before.get("binding_definition_identity")
-                    != after.get("binding_definition_identity")
+                    or definition_changed
                 )
                 else "preserved"
             ),
             "direct_evidence": {
-                "state": "changed" if changes else "preserved",
-                "changes": changes,
+                "state": "changed" if direct_changes else "preserved",
+                "changes": direct_changes,
+            },
+            "locator_evidence": {
+                "state": "changed" if locator_changes else "preserved",
+                "changes": locator_changes,
             },
             "member_evidence": {
                 "state": "changed" if member_changes else "preserved",
@@ -312,7 +372,7 @@ class RepositoryEvidenceBindingDeltaMixin:
                     "removed": relationship_removed,
                 },
                 "locators": {
-                    "state": locator_state,
+                    "state": relationship_locator_state,
                     "changes": relationship_locator_changes,
                 },
                 "completeness": str(after_config["completeness"]),
@@ -323,12 +383,7 @@ class RepositoryEvidenceBindingDeltaMixin:
                 },
             },
             "definition": {
-                "state": (
-                    "preserved"
-                    if before.get("binding_definition_identity")
-                    == after.get("binding_definition_identity")
-                    else "changed"
-                ),
+                "state": "changed" if definition_changed else "preserved",
                 "before": before.get("binding_definition_identity"),
                 "after": after.get("binding_definition_identity"),
             },
