@@ -106,8 +106,9 @@ class RepositoryEvidenceBindingDeltaMixin:
                     }
                 )
         dependency_changes = cls._dependency_changes(before, after)
+        relationship_changed = before.get("relationships") != after.get("relationships")
         return {
-            "state": "changed" if changes or dependency_changes else "preserved",
+            "state": "changed" if changes or dependency_changes or relationship_changed else "preserved",
             "direct_evidence": {
                 "state": "changed" if changes else "preserved",
                 "changes": changes,
@@ -115,6 +116,14 @@ class RepositoryEvidenceBindingDeltaMixin:
             "semantic_dependencies": {
                 "state": "affected" if dependency_changes else "unaffected",
                 "changes": dependency_changes,
+            },
+            "relationship_evidence": {
+                "state": "changed" if relationship_changed else "unchanged",
+                "completeness": (
+                    after.get("relationships", {}).get("completeness", "unknown")
+                    if isinstance(after.get("relationships"), Mapping)
+                    else "unknown"
+                ),
             },
         }
 
