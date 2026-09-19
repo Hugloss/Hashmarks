@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import tomllib
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -13,6 +14,36 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from .engine import CodeMap
+
+
+@dataclass
+class _JsonContainerScan:
+    opener: str
+    closer: str
+    depth: int = 0
+    in_string: bool = False
+    escaped: bool = False
+    started: bool = False
+
+    def consume(self, char: str) -> bool:
+        if self.in_string:
+            if self.escaped:
+                self.escaped = False
+            elif char == "\\":
+                self.escaped = True
+            elif char == '"':
+                self.in_string = False
+            return False
+        if char == '"':
+            self.in_string = True
+            return False
+        if char == self.opener:
+            self.depth += 1
+            self.started = True
+        elif char == self.closer and self.started:
+            self.depth -= 1
+            return self.depth == 0
+        return False
 
 
 class ConfigurationEvidenceMixin:
@@ -66,6 +97,13 @@ class ConfigurationEvidenceMixin:
         return end
 
     @staticmethod
+    def _json_value_line_segment(raw: str, *, first: bool) -> str:
+        if not first:
+            return raw
+        colon = raw.find(":")
+        return raw[colon + 1 :] if colon >= 0 else raw
+
+    @staticmethod
     def _json_value_end(
         lines: list[str], start_index: int, value_text: str
     ) -> int | None:
@@ -82,36 +120,42 @@ class ConfigurationEvidenceMixin:
         opener = stripped[0]
         if opener not in "[{":
             return None
-        closer = "]" if opener == "[" else "}"
-        depth = 0
-        in_string = False
-        escaped = False
-        started = False
+        scan = _JsonContainerScan(opener, "]" if opener == "[" else "}")
         for index in range(start_index, len(lines)):
-            segment = lines[index]
-            if index == start_index:
-                colon = segment.find(":")
-                segment = segment[colon + 1 :] if colon >= 0 else segment
+            segment = ConfigurationEvidenceMixin._json_value_line_segment(
+                lines[index], first=index == start_index
+            )
             for char in segment:
-                if in_string:
-                    if escaped:
-                        escaped = False
-                    elif char == "\\":
-                        escaped = True
-                    elif char == '"':
-                        in_string = False
-                    continue
-                if char == '"':
-                    in_string = True
-                    continue
-                if char == opener:
-                    depth += 1
-                    started = True
-                elif char == closer and started:
-                    depth -= 1
-                    if depth == 0:
-                        return index
+                if scan.consume(char):
+                    return index
         return None
+
+    def _toml_key_candidate(
+        self, raw: str, index: int, section: str, task_terms: set[str]
+    ) -> dict[str, object] | None:
+        match = re.match(
+            r'^\s*([A-Za-z0-9_.-]+|"[^"]+"|\'[^\']+\')\s*=\s*(.+?)\s*$', raw
+        )
+        if not match:
+            return None
+        key = match.group(1).strip().strip("\"'")
+        try:
+            tomllib.loads(f"{key} = {match.group(2)}\n")
+        except tomllib.TOMLDecodeError:
+            return None
+        full_name = f"{section}.{key}" if section else key
+        score = self._config_candidate_score(full_name, task_terms)
+        if score is None:
+            score = self._config_candidate_score(key, task_terms)
+        if score is None:
+            return None
+        return {
+            "kind": "key",
+            "name": full_name,
+            "start": index,
+            "end": index,
+            "score": score,
+        }
 
     def _toml_config_candidates(
         self,
@@ -133,33 +177,9 @@ class ConfigurationEvidenceMixin:
                 section = match.group(1).strip().strip("\"'")
                 headers.append((index, section))
                 continue
-            match = re.match(
-                r'^\s*([A-Za-z0-9_.-]+|"[^"]+"|\'[^\']+\')\s*=\s*(.+?)\s*$', raw
-            )
-            if not match:
-                continue
-            key = match.group(1).strip().strip("\"'")
-            try:
-                tomllib.loads(f"{key} = {match.group(2)}\n")
-            except tomllib.TOMLDecodeError:
-                continue
-            full_name = f"{section}.{key}" if section else key
-            score = self._config_candidate_score(full_name, task_terms)
-            score = (
-                self._config_candidate_score(key, task_terms)
-                if score is None
-                else score
-            )
-            if score is not None:
-                candidates.append(
-                    {
-                        "kind": "key",
-                        "name": full_name,
-                        "start": index,
-                        "end": index,
-                        "score": score,
-                    }
-                )
+            candidate = self._toml_key_candidate(raw, index, section, task_terms)
+            if candidate is not None:
+                candidates.append(candidate)
         for header_index, (start, name) in enumerate(headers):
             score = self._config_candidate_score(name, task_terms)
             if score is None:
@@ -267,6 +287,80 @@ class ConfigurationEvidenceMixin:
                 stack.append((indent, key))
         return candidates
 
+    def _config_candidates(
+        self, source: str, suffix: str, task_terms: set[str]
+    ) -> list[dict[str, object]] | None:
+        lines = source.splitlines()
+        if suffix == ".toml":
+            return self._toml_config_candidates(source, lines, task_terms)
+        if suffix == ".json":
+            return self._json_config_candidates(source, lines, task_terms)
+        return self._yaml_config_candidates(lines, task_terms)
+
+    def _project_config_candidate(
+        self,
+        path: str,
+        role: str,
+        suffix: str,
+        source: str,
+        candidates: list[dict[str, object]],
+        token_budget: int,
+    ) -> tuple[dict[str, object] | None, dict[str, object] | None]:
+        if not candidates:
+            return None, {
+                "role": role,
+                "path": path,
+                "reason": "no-task-local-config-key",
+            }
+        best_score = max(candidate["score"] for candidate in candidates)
+        best = [
+            candidate for candidate in candidates if candidate["score"] == best_score
+        ]
+        unique_ranges = {
+            (int(candidate["start"]), int(candidate["end"]), str(candidate["name"]))
+            for candidate in best
+        }
+        if len(unique_ranges) != 1:
+            return None, {
+                "role": role,
+                "path": path,
+                "reason": "ambiguous-task-local-config-key",
+                "candidate_count": len(unique_ranges),
+            }
+        chosen = best[0]
+        start = int(chosen["start"])
+        end = int(chosen["end"])
+        lines = source.splitlines()
+        content = "\n".join(lines[start : end + 1])
+        if source.endswith("\n") and end == len(lines) - 1:
+            content += "\n"
+        estimated_tokens = estimate_tokens(content)
+        pending = {
+            "role": role,
+            "path": path,
+            "lines": [start + 1, end + 1],
+            "reason": "exact-config-range-exceeds-start-budget",
+            "estimated_tokens": estimated_tokens,
+            "config": {
+                "format": suffix.lstrip(".").replace("yml", "yaml"),
+                "kind": str(chosen["kind"]),
+                "name": str(chosen["name"]),
+                "locator": "exact-task-key",
+            },
+        }
+        if estimated_tokens > token_budget:
+            return None, pending
+        return {
+            "role": role,
+            "path": path,
+            "symbol": str(chosen["name"]),
+            "lines": [start + 1, end + 1],
+            "representation": "config-key-range",
+            "content": content,
+            "estimated_tokens": estimated_tokens,
+            "config": pending["config"],
+        }, None
+
     def _task_evidence_config_evidence(
         self,
         path: str,
@@ -309,13 +403,7 @@ class ConfigurationEvidenceMixin:
                 "path": path,
                 "reason": "config-source-unavailable",
             }
-        lines = source.splitlines()
-        if suffix == ".toml":
-            candidates = self._toml_config_candidates(source, lines, task_terms)
-        elif suffix == ".json":
-            candidates = self._json_config_candidates(source, lines, task_terms)
-        else:
-            candidates = self._yaml_config_candidates(lines, task_terms)
+        candidates = self._config_candidates(source, suffix, task_terms)
         if candidates is None:
             return None, {
                 "role": role,
@@ -323,56 +411,6 @@ class ConfigurationEvidenceMixin:
                 "reason": "invalid-config-syntax",
             }
 
-        if not candidates:
-            return None, {
-                "role": role,
-                "path": path,
-                "reason": "no-task-local-config-key",
-            }
-        best_score = max(candidate["score"] for candidate in candidates)
-        best = [
-            candidate for candidate in candidates if candidate["score"] == best_score
-        ]
-        unique_ranges = {
-            (int(candidate["start"]), int(candidate["end"]), str(candidate["name"]))
-            for candidate in best
-        }
-        if len(unique_ranges) != 1:
-            return None, {
-                "role": role,
-                "path": path,
-                "reason": "ambiguous-task-local-config-key",
-                "candidate_count": len(unique_ranges),
-            }
-        chosen = best[0]
-        start = int(chosen["start"])
-        end = int(chosen["end"])
-        content = "\n".join(lines[start : end + 1])
-        if source.endswith("\n") and end == len(lines) - 1:
-            content += "\n"
-        estimated_tokens = estimate_tokens(content)
-        pending = {
-            "role": role,
-            "path": path,
-            "lines": [start + 1, end + 1],
-            "reason": "exact-config-range-exceeds-start-budget",
-            "estimated_tokens": estimated_tokens,
-            "config": {
-                "format": suffix.lstrip(".").replace("yml", "yaml"),
-                "kind": str(chosen["kind"]),
-                "name": str(chosen["name"]),
-                "locator": "exact-task-key",
-            },
-        }
-        if estimated_tokens > token_budget:
-            return None, pending
-        return {
-            "role": role,
-            "path": path,
-            "symbol": str(chosen["name"]),
-            "lines": [start + 1, end + 1],
-            "representation": "config-key-range",
-            "content": content,
-            "estimated_tokens": estimated_tokens,
-            "config": pending["config"],
-        }, None
+        return self._project_config_candidate(
+            path, role, suffix, source, candidates, token_budget
+        )

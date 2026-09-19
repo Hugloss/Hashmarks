@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from .directory_store import DirectoryDigestStore
 from .file_store import FileDigestStore
 from .inputs import InputManifest
-from .merkle import MerkleTree
+from .merkle import MerklePathScope, MerkleTree
 from .observation import ChangeTracker
 from .paths import canonical_host_path
 from .schema import IDENTITY_SCHEMA
@@ -56,7 +56,7 @@ class IdentityEngine:
             self.file_store,
             directory_store=self.directory_store,
             change_tracker=self.changes,
-            exclude_paths=(self.state_dir,),
+            path_scope=MerklePathScope(exclude_paths=(self.state_dir,)),
         )
 
     def close(self) -> None:

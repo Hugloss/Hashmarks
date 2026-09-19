@@ -76,7 +76,6 @@ def test_missing_edit_is_explicitly_unresolved() -> None:
     assert authority["resolved_owner"] is None
 
 
-
 def test_ownership_contract_never_grants_edit_permission() -> None:
     trace = ownership_decision_trace(
         OwnershipDecisionState(

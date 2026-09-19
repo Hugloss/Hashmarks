@@ -134,7 +134,7 @@ def verification_membership_from_selection(
     )
 
 
-def verification_selection_envelope(
+def _validated_repository_provenance(
     state: VerificationSelectionEnvelopeState,
 ) -> dict[str, object]:
     if (
@@ -154,6 +154,40 @@ def verification_selection_envelope(
         )
     if state.stale is not None and type(state.stale) is not bool:
         raise ValueError("stale must be boolean or null")
+    return {
+        "repository_identity": state.repository_identity,
+        "source_identity": state.source_identity,
+        "codemap_generation": codemap_generation,
+        "identity_generation": identity_generation,
+        # Unknown freshness must never become a positive freshness claim.
+        "stale": state.stale is not False,
+    }
+
+
+def _validated_owner_evidence(value: Mapping[str, object] | None) -> dict[str, object]:
+    owner_evidence = dict(value or {})
+    try:
+        _canonical_bytes(owner_evidence)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("owner_evidence must be strict JSON-portable") from exc
+    return owner_evidence
+
+
+def _validated_evidence_hashes(values: Mapping[str, str]) -> dict[str, str]:
+    evidence_hashes: dict[str, str] = {}
+    for key, value in sorted(values.items()):
+        if not isinstance(key, str) or not key.strip():
+            raise ValueError("evidence hash keys must be nonblank strings")
+        if not isinstance(value, str) or not _SHA256.fullmatch(value):
+            raise ValueError("evidence hashes must be sha256:<64 lowercase hex>")
+        evidence_hashes[key] = value
+    return evidence_hashes
+
+
+def verification_selection_envelope(
+    state: VerificationSelectionEnvelopeState,
+) -> dict[str, object]:
+    repository = _validated_repository_provenance(state)
     membership_validation = validate_verification_membership(state.membership)
     if not membership_validation["valid"]:
         raise ValueError(
@@ -167,18 +201,8 @@ def verification_selection_envelope(
         raise ValueError(
             "membership must carry a sha256:<64 lowercase hex> membership_identity"
         )
-    owner_evidence = dict(state.owner_evidence or {})
-    try:
-        _canonical_bytes(owner_evidence)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("owner_evidence must be strict JSON-portable") from exc
-    evidence_hashes: dict[str, str] = {}
-    for key, value in sorted(state.evidence_hashes.items()):
-        if not isinstance(key, str) or not key.strip():
-            raise ValueError("evidence hash keys must be nonblank strings")
-        if not isinstance(value, str) or not _SHA256.fullmatch(value):
-            raise ValueError("evidence hashes must be sha256:<64 lowercase hex>")
-        evidence_hashes[key] = value
+    owner_evidence = _validated_owner_evidence(state.owner_evidence)
+    evidence_hashes = _validated_evidence_hashes(state.evidence_hashes)
     implementation_identity = _implementation_identity(
         state.producer_implementation_identity
     )
@@ -189,14 +213,7 @@ def verification_selection_envelope(
             "version": __version__,
             "implementation_identity": implementation_identity,
         },
-        "repository": {
-            "repository_identity": state.repository_identity,
-            "source_identity": state.source_identity,
-            "codemap_generation": codemap_generation,
-            "identity_generation": identity_generation,
-            # Unknown freshness must never become a positive freshness claim.
-            "stale": state.stale is not False,
-        },
+        "repository": repository,
         "owner_evidence": owner_evidence,
         "selection": dict(state.membership),
         "evidence_hashes": evidence_hashes,
@@ -211,6 +228,22 @@ def _unexpected_fields(
     value: Mapping[str, object], allowed: frozenset[str], prefix: str
 ) -> list[str]:
     return [f"unexpected-{prefix}-field:{key}" for key in sorted(set(value) - allowed)]
+
+
+def _member_shape_reasons(members: list[object]) -> list[str]:
+    reasons: list[str] = []
+    for raw in members:
+        if not isinstance(raw, Mapping):
+            reasons.append("invalid-member-shape")
+            continue
+        reasons.extend(
+            _unexpected_fields(
+                raw, frozenset({"schema", "path", "test_symbol", "member_id"}), "member"
+            )
+        )
+        if raw.get("schema") != MEMBER_SCHEMA:
+            reasons.append("unsupported-member-schema")
+    return reasons
 
 
 def validate_verification_membership(
@@ -235,17 +268,7 @@ def validate_verification_membership(
             "valid": False,
             "reasons": list(dict.fromkeys([*reasons, "invalid-members"])),
         }
-    for raw in members:
-        if not isinstance(raw, Mapping):
-            reasons.append("invalid-member-shape")
-            continue
-        reasons.extend(
-            _unexpected_fields(
-                raw, frozenset({"schema", "path", "test_symbol", "member_id"}), "member"
-            )
-        )
-        if raw.get("schema") != MEMBER_SCHEMA:
-            reasons.append("unsupported-member-schema")
+    reasons.extend(_member_shape_reasons(members))
     try:
         rebuilt = verification_membership(members)
     except (TypeError, ValueError) as exc:
@@ -319,6 +342,29 @@ def _producer_validation_reasons(
     return reasons
 
 
+def _envelope_evidence_reasons(envelope: Mapping[str, object]) -> list[str]:
+    reasons: list[str] = []
+    owner_evidence = envelope.get("owner_evidence")
+    if not isinstance(owner_evidence, Mapping):
+        reasons.append("invalid-owner-evidence")
+    else:
+        try:
+            _canonical_bytes(dict(owner_evidence))
+        except (TypeError, ValueError):
+            reasons.append("invalid-owner-evidence")
+
+    evidence_hashes = envelope.get("evidence_hashes")
+    if not isinstance(evidence_hashes, Mapping):
+        reasons.append("invalid-evidence-hashes")
+    else:
+        for key, value in evidence_hashes.items():
+            if not isinstance(key, str) or not key.strip():
+                reasons.append("invalid-evidence-hash-key")
+            if not isinstance(value, str) or not _SHA256.fullmatch(value):
+                reasons.append("invalid-evidence-hash")
+    return reasons
+
+
 def validate_verification_selection_envelope(
     envelope: Mapping[str, object],
 ) -> dict[str, object]:
@@ -356,24 +402,7 @@ def validate_verification_selection_envelope(
         *envelope_reasons,
         *(str(reason) for reason in membership_validation.get("reasons", [])),
     ]
-    owner_evidence = envelope.get("owner_evidence")
-    if not isinstance(owner_evidence, Mapping):
-        reasons.append("invalid-owner-evidence")
-    else:
-        try:
-            _canonical_bytes(dict(owner_evidence))
-        except (TypeError, ValueError):
-            reasons.append("invalid-owner-evidence")
-
-    evidence_hashes = envelope.get("evidence_hashes")
-    if not isinstance(evidence_hashes, Mapping):
-        reasons.append("invalid-evidence-hashes")
-    else:
-        for key, value in evidence_hashes.items():
-            if not isinstance(key, str) or not key.strip():
-                reasons.append("invalid-evidence-hash-key")
-            if not isinstance(value, str) or not _SHA256.fullmatch(value):
-                reasons.append("invalid-evidence-hash")
+    reasons.extend(_envelope_evidence_reasons(envelope))
 
     payload = {
         key: value for key, value in envelope.items() if key != "envelope_identity"

@@ -7,7 +7,7 @@ import pytest
 from hashmarks.cas import CAS
 from hashmarks.directory_store import DirectoryDigestStore
 from hashmarks.file_store import FileDigestStore
-from hashmarks.merkle import MerkleTree
+from hashmarks.merkle import MerklePathScope, MerkleTree
 from hashmarks.paths import canonical_event_relative_path, canonical_host_path
 
 
@@ -29,7 +29,11 @@ def test_symlinked_workspace_store_auto_exclusion_is_stable(tmp_path: Path):
     workspace_alias = alias_root / "repo"
 
     store = FileDigestStore(workspace_alias / "custom-state" / "digests.sqlite3")
-    tree = MerkleTree(workspace_alias, store, walk_ignore_names=(".git",))
+    tree = MerkleTree(
+        workspace_alias,
+        store,
+        path_scope=MerklePathScope(walk_ignore_names=(".git",)),
+    )
 
     first = tree.directory_digest("")
     store.digest(
@@ -131,7 +135,9 @@ def test_mandatory_hashmarks_exclusion_cannot_be_disabled_by_legacy_ignore_names
     (state / "manual.txt").write_text("state")
 
     store = FileDigestStore(tmp_path / "files.sqlite3")
-    tree = MerkleTree(workspace, store, walk_ignore_names=())
+    tree = MerkleTree(
+        workspace, store, path_scope=MerklePathScope(walk_ignore_names=())
+    )
 
     with pytest.raises(ValueError, match="excluded"):
         tree.digest_selected([".hashmarks"])
@@ -146,7 +152,9 @@ def test_relative_explicit_exclusion_preserves_symlink_leaf(tmp_path: Path):
     _make_dir_symlink(link, outside)
 
     store = FileDigestStore(tmp_path / "files.sqlite3")
-    tree = MerkleTree(workspace, store, exclude_paths=("state-link",))
+    tree = MerkleTree(
+        workspace, store, path_scope=MerklePathScope(exclude_paths=("state-link",))
+    )
 
     with pytest.raises(ValueError, match="excluded"):
         tree.digest_selected(["state-link"])

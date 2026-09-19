@@ -9,6 +9,7 @@ from hashmarks.codemap import CodeMap
 from hashmarks.codemap.repository_index_store import (
     default_base_snapshot,
     git_base_identity,
+    git_overlay_paths,
 )
 
 if TYPE_CHECKING:
@@ -82,3 +83,13 @@ def test_sibling_worktree_reuses_clean_base_snapshot_and_keeps_dirty_overlay_loc
     assert dirty.overlay_paths == 1
     assert dirty.base_snapshot_reused == 1
     assert codemap is not None
+
+
+def test_git_overlay_paths_includes_rename_origin_and_untracked_file(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    subprocess.run(["git", "-C", str(repo), "mv", "a.py", "renamed.py"], check=True)
+    (repo / "new.py").write_text("value = 1\n", encoding="utf-8")
+
+    assert git_overlay_paths(repo) == {"a.py", "renamed.py", "new.py"}

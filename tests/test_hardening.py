@@ -12,7 +12,7 @@ from hashmarks.cas import CAS
 from hashmarks.file_store import FileDigestStore
 from hashmarks.graph import IdentityGraph
 from hashmarks.inputs import resolve_inputs
-from hashmarks.merkle import MerkleTree
+from hashmarks.merkle import MerklePathScope, MerkleTree
 from hashmarks.watcher import DirtyBatch
 
 if TYPE_CHECKING:
@@ -51,7 +51,9 @@ def test_custom_in_workspace_store_files_are_auto_excluded(tmp_path: Path):
     (workspace / "src.py").write_text("x")
     state_dir = workspace / "custom-state"
     store = FileDigestStore(state_dir / "digests.sqlite3")
-    tree = MerkleTree(workspace, store, walk_ignore_names=(".git",))
+    tree = MerkleTree(
+        workspace, store, path_scope=MerklePathScope(walk_ignore_names=(".git",))
+    )
 
     first = tree.directory_digest("")
     # Mutate the cache through its own API; the SQLite DB/WAL may change, but
