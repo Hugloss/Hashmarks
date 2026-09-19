@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import diagnostic_producer
+from .evidence_freshness import freshness_state
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -324,7 +325,7 @@ class RepositoryDeltaMixin:
         generation_changed = observed_generation != current_generation
 
         if not repository_changed and not generation_changed:
-            state = "fresh"
+            state = "current"
             reason = "repository-and-generation-unchanged"
         elif not relevant:
             state = "stale"
@@ -333,7 +334,7 @@ class RepositoryDeltaMixin:
             state = "stale"
             reason = "relevant-repository-evidence-changed"
         else:
-            state = "fresh"
+            state = "current"
             reason = "changed-paths-proven-outside-observation-scope"
 
         return {
