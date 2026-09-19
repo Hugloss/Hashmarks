@@ -83,6 +83,7 @@ class RepositoryEvidenceBindingsMixin:
             span.path, include_bytes=True
         )
         base: dict[str, object] = {
+            "scope": "lines",
             "path": span.path,
             "start_line": span.start_line,
             "end_line": span.end_line,
