@@ -168,6 +168,7 @@ class RepositoryEvidenceBindingsMixin:
         *,
         dependency_paths: Mapping[str, Sequence[str]] | None = None,
         relationship_limit_per_path: int = 100,
+        include_relationships: bool = True,
     ) -> dict[str, object]:
         """Return deterministic exact-span evidence for opaque consumer bindings."""
         if TYPE_CHECKING:
@@ -219,8 +220,17 @@ class RepositoryEvidenceBindingsMixin:
                 "binding_id": binding_id,
                 "evidence": evidence,
                 "dependencies": dependencies,
-                "relationships": self._binding_relationships(
-                    evidence, limit_per_path=relationship_limit_per_path
+                "relationships": (
+                    self._binding_relationships(
+                        evidence, limit_per_path=relationship_limit_per_path
+                    )
+                    if include_relationships
+                    else {
+                        "state": "not-requested",
+                        "relationships": [],
+                        "bounds": {"paths": 0, "limit_per_path": relationship_limit_per_path},
+                        "completeness": "not-observed",
+                    }
                 ),
             }
             rows.append(
