@@ -344,3 +344,56 @@ def test_relationship_projection_can_be_skipped_without_changing_evidence_author
     assert row["evidence"][0]["state"] == "known-present"
     assert row["relationships"]["state"] == "not-requested"
     assert row["relationships"]["completeness"] == "not-observed"
+
+
+@pytest.mark.parametrize(
+    ("payload", "match"),
+    [
+        ([{"binding_id": "", "evidence": []}], "binding_id must not be empty"),
+        ([{"binding_id": "x", "evidence": "a.py"}], "evidence must be a sequence"),
+        ([{"binding_id": "x", "evidence": [42]}], "each evidence item must be an object"),
+        ([{"binding_id": "x", "evidence": [{"path": "../escape.py", "start_line": 1, "end_line": 1}]}], "path"),
+    ],
+)
+def test_binding_contract_rejects_malformed_or_escaping_inputs(
+    tmp_path: Path, payload: object, match: str
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises((TypeError, ValueError), match=match):
+            codemap.repository_evidence_bindings(payload)  # type: ignore[arg-type]
+
+
+def test_overlapping_and_duplicate_spans_remain_explicit_evidence(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("a\nb\nc\n", encoding="utf-8")
+    binding = [{
+        "binding_id": "multi",
+        "evidence": [
+            {"path": "a.py", "start_line": 1, "end_line": 2},
+            {"path": "a.py", "start_line": 2, "end_line": 3},
+            {"path": "a.py", "start_line": 1, "end_line": 2},
+        ],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(binding, include_relationships=False)
+    evidence = packet["bindings"][0]["evidence"]
+    assert len(evidence) == 3
+    assert evidence[0]["span_identity"] == evidence[2]["span_identity"]
+    assert evidence[0]["span_identity"] != evidence[1]["span_identity"]
+
+
+def test_deleted_bound_member_is_first_class_delta(tmp_path: Path) -> None:
+    source = tmp_path / "a.py"
+    source.write_text("a\n", encoding="utf-8")
+    binding = [{"binding_id": "deleted", "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(binding, include_relationships=False)
+        source.unlink()
+        codemap.sync(["a.py"])
+        after = codemap.repository_evidence_bindings(binding, include_relationships=False)
+        delta = codemap.repository_evidence_binding_delta(before, after)
+    change = delta["bindings"]["changed"][0]["direct_evidence"]["changes"][0]
+    assert change["observation_state_changed"] is True
+    assert after["bindings"][0]["evidence"][0]["state"] == "known-absent"
