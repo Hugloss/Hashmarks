@@ -18,7 +18,7 @@ Rows participate in identity-based delta only when they carry a stable identity.
 
 ## Completeness and negative evidence
 
-Empty results are not automatically negative evidence. Public projections preserve known-present, known-absent, unknown, incomplete, stale, and unsupported evidence. Delta reports completeness transitions independently from added/removed rows, so unknown → known-absent cannot be misreported as “nothing changed.”
+Empty results are not automatically negative evidence. Public projections keep evidence availability, freshness, and completeness on separate axes: presence may be known-present/known-absent/unknown/unsupported, freshness is current/stale/unknown, and completeness is complete/incomplete/unknown. Delta reports completeness transitions independently from added/removed rows, so unknown → known-absent cannot be misreported as “nothing changed.”
 
 ## Delta taxonomy
 
