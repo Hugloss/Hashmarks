@@ -51,6 +51,7 @@ jobs:
             --source-root hashmarks \
             --tests-root tests \
             --package-name hashmarks \
+            --ownership-hints-path scripts/agent_evaluation/task_action_projection_test_ownership.json \
             --changed-path hashmarks/codemap/task_action_projection.py \
             --gate 'ruff=make ruff' \
             --gate 'tests=make test' \
