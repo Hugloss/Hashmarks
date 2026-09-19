@@ -5,10 +5,10 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.file_store import UnstableFileError
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import diagnostic_producer
-from .evidence_freshness import freshness_state
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -71,6 +71,121 @@ class RepositoryDeltaMixin:
         if not isinstance(value, Mapping):
             raise ValueError(f"{field} must be an object")
         return value
+
+    def _repository_member_observation(
+        self,
+        relpath: str,
+        *,
+        include_bytes: bool = False,
+    ) -> tuple[dict[str, object], bytes | None]:
+        """Observe one repository member through canonical policy/revision authority."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        rel = normalize_relative_path(relpath, allow_root=False)
+        decision = self.policy.decide(rel)
+        base: dict[str, object] = {"path": rel}
+
+        if not decision.index or decision.evidence_visibility.value == "deny":
+            return (
+                {
+                    **base,
+                    "state": "unsupported",
+                    "reason": "repository-evidence-denied",
+                },
+                None,
+            )
+
+        cursor = self.workspace
+        for part in rel.split("/"):
+            cursor = cursor / part
+            if cursor.is_symlink():
+                return (
+                    {
+                        **base,
+                        "state": "unsupported",
+                        "reason": "symlink-evidence-not-observed",
+                    },
+                    None,
+                )
+
+        path = self.workspace / rel
+        if not path.is_file():
+            return (
+                {
+                    **base,
+                    "state": "known-absent",
+                    "reason": "member-not-present",
+                },
+                None,
+            )
+
+        row = self._session_file_row(rel)
+        if row is None:
+            return (
+                {
+                    **base,
+                    "state": "unknown",
+                    "reason": "member-not-indexed",
+                },
+                None,
+            )
+
+        revision = str(row.get("file_digest") or "")
+        visibility = str(row.get("evidence_visibility") or decision.evidence_visibility.value)
+        observed: dict[str, object] = {
+            **base,
+            "state": "known-present",
+            "member_identity": revision,
+            "evidence_visibility": visibility,
+        }
+        if not include_bytes:
+            return observed, None
+        if visibility != "source":
+            return (
+                {
+                    **base,
+                    "state": "unsupported",
+                    "reason": "source-evidence-not-visible",
+                    "member_identity": revision,
+                    "evidence_visibility": visibility,
+                },
+                None,
+            )
+
+        try:
+            raw, digest = self.file_store.read_bytes_stable(path)
+        except FileNotFoundError:
+            return (
+                {
+                    **base,
+                    "state": "known-absent",
+                    "reason": "member-not-present",
+                },
+                None,
+            )
+        except (OSError, UnstableFileError):
+            return (
+                {
+                    **base,
+                    "state": "unknown",
+                    "reason": "member-read-unstable-or-unavailable",
+                    "member_identity": revision,
+                    "evidence_visibility": visibility,
+                },
+                None,
+            )
+        if digest.hash != revision:
+            return (
+                {
+                    **base,
+                    "state": "unknown",
+                    "reason": "member-revision-mismatch",
+                    "member_identity": revision,
+                    "evidence_visibility": visibility,
+                },
+                None,
+            )
+        return observed, raw
 
     def _snapshot_paths(
         self, changed_paths: Sequence[str | Path]
