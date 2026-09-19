@@ -118,10 +118,7 @@ class RepositoryEvidenceBindingsMixin:
         }
 
     @decision_scoped
-    def repository_evidence_bindings(
-        self,
-        bindings: Sequence[Mapping[str, object]],
-    ) -> dict[str, object]:
+    def repository_evidence_bindings(\n        self,\n        bindings: Sequence[Mapping[str, object]],\n        *,\n        dependency_paths: Mapping[str, Sequence[str]] | None = None,\n    ) -> dict[str, object]:
         """Return deterministic exact-span evidence for opaque consumer bindings."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -147,7 +144,30 @@ class RepositoryEvidenceBindingsMixin:
             ]
             if len(evidence) != len(raw_evidence):
                 raise ValueError("each evidence item must be an object")
-            binding_payload = {"binding_id": binding_id, "evidence": evidence}
+            declared_dependencies = sorted(
+                {
+                    normalize_relative_path(path, allow_root=False)
+                    for path in (dependency_paths or {}).get(binding_id, ())
+                }
+            )
+            dependency_rows = self._session_file_rows(declared_dependencies)
+            dependencies = [
+                {
+                    "path": path,
+                    "state": "known-present" if path in dependency_rows else "known-absent",
+                    **(
+                        {"member_identity": str(dependency_rows[path].get("file_digest") or "")}
+                        if path in dependency_rows
+                        else {}
+                    ),
+                }
+                for path in declared_dependencies
+            ]
+            binding_payload = {
+                "binding_id": binding_id,
+                "evidence": evidence,
+                "dependencies": dependencies,
+            }
             rows.append(
                 {
                     **binding_payload,
