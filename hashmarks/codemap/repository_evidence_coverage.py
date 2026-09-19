@@ -221,6 +221,15 @@ class RepositoryEvidenceCoverageMixin:
             != "hashmarks.repository-evidence-binding-delta.v1"
         ):
             raise ValueError("binding_delta must be a repository evidence binding delta")
+        if binding_delta is not None:
+            identities = binding_delta.get("bindings_identity")
+            after_identity = (
+                identities.get("after") if isinstance(identities, Mapping) else None
+            )
+            if after_identity != bindings_packet.get("bindings_identity"):
+                raise ValueError(
+                    "binding_delta after identity must match bindings_packet"
+                )
 
         changed, complete, change_set = self._change_set(
             changed_paths, change_set_complete, repository_observation
