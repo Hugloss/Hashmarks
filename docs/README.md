@@ -7,6 +7,7 @@ Hashmarks documentation is split into **public/current contracts** and **histori
 - [`GETTING_STARTED.md`](GETTING_STARTED.md) — install, CodeMap workflow, CLI, Python API, cache/state basics.
 - [`reference/ARCHITECTURE.md`](reference/ARCHITECTURE.md) — architecture and authority model.
 - [`reference/STATE_AND_SEMANTIC_OWNERS.md`](reference/STATE_AND_SEMANTIC_OWNERS.md) — canonical repository-intelligence state families, semantic owners, and reuse-before-new-owner rules.
+- [`reference/REPOSITORY_EVIDENCE_BINDINGS.md`](reference/REPOSITORY_EVIDENCE_BINDINGS.md) — opaque repository evidence bindings, exact range/member identities, deltas, and coverage semantics.
 - [`maintainers/CODEMAP.md`](maintainers/CODEMAP.md) — implementation ownership map and request-flow guide for maintainers.
 - [`reference/PRODUCT_BOUNDARY.md`](reference/PRODUCT_BOUNDARY.md) — normative feature-admission contract; read this before proposing a new capability.
 - [`reference/INVARIANTS.md`](reference/INVARIANTS.md) — normative correctness/freshness/authority guarantees.
