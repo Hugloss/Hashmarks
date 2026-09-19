@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped
+from .evidence_freshness import freshness_state
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -373,13 +374,7 @@ class RepositoryEvidenceBindingsMixin:
                 "repository_identity": self._repository_packet_identity(),
                 "codemap_generation": generation,
                 "identity_generation": identity_generation,
-                "freshness": (
-                    "stale"
-                    if stale is True
-                    else "current"
-                    if stale is False
-                    else "unknown"
-                ),
+                "freshness": freshness_state(stale),
             },
             "bindings": rows,
             "completeness": {
