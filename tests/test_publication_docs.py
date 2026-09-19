@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +25,88 @@ def test_codemap_maintainer_guide_maps_internal_ownership_and_request_flows() ->
     assert "ownership_analysis.py" in guide
     assert "decision_session.py" in guide
     assert "Execution/certification is external" in guide
+
+
+def test_codemap_direct_mixins_are_named_in_maintainer_responsibility_map() -> None:
+    tree = ast.parse(_text("hashmarks/codemap/engine.py"))
+    imports: dict[str, str] = {}
+    codemap: ast.ClassDef | None = None
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module:
+            for alias in node.names:
+                imports[alias.asname or alias.name] = node.module
+        elif isinstance(node, ast.ClassDef) and node.name == "CodeMap":
+            codemap = node
+    assert codemap is not None
+
+    guide = _text("docs/maintainers/CODEMAP.md")
+    owner_modules = sorted(
+        {
+            imports[base.id]
+            for base in codemap.bases
+            if isinstance(base, ast.Name) and base.id in imports
+        }
+    )
+    missing = [module for module in owner_modules if f"{module}.py" not in guide]
+    assert missing == [], (
+        "every direct CodeMap mixin is a responsibility boundary and must be "
+        "named in docs/maintainers/CODEMAP.md: " + ", ".join(missing)
+    )
+
+
+def test_repository_state_families_have_one_discoverable_owner_map() -> None:
+    docs = _text("docs/README.md")
+    state = _text("docs/reference/STATE_AND_SEMANTIC_OWNERS.md")
+    guide = _text("docs/maintainers/CODEMAP.md")
+    template = _text(".github/PULL_REQUEST_TEMPLATE.md")
+
+    assert "reference/STATE_AND_SEMANTIC_OWNERS.md" in docs
+    for owner in (
+        "observation.py::ObservationState",
+        "client.py::RepositoryObservation",
+        "repository_delta.py::RepositoryDeltaMixin",
+        "evidence_freshness.py",
+        "freshness_map.py",
+    ):
+        assert owner in state
+    for state_family in (
+        "Repository continuity",
+        "Member revision",
+        "Evidence availability",
+        "Freshness",
+        "Completeness",
+        "Repository semantic delta",
+        "Relationship evidence",
+        "Consumer binding definition",
+        "Consumer binding impact",
+    ):
+        assert state_family in state
+    assert "reuse before adding" in state.lower()
+    assert "STATE_AND_SEMANTIC_OWNERS.md" in guide
+    assert "Existing semantic owner extended:" in template
+    assert "New serialized state vocabulary:" in template
+
+
+def test_public_docs_expose_repository_evidence_binding_contract() -> None:
+    docs = _text("docs/README.md")
+    readme = _text("README.md")
+    stability = _text("docs/reference/API_STABILITY.md")
+    observer = _text("docs/reference/OBSERVER_DELTA.md")
+    binding = _text("docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md")
+
+    assert "reference/REPOSITORY_EVIDENCE_BINDINGS.md" in docs
+    assert "Repository evidence bindings" in readme
+    assert "repository_evidence_bindings()" in stability
+    assert "hashmarks.repository-evidence-bindings.v1" in stability
+    assert "## Repository evidence bindings" in observer
+    for schema in (
+        "hashmarks.repository-evidence-bindings.v1",
+        "hashmarks.repository-evidence-binding-delta.v1",
+        "hashmarks.repository-evidence-coverage.v1",
+    ):
+        assert schema in binding
+    for state in ("current", "stale", "unknown"):
+        assert state in binding
 
 
 def test_public_docs_separate_current_contracts_from_history() -> None:

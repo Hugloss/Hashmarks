@@ -38,7 +38,7 @@ def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_fre
     assert "freshness_reason" not in provenance
 
 
-def test_task_evidence_maps_generation_bound_continuity_to_proven(
+def test_task_evidence_maps_generation_bound_continuity_to_current(
     tmp_path: Path, monkeypatch
 ) -> None:
     _repo(tmp_path)
@@ -51,7 +51,7 @@ def test_task_evidence_maps_generation_bound_continuity_to_proven(
         start = codemap.task_evidence(_task(), token_budget=512)
 
     provenance = start["provenance"]
-    assert provenance["freshness"] == "proven"
+    assert provenance["freshness"] == "current"
     assert "identity_generation" not in provenance
     assert "freshness_reason" not in provenance
 
@@ -155,12 +155,12 @@ def test_task_evidence_context_identity_changes_with_freshness_authority(
         monkeypatch.setattr(
             codemap, "_generation_status", lambda: (generation, 91, False)
         )
-        proven = codemap.task_evidence(_task(), token_budget=32)
+        current = codemap.task_evidence(_task(), token_budget=32)
     assert unknown["provenance"]["freshness"] == "unknown"
-    assert proven["provenance"]["freshness"] == "proven"
+    assert current["provenance"]["freshness"] == "current"
     assert (
         unknown["provenance"]["context_identity"]
-        != proven["provenance"]["context_identity"]
+        != current["provenance"]["context_identity"]
     )
 
 

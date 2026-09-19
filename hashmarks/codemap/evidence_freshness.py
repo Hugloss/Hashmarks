@@ -13,6 +13,18 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+FRESHNESS_STATES = frozenset({"current", "stale", "unknown"})
+
+
+def freshness_state(stale: bool | None) -> str:
+    """Return the canonical serialized freshness state."""
+    if stale is True:
+        return "stale"
+    if stale is False:
+        return "current"
+    return "unknown"
+
+
 class EvidenceFreshnessMixin:
     """Own evidence snapshot identity, manifest freshness, and freshness status semantics."""
 

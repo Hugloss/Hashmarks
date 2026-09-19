@@ -18,7 +18,7 @@ Rows participate in identity-based delta only when they carry a stable identity.
 
 ## Completeness and negative evidence
 
-Empty results are not automatically negative evidence. Public projections preserve known-present, known-absent, unknown, incomplete, stale, and unsupported evidence. Delta reports completeness transitions independently from added/removed rows, so unknown → known-absent cannot be misreported as “nothing changed.”
+Empty results are not automatically negative evidence. Public projections keep evidence availability, freshness, and completeness on separate axes: presence may be known-present/known-absent/unknown/unsupported, freshness is current/stale/unknown, and completeness is complete/incomplete/unknown. Delta reports completeness transitions independently from added/removed rows, so unknown → known-absent cannot be misreported as “nothing changed.”
 
 ## Delta taxonomy
 
@@ -39,6 +39,12 @@ The canonical implementation owner is `hashmarks.codemap.repository_delta.Reposi
 The current slice keeps observer capability identity separate from repository identity, represents bounded completeness explicitly, and refuses to promote same-name/same-kind symbol disappearance and appearance into proven move identity. Such correlations are emitted only as possible moves with provenance and `identity_authority: false`.
 
 Further work must continue through this owner and the existing change-intelligence/evidence projections.
+
+## Repository evidence bindings
+
+Opaque repository evidence bindings are a consumer-facing projection over the same member revision, relationship, freshness, completeness, and repository-delta authorities. They may own binding-definition and binding-impact projection shape, but they do not introduce another repository generation, member revision model, relationship graph, freshness authority, or generic change-set authority.
+
+Binding deltas keep direct range/member evidence, declared dependencies, relationship evidence, and binding-definition change separate. Coverage may consume either caller-asserted changed paths or an atomic `RepositoryObservation`, and it must preserve which source established change-set completeness. See [`REPOSITORY_EVIDENCE_BINDINGS.md`](REPOSITORY_EVIDENCE_BINDINGS.md).
 
 
 ## Relationship evidence identity

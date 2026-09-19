@@ -75,6 +75,30 @@ def test_concurrent_external_state_first_claim_has_one_workspace_owner(
     assert sorted(results) == ["claimed", "rejected"]
 
 
+def test_concurrent_store_first_open_publishes_complete_schema(tmp_path: Path) -> None:
+    state = tmp_path / "state" / "codemap.sqlite3"
+
+    def open_store(_: int) -> tuple[str, ...]:
+        store = WorkspaceMapStore(state)
+        try:
+            return tuple(
+                str(row[0])
+                for row in store._db.execute(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                ).fetchall()
+            )
+        finally:
+            store.close()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        observed = list(executor.map(open_store, range(32)))
+
+    expected = tuple(sorted(WorkspaceMapStore._CURRENT_TABLES))
+    assert observed
+    assert all(tables == expected for tables in observed)
+
+
 def test_external_unbound_existing_state_fails_closed(tmp_path: Path) -> None:
     workspace = tmp_path / "repo"
     workspace.mkdir()

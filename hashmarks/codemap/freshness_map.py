@@ -7,6 +7,7 @@ from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
+from .evidence_freshness import freshness_state
 from .project_impact_codec import expand_project_impact
 
 if TYPE_CHECKING:
@@ -23,14 +24,6 @@ class EvidenceFreshnessMapMixin:
     and gives consumers stable evidence identities that can be compared across
     admitted repository states.
     """
-
-    @staticmethod
-    def _freshness_state(stale: bool | None) -> str:
-        if stale is True:
-            return "invalidated"
-        if stale is False:
-            return "current"
-        return "unknown"
 
     def _freshness_identity(self, kind: str, payload: object) -> str:
         if TYPE_CHECKING:
@@ -138,7 +131,7 @@ class EvidenceFreshnessMapMixin:
             candidate_limit=16,
         )
         generation, identity_generation, stale = self._generation_status()
-        continuity_state = self._freshness_state(stale)
+        continuity_state = freshness_state(stale)
         repository_identity = self._repository_packet_identity()
         task_identity = self._packet_digest("hashmarks.task.v1", {"task": task})
 
@@ -216,11 +209,11 @@ class EvidenceFreshnessMapMixin:
             )
             status = str(explanation.get("status") or "insufficient-evidence")
             if status == "selected":
-                state = "invalidated"
+                state = "stale"
                 reason = "member-is-selected"
             elif status == "insufficient-evidence":
                 state = (
-                    "unknown" if continuity_state != "invalidated" else "invalidated"
+                    "unknown" if continuity_state != "stale" else "stale"
                 )
                 reason = str(explanation.get("reason") or "insufficient-evidence")
             else:
@@ -261,11 +254,11 @@ class EvidenceFreshnessMapMixin:
             for producer in producers:
                 fresh, reason = self._evidence_fresh("project", producer)
                 if not fresh:
-                    dependency_state = "invalidated"
+                    dependency_state = "stale"
                 dependency_rows.append(
                     {
                         "producer": producer,
-                        "state": "current" if fresh else "invalidated",
+                        "state": "current" if fresh else "stale",
                         **({"reason": reason} if reason else {}),
                     }
                 )
@@ -305,7 +298,7 @@ class EvidenceFreshnessMapMixin:
                     "verification-membership",
                     "cross-repository",
                 }:
-                    state = "invalidated"
+                    state = "stale"
                     reason = "evidence-no-longer-supported-by-current-map"
                 else:
                     state = "unknown"
@@ -314,7 +307,7 @@ class EvidenceFreshnessMapMixin:
                 state = "current"
                 reason = "evidence-identity-unchanged"
             else:
-                state = "invalidated"
+                state = "stale"
                 reason = "evidence-identity-changed"
             prior.append(
                 {

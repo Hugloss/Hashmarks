@@ -83,7 +83,8 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 
 - `evidence_freshness.py` — low-level fact-local freshness evidence used by graph/intelligence producers.
 - `freshness_map.py` — consumer-facing freshness-map projection.
-- `change_intelligence.py`, `repository_delta.py`, `evidence_profiles.py`, `cross_repository_evidence.py`, `intelligence_economics.py` — derived repository-intelligence projections. `repository_delta.py` owns snapshot composition; inside one explicit decision session, an exact snapshot request may be reused by profile/economics/delta consumers without creating a second truth source.
+- `change_intelligence.py`, `repository_delta.py`, `evidence_profiles.py`, `cross_repository_evidence.py`, `intelligence_economics.py` — derived repository-intelligence projections. `repository_delta.py` owns snapshot composition and repository/observer delta vocabulary; inside one explicit decision session, an exact snapshot request may be reused by profile/economics/delta consumers without creating a second truth source.
+- `repository_evidence_bindings.py`, `repository_evidence_binding_delta.py`, `repository_evidence_coverage.py` — opaque consumer binding projections over existing repository observation, member revision, relationship, freshness, completeness, and delta authorities. They may own binding declaration/projection shape but must not create a second repository change/freshness model.
 - `repository_intelligence_query.py` — thin query facade over those producers; it is not a second source of truth.
 
 ### Task evidence packets
@@ -183,6 +184,9 @@ Use these questions in order:
 3. **Does it require repository bytes/state or execution results?** Execution results do not belong in Hashmarks.
 4. **Would two modules become writers for the same fact?** Stop and redesign.
 5. **Is a new cache necessary?** First look for operation-local or generation-bound reuse in `decision_session.py` and existing store bulk APIs.
+6. **Is a new serialized state word or delta concept necessary?** Read `docs/reference/STATE_AND_SEMANTIC_OWNERS.md` and reuse the existing state family/owner first.
+
+Every direct `CodeMap` mixin is a responsibility boundary and must be named in this responsibility map. CI enforces that rule so adding a mixin cannot silently add an undocumented semantic owner.
 
 ## Reading strategy for a new maintainer
 

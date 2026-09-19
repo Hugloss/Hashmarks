@@ -23,6 +23,7 @@ Coding agents repeatedly spend context and tool calls rediscovering the same cod
 - **Code navigation and ownership.** Trace symbols, references, imports, callers, project boundaries, and likely implementation owners.
 - **Freshness-aware evidence.** Distinguish current, stale, and unknown repository evidence instead of silently serving an old index as truth.
 - **Observer-aware deltas.** Keep repository change separate from observer-capability change, and compare stable evidence identities instead of treating every newly visible fact as a repository edit.
+- **Repository evidence bindings.** Bind opaque consumer IDs to exact line ranges or whole repository members, then compare direct/member/dependency/relationship evidence without transferring consumer policy into Hashmarks.
 - **Local and read-only for agent consumers.** Hashmarks maintains disposable derived state, while editing, execution, git, planning, and model decisions stay with the caller.
 
 ## Quick start
@@ -152,6 +153,7 @@ For the complete tool schemas, freshness behavior, concurrency guarantees, and h
 | Verification evidence | Bounded verification relevance and repository-bound verification descriptions |
 | Content identity | Canonical file, directory, manifest, and repository identities |
 | Interchange | Strict producer/consumer contracts, provenance, validation, and conformance surfaces |
+| Evidence bindings | Opaque consumer bindings to exact line/member evidence, declared dependencies, relationship evidence, deltas, and change coverage |
 
 Built-in lightweight structural parsing covers Python, JavaScript/TypeScript, Go, and Rust. Optional Tree-sitter range enrichment can add precise symbol ranges for additional languages when available. Native/project evidence can also be imported from supported adapters and SCIP.
 
@@ -227,6 +229,29 @@ with CodeMap(workspace) as codemap:
 
     print(codemap.affected("hashmarks/codemap/engine.py"))
 ```
+
+### Repository evidence bindings
+
+```python
+from hashmarks import CodeMap
+
+with CodeMap(".") as codemap:
+    codemap.sync()
+    before = codemap.repository_evidence_bindings(
+        [
+            {
+                "binding_id": "consumer:contract-a",
+                "evidence": [
+                    {"path": "src/owner.py", "start_line": 10, "end_line": 14},
+                    {"scope": "member", "path": "uv.lock"},
+                ],
+            }
+        ],
+        dependency_paths={"consumer:contract-a": ["pyproject.toml"]},
+    )
+```
+
+Bindings are read-only repository intelligence: the ID is opaque, exact line/member evidence remains separate from containing-member/dependency/relationship change, and Hashmarks does not decide what the consumer should execute. See [Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md).
 
 ### Canonical repository identity with `RepositoryIdentity`
 
@@ -346,6 +371,7 @@ See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs
 - [Hashmarks MCP server for coding agents](docs/integration/MCP.md)
 - [Architecture](docs/reference/ARCHITECTURE.md)
 - [Observer and delta model](docs/reference/OBSERVER_DELTA.md)
+- [Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md)
 - [Product boundary](docs/reference/PRODUCT_BOUNDARY.md)
 - [Normative invariants](docs/reference/INVARIANTS.md)
 - [Public API and stability policy](docs/reference/API_STABILITY.md)

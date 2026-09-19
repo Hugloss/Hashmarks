@@ -254,7 +254,7 @@ def test_repository_snapshot_exposes_observer_and_explicit_completeness(
     assert snapshot["observer"]["identity"].startswith("sha256:")
     assert snapshot["observer"]["producer"] == "hashmarks"
     assert snapshot["completeness"] == {
-        "state": "known-present",
+        "state": "complete",
         "scope": "bounded-explicit-change-set",
         "dynamic_runtime_relationships": "unknown",
     }
@@ -447,7 +447,7 @@ def test_unrelated_edit_does_not_destroy_scoped_observation_freshness() -> None:
         changed_paths=["docs/guide.md"],
     )
 
-    assert freshness["state"] == "fresh"
+    assert freshness["state"] == "current"
     assert freshness["reason"] == "changed-paths-proven-outside-observation-scope"
     assert freshness["intersection"] == []
 
