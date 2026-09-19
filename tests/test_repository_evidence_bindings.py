@@ -103,3 +103,42 @@ def test_binding_vocabulary_does_not_encode_consumer_execution_policy(tmp_path: 
     rendered = repr(packet).lower()
     for forbidden in ("recertif", "capability suspension", "admission", "goon"):
         assert forbidden not in rendered
+
+
+def test_span_identity_preserves_newline_bytes(tmp_path: Path) -> None:
+    source = tmp_path / "a.py"
+    source.write_bytes(b"one\r\ntwo\r\n")
+    binding = [{"binding_id": "newline", "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        crlf = codemap.repository_evidence_bindings(binding)
+        source.write_bytes(b"one\ntwo\r\n")
+        codemap.sync(["a.py"])
+        lf = codemap.repository_evidence_bindings(binding)
+    assert crlf["bindings"][0]["evidence"][0]["span_identity"] != lf["bindings"][0]["evidence"][0]["span_identity"]
+
+
+def test_binding_rejects_symlinked_ancestor_evidence(tmp_path: Path) -> None:
+    outside = tmp_path.parent / (tmp_path.name + "-outside")
+    outside.mkdir()
+    (outside / "secret.py").write_text("secret\n", encoding="utf-8")
+    (tmp_path / "linked").symlink_to(outside, target_is_directory=True)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            [{"binding_id": "escape", "evidence": [{"path": "linked/secret.py", "start_line": 1, "end_line": 1}]}]
+        )
+    row = packet["bindings"][0]["evidence"][0]
+    assert row["state"] == "unsupported"
+    assert row["reason"] == "symlink-evidence-not-observed"
+
+
+def test_binding_observation_is_decision_session_scoped(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("a\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with codemap.decision_session():
+            packet = codemap.repository_evidence_bindings(
+                [{"binding_id": "stable", "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}]}]
+            )
+            assert packet["repository"]["codemap_generation"] == codemap.store.generation()
