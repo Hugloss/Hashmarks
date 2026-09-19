@@ -51,6 +51,17 @@ class RepositoryDeltaMixin:
     facts plus compact semantic summaries.
     """
 
+    def _repository_observer_packet(self) -> dict[str, object]:
+        """Return the canonical observer capability descriptor with stable identity."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        observer = _observer_descriptor()
+        return {
+            **observer,
+            "identity": "sha256:"
+            + self._packet_digest("hashmarks.repository-observer.v1", observer),
+        }
+
     @staticmethod
     def _evidence_identity(schema: str, value: Mapping[str, object]) -> str:
         """Return a deterministic domain-separated identity for observer evidence."""
@@ -619,14 +630,9 @@ class RepositoryDeltaMixin:
             impact_limit_per_surface=impact_limit_per_surface,
             max_depth=max_depth,
         )
-        observer = _observer_descriptor()
         payload: dict[str, object] = {
             "schema": "hashmarks.repository-intelligence-snapshot.v1",
-            "observer": {
-                **observer,
-                "identity": "sha256:"
-                + self._packet_digest("hashmarks.repository-observer.v1", observer),
-            },
+            "observer": self._repository_observer_packet(),
             "repository": deepcopy(brief["repository"]),
             "task_identity": brief["task_identity"],
             "paths": self._snapshot_paths(changed_paths),
