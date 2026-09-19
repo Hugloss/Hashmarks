@@ -63,6 +63,7 @@ class _TaskActionConfigState:
     row_text: dict[int, str]
     term_rows: dict[str, int]
 
+
 @dataclass
 class _TaskActionMapContext:
     hits: Sequence[SearchHit]
