@@ -34,10 +34,10 @@ def test_repository_evidence_bindings_are_generic_deterministic_repository_facts
     assert row["binding_id"] == "consumer:a"
     assert row["evidence"][0]["state"] == "known-present"
     assert row["evidence"][0]["span_identity"].startswith("sha256:")
-    assert row["evidence"][0]["member_identity"].startswith("sha256:")
+    assert len(row["evidence"][0]["member_revision"]) == 64
 
 
-def test_span_identity_survives_unrelated_member_edit_while_member_identity_changes(
+def test_span_identity_survives_unrelated_member_edit_while_member_revision_changes(
     tmp_path: Path,
 ) -> None:
     source = tmp_path / "src.py"
@@ -58,7 +58,7 @@ def test_span_identity_survives_unrelated_member_edit_while_member_identity_chan
     old = before["bindings"][0]["evidence"][0]
     new = after["bindings"][0]["evidence"][0]
     assert old["span_identity"] == new["span_identity"]
-    assert old["member_identity"] != new["member_identity"]
+    assert old["member_revision"] != new["member_revision"]
 
 
 def test_binding_reports_deleted_and_unsupported_members_without_policy_decision(
@@ -164,8 +164,8 @@ def test_dependency_change_is_separate_from_unchanged_direct_evidence(tmp_path: 
 
     changed = delta["bindings"]["changed"][0]
     assert changed["direct_evidence"]["state"] == "preserved"
-    assert changed["semantic_dependencies"]["state"] == "affected"
-    assert changed["semantic_dependencies"]["changes"][0]["path"] == "dependency.py"
+    assert changed["declared_dependencies"]["state"] == "affected"
+    assert changed["declared_dependencies"]["changes"][0]["path"] == "dependency.py"
 
 
 def test_unrelated_change_does_not_affect_declared_dependency(tmp_path: Path) -> None:
@@ -243,7 +243,7 @@ def test_complete_change_set_can_prove_outside_declared_bindings(tmp_path: Path)
             change_set_complete=True,
         )
     assert coverage["classification"]["bound_member_precision_unknown"] == ["bound.py"]
-    assert coverage["classification"]["dependency_affected"] == ["dependency.py"]
+    assert coverage["classification"]["declared_dependencies_changed"] == ["dependency.py"]
     assert coverage["classification"]["outside_declared_bindings"] == ["outside.py"]
     assert coverage["coverage"]["state"] == "complete"
     assert coverage["coverage"]["outside_classification"] == "known"
