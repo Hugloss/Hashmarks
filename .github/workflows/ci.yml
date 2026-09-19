@@ -30,12 +30,41 @@ jobs:
         continue-on-error: true
         run: make lint-debt-summary
       - run: make compile
-      - name: Prove workspace-state authority before heavy qualification
+  authority-diagnostics:
+    name: Workspace authority diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.11
+      - run: uv sync --group test --python 3.11
+      - name: Prove workspace-state authority
         run: uv run --no-sync python -m pytest -q tests/test_codemap_state_binding.py
+
+  evidence-binding-diagnostics:
+    name: Repository evidence binding diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.11
+      - run: uv sync --group test --python 3.11
+      - name: Prove repository evidence binding behavior
+        run: uv run --no-sync python -m pytest -q tests/test_repository_evidence_bindings.py
 
   consumer-wheel-artifact:
     name: Consumer wheel artifact
-    needs: fast-gate
+    needs: [fast-gate, authority-diagnostics, evidence-binding-diagnostics]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -58,7 +87,7 @@ jobs:
 
   release-environment:
     name: Release qualification environment (Python 3.14)
-    needs: fast-gate
+    needs: [fast-gate, authority-diagnostics, evidence-binding-diagnostics]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -75,11 +104,11 @@ jobs:
 
   python-support:
     name: Tests / Python ${{ matrix.python }}
-    needs: fast-gate
+    needs: [fast-gate, authority-diagnostics, evidence-binding-diagnostics]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
@@ -96,11 +125,11 @@ jobs:
 
   mcp-interop:
     name: ${{ matrix.label }} / Python ${{ matrix.python }}
-    needs: fast-gate
+    needs: [fast-gate, authority-diagnostics, evidence-binding-diagnostics]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - python: "3.11"
@@ -132,7 +161,7 @@ jobs:
 
   precommit:
     name: Pre-commit checks
-    needs: fast-gate
+    needs: [fast-gate, authority-diagnostics, evidence-binding-diagnostics]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
