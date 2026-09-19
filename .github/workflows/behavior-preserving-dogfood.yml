@@ -58,6 +58,83 @@ jobs:
             --artifact .agent-artifacts/task-action-projection-test-focus.json \
             --format json
           cat .agent-artifacts/task-action-projection-test-focus.json
+      - name: Build behavior-preservation readiness evidence
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.agent-economics/scripts
+        run: |
+          uv run --no-sync python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          from agent_economics.behavior_preservation import behavior_preservation_readiness
+
+          target = Path("hashmarks/codemap/task_action_projection.py")
+          source_identity = "sha256:" + hashlib.sha256(target.read_bytes()).hexdigest()
+          test_paths = [
+              "tests/test_task_action_map.py",
+              "tests/test_task_action_brief.py",
+              "tests/test_task_action_session_reuse.py",
+              "tests/test_task_action_stale_workspace.py",
+          ]
+          tests = [
+              {
+                  "path": path,
+                  "evidence_identity": "sha256:" + hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+              }
+              for path in test_paths
+          ]
+          test_focus = json.loads(Path(".agent-artifacts/task-action-projection-test-focus.json").read_text())
+          test_focus_identity = test_focus["evidence_identity"]
+          boundaries = [
+              "task-action-projection-and-ambiguity",
+              "public-task-action-brief",
+              "decision-session-cache-and-mutation-isolation",
+              "stale-workspace-owner-reconciliation",
+          ]
+          boundary_rows = [
+              {
+                  "identity": boundary,
+                  "classification": "direct",
+                  "freshness": "fresh",
+                  "provider_reference": {
+                      "provider": "test-focus",
+                      "evidence_identity": test_focus_identity,
+                  },
+              }
+              for boundary in boundaries
+          ]
+          receipt_semantic = {
+              "source_identity": source_identity,
+              "status": "PASS",
+              "test_evidence_identities": sorted(row["evidence_identity"] for row in tests),
+              "workflow": "Behavior-preserving Agent Economics dogfood",
+              "run_id": "${{ github.run_id }}",
+              "head_sha": "${{ github.sha }}",
+              "command": "uv run pytest -q " + " ".join(test_paths),
+          }
+          receipt = {
+              **receipt_semantic,
+              "execution_identity": "sha256:" + hashlib.sha256(
+                  json.dumps(receipt_semantic, sort_keys=True, separators=(",", ":")).encode()
+              ).hexdigest(),
+          }
+          evidence = behavior_preservation_readiness(
+              target=target.as_posix(),
+              source_identity=source_identity,
+              boundaries=boundary_rows,
+              test_references=tests,
+              execution_receipt=receipt,
+              repository_gates=[
+                  {"name": "ruff", "command": "make ruff"},
+                  {"name": "tests", "command": "make test"},
+              ],
+          )
+          out = Path(".agent-artifacts/task-action-projection-behavior-preservation.json")
+          out.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
+          print(out.read_text())
+          if evidence["status"] != "READY_FOR_BEHAVIOR_PRESERVING_EDIT":
+              raise SystemExit("behavior-preservation evidence is not READY")
+          PY
       - name: Bind BP1 pre-edit behavior-preservation evidence
         env:
           PYTHONPATH: ${{ github.workspace }}/.agent-economics/scripts
