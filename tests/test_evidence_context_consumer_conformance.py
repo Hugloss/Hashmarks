@@ -13,7 +13,7 @@ def _receipt():
 
 
 def _provenance():
-    value = {"revision": "r1", "freshness": "proven"}
+    value = {"revision": "r1", "freshness": "current"}
     value["context_identity"] = evidence_context_identity(
         _receipt(), value, producer_implementation_identity=PRODUCER
     )
