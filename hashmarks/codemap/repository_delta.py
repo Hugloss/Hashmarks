@@ -120,40 +120,46 @@ class RepositoryDeltaMixin:
             )
 
         row = self._session_file_row(rel)
-        if row is None:
-            return (
-                {
-                    **base,
-                    "state": "unknown",
-                    "reason": "member-not-indexed",
-                },
-                None,
-            )
+        visibility = (
+            str(row.get("evidence_visibility") or decision.evidence_visibility.value)
+            if row is not None
+            else decision.evidence_visibility.value
+        )
+        indexed_revision = (
+            str(row.get("file_digest") or "") if row is not None else ""
+        )
 
-        revision = str(row.get("file_digest") or "")
-        visibility = str(row.get("evidence_visibility") or decision.evidence_visibility.value)
-        observed: dict[str, object] = {
-            **base,
-            "state": "known-present",
-            "member_identity": revision,
-            "evidence_visibility": visibility,
-        }
-        if not include_bytes:
-            return observed, None
-        if visibility != "source":
+        if include_bytes and visibility != "source":
             return (
                 {
                     **base,
                     "state": "unsupported",
                     "reason": "source-evidence-not-visible",
-                    "member_identity": revision,
+                    **(
+                        {"member_identity": indexed_revision}
+                        if indexed_revision
+                        else {}
+                    ),
                     "evidence_visibility": visibility,
+                    "index_state": "indexed" if row is not None else "unindexed",
                 },
                 None,
             )
 
         try:
-            raw, digest = self.file_store.read_bytes_stable(path)
+            if include_bytes:
+                raw, digest = self.file_store.read_bytes_stable(path)
+            elif row is None:
+                digest = self.file_store.digest(
+                    path,
+                    workspace=self.workspace,
+                    relative_path=rel,
+                    force=True,
+                )
+                raw = None
+            else:
+                digest = None
+                raw = None
         except FileNotFoundError:
             return (
                 {
@@ -169,23 +175,47 @@ class RepositoryDeltaMixin:
                     **base,
                     "state": "unknown",
                     "reason": "member-read-unstable-or-unavailable",
-                    "member_identity": revision,
+                    **(
+                        {"member_identity": indexed_revision}
+                        if indexed_revision
+                        else {}
+                    ),
                     "evidence_visibility": visibility,
+                    "index_state": "indexed" if row is not None else "unindexed",
                 },
                 None,
             )
-        if digest.hash != revision:
-            return (
-                {
-                    **base,
-                    "state": "unknown",
-                    "reason": "member-revision-mismatch",
-                    "member_identity": revision,
-                    "evidence_visibility": visibility,
-                },
-                None,
-            )
-        return observed, raw
+
+        if row is not None:
+            if digest is not None and digest.hash != indexed_revision:
+                return (
+                    {
+                        **base,
+                        "state": "unknown",
+                        "reason": "member-revision-mismatch",
+                        "member_identity": indexed_revision,
+                        "evidence_visibility": visibility,
+                        "index_state": "indexed",
+                    },
+                    None,
+                )
+            revision = indexed_revision
+            index_state = "indexed"
+        else:
+            assert digest is not None
+            revision = digest.hash
+            index_state = "unindexed"
+
+        return (
+            {
+                **base,
+                "state": "known-present",
+                "member_identity": revision,
+                "evidence_visibility": visibility,
+                "index_state": index_state,
+            },
+            raw,
+        )
 
     def _snapshot_paths(
         self, changed_paths: Sequence[str | Path]
