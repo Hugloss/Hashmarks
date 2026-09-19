@@ -242,7 +242,7 @@ def test_complete_change_set_can_prove_outside_declared_bindings(tmp_path: Path)
             changed_paths=["bound.py", "dependency.py", "outside.py"],
             change_set_complete=True,
         )
-    assert coverage["classification"]["bound_members"] == ["bound.py"]
+    assert coverage["classification"]["bound_member_precision_unknown"] == ["bound.py"]
     assert coverage["classification"]["dependency_affected"] == ["dependency.py"]
     assert coverage["classification"]["outside_declared_bindings"] == ["outside.py"]
     assert coverage["coverage"]["state"] == "complete"
@@ -279,3 +279,54 @@ def test_coverage_is_order_independent_and_identity_stable(tmp_path: Path) -> No
             packet, changed_paths=["a.py", "b.py"], change_set_complete=True
         )
     assert first == second
+
+
+def test_coverage_distinguishes_bound_range_from_elsewhere_in_member(tmp_path: Path) -> None:
+    source = tmp_path / "source.py"
+    source.write_text("outside\nbound\n", encoding="utf-8")
+    bindings = [{"binding_id": "range", "evidence": [{"path": "source.py", "start_line": 2, "end_line": 2}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(bindings)
+        source.write_text("OUTSIDE\nbound\n", encoding="utf-8")
+        codemap.sync(["source.py"])
+        after = codemap.repository_evidence_bindings(bindings)
+        delta = codemap.repository_evidence_binding_delta(before, after)
+        outside_range = codemap.repository_evidence_coverage(
+            after,
+            changed_paths=["source.py"],
+            change_set_complete=True,
+            binding_delta=delta,
+        )
+        source.write_text("OUTSIDE\nBOUND\n", encoding="utf-8")
+        codemap.sync(["source.py"])
+        latest = codemap.repository_evidence_bindings(bindings)
+        direct_delta = codemap.repository_evidence_binding_delta(after, latest)
+        inside_range = codemap.repository_evidence_coverage(
+            latest,
+            changed_paths=["source.py"],
+            change_set_complete=True,
+            binding_delta=direct_delta,
+        )
+
+    assert outside_range["classification"]["changed_inside_bound_evidence"] == []
+    assert outside_range["classification"]["changed_elsewhere_in_bound_member"] == ["source.py"]
+    assert outside_range["classification"]["bound_member_precision_unknown"] == []
+    assert inside_range["classification"]["changed_inside_bound_evidence"] == ["source.py"]
+    assert inside_range["classification"]["changed_elsewhere_in_bound_member"] == []
+    assert inside_range["precision"]["bound_range"] == "known"
+
+
+def test_path_only_coverage_refuses_to_infer_range_impact(tmp_path: Path) -> None:
+    (tmp_path / "source.py").write_text("a\nb\n", encoding="utf-8")
+    bindings = [{"binding_id": "range", "evidence": [{"path": "source.py", "start_line": 2, "end_line": 2}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(bindings)
+        coverage = codemap.repository_evidence_coverage(
+            packet, changed_paths=["source.py"], change_set_complete=True
+        )
+    assert coverage["classification"]["changed_inside_bound_evidence"] == []
+    assert coverage["classification"]["changed_elsewhere_in_bound_member"] == []
+    assert coverage["classification"]["bound_member_precision_unknown"] == ["source.py"]
+    assert coverage["precision"]["bound_range"] == "unknown"
