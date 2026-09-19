@@ -117,16 +117,63 @@ class RepositoryEvidenceBindingsMixin:
             "byte_length": len(selected),
         }
 
+    def _binding_relationships(
+        self, evidence: Sequence[Mapping[str, object]], *, limit_per_path: int
+    ) -> dict[str, object]:
+        """Project bounded indexed relationships without inventing dependency authority."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        paths = sorted(
+            {
+                str(row.get("path") or "")
+                for row in evidence
+                if row.get("state") == "known-present" and row.get("path")
+            }
+        )
+        edges = self._session_edges_for_paths_many(
+            paths, limit_per_path=limit_per_path
+        )
+        relationships: list[dict[str, object]] = []
+        for path in paths:
+            for edge in edges.get(path, ()):
+                relationships.append(
+                    {
+                        key: edge[key]
+                        for key in ("path", "source", "kind", "target", "line", "confidence")
+                        if edge.get(key) is not None
+                    }
+                )
+        relationships.sort(
+            key=lambda row: (
+                str(row.get("path") or ""),
+                int(row.get("line") or 0),
+                str(row.get("kind") or ""),
+                str(row.get("target") or ""),
+            )
+        )
+        return {
+            "state": "observed",
+            "relationships": relationships,
+            "bounds": {
+                "paths": len(paths),
+                "limit_per_path": limit_per_path,
+            },
+            "completeness": "bounded-not-claimed",
+        }
+
     @decision_scoped
     def repository_evidence_bindings(
         self,
         bindings: Sequence[Mapping[str, object]],
         *,
         dependency_paths: Mapping[str, Sequence[str]] | None = None,
+        relationship_limit_per_path: int = 100,
     ) -> dict[str, object]:
         """Return deterministic exact-span evidence for opaque consumer bindings."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
+        if relationship_limit_per_path < 1:
+            raise ValueError("relationship_limit_per_path must be >= 1")
         generation, identity_generation, stale = self._generation_status()
         rows: list[dict[str, object]] = []
         seen: set[str] = set()
@@ -172,6 +219,9 @@ class RepositoryEvidenceBindingsMixin:
                 "binding_id": binding_id,
                 "evidence": evidence,
                 "dependencies": dependencies,
+                "relationships": self._binding_relationships(
+                    evidence, limit_per_path=relationship_limit_per_path
+                ),
             }
             rows.append(
                 {
