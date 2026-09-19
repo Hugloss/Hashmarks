@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
+    from .model import SearchHit
     from .repository_domains import RepositoryDomain
 
 
@@ -61,3 +62,55 @@ class _TaskActionConfigState:
     task_terms: list[str]
     row_text: dict[int, str]
     term_rows: dict[str, int]
+
+@dataclass
+class _TaskActionMapContext:
+    hits: Sequence[SearchHit]
+    rows: list[dict[str, object]]
+    failed: set[str]
+    cues: _TaskActionCues
+    cue_words: set[str]
+    strong_config_cues: set[str]
+    strong_contract_cues: set[str]
+    strong_authority_cues: set[str]
+    projection_state: _TaskActionProjectionState
+
+
+@dataclass
+class _TaskActionSelectionState:
+    edit: dict[str, object] | None
+    verify: dict[str, object] | None
+    contract: dict[str, object] | None
+    discrimination: _TaskActionDiscriminationState
+    explicit_surface_ambiguity: bool
+    explicit_edit_surface_selected: bool
+    verification_anchor_tokens: Sequence[str]
+    localized_config_edit: bool
+    explicit_config_surface_request: bool
+    structural_owner: dict[str, object] | None
+    structural_owner_origin: Mapping[str, object] | None
+    archive_live_owner_ambiguity: bool
+    exact_identifier_paths: tuple[str, ...]
+    exact_identifier_displacement_guard: bool
+    exact_identifier_surface_selected: bool
+
+
+@dataclass
+class _TaskActionProjectionChoices:
+    edit: dict[str, object] | None
+    verify: dict[str, object] | None
+    contract: dict[str, object] | None
+    verification_relevance: Mapping[str, object]
+
+
+@dataclass
+class _TaskActionFinalState:
+    edit: dict[str, object] | None
+    verify: dict[str, object] | None
+    contract: dict[str, object] | None
+    structural_owner: dict[str, object] | None
+    verification_relevance: Mapping[str, object]
+    ambiguity_state: Mapping[str, object]
+    competing: list[dict[str, object]]
+    ambiguous: bool
+    ambiguity_reason: str
