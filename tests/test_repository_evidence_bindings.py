@@ -591,3 +591,87 @@ def test_coverage_reports_binding_ids_and_stable_impact_reasons(tmp_path: Path) 
             ],
         }
     ]
+
+
+def test_whole_member_binding_supports_empty_and_binary_repository_members(
+    tmp_path: Path,
+) -> None:
+    empty = tmp_path / "empty.lock"
+    binary = tmp_path / "payload.bin"
+    empty.write_bytes(b"")
+    binary.write_bytes(b"\xff\x00\xfe")
+    binding = [{
+        "binding_id": "whole-members",
+        "evidence": [
+            {"scope": "member", "path": "empty.lock"},
+            {"scope": "member", "path": "payload.bin"},
+        ],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+
+    evidence = packet["bindings"][0]["evidence"]
+    assert [row["scope"] for row in evidence] == ["member", "member"]
+    assert all(row["state"] == "known-present" for row in evidence)
+    assert all(len(str(row["member_revision"])) == 64 for row in evidence)
+    assert all(row["index_state"] == "unindexed" for row in evidence)
+
+
+def test_whole_member_change_is_direct_content_and_member_change(tmp_path: Path) -> None:
+    member = tmp_path / "artifact.lock"
+    member.write_bytes(b"one")
+    binding = [{
+        "binding_id": "whole",
+        "evidence": [{"scope": "member", "path": "artifact.lock"}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+        member.write_bytes(b"two")
+        after = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+        delta = codemap.repository_evidence_binding_delta(before, after)
+        coverage = codemap.repository_evidence_coverage(
+            after,
+            changed_paths=["artifact.lock"],
+            change_set_complete=True,
+            binding_delta=delta,
+        )
+
+    changed = delta["bindings"]["changed"][0]
+    assert changed["direct_evidence"]["state"] == "changed"
+    assert changed["direct_evidence"]["changes"][0]["scope"] == "member"
+    assert changed["member_evidence"]["state"] == "changed"
+    assert coverage["binding_impacts"] == [
+        {
+            "binding_id": "whole",
+            "reasons": [
+                "bound-member-changed",
+                "bound-member-content-changed",
+            ],
+        }
+    ]
+
+
+def test_member_scope_rejects_line_bounds(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("a\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="must not declare line bounds"):
+            codemap.repository_evidence_bindings(
+                [{
+                    "binding_id": "bad-member",
+                    "evidence": [{
+                        "scope": "member",
+                        "path": "a.txt",
+                        "start_line": 1,
+                        "end_line": 1,
+                    }],
+                }]
+            )
