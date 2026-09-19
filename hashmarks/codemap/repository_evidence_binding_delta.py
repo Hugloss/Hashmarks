@@ -66,28 +66,50 @@ class RepositoryEvidenceBindingDeltaMixin:
         }
 
     @classmethod
-    def _dependency_changes(cls, before: Mapping[str, object], after: Mapping[str, object]) -> list[dict[str, object]]:
+    def _dependency_delta(
+        cls,
+        before: Mapping[str, object],
+        after: Mapping[str, object],
+    ) -> dict[str, object]:
         old = cls._dependency_index(before)
         new = cls._dependency_index(after)
-        changes: list[dict[str, object]] = []
-        for path in sorted(set(old) | set(new)):
-            previous = old.get(path)
-            current = new.get(path)
-            if previous is None:
-                changes.append({"path": path, "state": "added"})
-            elif current is None:
-                changes.append({"path": path, "state": "removed"})
-            elif (
+        added = sorted(set(new) - set(old))
+        removed = sorted(set(old) - set(new))
+        observation_changes: list[dict[str, object]] = []
+        for path in sorted(set(old) & set(new)):
+            previous = old[path]
+            current = new[path]
+            member_changed = (
                 previous.get("member_revision") != current.get("member_revision")
-                or previous.get("state") != current.get("state")
-            ):
-                changes.append({
-                    "path": path,
-                    "state": "changed",
-                    "member_changed": previous.get("member_revision") != current.get("member_revision"),
-                    "observation_state_changed": previous.get("state") != current.get("state"),
-                })
-        return changes
+            )
+            state_changed = previous.get("state") != current.get("state")
+            if member_changed or state_changed:
+                observation_changes.append(
+                    {
+                        "path": path,
+                        "state": "changed",
+                        "member_changed": member_changed,
+                        "observation_state_changed": state_changed,
+                    }
+                )
+        return {
+            "state": (
+                "affected"
+                if observation_changes
+                else "definition-changed"
+                if added or removed
+                else "unaffected"
+            ),
+            "definition": {
+                "state": "changed" if added or removed else "preserved",
+                "added": added,
+                "removed": removed,
+            },
+            "observations": {
+                "state": "changed" if observation_changes else "unchanged",
+                "changes": observation_changes,
+            },
+        }
 
     @staticmethod
     def _relationship_observation_config(value: object) -> dict[str, object]:
@@ -153,7 +175,12 @@ class RepositoryEvidenceBindingDeltaMixin:
                         "observation_state_changed": state_changed,
                     }
                 )
-        dependency_changes = cls._dependency_changes(before, after)
+        dependency_delta = cls._dependency_delta(before, after)
+        dependency_observation_changes = (
+            dependency_delta["observations"]["changes"]
+            if isinstance(dependency_delta.get("observations"), Mapping)
+            else []
+        )
         before_relationships = before.get("relationships")
         after_relationships = after.get("relationships")
         before_config = cls._relationship_observation_config(before_relationships)
@@ -260,7 +287,7 @@ class RepositoryEvidenceBindingDeltaMixin:
                 if (
                     changes
                     or member_changes
-                    or dependency_changes
+                    or dependency_observation_changes
                     or relationship_changed
                     or before.get("binding_definition_identity")
                     != after.get("binding_definition_identity")
@@ -275,10 +302,7 @@ class RepositoryEvidenceBindingDeltaMixin:
                 "state": "changed" if member_changes else "preserved",
                 "changes": member_changes,
             },
-            "declared_dependencies": {
-                "state": "affected" if dependency_changes else "unaffected",
-                "changes": dependency_changes,
-            },
+            "declared_dependencies": dependency_delta,
             "relationship_evidence": {
                 "state": relationship_state,
                 "comparability": comparability,
