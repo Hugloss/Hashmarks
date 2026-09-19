@@ -2,6 +2,11 @@
 
 ## Unreleased — Public release / multi-host MCP hardening
 
+- Add public repository evidence bindings for opaque consumer IDs over exact physical line ranges and whole repository members, with stable definition/observation identities, declared dependency and relationship evidence, binding deltas, per-binding change coverage, explicit bounds, context-policy isolation, and fail-closed stable-read/member-revision checks. These remain repository intelligence only; consumer execution/certification policy stays external.
+- Normalize the serialized freshness state axis to `current | stale | unknown` across current pre-1.0 evidence projections. Proof strength such as `proven` is kept separate from freshness state, and `invalidated` remains a delta consequence rather than a second freshness spelling.
+- Add a canonical semantic-owner/state reference plus CI architecture guards so new CodeMap mixins, member-observation semantics, and freshness/delta projections cannot silently create undocumented parallel owners.
+- Split CI into independent cheap/static, workspace-authority, and evidence-binding diagnostics while allowing full matrices to continue after unrelated diagnostic failures; add one final qualification-convergence gate and cancel stale PR runs instead of duplicating push+PR work.
+
 - Rework the public GitHub/PyPI landing surface for launch discovery: the README now leads with repository intelligence, codebase search for coding agents, repository context, local MCP usage, change impact, and copy-ready Claude Code/Codex/OpenCode/Pi configuration; package metadata and public docs use the same search-facing vocabulary without competitor/comparison framing or keyword stuffing.
 - Bind every durable CodeMap state directory to exactly one canonical workspace. Reusing one explicit external `--state-dir` across different repositories now fails closed before any query/write instead of leaking or replacing another repository's evidence; `map clean` preserves that binding.
 - Move bounded repository-race retry (`BUILDING`, decision-generation changes, unstable file sampling) into one transport-neutral owner shared by MCP and the public repository CLI. CLI queries now retry those known races centrally and return one-line caller errors if the bounded budget is exhausted instead of leaking tracebacks from leaf commands.
