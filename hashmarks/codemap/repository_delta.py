@@ -136,7 +136,7 @@ class RepositoryDeltaMixin:
                     "state": "unsupported",
                     "reason": "source-evidence-not-visible",
                     **(
-                        {"member_identity": indexed_revision}
+                        {"member_revision": indexed_revision}
                         if indexed_revision
                         else {}
                     ),
@@ -176,7 +176,7 @@ class RepositoryDeltaMixin:
                     "state": "unknown",
                     "reason": "member-read-unstable-or-unavailable",
                     **(
-                        {"member_identity": indexed_revision}
+                        {"member_revision": indexed_revision}
                         if indexed_revision
                         else {}
                     ),
@@ -193,7 +193,7 @@ class RepositoryDeltaMixin:
                         **base,
                         "state": "unknown",
                         "reason": "member-revision-mismatch",
-                        "member_identity": indexed_revision,
+                        "member_revision": indexed_revision,
                         "evidence_visibility": visibility,
                         "index_state": "indexed",
                     },
@@ -210,7 +210,7 @@ class RepositoryDeltaMixin:
             {
                 **base,
                 "state": "known-present",
-                "member_identity": revision,
+                "member_revision": revision,
                 "evidence_visibility": visibility,
                 "index_state": index_state,
             },
@@ -238,7 +238,7 @@ class RepositoryDeltaMixin:
         for path in paths:
             member, _raw = self._repository_member_observation(path)
             revision = (
-                str(member.get("member_identity") or "")
+                str(member.get("member_revision") or "")
                 if member.get("state") == "known-present"
                 else None
             )
