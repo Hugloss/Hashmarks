@@ -132,11 +132,29 @@ class RepositoryEvidenceBindingsMixin:
         relationships: list[dict[str, object]] = []
         for path in paths:
             for edge in edges.get(path, ()):
+                fact = {
+                    "path": path,
+                    **{
+                        key: edge[key]
+                        for key in ("source", "kind", "target", "confidence")
+                        if edge.get(key) is not None
+                    },
+                }
                 relationships.append(
                     {
-                        key: edge[key]
-                        for key in ("path", "source", "kind", "target", "line", "confidence")
-                        if edge.get(key) is not None
+                        **fact,
+                        **(
+                            {"line": edge["line"]}
+                            if edge.get("line") is not None
+                            else {}
+                        ),
+                        "identity": self._evidence_identity(
+                            "hashmarks.relationship-evidence.v1", fact
+                        ),
+                        "provenance": {
+                            "source": "codemap-edge-index",
+                            "path": path,
+                        },
                     }
                 )
         relationships.sort(
