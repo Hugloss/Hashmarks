@@ -738,3 +738,63 @@ def test_binding_contract_rejects_unknown_dependency_owner_and_unbounded_request
                     for index in range(257)
                 ]
             )
+
+
+def test_binding_delta_preserves_duplicate_evidence_multiplicity(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("a\n", encoding="utf-8")
+    before_definition = [{
+        "binding_id": "duplicates",
+        "evidence": [
+            {"path": "a.py", "start_line": 1, "end_line": 1},
+            {"path": "a.py", "start_line": 1, "end_line": 1},
+        ],
+    }]
+    after_definition = [{
+        "binding_id": "duplicates",
+        "evidence": [
+            {"path": "a.py", "start_line": 1, "end_line": 1},
+        ],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(
+            before_definition, include_relationships=False
+        )
+        after = codemap.repository_evidence_bindings(
+            after_definition, include_relationships=False
+        )
+        delta = codemap.repository_evidence_binding_delta(before, after)
+
+    changed = delta["bindings"]["changed"][0]
+    assert changed["definition"]["state"] == "changed"
+    assert changed["direct_evidence"]["changes"] == [
+        {"evidence": ["a.py", 1, 1], "state": "removed"}
+    ]
+
+
+def test_coverage_rejects_delta_for_different_binding_packet(tmp_path: Path) -> None:
+    source = tmp_path / "a.py"
+    source.write_text("a\n", encoding="utf-8")
+    binding = [{
+        "binding_id": "a",
+        "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}],
+    }]
+    other = [{
+        "binding_id": "other",
+        "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(binding)
+        source.write_text("b\n", encoding="utf-8")
+        codemap.sync(["a.py"])
+        after = codemap.repository_evidence_bindings(binding)
+        unrelated = codemap.repository_evidence_bindings(other)
+        delta = codemap.repository_evidence_binding_delta(before, after)
+        with pytest.raises(ValueError, match="after identity"):
+            codemap.repository_evidence_coverage(
+                unrelated,
+                changed_paths=["a.py"],
+                change_set_complete=True,
+                binding_delta=delta,
+            )
