@@ -402,6 +402,12 @@ def test_deleted_bound_member_is_first_class_delta(tmp_path: Path) -> None:
         codemap.sync(["a.py"])
         after = codemap.repository_evidence_bindings(binding, include_relationships=False)
         delta = codemap.repository_evidence_binding_delta(before, after)
+        coverage = codemap.repository_evidence_coverage(
+            after,
+            changed_paths=["a.py"],
+            change_set_complete=True,
+            binding_delta=delta,
+        )
     changed = delta["bindings"]["changed"][0]
     assert changed["direct_evidence"]["state"] == "preserved"
     assert changed["locator_evidence"]["state"] == "changed"
@@ -409,6 +415,13 @@ def test_deleted_bound_member_is_first_class_delta(tmp_path: Path) -> None:
     assert member_change["state"] == "removed"
     assert member_change["observation_state_changed"] is True
     assert after["bindings"][0]["evidence"][0]["state"] == "known-absent"
+    assert coverage["classification"]["bound_members_removed"] == ["a.py"]
+    assert coverage["binding_impacts"] == [
+        {
+            "binding_id": "deleted",
+            "reasons": ["bound-locator-changed", "bound-member-removed"],
+        }
+    ]
 
 
 def test_exact_span_uses_physical_lf_lines_not_unicode_line_separators(
@@ -890,12 +903,24 @@ def test_range_definition_change_does_not_masquerade_as_repository_change(
             after_definition, include_relationships=False
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
+        coverage = codemap.repository_evidence_coverage(
+            after,
+            changed_paths=[],
+            change_set_complete=True,
+            binding_delta=delta,
+        )
 
     changed = delta["bindings"]["changed"][0]
     assert changed["definition"]["state"] == "changed"
     assert changed["direct_evidence"]["state"] == "preserved"
     assert changed["locator_evidence"]["state"] == "preserved"
     assert changed["member_evidence"]["state"] == "preserved"
+    assert coverage["binding_impacts"] == [
+        {
+            "binding_id": "range-definition",
+            "reasons": ["binding-definition-changed"],
+        }
+    ]
 
 
 def test_dependency_definition_change_is_not_dependency_observation_change(
@@ -918,6 +943,12 @@ def test_dependency_definition_change_is_not_dependency_observation_change(
             include_relationships=False,
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
+        coverage = codemap.repository_evidence_coverage(
+            after,
+            changed_paths=[],
+            change_set_complete=True,
+            binding_delta=delta,
+        )
 
     changed = delta["bindings"]["changed"][0]
     declared = changed["declared_dependencies"]
@@ -929,6 +960,12 @@ def test_dependency_definition_change_is_not_dependency_observation_change(
     }
     assert declared["observations"] == {"state": "unchanged", "changes": []}
     assert changed["definition"]["state"] == "changed"
+    assert coverage["binding_impacts"] == [
+        {
+            "binding_id": "dependency-definition",
+            "reasons": ["binding-definition-changed"],
+        }
+    ]
 
 
 def test_out_of_range_span_separates_member_presence_from_locator_state(
