@@ -143,7 +143,7 @@ or supply a typed **RepositoryObservation** with **repository_observation=** whe
 
 Schema: **hashmarks.repository-evidence-coverage.v1**
 
-Coverage preserves the source of change-set completeness:
+Coverage preserves the source of change-set completeness. Completeness uses its own `complete | incomplete | unknown` axis rather than presence/freshness words:
 
 - **repository-observer** — completeness comes from an atomic Hashmarks repository observation;
 - **caller-asserted** — completeness is an explicit caller assertion.
@@ -155,9 +155,15 @@ The packet includes **binding_impacts**, keyed by opaque binding ID, with stable
 - **bound-range-content-changed**;
 - **bound-member-content-changed**;
 - **bound-member-changed**;
+- **bound-member-added**;
+- **bound-member-removed**;
+- **bound-member-observation-state-changed**;
+- **bound-locator-changed**;
 - **declared-dependency-changed**;
 - **declared-dependency-path-changed**;
 - **relationship-evidence-changed**;
+- **relationship-locator-changed**;
+- **relationship-observation-config-changed**;
 - **binding-definition-changed**;
 - **bound-member-precision-unknown**.
 
