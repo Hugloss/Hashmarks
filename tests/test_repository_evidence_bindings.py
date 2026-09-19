@@ -798,3 +798,22 @@ def test_coverage_rejects_delta_for_different_binding_packet(tmp_path: Path) -> 
                 change_set_complete=True,
                 binding_delta=delta,
             )
+
+
+def test_whole_member_binding_cannot_bypass_pruned_analysis_scope(tmp_path: Path) -> None:
+    pruned = tmp_path / "node_modules" / "pkg"
+    pruned.mkdir(parents=True)
+    (pruned / "package.json").write_text('{"name":"pkg"}\n', encoding="utf-8")
+    binding = [{
+        "binding_id": "pruned",
+        "evidence": [{"scope": "member", "path": "node_modules/pkg/package.json"}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+    evidence = packet["bindings"][0]["evidence"][0]
+    assert evidence["state"] == "unsupported"
+    assert evidence["reason"] == "repository-evidence-not-admitted"
+    assert "member_revision" not in evidence
