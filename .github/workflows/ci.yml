@@ -31,15 +31,13 @@ jobs:
           git -C "$AE_ROOT" checkout --quiet --detach "$AE_REVISION"
           test "$(git -C "$AE_ROOT" rev-parse HEAD)" = "$AE_REVISION"
           UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --only-group lint --python 3.11
-          RUFF_EXECUTABLE="$PWD/.ruff-venv/bin/ruff"
-          test -x "$RUFF_EXECUTABLE"
-          PYTHONPATH="$AE_ROOT/scripts" uv run --no-sync python - "$RUFF_EXECUTABLE" <<'PY'
+          test -x "$PWD/.ruff-venv/bin/ruff"
+          export PATH="$PWD/.ruff-venv/bin:$PATH"
+          PYTHONPATH="$AE_ROOT/scripts" uv run --no-sync python - <<'PY'
           import json
-          import sys
           from pathlib import Path
           from agent_economics.quality_debt import quality_debt_audit
 
-          analyzer = sys.argv[1]
           limits = {
               "C901": 8,
               "PLR0911": 6,
@@ -54,7 +52,6 @@ jobs:
               roots=("hashmarks", "scripts", "benchmarks"),
               excludes=("benchmarks/agent_evaluation/retained",),
               limits=limits,
-              analyzer=analyzer,
           )
           argv = result["evidence"]["analyzer"]["analysis_argv"]
           expected = {
