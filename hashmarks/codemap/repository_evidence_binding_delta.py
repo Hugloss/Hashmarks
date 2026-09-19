@@ -66,13 +66,13 @@ class RepositoryEvidenceBindingDeltaMixin:
             elif current is None:
                 changes.append({"path": path, "state": "removed"})
             elif (
-                previous.get("member_identity") != current.get("member_identity")
+                previous.get("member_revision") != current.get("member_revision")
                 or previous.get("state") != current.get("state")
             ):
                 changes.append({
                     "path": path,
                     "state": "changed",
-                    "member_changed": previous.get("member_identity") != current.get("member_identity"),
+                    "member_changed": previous.get("member_revision") != current.get("member_revision"),
                     "observation_state_changed": previous.get("state") != current.get("state"),
                 })
         return changes
@@ -93,7 +93,7 @@ class RepositoryEvidenceBindingDeltaMixin:
                 changes.append({"evidence": list(key), "state": "removed"})
                 continue
             direct_changed = previous.get("span_identity") != current.get("span_identity")
-            member_changed = previous.get("member_identity") != current.get("member_identity")
+            member_changed = previous.get("member_revision") != current.get("member_revision")
             state_changed = previous.get("state") != current.get("state")
             if direct_changed or state_changed:
                 changes.append(
@@ -147,7 +147,7 @@ class RepositoryEvidenceBindingDeltaMixin:
             for key in keys
             if key in old
             and key in new
-            and old[key].get("member_identity") != new[key].get("member_identity")
+            and old[key].get("member_revision") != new[key].get("member_revision")
         ]
         return {
             "state": (
