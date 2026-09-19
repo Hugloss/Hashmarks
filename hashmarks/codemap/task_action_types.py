@@ -93,6 +93,8 @@ class _TaskActionSelectionState:
     exact_identifier_paths: tuple[str, ...]
     exact_identifier_displacement_guard: bool
     exact_identifier_surface_selected: bool
+    inspect_rows: list[dict[str, object]]
+    related_rows: list[dict[str, object]]
 
 
 @dataclass
