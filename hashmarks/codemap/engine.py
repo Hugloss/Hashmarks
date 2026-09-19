@@ -54,6 +54,7 @@ from .repository_context import ContextPlanningMixin
 from .repository_delta import RepositoryDeltaMixin
 from .repository_evidence_binding_delta import RepositoryEvidenceBindingDeltaMixin
 from .repository_evidence_bindings import RepositoryEvidenceBindingsMixin
+from .repository_evidence_coverage import RepositoryEvidenceCoverageMixin
 from .repository_index_store import (
     ArtifactStore,
     WorkspaceMapStore,
@@ -83,6 +84,7 @@ class CodeMap(
     RepositoryDeltaMixin,
     RepositoryEvidenceBindingsMixin,
     RepositoryEvidenceBindingDeltaMixin,
+    RepositoryEvidenceCoverageMixin,
     EvidenceProfilesMixin,
     CrossRepositoryEvidenceMixin,
     RepositoryIntelligenceQueryMixin,
