@@ -1,0 +1,97 @@
+name: Fresh main debt remeasure
+
+on:
+  push:
+    branches:
+      - fresh-main-debt-remeasure
+
+permissions:
+  contents: read
+
+jobs:
+  remeasure:
+    name: Remeasure current debt from fresh main
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - run: uv python install 3.11
+      - name: Materialize exact Ruff supply
+        run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --only-group lint --python 3.11
+      - name: Bootstrap exact Agent Economics revision
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/Hugloss/agentsCookbook/78b68603a8b65f3a17c5e2e4dcefb1750114bc28/scripts/bootstrap-agent-economics.sh -o /tmp/bootstrap-agent-economics.sh
+          sh /tmp/bootstrap-agent-economics.sh \
+            --revision 78b68603a8b65f3a17c5e2e4dcefb1750114bc28 \
+            --destination .agent-economics
+      - name: Measure current quality debt
+        run: |
+          export PATH="$PWD/.ruff-venv/bin:$PATH"
+          export PYTHONPATH="$PWD/.agent-economics/scripts"
+          python -m agent_economics quality-debt \
+            --repository-root . \
+            --root hashmarks \
+            --root scripts \
+            --root benchmarks \
+            --exclude benchmarks/agent_evaluation/retained \
+            --limit C901=8 \
+            --limit PLR0911=6 \
+            --limit PLR0912=8 \
+            --limit PLR0913=6 \
+            --limit PLR0914=15 \
+            --limit PLR0915=40 \
+            --limit PLR0916=5 \
+            --max-file-lines 1600 \
+            --file-line-root hashmarks \
+            --artifact .agent-artifacts/current-quality-debt.json \
+            --format json > /tmp/current-quality-debt.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path("/tmp/current-quality-debt.json").read_text())
+          summary = payload["derived"]["summary"]
+          print("FRESH_MAIN_SOURCE_IDENTITY=" + payload["repository"]["identity"])
+          print("QUALITY_DEBT_EXCESS=" + str(summary["excess"]))
+          print("QUALITY_DEBT_LOCATIONS=" + str(summary["locations"]))
+          print("QUALITY_DEBT_RULE_FINDINGS=" + str(summary["rule_findings"]))
+          print("QUALITY_DEBT_FILE_COUNT=" + str(len(summary["files"])))
+          print("QUALITY_DEBT_TOP_CANDIDATES")
+          for index, candidate in enumerate(payload["candidates"][:20], 1):
+              facts = candidate["facts"]
+              print(
+                  f"{index:02d} {candidate['target']} "
+                  f"excess={facts['excess']} "
+                  f"locations={facts['locations']} "
+                  f"rule_findings={facts['rule_findings']}"
+              )
+          PY
+      - name: Measure current investigation hotspots
+        run: |
+          export PYTHONPATH="$PWD/.agent-economics/scripts"
+          python -m agent_economics hotspot-focus \
+            --repository-root . \
+            --source-root hashmarks \
+            --tests-root tests \
+            --package-name hashmarks \
+            --top 20 \
+            --artifact .agent-artifacts/current-hotspots.json \
+            --format json > /tmp/current-hotspots.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path("/tmp/current-hotspots.json").read_text())
+          print("HOTSPOT_TOP_CANDIDATES")
+          for index, candidate in enumerate(payload["candidates"][:20], 1):
+              facts = candidate["facts"]
+              print(
+                  f"{index:02d} {candidate['target']} "
+                  f"churn={facts['churn_commits']} "
+                  f"fan_in={facts['fan_in']} "
+                  f"branches={facts['branch_points']} "
+                  f"lines={facts['source_lines']} "
+                  f"confirmed_tests={facts['confirmed_tests']}"
+              )
+          PY
