@@ -95,7 +95,7 @@ class RepositoryEvidenceBindingDeltaMixin:
             direct_changed = previous.get("span_identity") != current.get("span_identity")
             member_changed = previous.get("member_identity") != current.get("member_identity")
             state_changed = previous.get("state") != current.get("state")
-            if direct_changed or member_changed or state_changed:
+            if direct_changed or state_changed:
                 changes.append(
                     {
                         "evidence": list(key),
