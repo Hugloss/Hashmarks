@@ -259,7 +259,8 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         # initialization authority. Without the writer lock, two first-open
         # callers can observe each other's partial CREATE script and one can
         # discard tables while the other is still creating indexes.
-        with sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
+        self._db.execute("BEGIN IMMEDIATE")
+        try:
             if not self._schema_is_current():
                 self._discard_incompatible_schema_locked()
             self._db.executescript(
@@ -386,6 +387,10 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             self._db.execute(
                 "CREATE INDEX IF NOT EXISTS lexical_path_idx ON lexical(path)"
             )
+        except Exception:
+            if self._db.in_transaction:
+                self._db.execute("ROLLBACK")
+            raise
         self._lock = threading.RLock()
         # Process-local diagnostics for repository-read amplification. These
         # counters are observational only and are never persisted as authority.
