@@ -260,13 +260,12 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         # callers can observe each other's partial CREATE script and one can
         # discard tables while the other is still creating indexes.
         self._db.execute("BEGIN IMMEDIATE")
-        try:
-            if not self._schema_is_current():
-                self._discard_incompatible_schema_locked()
-            # executescript() commits an active transaction before running.
-            # Put BEGIN IMMEDIATE inside the script so schema publication stays
-            # serialized until its final COMMIT.
-            self._db.executescript(
+        if not self._schema_is_current():
+            self._discard_incompatible_schema_locked()
+        # executescript() commits an active transaction before running.
+        # Put BEGIN IMMEDIATE inside the script so schema publication stays
+        # serialized until its final COMMIT.
+        self._db.executescript(
             """
             BEGIN IMMEDIATE;
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -382,20 +381,16 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             COMMIT;
             """
             )
-            self._db.execute(
-                "CREATE INDEX IF NOT EXISTS edge_target_short_idx ON edge(target_short)"
-            )
-            self._db.execute(
-                "CREATE INDEX IF NOT EXISTS edge_target_short_path_line_idx "
-                "ON edge(target_short,path,line)"
-            )
-            self._db.execute(
-                "CREATE INDEX IF NOT EXISTS lexical_path_idx ON lexical(path)"
-            )
-        except Exception:
-            if self._db.in_transaction:
-                self._db.execute("ROLLBACK")
-            raise
+        self._db.execute(
+            "CREATE INDEX IF NOT EXISTS edge_target_short_idx ON edge(target_short)"
+        )
+        self._db.execute(
+            "CREATE INDEX IF NOT EXISTS edge_target_short_path_line_idx "
+            "ON edge(target_short,path,line)"
+        )
+        self._db.execute(
+            "CREATE INDEX IF NOT EXISTS lexical_path_idx ON lexical(path)"
+        )
         self._lock = threading.RLock()
         # Process-local diagnostics for repository-read amplification. These
         # counters are observational only and are never persisted as authority.
