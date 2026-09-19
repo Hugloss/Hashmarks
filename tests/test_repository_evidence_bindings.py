@@ -167,7 +167,9 @@ def test_dependency_change_is_separate_from_unchanged_direct_evidence(tmp_path: 
     changed = delta["bindings"]["changed"][0]
     assert changed["direct_evidence"]["state"] == "preserved"
     assert changed["declared_dependencies"]["state"] == "affected"
-    assert changed["declared_dependencies"]["changes"][0]["path"] == "dependency.py"
+    observations = changed["declared_dependencies"]["observations"]
+    assert observations["state"] == "changed"
+    assert observations["changes"][0]["path"] == "dependency.py"
 
 
 def test_unrelated_change_does_not_affect_declared_dependency(tmp_path: Path) -> None:
@@ -400,8 +402,12 @@ def test_deleted_bound_member_is_first_class_delta(tmp_path: Path) -> None:
         codemap.sync(["a.py"])
         after = codemap.repository_evidence_bindings(binding, include_relationships=False)
         delta = codemap.repository_evidence_binding_delta(before, after)
-    change = delta["bindings"]["changed"][0]["direct_evidence"]["changes"][0]
-    assert change["observation_state_changed"] is True
+    changed = delta["bindings"]["changed"][0]
+    assert changed["direct_evidence"]["state"] == "preserved"
+    assert changed["locator_evidence"]["state"] == "changed"
+    member_change = changed["member_evidence"]["changes"][0]
+    assert member_change["state"] == "removed"
+    assert member_change["observation_state_changed"] is True
     assert after["bindings"][0]["evidence"][0]["state"] == "known-absent"
 
 
@@ -774,9 +780,10 @@ def test_binding_delta_preserves_duplicate_evidence_multiplicity(tmp_path: Path)
 
     changed = delta["bindings"]["changed"][0]
     assert changed["definition"]["state"] == "changed"
-    assert changed["direct_evidence"]["changes"] == [
-        {"evidence": ["a.py", 1, 1], "state": "removed"}
-    ]
+    assert changed["direct_evidence"]["state"] == "preserved"
+    assert changed["direct_evidence"]["changes"] == []
+    assert changed["locator_evidence"]["state"] == "preserved"
+    assert changed["member_evidence"]["state"] == "preserved"
 
 
 def test_coverage_rejects_delta_for_different_binding_packet(tmp_path: Path) -> None:
@@ -860,3 +867,137 @@ def test_relationship_locator_change_is_separate_from_relationship_fact_change(
     assert relationships["facts"]["removed"] == []
     assert relationships["locators"]["state"] == "changed"
     assert len(relationships["locators"]["changes"]) >= 1
+
+
+def test_range_definition_change_does_not_masquerade_as_repository_change(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("one\ntwo\n", encoding="utf-8")
+    before_definition = [{
+        "binding_id": "range-definition",
+        "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+    }]
+    after_definition = [{
+        "binding_id": "range-definition",
+        "evidence": [{"path": "owner.py", "start_line": 2, "end_line": 2}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(
+            before_definition, include_relationships=False
+        )
+        after = codemap.repository_evidence_bindings(
+            after_definition, include_relationships=False
+        )
+        delta = codemap.repository_evidence_binding_delta(before, after)
+
+    changed = delta["bindings"]["changed"][0]
+    assert changed["definition"]["state"] == "changed"
+    assert changed["direct_evidence"]["state"] == "preserved"
+    assert changed["locator_evidence"]["state"] == "preserved"
+    assert changed["member_evidence"]["state"] == "preserved"
+
+
+def test_dependency_definition_change_is_not_dependency_observation_change(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("stable\n", encoding="utf-8")
+    (tmp_path / "dependency.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [{
+        "binding_id": "dependency-definition",
+        "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+        after = codemap.repository_evidence_bindings(
+            binding,
+            dependency_paths={"dependency-definition": ["dependency.py"]},
+            include_relationships=False,
+        )
+        delta = codemap.repository_evidence_binding_delta(before, after)
+
+    changed = delta["bindings"]["changed"][0]
+    declared = changed["declared_dependencies"]
+    assert declared["state"] == "definition-changed"
+    assert declared["definition"] == {
+        "state": "changed",
+        "added": ["dependency.py"],
+        "removed": [],
+    }
+    assert declared["observations"] == {"state": "unchanged", "changes": []}
+    assert changed["definition"]["state"] == "changed"
+
+
+def test_out_of_range_span_separates_member_presence_from_locator_state(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("one\n", encoding="utf-8")
+    binding = [{
+        "binding_id": "locator",
+        "evidence": [{"path": "owner.py", "start_line": 2, "end_line": 2}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+
+    evidence = packet["bindings"][0]["evidence"][0]
+    assert evidence["member_state"] == "known-present"
+    assert evidence["state"] == "known-absent"
+    assert evidence["locator_state"] == "outside-member"
+    assert evidence["content_state"] == "known-absent"
+    assert packet["completeness"]["state"] == "complete"
+
+
+def test_cheap_binding_mode_does_not_query_relationship_lane(tmp_path: Path) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [{
+        "binding_id": "cheap-economics",
+        "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        codemap.store.reset_read_counters()
+        with codemap.decision_session():
+            codemap.repository_evidence_bindings(
+                binding, include_relationships=False
+            )
+            stats = codemap.decision_session_stats()
+        counters = codemap.store.read_counters()
+
+    assert stats.get("store_edges_for_paths_many", 0) == 0
+    assert counters.get("edges_for_paths_many", 0) == 0
+
+
+def test_bindings_are_language_neutral_for_typescript_and_config(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src.ts").write_text(
+        "export const VALUE = 1;\nexport const KEEP = 2;\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "settings.json").write_text(
+        '{"enabled": true}\n',
+        encoding="utf-8",
+    )
+    bindings = [{
+        "binding_id": "mixed-repository",
+        "evidence": [
+            {"path": "src.ts", "start_line": 2, "end_line": 2},
+            {"scope": "member", "path": "settings.json"},
+        ],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            bindings, include_relationships=False
+        )
+
+    evidence = packet["bindings"][0]["evidence"]
+    assert [row["path"] for row in evidence] == ["src.ts", "settings.json"]
+    assert all(row["state"] == "known-present" for row in evidence)
+    assert packet["completeness"]["state"] == "complete"
