@@ -41,7 +41,7 @@ def _bundle(producer=PRODUCER_A, repo=REPO_A, generation=7):
     }
     provenance = {
         "revision": {"path": "pyproject.toml", "sha256": "sha256:" + "6" * 64},
-        "freshness": "proven",
+        "freshness": "current",
     }
     provenance["context_identity"] = evidence_context_identity(
         receipt, provenance, producer_implementation_identity=producer

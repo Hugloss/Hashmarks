@@ -255,10 +255,19 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         self._db = sqlite3.connect(self.db_path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         configure_sqlite_connection(self._db)
+        # Schema inspection, disposal, and creation are one cross-connection
+        # initialization authority. Without the writer lock, two first-open
+        # callers can observe each other's partial CREATE script and one can
+        # discard tables while the other is still creating indexes.
+        self._db.execute("BEGIN IMMEDIATE")
         if not self._schema_is_current():
-            self._discard_incompatible_schema()
+            self._discard_incompatible_schema_locked()
+        # executescript() commits an active transaction before running.
+        # Put BEGIN IMMEDIATE inside the script so schema publication stays
+        # serialized until its final COMMIT.
         self._db.executescript(
             """
+            BEGIN IMMEDIATE;
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS file_map (
               path TEXT PRIMARY KEY,
@@ -369,8 +378,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             CREATE INDEX IF NOT EXISTS derived_node_path_idx ON derived_node(path);
             CREATE INDEX IF NOT EXISTS derived_node_kind_idx ON derived_node(kind);
             CREATE INDEX IF NOT EXISTS derived_node_identity_idx ON derived_node(identity);
+            COMMIT;
             """
-        )
+            )
         self._db.execute(
             "CREATE INDEX IF NOT EXISTS edge_target_short_idx ON edge(target_short)"
         )
@@ -378,8 +388,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             "CREATE INDEX IF NOT EXISTS edge_target_short_path_line_idx "
             "ON edge(target_short,path,line)"
         )
-        self._db.execute("CREATE INDEX IF NOT EXISTS lexical_path_idx ON lexical(path)")
-        self._db.commit()
+        self._db.execute(
+            "CREATE INDEX IF NOT EXISTS lexical_path_idx ON lexical(path)"
+        )
         self._lock = threading.RLock()
         # Process-local diagnostics for repository-read amplification. These
         # counters are observational only and are never persisted as authority.
@@ -523,20 +534,21 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         shape = "" if row is None else "".join(str(row[0] or "").lower().split())
         return "withoutrowid" in shape and "primarykey(token,path,line)" in shape
 
+    def _discard_incompatible_schema_locked(self) -> None:
+        """Discard generated state while the caller owns SQLite writer authority."""
+        if self._schema_is_current():
+            return
+        rows = self._db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+        for row in rows:
+            name = str(row[0]).replace('"', '""')
+            self._db.execute(f'DROP TABLE "{name}"')
+
     def _discard_incompatible_schema(self) -> None:
         """Discard generated CodeMap state instead of migrating historical local schemas."""
         with sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
-            # Recheck only after acquiring SQLite writer authority. Another
-            # connection may have been creating the current schema when the
-            # optimistic pre-lock check observed a partial table set.
-            if self._schema_is_current():
-                return
-            rows = self._db.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-            ).fetchall()
-            for row in rows:
-                name = str(row[0]).replace('"', '""')
-                self._db.execute(f'DROP TABLE "{name}"')
+            self._discard_incompatible_schema_locked()
 
     def bind_workspace(
         self,

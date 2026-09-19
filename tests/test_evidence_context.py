@@ -38,7 +38,7 @@ def test_native_context_validation_rejects_tampered_revision_or_freshness() -> N
     provenance["context_identity"] = evidence_context_identity(
         receipt, provenance, producer_implementation_identity=PRODUCER
     )
-    for key, value in (("revision", "r2"), ("freshness", "proven")):
+    for key, value in (("revision", "r2"), ("freshness", "current")):
         tampered = dict(provenance)
         tampered[key] = value
         result = validate_evidence_context(

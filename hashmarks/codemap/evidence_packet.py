@@ -10,6 +10,7 @@ from hashmarks.evidence_context import evidence_context_identity
 from .configuration_evidence import ConfigurationEvidenceMixin
 from .decision_session import decision_scoped
 from .evidence_decision_packet import DecisionPacketMixin
+from .evidence_freshness import freshness_state
 from .model import EvidenceVisibility
 from .python_ast import estimate_tokens
 
@@ -562,20 +563,22 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         elif verification_stale:
             freshness = "stale"
             freshness_reason = "verification-changed-since-selection"
-        elif stale is True:
-            freshness = "stale"
-            freshness_reason = "continuity-reported-change"
-        elif stale is False:
-            freshness = "proven"
-            freshness_reason = None
         else:
-            freshness = "unknown"
-            freshness_reason = "filesystem-continuity-unproven"
+            freshness = freshness_state(stale)
+            freshness_reason = (
+                "continuity-reported-change"
+                if freshness == "stale"
+                else "filesystem-continuity-unproven"
+                if freshness == "unknown"
+                else None
+            )
 
         result: dict[str, object] = {
             "why": self._task_evidence_selection_reason(action, edit),
             "freshness": freshness,
         }
+        if freshness == "current":
+            result["freshness_proof"] = "proven"
         if edit is not None and edit.get("path"):
             file_row = self._session_file_row(str(edit["path"]))
             if file_row is not None and file_row["file_digest"]:

@@ -5,6 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.file_store import UnstableFileError
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import diagnostic_producer
@@ -71,6 +72,151 @@ class RepositoryDeltaMixin:
             raise ValueError(f"{field} must be an object")
         return value
 
+    def _repository_member_observation(
+        self,
+        relpath: str,
+        *,
+        include_bytes: bool = False,
+    ) -> tuple[dict[str, object], bytes | None]:
+        """Observe one repository member through canonical policy/revision authority."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        rel = normalize_relative_path(relpath, allow_root=False)
+        decision = self.policy.decide(rel)
+        base: dict[str, object] = {"path": rel}
+
+        if not decision.index or decision.evidence_visibility.value == "deny":
+            return (
+                {
+                    **base,
+                    "state": "unsupported",
+                    "reason": "repository-evidence-denied",
+                },
+                None,
+            )
+
+        cursor = self.workspace
+        for part in rel.split("/"):
+            cursor = cursor / part
+            if cursor.is_symlink():
+                return (
+                    {
+                        **base,
+                        "state": "unsupported",
+                        "reason": "symlink-evidence-not-observed",
+                    },
+                    None,
+                )
+
+        path = self.workspace / rel
+        if not path.is_file():
+            return (
+                {
+                    **base,
+                    "state": "known-absent",
+                    "reason": "member-not-present",
+                },
+                None,
+            )
+
+        row = self._session_file_row(rel)
+        visibility = (
+            str(row.get("evidence_visibility") or decision.evidence_visibility.value)
+            if row is not None
+            else decision.evidence_visibility.value
+        )
+        indexed_revision = (
+            str(row.get("file_digest") or "") if row is not None else ""
+        )
+
+        if include_bytes and visibility != "source":
+            return (
+                {
+                    **base,
+                    "state": "unsupported",
+                    "reason": "source-evidence-not-visible",
+                    **(
+                        {"member_revision": indexed_revision}
+                        if indexed_revision
+                        else {}
+                    ),
+                    "evidence_visibility": visibility,
+                    "index_state": "indexed" if row is not None else "unindexed",
+                },
+                None,
+            )
+
+        try:
+            if include_bytes:
+                raw, digest = self.file_store.read_bytes_stable(path)
+            elif row is None:
+                digest = self.file_store.digest(
+                    path,
+                    workspace=self.workspace,
+                    relative_path=rel,
+                    force=True,
+                )
+                raw = None
+            else:
+                digest = None
+                raw = None
+        except FileNotFoundError:
+            return (
+                {
+                    **base,
+                    "state": "known-absent",
+                    "reason": "member-not-present",
+                },
+                None,
+            )
+        except (OSError, UnstableFileError):
+            return (
+                {
+                    **base,
+                    "state": "unknown",
+                    "reason": "member-read-unstable-or-unavailable",
+                    **(
+                        {"member_revision": indexed_revision}
+                        if indexed_revision
+                        else {}
+                    ),
+                    "evidence_visibility": visibility,
+                    "index_state": "indexed" if row is not None else "unindexed",
+                },
+                None,
+            )
+
+        if row is not None:
+            if digest is not None and digest.hash != indexed_revision:
+                return (
+                    {
+                        **base,
+                        "state": "unknown",
+                        "reason": "member-revision-mismatch",
+                        "member_revision": indexed_revision,
+                        "evidence_visibility": visibility,
+                        "index_state": "indexed",
+                    },
+                    None,
+                )
+            revision = indexed_revision
+            index_state = "indexed"
+        else:
+            assert digest is not None
+            revision = digest.hash
+            index_state = "unindexed"
+
+        return (
+            {
+                **base,
+                "state": "known-present",
+                "member_revision": revision,
+                "evidence_visibility": visibility,
+                "index_state": index_state,
+            },
+            raw,
+        )
+
     def _snapshot_paths(
         self, changed_paths: Sequence[str | Path]
     ) -> dict[str, dict[str, object]]:
@@ -90,11 +236,11 @@ class RepositoryDeltaMixin:
         edges_by_path = self._session_edges_for_paths_many(paths, limit_per_path=32)
         rows: dict[str, dict[str, object]] = {}
         for path in paths:
-            file_row = self._session_file_row(path)
+            member, _raw = self._repository_member_observation(path)
             revision = (
-                None
-                if file_row is None or not file_row["file_digest"]
-                else str(file_row["file_digest"])
+                str(member.get("member_revision") or "")
+                if member.get("state") == "known-present"
+                else None
             )
             symbols = sorted(
                 (
@@ -171,6 +317,7 @@ class RepositoryDeltaMixin:
                 ),
             )
             rows[path] = {
+                "member_state": member["state"],
                 "revision": revision,
                 "symbols": symbols,
                 "dependencies": dependencies,
@@ -324,7 +471,7 @@ class RepositoryDeltaMixin:
         generation_changed = observed_generation != current_generation
 
         if not repository_changed and not generation_changed:
-            state = "fresh"
+            state = "current"
             reason = "repository-and-generation-unchanged"
         elif not relevant:
             state = "stale"
@@ -333,7 +480,7 @@ class RepositoryDeltaMixin:
             state = "stale"
             reason = "relevant-repository-evidence-changed"
         else:
-            state = "fresh"
+            state = "current"
             reason = "changed-paths-proven-outside-observation-scope"
 
         return {

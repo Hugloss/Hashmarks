@@ -97,7 +97,7 @@ def test_prior_map_invalidates_only_changed_evidence_identity(tmp_path: Path) ->
         )
 
     prior = {_row_key(row): row for row in after["prior"]}
-    assert prior[("impact", None)]["state"] == "invalidated"
+    assert prior[("impact", None)]["state"] == "stale"
     assert prior[("ownership", None)]["state"] == "current"
     assert prior[("verification-membership", None)]["state"] == "current"
     assert (
@@ -117,7 +117,7 @@ def test_selected_member_invalidates_prior_negative_claim(tmp_path: Path) -> Non
         )
 
     row = _by_key(freshness)[("negative-verification-evidence", "tests/test_ember.py")]
-    assert row["state"] == "invalidated"
+    assert row["state"] == "stale"
     assert row["reason"] == "member-is-selected"
 
 
@@ -202,7 +202,7 @@ def test_negative_evidence_invalidates_when_reference_evidence_changes(
     prior = {_row_key(row): row for row in after["prior"]}
     assert (
         prior[("negative-verification-evidence", "tests/test_other.py")]["state"]
-        == "invalidated"
+        == "stale"
     )
 
 
@@ -235,4 +235,4 @@ def test_cross_repository_prior_invalidates_on_declared_dependency_change(
         )
 
     prior = {_row_key(row): row for row in after["prior"]}
-    assert prior[("cross-repository", None)]["state"] == "invalidated"
+    assert prior[("cross-repository", None)]["state"] == "stale"

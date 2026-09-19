@@ -6,7 +6,7 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .digest import Digest, hash_file
+from .digest import FILE_DOMAIN, Digest, hash_bytes, hash_file
 from .file_metadata_codec import (
     MetadataCodecError,
     decode_overflow_metadata,
@@ -175,6 +175,28 @@ class FileDigestStore:
                 return digest, after
             before = after
         raise UnstableFileError(f"file changed while hashing: {path}")
+
+    def read_bytes_stable(
+        self,
+        path: str | Path,
+        *,
+        max_attempts: int = 3,
+    ) -> tuple[bytes, Digest]:
+        """Read bytes from one stable filesystem observation.
+
+        This is the byte-returning counterpart of the canonical stable hash path:
+        metadata is sampled before and after the read, and moving bytes fail
+        closed rather than being returned under a stale repository revision.
+        """
+        path = Path(path)
+        before = self._metadata(path)
+        for _ in range(max_attempts):
+            data = path.read_bytes()
+            after = self._metadata(path)
+            if after == before:
+                return data, hash_bytes(data, domain=FILE_DOMAIN)
+            before = after
+        raise UnstableFileError(f"file changed while reading: {path}")
 
     def _row(self, workspace: str, relpath: str) -> _CachedRow | None:
         key = (workspace, relpath)
