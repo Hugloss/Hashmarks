@@ -18,7 +18,7 @@ A new schema is **not** evidence that a new semantic owner is needed.
 
 ## State families are separate axes
 
-Similar-looking state words are not interchangeable. A consumer must know which axis a value belongs to.
+Similar-looking state words are not interchangeable. A consumer must know which axis a value belongs to. New public schemas must reuse the canonical state spelling for an existing axis rather than introduce a local synonym.
 
 | State family | Meaning | Canonical owner | Extension rule |
 | --- | --- | --- | --- |
@@ -27,7 +27,7 @@ Similar-looking state words are not interchangeable. A consumer must know which 
 | Repository identity | Content/repository identity independent of a consumer projection | canonical identity owners and `_repository_packet_identity()` | A projection may reference identity; it does not redefine it. |
 | Member revision | Content identity of one admitted indexed repository member | CodeMap file row / repository-intelligence snapshot path revision | Reuse the indexed revision semantics. A projection must distinguish missing, unindexed/unknown, denied/unsupported, and present members rather than treating them as one state. |
 | Evidence availability | Whether a requested repository fact is known present, known absent, unavailable/unknown, or unsupported | repository-intelligence evidence producers; endpoint delta vocabulary is coordinated by `repository_delta.py` | Do not invent synonyms in a new packet. Add a new value only at the owning evidence layer. |
-| Freshness | Whether a previously observed fact is still current for the claim being made | `evidence_freshness.py`, `freshness_map.py`, and repository-delta freshness projections | Preserve current/stale/unknown semantics and the reason/provenance. Never turn unknown into current. |
+| Freshness | Whether a previously observed fact is still current for the claim being made | `evidence_freshness.py`, `freshness_map.py`, and repository-delta freshness projections | The serialized state vocabulary is exactly `current`, `stale`, or `unknown`. Proof strength such as `proven` belongs in a separate proof/provenance field; `invalidated` is a delta consequence, not a freshness-state synonym. Never turn unknown into current. |
 | Completeness | Whether the observation covers the declared scope strongly enough to make negative claims | repository observation + repository snapshot/delta completeness | Keep completeness independent from presence and freshness. A bounded or incomplete observation cannot prove absence outside its scope. |
 | Repository semantic delta | What repository-intelligence facts differ between admitted endpoint observations | `repository_delta.py::RepositoryDeltaMixin` | New domain-specific deltas are projections over this authority, not a second notion of repository change. |
 | Relationship evidence | Repository-derived dependency/reference/ownership/project relationships and their provenance | relationship/graph producers; stable snapshot relationship identity in `repository_delta.py` | Reuse relationship identity/provenance. Observation bounds changing is not a repository relationship change. |
