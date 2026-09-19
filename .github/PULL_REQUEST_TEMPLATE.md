@@ -28,6 +28,20 @@ Boundary decision: ADMIT / SPLIT / REJECT
 
 A proposal that belongs to agent reasoning/workflow or execution/certification should be split or rejected rather than implemented in Hashmarks.
 
+## Semantic ownership / state reuse
+
+For repository-intelligence changes, identify the existing owner before adding a new surface:
+
+```text
+Repository fact being exposed:
+Existing semantic owner extended:
+Existing state family reused:
+New serialized state vocabulary: NONE / <values and owner>
+New semantic owner: NO / <owner and why existing owners are insufficient>
+```
+
+Read `docs/reference/STATE_AND_SEMANTIC_OWNERS.md` before introducing a new state word, delta concept, generation, freshness result, completeness result, or CodeMap mixin.
+
 ## Authority / invariants affected
 
 List the repository authority, freshness, ownership, identity, provenance, or compatibility rules touched by this change.
