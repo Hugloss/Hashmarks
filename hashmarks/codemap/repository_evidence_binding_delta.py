@@ -23,16 +23,20 @@ class RepositoryEvidenceBindingDeltaMixin:
         }
 
     @staticmethod
-    def _evidence_index(binding: Mapping[str, object]) -> dict[tuple[str, int, int], Mapping[str, object]]:
+    def _evidence_index(
+        binding: Mapping[str, object],
+    ) -> dict[tuple[str, str, int, int], Mapping[str, object]]:
         rows = binding.get("evidence")
         if not isinstance(rows, list):
             return {}
-        result: dict[tuple[str, int, int], Mapping[str, object]] = {}
+        result: dict[tuple[str, str, int, int], Mapping[str, object]] = {}
         for row in rows:
             if not isinstance(row, Mapping):
                 continue
+            scope = str(row.get("scope") or "lines")
             try:
                 key = (
+                    scope,
                     str(row.get("path") or ""),
                     int(row.get("start_line") or 0),
                     int(row.get("end_line") or 0),
@@ -41,6 +45,11 @@ class RepositoryEvidenceBindingDeltaMixin:
                 continue
             result[key] = row
         return result
+
+    @staticmethod
+    def _evidence_locator(key: tuple[str, str, int, int]) -> list[object]:
+        scope, path, start, end = key
+        return [path] if scope == "member" else [path, start, end]
 
     @staticmethod
     def _dependency_index(binding: Mapping[str, object]) -> dict[str, Mapping[str, object]]:
@@ -87,18 +96,26 @@ class RepositoryEvidenceBindingDeltaMixin:
             previous = old.get(key)
             current = new.get(key)
             if previous is None:
-                changes.append({"evidence": list(key), "state": "added"})
+                changes.append({"evidence": cls._evidence_locator(key), "state": "added"})
                 continue
             if current is None:
-                changes.append({"evidence": list(key), "state": "removed"})
+                changes.append({"evidence": cls._evidence_locator(key), "state": "removed"})
                 continue
-            direct_changed = previous.get("span_identity") != current.get("span_identity")
-            member_changed = previous.get("member_revision") != current.get("member_revision")
+            scope = key[0]
+            direct_changed = (
+                previous.get("member_revision") != current.get("member_revision")
+                if scope == "member"
+                else previous.get("span_identity") != current.get("span_identity")
+            )
+            member_changed = (
+                previous.get("member_revision") != current.get("member_revision")
+            )
             state_changed = previous.get("state") != current.get("state")
             if direct_changed or state_changed:
                 changes.append(
                     {
-                        "evidence": list(key),
+                        "scope": scope,
+                        "evidence": cls._evidence_locator(key),
                         "state": "changed",
                         "direct_content_changed": direct_changed,
                         "member_changed": member_changed,
@@ -140,7 +157,8 @@ class RepositoryEvidenceBindingDeltaMixin:
         relationship_observation_changed = before_relationships != after_relationships
         member_changes = [
             {
-                "evidence": list(key),
+                "scope": key[0],
+                "evidence": cls._evidence_locator(key),
                 "state": "changed",
                 "member_changed": True,
             }
