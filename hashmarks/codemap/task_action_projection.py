@@ -42,7 +42,9 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         if cached is not None:
             return cached
         context = self._task_action_map_context(task, limit)
-        selection = self._task_action_surface_owner_state(task, context, limit, per_role)
+        selection = self._task_action_surface_owner_state(
+            task, context, limit, per_role
+        )
         choices = self._task_action_projection_choices(task, context, selection, limit)
         final = self._task_action_final_state(
             task, context, selection, choices, (limit, per_role)
@@ -69,9 +71,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         self._decision_session_stats["task_action_miss"] += 1
         return action_key, None
 
-    def _task_action_map_context(
-        self, task: str, limit: int
-    ) -> _TaskActionMapContext:
+    def _task_action_map_context(self, task: str, limit: int) -> _TaskActionMapContext:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         failed: set[str] = set()
@@ -158,9 +158,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             structural_owner_origin=cast(
                 "Mapping[str, object] | None", owner["structural_owner_origin"]
             ),
-            archive_live_owner_ambiguity=bool(
-                owner["archive_live_owner_ambiguity"]
-            ),
+            archive_live_owner_ambiguity=bool(owner["archive_live_owner_ambiguity"]),
             exact_identifier_paths=tuple(
                 cast("Sequence[str]", owner["exact_identifier_paths"])
             ),
@@ -170,12 +168,12 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             exact_identifier_surface_selected=bool(
                 owner["exact_identifier_surface_selected"]
             ),
-            inspect_rows=[
-                row for row in context.rows if "inspect" in row["roles"]
-            ][:per_role],
-            related_rows=[
-                row for row in context.rows if "related" in row["roles"]
-            ][:per_role],
+            inspect_rows=[row for row in context.rows if "inspect" in row["roles"]][
+                :per_role
+            ],
+            related_rows=[row for row in context.rows if "related" in row["roles"]][
+                :per_role
+            ],
         )
 
     def _task_action_promoted_edit(
@@ -377,9 +375,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                         final.ambiguity_state["verification_origins"],
                     ),
                     multi_structural_owner_ambiguity=bool(
-                        final.ambiguity_state[
-                            "multi_structural_owner_ambiguity"
-                        ]
+                        final.ambiguity_state["multi_structural_owner_ambiguity"]
                     ),
                 )
             ),
