@@ -183,3 +183,41 @@ jobs:
       - name: Pre-commit correctness and hygiene diagnostic
         continue-on-error: true
         run: make precommit
+
+  qualification-convergence:
+    name: Qualification convergence
+    if: always()
+    needs:
+      - fast-gate
+      - authority-diagnostics
+      - evidence-binding-diagnostics
+      - consumer-wheel-artifact
+      - release-environment
+      - python-support
+      - mcp-interop
+      - precommit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every authoritative qualification lane
+        env:
+          FAST_GATE: ${{ needs.fast-gate.result }}
+          WORKSPACE_AUTHORITY: ${{ needs.authority-diagnostics.result }}
+          EVIDENCE_BINDINGS: ${{ needs.evidence-binding-diagnostics.result }}
+          CONSUMER_WHEEL: ${{ needs.consumer-wheel-artifact.result }}
+          RELEASE_ENVIRONMENT: ${{ needs.release-environment.result }}
+          PYTHON_SUPPORT: ${{ needs.python-support.result }}
+          MCP_INTEROP: ${{ needs.mcp-interop.result }}
+          PRECOMMIT: ${{ needs.precommit.result }}
+        run: |
+          failed=0
+          for lane in             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             PRECOMMIT
+          do
+            result="${!lane}"
+            printf '%-24s %s\n' "$lane" "$result"
+            if [ "$result" != "success" ]; then
+              failed=1
+            fi
+          done
+          test "$failed" -eq 0
+
