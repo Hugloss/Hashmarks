@@ -40,6 +40,8 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **O6. Freshness is evidence-specific.** A recent timestamp, successful cache lookup, or previous query cannot substitute for repository continuity proof.
 
+**O7. Serialized freshness has one state vocabulary.** Current public repository-evidence projections use exactly `current`, `stale`, or `unknown` for freshness state. Proof strength such as `proven` is separate provenance; invalidation is a delta consequence, not an alternate freshness-state spelling.
+
 ## Public API and daemon safety
 
 **A1. Local/daemon acceleration may change cost, never semantics.** Automatic fallback must preserve the same repository truth.
@@ -213,6 +215,10 @@ Hashmarks is a repository observer that exposes repository intelligence, not an 
 **G54. The CLI facade does not acquire adjacent authority.** Moving parser/handler ownership cannot transfer execution, benchmark orchestration, or certification responsibility into repository intelligence.
 
 **G65. Exception translation has one owner per boundary.** Repository/domain code raises domain errors; the repository CLI adapter and top-level CLI translate caller-visible failures once, the MCP server translates `McpSurfaceError` to the SDK transport error once, and local daemon/CodeMap IPC handlers share one request/error serialization boundary. Broad catches remain local only where rollback, cleanup, optional-provider isolation, single-flight propagation, or a transport request envelope requires them. Catch-and-immediate-reraise blocks are forbidden.
+
+**G66. Repository-intelligence state families have one semantic owner.** A new projection or schema must reuse the existing repository observation, generation, member revision, freshness, completeness, relationship, and delta authorities when they already define the fact. A new CodeMap mixin or public state word may not silently become a second owner merely because a consumer needs a different projection shape.
+
+**G67. Repository evidence bindings are projections, not a second change authority.** Binding definitions may be consumer-declared and opaque, but observed member/range identities, relationships, freshness, completeness, and change facts remain bound to the canonical Hashmarks owners. Definition/configuration change must remain distinguishable from repository content or relationship change.
 
 ## Historical evidence
 
