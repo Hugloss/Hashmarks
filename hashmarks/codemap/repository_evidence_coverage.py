@@ -84,19 +84,24 @@ class RepositoryEvidenceCoverageMixin:
                 for binding in changed_bindings:
                     direct = binding.get("direct_evidence") if isinstance(binding, Mapping) else None
                     changes = direct.get("changes") if isinstance(direct, Mapping) else None
-                    if not isinstance(changes, list):
-                        continue
-                    for change in changes:
-                        if not isinstance(change, Mapping):
-                            continue
-                        evidence = change.get("evidence")
-                        if not isinstance(evidence, list) or not evidence:
-                            continue
-                        path = str(evidence[0])
-                        if change.get("direct_content_changed") is True:
-                            direct_changed.add(path)
-                        elif change.get("member_changed") is True:
-                            member_only.add(path)
+                    if isinstance(changes, list):
+                        for change in changes:
+                            if not isinstance(change, Mapping):
+                                continue
+                            evidence = change.get("evidence")
+                            if not isinstance(evidence, list) or not evidence:
+                                continue
+                            if change.get("direct_content_changed") is True:
+                                direct_changed.add(str(evidence[0]))
+                    member = binding.get("member_evidence") if isinstance(binding, Mapping) else None
+                    member_changes = member.get("changes") if isinstance(member, Mapping) else None
+                    if isinstance(member_changes, list):
+                        for change in member_changes:
+                            if not isinstance(change, Mapping):
+                                continue
+                            evidence = change.get("evidence")
+                            if isinstance(evidence, list) and evidence:
+                                member_only.add(str(evidence[0]))
         direct_changed &= set(bound_members)
         member_only = (member_only & set(bound_members)) - direct_changed
         precision_unknown = set(bound_members) - direct_changed - member_only
