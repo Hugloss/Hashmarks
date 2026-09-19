@@ -5,6 +5,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from .decision_session import decision_scoped
+
 from hashmarks.paths import normalize_relative_path
 
 if TYPE_CHECKING:
@@ -44,7 +46,16 @@ class RepositoryEvidenceBindingsMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         path = self.workspace / span.path
-        if path.is_symlink():
+        # Evidence identity is lexical repository evidence. Never follow a symlink
+        # leaf or a symlinked ancestor into another filesystem authority.
+        cursor = self.workspace
+        symlinked = False
+        for part in span.path.split("/"):
+            cursor = cursor / part
+            if cursor.is_symlink():
+                symlinked = True
+                break
+        if symlinked:
             return {
                 "path": span.path,
                 "start_line": span.start_line,
@@ -91,7 +102,11 @@ class RepositoryEvidenceBindingsMixin:
                 "reason": "declared-span-outside-member",
                 "member_identity": "sha256:" + hashlib.sha256(raw).hexdigest(),
             }
-        selected = "".join(lines[span.start_line - 1 : span.end_line]).encode("utf-8")
+        # splitlines(keepends=True) plus UTF-8 re-encoding preserves the exact
+        # selected bytes for valid UTF-8, including CRLF/LF and a missing final newline.
+        selected = b"".join(
+            line.encode("utf-8") for line in lines[span.start_line - 1 : span.end_line]
+        )
         return {
             "path": span.path,
             "start_line": span.start_line,
@@ -102,6 +117,7 @@ class RepositoryEvidenceBindingsMixin:
             "byte_length": len(selected),
         }
 
+    @decision_scoped
     def repository_evidence_bindings(
         self,
         bindings: Sequence[Mapping[str, object]],
