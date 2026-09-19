@@ -263,8 +263,12 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         try:
             if not self._schema_is_current():
                 self._discard_incompatible_schema_locked()
+            # executescript() commits an active transaction before running.
+            # Put BEGIN IMMEDIATE inside the script so schema publication stays
+            # serialized until its final COMMIT.
             self._db.executescript(
             """
+            BEGIN IMMEDIATE;
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS file_map (
               path TEXT PRIMARY KEY,
@@ -375,6 +379,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             CREATE INDEX IF NOT EXISTS derived_node_path_idx ON derived_node(path);
             CREATE INDEX IF NOT EXISTS derived_node_kind_idx ON derived_node(kind);
             CREATE INDEX IF NOT EXISTS derived_node_identity_idx ON derived_node(identity);
+            COMMIT;
             """
             )
             self._db.execute(
