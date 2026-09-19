@@ -98,99 +98,99 @@ def load_set_manifest(path: Path) -> dict[str, Any]:
     return value
 
 
-
 def _replication_report(
     manifest: dict[str, Any],
     manifest_path: Path,
     experiment_reports: list[dict[str, Any]],
 ) -> dict[str, Any]:
-# v2 adds replication/statistical authority without changing v1 semantics.
-# Repeated runs are grouped by an explicit replication_group.  Repetitions
-# never count as additional repository/task breadth; they only describe
-# within-task run-to-run variation.
-import math
-import random
-
-groups: dict[str, list[dict[str, Any]]] = {}
-for index, entry in enumerate(manifest["experiments"]):
-    group = _nonempty(
-        entry.get("replication_group"),
-        f"experiment-set entry {index} replication_group",
-        manifest_path,
+    # v2 adds replication/statistical authority without changing v1 semantics.
+    # Repeated runs are grouped by an explicit replication_group.  Repetitions
+    # never count as additional repository/task breadth; they only describe
+    # within-task run-to-run variation.
+    import math
+    import random
+    
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for index, entry in enumerate(manifest["experiments"]):
+        group = _nonempty(
+            entry.get("replication_group"),
+            f"experiment-set entry {index} replication_group",
+            manifest_path,
+        )
+        groups.setdefault(group, []).append(experiment_reports[index])
+    min_repeats = manifest.get("replication_policy", {}).get("min_repeats_per_group", 3)
+    if not isinstance(min_repeats, int) or min_repeats < 2:
+        raise ValueError(
+            "replication_policy min_repeats_per_group must be an integer >= 2"
+        )
+    confidence = manifest.get("replication_policy", {}).get("confidence", 0.95)
+    if not isinstance(confidence, (int, float)) or not 0.5 < confidence < 1.0:
+        raise ValueError("replication_policy confidence must be between 0.5 and 1.0")
+    bootstrap_samples = manifest.get("replication_policy", {}).get(
+        "bootstrap_samples", 10000
     )
-    groups.setdefault(group, []).append(experiment_reports[index])
-min_repeats = manifest.get("replication_policy", {}).get("min_repeats_per_group", 3)
-if not isinstance(min_repeats, int) or min_repeats < 2:
-    raise ValueError(
-        "replication_policy min_repeats_per_group must be an integer >= 2"
-    )
-confidence = manifest.get("replication_policy", {}).get("confidence", 0.95)
-if not isinstance(confidence, (int, float)) or not 0.5 < confidence < 1.0:
-    raise ValueError("replication_policy confidence must be between 0.5 and 1.0")
-bootstrap_samples = manifest.get("replication_policy", {}).get(
-    "bootstrap_samples", 10000
-)
-if not isinstance(bootstrap_samples, int) or bootstrap_samples < 1000:
-    raise ValueError(
-        "replication_policy bootstrap_samples must be an integer >= 1000"
-    )
-
-group_reports = []
-eligible_groups = 0
-for group_id in sorted(groups):
-    rows = groups[group_id]
-    reductions = [r["model_input_token_reduction"] for r in rows]
-    eligible = len(rows) >= min_repeats
-    if eligible:
-        eligible_groups += 1
-    group_reports.append(
-        {
-            "replication_group": group_id,
-            "repeat_count": len(rows),
-            "replication_eligible": eligible,
-            "mean_model_input_token_reduction": sum(reductions) / len(reductions),
-            "min_model_input_token_reduction": min(reductions),
-            "max_model_input_token_reduction": max(reductions),
+    if not isinstance(bootstrap_samples, int) or bootstrap_samples < 1000:
+        raise ValueError(
+            "replication_policy bootstrap_samples must be an integer >= 1000"
+        )
+    
+    group_reports = []
+    eligible_groups = 0
+    for group_id in sorted(groups):
+        rows = groups[group_id]
+        reductions = [r["model_input_token_reduction"] for r in rows]
+        eligible = len(rows) >= min_repeats
+        if eligible:
+            eligible_groups += 1
+        group_reports.append(
+            {
+                "replication_group": group_id,
+                "repeat_count": len(rows),
+                "replication_eligible": eligible,
+                "mean_model_input_token_reduction": sum(reductions) / len(reductions),
+                "min_model_input_token_reduction": min(reductions),
+                "max_model_input_token_reduction": max(reductions),
+            }
+        )
+    
+    # Deterministic paired bootstrap over experiment-level reductions.  This
+    # interval is descriptive evidence for the exact retained experiment set;
+    # it is not a population/generalization claim.
+    ci = None
+    if len(experiment_reports) >= 2:
+        values = [r["model_input_token_reduction"] for r in experiment_reports]
+        seed = int(hashlib.sha256(manifest_path.read_bytes()).hexdigest()[:16], 16)
+        rng = random.Random(seed)
+        means = []
+        n = len(values)
+        for _ in range(bootstrap_samples):
+            means.append(sum(values[rng.randrange(n)] for _ in range(n)) / n)
+        means.sort()
+        alpha = (1.0 - float(confidence)) / 2.0
+        lo = means[max(0, min(len(means) - 1, int(math.floor(alpha * len(means)))))]
+        hi = means[
+            max(0, min(len(means) - 1, int(math.ceil((1.0 - alpha) * len(means))) - 1))
+        ]
+        ci = {
+            "method": "deterministic-experiment-bootstrap",
+            "confidence": float(confidence),
+            "samples": bootstrap_samples,
+            "lower": lo,
+            "upper": hi,
+            "scope": "exact-retained-experiments-only",
         }
-    )
-
-# Deterministic paired bootstrap over experiment-level reductions.  This
-# interval is descriptive evidence for the exact retained experiment set;
-# it is not a population/generalization claim.
-ci = None
-if len(experiment_reports) >= 2:
-    values = [r["model_input_token_reduction"] for r in experiment_reports]
-    seed = int(hashlib.sha256(manifest_path.read_bytes()).hexdigest()[:16], 16)
-    rng = random.Random(seed)
-    means = []
-    n = len(values)
-    for _ in range(bootstrap_samples):
-        means.append(sum(values[rng.randrange(n)] for _ in range(n)) / n)
-    means.sort()
-    alpha = (1.0 - float(confidence)) / 2.0
-    lo = means[max(0, min(len(means) - 1, int(math.floor(alpha * len(means)))))]
-    hi = means[
-        max(0, min(len(means) - 1, int(math.ceil((1.0 - alpha) * len(means))) - 1))
-    ]
-    ci = {
-        "method": "deterministic-experiment-bootstrap",
-        "confidence": float(confidence),
-        "samples": bootstrap_samples,
-        "lower": lo,
-        "upper": hi,
-        "scope": "exact-retained-experiments-only",
+    return {
+        "group_count": len(groups),
+        "eligible_group_count": eligible_groups,
+        "min_repeats_per_group": min_repeats,
+        "groups": group_reports,
+        "descriptive_confidence_interval": ci,
+        "statistical_claim_eligible": bool(groups)
+        and eligible_groups == len(groups)
+        and ci is not None,
+        "warning": "replication does not increase repository/task breadth and this interval does not establish population generalization",
     }
-return {
-    "group_count": len(groups),
-    "eligible_group_count": eligible_groups,
-    "min_repeats_per_group": min_repeats,
-    "groups": group_reports,
-    "descriptive_confidence_interval": ci,
-    "statistical_claim_eligible": bool(groups)
-    and eligible_groups == len(groups)
-    and ci is not None,
-    "warning": "replication does not increase repository/task breadth and this interval does not establish population generalization",
-}
+    
 
 def run_experiment_set(
     manifest_path: Path, *, strict_raw_evidence: bool = True
