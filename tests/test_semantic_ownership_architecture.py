@@ -67,3 +67,18 @@ def test_binding_modules_are_projection_owners_not_second_change_authorities() -
     assert "semantic_dependencies" not in delta
     assert '"source": "repository-observer"' in coverage
     assert '"source": "caller-asserted"' in coverage
+
+
+def test_completeness_is_not_mixed_with_availability_or_freshness() -> None:
+    delta = (CODEMAP / "repository_delta.py").read_text(encoding="utf-8")
+    bindings = (CODEMAP / "repository_evidence_bindings.py").read_text(
+        encoding="utf-8"
+    )
+    state_doc = (ROOT / "docs" / "reference" / "STATE_AND_SEMANTIC_OWNERS.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "OBSERVATION_STATES" not in delta
+    assert '"state": "complete"' in delta
+    assert '"state": "complete"' in bindings
+    assert "complete/incomplete/unknown" in state_doc
