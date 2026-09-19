@@ -226,6 +226,7 @@ class RepositoryEvidenceBindingsMixin:
         )
         return {
             "state": "observed",
+            "scope_paths": paths,
             "relationships": relationships,
             "bounds": {
                 "paths": len(paths),
@@ -348,6 +349,7 @@ class RepositoryEvidenceBindingsMixin:
                     if include_relationships
                     else {
                         "state": "not-requested",
+                        "scope_paths": [],
                         "relationships": [],
                         "bounds": {"paths": 0, "limit_per_path": relationship_limit_per_path},
                         "completeness": "not-observed",
