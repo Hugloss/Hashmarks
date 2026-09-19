@@ -68,6 +68,57 @@ jobs:
                   f"rule_findings={facts['rule_findings']}"
               )
           PY
+      - name: Select only the fresh-measured candidate
+        run: |
+          target=$(python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path("/tmp/current-quality-debt.json").read_text())
+          print(payload["candidates"][0]["target"])
+          PY
+          )
+          printf 'CURRENT_TARGET=%s\n' "$target" >> "$GITHUB_ENV"
+          printf 'CURRENT_TARGET=%s\n' "$target"
+      - name: Refresh test ownership for fresh candidate
+        run: |
+          export PYTHONPATH="$PWD/.agent-economics/scripts"
+          python -m agent_economics test-focus \
+            --repository-root . \
+            --source-root hashmarks \
+            --tests-root tests \
+            --package-name hashmarks \
+            --changed-path "$CURRENT_TARGET" \
+            --gate "ruff=make ruff" \
+            --gate "test=make test" \
+            --artifact .agent-artifacts/current-test-focus.json \
+            --format json > /tmp/current-test-focus.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path("/tmp/current-test-focus.json").read_text())
+          candidate = payload["candidates"][0]
+          print("TEST_FOCUS_REPOSITORY_IDENTITY=" + payload["repository"]["identity"])
+          print("TEST_FOCUS_TARGET=" + candidate["target"])
+          print("TEST_FOCUS_CONFIRMED_DIRECT=" + str(candidate["derived"]["confirmed_direct_test_count"]))
+          print("TEST_FOCUS_SUPPORTING=" + str(candidate["derived"]["supporting_relationship_count"]))
+          print("TEST_FOCUS_CONFIRMED_TESTS")
+          for row in candidate["evidence"]["confirmed"]:
+              print(
+                  f"{row.get('test_path','')} "
+                  f"match_type={row.get('match_type','')} "
+                  f"provenance={row.get('provenance','')}"
+              )
+          print("TEST_FOCUS_VERIFICATION")
+          for row in payload["verification_suggestions"]:
+              print(
+                  f"stage={row.get('stage','')} "
+                  f"path={row.get('path','')} "
+                  f"name={row.get('name','')} "
+                  f"command={row.get('command','')}"
+              )
+          print("TEST_FOCUS_REQUIRED_NEXT_EVIDENCE=" + json.dumps(payload["required_next_evidence"], sort_keys=True))
+          print("TEST_FOCUS_UNCERTAINTY=" + json.dumps(payload["uncertainty"], sort_keys=True))
+          PY
       - name: Measure current investigation hotspots
         run: |
           export PYTHONPATH="$PWD/.agent-economics/scripts"
