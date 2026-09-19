@@ -109,7 +109,7 @@ def _replication_report(
     # within-task run-to-run variation.
     import math
     import random
-    
+
     groups: dict[str, list[dict[str, Any]]] = {}
     for index, entry in enumerate(manifest["experiments"]):
         group = _nonempty(
@@ -133,7 +133,7 @@ def _replication_report(
         raise ValueError(
             "replication_policy bootstrap_samples must be an integer >= 1000"
         )
-    
+
     group_reports = []
     eligible_groups = 0
     for group_id in sorted(groups):
@@ -152,7 +152,7 @@ def _replication_report(
                 "max_model_input_token_reduction": max(reductions),
             }
         )
-    
+
     # Deterministic paired bootstrap over experiment-level reductions.  This
     # interval is descriptive evidence for the exact retained experiment set;
     # it is not a population/generalization claim.
@@ -190,7 +190,7 @@ def _replication_report(
         and ci is not None,
         "warning": "replication does not increase repository/task breadth and this interval does not establish population generalization",
     }
-    
+
 
 def run_experiment_set(
     manifest_path: Path, *, strict_raw_evidence: bool = True
