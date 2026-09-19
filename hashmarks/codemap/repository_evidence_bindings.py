@@ -118,7 +118,12 @@ class RepositoryEvidenceBindingsMixin:
         }
 
     @decision_scoped
-    def repository_evidence_bindings(\n        self,\n        bindings: Sequence[Mapping[str, object]],\n        *,\n        dependency_paths: Mapping[str, Sequence[str]] | None = None,\n    ) -> dict[str, object]:
+    def repository_evidence_bindings(
+        self,
+        bindings: Sequence[Mapping[str, object]],
+        *,
+        dependency_paths: Mapping[str, Sequence[str]] | None = None,
+    ) -> dict[str, object]:
         """Return deterministic exact-span evidence for opaque consumer bindings."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
