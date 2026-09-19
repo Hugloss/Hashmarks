@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 EVIDENCE_CONTEXT_SCHEMA = "hashmarks.evidence-context.v1"
 _SHA = re.compile(r"^sha256:[0-9a-f]{64}$")
-_FRESHNESS_STATES = frozenset({"unknown", "proven", "stale"})
+_FRESHNESS_STATES = frozenset({"unknown", "current", "stale"})
 
 
 def _digest(payload: object) -> str:
@@ -69,7 +69,7 @@ def evidence_context_identity(
         raise ValueError("revision must be strict JSON-portable") from exc
     freshness = provenance.get("freshness", "unknown")
     if freshness not in _FRESHNESS_STATES:
-        raise ValueError("freshness must be one of unknown, proven, stale")
+        raise ValueError("freshness must be one of unknown, current, stale")
     payload = {
         "schema": EVIDENCE_CONTEXT_SCHEMA,
         "evidence_identity": evidence_identity,
