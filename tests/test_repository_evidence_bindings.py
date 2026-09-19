@@ -225,3 +225,57 @@ def test_relationship_change_does_not_masquerade_as_direct_content_change(tmp_pa
     assert changed["direct_evidence"]["state"] == "preserved"
     assert changed["relationship_evidence"]["state"] == "changed"
     assert changed["relationship_evidence"]["completeness"] == "bounded-not-claimed"
+
+
+def test_complete_change_set_can_prove_outside_declared_bindings(tmp_path: Path) -> None:
+    (tmp_path / "bound.py").write_text("bound\n", encoding="utf-8")
+    (tmp_path / "dependency.py").write_text("dep\n", encoding="utf-8")
+    (tmp_path / "outside.py").write_text("outside\n", encoding="utf-8")
+    bindings = [{"binding_id": "generic", "evidence": [{"path": "bound.py", "start_line": 1, "end_line": 1}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            bindings, dependency_paths={"generic": ["dependency.py"]}
+        )
+        coverage = codemap.repository_evidence_coverage(
+            packet,
+            changed_paths=["bound.py", "dependency.py", "outside.py"],
+            change_set_complete=True,
+        )
+    assert coverage["classification"]["bound_members"] == ["bound.py"]
+    assert coverage["classification"]["dependency_affected"] == ["dependency.py"]
+    assert coverage["classification"]["outside_declared_bindings"] == ["outside.py"]
+    assert coverage["coverage"]["state"] == "complete"
+    assert coverage["coverage"]["outside_classification"] == "known"
+
+
+def test_incomplete_change_set_never_claims_unmapped_change(tmp_path: Path) -> None:
+    (tmp_path / "bound.py").write_text("bound\n", encoding="utf-8")
+    (tmp_path / "seen.py").write_text("seen\n", encoding="utf-8")
+    bindings = [{"binding_id": "generic", "evidence": [{"path": "bound.py", "start_line": 1, "end_line": 1}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(bindings)
+        coverage = codemap.repository_evidence_coverage(
+            packet, changed_paths=["seen.py"], change_set_complete=False
+        )
+    assert coverage["classification"]["outside_declared_bindings"] == []
+    assert coverage["classification"]["outside_declared_bindings_candidates"] == ["seen.py"]
+    assert coverage["coverage"]["state"] == "incomplete"
+    assert coverage["coverage"]["outside_classification"] == "unknown"
+
+
+def test_coverage_is_order_independent_and_identity_stable(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("a\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("b\n", encoding="utf-8")
+    bindings = [{"binding_id": "generic", "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(bindings)
+        first = codemap.repository_evidence_coverage(
+            packet, changed_paths=["b.py", "a.py"], change_set_complete=True
+        )
+        second = codemap.repository_evidence_coverage(
+            packet, changed_paths=["a.py", "b.py"], change_set_complete=True
+        )
+    assert first == second
