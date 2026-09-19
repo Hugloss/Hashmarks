@@ -12,7 +12,7 @@ jobs:
   remeasure:
     name: Remeasure current debt from fresh main
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,7 +79,23 @@ jobs:
           )
           printf 'CURRENT_TARGET=%s\n' "$target" >> "$GITHUB_ENV"
           printf 'CURRENT_TARGET=%s\n' "$target"
-      - name: Refresh test ownership for fresh candidate
+      - name: Show exact debt in the fresh candidate
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          payload = json.loads(Path("/tmp/current-quality-debt.json").read_text())
+          target = os.environ["CURRENT_TARGET"]
+          print("CURRENT_TARGET_DETAILED_FINDINGS")
+          for row in payload["evidence"]["detailed_findings"]:
+              if row["path"] == target:
+                  print(
+                      f"line={row['line']} rule={row['rule']} "
+                      f"observed={row['observed']} limit={row['limit']} excess={row['excess']}"
+                  )
+          PY
+      - name: Refresh test ownership without declarations
         run: |
           export PYTHONPATH="$PWD/.agent-economics/scripts"
           python -m agent_economics test-focus \
@@ -88,6 +104,57 @@ jobs:
             --tests-root tests \
             --package-name hashmarks \
             --changed-path "$CURRENT_TARGET" \
+            --gate "ruff=make ruff" \
+            --gate "test=make test" \
+            --artifact .agent-artifacts/current-test-focus-unassisted.json \
+            --format json > /tmp/current-test-focus-unassisted.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path("/tmp/current-test-focus-unassisted.json").read_text())
+          candidate = payload["candidates"][0]
+          print("UNASSISTED_TEST_FOCUS_CONFIRMED_DIRECT=" + str(candidate["derived"]["confirmed_direct_test_count"]))
+          print("UNASSISTED_TEST_FOCUS_REQUIRED_NEXT_EVIDENCE=" + json.dumps(payload["required_next_evidence"], sort_keys=True))
+          PY
+      - name: Bind reviewed current public-API behavior owners
+        run: |
+          cat > /tmp/task-action-ownership.json <<'JSON'
+          {
+            "version": 1,
+            "relationships": [
+              {
+                "source": "hashmarks/codemap/task_action_projection.py",
+                "test": "tests/test_task_action_map.py",
+                "reason": "current test directly exercises task_action_map public behavior"
+              },
+              {
+                "source": "hashmarks/codemap/task_action_projection.py",
+                "test": "tests/test_task_action_brief.py",
+                "reason": "current test exercises task_action_map through task_action_brief and direct call-count behavior"
+              },
+              {
+                "source": "hashmarks/codemap/task_action_projection.py",
+                "test": "tests/test_task_action_session_reuse.py",
+                "reason": "current test directly exercises task_action_map decision-session cache behavior"
+              },
+              {
+                "source": "hashmarks/codemap/task_action_projection.py",
+                "test": "tests/test_task_action_stale_workspace.py",
+                "reason": "current test directly exercises task_action_map stale-workspace authority behavior"
+              }
+            ]
+          }
+          JSON
+      - name: Refresh test ownership with reviewed current evidence
+        run: |
+          export PYTHONPATH="$PWD/.agent-economics/scripts"
+          python -m agent_economics test-focus \
+            --repository-root . \
+            --source-root hashmarks \
+            --tests-root tests \
+            --package-name hashmarks \
+            --changed-path "$CURRENT_TARGET" \
+            --ownership-hints-path /tmp/task-action-ownership.json \
             --gate "ruff=make ruff" \
             --gate "test=make test" \
             --artifact .agent-artifacts/current-test-focus.json \
@@ -108,16 +175,118 @@ jobs:
                   f"match_type={row.get('match_type','')} "
                   f"provenance={row.get('provenance','')}"
               )
-          print("TEST_FOCUS_VERIFICATION")
-          for row in payload["verification_suggestions"]:
-              print(
-                  f"stage={row.get('stage','')} "
-                  f"path={row.get('path','')} "
-                  f"name={row.get('name','')} "
-                  f"command={row.get('command','')}"
-              )
           print("TEST_FOCUS_REQUIRED_NEXT_EVIDENCE=" + json.dumps(payload["required_next_evidence"], sort_keys=True))
           print("TEST_FOCUS_UNCERTAINTY=" + json.dumps(payload["uncertainty"], sort_keys=True))
+          PY
+      - name: Materialize test supply
+        run: uv sync --group test --python 3.11
+      - name: Execute bound pre-edit behavioral tests
+        run: |
+          uv run --frozen --no-sync --group test python -m pytest -q \
+            tests/test_task_action_map.py \
+            tests/test_task_action_brief.py \
+            tests/test_task_action_session_reuse.py \
+            tests/test_task_action_stale_workspace.py
+          echo "PRE_EDIT_BEHAVIOR_TESTS=PASS"
+      - name: Evaluate BP1 pre-edit behavior readiness
+        run: |
+          export PYTHONPATH="$PWD/.agent-economics/scripts"
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          from agent_economics.behavior_preservation import behavior_preservation_readiness
+
+          target = Path(os.environ["CURRENT_TARGET"])
+          source_identity = "sha256:" + hashlib.sha256(target.read_bytes()).hexdigest()
+          test_paths = [
+              Path("tests/test_task_action_map.py"),
+              Path("tests/test_task_action_brief.py"),
+              Path("tests/test_task_action_session_reuse.py"),
+              Path("tests/test_task_action_stale_workspace.py"),
+          ]
+          test_references = [
+              {
+                  "path": path.as_posix(),
+                  "evidence_identity": "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest(),
+              }
+              for path in test_paths
+          ]
+          review_semantic = {
+              "target": target.as_posix(),
+              "source_identity": source_identity,
+              "tests": test_references,
+              "boundaries": [
+                  "canonical-ranking-and-role-projection",
+                  "owner-resolution-and-ambiguity-fail-closed",
+                  "decision-session-cache-isolation",
+                  "stale-workspace-authority-reconciliation",
+                  "task-action-brief-consumer-contract",
+              ],
+          }
+          review_identity = "sha256:" + hashlib.sha256(
+              json.dumps(review_semantic, sort_keys=True, separators=(",", ":")).encode()
+          ).hexdigest()
+          boundaries = [
+              {
+                  "identity": name,
+                  "classification": "direct",
+                  "freshness": "fresh",
+                  "provider_reference": {
+                      "provider": "hashmarks-current-public-api-test-review",
+                      "evidence_identity": review_identity,
+                  },
+              }
+              for name in review_semantic["boundaries"]
+          ]
+          execution_semantic = {
+              "source_identity": source_identity,
+              "test_evidence_identities": sorted(
+                  row["evidence_identity"] for row in test_references
+              ),
+              "command": (
+                  "uv run --frozen --no-sync --group test python -m pytest -q "
+                  "tests/test_task_action_map.py tests/test_task_action_brief.py "
+                  "tests/test_task_action_session_reuse.py tests/test_task_action_stale_workspace.py"
+              ),
+              "github_run_id": os.environ["GITHUB_RUN_ID"],
+              "github_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+          }
+          execution_identity = "sha256:" + hashlib.sha256(
+              json.dumps(execution_semantic, sort_keys=True, separators=(",", ":")).encode()
+          ).hexdigest()
+          receipt = {
+              "source_identity": source_identity,
+              "status": "PASS",
+              "test_evidence_identities": sorted(
+                  row["evidence_identity"] for row in test_references
+              ),
+              "execution_identity": execution_identity,
+          }
+          result = behavior_preservation_readiness(
+              target=target.as_posix(),
+              source_identity=source_identity,
+              boundaries=boundaries,
+              test_references=test_references,
+              execution_receipt=receipt,
+              repository_gates=[
+                  {"name": "ruff", "command": "make ruff"},
+                  {"name": "test", "command": "make test"},
+              ],
+          )
+          Path("/tmp/pre-edit-readiness.json").write_text(
+              json.dumps(result, indent=2, sort_keys=True) + "\n"
+          )
+          print("PRE_EDIT_SOURCE_IDENTITY=" + source_identity)
+          print("PRE_EDIT_REVIEW_IDENTITY=" + review_identity)
+          print("PRE_EDIT_EXECUTION_IDENTITY=" + execution_identity)
+          print("PRE_EDIT_READINESS_STATUS=" + str(result["status"]))
+          print("PRE_EDIT_EVIDENCE_IDENTITY=" + str(result["evidence_identity"]))
+          print("PRE_EDIT_UNRESOLVED=" + json.dumps(result["unresolved_evidence"], sort_keys=True))
+          print("PRE_EDIT_STRENGTHENING=" + json.dumps(result["boundaries_requiring_test_strengthening"], sort_keys=True))
+          if result["status"] != "READY_FOR_BEHAVIOR_PRESERVING_EDIT":
+              raise SystemExit("pre-edit behavior evidence is not ready")
           PY
       - name: Measure current investigation hotspots
         run: |
