@@ -1,0 +1,36 @@
+name: Behavior-preserving Agent Economics dogfood
+
+on:
+  push:
+    branches:
+      - dogfood-behavior-preserving-split
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    name: Fresh current-main debt measurement
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - run: uv python install 3.11
+      - name: Materialize exact qualified Agent Economics
+        env:
+          AE_REVISION: acf435e124d963bb56033b9d5f5f83cb93630916
+        run: |
+          git clone --filter=blob:none https://github.com/Hugloss/agentsCookbook.git .agent-economics
+          git -C .agent-economics checkout --detach "$AE_REVISION"
+          test "$(git -C .agent-economics rev-parse HEAD)" = "$AE_REVISION"
+      - name: Install Hashmarks-owned Ruff supply
+        run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --only-group lint --python 3.11
+      - name: Measure exact parity and ranked hotspots
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.agent-economics/scripts
+        run: |
+          export PATH="$PWD/.ruff-venv/bin:$PATH"
+          uv run --no-sync python scripts/agent_evaluation/ruff_debt_agent_economics_parity.py
