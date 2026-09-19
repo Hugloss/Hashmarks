@@ -675,3 +675,65 @@ def test_member_scope_rejects_line_bounds(tmp_path: Path) -> None:
                     }],
                 }]
             )
+
+
+def test_binding_identity_is_order_independent_but_duplicates_remain_explicit(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.py").write_text("a\nb\n", encoding="utf-8")
+    (tmp_path / "dep.py").write_text("dep\n", encoding="utf-8")
+    left = [{
+        "binding_id": "canonical",
+        "evidence": [
+            {"path": "a.py", "start_line": 2, "end_line": 2},
+            {"path": "a.py", "start_line": 1, "end_line": 1},
+            {"path": "a.py", "start_line": 1, "end_line": 1},
+        ],
+    }]
+    right = [{
+        "binding_id": "canonical",
+        "evidence": [
+            {"path": "a.py", "start_line": 1, "end_line": 1},
+            {"path": "a.py", "start_line": 1, "end_line": 1},
+            {"path": "a.py", "start_line": 2, "end_line": 2},
+        ],
+    }]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        first = codemap.repository_evidence_bindings(
+            left,
+            dependency_paths={"canonical": ["dep.py"]},
+            include_relationships=False,
+        )
+        second = codemap.repository_evidence_bindings(
+            right,
+            dependency_paths={"canonical": ["dep.py"]},
+            include_relationships=False,
+        )
+    assert first == second
+    assert len(first["bindings"][0]["evidence"]) == 3
+
+
+def test_binding_contract_rejects_unknown_dependency_owner_and_unbounded_requests(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.py").write_text("a\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="unknown binding ids"):
+            codemap.repository_evidence_bindings(
+                [{"binding_id": "known", "evidence": []}],
+                dependency_paths={"unknown": ["a.py"]},
+            )
+        with pytest.raises(ValueError, match="between 1 and"):
+            codemap.repository_evidence_bindings(
+                [{"binding_id": "known", "evidence": []}],
+                relationship_limit_per_path=1001,
+            )
+        with pytest.raises(ValueError, match="bindings exceeds"):
+            codemap.repository_evidence_bindings(
+                [
+                    {"binding_id": f"b:{index}", "evidence": []}
+                    for index in range(257)
+                ]
+            )
