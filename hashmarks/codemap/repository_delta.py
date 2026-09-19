@@ -16,10 +16,6 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
-OBSERVATION_STATES = frozenset(
-    {"known-present", "known-absent", "unknown", "incomplete", "stale", "unsupported"}
-)
-
 
 @dataclass(frozen=True, slots=True)
 class RepositoryGenerationBinding:
@@ -640,7 +636,7 @@ class RepositoryDeltaMixin:
             "freshness": self._snapshot_freshness(freshness),
             "bounds": deepcopy(brief.get("bounds") or {}),
             "completeness": {
-                "state": "known-present",
+                "state": "complete",
                 "scope": "bounded-explicit-change-set",
                 "dynamic_runtime_relationships": "unknown",
             },
