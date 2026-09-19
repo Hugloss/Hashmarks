@@ -381,8 +381,9 @@ def test_overlapping_and_duplicate_spans_remain_explicit_evidence(tmp_path: Path
         packet = codemap.repository_evidence_bindings(binding, include_relationships=False)
     evidence = packet["bindings"][0]["evidence"]
     assert len(evidence) == 3
-    assert evidence[0]["span_identity"] == evidence[2]["span_identity"]
-    assert evidence[0]["span_identity"] != evidence[1]["span_identity"]
+    identities = [str(row["span_identity"]) for row in evidence]
+    assert len(set(identities)) == 2
+    assert sorted(identities.count(identity) for identity in set(identities)) == [1, 2]
 
 
 def test_deleted_bound_member_is_first_class_delta(tmp_path: Path) -> None:
