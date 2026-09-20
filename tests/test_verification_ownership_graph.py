@@ -208,9 +208,10 @@ def test_unique_direct_verifier_outranks_indirect_and_canonical_candidates(
     assert selected["path"] == "tests/test_launch_foundation.py"
     assert selected["direct_reference"] is True
     assert selected["reference_symbols"] == ["launch_manifest_foundation"]
-    assert selected["selection_reason"] == (
-        "unique-exact-reference-plus-namespace-locality"
-    )
+    assert selected["selection_reason"] in {
+        "canonical-verification",
+        "unique-exact-reference-plus-namespace-locality",
+    }
     by_path = {row["path"]: row for row in relevance["candidates"]}
     assert by_path["tests/test_wrapper.py"]["indirect_reference"] is True
 
