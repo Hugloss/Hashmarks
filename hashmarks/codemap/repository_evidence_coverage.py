@@ -120,12 +120,34 @@ class RepositoryEvidenceCoverageMixin:
         )
         return evidence_paths, dependency_paths
 
+    @staticmethod
+    def _member_binding_impact_reasons(
+        detail: Mapping[str, object],
+    ) -> set[str]:
+        member = detail.get("member_evidence")
+        member_changes = member.get("changes") if isinstance(member, Mapping) else None
+        if not isinstance(member_changes, list):
+            return set()
+        reasons: set[str] = set()
+        for change in member_changes:
+            if not isinstance(change, Mapping):
+                continue
+            transition = str(change.get("state") or "changed")
+            reasons.add(
+                {
+                    "removed": "bound-member-removed",
+                    "added": "bound-member-added",
+                    "state-changed": "bound-member-observation-state-changed",
+                }.get(transition, "bound-member-changed")
+            )
+        return reasons
+
     @classmethod
     def _direct_binding_impact_reasons(
         cls,
         detail: Mapping[str, object],
     ) -> set[str]:
-        reasons: set[str] = set()
+        reasons = cls._member_binding_impact_reasons(detail)
         direct = detail.get("direct_evidence")
         if isinstance(direct, Mapping) and direct.get("state") == "changed":
             direct_changes = direct.get("changes")
@@ -146,21 +168,6 @@ class RepositoryEvidenceCoverageMixin:
         locator = detail.get("locator_evidence")
         if isinstance(locator, Mapping) and locator.get("state") == "changed":
             reasons.add("bound-locator-changed")
-
-        member = detail.get("member_evidence")
-        member_changes = member.get("changes") if isinstance(member, Mapping) else None
-        if isinstance(member_changes, list):
-            for change in member_changes:
-                if not isinstance(change, Mapping):
-                    continue
-                transition = str(change.get("state") or "changed")
-                reasons.add(
-                    {
-                        "removed": "bound-member-removed",
-                        "added": "bound-member-added",
-                        "state-changed": "bound-member-observation-state-changed",
-                    }.get(transition, "bound-member-changed")
-                )
 
         declared = detail.get("declared_dependencies")
         if isinstance(declared, Mapping) and declared.get("state") == "affected":
