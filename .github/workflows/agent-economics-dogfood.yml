@@ -62,7 +62,9 @@ jobs:
             hashmarks/qualification_units.py \
             hashmarks/codemap/work_context.py \
             --preview \
+            --isolated \
             --select C901,PLR0911,PLR0912,PLR0913,PLR0914,PLR0915,PLR0916 \
+            --config 'lint.per-file-ignores = {}' \
             --config 'lint.mccabe.max-complexity = 8' \
             --config 'lint.pylint.max-returns = 6' \
             --config 'lint.pylint.max-branches = 8' \
