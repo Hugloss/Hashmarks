@@ -63,8 +63,8 @@ from .repository_index_store import (
 from .repository_intelligence_query import RepositoryIntelligenceQueryMixin
 from .repository_task_action import TaskActionMixin
 from .singleflight import SingleFlight
-from .structural_search import AstGrepSearchProvider
 from .structural_locality import StructuralLocalityMixin
+from .structural_search import AstGrepSearchProvider
 from .task_retrieval import TaskRetrievalMixin
 from .typescript_resolver import TypeScriptResolverProvider
 from .verification_explanation import VerificationExplanationMixin
