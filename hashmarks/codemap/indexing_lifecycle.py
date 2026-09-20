@@ -211,6 +211,62 @@ def _uv_workspace_pyprojects(
     return tuple(pyproject for pyproject in pyprojects if selected(pyproject))
 
 
+def _setuptools_source_roots(tool: dict[str, object]) -> set[str]:
+    configured: set[str] = set()
+    setuptools = tool.get("setuptools")
+    if not isinstance(setuptools, dict):
+        return configured
+    package_dir = setuptools.get("package-dir")
+    if not isinstance(package_dir, dict):
+        return configured
+    root = package_dir.get("")
+    if isinstance(root, str) and root.strip():
+        configured.add(root.strip().strip("/"))
+    return configured
+
+
+def _hatch_source_roots(tool: dict[str, object]) -> set[str]:
+    configured: set[str] = set()
+    hatch = tool.get("hatch")
+    if not isinstance(hatch, dict):
+        return configured
+    build = hatch.get("build")
+    targets = build.get("targets") if isinstance(build, dict) else None
+    wheel = targets.get("wheel") if isinstance(targets, dict) else None
+    packages = wheel.get("packages") if isinstance(wheel, dict) else None
+    if not isinstance(packages, list):
+        return configured
+    for package in packages:
+        if isinstance(package, str) and "/" in package.strip("/"):
+            configured.add(package.strip("/").split("/", 1)[0])
+    return configured
+
+
+def _poetry_source_roots(tool: dict[str, object]) -> set[str]:
+    configured: set[str] = set()
+    poetry = tool.get("poetry")
+    packages = poetry.get("packages") if isinstance(poetry, dict) else None
+    if not isinstance(packages, list):
+        return configured
+    for package in packages:
+        if not isinstance(package, dict):
+            continue
+        root = package.get("from")
+        if isinstance(root, str) and root.strip():
+            configured.add(root.strip().strip("/"))
+    return configured
+
+
+def _project_source_roots(data: object) -> set[str]:
+    tool = data.get("tool") if isinstance(data, dict) else None
+    tool = tool if isinstance(tool, dict) else {}
+    return {
+        *_setuptools_source_roots(tool),
+        *_hatch_source_roots(tool),
+        *_poetry_source_roots(tool),
+    }
+
+
 def _python_source_roots_from_pyprojects(
     workspace: Path, pyprojects: Sequence[Path]
 ) -> tuple[str, ...]:
@@ -219,45 +275,10 @@ def _python_source_roots_from_pyprojects(
     for pyproject in _uv_workspace_pyprojects(workspace, pyprojects):
         try:
             data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-        except (OSError, tomllib.TOMLDecodeError):
-            continue
-        tool = data.get("tool") if isinstance(data, dict) else None
-        tool = tool if isinstance(tool, dict) else {}
-        configured: set[str] = set()
-
-        setuptools = tool.get("setuptools")
-        if isinstance(setuptools, dict):
-            package_dir = setuptools.get("package-dir")
-            if isinstance(package_dir, dict):
-                root = package_dir.get("")
-                if isinstance(root, str) and root.strip():
-                    configured.add(root.strip().strip("/"))
-
-        hatch = tool.get("hatch")
-        if isinstance(hatch, dict):
-            build = hatch.get("build")
-            targets = build.get("targets") if isinstance(build, dict) else None
-            wheel = targets.get("wheel") if isinstance(targets, dict) else None
-            packages = wheel.get("packages") if isinstance(wheel, dict) else None
-            if isinstance(packages, list):
-                for package in packages:
-                    if isinstance(package, str) and "/" in package.strip("/"):
-                        configured.add(package.strip("/").split("/", 1)[0])
-
-        poetry = tool.get("poetry")
-        packages = poetry.get("packages") if isinstance(poetry, dict) else None
-        if isinstance(packages, list):
-            for package in packages:
-                if isinstance(package, dict):
-                    root = package.get("from")
-                    if isinstance(root, str) and root.strip():
-                        configured.add(root.strip().strip("/"))
-
-        try:
             project_prefix = pyproject.parent.relative_to(workspace).as_posix()
-        except ValueError:
+        except (OSError, ValueError, tomllib.TOMLDecodeError):
             continue
-        for root in configured:
+        for root in _project_source_roots(data):
             combined = "/".join(
                 part for part in (project_prefix, root) if part and part != "."
             )
@@ -426,6 +447,55 @@ class IndexingLifecycleMixin:
         self.store.set_meta("analysis_scope_conformance_identity", identity)
         return removed
 
+    def _workspace_relative_path(self, path: Path) -> str | None:
+        try:
+            value = path.relative_to(self.workspace).as_posix()
+        except ValueError:
+            return None
+        return "" if value == "." else value
+
+    def _prune_discovery_dirs(self, root_path: Path, dirs: list[str]) -> None:
+        root_rel = self._workspace_relative_path(root_path) or ""
+        dirs[:] = sorted(
+            name
+            for name in dirs
+            if name not in _PRUNE_DIRS
+            and not self._internal_path(f"{root_rel}/{name}".strip("/"))
+        )
+
+    def _discovered_file(
+        self,
+        path: Path,
+        *,
+        warnings: list[str] | None = None,
+    ) -> _DiscoveredFile | None:
+        if path.is_symlink():
+            return None
+        rel = self._workspace_relative_path(path)
+        if rel is None:
+            return None
+        decision = self.policy.decide(rel)
+        language = _language_for_path(path)
+        if not decision.index or language is None:
+            return None
+        try:
+            size = int(path.stat().st_size)
+        except OSError as exc:
+            if warnings is not None:
+                warnings.append(f"cannot stat {rel}: {exc}")
+            return None
+        if size > self.max_index_bytes:
+            if warnings is not None:
+                warnings.append(f"skipped oversized source {rel} ({size} bytes)")
+            return None
+        return _DiscoveredFile(
+            rel,
+            path,
+            language,
+            decision.evidence_visibility,
+            size,
+        )
+
     def _discover(self) -> tuple[list[_DiscoveredFile], list[str]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -435,44 +505,11 @@ class IndexingLifecycleMixin:
             self.workspace, topdown=True, followlinks=False
         ):
             root_path = Path(root)
-            try:
-                root_rel_value = root_path.relative_to(self.workspace).as_posix()
-                root_rel = "" if root_rel_value == "." else root_rel_value
-            except ValueError:
-                root_rel = ""
-            dirs[:] = sorted(
-                name
-                for name in dirs
-                if name not in _PRUNE_DIRS
-                and not self._internal_path(f"{root_rel}/{name}".strip("/"))
-            )
+            self._prune_discovery_dirs(root_path, dirs)
             for name in sorted(files):
-                path = root_path / name
-                if path.is_symlink():
-                    continue
-                try:
-                    rel = path.relative_to(self.workspace).as_posix()
-                except ValueError:
-                    continue
-                decision = self.policy.decide(rel)
-                if not decision.index:
-                    continue
-                language = _language_for_path(path)
-                if language is None:
-                    continue
-                try:
-                    size = path.stat().st_size
-                except OSError as exc:
-                    warnings.append(f"cannot stat {rel}: {exc}")
-                    continue
-                if size > self.max_index_bytes:
-                    warnings.append(f"skipped oversized source {rel} ({size} bytes)")
-                    continue
-                result.append(
-                    _DiscoveredFile(
-                        rel, path, language, decision.evidence_visibility, int(size)
-                    )
-                )
+                item = self._discovered_file(root_path / name, warnings=warnings)
+                if item is not None:
+                    result.append(item)
         return result, warnings
 
     def _parse_or_reuse(self, rel: str, path: Path, language: str, digest_hash: str):
@@ -503,54 +540,19 @@ class IndexingLifecycleMixin:
         if path.is_symlink():
             return []
         if path.is_file():
-            decision = self.policy.decide(rel)
-            language = _language_for_path(path)
-            if not decision.index or language is None:
-                return []
-            try:
-                size = int(path.stat().st_size)
-            except OSError:
-                return []
-            if size <= self.max_index_bytes:
-                return [
-                    _DiscoveredFile(
-                        rel, path, language, decision.evidence_visibility, size
-                    )
-                ]
-            return []
+            item = self._discovered_file(path)
+            return [] if item is None else [item]
         if not path.is_dir():
             return []
+
         result: list[_DiscoveredFile] = []
         for root, dirs, files in os.walk(path, topdown=True, followlinks=False):
             root_path = Path(root)
-            dirs[:] = sorted(
-                name
-                for name in dirs
-                if name not in _PRUNE_DIRS
-                and not self._internal_path(
-                    (Path(root).relative_to(self.workspace) / name).as_posix()
-                )
-            )
+            self._prune_discovery_dirs(root_path, dirs)
             for name in sorted(files):
-                child = root_path / name
-                if child.is_symlink():
-                    continue
-                child_rel = child.relative_to(self.workspace).as_posix()
-                decision = self.policy.decide(child_rel)
-                language = _language_for_path(child)
-                if not decision.index or language is None:
-                    continue
-                try:
-                    size = int(child.stat().st_size)
-                except OSError:
-                    continue
-                if size > self.max_index_bytes:
-                    continue
-                result.append(
-                    _DiscoveredFile(
-                        child_rel, child, language, decision.evidence_visibility, size
-                    )
-                )
+                item = self._discovered_file(root_path / name)
+                if item is not None:
+                    result.append(item)
         return result
 
     @staticmethod
