@@ -74,8 +74,8 @@ def test_authority():
     }
     assert nodes["pkg/core.py::authority"]["forwarding_only"] is False
     assert nodes["pkg/core.py::wrapper"]["forwarding_only"] is True
-    assert nodes["pkg/core.py::wrapper"]["meaningful_caller_count"] == 1
-    assert nodes["pkg/core.py::helper"]["meaningful_caller_count"] == 1
+    assert nodes["pkg/core.py::wrapper"]["exact_caller_count"] == 1
+    assert nodes["pkg/core.py::helper"]["exact_caller_count"] == 1
     assert packet["dimensions"]["file_count"] == 1
     assert packet["dimensions"]["max_navigation_depth"] == 2
     assert packet["dimensions"]["forwarding_only_symbol_count"] == 1
@@ -277,3 +277,41 @@ def test_structural_locality_delta_rejects_tampered_packet_identity(
 
     assert delta["comparable"] is False
     assert "after-evidence-identity" in delta["incomparability_reasons"]
+
+
+def test_structural_locality_exact_callers_are_positive_reuse_evidence(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(tmp_path, "pkg/shared.py", "def helper(value):\n    return value + 1\n")
+    _write(
+        tmp_path,
+        "pkg/a.py",
+        "from pkg.shared import helper\n"
+        "def use_a(value):\n"
+        "    return helper(value)\n",
+    )
+    _write(
+        tmp_path,
+        "pkg/b.py",
+        "from pkg.shared import helper\n"
+        "def use_b(value):\n"
+        "    return helper(value)\n",
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/shared.py::helper",
+            max_depth=0,
+        )
+
+    target = packet["nodes"][0]
+    assert target["symbol_id"] == "pkg/shared.py::helper"
+    assert target["exact_caller_count"] == 2
+    assert {
+        (row["path"], row["source"]) for row in target["exact_callers"]
+    } == {
+        ("pkg/a.py", "use_a"),
+        ("pkg/b.py", "use_b"),
+    }
+    assert packet["dimensions"]["target_exact_caller_count"] == 2
