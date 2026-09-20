@@ -14,6 +14,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
 
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
@@ -24,11 +27,11 @@ jobs:
       - name: Install Hashmarks Ruff supply
         run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --only-group lint --python 3.11
 
-      - name: Checkout exact agentsCookbook authority
+      - name: Checkout qualified agentsCookbook authority
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Hugloss/agentsCookbook
-          ref: ab44164f2616791336411ec8552f00b2910c76b2
+          ref: e15b4e12e76b580430ff6a8b7252a70a827862a3
           path: .agentsCookbook
           persist-credentials: false
 
@@ -55,89 +58,6 @@ jobs:
             --artifact .agent-artifacts/quality-debt.json \
             --format json
 
-      - name: Raw Ruff target diagnostics
-        run: |
-          export PATH="$PWD/.ruff-venv/bin:$PATH"
-          ruff check \
-            hashmarks/qualification_units.py \
-            hashmarks/codemap/work_context.py \
-            --preview \
-            --isolated \
-            --select C901,PLR0911,PLR0912,PLR0913,PLR0914,PLR0915,PLR0916 \
-            --config 'lint.per-file-ignores = {}' \
-            --config 'lint.mccabe.max-complexity = 8' \
-            --config 'lint.pylint.max-returns = 6' \
-            --config 'lint.pylint.max-branches = 8' \
-            --config 'lint.pylint.max-args = 6' \
-            --config 'lint.pylint.max-locals = 15' \
-            --config 'lint.pylint.max-statements = 40' \
-            --config 'lint.pylint.max-bool-expr = 5' \
-            --output-format concise || true
-
-      - name: Compare broad and targeted Ruff JSON
-        run: |
-          export PATH="$PWD/.ruff-venv/bin:$PATH"
-          COMMON=(--preview --select C901,PLR0911,PLR0912,PLR0913,PLR0914,PLR0915,PLR0916 --isolated --config 'lint.per-file-ignores = {}' --config 'lint.mccabe.max-complexity = 8' --config 'lint.pylint.max-returns = 6' --config 'lint.pylint.max-branches = 8' --config 'lint.pylint.max-args = 6' --config 'lint.pylint.max-locals = 15' --config 'lint.pylint.max-statements = 40' --config 'lint.pylint.max-bool-expr = 5' --output-format json)
-          .ruff-venv/bin/ruff check hashmarks scripts benchmarks "${COMMON[@]}" --exclude benchmarks/agent_evaluation/retained > /tmp/broad.json || true
-          .ruff-venv/bin/ruff check hashmarks/qualification_units.py hashmarks/codemap/work_context.py "${COMMON[@]}" > /tmp/target.json || true
-          python3 - <<'PY'
-          import json
-          from collections import Counter
-          for name in ("broad", "target"):
-              rows = json.load(open(f"/tmp/{name}.json"))
-              wanted = [row for row in rows if row["filename"].endswith(("hashmarks/qualification_units.py", "hashmarks/codemap/work_context.py"))]
-              print(name, "total", len(rows), "wanted", len(wanted))
-              print(name, Counter((row["code"], row["filename"].split("/Hashmarks/")[-1], row["location"]["row"]) for row in wanted))
-          PY
-
-      - name: Compare bounded runner with direct subprocess
-        env:
-          PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
-        run: |
-          export PATH="$PWD/.ruff-venv/bin:$PATH"
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import subprocess
-          from pathlib import Path
-          from agent_economics.bounded_process import ProcessLimits, run_bounded
-          from agent_economics.quality_debt import _run_ruff
-
-          root = Path(".").resolve()
-          limits = {
-              "C901": 8,
-              "PLR0911": 6,
-              "PLR0912": 8,
-              "PLR0913": 6,
-              "PLR0914": 15,
-              "PLR0915": 40,
-              "PLR0916": 5,
-          }
-          rows, metrics, argv = _run_ruff(
-              root,
-              executable=str(root / ".ruff-venv/bin/ruff"),
-              roots=("hashmarks", "scripts", "benchmarks"),
-              limits=limits,
-              timeout_seconds=30,
-              max_stdout_bytes=2_000_000,
-              max_stderr_bytes=200_000,
-              excludes=("benchmarks/agent_evaluation/retained",),
-          )
-          direct = subprocess.run(argv, cwd=root, capture_output=True, check=False)
-          bounded = run_bounded(
-              repository_root=root,
-              argv=argv,
-              limits=ProcessLimits(30, 2_000_000, 200_000),
-          )
-          direct_rows = json.loads(direct.stdout)
-          bounded_rows = json.loads(bounded.stdout)
-          print("helper_rows", len(rows), "metrics", metrics)
-          print("direct_rows", len(direct_rows), "rc", direct.returncode, "sha", hashlib.sha256(direct.stdout).hexdigest())
-          print("bounded_rows", len(bounded_rows), "rc", bounded.return_code, "sha", hashlib.sha256(bounded.stdout).hexdigest())
-          print("helper_equals_direct", rows == direct_rows)
-          print("helper_equals_bounded", rows == bounded_rows)
-          PY
-
       - name: Agent Economics test-focus
         env:
           PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
@@ -147,8 +67,10 @@ jobs:
             --source-root hashmarks \
             --tests-root tests \
             --changed-path hashmarks/codemap/repository_evidence_coverage.py \
-            --changed-path hashmarks/qualification_units.py \
-            --changed-path hashmarks/codemap/work_context.py \
+            --changed-path hashmarks/codemap/repository_evidence_binding_delta.py \
+            --changed-path hashmarks/codemap/query_surface.py \
+            --changed-path hashmarks/codemap/task_action_projection.py \
+            --changed-path hashmarks/codemap/task_action_owner_resolution.py \
             --changed-path hashmarks/codemap/indexing_lifecycle.py \
             --package-name hashmarks \
             --gate 'repository=make test' \
