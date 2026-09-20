@@ -64,6 +64,7 @@ from .repository_intelligence_query import RepositoryIntelligenceQueryMixin
 from .repository_task_action import TaskActionMixin
 from .singleflight import SingleFlight
 from .structural_search import AstGrepSearchProvider
+from .structural_locality import StructuralLocalityMixin
 from .task_retrieval import TaskRetrievalMixin
 from .typescript_resolver import TypeScriptResolverProvider
 from .verification_explanation import VerificationExplanationMixin
@@ -99,6 +100,7 @@ class CodeMap(
     EvidenceGraphMixin,
     ContextPlanningMixin,
     OwnershipAnalysisMixin,
+    StructuralLocalityMixin,
     QuerySurfaceMixin,
     WorkContextMixin,
     IndexingLifecycleMixin,
