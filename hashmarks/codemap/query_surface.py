@@ -432,6 +432,80 @@ class QuerySurfaceMixin:
             "evidence": value["evidence"],
         }
 
+    def _instruction_seed_paths(
+        self,
+        query: str,
+        *,
+        seed_limit: int,
+    ) -> tuple[list[str], str]:
+        try:
+            rel = normalize_relative_path(query, allow_root=False)
+        except ValueError:
+            rel = None
+        candidate = None if rel is None else self.workspace / rel
+        if rel is not None and candidate is not None and candidate.exists():
+            return [rel], "explicit-path"
+
+        seed_paths: list[str] = []
+        for hit in self.find_task(query, limit=seed_limit):
+            if hit.path not in seed_paths:
+                seed_paths.append(hit.path)
+        return seed_paths, "task-retrieval"
+
+    @staticmethod
+    def _instruction_authority_projection(
+        seed_paths: list[str],
+        indexed_authority: dict[str, dict[str, object]],
+        authority_paths: set[str],
+    ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+        chains: list[dict[str, object]] = []
+        merged: dict[str, dict[str, object]] = {}
+        for seed in seed_paths:
+            applicable = [
+                path for path in authority_paths if _instruction_applies(path, seed)
+            ]
+            applicable.sort(
+                key=lambda path: (
+                    _instruction_specificity(path),
+                    0 if Path(path).name == "AGENTS.md" else 1,
+                    path,
+                )
+            )
+            chain: list[dict[str, object]] = []
+            for order, path in enumerate(applicable):
+                row = indexed_authority[path]
+                entry = {
+                    "path": path,
+                    "scope": _instruction_scope(path),
+                    "specificity": _instruction_specificity(path),
+                    "kind": (
+                        "override"
+                        if Path(path).name == "AGENTS.override.md"
+                        else "agents"
+                    ),
+                    "precedence": order,
+                    "evidence_visibility": str(row.get("evidence_visibility") or ""),
+                }
+                chain.append(entry)
+                previous = merged.get(path)
+                if previous is None:
+                    merged[path] = {**entry, "applies_to": [seed]}
+                    continue
+                applies_to = previous["applies_to"]
+                if isinstance(applies_to, list) and seed not in applies_to:
+                    applies_to.append(seed)
+            chains.append({"path": seed, "authority": chain})
+
+        ordered = sorted(
+            merged.values(),
+            key=lambda row: (
+                int(row["specificity"]),
+                0 if row["kind"] == "agents" else 1,
+                str(row["path"]),
+            ),
+        )
+        return chains, ordered
+
     def repository_instruction_scope(
         self, query: str, *, seed_limit: int = 8
     ) -> dict[str, object]:
@@ -451,82 +525,20 @@ class QuerySurfaceMixin:
             raise ValueError("seed_limit must be >= 1")
         self._ensure_map_ready()
         rows = self.store.repository_instruction_file_rows()
-        indexed_authority = {str(row["path"]): row for row in rows}
-        authority_names = {"AGENTS.md", "AGENTS.override.md"}
+        indexed_authority = {str(row["path"]): dict(row) for row in rows}
         authority_paths = {
-            path for path in indexed_authority if Path(path).name in authority_names
+            path
+            for path in indexed_authority
+            if Path(path).name in {"AGENTS.md", "AGENTS.override.md"}
         }
-
-        try:
-            rel = normalize_relative_path(query, allow_root=False)
-        except ValueError:
-            rel = None
-        candidate = None if rel is None else self.workspace / rel
-        if rel is not None and candidate is not None and candidate.exists():
-            seed_paths = [rel]
-            source = "explicit-path"
-        else:
-            seed_paths = []
-            for hit in self.find_task(query, limit=seed_limit):
-                if hit.path not in seed_paths:
-                    seed_paths.append(hit.path)
-            source = "task-retrieval"
-
-        def scope_for(authority: str) -> str:
-            parent = Path(authority).parent.as_posix()
-            return "." if parent in {"", "."} else parent
-
-        def applies(authority: str, target: str) -> bool:
-            scope = scope_for(authority)
-            if scope == ".":
-                return True
-            return target == scope or target.startswith(scope + "/")
-
-        def specificity(authority: str) -> int:
-            scope = scope_for(authority)
-            return 0 if scope == "." else len(Path(scope).parts)
-
-        chains: list[dict[str, object]] = []
-        merged: dict[str, dict[str, object]] = {}
-        for seed in seed_paths:
-            applicable = [path for path in authority_paths if applies(path, seed)]
-            applicable.sort(
-                key=lambda path: (
-                    specificity(path),
-                    0 if Path(path).name == "AGENTS.md" else 1,
-                    path,
-                )
-            )
-            chain: list[dict[str, object]] = []
-            for order, path in enumerate(applicable):
-                row = indexed_authority[path]
-                entry = {
-                    "path": path,
-                    "scope": scope_for(path),
-                    "specificity": specificity(path),
-                    "kind": "override"
-                    if Path(path).name == "AGENTS.override.md"
-                    else "agents",
-                    "precedence": order,
-                    "evidence_visibility": str(row.get("evidence_visibility") or ""),
-                }
-                chain.append(entry)
-                previous = merged.get(path)
-                if previous is None:
-                    merged[path] = {**entry, "applies_to": [seed]}
-                else:
-                    applies_to = previous["applies_to"]
-                    if isinstance(applies_to, list) and seed not in applies_to:
-                        applies_to.append(seed)
-            chains.append({"path": seed, "authority": chain})
-
-        ordered = sorted(
-            merged.values(),
-            key=lambda row: (
-                int(row["specificity"]),
-                0 if row["kind"] == "agents" else 1,
-                str(row["path"]),
-            ),
+        seed_paths, source = self._instruction_seed_paths(
+            query,
+            seed_limit=seed_limit,
+        )
+        chains, ordered = self._instruction_authority_projection(
+            seed_paths,
+            indexed_authority,
+            authority_paths,
         )
         return {
             "schema": "hashmarks.codemap-scoped-authority.v1",
