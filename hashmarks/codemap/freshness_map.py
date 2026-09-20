@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
@@ -14,6 +15,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from .engine import CodeMap
+
+
+@dataclass(frozen=True, slots=True)
+class _FreshnessScope:
+    repository_identity: str
+    task_identity: str
+    continuity_state: str
 
 
 class EvidenceFreshnessMapMixin:
@@ -92,6 +100,194 @@ class EvidenceFreshnessMapMixin:
         )
         return kind, member
 
+    def _ownership_freshness_entry(
+        self,
+        scope: _FreshnessScope,
+        ownership: dict[str, object] | None,
+    ) -> dict[str, object]:
+        fact = {
+            "repository_identity": scope.repository_identity,
+            "task_identity": scope.task_identity,
+            "ownership": ownership,
+        }
+        return {
+            "kind": "ownership",
+            "state": scope.continuity_state,
+            "evidence_identity": self._freshness_identity("ownership", fact),
+            "facts": ownership,
+        }
+
+    def _impact_freshness_entry(
+        self,
+        scope: _FreshnessScope,
+        revisions: list[dict[str, object]],
+        surfaces: Mapping[str, object],
+        bounds: Mapping[str, object],
+    ) -> dict[str, object]:
+        fact = {
+            "repository_identity": scope.repository_identity,
+            "task_identity": scope.task_identity,
+            "changed_revisions": revisions,
+            "surfaces": surfaces,
+            "bounds": dict(bounds),
+        }
+        return {
+            "kind": "impact",
+            "state": scope.continuity_state,
+            "evidence_identity": self._freshness_identity("impact", fact),
+            "changed_revisions": revisions,
+        }
+
+    def _verification_freshness_entry(
+        self,
+        scope: _FreshnessScope,
+        selected_member: str,
+        selected_explanation: Mapping[str, object],
+    ) -> dict[str, object]:
+        fact = {
+            "repository_identity": scope.repository_identity,
+            "task_identity": scope.task_identity,
+            "member": selected_member or None,
+            "reason": selected_explanation.get("reason"),
+            "facts": selected_explanation.get("facts") or [],
+        }
+        return {
+            "kind": "verification-membership",
+            "state": scope.continuity_state,
+            "evidence_identity": self._freshness_identity(
+                "verification-membership", fact
+            ),
+            "member": selected_member or None,
+            "reason": selected_explanation.get("reason"),
+        }
+
+    def _negative_verification_freshness_entry(
+        self,
+        scope: _FreshnessScope,
+        task: str,
+        raw_member: str | Path,
+        limit: int,
+    ) -> dict[str, object]:
+        member = normalize_relative_path(raw_member, allow_root=False)
+        explanation = self.explain_verification_selection(
+            task,
+            member,
+            limit=limit,
+            candidate_limit=16,
+        )
+        status = str(explanation.get("status") or "insufficient-evidence")
+        if status == "selected":
+            state = "stale"
+            reason = "member-is-selected"
+        elif status == "insufficient-evidence":
+            state = "unknown" if scope.continuity_state != "stale" else "stale"
+            reason = str(explanation.get("reason") or "insufficient-evidence")
+        else:
+            state = scope.continuity_state
+            reason = str(explanation.get("reason") or "not-selected")
+        fact = {
+            "repository_identity": scope.repository_identity,
+            "task_identity": scope.task_identity,
+            "member": member,
+            "status": status,
+            "reason": reason,
+            "facts": explanation.get("facts") or [],
+        }
+        return {
+            "kind": "negative-verification-evidence",
+            "member": member,
+            "state": state,
+            "evidence_identity": self._freshness_identity(
+                "negative-verification", fact
+            ),
+            "reason": reason,
+        }
+
+    def _cross_repository_freshness_entry(
+        self,
+        scope: _FreshnessScope,
+        project_impact: object,
+    ) -> dict[str, object] | None:
+        if not isinstance(project_impact, Mapping):
+            return None
+        expanded = expand_project_impact(project_impact)
+        producers = sorted(
+            {
+                str(edge.get("producer") or "")
+                for edge in expanded.get("edges", [])
+                if isinstance(edge, Mapping) and edge.get("producer")
+            }
+        )
+        dependencies: list[dict[str, object]] = []
+        dependency_state = "current"
+        for producer in producers:
+            fresh, reason = self._evidence_fresh("project", producer)
+            if not fresh:
+                dependency_state = "stale"
+            dependencies.append(
+                {
+                    "producer": producer,
+                    "state": "current" if fresh else "stale",
+                    **({"reason": reason} if reason else {}),
+                }
+            )
+        fact = {
+            "repository_identity": scope.repository_identity,
+            "task_identity": scope.task_identity,
+            "project_impact": dict(project_impact),
+            "dependencies": dependencies,
+        }
+        return {
+            "kind": "cross-repository",
+            "state": "dependent" if dependency_state == "current" else dependency_state,
+            "dependency_state": dependency_state,
+            "evidence_identity": self._freshness_identity("cross-repository", fact),
+            "dependencies": dependencies,
+        }
+
+    def _prior_freshness_rows(
+        self,
+        entries: Sequence[Mapping[str, object]],
+        previous_map: Mapping[str, object] | None,
+    ) -> list[dict[str, object]]:
+        current_by_key = {self._prior_key(row): row for row in entries}
+        prior: list[dict[str, object]] = []
+        for old in self._prior_entries(previous_map):
+            key = self._prior_key(old)
+            current = current_by_key.get(key)
+            old_identity = str(old.get("evidence_identity") or "")
+            current_identity = (
+                str(current.get("evidence_identity") or "") if current else ""
+            )
+            if current is None:
+                if key[0] in {
+                    "ownership",
+                    "impact",
+                    "verification-membership",
+                    "cross-repository",
+                }:
+                    state = "stale"
+                    reason = "evidence-no-longer-supported-by-current-map"
+                else:
+                    state = "unknown"
+                    reason = "evidence-kind-not-requested-in-current-map"
+            elif old_identity and old_identity == current_identity:
+                state = "current"
+                reason = "evidence-identity-unchanged"
+            else:
+                state = "stale"
+                reason = "evidence-identity-changed"
+            prior.append(
+                {
+                    "kind": key[0],
+                    **({"member": key[1]} if key[1] is not None else {}),
+                    "evidence_identity": old_identity or None,
+                    "state": state,
+                    "reason": reason,
+                }
+            )
+        return prior
+
     @diagnostic_producer
     def evidence_freshness_map(
         self,
@@ -131,9 +327,11 @@ class EvidenceFreshnessMapMixin:
             candidate_limit=16,
         )
         generation, identity_generation, stale = self._generation_status()
-        continuity_state = freshness_state(stale)
-        repository_identity = self._repository_packet_identity()
-        task_identity = self._packet_digest("hashmarks.task.v1", {"task": task})
+        scope = _FreshnessScope(
+            repository_identity=self._repository_packet_identity(),
+            task_identity=self._packet_digest("hashmarks.task.v1", {"task": task}),
+            continuity_state=freshness_state(stale),
+        )
 
         ownership = self._ownership_projection(action)
         changed_rows = (
@@ -145,189 +343,47 @@ class EvidenceFreshnessMapMixin:
             if isinstance(impact.get("surfaces"), Mapping)
             else {}
         )
-
-        entries: list[dict[str, object]] = []
-
-        ownership_fact = {
-            "repository_identity": repository_identity,
-            "task_identity": task_identity,
-            "ownership": ownership,
-        }
-        entries.append(
-            {
-                "kind": "ownership",
-                "state": continuity_state,
-                "evidence_identity": self._freshness_identity(
-                    "ownership", ownership_fact
-                ),
-                "facts": ownership,
-            }
-        )
-
-        impact_fact = {
-            "repository_identity": repository_identity,
-            "task_identity": task_identity,
-            "changed_revisions": revisions,
-            "surfaces": surfaces,
-            "bounds": dict(impact.get("bounds") or {}),
-        }
-        entries.append(
-            {
-                "kind": "impact",
-                "state": continuity_state,
-                "evidence_identity": self._freshness_identity("impact", impact_fact),
-                "changed_revisions": revisions,
-            }
-        )
-
-        verification_fact = {
-            "repository_identity": repository_identity,
-            "task_identity": task_identity,
-            "member": selected_member or None,
-            "reason": selected_explanation.get("reason"),
-            "facts": selected_explanation.get("facts") or [],
-        }
-        entries.append(
-            {
-                "kind": "verification-membership",
-                "state": continuity_state,
-                "evidence_identity": self._freshness_identity(
-                    "verification-membership", verification_fact
-                ),
-                "member": selected_member or None,
-                "reason": selected_explanation.get("reason"),
-            }
-        )
-
-        for raw_member in negative_members:
-            member = normalize_relative_path(raw_member, allow_root=False)
-            explanation = self.explain_verification_selection(
+        bounds = impact.get("bounds")
+        entries = [
+            self._ownership_freshness_entry(scope, ownership),
+            self._impact_freshness_entry(
+                scope,
+                revisions,
+                surfaces,
+                bounds if isinstance(bounds, Mapping) else {},
+            ),
+            self._verification_freshness_entry(
+                scope,
+                selected_member,
+                selected_explanation,
+            ),
+        ]
+        entries.extend(
+            self._negative_verification_freshness_entry(
+                scope,
                 task,
-                member,
-                limit=limit,
-                candidate_limit=16,
+                raw_member,
+                limit,
             )
-            status = str(explanation.get("status") or "insufficient-evidence")
-            if status == "selected":
-                state = "stale"
-                reason = "member-is-selected"
-            elif status == "insufficient-evidence":
-                state = (
-                    "unknown" if continuity_state != "stale" else "stale"
-                )
-                reason = str(explanation.get("reason") or "insufficient-evidence")
-            else:
-                state = continuity_state
-                reason = str(explanation.get("reason") or "not-selected")
-            negative_fact = {
-                "repository_identity": repository_identity,
-                "task_identity": task_identity,
-                "member": member,
-                "status": status,
-                "reason": reason,
-                "facts": explanation.get("facts") or [],
-            }
-            entries.append(
-                {
-                    "kind": "negative-verification-evidence",
-                    "member": member,
-                    "state": state,
-                    "evidence_identity": self._freshness_identity(
-                        "negative-verification", negative_fact
-                    ),
-                    "reason": reason,
-                }
-            )
+            for raw_member in negative_members
+        )
 
-        project_impact = impact.get("project_impact")
-        if isinstance(project_impact, Mapping):
-            expanded = expand_project_impact(project_impact)
-            producers = sorted(
-                {
-                    str(edge.get("producer") or "")
-                    for edge in expanded.get("edges", [])
-                    if isinstance(edge, Mapping) and edge.get("producer")
-                }
-            )
-            dependency_rows: list[dict[str, object]] = []
-            dependency_state = "current"
-            for producer in producers:
-                fresh, reason = self._evidence_fresh("project", producer)
-                if not fresh:
-                    dependency_state = "stale"
-                dependency_rows.append(
-                    {
-                        "producer": producer,
-                        "state": "current" if fresh else "stale",
-                        **({"reason": reason} if reason else {}),
-                    }
-                )
-            project_fact = {
-                "repository_identity": repository_identity,
-                "task_identity": task_identity,
-                "project_impact": dict(project_impact),
-                "dependencies": dependency_rows,
-            }
-            entries.append(
-                {
-                    "kind": "cross-repository",
-                    "state": "dependent"
-                    if dependency_state == "current"
-                    else dependency_state,
-                    "dependency_state": dependency_state,
-                    "evidence_identity": self._freshness_identity(
-                        "cross-repository", project_fact
-                    ),
-                    "dependencies": dependency_rows,
-                }
-            )
+        cross_repository = self._cross_repository_freshness_entry(
+            scope, impact.get("project_impact")
+        )
+        if cross_repository is not None:
+            entries.append(cross_repository)
 
-        current_by_key = {self._prior_key(row): row for row in entries}
-        prior: list[dict[str, object]] = []
-        for old in self._prior_entries(previous_map):
-            key = self._prior_key(old)
-            current = current_by_key.get(key)
-            old_identity = str(old.get("evidence_identity") or "")
-            current_identity = (
-                str(current.get("evidence_identity") or "") if current else ""
-            )
-            if current is None:
-                if key[0] in {
-                    "ownership",
-                    "impact",
-                    "verification-membership",
-                    "cross-repository",
-                }:
-                    state = "stale"
-                    reason = "evidence-no-longer-supported-by-current-map"
-                else:
-                    state = "unknown"
-                    reason = "evidence-kind-not-requested-in-current-map"
-            elif old_identity and old_identity == current_identity:
-                state = "current"
-                reason = "evidence-identity-unchanged"
-            else:
-                state = "stale"
-                reason = "evidence-identity-changed"
-            prior.append(
-                {
-                    "kind": key[0],
-                    **({"member": key[1]} if key[1] is not None else {}),
-                    "evidence_identity": old_identity or None,
-                    "state": state,
-                    "reason": reason,
-                }
-            )
-
+        prior = self._prior_freshness_rows(entries, previous_map)
         payload: dict[str, object] = {
             "schema": "hashmarks.evidence-freshness-map.v1",
             "repository": {
-                "repository_identity": repository_identity,
+                "repository_identity": scope.repository_identity,
                 "codemap_generation": generation,
                 "identity_generation": identity_generation,
-                "continuity": continuity_state,
+                "continuity": scope.continuity_state,
             },
-            "task_identity": task_identity,
+            "task_identity": scope.task_identity,
             "entries": entries,
             "authority": "repository-intelligence-only",
             "storage": "derived-not-persisted",
@@ -338,8 +394,8 @@ class EvidenceFreshnessMapMixin:
         payload["freshness_map_identity"] = self._freshness_identity(
             "map",
             {
-                "repository_identity": repository_identity,
-                "task_identity": task_identity,
+                "repository_identity": scope.repository_identity,
+                "task_identity": scope.task_identity,
                 "entries": entries,
             },
         )
