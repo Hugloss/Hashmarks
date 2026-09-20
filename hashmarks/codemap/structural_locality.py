@@ -257,7 +257,7 @@ class StructuralLocalityMixin:
         source_path = str(edge.get("path") or "")
         source_qualname = str(edge.get("source") or "")
         source_row = self.store.file_row(source_path)
-        language = "" if source_row is None else str(source_row.get("language") or "")
+        language = "" if source_row is None else str(source_row["language"] or "")
         if language == "python":
             return self._python_plain_call_binding(
                 source_path=source_path,
