@@ -92,28 +92,18 @@ def test_authority():
 
 def test_structural_locality_keeps_ambiguous_call_unresolved(tmp_path: Path) -> None:
     _write(tmp_path, "pkg/__init__.py", "")
+    _write(tmp_path, "pkg/a.py", "def helper(value):\n    return value + 1\n")
+    _write(tmp_path, "pkg/b.py", "def helper(value):\n    return value - 1\n")
     _write(
         tmp_path,
         "pkg/core.py",
         """
-def helper(value):
-    return value + 1
-
-
-def wrapper(value):
-    return helper(value)
+from pkg.a import helper
+from pkg.b import helper
 
 
 def authority(value):
-    return wrapper(value)
-""".lstrip(),
-    )
-    _write(
-        tmp_path,
-        "pkg/other.py",
-        """
-def helper(value):
-    return value - 1
+    return helper(value)
 """.lstrip(),
     )
 
@@ -124,15 +114,13 @@ def helper(value):
         )
 
     nodes = {row["symbol_id"] for row in packet["nodes"]}
-    assert "pkg/core.py::wrapper" in nodes
-    assert "pkg/core.py::helper" not in nodes
-    assert "pkg/other.py::helper" not in nodes
+    assert nodes == {"pkg/core.py::authority"}
     unresolved = packet["unresolved_calls"]
     assert any(row.get("target_text") == "helper" for row in unresolved)
     helper_row = next(row for row in unresolved if row.get("target_text") == "helper")
     assert helper_row["candidate_symbol_ids"] == [
-        "pkg/core.py::helper",
-        "pkg/other.py::helper",
+        "pkg/a.py::helper",
+        "pkg/b.py::helper",
     ]
     assert packet["claims"]["ambiguous_calls_promoted_to_exact"] is False
 
