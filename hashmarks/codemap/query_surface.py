@@ -98,6 +98,45 @@ class _ChangeImpactAccumulator:
 
 
 class QuerySurfaceMixin:
+    def _grep_candidate_match(
+        self,
+        candidate: dict[str, object],
+        *,
+        lowered: str,
+        tokens: list[str],
+        context_lines: int,
+    ) -> dict[str, object] | None:
+        path = str(candidate["path"])
+        visibility = EvidenceVisibility(str(candidate["evidence_visibility"]))
+        if visibility is not EvidenceVisibility.SOURCE:
+            return None
+        self._ensure_path_current(path)
+        try:
+            lines = (
+                (self.workspace / path)
+                .read_text(encoding="utf-8", errors="replace")
+                .splitlines()
+            )
+        except OSError:
+            return None
+        line_no = int(candidate["line"])
+        if line_no < 1 or line_no > len(lines):
+            return None
+        line = lines[line_no - 1]
+        if lowered not in line.lower() and not all(
+            token in line.lower() for token in tokens
+        ):
+            return None
+        start = max(1, line_no - max(0, context_lines))
+        end = min(len(lines), line_no + max(0, context_lines))
+        return {
+            "path": path,
+            "line": line_no,
+            "range": [start, end],
+            "content": "\n".join(lines[start - 1 : end]),
+            "evidence_visibility": visibility.value,
+        }
+
     def grep(
         self, query: str, *, limit: int = 50, context_lines: int = 0
     ) -> dict[str, object]:
@@ -112,45 +151,15 @@ class QuerySurfaceMixin:
         matches: list[dict[str, object]] = []
         lowered = raw.lower()
         for candidate in candidates:
-            path = str(candidate["path"])
-            visibility = EvidenceVisibility(str(candidate["evidence_visibility"]))
-            if visibility is not EvidenceVisibility.SOURCE:
-                # Lexical grep is implementation-content disclosure. OUTLINE
-                # visibility may expose names/signatures/relationships only.
-                continue
-            self._ensure_path_current(path)
-            # The refresh above may invalidate this candidate line. Verify the
-            # actual current line before returning it.
-            try:
-                lines = (
-                    (self.workspace / path)
-                    .read_text(encoding="utf-8", errors="replace")
-                    .splitlines()
-                )
-            except OSError:
-                continue
-            line_no = int(candidate["line"])
-            if line_no < 1 or line_no > len(lines):
-                continue
-            line = lines[line_no - 1]
-            if lowered not in line.lower() and not all(
-                token in line.lower() for token in tokens
-            ):
-                continue
-            start = max(1, line_no - max(0, context_lines))
-            end = min(len(lines), line_no + max(0, context_lines))
-            content = None
-            if visibility is EvidenceVisibility.SOURCE:
-                content = "\n".join(lines[start - 1 : end])
-            matches.append(
-                {
-                    "path": path,
-                    "line": line_no,
-                    "range": [start, end],
-                    "content": content,
-                    "evidence_visibility": visibility.value,
-                }
+            match = self._grep_candidate_match(
+                dict(candidate),
+                lowered=lowered,
+                tokens=tokens,
+                context_lines=context_lines,
             )
+            if match is None:
+                continue
+            matches.append(match)
             if len(matches) >= limit:
                 break
         generation, identity_generation, stale = self._generation_status()
@@ -185,12 +194,10 @@ class QuerySurfaceMixin:
             "matches": visible,
         }
 
-    def source(self, query: str, *, token_budget: int = 4000) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
-        if token_budget < 16:
-            raise ValueError("token budget must be at least 16")
+    def _source_visible_matches(
+        self,
+        query: str,
+    ) -> list[dict[str, object]]:
         if "::" in query:
             raw_path, qualname = query.split("::", 1)
             path = normalize_relative_path(raw_path, allow_root=False)
@@ -200,13 +207,45 @@ class QuerySurfaceMixin:
         else:
             matches = self.store.symbol(query)
         visible = [
-            row
+            dict(row)
             for row in matches
             if EvidenceVisibility(str(row["evidence_visibility"]))
             is not EvidenceVisibility.DENY
         ]
         if not visible:
             raise KeyError(f"symbol not found: {query}")
+        return visible
+
+    def _source_current_content(
+        self,
+        query: str,
+        row: dict[str, object],
+    ) -> tuple[str, str, dict[str, object], str]:
+        path = str(row["path"])
+        qualname = str(row["qualname"])
+        self._ensure_path_current(path)
+        current_row = self.store.symbol_at(path, qualname)
+        if current_row is None:
+            raise KeyError(f"symbol changed or disappeared during refresh: {query}")
+        current = dict(current_row)
+        visibility = EvidenceVisibility(str(current["evidence_visibility"]))
+        if visibility is not EvidenceVisibility.SOURCE:
+            raise PermissionError(f"source body is not agent-visible: {path}")
+        content = self._source_slice(
+            path,
+            int(current["start_line"]),
+            int(current["end_line"]),
+            qualname=qualname,
+        )
+        return path, qualname, current, content
+
+    def source(self, query: str, *, token_budget: int = 4000) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        self._ensure_map_ready()
+        if token_budget < 16:
+            raise ValueError("token budget must be at least 16")
+        visible = self._source_visible_matches(query)
         if len(visible) > 1 and "::" not in query:
             return {
                 "schema": "hashmarks.source.v1",
@@ -222,23 +261,9 @@ class QuerySurfaceMixin:
                     for row in visible[:20]
                 ],
             }
-        row = visible[0]
-        path = str(row["path"])
-        qualname = str(row["qualname"])
-        self._ensure_path_current(path)
-        current = self.store.symbol_at(path, qualname)
-        if current is None:
-            raise KeyError(f"symbol changed or disappeared during refresh: {query}")
-        visibility = EvidenceVisibility(str(current["evidence_visibility"]))
-        if visibility is not EvidenceVisibility.SOURCE:
-            raise PermissionError(f"source body is not agent-visible: {path}")
-        content = self._source_slice(
-            path,
-            int(current["start_line"]),
-            int(current["end_line"]),
-            qualname=qualname,
-        )
-        tokens = estimate_tokens(content)
+
+        path, qualname, current, body = self._source_current_content(query, visible[0])
+        tokens = estimate_tokens(body)
         if tokens > token_budget:
             return {
                 "schema": "hashmarks.source.v1",
@@ -264,7 +289,7 @@ class QuerySurfaceMixin:
             "estimated_tokens": tokens,
             "budget": token_budget,
             "too_large": False,
-            "content": content,
+            "content": body,
         }
 
     def projects(self) -> dict[str, object]:
