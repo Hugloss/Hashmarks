@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks._version import __version__
 from hashmarks.paths import normalize_relative_path
+from hashmarks.producer_identity import native_producer_implementation_identity
 from hashmarks.python_ast_cache import read_python_ast
 
 from .model import EvidenceVisibility
@@ -502,6 +503,7 @@ class StructuralLocalityMixin:
             "schema": STRUCTURAL_LOCALITY_SCHEMA,
             "provider": "hashmarks",
             "provider_version": __version__,
+            "provider_implementation_identity": native_producer_implementation_identity(),
             "repository_identity": repository_identity,
             "source_identity": nodes[_symbol_id(target_row)]["symbol_source_identity"],
             "measurement_configuration_identity": _identity(configuration),
@@ -575,6 +577,11 @@ def structural_locality_delta(
         issues.append("after-provider")
     if before.get("provider_version") != after.get("provider_version"):
         issues.append("provider-version")
+    if (
+        before.get("provider_implementation_identity")
+        != after.get("provider_implementation_identity")
+    ):
+        issues.append("provider-implementation")
     if not _packet_identity_valid(before):
         issues.append("before-evidence-identity")
     if not _packet_identity_valid(after):
