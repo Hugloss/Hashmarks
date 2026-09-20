@@ -5,7 +5,7 @@ import hashlib
 import json
 import os
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -53,7 +53,9 @@ class _VerificationRelevanceState:
     indirect_via_paths: dict[str, set[str]]
     source_ref_paths: set[str]
     unresolved_import_identity_paths: set[str]
-    reference_indexes: dict[str, _VerificationReferenceIndex | None]
+    reference_indexes: dict[str, _VerificationReferenceIndex | None] = field(
+        default_factory=dict
+    )
 
 
 @dataclass(frozen=True)
@@ -406,12 +408,12 @@ class VerificationMixin:
 
     def _verification_reference_index_for_path(
         self,
-        state: _VerificationRelevanceState,
+        state: _VerificationRelevanceState | None,
         path: str,
     ) -> _VerificationReferenceIndex | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        if path in state.reference_indexes:
+        if state is not None and path in state.reference_indexes:
             return state.reference_indexes[path]
         try:
             snapshot = read_python_ast(self.workspace / path)
@@ -422,7 +424,8 @@ class VerificationMixin:
             )
         except (OSError, SyntaxError):
             index = None
-        state.reference_indexes[path] = index
+        if state is not None:
+            state.reference_indexes[path] = index
         return index
 
     def _verification_module_alias_reference_owner_match(
@@ -661,9 +664,10 @@ class VerificationMixin:
 
     def _verification_reference_strength(
         self,
-        state: _VerificationRelevanceState,
         path: str,
         symbols: Sequence[str],
+        *,
+        state: _VerificationRelevanceState | None = None,
     ) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -703,7 +707,7 @@ class VerificationMixin:
         direct_symbols = sorted(state.refs_by_path.get(path, set()))
         indirect_symbols = sorted(state.indirect_refs_by_path.get(path, set()))
         reference = self._verification_reference_strength(
-            state, path, direct_symbols
+            path, direct_symbols, state=state
         )
         direct_reference = reference.get("reference_strength") == "reachable-symbol-use"
         return {
