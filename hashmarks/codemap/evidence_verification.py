@@ -58,16 +58,20 @@ class _VerificationRelevanceState:
 @dataclass(frozen=True)
 class _VerificationReferenceIndex:
     bindings: tuple[tuple[str, str, str | None], ...]
+    module_bindings: tuple[tuple[str, str, str | None], ...]
     reachable_names: frozenset[str]
     reachable_attributes: frozenset[str]
+    reachable_attribute_chains: frozenset[str]
 
 
 class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
     def __init__(self) -> None:
         self.guard: str | None = None
         self.bindings: list[tuple[str, str, str | None]] = []
+        self.module_bindings: list[tuple[str, str, str | None]] = []
         self.reachable_names: set[str] = set()
         self.reachable_attributes: set[str] = set()
+        self.reachable_attribute_chains: set[str] = set()
 
     @staticmethod
     def _guard_kind(test: ast.expr) -> str | None:
@@ -92,6 +96,37 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
         self.bindings.extend(
             (alias.name, alias.asname or alias.name, self.guard) for alias in node.names
         )
+        prefix = "." * int(node.level or 0) + str(node.module or "")
+        self.module_bindings.extend(
+            (
+                ".".join(part for part in (prefix, alias.name) if part),
+                alias.asname or alias.name,
+                self.guard,
+            )
+            for alias in node.names
+        )
+
+    def visit_Import(self, node: ast.Import) -> None:
+        self.module_bindings.extend(
+            (
+                alias.name,
+                alias.asname or alias.name.split(".", 1)[0],
+                self.guard,
+            )
+            for alias in node.names
+        )
+
+    @staticmethod
+    def _attribute_chain(node: ast.Attribute) -> str | None:
+        parts = [node.attr]
+        value: ast.expr = node.value
+        while isinstance(value, ast.Attribute):
+            parts.append(value.attr)
+            value = value.value
+        if not isinstance(value, ast.Name):
+            return None
+        parts.append(value.id)
+        return ".".join(reversed(parts))
 
     def visit_Name(self, node: ast.Name) -> None:
         if self.guard is None and isinstance(node.ctx, ast.Load):
@@ -100,6 +135,9 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
     def visit_Attribute(self, node: ast.Attribute) -> None:
         if self.guard is None and isinstance(node.ctx, ast.Load):
             self.reachable_attributes.add(node.attr)
+            chain = self._attribute_chain(node)
+            if chain:
+                self.reachable_attribute_chains.add(chain)
         self.generic_visit(node)
 
 
@@ -119,8 +157,10 @@ def _verification_reference_index(
     visitor.visit(tree)
     return _VerificationReferenceIndex(
         bindings=tuple(visitor.bindings),
+        module_bindings=tuple(visitor.module_bindings),
         reachable_names=frozenset(visitor.reachable_names),
         reachable_attributes=frozenset(visitor.reachable_attributes),
+        reachable_attribute_chains=frozenset(visitor.reachable_attribute_chains),
     )
 
 
@@ -361,6 +401,39 @@ class VerificationMixin:
                 exact_import_paths.add(ref_path)
         return exact_import_paths, import_resolution_available
 
+    def _verification_module_alias_reference_proves_owner(
+        self,
+        state: _VerificationRelevanceState,
+        ref_path: str,
+        target: str,
+    ) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if not ref_path.endswith(".py") or "." not in target:
+            return False
+        try:
+            snapshot = read_python_ast(self.workspace / ref_path)
+            index = _verification_reference_index(
+                os.path.abspath(os.fspath(self.workspace / ref_path)),
+                snapshot.identity,
+                snapshot.tree,
+            )
+        except (OSError, SyntaxError):
+            return False
+        if target not in index.reachable_attribute_chains:
+            return False
+
+        bound_name = target.split(".", 1)[0]
+        for module_target, alias, guard in index.module_bindings:
+            if guard is not None or alias != bound_name or not module_target:
+                continue
+            resolved_paths = self._verification_resolved_import_paths(
+                state, ref_path, module_target
+            )
+            if state.edit_path in resolved_paths:
+                return True
+        return False
+
     def _verification_collect_direct_symbol_refs(
         self,
         state: _VerificationRelevanceState,
@@ -379,6 +452,14 @@ class VerificationMixin:
             exact_reference = (
                 path in exact_import_paths if resolution_available else short_match
             )
+            if (
+                short_match
+                and not exact_reference
+                and self._verification_module_alias_reference_proves_owner(
+                    state, path, str(ref.get("target") or "")
+                )
+            ):
+                exact_reference = True
             if not short_match or not exact_reference:
                 if RepositoryDomain.TEST in set(classify_repository_path(path)):
                     state.candidate_paths.add(path)
