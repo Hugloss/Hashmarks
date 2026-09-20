@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks._version import __version__
 from hashmarks.paths import normalize_relative_path
+from hashmarks.python_ast_cache import read_python_ast
 
 from .model import EvidenceVisibility
 
@@ -84,8 +85,7 @@ def _forwarding_only_python_symbol(
     path: Path, *, start_line: int, name: str
 ) -> tuple[bool | None, str]:
     try:
-        source = path.read_text(encoding="utf-8", errors="replace")
-        tree = ast.parse(source)
+        tree = read_python_ast(path, errors="replace").tree
     except (OSError, SyntaxError, ValueError):
         return None, "python-ast-unavailable"
     candidates = [
@@ -314,6 +314,7 @@ class StructuralLocalityMixin:
         nodes: dict[str, dict[str, object]] = {}
         edges: list[dict[str, object]] = []
         unresolved_calls: list[dict[str, object]] = []
+        external_or_unindexed_calls: list[dict[str, object]] = []
         while queue:
             row, depth = queue.pop(0)
             symbol_id = _symbol_id(row)
@@ -348,7 +349,10 @@ class StructuralLocalityMixin:
                 }
                 edges.append(record)
                 if resolved is None:
-                    unresolved_calls.append(record)
+                    if candidates:
+                        unresolved_calls.append(record)
+                    else:
+                        external_or_unindexed_calls.append(record)
                     continue
                 queue.append((resolved, depth + 1))
             if truncated:
@@ -394,6 +398,7 @@ class StructuralLocalityMixin:
                 if str(row["path"]) != str(target_row["path"])
             ),
             "unresolved_call_count": len(unresolved_calls),
+            "external_or_unindexed_call_count": len(external_or_unindexed_calls),
             "target_meaningful_caller_count": int(
                 nodes[_symbol_id(target_row)]["meaningful_caller_count"]
             ),
@@ -440,6 +445,14 @@ class StructuralLocalityMixin:
                     str(item.get("source_symbol_id") or ""),
                     int(item.get("line") or 0),
                     str(item.get("target_text") or item.get("reason") or ""),
+                ),
+            ),
+            "external_or_unindexed_calls": sorted(
+                external_or_unindexed_calls,
+                key=lambda item: (
+                    str(item.get("source_symbol_id") or ""),
+                    int(item.get("line") or 0),
+                    str(item.get("target_text") or ""),
                 ),
             ),
             "verification_paths": verification_paths,
