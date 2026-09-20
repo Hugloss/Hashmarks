@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from hashmarks._version import __version__
+from hashmarks.paths import normalize_relative_path
 
 from .model import EvidenceVisibility
 
@@ -137,9 +138,9 @@ class StructuralLocalityMixin:
                 "structural locality requires an exact path::qualname target"
             )
         raw_path, qualname = target.split("::", 1)
-        path = raw_path.strip().replace("\\", "/").strip("/")
+        path = normalize_relative_path(raw_path.strip().replace("\\", "/"), allow_root=False)
         qualname = qualname.strip()
-        if not path or not qualname:
+        if not qualname:
             raise ValueError("target path and qualname must be non-empty")
         self._ensure_path_current(path)
         row = self.store.symbol_at(path, qualname)
@@ -189,12 +190,11 @@ class StructuralLocalityMixin:
             self = cast("CodeMap", self)
         name = str(row["name"])
         target_id = _symbol_id(row)
+        raw_refs = [dict(ref) for ref in self.store.refs(name, limit=ref_limit)]
+        complete = len(raw_refs) < ref_limit
         raw = [
-            dict(ref)
-            for ref in self.store.refs(name, limit=ref_limit)
-            if str(ref.get("kind") or "") == "call"
+            ref for ref in raw_refs if str(ref.get("kind") or "") == "call"
         ]
-        complete = len(raw) < ref_limit
         callers: dict[tuple[str, str], dict[str, object]] = {}
         unresolved: list[dict[str, object]] = []
         for ref in raw:
@@ -255,6 +255,12 @@ class StructuralLocalityMixin:
         callers, caller_count_complete, unresolved_callers = self._locality_callers(
             row, ref_limit=ref_limit
         )
+        source_semantic = {
+            "path": path,
+            "qualname": str(row["qualname"]),
+            "file_digest": digest,
+            "lines": [int(row["start_line"]), int(row["end_line"])],
+        }
         semantic = {
             "path": path,
             "qualname": str(row["qualname"]),
@@ -274,6 +280,7 @@ class StructuralLocalityMixin:
         return {
             "symbol_id": _symbol_id(row),
             **semantic,
+            "symbol_source_identity": _identity(source_semantic),
             "symbol_evidence_identity": _identity(semantic),
         }
 
@@ -284,6 +291,7 @@ class StructuralLocalityMixin:
         max_depth: int = 2,
         call_limit_per_symbol: int = 64,
         ref_limit_per_symbol: int = 256,
+        refresh: bool = True,
     ) -> dict[str, object]:
         """Return bounded structural facts reachable from one exact symbol.
 
@@ -296,7 +304,10 @@ class StructuralLocalityMixin:
         self._validate_locality_bounds(
             max_depth, call_limit_per_symbol, ref_limit_per_symbol
         )
-        self._ensure_map_ready()
+        if refresh:
+            self.sync()
+        else:
+            self._ensure_map_ready()
         target_row = self._exact_locality_target(target)
 
         queue: list[tuple[dict[str, object], int]] = [(target_row, 0)]
@@ -395,20 +406,23 @@ class StructuralLocalityMixin:
             "verification_max_depth": 3,
             "target_resolution": "exact-path-qualname",
             "call_resolution": "unambiguous-indexed-symbol-only",
+            "refresh": refresh,
         }
         freshness_fields = self._query_freshness_fields()
+        freshness_state = "current" if refresh else _freshness(freshness_fields.get("stale"))
         semantic = {
             "schema": STRUCTURAL_LOCALITY_SCHEMA,
             "provider": "hashmarks",
             "provider_version": __version__,
             "repository_identity": repository_identity,
-            "source_identity": nodes[_symbol_id(target_row)]["symbol_evidence_identity"],
+            "source_identity": nodes[_symbol_id(target_row)]["symbol_source_identity"],
             "measurement_configuration_identity": _identity(configuration),
             "target": target,
             "target_symbol_id": _symbol_id(target_row),
             "freshness": {
                 **freshness_fields,
-                "state": _freshness(freshness_fields.get("stale")),
+                "state": freshness_state,
+                "basis": "explicit-sync" if refresh else "observer-status",
             },
             "bounds": configuration,
             "nodes": ordered_nodes,
