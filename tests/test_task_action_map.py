@@ -351,3 +351,41 @@ def test_qualified_module_function_does_not_match_wrong_module(
 
     assert candidates == []
 
+def test_qualified_target_recovers_from_index_when_canonical_limit_excludes_source(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "src/test_batches.py").write_text(
+        "from src.test_batch_receipts import receipt_identity\n\n"
+        "def main() -> int:\n"
+        "    return receipt_identity()\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "src/test_batch_receipts.py").write_text(
+        "def receipt_identity() -> int:\n"
+        "    return 0\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_test_batches.py").write_text(
+        "from src import test_batches\n\n"
+        "def test_batches_main_behavior():\n"
+        "    assert test_batches.main() == 0\n",
+        encoding="utf-8",
+    )
+
+    task = "Refactor test_batches.main without changing behavior"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=1, per_role=1)
+
+    assert [row["path"] for row in action["canonical"]] == [
+        "tests/test_test_batches.py"
+    ]
+    assert action["edit"]["path"] == "src/test_batches.py"
+    assert action["edit"]["name"] == "main"
+    assert action["edit"]["exact_identifier_projection"] is True
+    assert action["edit"]["qualified_identifier_index_projection"] is True
+    assert action["ambiguity"]["ambiguous"] is False
+
