@@ -90,6 +90,54 @@ jobs:
               print(name, Counter((row["code"], row["filename"].split("/Hashmarks/")[-1], row["location"]["row"]) for row in wanted))
           PY
 
+      - name: Compare bounded runner with direct subprocess
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
+        run: |
+          export PATH="$PWD/.ruff-venv/bin:$PATH"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+          from agent_economics.bounded_process import ProcessLimits, run_bounded
+          from agent_economics.quality_debt import _run_ruff
+
+          root = Path(".").resolve()
+          limits = {
+              "C901": 8,
+              "PLR0911": 6,
+              "PLR0912": 8,
+              "PLR0913": 6,
+              "PLR0914": 15,
+              "PLR0915": 40,
+              "PLR0916": 5,
+          }
+          rows, metrics, argv = _run_ruff(
+              root,
+              executable=str(root / ".ruff-venv/bin/ruff"),
+              roots=("hashmarks", "scripts", "benchmarks"),
+              limits=limits,
+              timeout_seconds=30,
+              max_stdout_bytes=2_000_000,
+              max_stderr_bytes=200_000,
+              excludes=("benchmarks/agent_evaluation/retained",),
+          )
+          direct = subprocess.run(argv, cwd=root, capture_output=True, check=False)
+          bounded = run_bounded(
+              repository_root=root,
+              argv=argv,
+              limits=ProcessLimits(30, 2_000_000, 200_000),
+          )
+          direct_rows = json.loads(direct.stdout)
+          bounded_rows = json.loads(bounded.stdout)
+          print("helper_rows", len(rows), "metrics", metrics)
+          print("direct_rows", len(direct_rows), "rc", direct.returncode, "sha", hashlib.sha256(direct.stdout).hexdigest())
+          print("bounded_rows", len(bounded_rows), "rc", bounded.return_code, "sha", hashlib.sha256(bounded.stdout).hexdigest())
+          print("helper_equals_direct", rows == direct_rows)
+          print("helper_equals_bounded", rows == bounded_rows)
+          PY
+
       - name: Agent Economics test-focus
         env:
           PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
