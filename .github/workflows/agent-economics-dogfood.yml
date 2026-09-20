@@ -63,9 +63,11 @@ jobs:
             --repository-root . \
             --source-root hashmarks \
             --tests-root tests \
-            --changed-path hashmarks/codemap/freshness_map.py \
+            --changed-path hashmarks/codemap/repository_evidence_coverage.py \
+            --changed-path hashmarks/qualification_units.py \
+            --changed-path hashmarks/codemap/work_context.py \
+            --changed-path hashmarks/codemap/indexing_lifecycle.py \
             --package-name hashmarks \
-            --gate 'focused=uv run --no-sync python -m pytest -q tests/test_evidence_freshness_map.py tests/test_evidence_freshness_bounds.py tests/test_evidence_freshness_responsibility.py' \
             --gate 'repository=make test' \
             --artifact .agent-artifacts/test-focus.json \
             --format json
