@@ -108,3 +108,52 @@ def test_dead_verifier_reference_cannot_claim_edit_coverage(tmp_path: Path) -> N
     assert verifier["covers_edit_candidates"] == []
     assert verifier["coverage_evidence"] is None
     assert graph["summary"]["unlinked_edit_candidates"] == 1
+
+def test_symbol_scoped_edit_does_not_link_sibling_verifier(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\ntestpaths=['tests']\n", encoding="utf-8"
+    )
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/launch.py").write_text(
+        "def launch_manifest_foundation():\n"
+        "    return 'foundation'\n\n"
+        "def runtime_authority_registry():\n"
+        "    return 'registry'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_launch_foundation.py").write_text(
+        "from src.launch import launch_manifest_foundation\n\n"
+        "def test_launch_manifest_foundation():\n"
+        "    assert launch_manifest_foundation() == 'foundation'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_runtime_authority_registry.py").write_text(
+        "from src.launch import runtime_authority_registry\n\n"
+        "def test_runtime_authority_registry():\n"
+        "    assert runtime_authority_registry() == 'registry'\n",
+        encoding="utf-8",
+    )
+
+    task = (
+        "Change launch_manifest_foundation behavior and verify "
+        "launch_manifest_foundation"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20)
+        graph = codemap.verification_ownership_graph(task, limit=20)
+
+    assert action["edit"]["path"] == "src/launch.py"
+    assert action["edit"]["name"] == "launch_manifest_foundation"
+    assert action["verify"]["path"] == "tests/test_launch_foundation.py"
+
+    by_path = {row["path"]: row for row in graph["verification_owners"]}
+    assert by_path["tests/test_launch_foundation.py"]["covers_edit_candidates"] == [
+        "src/launch.py"
+    ]
+    sibling = by_path.get("tests/test_runtime_authority_registry.py")
+    if sibling is not None:
+        assert sibling["covers_edit_candidates"] == []
+        assert sibling["coverage_evidence"] is None
+
