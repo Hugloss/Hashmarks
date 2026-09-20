@@ -334,6 +334,15 @@ class _SyncIndexState:
     present: set[str] = field(default_factory=set)
 
 
+@dataclass(frozen=True)
+class _FileReuseState:
+    digest: str | None
+    artifact: str | None
+    visibility: str | None
+    module: str | None
+    has_derived: bool
+
+
 def _minimal_path_prefixes(paths: Sequence[str]) -> tuple[str, ...]:
     """Return the smallest segment-aware prefix cover for normalized paths."""
     selected: list[str] = []
@@ -926,78 +935,72 @@ class IndexingLifecycleMixin:
         state.changed = True
         return True
 
-    def _sync_index_file(
+    def _sync_file_digest(
         self,
+        item: _DiscoveredFile,
         *,
-        rel: str,
-        path: Path,
-        language: str,
-        visibility: EvidenceVisibility,
         warnings: list[str],
         state: _SyncIndexState,
         digest=None,
-        row=None,
-        has_derived: bool | None = None,
-    ) -> None:
-        """Reuse or parse one already-discovered repository file and persist its evidence."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if digest is None:
-            try:
-                digest = self.file_store.digest(
-                    path, workspace=self.workspace, relative_path=rel
-                )
-            except (OSError, UnstableFileError) as exc:
-                warnings.append(f"cannot index {rel}: {exc}")
-                state.skipped += 1
-                return
-        if row is None:
-            row = self.store.file_row(rel)
-        expected_artifact = artifact_key_for(
-            digest.hash, language, range_provider=self.range_provider
-        )
-        if isinstance(row, tuple):
-            row_digest, row_artifact, row_visibility, row_module, row_has_derived = row
-        elif row is not None:
-            row_digest = str(row["file_digest"])
-            row_artifact = str(row["artifact_key"])
-            row_visibility = str(row["evidence_visibility"])
-            row_module = str(row["module_name"] or "")
-            row_has_derived = (
-                self.store.has_derived_nodes(rel)
-                if has_derived is None
-                else has_derived
-            )
-        else:
-            row_digest = row_artifact = row_visibility = row_module = None
-            row_has_derived = False
-        if (
-            row is not None
-            and row_digest == digest.hash
-            and row_artifact == expected_artifact
-            and row_visibility == visibility.value
-            and row_module
-            == (_module_name(rel, getattr(self, "_python_import_roots", ())) or "")
-            and row_has_derived
-        ):
-            state.indexed += 1
-            state.reused += 1
-            return
+    ):
+        if digest is not None:
+            return digest
         try:
-            artifact, was_reused = self._parse_or_reuse(
-                rel, path, language, digest.hash
+            return self.file_store.digest(
+                item.path,
+                workspace=self.workspace,
+                relative_path=item.rel,
             )
-        except OSError as exc:
-            warnings.append(f"cannot read {rel}: {exc}")
+        except (OSError, UnstableFileError) as exc:
+            warnings.append(f"cannot index {item.rel}: {exc}")
             state.skipped += 1
-            return
-        derived_update = self.store.set_file(
-            rel,
-            artifact,
-            module_name=_module_name(rel, getattr(self, "_python_import_roots", ())),
-            visibility=visibility,
-            index_surface=self._index_surface_for_path(rel),
+            return None
+
+    def _sync_reuse_state(self, rel: str, row) -> _FileReuseState:
+        if isinstance(row, tuple):
+            digest, artifact, visibility, module, has_derived = row
+            return _FileReuseState(
+                str(digest) if digest is not None else None,
+                str(artifact) if artifact is not None else None,
+                str(visibility) if visibility is not None else None,
+                str(module) if module is not None else None,
+                bool(has_derived),
+            )
+        if row is None:
+            return _FileReuseState(None, None, None, None, False)
+        return _FileReuseState(
+            str(row["file_digest"]),
+            str(row["artifact_key"]),
+            str(row["evidence_visibility"]),
+            str(row["module_name"] or ""),
+            self.store.has_derived_nodes(rel),
         )
+
+    @staticmethod
+    def _sync_file_reusable(
+        reuse: _FileReuseState,
+        *,
+        digest_hash: str,
+        expected_artifact: str,
+        visibility: EvidenceVisibility,
+        module_name: str,
+    ) -> bool:
+        return (
+            reuse.digest == digest_hash
+            and reuse.artifact == expected_artifact
+            and reuse.visibility == visibility.value
+            and reuse.module == module_name
+            and reuse.has_derived
+        )
+
+    @staticmethod
+    def _record_persisted_artifact(
+        state: _SyncIndexState,
+        derived_update: dict[str, object],
+        *,
+        was_reused: bool,
+        parse_error: bool,
+    ) -> None:
         state.persisted_file_writes += 1
         state.derived_changed += len(derived_update["changed_kinds"])
         state.derived_preserved += len(derived_update["preserved_kinds"])
@@ -1005,8 +1008,72 @@ class IndexingLifecycleMixin:
         state.indexed += 1
         state.reused += int(was_reused)
         state.parsed += int(not was_reused)
-        state.parse_errors += int(artifact.parse_error is not None)
+        state.parse_errors += int(parse_error)
         state.changed = True
+
+    def _sync_index_file(
+        self,
+        *,
+        item: _DiscoveredFile,
+        warnings: list[str],
+        state: _SyncIndexState,
+        digest=None,
+        row=None,
+    ) -> None:
+        """Reuse or parse one already-discovered repository file and persist its evidence."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        digest = self._sync_file_digest(
+            item,
+            warnings=warnings,
+            state=state,
+            digest=digest,
+        )
+        if digest is None:
+            return
+        row = self.store.file_row(item.rel) if row is None else row
+        expected_artifact = artifact_key_for(
+            digest.hash,
+            item.language,
+            range_provider=self.range_provider,
+        )
+        module_name = (
+            _module_name(item.rel, getattr(self, "_python_import_roots", ())) or ""
+        )
+        if row is not None and self._sync_file_reusable(
+            self._sync_reuse_state(item.rel, row),
+            digest_hash=digest.hash,
+            expected_artifact=expected_artifact,
+            visibility=item.visibility,
+            module_name=module_name,
+        ):
+            state.indexed += 1
+            state.reused += 1
+            return
+        try:
+            artifact, was_reused = self._parse_or_reuse(
+                item.rel,
+                item.path,
+                item.language,
+                digest.hash,
+            )
+        except OSError as exc:
+            warnings.append(f"cannot read {item.rel}: {exc}")
+            state.skipped += 1
+            return
+        derived_update = self.store.set_file(
+            item.rel,
+            artifact,
+            module_name=module_name,
+            visibility=item.visibility,
+            index_surface=self._index_surface_for_path(item.rel),
+        )
+        self._record_persisted_artifact(
+            state,
+            derived_update,
+            was_reused=was_reused,
+            parse_error=artifact.parse_error is not None,
+        )
 
     def _sync_index_discovered(
         self,
@@ -1078,10 +1145,7 @@ class IndexingLifecycleMixin:
                     item.visibility,
                 )
                 self._sync_index_file(
-                    rel=rel,
-                    path=path,
-                    language=language,
-                    visibility=visibility,
+                    item=item,
                     warnings=warnings,
                     state=state,
                     digest=digests.get(rel),
@@ -1164,6 +1228,30 @@ class IndexingLifecycleMixin:
             self.workspace, pyprojects
         )
 
+    def _extend_discovered_from_roots(
+        self,
+        discovered: list[_DiscoveredFile],
+        *,
+        roots: Sequence[str],
+        seen: set[str],
+    ) -> None:
+        for root in sorted(roots):
+            for item in self._discover_subtree(root):
+                if item.rel in seen:
+                    continue
+                discovered.append(item)
+                seen.add(item.rel)
+
+    def _python_reprojection_paths(
+        self,
+        previous_roots: set[str],
+        current_roots: set[str],
+    ) -> set[str]:
+        affected: set[str] = set()
+        for root in sorted(previous_roots ^ current_roots):
+            affected.update(self.store.paths_under(root))
+        return affected
+
     def _sync_expand_python_reprojection(
         self,
         discovered: list[_DiscoveredFile],
@@ -1180,23 +1268,14 @@ class IndexingLifecycleMixin:
         previous = set(previous_roots)
         current = set(self._python_import_roots)
 
-        # Newly admitted uv workspace members may contain files that have never
-        # existed in the persistent map. Discover only their newly authoritative
-        # source roots instead of forcing a repository-wide reconciliation.
-        for root in sorted(current - previous):
-            for item in self._discover_subtree(root):
-                if item.rel not in seen:
-                    discovered.append(item)
-                    seen.add(item.rel)
-
-        # Import identity can change only beneath source roots whose authority
-        # was added or removed. Query those bounded ranges rather than every
-        # persisted repository row for a one-member uv workspace transition.
-        affected_paths: set[str] = set()
-        for root in sorted(previous ^ current):
-            affected_paths.update(self.store.paths_under(root))
-        affected_rows = self.store.file_rows(affected_paths)
-
+        self._extend_discovered_from_roots(
+            discovered,
+            roots=tuple(current - previous),
+            seen=seen,
+        )
+        affected_rows = self.store.file_rows(
+            self._python_reprojection_paths(previous, current)
+        )
         stale_missing: set[str] = set()
         for rel, row in affected_rows.items():
             if not rel.endswith((".py", ".pyi")):
@@ -1206,10 +1285,11 @@ class IndexingLifecycleMixin:
             if not (self.workspace / rel).exists():
                 stale_missing.add(rel)
                 continue
-            for item in self._discover_subtree(rel):
-                if item.rel not in seen:
-                    discovered.append(item)
-                    seen.add(item.rel)
+            self._extend_discovered_from_roots(
+                discovered,
+                roots=(rel,),
+                seen=seen,
+            )
         return self.store.delete_paths(stale_missing) if stale_missing else 0
 
     def sync(self, paths: Iterable[str | Path] | None = None) -> SyncResult:
@@ -1536,33 +1616,33 @@ class IndexingLifecycleMixin:
             return False
         return actual == str(row["file_digest"] or "")
 
+    def _retire_indexed_path(self, rel: str, row) -> None:
+        if row is None:
+            return
+        self.store.delete_paths((rel,))
+        self.store.bump_generation()
+
     def _ensure_path_current(self, relpath: str) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         rel = normalize_relative_path(relpath, allow_root=False)
         row = self.store.file_row(rel)
-        if not self._path_admitted_for_analysis(rel):
-            if row is not None:
-                self.store.delete_paths((rel,))
-                self.store.bump_generation()
-            return
         path = self.workspace / rel
-        if path.is_symlink():
-            if row is not None:
-                self.store.delete_paths((rel,))
-                self.store.bump_generation()
-            return
-        if not path.is_file():
-            if row is not None:
-                self.store.delete_paths((rel,))
-                self.store.bump_generation()
+        if (
+            not self._path_admitted_for_analysis(rel)
+            or path.is_symlink()
+            or not path.is_file()
+        ):
+            self._retire_indexed_path(rel, row)
             return
         language = _language_for_path(path)
-        decision = self.policy.decide(rel)
         if language is None:
             return
+        decision = self.policy.decide(rel)
         digest = self.file_store.digest(
-            path, workspace=self.workspace, relative_path=rel
+            path,
+            workspace=self.workspace,
+            relative_path=rel,
         )
         if (
             row is not None
@@ -1579,3 +1659,4 @@ class IndexingLifecycleMixin:
             index_surface=self._index_surface_for_path(rel),
         )
         self.store.bump_generation()
+
