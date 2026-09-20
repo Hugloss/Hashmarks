@@ -212,8 +212,9 @@ def authority(client, value):
     assert [row["symbol_id"] for row in packet["nodes"]] == [
         "pkg/core.py::authority"
     ]
-    assert packet["dimensions"]["unresolved_call_count"] == 1
-    row = packet["unresolved_calls"][0]
+    assert packet["dimensions"]["unresolved_call_count"] == 0
+    assert packet["dimensions"]["external_or_unindexed_call_count"] == 1
+    row = packet["external_or_unindexed_calls"][0]
     assert row["target_text"] == "client.helper"
     assert row["candidate_symbol_ids"] == ["pkg/core.py::helper"]
 
@@ -244,10 +245,11 @@ def authority(helper, value):
     assert [row["symbol_id"] for row in packet["nodes"]] == [
         "pkg/core.py::authority"
     ]
-    assert packet["dimensions"]["unresolved_call_count"] == 1
-    assert packet["unresolved_calls"][0]["candidate_symbol_ids"] == [
-        "pkg/core.py::helper"
-    ]
+    assert packet["dimensions"]["unresolved_call_count"] == 0
+    assert packet["dimensions"]["external_or_unindexed_call_count"] == 1
+    row = packet["external_or_unindexed_calls"][0]
+    assert row["target_text"] == "helper"
+    assert row["candidate_symbol_ids"] == ["pkg/core.py::helper"]
 
 
 def test_structural_locality_delta_rejects_tampered_packet_identity(
@@ -365,7 +367,63 @@ def authority(Worker, value):
     assert [row["symbol_id"] for row in packet["nodes"]] == [
         "pkg/core.py::authority"
     ]
-    assert packet["dimensions"]["unresolved_call_count"] == 1
-    row = packet["unresolved_calls"][0]
+    assert packet["dimensions"]["unresolved_call_count"] == 0
+    assert packet["dimensions"]["external_or_unindexed_call_count"] == 1
+    row = packet["external_or_unindexed_calls"][0]
     assert row["target_text"] == "Worker.helper"
     assert row["candidate_symbol_ids"] == ["pkg/core.py::Worker.helper"]
+
+
+def test_structural_locality_dynamic_receivers_do_not_create_repository_ambiguity(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/unrelated.py",
+        """
+class Unrelated:
+    def append(self, value):
+        return value
+
+    def get(self, key):
+        return key
+
+    def add(self, value):
+        return value
+
+    def read_text(self):
+        return "text"
+""".lstrip(),
+    )
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+def authority(gaps, payload, seen, observations_path):
+    gaps.append("gap")
+    payload.get("key")
+    seen.add("value")
+    return observations_path.read_text()
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::authority",
+            max_depth=2,
+        )
+
+    assert [row["symbol_id"] for row in packet["nodes"]] == [
+        "pkg/core.py::authority"
+    ]
+    assert packet["dimensions"]["unresolved_call_count"] == 0
+    assert packet["dimensions"]["external_or_unindexed_call_count"] == 4
+    external = packet["external_or_unindexed_calls"]
+    assert [row["target_text"] for row in external] == [
+        "gaps.append",
+        "payload.get",
+        "seen.add",
+        "observations_path.read_text",
+    ]
+    assert all(row["candidate_symbol_ids"] for row in external)
