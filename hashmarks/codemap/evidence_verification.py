@@ -238,12 +238,16 @@ class VerificationMixin:
     ) -> list[str]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        symbol_names: list[str] = []
-        for symbol in self._session_symbols_for_path(edit_path)[:32]:
-            self._append_verification_symbol_names(symbol_names, symbol)
+        selected_symbols: list[str] = []
         if isinstance(edit, Mapping):
-            self._append_verification_symbol_names(symbol_names, edit)
-        return symbol_names
+            self._append_verification_symbol_names(selected_symbols, edit)
+        if selected_symbols:
+            return selected_symbols
+
+        file_symbols: list[str] = []
+        for symbol in self._session_symbols_for_path(edit_path)[:32]:
+            self._append_verification_symbol_names(file_symbols, symbol)
+        return file_symbols
 
     @staticmethod
     def _append_verification_symbol_names(
