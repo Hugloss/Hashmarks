@@ -756,6 +756,96 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                     return True
         return False
 
+    def _task_action_qualified_identifier_index_candidates(
+        self,
+        qualified_terms: Sequence[str],
+        failed: set[str],
+        *,
+        canonical_rank: int,
+    ) -> list[dict[str, object]]:
+        """Recover explicit module-qualified symbols from the maintained index.
+
+        Canonical lexical retrieval can be saturated by test surfaces. A task that
+        explicitly names module.symbol may therefore recover that exact indexed
+        source without granting arbitrary prose edit authority. The longest
+        resolvable module prefix wins for each term; zero or multiple matching
+        owners remain unresolved/ambiguous through the existing exact-identifier
+        machinery.
+        """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        candidates: list[dict[str, object]] = []
+        seen: set[tuple[str, str]] = set()
+        for term in qualified_terms:
+            parts = [part for part in term.lower().split(".") if part]
+            if len(parts) < 2:
+                continue
+            for identity_parts in range(1, len(parts)):
+                module = ".".join(parts[:-identity_parts])
+                module_paths = self._session_module_paths(module)
+                if not module_paths:
+                    continue
+                matched_module = False
+                for path in module_paths:
+                    if (
+                        not path
+                        or path in failed
+                        or self._task_action_is_archive_path(path)
+                    ):
+                        continue
+                    domains = [
+                        domain.value for domain in classify_repository_path(path)
+                    ]
+                    if (
+                        RepositoryDomain.SOURCE.value not in domains
+                        and RepositoryDomain.SCRIPT.value not in domains
+                    ):
+                        continue
+                    file_row = self._session_file_row(path)
+                    if (
+                        isinstance(file_row, Mapping)
+                        and str(file_row.get("evidence_visibility") or "")
+                        == EvidenceVisibility.DENY.value
+                    ):
+                        continue
+                    for symbol in self._session_symbols_for_path(path):
+                        if not self._task_action_qualified_identifier_matches_symbol(
+                            path, symbol, (term,)
+                        ):
+                            continue
+                        matched_module = True
+                        key = (
+                            path,
+                            str(symbol.get("qualname") or symbol.get("name") or ""),
+                        )
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        candidates.append(
+                            {
+                                "path": path,
+                                "canonical_rank": canonical_rank,
+                                "canonical_score": 0.0,
+                                "domains": domains,
+                                "roles": ["edit", "related"],
+                                "name": symbol.get("name"),
+                                "qualname": symbol.get("qualname"),
+                                "signature": symbol.get("signature"),
+                                "start_line": symbol.get("start_line"),
+                                "end_line": symbol.get("end_line"),
+                                "evidence_visibility": (
+                                    str(file_row["evidence_visibility"])
+                                    if isinstance(file_row, Mapping)
+                                    else EvidenceVisibility.SOURCE.value
+                                ),
+                                "exact_identifier_projection": True,
+                                "qualified_identifier_index_projection": True,
+                            }
+                        )
+                if matched_module:
+                    break
+        return candidates
+
     def _task_action_exact_identifier_edit_candidates(
         self,
         task: str,
@@ -835,6 +925,34 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                     "exact_identifier_projection": True,
                 }
             )
+        projection_rank = (
+            max(
+                (int(row.get("canonical_rank") or 0) for row in rows),
+                default=0,
+            )
+            + 1
+        )
+        indexed = self._task_action_qualified_identifier_index_candidates(
+            qualified_terms,
+            failed,
+            canonical_rank=projection_rank,
+        )
+        existing = {
+            (
+                str(row.get("path") or ""),
+                str(row.get("qualname") or row.get("name") or ""),
+            )
+            for row in candidates
+        }
+        candidates.extend(
+            row
+            for row in indexed
+            if (
+                str(row.get("path") or ""),
+                str(row.get("qualname") or row.get("name") or ""),
+            )
+            not in existing
+        )
         return candidates
 
     def _task_action_structural_exact_identifier_owner(
