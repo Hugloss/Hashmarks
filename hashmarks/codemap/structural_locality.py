@@ -210,32 +210,44 @@ class StructuralLocalityMixin:
         source_qualname: str,
         short: str,
         candidates: list[dict[str, object]],
-    ) -> tuple[dict[str, object] | None, list[str]]:
+    ) -> tuple[dict[str, object] | None, list[str], bool]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
+        candidate_ids = sorted(_symbol_id(row) for row in candidates)
         if self._python_function_locally_binds(source_path, source_qualname, short):
-            return None, sorted(_symbol_id(row) for row in candidates)
+            return None, candidate_ids, False
         kind, targets = self._python_export_binding(source_path, short)
         if kind == "local":
-            local = [row for row in candidates if str(row.get("path") or "") == source_path]
+            local = [
+                row
+                for row in candidates
+                if str(row.get("path") or "") == source_path
+            ]
             if len(local) == 1:
-                return local[0], [_symbol_id(local[0])]
-            return None, sorted(_symbol_id(row) for row in local or candidates)
+                return local[0], [_symbol_id(local[0])], False
+            return (
+                None,
+                sorted(_symbol_id(row) for row in local or candidates),
+                len(local) > 1,
+            )
         if kind == "reexport" and len(targets) == 1:
             owners, unresolved = self._resolve_import_owner_evidence(
                 source_path, targets[0]
             )
             if unresolved:
-                return None, sorted(_symbol_id(row) for row in candidates)
+                return None, candidate_ids, True
+            owner_paths = set(owners)
             owned = [
                 row
                 for row in candidates
-                if str(row.get("path") or "") in set(owners)
+                if str(row.get("path") or "") in owner_paths
             ]
             if len(owned) == 1:
-                return owned[0], [_symbol_id(owned[0])]
-            return None, sorted(_symbol_id(row) for row in owned or candidates)
-        return None, sorted(_symbol_id(row) for row in candidates)
+                return owned[0], [_symbol_id(owned[0])], False
+            return None, sorted(_symbol_id(row) for row in owned or candidates), bool(owners)
+        if kind in {"ambiguous", "star"}:
+            return None, candidate_ids, True
+        return None, candidate_ids, False
 
     def _python_qualified_call_binding(
         self,
@@ -244,14 +256,15 @@ class StructuralLocalityMixin:
         source_qualname: str,
         target: str,
         candidates: list[dict[str, object]],
-    ) -> tuple[dict[str, object] | None, list[str]]:
+    ) -> tuple[dict[str, object] | None, list[str], bool]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
+        candidate_ids = sorted(_symbol_id(row) for row in candidates)
         root = target.split(".", 1)[0]
         if not root or self._python_function_locally_binds(
             source_path, source_qualname, root
         ):
-            return None, sorted(_symbol_id(row) for row in candidates)
+            return None, candidate_ids, False
         kind, targets = self._python_export_binding(source_path, root)
         if kind == "local":
             qualified = [
@@ -260,12 +273,25 @@ class StructuralLocalityMixin:
                 if str(row.get("path") or "") == source_path
                 and str(row.get("qualname") or "") == target
             ]
-        elif kind == "reexport" and len(targets) == 1:
+            if len(qualified) == 1:
+                return qualified[0], [_symbol_id(qualified[0])], False
+            root_symbols = [
+                row
+                for row in self._visible_named_symbol_candidates(root)
+                if str(row.get("path") or "") == source_path
+                and str(row.get("qualname") or "") == root
+            ]
+            return (
+                None,
+                sorted(_symbol_id(row) for row in qualified or candidates),
+                bool(root_symbols),
+            )
+        if kind == "reexport" and len(targets) == 1:
             owners, unresolved = self._resolve_import_owner_evidence(
                 source_path, targets[0]
             )
             if unresolved:
-                return None, sorted(_symbol_id(row) for row in candidates)
+                return None, candidate_ids, True
             owner_paths = set(owners)
             qualified = [
                 row
@@ -273,19 +299,20 @@ class StructuralLocalityMixin:
                 if str(row.get("path") or "") in owner_paths
                 and str(row.get("qualname") or "") == target
             ]
-        else:
-            qualified = []
-        if len(qualified) == 1:
-            return qualified[0], [_symbol_id(qualified[0])]
-        return None, sorted(_symbol_id(row) for row in qualified or candidates)
+            if len(qualified) == 1:
+                return qualified[0], [_symbol_id(qualified[0])], False
+            return None, sorted(_symbol_id(row) for row in qualified or candidates), bool(owners)
+        if kind in {"ambiguous", "star"}:
+            return None, candidate_ids, True
+        return None, candidate_ids, False
 
     def _resolve_call_target(
         self, edge: Mapping[str, object]
-    ) -> tuple[dict[str, object] | None, list[str]]:
+    ) -> tuple[dict[str, object] | None, list[str], bool]:
         target = str(edge.get("target") or "").strip()
         short = target.rsplit(".", 1)[-1]
         if not short:
-            return None, []
+            return None, [], False
         candidates = self._visible_named_symbol_candidates(short)
         source_path = str(edge.get("path") or "")
         source_qualname = str(edge.get("source") or "")
@@ -305,7 +332,8 @@ class StructuralLocalityMixin:
                 short=short,
                 candidates=candidates,
             )
-        return None, sorted(_symbol_id(row) for row in candidates)
+        candidate_ids = sorted(_symbol_id(row) for row in candidates)
+        return None, candidate_ids, bool(candidate_ids)
 
     def _locality_callers(
         self, row: Mapping[str, object], *, ref_limit: int
@@ -322,9 +350,9 @@ class StructuralLocalityMixin:
         callers: dict[tuple[str, str], dict[str, object]] = {}
         unresolved: list[dict[str, object]] = []
         for ref in raw:
-            resolved, candidates = self._resolve_call_target(ref)
+            resolved, candidates, repository_unresolved = self._resolve_call_target(ref)
             if resolved is None or _symbol_id(resolved) != target_id:
-                if target_id in candidates or not candidates:
+                if repository_unresolved and target_id in candidates:
                     unresolved.append(
                         {
                             "path": str(ref.get("path") or ""),
@@ -459,7 +487,7 @@ class StructuralLocalityMixin:
             ]
             truncated = len(outgoing) > call_limit_per_symbol
             for edge in outgoing[:call_limit_per_symbol]:
-                resolved, candidates = self._resolve_call_target(edge)
+                resolved, candidates, repository_unresolved = self._resolve_call_target(edge)
                 record = {
                     "source_symbol_id": symbol_id,
                     "path": str(edge.get("path") or ""),
@@ -473,7 +501,7 @@ class StructuralLocalityMixin:
                 }
                 edges.append(record)
                 if resolved is None:
-                    if candidates:
+                    if repository_unresolved:
                         unresolved_calls.append(record)
                     else:
                         external_or_unindexed_calls.append(record)
