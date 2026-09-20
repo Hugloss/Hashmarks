@@ -679,9 +679,12 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
     def _task_action_ambiguous_plain_identifiers(
         self, task: str, rows: Sequence[dict[str, object]], failed: set[str]
     ) -> set[str]:
+        masked = task
+        for value in _QUALIFIED_IDENTIFIER_RE.findall(task):
+            masked = masked.replace(value, " ")
         plain_tokens = {
             token.lower()
-            for token in _WORD_RE.findall(task)
+            for token in _WORD_RE.findall(masked)
             if len(token) >= 4 and token.lower() not in _TASK_STOPWORDS
         }
         exact_row_paths: dict[str, set[str]] = {}
