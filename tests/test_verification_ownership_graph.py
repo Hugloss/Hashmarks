@@ -451,3 +451,44 @@ def test_module_alias_local_override_cannot_claim_reexported_owner(
     assert row["direct_reference"] is False
     assert relevance["qualified_identity_ambiguous"] is False
 
+def test_bounded_verification_candidates_always_retain_selected_verifier() -> None:
+    candidates = [
+        {
+            "path": f"tests/test_decoy_{index}.py",
+            "direct_reference": False,
+            "indirect_reference": True,
+            "namespace_overlap": 1,
+            "task_anchor_count": 1,
+            "canonical_rank": None,
+        }
+        for index in range(9)
+    ]
+    selected = {
+        "path": "scripts/tests/test_canonical.py",
+        "direct_reference": False,
+        "indirect_reference": True,
+        "namespace_overlap": 0,
+        "task_anchor_count": 4,
+        "canonical_rank": 1,
+    }
+    candidates.append(selected)
+
+    bounded = CodeMap._verification_bounded_candidates(
+        candidates,
+        selected,
+        8,
+    )
+
+    assert len(bounded) == 8
+    assert [row["path"] for row in bounded[:7]] == [
+        f"tests/test_decoy_{index}.py" for index in range(7)
+    ]
+    assert bounded[-1]["path"] == "scripts/tests/test_canonical.py"
+
+    single = CodeMap._verification_bounded_candidates(
+        candidates,
+        {**selected, "selection_reason": "canonical-verification"},
+        1,
+    )
+    assert single == [selected]
+
