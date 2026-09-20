@@ -402,16 +402,16 @@ class VerificationMixin:
                 exact_import_paths.add(ref_path)
         return exact_import_paths, import_resolution_available
 
-    def _verification_module_alias_reference_proves_owner(
+    def _verification_module_alias_reference_owner_match(
         self,
         state: _VerificationRelevanceState,
         ref_path: str,
         target: str,
-    ) -> bool:
+    ) -> bool | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if not ref_path.endswith(".py") or "." not in target:
-            return False
+            return None
         try:
             snapshot = read_python_ast(self.workspace / ref_path)
             index = _verification_reference_index(
@@ -420,20 +420,24 @@ class VerificationMixin:
                 snapshot.tree,
             )
         except (OSError, SyntaxError):
-            return False
+            return None
         if target not in index.reachable_attribute_chains:
-            return False
+            return None
 
         bound_name = target.split(".", 1)[0]
+        resolved_alias = False
         for module_target, alias, guard in index.module_bindings:
             if guard is not None or alias != bound_name or not module_target:
                 continue
             resolved_paths = self._verification_resolved_import_paths(
                 state, ref_path, module_target
             )
+            if not resolved_paths:
+                continue
+            resolved_alias = True
             if state.edit_path in resolved_paths:
                 return True
-        return False
+        return False if resolved_alias else None
 
     def _verification_collect_direct_symbol_refs(
         self,
@@ -450,17 +454,19 @@ class VerificationMixin:
             if not path or not self._verification_ref_visible(ref):
                 continue
             short_match = str(ref.get("target_short") or "") == short
-            exact_reference = (
-                path in exact_import_paths if resolution_available else short_match
-            )
-            if (
-                short_match
-                and not exact_reference
-                and self._verification_module_alias_reference_proves_owner(
+            alias_owner_match = (
+                self._verification_module_alias_reference_owner_match(
                     state, path, str(ref.get("target") or "")
                 )
-            ):
-                exact_reference = True
+                if short_match
+                else None
+            )
+            if alias_owner_match is not None:
+                exact_reference = alias_owner_match
+            else:
+                exact_reference = (
+                    path in exact_import_paths if resolution_available else short_match
+                )
             if not short_match or not exact_reference:
                 if RepositoryDomain.TEST in set(classify_repository_path(path)):
                     state.candidate_paths.add(path)
