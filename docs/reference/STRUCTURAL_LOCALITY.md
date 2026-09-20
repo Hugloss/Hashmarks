@@ -17,7 +17,7 @@ A `hashmarks.structural-locality.v1` packet binds:
 - the exact target source identity;
 - the measurement configuration identity;
 - bounded reachable symbols and static call edges;
-- exact meaningful caller evidence when the indexed target resolves unambiguously;
+- exact observed caller evidence when the indexed target resolves unambiguously; this is a conservative lower bound, not a proof that no aliased or dynamically bound callers exist;
 - unresolved call/caller candidates when exact resolution is not possible;
 - syntactic forwarding-only classification where Hashmarks has a supported parser;
 - file fan-out, symbol count, navigation depth, context-line closure and cross-file reach;
@@ -38,7 +38,7 @@ Structural-locality evidence deliberately prefers incompleteness to a false exac
 
 For a static call such as `helper(...)`, Hashmarks resolves the target only when the indexed repository evidence identifies one unambiguous symbol. If two repository symbols can satisfy the same short identity, the edge is emitted in `unresolved_calls` with candidate symbol IDs and is **not** counted as exact reuse, exact ownership, or exact navigation closure.
 
-The same rule applies to caller evidence. A candidate caller that cannot be proven to target the selected symbol remains unresolved.
+The same rule applies to caller evidence. A candidate caller that cannot be proven to target the selected symbol remains unresolved. `exact_caller_count` is therefore safe as positive evidence (for example, two exact callers prove at least two callers) but must not be interpreted as global caller-set completeness or as proof that a symbol is single-use.
 
 ## Forwarding-only syntax
 
