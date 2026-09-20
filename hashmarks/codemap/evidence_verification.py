@@ -973,7 +973,7 @@ class VerificationMixin:
         return {
             "schema": "hashmarks.verification-relevance.v1",
             "selected": selected,
-            "candidates": VerificationEvidenceMixin._verification_bounded_candidates(
+            "candidates": VerificationMixin._verification_bounded_candidates(
                 candidates, selected_row, limit
             ),
             "candidate_count": len(candidates),
