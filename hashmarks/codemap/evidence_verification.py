@@ -238,12 +238,16 @@ class VerificationMixin:
     ) -> list[str]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        symbol_names: list[str] = []
-        for symbol in self._session_symbols_for_path(edit_path)[:32]:
-            self._append_verification_symbol_names(symbol_names, symbol)
+        selected_symbols: list[str] = []
         if isinstance(edit, Mapping):
-            self._append_verification_symbol_names(symbol_names, edit)
-        return symbol_names
+            self._append_verification_symbol_names(selected_symbols, edit)
+        if selected_symbols:
+            return selected_symbols
+
+        file_symbols: list[str] = []
+        for symbol in self._session_symbols_for_path(edit_path)[:32]:
+            self._append_verification_symbol_names(file_symbols, symbol)
+        return file_symbols
 
     @staticmethod
     def _append_verification_symbol_names(
@@ -682,12 +686,28 @@ class VerificationMixin:
         if not candidates:
             return selected, reason
         best = candidates[0]
-        reference_candidates = [
-            row for row in candidates if cls._verification_candidate_score(row)[0] > 0
+        direct_reference_candidates = [
+            row for row in candidates if bool(row.get("direct_reference"))
         ]
-        unique_reference = len(reference_candidates) == 1 and (
-            selected is None or cls._verification_candidate_score(selected)[0] == 0
-        )
+        if direct_reference_candidates:
+            unique_reference = len(direct_reference_candidates) == 1 and (
+                selected is None or not bool(selected.get("direct_reference"))
+            )
+        else:
+            indirect_reference_candidates = [
+                row for row in candidates if bool(row.get("indirect_reference"))
+            ]
+            selected_has_reference = bool(
+                isinstance(selected, Mapping)
+                and (
+                    selected.get("direct_reference")
+                    or selected.get("indirect_reference")
+                )
+            )
+            unique_reference = (
+                len(indirect_reference_candidates) == 1
+                and not selected_has_reference
+            )
         if cls._verification_best_can_replace(
             best, selected, unique_reference, current_path
         ):
