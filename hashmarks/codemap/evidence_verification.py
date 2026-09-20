@@ -53,6 +53,7 @@ class _VerificationRelevanceState:
     indirect_via_paths: dict[str, set[str]]
     source_ref_paths: set[str]
     unresolved_import_identity_paths: set[str]
+    reference_indexes: dict[str, _VerificationReferenceIndex | None]
 
 
 @dataclass(frozen=True)
@@ -251,6 +252,7 @@ class VerificationMixin:
             indirect_via_paths={},
             source_ref_paths=set(),
             unresolved_import_identity_paths=set(),
+            reference_indexes={},
         )
 
     @staticmethod
@@ -402,6 +404,27 @@ class VerificationMixin:
                 exact_import_paths.add(ref_path)
         return exact_import_paths, import_resolution_available
 
+    def _verification_reference_index_for_path(
+        self,
+        state: _VerificationRelevanceState,
+        path: str,
+    ) -> _VerificationReferenceIndex | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if path in state.reference_indexes:
+            return state.reference_indexes[path]
+        try:
+            snapshot = read_python_ast(self.workspace / path)
+            index = _verification_reference_index(
+                os.path.abspath(os.fspath(self.workspace / path)),
+                snapshot.identity,
+                snapshot.tree,
+            )
+        except (OSError, SyntaxError):
+            index = None
+        state.reference_indexes[path] = index
+        return index
+
     def _verification_module_alias_reference_owner_match(
         self,
         state: _VerificationRelevanceState,
@@ -412,14 +435,8 @@ class VerificationMixin:
             self = cast("CodeMap", self)
         if not ref_path.endswith(".py") or "." not in target:
             return None
-        try:
-            snapshot = read_python_ast(self.workspace / ref_path)
-            index = _verification_reference_index(
-                os.path.abspath(os.fspath(self.workspace / ref_path)),
-                snapshot.identity,
-                snapshot.tree,
-            )
-        except (OSError, SyntaxError):
+        index = self._verification_reference_index_for_path(state, ref_path)
+        if index is None:
             return None
         if target not in index.reachable_attribute_chains:
             return None
@@ -643,7 +660,10 @@ class VerificationMixin:
         }
 
     def _verification_reference_strength(
-        self, path: str, symbols: Sequence[str]
+        self,
+        state: _VerificationRelevanceState,
+        path: str,
+        symbols: Sequence[str],
     ) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -653,14 +673,8 @@ class VerificationMixin:
                 "syntactic_reference": bool(symbols),
                 "reference_strength": strength,
             }
-        try:
-            snapshot = read_python_ast(self.workspace / path)
-            index = _verification_reference_index(
-                os.path.abspath(os.fspath(self.workspace / path)),
-                snapshot.identity,
-                snapshot.tree,
-            )
-        except (OSError, SyntaxError):
+        index = self._verification_reference_index_for_path(state, path)
+        if index is None:
             return {"syntactic_reference": True, "reference_strength": "syntactic"}
         return self._verification_index_strength(index, symbols)
 
@@ -688,7 +702,9 @@ class VerificationMixin:
         )
         direct_symbols = sorted(state.refs_by_path.get(path, set()))
         indirect_symbols = sorted(state.indirect_refs_by_path.get(path, set()))
-        reference = self._verification_reference_strength(path, direct_symbols)
+        reference = self._verification_reference_strength(
+            state, path, direct_symbols
+        )
         direct_reference = reference.get("reference_strength") == "reachable-symbol-use"
         return {
             "path": path,
