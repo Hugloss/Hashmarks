@@ -215,3 +215,81 @@ def test_unique_direct_verifier_outranks_indirect_and_canonical_candidates(
     by_path = {row["path"]: row for row in relevance["candidates"]}
     assert by_path["tests/test_wrapper.py"]["indirect_reference"] is True
 
+def test_module_alias_call_is_direct_verifier_for_exact_owner(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\ntestpaths=['tests']\n", encoding="utf-8"
+    )
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "src/policy.py").write_text(
+        "def evaluate(value):\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "src/other.py").write_text(
+        "def evaluate(value):\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_policy.py").write_text(
+        "from src import policy as subject\n\n"
+        "def test_evaluate_policy():\n"
+        "    assert subject.evaluate('x') == 'x'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_other.py").write_text(
+        "from src import other as subject\n\n"
+        "def test_evaluate_other():\n"
+        "    assert subject.evaluate('x') == 'x'\n",
+        encoding="utf-8",
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        relevance = codemap.verification_relevance(
+            "Change policy.evaluate behavior", limit=20, candidate_limit=16
+        )
+
+    selected = relevance["selected"]
+    assert selected["path"] == "tests/test_policy.py"
+    assert selected["direct_reference"] is True
+    assert selected["reference_symbols"] == ["evaluate"]
+    by_path = {row["path"]: row for row in relevance["candidates"]}
+    assert by_path["tests/test_other.py"]["direct_reference"] is False
+
+
+def test_dead_module_alias_call_cannot_claim_direct_verification(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\ntestpaths=['tests']\n", encoding="utf-8"
+    )
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "src/policy.py").write_text(
+        "def evaluate(value):\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_policy.py").write_text(
+        "if False:\n"
+        "    from src import policy as subject\n"
+        "    subject.evaluate('x')\n\n"
+        "def test_placeholder():\n"
+        "    assert True\n",
+        encoding="utf-8",
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        relevance = codemap.verification_relevance(
+            "Change policy.evaluate behavior", limit=20, candidate_limit=16
+        )
+
+    row = next(
+        candidate
+        for candidate in relevance["candidates"]
+        if candidate["path"] == "tests/test_policy.py"
+    )
+    assert row["direct_reference"] is False
+
