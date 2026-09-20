@@ -274,6 +274,29 @@ def _tests_code(args) -> int:
     return 0
 
 
+def _structural_locality_code(args) -> int:
+    value = _call_codemap(
+        args,
+        lambda codemap: codemap.structural_locality(
+            args.target,
+            max_depth=args.max_depth,
+            call_limit_per_symbol=args.call_limit,
+            ref_limit_per_symbol=args.ref_limit,
+        ),
+    )
+    _print(value)
+    return 0
+
+
+def _structural_locality_delta_code(args) -> int:
+    from .codemap import structural_locality_delta
+
+    before = _read_json_object(args.before, option="--before")
+    after = _read_json_object(args.after, option="--after")
+    _print(structural_locality_delta(before, after))
+    return 0
+
+
 def _context_code(args) -> int:
     value = _call_codemap(
         args,
@@ -578,6 +601,26 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     tests_code.add_argument("query")
     tests_code.add_argument("--max-depth", type=int, default=12)
     tests_code.set_defaults(func=_tests_code)
+
+    locality = sub.add_parser(
+        "structural-locality",
+        help="project bounded structural locality facts for one exact path::qualname",
+    )
+    add_common_arguments(locality, inherited=True)
+    locality.add_argument("target", help="exact repository-relative path::qualname")
+    locality.add_argument("--max-depth", type=int, default=2)
+    locality.add_argument("--call-limit", type=int, default=64)
+    locality.add_argument("--ref-limit", type=int, default=256)
+    locality.set_defaults(func=_structural_locality_code)
+
+    locality_delta = sub.add_parser(
+        "structural-locality-delta",
+        help="compare two structural-locality evidence packets without policy",
+    )
+    add_common_arguments(locality_delta, inherited=True)
+    locality_delta.add_argument("--before", required=True)
+    locality_delta.add_argument("--after", required=True)
+    locality_delta.set_defaults(func=_structural_locality_delta_code)
 
 
 def _add_context_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
