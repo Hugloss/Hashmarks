@@ -917,6 +917,44 @@ class VerificationMixin:
         )
 
     @staticmethod
+    def _verification_bounded_candidates(
+        candidates: Sequence[dict[str, object]],
+        selected: Mapping[str, object] | None,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        bounded = [dict(row) for row in candidates[:limit]]
+        selected_path = (
+            str(selected.get("path") or "")
+            if isinstance(selected, Mapping)
+            else ""
+        )
+        if not selected_path or any(
+            str(row.get("path") or "") == selected_path for row in bounded
+        ):
+            return bounded
+        selected_row = next(
+            (
+                dict(row)
+                for row in candidates
+                if str(row.get("path") or "") == selected_path
+            ),
+            None,
+        )
+        if selected_row is None and isinstance(selected, Mapping):
+            selected_row = {
+                key: value
+                for key, value in selected.items()
+                if key != "selection_reason"
+            }
+        if selected_row is None:
+            return bounded
+        if len(bounded) >= limit:
+            bounded[-1] = selected_row
+        else:
+            bounded.append(selected_row)
+        return bounded
+
+    @staticmethod
     def _verification_relevance_result(
         state: _VerificationRelevanceState,
         candidates: Sequence[dict[str, object]],
@@ -935,7 +973,9 @@ class VerificationMixin:
         return {
             "schema": "hashmarks.verification-relevance.v1",
             "selected": selected,
-            "candidates": list(candidates[:limit]),
+            "candidates": VerificationEvidenceMixin._verification_bounded_candidates(
+                candidates, selected_row, limit
+            ),
             "candidate_count": len(candidates),
             "selection_reason": selection_reason
             if selected is not None
@@ -1014,8 +1054,13 @@ class VerificationMixin:
             raise ValueError("candidate_limit must be >= 1")
         result = dict(relevance)
         candidates = relevance.get("candidates")
+        selected = relevance.get("selected")
         if isinstance(candidates, list):
-            result["candidates"] = candidates[: min(int(candidate_limit), 16)]
+            result["candidates"] = self._verification_bounded_candidates(
+                candidates,
+                selected if isinstance(selected, Mapping) else None,
+                min(int(candidate_limit), 16),
+            )
         return result
 
     @staticmethod
