@@ -76,6 +76,38 @@ def test_rmw_risk_ignores_function_local_fresh_mapping(tmp_path):
     assert result["findings"] == []
 
 
+def test_rmw_risk_ignores_fresh_os_environ_copy(tmp_path):
+    (tmp_path / "local_env.py").write_text(
+        "import os\n"
+        "def prepare():\n"
+        " env = os.environ.copy()\n"
+        " current = env.get('VALUE')\n"
+        " env.update(VALUE=current or 'default')\n",
+        encoding="utf-8",
+    )
+    with CodeMap(tmp_path) as c:
+        c.sync()
+        result = c.concurrency_risk_findings(["local_env.py"])
+    assert result["findings"] == []
+
+
+def test_rmw_risk_keeps_direct_os_environ_alias(tmp_path):
+    (tmp_path / "shared_env.py").write_text(
+        "import os\n"
+        "def mutate():\n"
+        " env = os.environ\n"
+        " current = env.get('VALUE')\n"
+        " env.update(VALUE=current or 'default')\n",
+        encoding="utf-8",
+    )
+    with CodeMap(tmp_path) as c:
+        c.sync()
+        result = c.concurrency_risk_findings(["shared_env.py"])
+    assert len(result["findings"]) == 1
+    assert result["findings"][0]["read_call"] == "env.get"
+    assert result["findings"][0]["write_call"] == "env.update"
+
+
 def test_rmw_risk_keeps_parameter_owned_mapping(tmp_path):
     (tmp_path / "shared.py").write_text(
         "def merge(store):\n"

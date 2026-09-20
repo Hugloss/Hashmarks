@@ -160,6 +160,11 @@ def _fresh_local_value(node: ast.AST | None) -> bool:
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id in {"dict", "list", "set"}
+    ) or (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "copy"
+        and _name(node.func.value).rsplit(".", 1)[-1] == "environ"
     )
 
 
