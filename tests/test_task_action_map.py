@@ -424,3 +424,29 @@ def test_structural_owner_projection_preserves_unique_qualified_symbol_evidence(
     assert evidence["edit_evidence"]["content"].startswith("def target(value):")
     assert "UnrelatedError" not in evidence["edit_evidence"]["content"]
 
+def test_qualified_identifier_does_not_inherit_plain_same_name_ambiguity(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/bootstrap.py").write_text(
+        "def _require_regular(path):\n"
+        "    return path\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "src/qualification.py").write_text(
+        "def _require_regular(path):\n"
+        "    return path\n",
+        encoding="utf-8",
+    )
+
+    task = "Refactor bootstrap._require_regular without changing behavior"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20)
+
+    assert action["edit"]["path"] == "src/bootstrap.py"
+    assert action["edit"]["name"] == "_require_regular"
+    assert action["edit"]["exact_identifier_projection"] is True
+    assert action["ambiguity"]["ambiguous"] is False
+    assert action["ownership_authority"]["owner_resolved"] is True
+
