@@ -293,3 +293,74 @@ def test_dead_module_alias_call_cannot_claim_direct_verification(tmp_path: Path)
     )
     assert row["direct_reference"] is False
 
+def test_indirect_namespace_candidate_cannot_displace_reference_bound_canonical_verifier() -> None:
+    canonical = {
+        "path": "scripts/tests/test_hosted_dependency_capability.py",
+        "direct_reference": False,
+        "indirect_reference": True,
+        "namespace_overlap": 0,
+        "task_anchor_count": 6,
+        "canonical_rank": 2,
+    }
+    namespace_candidate = {
+        "path": "backend/tests/unit/repository_tooling/test_test_batches.py",
+        "direct_reference": False,
+        "indirect_reference": True,
+        "namespace_overlap": 1,
+        "task_anchor_count": 1,
+        "canonical_rank": None,
+    }
+
+    selected, reason = CodeMap._verification_select_candidate(
+        [namespace_candidate, canonical],
+        canonical["path"],
+    )
+
+    assert selected == canonical
+    assert reason == "canonical-verification"
+
+
+def test_direct_or_unique_indirect_evidence_can_still_improve_weak_canonical_verifier() -> None:
+    indirect_canonical = {
+        "path": "tests/test_canonical.py",
+        "direct_reference": False,
+        "indirect_reference": True,
+        "namespace_overlap": 0,
+        "task_anchor_count": 3,
+        "canonical_rank": 1,
+    }
+    direct = {
+        "path": "tests/test_direct.py",
+        "direct_reference": True,
+        "indirect_reference": False,
+        "namespace_overlap": 0,
+        "task_anchor_count": 1,
+        "canonical_rank": None,
+    }
+    selected, reason = CodeMap._verification_select_candidate(
+        [direct, indirect_canonical],
+        indirect_canonical["path"],
+    )
+    assert selected == direct
+    assert reason == "unique-exact-reference-plus-namespace-locality"
+
+    unbound_canonical = {
+        **indirect_canonical,
+        "direct_reference": False,
+        "indirect_reference": False,
+    }
+    indirect = {
+        "path": "tests/test_wrapper.py",
+        "direct_reference": False,
+        "indirect_reference": True,
+        "namespace_overlap": 0,
+        "task_anchor_count": 1,
+        "canonical_rank": None,
+    }
+    selected, reason = CodeMap._verification_select_candidate(
+        [indirect, unbound_canonical],
+        unbound_canonical["path"],
+    )
+    assert selected == indirect
+    assert reason == "unique-bounded-indirect-reference-plus-namespace-locality"
+
