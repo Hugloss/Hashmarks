@@ -844,6 +844,14 @@ class VerificationMixin:
             return False
         if selected is None or str(best.get("path") or "") == current_path:
             return True
+        selected_has_reference = bool(
+            selected.get("direct_reference") or selected.get("indirect_reference")
+        )
+        best_is_indirect_only = bool(
+            best.get("indirect_reference") and not best.get("direct_reference")
+        )
+        if best_is_indirect_only and selected_has_reference:
+            return False
         return (
             best_score[:2] > cls._verification_candidate_score(selected)[:2]
             or unique_reference
