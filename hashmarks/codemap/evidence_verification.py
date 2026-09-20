@@ -96,10 +96,11 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
         self.bindings.extend(
             (alias.name, alias.asname or alias.name, self.guard) for alias in node.names
         )
-        prefix = "." * int(node.level or 0) + str(node.module or "")
+        prefix = "." * int(node.level or 0)
+        module = str(node.module or "")
         self.module_bindings.extend(
             (
-                ".".join(part for part in (prefix, alias.name) if part),
+                f"{prefix}{module + '.' if module else ''}{alias.name}",
                 alias.asname or alias.name,
                 self.guard,
             )
