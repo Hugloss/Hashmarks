@@ -448,6 +448,24 @@ def _plan_header_reasons(
     return reasons, classification_identity
 
 
+def _plan_unit_metadata(
+    unit: object,
+) -> tuple[list[str], list[str], list[str]]:
+    if not isinstance(unit, Mapping):
+        return [], [], []
+    name = unit.get("name")
+    identity = unit.get("unit_identity")
+    raw_nodeids = unit.get("nodeids")
+    names = [str(name)] if isinstance(name, str) else []
+    identities = [str(identity)] if isinstance(identity, str) else []
+    nodeids = (
+        [str(nodeid) for nodeid in raw_nodeids if isinstance(nodeid, str)]
+        if isinstance(raw_nodeids, list)
+        else []
+    )
+    return names, identities, nodeids
+
+
 def _plan_unit_reasons(
     units: object,
     *,
@@ -464,17 +482,10 @@ def _plan_unit_reasons(
         reasons.extend(
             _unit_reasons(unit, classification_identity=classification_identity)
         )
-        if not isinstance(unit, Mapping):
-            continue
-        if isinstance(unit.get("name"), str):
-            unit_names.append(str(unit["name"]))
-        if isinstance(unit.get("unit_identity"), str):
-            unit_ids.append(str(unit["unit_identity"]))
-        raw_nodeids = unit.get("nodeids")
-        if isinstance(raw_nodeids, list):
-            nodeids.extend(
-                str(nodeid) for nodeid in raw_nodeids if isinstance(nodeid, str)
-            )
+        names, identities, members = _plan_unit_metadata(unit)
+        unit_names.extend(names)
+        unit_ids.extend(identities)
+        nodeids.extend(members)
 
     if unit_names != sorted(unit_names) or len(unit_names) != len(set(unit_names)):
         reasons.append("noncanonical-qualification-units")
