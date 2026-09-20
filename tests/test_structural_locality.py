@@ -195,3 +195,84 @@ def test_structural_locality_requires_exact_symbol_identity(tmp_path: Path) -> N
             assert "path::qualname" in str(exc)
         else:
             raise AssertionError("plain symbol name was accepted as structural-locality authority")
+
+
+def test_structural_locality_does_not_short_name_resolve_qualified_call(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+def helper(value):
+    return value + 1
+
+
+def authority(client, value):
+    return client.helper(value)
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::authority",
+            max_depth=2,
+        )
+
+    assert [row["symbol_id"] for row in packet["nodes"]] == [
+        "pkg/core.py::authority"
+    ]
+    assert packet["dimensions"]["unresolved_call_count"] == 1
+    row = packet["unresolved_calls"][0]
+    assert row["target_text"] == "client.helper"
+    assert row["candidate_symbol_ids"] == ["pkg/core.py::helper"]
+
+
+def test_structural_locality_does_not_resolve_shadowed_plain_call(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+def helper(value):
+    return value + 1
+
+
+def authority(helper, value):
+    return helper(value)
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::authority",
+            max_depth=2,
+        )
+
+    assert [row["symbol_id"] for row in packet["nodes"]] == [
+        "pkg/core.py::authority"
+    ]
+    assert packet["dimensions"]["unresolved_call_count"] == 1
+    assert packet["unresolved_calls"][0]["candidate_symbol_ids"] == [
+        "pkg/core.py::helper"
+    ]
+
+
+def test_structural_locality_delta_rejects_tampered_packet_identity(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/core.py", "def authority():\n    return 1\n")
+    with _codemap(tmp_path) as codemap:
+        before = codemap.structural_locality("pkg/core.py::authority")
+        _write(tmp_path, "pkg/core.py", "def authority():\n    return 2\n")
+        after = codemap.structural_locality("pkg/core.py::authority")
+
+    tampered = dict(after)
+    tampered["repository_identity"] = "sha256:tampered"
+    delta = structural_locality_delta(before, tampered)
+
+    assert delta["comparable"] is False
+    assert "after-evidence-identity" in delta["incomparability_reasons"]
