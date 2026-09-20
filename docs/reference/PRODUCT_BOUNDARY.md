@@ -20,6 +20,8 @@ Hashmarks should be excellent at answering observer questions of the form:
 
 > **What is observable about this repository, how do we know it, how complete/current is that observation, and what changed?**
 
+This includes structural-locality facts useful to external refactoring agents: exact symbol spans, bounded call/caller relationships, forwarding-only syntax, file/symbol navigation closure, related verification paths, ambiguity, and before/after deltas. Hashmarks may expose those facts and their completeness, but it must not decide whether a decomposition is desirable, whether a helper has semantic value, or whether an edit should be made.
+
 Hashmarks must not evolve into the system that decides or performs the consumer's work.
 
 The permanent ownership split is:
