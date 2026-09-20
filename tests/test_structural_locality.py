@@ -303,3 +303,69 @@ def test_structural_locality_exact_callers_are_positive_reuse_evidence(
         ("pkg/b.py", "use_b"),
     }
     assert packet["dimensions"]["target_exact_caller_count"] == 2
+
+
+def test_structural_locality_resolves_unshadowed_local_class_method(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+class Worker:
+    @staticmethod
+    def helper(value):
+        return value + 1
+
+
+def authority(value):
+    return Worker.helper(value)
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::authority",
+            max_depth=2,
+        )
+
+    assert {row["symbol_id"] for row in packet["nodes"]} == {
+        "pkg/core.py::authority",
+        "pkg/core.py::Worker.helper",
+    }
+    assert packet["dimensions"]["unresolved_call_count"] == 0
+
+
+def test_structural_locality_does_not_resolve_shadowed_qualified_call(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+class Worker:
+    @staticmethod
+    def helper(value):
+        return value + 1
+
+
+def authority(Worker, value):
+    return Worker.helper(value)
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::authority",
+            max_depth=2,
+        )
+
+    assert [row["symbol_id"] for row in packet["nodes"]] == [
+        "pkg/core.py::authority"
+    ]
+    assert packet["dimensions"]["unresolved_call_count"] == 1
+    row = packet["unresolved_calls"][0]
+    assert row["target_text"] == "Worker.helper"
+    assert row["candidate_symbol_ids"] == ["pkg/core.py::Worker.helper"]
