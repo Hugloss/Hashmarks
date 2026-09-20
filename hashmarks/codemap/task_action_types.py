@@ -78,6 +78,19 @@ class _TaskActionMapContext:
 
 
 @dataclass
+class _TaskActionInitialSurfaceState:
+    edit: dict[str, object] | None
+    verify: dict[str, object] | None
+    contract: dict[str, object] | None
+    explicit_surface_ambiguity: bool
+    explicit_edit_surface_selected: bool
+    verification_anchor_tokens: Sequence[str]
+    literal_reference_owner: dict[str, object] | None
+    localized_config_edit: bool
+    explicit_config_surface_request: bool
+
+
+@dataclass
 class _TaskActionSelectionState:
     edit: dict[str, object] | None
     verify: dict[str, object] | None
