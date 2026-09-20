@@ -80,6 +80,8 @@ def test_authority():
     assert packet["dimensions"]["max_navigation_depth"] == 2
     assert packet["dimensions"]["forwarding_only_symbol_count"] == 1
     assert packet["dimensions"]["unresolved_call_count"] == 0
+    assert packet["dimensions"]["external_or_unindexed_call_count"] == 1
+    assert packet["external_or_unindexed_calls"][0]["target_text"] == "ValueError"
     assert "tests/test_core.py" in packet["verification_paths"]
     assert str(packet["repository_identity"]).startswith("sha256:")
     assert str(packet["source_identity"]).startswith("sha256:")
