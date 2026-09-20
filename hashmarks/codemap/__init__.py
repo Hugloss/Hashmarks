@@ -21,6 +21,7 @@ from .project_impact_codec import (
     expand_project_impact,
 )
 from .service import CodeMapService, CodeMapServiceClient, default_codemap_socket
+from .structural_locality import structural_locality_delta
 from .worktree_overlay import WorktreeOverlay
 
 __all__ = [
@@ -36,6 +37,7 @@ __all__ = [
     "SearchHit",
     "SyncResult",
     "WorktreeOverlay",
+    "structural_locality_delta",
     "COMPACT_PROJECT_IMPACT_SCHEMA",
     "compact_project_impact",
     "expand_project_impact",
