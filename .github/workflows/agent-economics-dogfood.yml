@@ -1,0 +1,71 @@
+name: Agent Economics dogfood
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  complexity-evidence:
+    if: github.head_ref == 'ruff-complexity-cleanup'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.11
+
+      - name: Install Hashmarks Ruff supply
+        run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --only-group lint --python 3.11
+
+      - name: Checkout exact agentsCookbook authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Hugloss/agentsCookbook
+          ref: f8506ba311a0e83b1fa7b5b93d0a80aae7e2d4d0
+          path: .agentsCookbook
+          persist-credentials: false
+
+      - name: Agent Economics quality-debt
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
+        run: |
+          export PATH="$PWD/.ruff-venv/bin:$PATH"
+          python3 -m agent_economics quality-debt \
+            --repository-root . \
+            --root hashmarks \
+            --root scripts \
+            --root benchmarks \
+            --exclude benchmarks/agent_evaluation/retained \
+            --limit C901=8 \
+            --limit PLR0911=6 \
+            --limit PLR0912=8 \
+            --limit PLR0913=6 \
+            --limit PLR0914=15 \
+            --limit PLR0915=40 \
+            --limit PLR0916=5 \
+            --max-file-lines 1600 \
+            --file-line-root hashmarks \
+            --artifact .agent-artifacts/quality-debt.json \
+            --format json
+
+      - name: Agent Economics test-focus
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
+        run: |
+          python3 -m agent_economics test-focus \
+            --repository-root . \
+            --source-root hashmarks \
+            --tests-root tests \
+            --changed-path hashmarks/codemap/freshness_map.py \
+            --package-name hashmarks \
+            --gate 'focused=uv run --no-sync python -m pytest -q tests/test_evidence_freshness_map.py tests/test_evidence_freshness_bounds.py tests/test_evidence_freshness_responsibility.py' \
+            --gate 'repository=make test' \
+            --artifact .agent-artifacts/test-focus.json \
+            --format json
