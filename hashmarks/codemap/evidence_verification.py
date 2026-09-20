@@ -689,9 +689,25 @@ class VerificationMixin:
         direct_reference_candidates = [
             row for row in candidates if bool(row.get("direct_reference"))
         ]
-        unique_reference = len(direct_reference_candidates) == 1 and (
-            selected is None or not bool(selected.get("direct_reference"))
-        )
+        if direct_reference_candidates:
+            unique_reference = len(direct_reference_candidates) == 1 and (
+                selected is None or not bool(selected.get("direct_reference"))
+            )
+        else:
+            indirect_reference_candidates = [
+                row for row in candidates if bool(row.get("indirect_reference"))
+            ]
+            selected_has_reference = bool(
+                isinstance(selected, Mapping)
+                and (
+                    selected.get("direct_reference")
+                    or selected.get("indirect_reference")
+                )
+            )
+            unique_reference = (
+                len(indirect_reference_candidates) == 1
+                and not selected_has_reference
+            )
         if cls._verification_best_can_replace(
             best, selected, unique_reference, current_path
         ):
