@@ -274,3 +274,80 @@ def test_task_action_map_reuses_primary_structural_owner_for_ambiguity(
 
     assert action["edit"]["path"] == "src/widget.py"
     assert calls.count("tests/test_widget.py") == 1
+
+def test_qualified_module_function_target_wins_over_lexically_stronger_sibling(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/repository_understanding_policy.py").write_text(
+        "from src._repository_understanding_policy_primitives import prepare\n\n"
+        "def evaluate(value):\n"
+        "    return prepare(value)\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "src/_repository_understanding_policy_primitives.py").write_text(
+        "def prepare(value):\n"
+        "    return value\n\n"
+        "def refactor_repository_understanding_policy_evaluate_without_changing_behavior():\n"
+        "    return True\n",
+        encoding="utf-8",
+    )
+
+    task = (
+        "Refactor repository_understanding_policy.evaluate "
+        "without changing behavior"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20)
+
+    assert action["edit"]["path"] == "src/repository_understanding_policy.py"
+    assert action["edit"]["name"] == "evaluate"
+    assert action["edit"]["exact_identifier_projection"] is True
+
+
+def test_qualified_module_function_target_stays_ambiguous_across_duplicate_modules(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src/a").mkdir(parents=True)
+    (tmp_path / "src/b").mkdir(parents=True)
+    for package in ("a", "b"):
+        (tmp_path / f"src/{package}/repository_understanding_policy.py").write_text(
+            "def evaluate(value):\n"
+            "    return value\n",
+            encoding="utf-8",
+        )
+
+    task = (
+        "Refactor repository_understanding_policy.evaluate "
+        "without changing behavior"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20)
+
+    assert action["ambiguity"]["ambiguous"] is True
+    assert action["ambiguity"]["reason"] == "multiple-exact-identifier-edit-owners"
+    assert action["ownership_authority"]["owner_resolved"] is False
+
+
+def test_qualified_module_function_does_not_match_wrong_module(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/policy.py").write_text(
+        "def evaluate(value):\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+
+    task = "Refactor missing_policy.evaluate without changing behavior"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        context = codemap._task_action_map_context(task, 20)
+        candidates = codemap._task_action_exact_identifier_edit_candidates(
+            task, context.rows, context.failed
+        )
+
+    assert candidates == []
+

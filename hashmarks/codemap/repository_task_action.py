@@ -700,6 +700,62 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 exact_row_paths.setdefault(name, set()).add(path)
         return {token for token, paths in exact_row_paths.items() if len(paths) > 1}
 
+    @staticmethod
+    def _task_action_path_module_aliases(path: str) -> set[str]:
+        module_parts = Path(path).with_suffix("").parts
+        aliases = {Path(path).stem.lower()}
+        aliases.update(
+            ".".join(part.lower() for part in module_parts[index:])
+            for index in range(len(module_parts))
+        )
+        return {alias for alias in aliases if alias}
+
+    def _task_action_qualified_identifier_matches_symbol(
+        self,
+        path: str,
+        symbol: Mapping[str, object],
+        qualified_terms: Sequence[str],
+    ) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        identities = tuple(
+            dict.fromkeys(
+                value.lower()
+                for value in (
+                    str(symbol.get("qualname") or ""),
+                    str(symbol.get("name") or ""),
+                )
+                if value
+            )
+        )
+        if not identities:
+            return False
+
+        module_aliases = self._task_action_path_module_aliases(path)
+        file_row = self._session_file_row(path)
+        module_name = (
+            str(file_row.get("module_name") or "").lower()
+            if isinstance(file_row, Mapping)
+            else ""
+        )
+        if module_name:
+            module_aliases.add(module_name)
+
+        for term in qualified_terms:
+            lowered = term.lower()
+            for identity in identities:
+                if lowered == identity:
+                    return True
+                suffix = f".{identity}"
+                if not lowered.endswith(suffix):
+                    continue
+                qualifier = lowered[: -len(suffix)]
+                if qualifier in module_aliases:
+                    return True
+                if module_name and module_name.endswith(f".{qualifier}"):
+                    return True
+        return False
+
     def _task_action_exact_identifier_edit_candidates(
         self,
         task: str,
@@ -715,6 +771,11 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         terms = set(self._task_action_exact_identifier_terms(task))
+        qualified_terms = tuple(
+            dict.fromkeys(
+                value.lower() for value in _QUALIFIED_IDENTIFIER_RE.findall(task)
+            )
+        )
         # A plain method name can still be an exact identifier even when it lacks
         # underscore/case cues (for example ``close`` or ``resolve``).  Promote
         # such a token only as an ambiguity signal when canonical retrieval
@@ -734,6 +795,9 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 for symbol in self._session_symbols_for_path(path)
                 if str(symbol.get("name") or "").lower() in terms
                 or str(symbol.get("qualname") or "").lower() in terms
+                or self._task_action_qualified_identifier_matches_symbol(
+                    path, symbol, qualified_terms
+                )
             ]
             if not matches:
                 continue

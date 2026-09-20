@@ -5,7 +5,7 @@ import hashlib
 import json
 import os
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -53,21 +53,28 @@ class _VerificationRelevanceState:
     indirect_via_paths: dict[str, set[str]]
     source_ref_paths: set[str]
     unresolved_import_identity_paths: set[str]
+    reference_indexes: dict[str, _VerificationReferenceIndex | None] = field(
+        default_factory=dict
+    )
 
 
 @dataclass(frozen=True)
 class _VerificationReferenceIndex:
     bindings: tuple[tuple[str, str, str | None], ...]
+    module_bindings: tuple[tuple[str, str, str | None], ...]
     reachable_names: frozenset[str]
     reachable_attributes: frozenset[str]
+    reachable_attribute_chains: frozenset[str]
 
 
 class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
     def __init__(self) -> None:
         self.guard: str | None = None
         self.bindings: list[tuple[str, str, str | None]] = []
+        self.module_bindings: list[tuple[str, str, str | None]] = []
         self.reachable_names: set[str] = set()
         self.reachable_attributes: set[str] = set()
+        self.reachable_attribute_chains: set[str] = set()
 
     @staticmethod
     def _guard_kind(test: ast.expr) -> str | None:
@@ -92,6 +99,38 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
         self.bindings.extend(
             (alias.name, alias.asname or alias.name, self.guard) for alias in node.names
         )
+        prefix = "." * int(node.level or 0)
+        module = str(node.module or "")
+        self.module_bindings.extend(
+            (
+                f"{prefix}{module + '.' if module else ''}{alias.name}",
+                alias.asname or alias.name,
+                self.guard,
+            )
+            for alias in node.names
+        )
+
+    def visit_Import(self, node: ast.Import) -> None:
+        self.module_bindings.extend(
+            (
+                alias.name,
+                alias.asname or alias.name.split(".", 1)[0],
+                self.guard,
+            )
+            for alias in node.names
+        )
+
+    @staticmethod
+    def _attribute_chain(node: ast.Attribute) -> str | None:
+        parts = [node.attr]
+        value: ast.expr = node.value
+        while isinstance(value, ast.Attribute):
+            parts.append(value.attr)
+            value = value.value
+        if not isinstance(value, ast.Name):
+            return None
+        parts.append(value.id)
+        return ".".join(reversed(parts))
 
     def visit_Name(self, node: ast.Name) -> None:
         if self.guard is None and isinstance(node.ctx, ast.Load):
@@ -100,6 +139,9 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
     def visit_Attribute(self, node: ast.Attribute) -> None:
         if self.guard is None and isinstance(node.ctx, ast.Load):
             self.reachable_attributes.add(node.attr)
+            chain = self._attribute_chain(node)
+            if chain:
+                self.reachable_attribute_chains.add(chain)
         self.generic_visit(node)
 
 
@@ -119,8 +161,10 @@ def _verification_reference_index(
     visitor.visit(tree)
     return _VerificationReferenceIndex(
         bindings=tuple(visitor.bindings),
+        module_bindings=tuple(visitor.module_bindings),
         reachable_names=frozenset(visitor.reachable_names),
         reachable_attributes=frozenset(visitor.reachable_attributes),
+        reachable_attribute_chains=frozenset(visitor.reachable_attribute_chains),
     )
 
 
@@ -210,6 +254,7 @@ class VerificationMixin:
             indirect_via_paths={},
             source_ref_paths=set(),
             unresolved_import_identity_paths=set(),
+            reference_indexes={},
         )
 
     @staticmethod
@@ -361,6 +406,59 @@ class VerificationMixin:
                 exact_import_paths.add(ref_path)
         return exact_import_paths, import_resolution_available
 
+    def _verification_reference_index_for_path(
+        self,
+        state: _VerificationRelevanceState | None,
+        path: str,
+    ) -> _VerificationReferenceIndex | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if state is not None and path in state.reference_indexes:
+            return state.reference_indexes[path]
+        try:
+            snapshot = read_python_ast(self.workspace / path)
+            index = _verification_reference_index(
+                os.path.abspath(os.fspath(self.workspace / path)),
+                snapshot.identity,
+                snapshot.tree,
+            )
+        except (OSError, SyntaxError):
+            index = None
+        if state is not None:
+            state.reference_indexes[path] = index
+        return index
+
+    def _verification_module_alias_reference_owner_match(
+        self,
+        state: _VerificationRelevanceState,
+        ref_path: str,
+        target: str,
+    ) -> bool | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if not ref_path.endswith(".py") or "." not in target:
+            return None
+        index = self._verification_reference_index_for_path(state, ref_path)
+        if index is None:
+            return None
+        if target not in index.reachable_attribute_chains:
+            return None
+
+        bound_name = target.split(".", 1)[0]
+        resolved_alias = False
+        for module_target, alias, guard in index.module_bindings:
+            if guard is not None or alias != bound_name or not module_target:
+                continue
+            resolved_paths = self._verification_resolved_import_paths(
+                state, ref_path, module_target
+            )
+            if not resolved_paths:
+                continue
+            resolved_alias = True
+            if state.edit_path in resolved_paths:
+                return True
+        return False if resolved_alias else None
+
     def _verification_collect_direct_symbol_refs(
         self,
         state: _VerificationRelevanceState,
@@ -376,9 +474,19 @@ class VerificationMixin:
             if not path or not self._verification_ref_visible(ref):
                 continue
             short_match = str(ref.get("target_short") or "") == short
-            exact_reference = (
-                path in exact_import_paths if resolution_available else short_match
+            alias_owner_match = (
+                self._verification_module_alias_reference_owner_match(
+                    state, path, str(ref.get("target") or "")
+                )
+                if short_match
+                else None
             )
+            if alias_owner_match is not None:
+                exact_reference = alias_owner_match
+            else:
+                exact_reference = (
+                    path in exact_import_paths if resolution_available else short_match
+                )
             if not short_match or not exact_reference:
                 if RepositoryDomain.TEST in set(classify_repository_path(path)):
                     state.candidate_paths.add(path)
@@ -555,7 +663,11 @@ class VerificationMixin:
         }
 
     def _verification_reference_strength(
-        self, path: str, symbols: Sequence[str]
+        self,
+        path: str,
+        symbols: Sequence[str],
+        *,
+        state: _VerificationRelevanceState | None = None,
     ) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -565,14 +677,8 @@ class VerificationMixin:
                 "syntactic_reference": bool(symbols),
                 "reference_strength": strength,
             }
-        try:
-            snapshot = read_python_ast(self.workspace / path)
-            index = _verification_reference_index(
-                os.path.abspath(os.fspath(self.workspace / path)),
-                snapshot.identity,
-                snapshot.tree,
-            )
-        except (OSError, SyntaxError):
+        index = self._verification_reference_index_for_path(state, path)
+        if index is None:
             return {"syntactic_reference": True, "reference_strength": "syntactic"}
         return self._verification_index_strength(index, symbols)
 
@@ -600,7 +706,9 @@ class VerificationMixin:
         )
         direct_symbols = sorted(state.refs_by_path.get(path, set()))
         indirect_symbols = sorted(state.indirect_refs_by_path.get(path, set()))
-        reference = self._verification_reference_strength(path, direct_symbols)
+        reference = self._verification_reference_strength(
+            path, direct_symbols, state=state
+        )
         direct_reference = reference.get("reference_strength") == "reachable-symbol-use"
         return {
             "path": path,
