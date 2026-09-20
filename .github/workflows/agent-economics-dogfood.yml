@@ -74,6 +74,22 @@ jobs:
             --config 'lint.pylint.max-bool-expr = 5' \
             --output-format concise || true
 
+      - name: Compare broad and targeted Ruff JSON
+        run: |
+          export PATH="$PWD/.ruff-venv/bin:$PATH"
+          COMMON=(--preview --select C901,PLR0911,PLR0912,PLR0913,PLR0914,PLR0915,PLR0916 --isolated --config 'lint.per-file-ignores = {}' --config 'lint.mccabe.max-complexity = 8' --config 'lint.pylint.max-returns = 6' --config 'lint.pylint.max-branches = 8' --config 'lint.pylint.max-args = 6' --config 'lint.pylint.max-locals = 15' --config 'lint.pylint.max-statements = 40' --config 'lint.pylint.max-bool-expr = 5' --output-format json)
+          .ruff-venv/bin/ruff check hashmarks scripts benchmarks "${COMMON[@]}" --exclude benchmarks/agent_evaluation/retained > /tmp/broad.json || true
+          .ruff-venv/bin/ruff check hashmarks/qualification_units.py hashmarks/codemap/work_context.py "${COMMON[@]}" > /tmp/target.json || true
+          python3 - <<'PY'
+          import json
+          from collections import Counter
+          for name in ("broad", "target"):
+              rows = json.load(open(f"/tmp/{name}.json"))
+              wanted = [row for row in rows if row["filename"].endswith(("hashmarks/qualification_units.py", "hashmarks/codemap/work_context.py"))]
+              print(name, "total", len(rows), "wanted", len(wanted))
+              print(name, Counter((row["code"], row["filename"].split("/Hashmarks/")[-1], row["location"]["row"]) for row in wanted))
+          PY
+
       - name: Agent Economics test-focus
         env:
           PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
