@@ -55,6 +55,23 @@ jobs:
             --artifact .agent-artifacts/quality-debt.json \
             --format json
 
+      - name: Raw Ruff target diagnostics
+        run: |
+          export PATH="$PWD/.ruff-venv/bin:$PATH"
+          ruff check \
+            hashmarks/qualification_units.py \
+            hashmarks/codemap/work_context.py \
+            --preview \
+            --select C901,PLR0911,PLR0912,PLR0913,PLR0914,PLR0915,PLR0916 \
+            --config 'lint.mccabe.max-complexity = 8' \
+            --config 'lint.pylint.max-returns = 6' \
+            --config 'lint.pylint.max-branches = 8' \
+            --config 'lint.pylint.max-args = 6' \
+            --config 'lint.pylint.max-locals = 15' \
+            --config 'lint.pylint.max-statements = 40' \
+            --config 'lint.pylint.max-bool-expr = 5' \
+            --output-format concise || true
+
       - name: Agent Economics test-focus
         env:
           PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
