@@ -553,6 +553,54 @@ class QuerySurfaceMixin:
             "ranking_effect": "none",
         }
 
+    @staticmethod
+    def _change_impact_depths(
+        roots: set[str],
+        levels: list[list[str]],
+    ) -> dict[str, int]:
+        depth_by_path: dict[str, int] = dict.fromkeys(roots, 0)
+        for depth, level in enumerate(levels, start=1):
+            for path in level:
+                depth_by_path.setdefault(path, depth)
+        return depth_by_path
+
+    def _change_impact_adjacency(
+        self,
+        query: str,
+        roots: set[str],
+        *,
+        limit_per_surface: int,
+    ) -> dict[str, object]:
+        adjacency_limit = max(12, limit_per_surface * 2)
+        exact_path_roots = self._query_paths(query)
+        if len(exact_path_roots) == 1 and exact_path_roots == roots:
+            try:
+                normalized_query = normalize_relative_path(query, allow_root=False)
+            except ValueError:
+                normalized_query = ""
+            if normalized_query in roots:
+                return self._path_graph_adjacency(
+                    query,
+                    roots,
+                    limit=adjacency_limit,
+                )
+        return self.task_graph_adjacency(
+            query,
+            seed_limit=min(12, max(4, limit_per_surface)),
+            limit=adjacency_limit,
+        )
+
+    @staticmethod
+    def _change_impact_relation(row: dict[str, object]) -> str | None:
+        provenance_rows = row.get("provenance")
+        if (
+            isinstance(provenance_rows, list)
+            and provenance_rows
+            and isinstance(provenance_rows[0], dict)
+        ):
+            return str(provenance_rows[0].get("relation") or "") or None
+        return None
+
     def change_impact(
         self, query: str, *, max_depth: int = 4, limit_per_surface: int = 20
     ) -> dict[str, object]:
@@ -570,110 +618,32 @@ class QuerySurfaceMixin:
         value = self.affected(query, max_depth=max_depth)
         roots = {str(path) for path in value["roots"]}
         levels = [list(map(str, level)) for level in value["levels"]]
-        depth_by_path: dict[str, int] = dict.fromkeys(roots, 0)
-        for depth, level in enumerate(levels, start=1):
-            for path in level:
-                depth_by_path.setdefault(path, depth)
+        depth_by_path = self._change_impact_depths(roots, levels)
+        accumulator = _ChangeImpactAccumulator(roots, limit_per_surface)
 
-        def roles(path: str) -> tuple[str, ...]:
-            domains = set(classify_repository_path(path))
-            out: list[str] = []
-            if RepositoryDomain.TEST in domains:
-                out.append("verification")
-            if domains & {RepositoryDomain.CONTRACT, RepositoryDomain.OWNERSHIP}:
-                out.append("contract")
-            if domains & {
-                RepositoryDomain.BUILD,
-                RepositoryDomain.CONFIG,
-                RepositoryDomain.PLAN,
-                RepositoryDomain.SCRIPT,
-            }:
-                out.append("build_config")
-            if domains & {RepositoryDomain.ARCHITECTURE, RepositoryDomain.DOC}:
-                out.append("orientation")
-            if (
-                RepositoryDomain.SOURCE in domains
-                and RepositoryDomain.TEST not in domains
-            ):
-                out.append("implementation")
-            return tuple(dict.fromkeys(out)) or ("other",)
-
-        surfaces: dict[str, list[dict[str, object]]] = {
-            key: []
-            for key in (
-                "implementation",
-                "contract",
-                "verification",
-                "build_config",
-                "orientation",
-                "other",
+        for path in sorted(
+            depth_by_path,
+            key=lambda item: (depth_by_path[item], item),
+        ):
+            accumulator.add(
+                path,
+                depth=depth_by_path[path],
+                provenance="reverse-file-graph",
             )
-        }
-        seen: set[tuple[str, str]] = set()
 
-        def add(
-            path: str, *, depth: int, provenance: str, relation: str | None = None
-        ) -> None:
-            if path in roots:
-                return
-            domains = [domain.value for domain in classify_repository_path(path)]
-            for role in roles(path):
-                key = (role, path)
-                if key in seen or len(surfaces[role]) >= limit_per_surface:
-                    continue
-                row: dict[str, object] = {
-                    "path": path,
-                    "depth": depth,
-                    "domains": domains,
-                    "provenance": provenance,
-                }
-                if relation is not None:
-                    row["relation"] = relation
-                surfaces[role].append(row)
-                seen.add(key)
-
-        for path in sorted(depth_by_path, key=lambda item: (depth_by_path[item], item)):
-            add(path, depth=depth_by_path[path], provenance="reverse-file-graph")
-
-        adjacency_limit = max(12, limit_per_surface * 2)
-        exact_path_roots = self._query_paths(query)
-        if len(exact_path_roots) == 1 and exact_path_roots == roots:
-            try:
-                normalized_query = normalize_relative_path(query, allow_root=False)
-            except ValueError:
-                normalized_query = ""
-            if normalized_query in roots:
-                adjacency = self._path_graph_adjacency(
-                    query, roots, limit=adjacency_limit
-                )
-            else:
-                adjacency = self.task_graph_adjacency(
-                    query,
-                    seed_limit=min(12, max(4, limit_per_surface)),
-                    limit=adjacency_limit,
-                )
-        else:
-            adjacency = self.task_graph_adjacency(
-                query,
-                seed_limit=min(12, max(4, limit_per_surface)),
-                limit=adjacency_limit,
-            )
+        adjacency = self._change_impact_adjacency(
+            query,
+            roots,
+            limit_per_surface=limit_per_surface,
+        )
         for row in adjacency["adjacent"]:
             if not isinstance(row, dict):
                 continue
-            provenance_rows = row.get("provenance")
-            relation = None
-            if (
-                isinstance(provenance_rows, list)
-                and provenance_rows
-                and isinstance(provenance_rows[0], dict)
-            ):
-                relation = str(provenance_rows[0].get("relation") or "") or None
-            add(
+            accumulator.add(
                 str(row.get("path") or ""),
                 depth=1,
                 provenance="task-graph-adjacency",
-                relation=relation,
+                relation=self._change_impact_relation(row),
             )
 
         return {
@@ -683,7 +653,7 @@ class QuerySurfaceMixin:
             "identity_generation": value["identity_generation"],
             "stale": value["stale"],
             "roots": sorted(roots),
-            "surfaces": surfaces,
+            "surfaces": accumulator.surfaces,
             "affected_projects": value["affected_projects"],
             "root_projects": value["root_projects"],
             "bounds": {
@@ -694,3 +664,4 @@ class QuerySurfaceMixin:
             "evidence": value["evidence"] + "; plus bounded task graph adjacency",
             "authority": "advisory-navigation-only",
         }
+
