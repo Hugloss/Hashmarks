@@ -686,11 +686,11 @@ class VerificationMixin:
         if not candidates:
             return selected, reason
         best = candidates[0]
-        reference_candidates = [
-            row for row in candidates if cls._verification_candidate_score(row)[0] > 0
+        direct_reference_candidates = [
+            row for row in candidates if bool(row.get("direct_reference"))
         ]
-        unique_reference = len(reference_candidates) == 1 and (
-            selected is None or cls._verification_candidate_score(selected)[0] == 0
+        unique_reference = len(direct_reference_candidates) == 1 and (
+            selected is None or not bool(selected.get("direct_reference"))
         )
         if cls._verification_best_can_replace(
             best, selected, unique_reference, current_path
