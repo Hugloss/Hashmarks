@@ -275,7 +275,7 @@ class StructuralLocalityMixin:
         name = str(row["name"])
         target_id = _symbol_id(row)
         raw_refs = [dict(ref) for ref in self.store.refs(name, limit=ref_limit)]
-        complete = len(raw_refs) < ref_limit
+        reference_bound_complete = len(raw_refs) < ref_limit
         raw = [
             ref for ref in raw_refs if str(ref.get("kind") or "") == "call"
         ]
@@ -304,7 +304,7 @@ class StructuralLocalityMixin:
             }
         return (
             [callers[key] for key in sorted(callers)],
-            complete,
+            reference_bound_complete,
             sorted(
                 unresolved,
                 key=lambda item: (
@@ -336,7 +336,7 @@ class StructuralLocalityMixin:
                 start_line=int(row["start_line"]),
                 name=str(row["name"]),
             )
-        callers, caller_count_complete, unresolved_callers = self._locality_callers(
+        callers, caller_reference_bound_complete, unresolved_callers = self._locality_callers(
             row, ref_limit=ref_limit
         )
         source_semantic = {
@@ -356,9 +356,9 @@ class StructuralLocalityMixin:
             "file_digest": digest,
             "forwarding_only": forwarding,
             "forwarding_provider": forwarding_provider,
-            "meaningful_callers": callers,
-            "meaningful_caller_count": len(callers),
-            "caller_count_complete": caller_count_complete,
+            "exact_callers": callers,
+            "exact_caller_count": len(callers),
+            "caller_reference_bound_complete": caller_reference_bound_complete,
             "unresolved_caller_candidates": unresolved_callers,
         }
         return {
@@ -483,8 +483,8 @@ class StructuralLocalityMixin:
             ),
             "unresolved_call_count": len(unresolved_calls),
             "external_or_unindexed_call_count": len(external_or_unindexed_calls),
-            "target_meaningful_caller_count": int(
-                nodes[_symbol_id(target_row)]["meaningful_caller_count"]
+            "target_exact_caller_count": int(
+                nodes[_symbol_id(target_row)]["exact_caller_count"]
             ),
         }
         repository_identity = "sha256:" + self._workspace_fingerprint_from_store()
