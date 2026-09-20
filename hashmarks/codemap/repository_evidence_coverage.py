@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.client import RepositoryObservation
@@ -9,6 +10,37 @@ from hashmarks.paths import normalize_relative_path
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+
+
+@dataclass
+class _CoverageBindingChanges:
+    direct_changed: set[str] = field(default_factory=set)
+    member_only: set[str] = field(default_factory=set)
+    member_added: set[str] = field(default_factory=set)
+    member_removed: set[str] = field(default_factory=set)
+    member_state_changed: set[str] = field(default_factory=set)
+    locator_changed: set[str] = field(default_factory=set)
+
+    def bound_to(self, bound_members: set[str]) -> "_CoverageBindingChanges":
+        direct_changed = self.direct_changed & bound_members
+        return _CoverageBindingChanges(
+            direct_changed=direct_changed,
+            member_only=(self.member_only & bound_members) - direct_changed,
+            member_added=self.member_added & bound_members,
+            member_removed=self.member_removed & bound_members,
+            member_state_changed=self.member_state_changed & bound_members,
+            locator_changed=self.locator_changed & bound_members,
+        )
+
+    def classified_paths(self) -> set[str]:
+        return (
+            self.direct_changed
+            | self.member_only
+            | self.member_added
+            | self.member_removed
+            | self.member_state_changed
+            | self.locator_changed
+        )
 
 
 class RepositoryEvidenceCoverageMixin:
@@ -62,6 +94,120 @@ class RepositoryEvidenceCoverageMixin:
             if isinstance(row, Mapping) and row.get("binding_id")
         }
 
+    @staticmethod
+    def _binding_paths(
+        binding: Mapping[str, object],
+    ) -> tuple[set[str], set[str]]:
+        evidence = binding.get("evidence")
+        dependencies = binding.get("dependencies")
+        evidence_paths = (
+            {
+                str(row.get("path") or "")
+                for row in evidence
+                if isinstance(row, Mapping) and row.get("path")
+            }
+            if isinstance(evidence, list)
+            else set()
+        )
+        dependency_paths = (
+            {
+                str(row.get("path") or "")
+                for row in dependencies
+                if isinstance(row, Mapping) and row.get("path")
+            }
+            if isinstance(dependencies, list)
+            else set()
+        )
+        return evidence_paths, dependency_paths
+
+    @classmethod
+    def _direct_binding_impact_reasons(
+        cls,
+        detail: Mapping[str, object],
+    ) -> set[str]:
+        reasons: set[str] = set()
+        direct = detail.get("direct_evidence")
+        if isinstance(direct, Mapping) and direct.get("state") == "changed":
+            direct_changes = direct.get("changes")
+            scopes = (
+                {
+                    str(change.get("scope") or "lines")
+                    for change in direct_changes
+                    if isinstance(change, Mapping)
+                }
+                if isinstance(direct_changes, list)
+                else {"lines"}
+            )
+            if "member" in scopes:
+                reasons.add("bound-member-content-changed")
+            if "lines" in scopes:
+                reasons.add("bound-range-content-changed")
+
+        locator = detail.get("locator_evidence")
+        if isinstance(locator, Mapping) and locator.get("state") == "changed":
+            reasons.add("bound-locator-changed")
+
+        member = detail.get("member_evidence")
+        member_changes = member.get("changes") if isinstance(member, Mapping) else None
+        if isinstance(member_changes, list):
+            for change in member_changes:
+                if not isinstance(change, Mapping):
+                    continue
+                transition = str(change.get("state") or "changed")
+                reasons.add(
+                    {
+                        "removed": "bound-member-removed",
+                        "added": "bound-member-added",
+                        "state-changed": "bound-member-observation-state-changed",
+                    }.get(transition, "bound-member-changed")
+                )
+
+        declared = detail.get("declared_dependencies")
+        if isinstance(declared, Mapping) and declared.get("state") == "affected":
+            reasons.add("declared-dependency-changed")
+
+        definition = detail.get("definition")
+        if isinstance(definition, Mapping) and definition.get("state") == "changed":
+            reasons.add("binding-definition-changed")
+        return reasons
+
+    @staticmethod
+    def _relationship_binding_impact_reasons(
+        detail: Mapping[str, object],
+    ) -> set[str]:
+        relationships = detail.get("relationship_evidence")
+        if not isinstance(relationships, Mapping):
+            return set()
+
+        reasons: set[str] = set()
+        facts = relationships.get("facts")
+        if isinstance(facts, Mapping) and facts.get("state") == "changed":
+            reasons.add("relationship-evidence-changed")
+
+        locators = relationships.get("locators")
+        if isinstance(locators, Mapping) and locators.get("state") == "changed":
+            reasons.add("relationship-locator-changed")
+
+        observation = relationships.get("observation")
+        if (
+            isinstance(observation, Mapping)
+            and observation.get("changed") is True
+            and relationships.get("comparability")
+            == "observation-configuration-changed"
+        ):
+            reasons.add("relationship-observation-config-changed")
+        return reasons
+
+    @classmethod
+    def _binding_impact_reasons(
+        cls,
+        detail: Mapping[str, object],
+    ) -> set[str]:
+        return (
+            cls._direct_binding_impact_reasons(detail)
+            | cls._relationship_binding_impact_reasons(detail)
+        )
+
     @classmethod
     def _binding_impacts(
         cls,
@@ -73,87 +219,19 @@ class RepositoryEvidenceCoverageMixin:
         result: list[dict[str, object]] = []
         for binding in cls._binding_rows(packet):
             binding_id = str(binding.get("binding_id") or "")
-            evidence = binding.get("evidence")
-            dependencies = binding.get("dependencies")
-            evidence_paths = {
-                str(row.get("path") or "")
-                for row in evidence
-                if isinstance(row, Mapping) and row.get("path")
-            } if isinstance(evidence, list) else set()
-            dependency_paths = {
-                str(row.get("path") or "")
-                for row in dependencies
-                if isinstance(row, Mapping) and row.get("path")
-            } if isinstance(dependencies, list) else set()
-            reasons: set[str] = set()
+            evidence_paths, dependency_paths = cls._binding_paths(binding)
             detail = changed_bindings.get(binding_id)
-            if detail is not None:
-                direct = detail.get("direct_evidence")
-                locator = detail.get("locator_evidence")
-                member = detail.get("member_evidence")
-                declared = detail.get("declared_dependencies")
-                relationships = detail.get("relationship_evidence")
-                definition = detail.get("definition")
-
-                if isinstance(direct, Mapping) and direct.get("state") == "changed":
-                    direct_changes = direct.get("changes")
-                    scopes = {
-                        str(change.get("scope") or "lines")
-                        for change in direct_changes
-                        if isinstance(change, Mapping)
-                    } if isinstance(direct_changes, list) else {"lines"}
-                    if "member" in scopes:
-                        reasons.add("bound-member-content-changed")
-                    if "lines" in scopes:
-                        reasons.add("bound-range-content-changed")
-
-                if isinstance(locator, Mapping) and locator.get("state") == "changed":
-                    reasons.add("bound-locator-changed")
-
-                member_changes = (
-                    member.get("changes") if isinstance(member, Mapping) else None
-                )
-                if isinstance(member_changes, list):
-                    for change in member_changes:
-                        if not isinstance(change, Mapping):
-                            continue
-                        transition = str(change.get("state") or "changed")
-                        if transition == "removed":
-                            reasons.add("bound-member-removed")
-                        elif transition == "added":
-                            reasons.add("bound-member-added")
-                        elif transition == "state-changed":
-                            reasons.add("bound-member-observation-state-changed")
-                        else:
-                            reasons.add("bound-member-changed")
-
-                if isinstance(declared, Mapping) and declared.get("state") == "affected":
-                    reasons.add("declared-dependency-changed")
-
-                if isinstance(relationships, Mapping):
-                    facts = relationships.get("facts")
-                    locators = relationships.get("locators")
-                    observation = relationships.get("observation")
-                    if isinstance(facts, Mapping) and facts.get("state") == "changed":
-                        reasons.add("relationship-evidence-changed")
-                    if (
-                        isinstance(locators, Mapping)
-                        and locators.get("state") == "changed"
-                    ):
-                        reasons.add("relationship-locator-changed")
-                    if (
-                        isinstance(observation, Mapping)
-                        and observation.get("changed") is True
-                        and relationships.get("comparability")
-                        == "observation-configuration-changed"
-                    ):
-                        reasons.add("relationship-observation-config-changed")
-
-                if isinstance(definition, Mapping) and definition.get("state") == "changed":
-                    reasons.add("binding-definition-changed")
-            elif changed_paths & evidence_paths:
+            reasons = (
+                cls._binding_impact_reasons(detail)
+                if detail is not None
+                else set()
+            )
+            if detail is None and changed_paths & evidence_paths:
                 reasons.add("bound-member-precision-unknown")
-            if changed_paths & dependency_paths and "declared-dependency-changed" not in reasons:
+            if (
+                changed_paths & dependency_paths
+                and "declared-dependency-changed" not in reasons
+            ):
                 reasons.add("declared-dependency-path-changed")
             if reasons:
                 result.append(
@@ -237,6 +315,113 @@ class RepositoryEvidenceCoverageMixin:
             },
         )
 
+    @staticmethod
+    def _validate_coverage_packets(
+        bindings_packet: Mapping[str, object],
+        binding_delta: Mapping[str, object] | None,
+    ) -> None:
+        if bindings_packet.get("schema") != "hashmarks.repository-evidence-bindings.v1":
+            raise ValueError("bindings_packet must be repository evidence bindings")
+        if (
+            binding_delta is not None
+            and binding_delta.get("schema")
+            != "hashmarks.repository-evidence-binding-delta.v1"
+        ):
+            raise ValueError("binding_delta must be a repository evidence binding delta")
+        if binding_delta is None:
+            return
+        identities = binding_delta.get("bindings_identity")
+        after_identity = (
+            identities.get("after") if isinstance(identities, Mapping) else None
+        )
+        if after_identity != bindings_packet.get("bindings_identity"):
+            raise ValueError("binding_delta after identity must match bindings_packet")
+
+    @staticmethod
+    def _delta_evidence_paths(
+        binding: Mapping[str, object],
+        field_name: str,
+    ) -> set[str]:
+        evidence = binding.get(field_name)
+        changes = evidence.get("changes") if isinstance(evidence, Mapping) else None
+        if not isinstance(changes, list):
+            return set()
+        result: set[str] = set()
+        for change in changes:
+            if not isinstance(change, Mapping):
+                continue
+            locator = change.get("evidence")
+            if isinstance(locator, list) and locator:
+                result.add(str(locator[0]))
+        return result
+
+    @classmethod
+    def _coverage_binding_changes(
+        cls,
+        binding_delta: Mapping[str, object] | None,
+    ) -> _CoverageBindingChanges:
+        changes = _CoverageBindingChanges()
+        for binding in cls._changed_binding_index(binding_delta).values():
+            changes.direct_changed.update(
+                cls._delta_evidence_paths(binding, "direct_evidence")
+            )
+            changes.locator_changed.update(
+                cls._delta_evidence_paths(binding, "locator_evidence")
+            )
+
+            member = binding.get("member_evidence")
+            member_changes = (
+                member.get("changes") if isinstance(member, Mapping) else None
+            )
+            if not isinstance(member_changes, list):
+                continue
+            for change in member_changes:
+                if not isinstance(change, Mapping):
+                    continue
+                locator = change.get("evidence")
+                if not isinstance(locator, list) or not locator:
+                    continue
+                path = str(locator[0])
+                target = {
+                    "added": changes.member_added,
+                    "removed": changes.member_removed,
+                    "state-changed": changes.member_state_changed,
+                }.get(str(change.get("state") or "changed"), changes.member_only)
+                target.add(path)
+        return changes
+
+    @classmethod
+    def _coverage_classification(
+        cls,
+        bindings_packet: Mapping[str, object],
+        changed_set: set[str],
+        *,
+        complete: bool,
+        binding_delta: Mapping[str, object] | None,
+    ) -> dict[str, object]:
+        evidence_paths, dependency_paths = cls._coverage_binding_paths(bindings_packet)
+        bound_members = changed_set & evidence_paths
+        declared_dependencies_changed = (changed_set & dependency_paths) - bound_members
+        outside = changed_set - evidence_paths - dependency_paths
+        changes = cls._coverage_binding_changes(binding_delta).bound_to(bound_members)
+        precision_unknown = bound_members - changes.classified_paths()
+        return {
+            "changed_inside_bound_evidence": sorted(changes.direct_changed),
+            "changed_elsewhere_in_bound_member": sorted(changes.member_only),
+            "bound_members_added": sorted(changes.member_added),
+            "bound_members_removed": sorted(changes.member_removed),
+            "bound_member_observation_state_changed": sorted(
+                changes.member_state_changed
+            ),
+            "bound_locator_changed": sorted(changes.locator_changed),
+            "bound_member_precision_unknown": sorted(precision_unknown),
+            "declared_dependencies_changed": sorted(declared_dependencies_changed),
+            "outside_declared_bindings": sorted(outside) if complete else [],
+            "outside_declared_bindings_candidates": (
+                sorted(outside) if not complete else []
+            ),
+        }
+
     def repository_evidence_coverage(
         self,
         bindings_packet: Mapping[str, object],
@@ -249,114 +434,17 @@ class RepositoryEvidenceCoverageMixin:
         """Classify changes while preserving change-set authority and precision."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        if bindings_packet.get("schema") != "hashmarks.repository-evidence-bindings.v1":
-            raise ValueError("bindings_packet must be repository evidence bindings")
-        if (
-            binding_delta is not None
-            and binding_delta.get("schema")
-            != "hashmarks.repository-evidence-binding-delta.v1"
-        ):
-            raise ValueError("binding_delta must be a repository evidence binding delta")
-        if binding_delta is not None:
-            identities = binding_delta.get("bindings_identity")
-            after_identity = (
-                identities.get("after") if isinstance(identities, Mapping) else None
-            )
-            if after_identity != bindings_packet.get("bindings_identity"):
-                raise ValueError(
-                    "binding_delta after identity must match bindings_packet"
-                )
-
+        self._validate_coverage_packets(bindings_packet, binding_delta)
         changed, complete, change_set = self._change_set(
             changed_paths, change_set_complete, repository_observation
         )
         changed_set = set(changed)
-        evidence_paths, dependency_paths = self._coverage_binding_paths(bindings_packet)
-        bound_members = changed_set & evidence_paths
-        declared_dependencies_changed = (changed_set & dependency_paths) - bound_members
-        outside = changed_set - evidence_paths - dependency_paths
-
-        direct_changed: set[str] = set()
-        member_only: set[str] = set()
-        member_added: set[str] = set()
-        member_removed: set[str] = set()
-        member_state_changed: set[str] = set()
-        locator_changed: set[str] = set()
-        for binding in self._changed_binding_index(binding_delta).values():
-            direct = binding.get("direct_evidence")
-            changes = direct.get("changes") if isinstance(direct, Mapping) else None
-            if isinstance(changes, list):
-                for change in changes:
-                    if not isinstance(change, Mapping):
-                        continue
-                    evidence = change.get("evidence")
-                    if isinstance(evidence, list) and evidence:
-                        direct_changed.add(str(evidence[0]))
-
-            locator = binding.get("locator_evidence")
-            locator_changes = (
-                locator.get("changes") if isinstance(locator, Mapping) else None
-            )
-            if isinstance(locator_changes, list):
-                for change in locator_changes:
-                    if not isinstance(change, Mapping):
-                        continue
-                    evidence = change.get("evidence")
-                    if isinstance(evidence, list) and evidence:
-                        locator_changed.add(str(evidence[0]))
-
-            member = binding.get("member_evidence")
-            member_changes = (
-                member.get("changes") if isinstance(member, Mapping) else None
-            )
-            if isinstance(member_changes, list):
-                for change in member_changes:
-                    if not isinstance(change, Mapping):
-                        continue
-                    evidence = change.get("evidence")
-                    if not isinstance(evidence, list) or not evidence:
-                        continue
-                    path = str(evidence[0])
-                    transition = str(change.get("state") or "changed")
-                    if transition == "added":
-                        member_added.add(path)
-                    elif transition == "removed":
-                        member_removed.add(path)
-                    elif transition == "state-changed":
-                        member_state_changed.add(path)
-                    else:
-                        member_only.add(path)
-
-        direct_changed &= bound_members
-        member_added &= bound_members
-        member_removed &= bound_members
-        member_state_changed &= bound_members
-        locator_changed &= bound_members
-        member_only = (member_only & bound_members) - direct_changed
-        classified = (
-            direct_changed
-            | member_only
-            | member_added
-            | member_removed
-            | member_state_changed
-            | locator_changed
+        classification = self._coverage_classification(
+            bindings_packet,
+            changed_set,
+            complete=complete,
+            binding_delta=binding_delta,
         )
-        precision_unknown = bound_members - classified
-
-        classification = {
-            "changed_inside_bound_evidence": sorted(direct_changed),
-            "changed_elsewhere_in_bound_member": sorted(member_only),
-            "bound_members_added": sorted(member_added),
-            "bound_members_removed": sorted(member_removed),
-            "bound_member_observation_state_changed": sorted(member_state_changed),
-            "bound_locator_changed": sorted(locator_changed),
-            "bound_member_precision_unknown": sorted(precision_unknown),
-            "declared_dependencies_changed": sorted(declared_dependencies_changed),
-            "outside_declared_bindings": sorted(outside) if complete else [],
-            "outside_declared_bindings_candidates": (
-                sorted(outside) if not complete else []
-            ),
-        }
         payload: dict[str, object] = {
             "schema": "hashmarks.repository-evidence-coverage.v1",
             "changed_paths": changed,
@@ -390,3 +478,4 @@ class RepositoryEvidenceCoverageMixin:
             "hashmarks.repository-evidence-coverage.v1", payload
         )
         return payload
+
