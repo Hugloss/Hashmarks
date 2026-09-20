@@ -328,12 +328,7 @@ def test_qualified_module_function_target_stays_ambiguous_across_duplicate_modul
 
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-exact-identifier-edit-owners"
-    exact_paths = {
-        row["path"]
-        for row in action["ambiguity"]["candidates"]
-        if row.get("exact_identifier_projection")
-    }
-    assert exact_paths
+    assert action["ownership_authority"]["owner_resolved"] is False
 
 
 def test_qualified_module_function_does_not_match_wrong_module(
