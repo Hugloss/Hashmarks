@@ -184,8 +184,18 @@ class TaskActionOwnerResolutionMixin:
         if not exact_identifier_displacement_guard and not (
             archive_owner and live_current_edit
         ):
-            edit = self._task_action_projected_owner_row(
-                owner_path, resolved, rows, limit
+            exact_owner_edit = (
+                exact_identifier_edits[0]
+                if len(exact_identifier_edits) == 1
+                and str(exact_identifier_edits[0].get("path") or "") == owner_path
+                else None
+            )
+            edit = (
+                exact_owner_edit
+                if exact_owner_edit is not None
+                else self._task_action_projected_owner_row(
+                    owner_path, resolved, rows, limit
+                )
             )
             structural_owner = self._task_action_structural_owner_evidence(
                 resolved, owner_path
