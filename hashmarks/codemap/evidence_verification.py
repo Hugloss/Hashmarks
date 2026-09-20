@@ -428,6 +428,53 @@ class VerificationMixin:
             state.reference_indexes[path] = index
         return index
 
+    def _verification_facade_reexport_owner_match(
+        self,
+        state: _VerificationRelevanceState,
+        facade_path: str,
+        exported_name: str,
+    ) -> bool | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if not facade_path.endswith(".py") or not exported_name:
+            return None
+        binding_kind, _binding_targets = self._python_export_binding(
+            facade_path, exported_name
+        )
+        if binding_kind == "local":
+            return False
+
+        matching_edges = [
+            edge
+            for edge in self.store.edges_from(facade_path)
+            if str(edge.get("kind") or "") == "import"
+            and edge.get("source") is None
+            and str(edge.get("target_short") or "") == exported_name
+            and str(edge.get("target") or "")
+        ][:16]
+        if not matching_edges:
+            return None
+
+        owners: set[str] = set()
+        unresolved = False
+        for edge in matching_edges:
+            import_target = str(edge.get("target") or "")
+            resolved, ambiguous = self._resolve_import_owner_evidence(
+                facade_path, import_target
+            )
+            if not resolved and not import_target.startswith("."):
+                resolved, fallback_ambiguous = self._resolve_import_owner_evidence(
+                    facade_path, f".{import_target}"
+                )
+                ambiguous = ambiguous or fallback_ambiguous
+            if ambiguous or not resolved:
+                unresolved = True
+                continue
+            owners.update(map(str, resolved))
+        if unresolved or not owners:
+            return None
+        return owners == {state.edit_path}
+
     def _verification_module_alias_reference_owner_match(
         self,
         state: _VerificationRelevanceState,
@@ -444,7 +491,7 @@ class VerificationMixin:
         if target not in index.reachable_attribute_chains:
             return None
 
-        bound_name = target.split(".", 1)[0]
+        bound_name, attribute_chain = target.split(".", 1)
         resolved_alias = False
         for module_target, alias, guard in index.module_bindings:
             if guard is not None or alias != bound_name or not module_target:
@@ -457,6 +504,18 @@ class VerificationMixin:
             resolved_alias = True
             if state.edit_path in resolved_paths:
                 return True
+            if "." in attribute_chain:
+                continue
+            reexport_matches = [
+                self._verification_facade_reexport_owner_match(
+                    state, facade_path, attribute_chain
+                )
+                for facade_path in sorted(resolved_paths)[:8]
+            ]
+            if any(match is True for match in reexport_matches):
+                return True
+            if any(match is None for match in reexport_matches):
+                return None
         return False if resolved_alias else None
 
     def _verification_collect_direct_symbol_refs(
@@ -844,10 +903,56 @@ class VerificationMixin:
             return False
         if selected is None or str(best.get("path") or "") == current_path:
             return True
+        selected_has_reference = bool(
+            selected.get("direct_reference") or selected.get("indirect_reference")
+        )
+        best_is_indirect_only = bool(
+            best.get("indirect_reference") and not best.get("direct_reference")
+        )
+        if best_is_indirect_only and selected_has_reference:
+            return False
         return (
             best_score[:2] > cls._verification_candidate_score(selected)[:2]
             or unique_reference
         )
+
+    @staticmethod
+    def _verification_bounded_candidates(
+        candidates: Sequence[dict[str, object]],
+        selected: Mapping[str, object] | None,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        bounded = [dict(row) for row in candidates[:limit]]
+        selected_path = (
+            str(selected.get("path") or "")
+            if isinstance(selected, Mapping)
+            else ""
+        )
+        if not selected_path or any(
+            str(row.get("path") or "") == selected_path for row in bounded
+        ):
+            return bounded
+        selected_row = next(
+            (
+                dict(row)
+                for row in candidates
+                if str(row.get("path") or "") == selected_path
+            ),
+            None,
+        )
+        if selected_row is None and isinstance(selected, Mapping):
+            selected_row = {
+                key: value
+                for key, value in selected.items()
+                if key != "selection_reason"
+            }
+        if selected_row is None:
+            return bounded
+        if len(bounded) >= limit:
+            bounded[-1] = selected_row
+        else:
+            bounded.append(selected_row)
+        return bounded
 
     @staticmethod
     def _verification_relevance_result(
@@ -868,7 +973,9 @@ class VerificationMixin:
         return {
             "schema": "hashmarks.verification-relevance.v1",
             "selected": selected,
-            "candidates": list(candidates[:limit]),
+            "candidates": VerificationMixin._verification_bounded_candidates(
+                candidates, selected_row, limit
+            ),
             "candidate_count": len(candidates),
             "selection_reason": selection_reason
             if selected is not None
@@ -947,8 +1054,13 @@ class VerificationMixin:
             raise ValueError("candidate_limit must be >= 1")
         result = dict(relevance)
         candidates = relevance.get("candidates")
+        selected = relevance.get("selected")
         if isinstance(candidates, list):
-            result["candidates"] = candidates[: min(int(candidate_limit), 16)]
+            result["candidates"] = self._verification_bounded_candidates(
+                candidates,
+                selected if isinstance(selected, Mapping) else None,
+                min(int(candidate_limit), 16),
+            )
         return result
 
     @staticmethod

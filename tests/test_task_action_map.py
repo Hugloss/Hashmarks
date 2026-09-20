@@ -389,3 +389,64 @@ def test_qualified_target_recovers_from_index_when_canonical_limit_excludes_sour
     assert action["edit"]["qualified_identifier_index_projection"] is True
     assert action["ambiguity"]["ambiguous"] is False
 
+def test_structural_owner_projection_preserves_unique_qualified_symbol_evidence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "src/capability.py").write_text(
+        "class UnrelatedError(RuntimeError):\n"
+        "    pass\n\n"
+        "def target(value):\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_capability.py").write_text(
+        "from src import capability\n\n"
+        "def test_target():\n"
+        "    assert capability.target('x') == 'x'\n",
+        encoding="utf-8",
+    )
+
+    task = "Refactor capability.target without changing behavior"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20)
+        evidence = codemap.task_evidence(task, limit=20)
+
+    assert action["edit"]["path"] == "src/capability.py"
+    assert action["edit"]["name"] == "target"
+    assert action["edit"]["qualname"] == "target"
+    assert action["edit"]["exact_identifier_projection"] is True
+    assert evidence["edit"] == "src/capability.py"
+    assert evidence["edit_evidence"]["symbol"] == "target"
+    assert evidence["edit_evidence"]["content"].startswith("def target(value):")
+    assert "UnrelatedError" not in evidence["edit_evidence"]["content"]
+
+def test_qualified_identifier_does_not_inherit_plain_same_name_ambiguity(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/bootstrap.py").write_text(
+        "def _require_regular(path):\n"
+        "    return path\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "src/qualification.py").write_text(
+        "def _require_regular(path):\n"
+        "    return path\n",
+        encoding="utf-8",
+    )
+
+    task = "Refactor bootstrap._require_regular without changing behavior"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20)
+
+    assert action["edit"]["path"] == "src/bootstrap.py"
+    assert action["edit"]["name"] == "_require_regular"
+    assert action["edit"]["exact_identifier_projection"] is True
+    assert action["ambiguity"]["ambiguous"] is False
+    assert action["ownership_authority"]["owner_resolved"] is True
+
