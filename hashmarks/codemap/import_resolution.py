@@ -201,6 +201,15 @@ class ImportResolutionMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         resolved = list(self._resolve_import_paths(source_path, target))
+        module_candidates = self._python_import_module_candidates(source_path, target)
+        direct_module = module_candidates[0] if module_candidates else ""
+        if len(resolved) == 1 and direct_module:
+            file_row = self._session_file_row(resolved[0])
+            if (
+                file_row is not None
+                and str(file_row.get("module_name") or "") == direct_module
+            ):
+                return resolved, False
         short = target.lstrip(".").rsplit(".", 1)[-1]
         if not short or not resolved:
             ambiguous = source_path.endswith(
