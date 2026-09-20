@@ -237,6 +237,48 @@ class StructuralLocalityMixin:
             return None, sorted(_symbol_id(row) for row in owned or candidates)
         return None, sorted(_symbol_id(row) for row in candidates)
 
+    def _python_qualified_call_binding(
+        self,
+        *,
+        source_path: str,
+        source_qualname: str,
+        target: str,
+        candidates: list[dict[str, object]],
+    ) -> tuple[dict[str, object] | None, list[str]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        root = target.split(".", 1)[0]
+        if not root or self._python_function_locally_binds(
+            source_path, source_qualname, root
+        ):
+            return None, sorted(_symbol_id(row) for row in candidates)
+        kind, targets = self._python_export_binding(source_path, root)
+        if kind == "local":
+            qualified = [
+                row
+                for row in candidates
+                if str(row.get("path") or "") == source_path
+                and str(row.get("qualname") or "") == target
+            ]
+        elif kind == "reexport" and len(targets) == 1:
+            owners, unresolved = self._resolve_import_owner_evidence(
+                source_path, targets[0]
+            )
+            if unresolved:
+                return None, sorted(_symbol_id(row) for row in candidates)
+            owner_paths = set(owners)
+            qualified = [
+                row
+                for row in candidates
+                if str(row.get("path") or "") in owner_paths
+                and str(row.get("qualname") or "") == target
+            ]
+        else:
+            qualified = []
+        if len(qualified) == 1:
+            return qualified[0], [_symbol_id(qualified[0])]
+        return None, sorted(_symbol_id(row) for row in qualified or candidates)
+
     def _resolve_call_target(
         self, edge: Mapping[str, object]
     ) -> tuple[dict[str, object] | None, list[str]]:
@@ -245,19 +287,17 @@ class StructuralLocalityMixin:
         if not short:
             return None, []
         candidates = self._visible_named_symbol_candidates(short)
-        if target != short:
-            qualified = [
-                row
-                for row in candidates
-                if str(row.get("qualname") or "") == target
-            ]
-            if len(qualified) == 1:
-                return qualified[0], [_symbol_id(qualified[0])]
-            return None, sorted(_symbol_id(row) for row in qualified or candidates)
         source_path = str(edge.get("path") or "")
         source_qualname = str(edge.get("source") or "")
         source_row = self.store.file_row(source_path)
         language = "" if source_row is None else str(source_row["language"] or "")
+        if language == "python" and target != short:
+            return self._python_qualified_call_binding(
+                source_path=source_path,
+                source_qualname=source_qualname,
+                target=target,
+                candidates=candidates,
+            )
         if language == "python":
             return self._python_plain_call_binding(
                 source_path=source_path,
