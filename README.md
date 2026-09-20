@@ -376,6 +376,7 @@ See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs
 - [Architecture](docs/reference/ARCHITECTURE.md)
 - [Observer and delta model](docs/reference/OBSERVER_DELTA.md)
 - [Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md)
+- [Structural locality evidence](docs/reference/STRUCTURAL_LOCALITY.md)
 - [Product boundary](docs/reference/PRODUCT_BOUNDARY.md)
 - [Normative invariants](docs/reference/INVARIANTS.md)
 - [Public API and stability policy](docs/reference/API_STABILITY.md)
