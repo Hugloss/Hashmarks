@@ -36,12 +36,12 @@ def _identity(value: object) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
-def _task_owner(packet: dict[str, object]) -> dict[str, object] | None:
+def _task_candidate(packet: dict[str, object]) -> dict[str, object] | None:
     ownership = packet.get("ownership")
     if not isinstance(ownership, dict):
         return None
-    owner = ownership.get("owner")
-    return owner if isinstance(owner, dict) else None
+    candidate = ownership.get("candidate")
+    return candidate if isinstance(candidate, dict) else None
 
 
 def _task_verification(packet: dict[str, object]) -> dict[str, object]:
@@ -93,8 +93,10 @@ def run(
                 if isinstance(packet.get("provenance"), dict)
                 else {}
             )
-            owner = _task_owner(packet)
-            edit_path = str(owner.get("path") or "") if owner is not None else ""
+            candidate = _task_candidate(packet)
+            edit_path = (
+                str(candidate.get("path") or "") if candidate is not None else ""
+            )
             file_row = codemap.store.file_row(edit_path) if edit_path else None
             indexed_revision = (
                 str(file_row["file_digest"]) if file_row is not None else None
@@ -151,9 +153,9 @@ def run(
     for row in frozen:
         truth = expected[row["id"]]
         packet = row["packet"]
-        owner = _task_owner(packet)
+        candidate = _task_candidate(packet)
         edit_correct = (
-            str(owner.get("path") or "") if owner is not None else ""
+            str(candidate.get("path") or "") if candidate is not None else ""
         ) == str(truth["expected_edit_path"])
         verification = _task_verification(packet)
         plan = verification.get("plan") if isinstance(verification.get("plan"), dict) else {}
@@ -175,11 +177,10 @@ def run(
             "id": row["id"],
             "category": str(truth.get("category") or "unknown"),
             "ownership_status": str(ownership.get("status") or "unresolved"),
+            "owner_resolved": str(ownership.get("status") or "") == "resolved",
             "edit_correct": edit_correct,
             "verify_correct": verify_correct,
-            "fully_correct": edit_correct
-            and verify_correct
-            and str(ownership.get("status") or "") == "resolved",
+            "fully_correct": edit_correct and verify_correct,
             "source_complete": bool(source_budget.get("complete")),
             "packet_bytes": int(row["packet_bytes"]),
             "first_warm_ms": float(row["first_warm_ms"]),
@@ -201,7 +202,8 @@ def run(
         "edit_correct": sum(bool(row["edit_correct"]) for row in results),
         "verify_correct": sum(bool(row["verify_correct"]) for row in results),
         "fully_correct": sum(bool(row["fully_correct"]) for row in results),
-        "unresolved": sum(
+        "owner_resolved": sum(bool(row["owner_resolved"]) for row in results),
+        "owner_unresolved_or_ambiguous": sum(
             row["ownership_status"] != "resolved" for row in results
         ),
         "source_complete": sum(bool(row["source_complete"]) for row in results),
