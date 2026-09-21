@@ -34,6 +34,9 @@ Similar-looking state words are not interchangeable. A consumer must know which 
 | External diagnostic observation | Imported lint/test/type/timing facts bound to repository evidence | `repository_delta.py` external diagnostic observation/delta helpers | Keep execution result authority external; Hashmarks records the observation only. |
 | Consumer binding definition | Opaque consumer-declared repository evidence scope | repository-evidence binding projection | Definition identity is separate from repository observation identity. Changing the declaration is not a repository change. |
 | Consumer binding impact | Which declared bindings intersect changed repository evidence | repository-evidence coverage/delta projection consuming canonical repository observation/delta facts | Report projection facts and reasons; do not create a feature-local change authority. |
+| External evidence claim | Request-scoped caller observation that may point into repository truth | `evidence_correlation.py` owns only the claim/correlation projection; repository facts remain with existing owners | Preserve the claim separately. Opaque metadata never becomes repository authority by naming convention. |
+| Evidence correlation resolution | Whether a bounded path/line/symbol claim maps uniquely, ambiguously, not at all, or conflicts with admitted repository evidence | `evidence_correlation.py` over canonical member observation plus bounded symbol queries | State vocabulary is `resolved-unique | resolved-ambiguous | unresolved | claim-conflict`; it describes correspondence, never causation. |
+| Source equivalence | Whether explicitly qualified external source identity matches the correlated repository member/range identity | `evidence_correlation.py` comparison over repository-evidence binding identities | State vocabulary is `proven | mismatch | unknown`. Keep it independent from repository freshness and correlation resolution. |
 
 ## Orthogonal state rule
 
@@ -106,3 +109,16 @@ If the answer to **Existing semantic owner** is unclear, stop implementation and
 Repository evidence bindings are a consumer-facing projection over existing Hashmarks repository intelligence. They may own the binding declaration and binding-specific projection shape. They do **not** own a second repository observer, repository generation, member revision model, relationship graph, freshness model, or repository change set.
 
 The binding implementation must therefore converge on the existing owners above before it becomes public.
+
+## Evidence correlation work
+
+Evidence correlation is a request-scoped projection over external claims plus existing repository authorities. Its only new semantic ownership is the declaration/correspondence layer: the exact claim supplied by the caller, the conservative resolution state, and qualified source-equivalence comparison.
+
+It must reuse:
+
+- canonical repository member observation for presence/admission/revision;
+- bounded indexed symbol evidence for structural correspondence;
+- repository evidence bindings for range/member identities, relationships, freshness, completeness, and provenance;
+- repository evidence binding delta for before/after repository change.
+
+It must not create a second repository observer, source identity, freshness model, completeness model, relationship graph, repository delta, persistent runtime-evidence store, or causal interpretation layer.
