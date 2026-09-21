@@ -769,6 +769,7 @@ class EvidenceCorrelationMixin:
             self._validate_request_totals(total_metadata, total_anchors)
             prepared.append(result.packet)
             bindings.extend(result.bindings)
+        prepared.sort(key=lambda row: str(row["bundle_id"]))
         return prepared, bindings
 
     @staticmethod
