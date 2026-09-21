@@ -47,6 +47,16 @@ def _append_probe(path: Path) -> None:
     )
 
 
+def _task_candidate_path(packet: dict[str, object]) -> str:
+    ownership = packet.get("ownership")
+    if not isinstance(ownership, dict):
+        return ""
+    candidate = ownership.get("candidate")
+    if not isinstance(candidate, dict):
+        return ""
+    return str(candidate.get("path") or "")
+
+
 def _surface_paths(packet: dict[str, Any], role: str) -> set[str]:
     surfaces = (
         packet.get("surfaces") if isinstance(packet.get("surfaces"), dict) else {}
@@ -86,7 +96,7 @@ def run_scenario(
             start_started = time.perf_counter()
             start = codemap.task_evidence(query)
             start_ms = (time.perf_counter() - start_started) * 1000.0
-            edit_path = str(start.get("edit") or "")
+            edit_path = _task_candidate_path(start)
             if edit_path:
                 _append_probe(repo / edit_path)
                 impact_started = time.perf_counter()
@@ -123,8 +133,8 @@ def run_scenario(
         )
         result = {
             "id": row["id"],
-            "edit_correct": row["edit"] == str(truth["expected_edit_path"]),
-            "safe_start": row["start"].get("status") != "unsafe",
+            "candidate_correct": row["edit"] == str(truth["expected_edit_path"]),
+            "candidate_available": bool(row["edit"]),
             "verify_relevant": str(truth["expected_verify_path"]) in verify,
             "dependency_relevant": str(truth["expected_dependency_path"])
             in implementation,
@@ -137,8 +147,8 @@ def run_scenario(
         result["fully_correct"] = all(
             bool(result[key])
             for key in (
-                "edit_correct",
-                "safe_start",
+                "candidate_correct",
+                "candidate_available",
                 "verify_relevant",
                 "dependency_relevant",
                 "no_source_or_argv_replay",
@@ -155,7 +165,7 @@ def run_scenario(
         "tasks": tasks,
         "sync_ms": sync_ms,
         "fully_correct": sum(bool(row["fully_correct"]) for row in graded),
-        "edit_correct": sum(bool(row["edit_correct"]) for row in graded),
+        "candidate_correct": sum(bool(row["candidate_correct"]) for row in graded),
         "verify_relevant": sum(bool(row["verify_relevant"]) for row in graded),
         "dependency_relevant": sum(bool(row["dependency_relevant"]) for row in graded),
         "no_source_or_argv_replay": sum(
@@ -168,7 +178,7 @@ def run_scenario(
         "results": graded,
         "protocol": {
             "secret_join_after_scenario_freeze": True,
-            "external_edit": "syntax-preserving comment",
+            "external_edit": "syntax-preserving comment applied to a repository candidate; no ownership claim",
             "solution_loop_owner": "external-agent",
         },
     }
@@ -205,7 +215,7 @@ def run_matrix(
             "scenarios": len(scenarios),
             "tasks": total_tasks,
             "fully_correct": sum(row["fully_correct"] for row in scenarios),
-            "edit_correct": sum(row["edit_correct"] for row in scenarios),
+            "candidate_correct": sum(row["candidate_correct"] for row in scenarios),
             "verify_relevant": sum(row["verify_relevant"] for row in scenarios),
             "dependency_relevant": sum(row["dependency_relevant"] for row in scenarios),
             "no_source_or_argv_replay": sum(
