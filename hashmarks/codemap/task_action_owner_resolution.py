@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+import re
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
@@ -67,6 +68,54 @@ class TaskActionOwnerResolutionMixin:
             return "unique-exact-symbol"
         return "exact-symbol"
 
+    @staticmethod
+    def _task_action_requested_edit_span(task: str) -> str:
+        """Return the task span that explicitly names the requested edit surface.
+
+        Exact identifiers outside this span remain evidence, but they do not
+        automatically become competing edit owners. This is deliberately a
+        bounded request-role discriminator, not a second repository resolver.
+        """
+        lowered = task.lower()
+        dependency_markers = (" so ", " using ", " with ", " by ")
+        for marker in dependency_markers:
+            index = lowered.find(marker)
+            if index > 0:
+                return task[:index]
+
+        dependency_first = re.match(
+            r"^\s*(?:use|apply)\s+.+?\s+(?:in|inside|within)\s+(.+)$",
+            task,
+            flags=re.IGNORECASE,
+        )
+        if dependency_first:
+            return dependency_first.group(1)
+        return task
+
+    @classmethod
+    def _task_action_requested_exact_identifier_edits(
+        cls,
+        task: str,
+        candidates: Sequence[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        """Narrow exact identities only when request grammar proves one edit role."""
+        if len(candidates) < 2:
+            return list(candidates)
+        span = cls._task_action_requested_edit_span(task).lower()
+        matched: list[dict[str, object]] = []
+        for candidate in candidates:
+            identities = {
+                str(candidate.get(key) or "").lower()
+                for key in ("name", "qualname")
+                if candidate.get(key)
+            }
+            if any(
+                re.search(rf"(?<![a-z0-9_]){re.escape(identity)}(?![a-z0-9_])", span)
+                for identity in identities
+            ):
+                matched.append(candidate)
+        return matched if len(matched) == 1 else list(candidates)
+
     def _task_action_resolve_owner(
         self,
         *,
@@ -129,6 +178,9 @@ class TaskActionOwnerResolutionMixin:
         ):
             exact_identifier_edits = self._task_action_exact_identifier_edit_candidates(
                 task, rows, failed
+            )
+            exact_identifier_edits = self._task_action_requested_exact_identifier_edits(
+                task, exact_identifier_edits
             )
             if literal_task_path:
                 exact_identifier_edits = [
