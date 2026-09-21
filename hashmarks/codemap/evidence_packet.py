@@ -19,6 +19,16 @@ if TYPE_CHECKING:
 
 
 class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
+    @staticmethod
+    def _compact_owner_candidate(
+        source: Mapping[str, object],
+    ) -> tuple[object | None, bool]:
+        """Return the projected candidate and whether repository ownership resolved."""
+        candidate = source.get("edit")
+        authority = source.get("ownership_authority")
+        resolved = isinstance(authority, Mapping) and bool(authority.get("owner_resolved"))
+        return candidate, resolved
+
     @decision_scoped
     def task_decision_brief(
         self,
@@ -50,13 +60,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 row["symbol"] = str(symbol)
             return row
 
-        candidate = anchor(packet.get("edit"))
-        authority = (
-            packet.get("ownership_authority")
-            if isinstance(packet.get("ownership_authority"), dict)
-            else {}
-        )
-        owner_resolved = bool(authority.get("owner_resolved"))
+        raw_candidate, owner_resolved = self._compact_owner_candidate(packet)
+        candidate = anchor(raw_candidate)
         edit = candidate if owner_resolved else None
         verify = anchor(packet.get("verify"))
         contract = anchor(packet.get("contract"))
@@ -248,12 +253,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         context = self.work_context(action, token_budget=token_budget)
         _generation, _identity_generation, stale = self._generation_status()
         candidate, verify, contract = self._task_action_selected_rows(action)
-        authority = (
-            action.get("ownership_authority")
-            if isinstance(action.get("ownership_authority"), Mapping)
-            else {}
-        )
-        owner_resolved = bool(authority.get("owner_resolved"))
+        _raw_candidate, owner_resolved = self._compact_owner_candidate(action)
         edit = candidate if owner_resolved else None
         verification = self._task_action_verification_plan(verify)
 
