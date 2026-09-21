@@ -798,7 +798,11 @@ class StructuralLocalityMixin:
             "unresolved_call_count": len(unresolved_calls),
             "external_or_unindexed_call_count": len(external_or_unindexed_calls),
             "target_exact_caller_count": int(
-                nodes[_symbol_id(target_row)]["exact_caller_count"]
+                next(
+                    row["exact_caller_count"]
+                    for row in ordered_nodes
+                    if row["symbol_id"] == _symbol_id(target_row)
+                )
             ),
         }
         repository_identity = "sha256:" + self._workspace_fingerprint_from_store()
