@@ -144,3 +144,67 @@ def test_owner_resolution_marks_structural_repository_owner(
     assert selection.edit is not None
     assert selection.edit["path"] == "src/case/engine.py"
     assert selection.owner_basis == "structural-owner"
+
+
+def test_unique_exact_owner_does_not_enter_weaker_structural_resolution(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from hashmarks.codemap.ownership_graph import OwnershipGraphMixin
+
+    _write(
+        tmp_path,
+        "src/owner.py",
+        "def cancel_queued_admission(*, expected_sequence: int) -> None:\n"
+        "    del expected_sequence\n",
+    )
+
+    def forbidden(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("exact owner must terminate before structural resolution")
+
+    monkeypatch.setattr(
+        OwnershipGraphMixin,
+        "_structural_owner_candidate",
+        forbidden,
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(
+            "change cancel_queued_admission",
+            limit=1,
+            per_role=1,
+        )
+
+    assert action["edit"]["path"] == "src/owner.py"
+    assert action["owner_basis"] in {"exact-symbol", "unique-exact-symbol"}
+    assert action["ownership_authority"]["owner_resolved"] is True
+
+
+def test_exact_owner_cannot_be_displaced_by_contract_projection(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/authority.py",
+        "class PublicationAuthority:\n"
+        "    pass\n",
+    )
+    _write(
+        tmp_path,
+        "INVARIANTS.md",
+        "PublicationAuthority contract contract contract policy evidence.\n",
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(
+            "Change PublicationAuthority contract",
+            limit=20,
+            per_role=3,
+        )
+
+    assert action["edit"]["path"] == "src/authority.py"
+    assert action["owner_basis"] == "exact-symbol"
+    assert action["ownership_authority"]["owner_resolved"] is True
