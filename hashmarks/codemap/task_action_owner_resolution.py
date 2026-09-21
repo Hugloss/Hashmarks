@@ -172,9 +172,12 @@ class TaskActionOwnerResolutionMixin:
             exact_identifier_edits = self._task_action_exact_identifier_edit_candidates(
                 task, rows, failed
             )
-            exact_identifier_edits = self._task_action_requested_exact_identifier_edits(
-                task, exact_identifier_edits
-            )
+            if len(exact_identifier_edits) > 1:
+                exact_identifier_edits = (
+                    self._task_action_requested_exact_identifier_edits(
+                        task, exact_identifier_edits
+                    )
+                )
             if literal_task_path:
                 exact_identifier_edits = [
                     row
