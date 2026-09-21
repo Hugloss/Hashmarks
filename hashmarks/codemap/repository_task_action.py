@@ -1080,7 +1080,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             )
             not in existing
         )
-        return candidates
+        return self._task_action_requested_exact_identifier_edits(task, candidates)
 
     def _task_action_structural_exact_identifier_owner(
         self,
