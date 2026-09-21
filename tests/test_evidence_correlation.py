@@ -1179,3 +1179,114 @@ def test_evidence_payload_is_not_operational_telemetry(tmp_path: Path) -> None:
     assert packet["bundles"][0]["anchors"][0]["claims"]["metadata"]["message"] == secret_marker
     assert packet["storage"] == "request-scoped-not-persisted"
     assert packet["execution_effect"] == "none"
+
+
+def test_cross_bundle_correspondence_reports_same_target_without_incident_or_cause(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text(
+        "def target():\n    return 1\n",
+        encoding="utf-8",
+    )
+    bundles = []
+    for bundle_id, producer in (("tests", "pytest"), ("logs", "otel-style")):
+        bundle = _bundle(
+            {
+                "anchor_id": f"{bundle_id}:target",
+                "path": "owner.py",
+                "line": 1,
+                "symbol": "target",
+                "metadata": {"producer_event": bundle_id},
+            }
+        )[0]
+        bundle["bundle_id"] = bundle_id
+        bundle["producer"] = {"kind": producer}
+        bundles.append(bundle)
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence(bundles, include_relationships=False)
+
+    assert packet["correspondence"] == [
+        {
+            "state": "same-repository-target",
+            "scope": "symbol",
+            "repository_path": "owner.py",
+            "symbol": "target",
+            "start_line": 1,
+            "end_line": 2,
+            "observations": [
+                {"bundle_id": "logs", "anchor_id": "logs:target"},
+                {"bundle_id": "tests", "anchor_id": "tests:target"},
+            ],
+            "causation": "not-inferred",
+            "incident_identity": "not-inferred",
+        }
+    ]
+
+
+def test_cross_bundle_correspondence_excludes_ambiguous_and_unresolved(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "one.py").write_text("def duplicate():\n    return 1\n", encoding="utf-8")
+    (tmp_path / "two.py").write_text("def duplicate():\n    return 2\n", encoding="utf-8")
+    first = _bundle({"anchor_id": "ambiguous", "symbol": "duplicate"})[0]
+    first["bundle_id"] = "first"
+    second = _bundle({"anchor_id": "missing", "path": "missing.py"})[0]
+    second["bundle_id"] = "second"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence([first, second], include_relationships=False)
+
+    assert packet["correspondence"] == []
+
+
+@pytest.mark.parametrize("anchor_count", [1, 10, 100, 256])
+def test_final_correlation_scale_matrix_is_bounded_and_deterministic(
+    tmp_path: Path,
+    anchor_count: int,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    anchors = [
+        {
+            "anchor_id": f"anchor:{index:03d}",
+            "path": "owner.py",
+            "line": 1,
+            "metadata": {"index": index, "text": "x" * 32},
+        }
+        for index in range(anchor_count)
+    ]
+    bundles = _bundle(*anchors)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        first = codemap.correlate_evidence(bundles, include_relationships=False)
+        replay = codemap.correlate_evidence(
+            list(reversed(bundles)),
+            include_relationships=False,
+        )
+
+    assert len(first["bundles"][0]["anchors"]) == anchor_count
+    assert len(first["repository_evidence"]["bindings"]) == 1
+    assert first["correlation_identity"] == replay["correlation_identity"]
+    assert len(json.dumps(first, separators=(",", ":")).encode("utf-8")) <= 1_048_576
+
+
+def test_cross_bundle_correspondence_is_identity_bound_and_tamper_detected(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    bundles = []
+    for bundle_id in ("a", "b"):
+        bundle = _bundle({"anchor_id": bundle_id, "path": "owner.py"})[0]
+        bundle["bundle_id"] = bundle_id
+        bundles.append(bundle)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence(bundles, include_relationships=False)
+        tampered = json.loads(json.dumps(packet))
+        tampered["correspondence"][0]["causation"] = "same-cause"
+        with pytest.raises(
+            ValueError,
+            match="correlation_identity does not match packet content",
+        ):
+            codemap.evidence_correlation_delta(packet, tampered)
