@@ -27,8 +27,7 @@ A unique owner with insufficient admitted evidence is expected to remain unresol
 that is not a missed-resolution defect. The hard missed-resolution counters apply only
 when admitted evidence is sufficient.
 
-Missing measurements are unknown, never zero.
-
+Missing measurements are unknown, never zero. Every validated ground-truth case receives a deterministic SHA-256 identity over its complete canonical JSON payload. Reports also carry an order-independent corpus identity over the exact evaluated case identities, so adding, removing, or relabeling a case changes the qualification evidence identity rather than silently changing the benchmark beneath a score.\n
 ## Hard-zero authority metrics
 
 The canonical vocabulary is owned by
@@ -43,7 +42,7 @@ product confidence probability, or agent permission state.
 
 The same evaluator will be extended with:
 
-- benchmark registry identity and label lifecycle;
+- benchmark registry label lifecycle and independent review metadata;
 - semantic-slice floors and minimum case counts;
 - macro and micro positive metrics with descriptive uncertainty;
 - projection/generation/provenance observations derived from frozen public outputs;
