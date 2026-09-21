@@ -118,8 +118,12 @@ jobs:
           PY
           chmod +x "$RUNNER_TEMP/hashmarks-current-observer"
 
-      - name: Prepare exact binding-delta pre-edit worktree
-        run: git worktree add "$RUNNER_TEMP/hashmarks-binding-before" 50b0e3be83fc0dd445bae9494367ece2f25179fe
+      - name: Checkout exact binding-delta pre-edit source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: 50b0e3be83fc0dd445bae9494367ece2f25179fe
+          path: .binding-before
+          persist-credentials: false
 
       - name: Observe pre-edit binding-delta locality
         env:
@@ -127,7 +131,7 @@ jobs:
         run: |
           python3 -m agent_economics refactor-locality observe-hashmarks \
             'hashmarks/codemap/repository_evidence_binding_delta.py::RepositoryEvidenceBindingDeltaMixin._binding_change' \
-            --repository-root "$RUNNER_TEMP/hashmarks-binding-before" \
+            --repository-root "$GITHUB_WORKSPACE/.binding-before" \
             --hashmarks-executable "$RUNNER_TEMP/hashmarks-current-observer" \
             --artifact "$RUNNER_TEMP/binding-locality-before-observed.json"
 
