@@ -67,6 +67,16 @@ def _append_probe(path: Path, task_id: str) -> None:
     path.write_text(original.rstrip("\n") + "\n" + marker + "\n", encoding="utf-8")
 
 
+def _task_owner_path(packet: dict[str, object]) -> str:
+    ownership = packet.get("ownership")
+    if not isinstance(ownership, dict) or ownership.get("status") != "resolved":
+        return ""
+    owner = ownership.get("owner")
+    if not isinstance(owner, dict):
+        return ""
+    return str(owner.get("path") or "")
+
+
 def _surface_paths(packet: dict[str, Any], role: str) -> set[str]:
     surfaces = (
         packet.get("surfaces") if isinstance(packet.get("surfaces"), dict) else {}
@@ -102,9 +112,11 @@ def run(
             task_id = str(task["id"])
             query = str(task["query"])
             start = codemap.task_evidence(query)
-            edit_path = str(start.get("edit") or "")
+            edit_path = _task_owner_path(start)
             if not edit_path:
-                raise ValueError(f"PUBLIC task {task_id} has no safe edit authority")
+                raise ValueError(
+                    f"PUBLIC task {task_id} has no resolved repository owner"
+                )
             _append_probe(repo / edit_path, task_id)
             impact_started = time.perf_counter()
             impact = codemap.task_change_impact(query, [edit_path])
@@ -246,7 +258,7 @@ def run(
         ],
         "secret_join_after_start_external_edit_and_impact_freeze": True,
         "external_edit": "syntax-preserving comment appended to PUBLIC-only selected edit path",
-        "changed_paths_source": "exact PUBLIC-only task_evidence edit authority",
+        "changed_paths_source": "exact PUBLIC-only task_evidence ownership authority",
         "impact_authority": "existing reverse/project impact plus proven task ownership path and selected verification authority",
         "solution_loop_owner": "external-agent",
         "public_sha256": _sha(public_path),
