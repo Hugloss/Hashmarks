@@ -342,6 +342,7 @@ jobs:
                   encoding="utf-8"
               )
           )
+          packet = payload["packet"]
           print(
               json.dumps(
                   {
