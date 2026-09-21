@@ -21,7 +21,7 @@ def test_decision_brief_budget_sweep_finds_smallest_safe_agent_budget(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         sweep = codemap.task_decision_brief_budget_sweep(
-            "change widget behavior implementation test",
+            "change widget",
             budgets=(1, 32, 64, 128, 256, 512),
         )
     assert sweep["schema"] == "hashmarks.task-decision-brief-budget-sweep.v1"
