@@ -184,7 +184,7 @@ def test_camelcase_task_anchor_matches_snake_case_owner(tmp_path: Path) -> None:
     assert action["edit"]["path"] == "src/runtime/checkpoint.py"
 
 
-def test_close_model_and_runtime_identifier_owners_require_discrimination(
+def test_unique_exact_identifier_outweighs_close_nonexact_runtime_name(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "src/models").mkdir(parents=True)
@@ -200,11 +200,11 @@ def test_close_model_and_runtime_identifier_owners_require_discrimination(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)
-        packet = codemap.task_decision_packet(task, limit=20)
 
-    assert action["ambiguity"]["ambiguous"] is True
-    assert action["ambiguity"]["reason"] == "multiple-identifier-edit-owners"
-    assert packet["discrimination"]["needed"] is True
+    assert action["edit"]["path"] == "src/models/workspace_lease.py"
+    assert action["owner_basis"] in {"exact-symbol", "unique-exact-symbol"}
+    assert action["ambiguity"]["ambiguous"] is False
+    assert action["ownership_authority"]["owner_resolved"] is True
 
 
 def test_task_action_map_exposes_resolved_ownership_trace_and_authority(
@@ -243,10 +243,10 @@ def test_task_action_map_no_edit_fails_closed(tmp_path: Path) -> None:
     assert action["ownership_authority"]["resolved_owner"] is None
 
 
-def test_task_action_map_reuses_primary_structural_owner_for_ambiguity(
+def test_task_action_map_skips_structural_owner_after_exact_resolution(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """One decision must not rebuild the same ownership graph for ambiguity evidence."""
+    """A stronger exact owner must terminate before weaker structural traversal."""
     from hashmarks.codemap.ownership_graph import OwnershipGraphMixin
 
     (tmp_path / "src").mkdir()
@@ -273,7 +273,8 @@ def test_task_action_map_reuses_primary_structural_owner_for_ambiguity(
         )
 
     assert action["edit"]["path"] == "src/widget.py"
-    assert calls.count("tests/test_widget.py") == 1
+    assert action["owner_basis"] in {"exact-symbol", "unique-exact-symbol"}
+    assert calls == []
 
 def test_qualified_module_function_target_wins_over_lexically_stronger_sibling(
     tmp_path: Path,
