@@ -1451,10 +1451,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             if isinstance(edit, Mapping)
             else ""
         )
-        owner_eligible = (
-            explicit_target_basis != "explicit-test-edit"
-            and (not ambiguous or structural_owner is not None)
-        )
+        owner_eligible = explicit_target_basis != "explicit-test-edit"
         trace = ownership_decision_trace(
             OwnershipDecisionState(
                 edit=edit,

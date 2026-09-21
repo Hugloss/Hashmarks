@@ -276,3 +276,66 @@ def test_external_correlation_cannot_change_task_ownership_authority(
     assert _ownership(after)["status"] == "ambiguous"
     assert _ownership(before)["owner"] is None
     assert _ownership(after)["owner"] is None
+
+
+def test_candidate_never_becomes_admitted_owner_across_action_projections(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "src/a.py", "def duplicate_owner():\n    return 1\n")
+    _write(tmp_path, "src/b.py", "def duplicate_owner():\n    return 2\n")
+    _write(tmp_path, "tests/test_owner.py", "def test_owner():\n    assert True\n")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map("fix duplicate_owner")
+        evidence = codemap.task_evidence("fix duplicate_owner")
+        packet = codemap.task_decision_packet("fix duplicate_owner")
+        decision_brief = codemap.task_decision_brief("fix duplicate_owner")
+        action_brief = codemap.task_action_brief(
+            "fix duplicate_owner", token_budget=256
+        )
+
+    assert action["edit"]["path"] in {"src/a.py", "src/b.py"}
+    assert action["admitted_edit"] is None
+    assert action["ownership_authority"]["owner_resolved"] is False
+    assert _ownership(evidence)["status"] == "ambiguous"
+    assert _ownership(evidence)["owner"] is None
+    assert packet["candidate"]["path"] in {"src/a.py", "src/b.py"}
+    assert packet["edit"] is None
+    assert packet["discrimination"]["needed"] is True
+    assert decision_brief["candidate"]["path"] in {"src/a.py", "src/b.py"}
+    assert decision_brief["edit"] is None
+    assert decision_brief["safe"] is False
+    assert action_brief["candidate"] in {"src/a.py", "src/b.py"}
+    assert "edit" not in action_brief
+    assert action_brief["status"] == "unsafe"
+
+
+def test_resolved_owner_survives_all_action_projections(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "src/owner.py", "def exact_owner():\n    return 1\n")
+    _write(
+        tmp_path,
+        "tests/test_owner.py",
+        "from src.owner import exact_owner\n"
+        "def test_owner():\n    assert exact_owner() == 1\n",
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map("fix exact_owner")
+        evidence = codemap.task_evidence("fix exact_owner")
+        packet = codemap.task_decision_packet("fix exact_owner")
+        decision_brief = codemap.task_decision_brief("fix exact_owner")
+        action_brief = codemap.task_action_brief("fix exact_owner", token_budget=256)
+
+    assert action["edit"]["path"] == "src/owner.py"
+    assert action["admitted_edit"]["path"] == "src/owner.py"
+    assert _owner_path(evidence) == "src/owner.py"
+    assert packet["candidate"]["path"] == "src/owner.py"
+    assert packet["edit"]["path"] == "src/owner.py"
+    assert decision_brief["candidate"]["path"] == "src/owner.py"
+    assert decision_brief["edit"]["path"] == "src/owner.py"
+    assert action_brief["candidate"] == "src/owner.py"
+    assert action_brief["edit"] == "src/owner.py"

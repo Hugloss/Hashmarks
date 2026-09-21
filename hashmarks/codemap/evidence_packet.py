@@ -93,7 +93,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "verification_argv": list(plan.get("argv") or [])
             if plan.get("available")
             else None,
-            "safe": bool(context.get("safe")),
+            "safe": bool(context.get("safe")) and edit is not None,
             "stale": bool(identity.get("stale")),
             "decision_generation": identity.get("decision_generation"),
             "evidence_receipt": dict(packet.get("evidence_receipt") or {}),

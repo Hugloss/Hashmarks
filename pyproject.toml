@@ -5,7 +5,7 @@ backend-path = ["."]
 
 [project]
 name = "hashmarks"
-version = "0.14.0"
+version = "0.15.0"
 description = "Local repository intelligence and a read-only MCP server for coding agents: codebase search, repository context, code navigation, ownership, change impact, freshness, and verification evidence."
 readme = "README.md"
 license = "Apache-2.0"
