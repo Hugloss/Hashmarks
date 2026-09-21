@@ -30,7 +30,10 @@ def _candidate_identity(row: Mapping[str, object]) -> dict[str, object]:
 def _decision_status(state: OwnershipDecisionState) -> str:
     if state.edit is None or not state.owner_eligible:
         return "unresolved"
-    if state.ambiguous:
+    structural = state.structural_owner or {}
+    selected = str(structural.get("selected") or "")
+    edit_path = str(state.edit.get("path") or "")
+    if state.ambiguous and selected != edit_path:
         return "ambiguous"
     return "resolved"
 
