@@ -31,9 +31,8 @@ jobs:
       - name: Ruff formatting diagnostic
         continue-on-error: true
         run: make ruff-format-check
-      - name: Ruff maintainability debt diagnostic
-        continue-on-error: true
-        run: make lint-debt-summary
+      - name: Ruff maintainability debt gate
+        run: make lint-debt-gate
       - name: Exact current Ruff debt inventory
         continue-on-error: true
         run: make lint-debt-json
