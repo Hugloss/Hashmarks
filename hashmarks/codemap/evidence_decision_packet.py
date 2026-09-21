@@ -211,7 +211,9 @@ class DecisionPacketMixin:
             per_role=per_role,
         )
         timing.record("action_map")
-        edit = action.get("edit") if isinstance(action.get("edit"), dict) else None
+        candidate = action.get("edit") if isinstance(action.get("edit"), dict) else None
+        edit, _candidate, owner_resolved = project_owner_candidate(action)
+        edit = edit if isinstance(edit, dict) else None
         verify = (
             action.get("verify") if isinstance(action.get("verify"), dict) else None
         )
@@ -245,6 +247,8 @@ class DecisionPacketMixin:
             "schema": "hashmarks.task-decision-packet.v2",
             "task": task,
             "edit": edit,
+            "candidate": candidate,
+            "owner_resolved": owner_resolved,
             "verify": verify,
             "verification_relevance": action.get("verification_relevance"),
             "symbolic_nomination": self._symbolic_task_nomination(task),
