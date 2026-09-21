@@ -636,20 +636,26 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         owner = action.get("edit") if isinstance(action.get("edit"), Mapping) else None
         owner_resolved = bool(authority.get("owner_resolved")) and owner is not None
         basis = str(action.get("owner_basis") or "") or None
+        explicit_target_basis = (
+            str(owner.get("explicit_target_basis") or "")
+            if isinstance(owner, Mapping)
+            else ""
+        ) or basis
         explicit_bases = {
             "literal-path",
             "qualified-symbol",
             "unique-exact-symbol",
             "exact-symbol",
+            "explicit-test-edit",
         }
         explicit_target = (
             {
                 "status": "resolved",
-                "basis": basis,
+                "basis": explicit_target_basis,
                 "path": str(owner.get("path") or ""),
                 "symbol": owner.get("qualname") or owner.get("name"),
             }
-            if owner_resolved and basis in explicit_bases
+            if owner is not None and explicit_target_basis in explicit_bases
             else {
                 "status": "not-explicit",
                 "basis": None,
@@ -681,7 +687,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 "owner": dict(owner) if owner_resolved else None,
                 "candidate": None if owner is None else dict(owner),
                 "basis": basis if owner_resolved else None,
-                "candidate_basis": basis,
+                "candidate_basis": explicit_target_basis or basis,
                 "ambiguity": dict(ambiguity),
                 "authority": "repository-ownership-only",
                 "source_evidence": None,
