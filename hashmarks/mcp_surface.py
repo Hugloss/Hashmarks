@@ -16,6 +16,7 @@ _MAX_CHANGED_PATHS = 256
 _MAX_LIMIT = 50
 _MAX_TOKEN_BUDGET = 8_192
 _MAX_PREVIOUS_EVIDENCE_BYTES = 262_144
+_MAX_CORRELATION_INPUT_BYTES = 524_288
 
 _T = TypeVar("_T")
 
@@ -59,6 +60,27 @@ def _previous_evidence(value: dict[str, Any]) -> dict[str, Any]:
     if len(encoded) > _MAX_PREVIOUS_EVIDENCE_BYTES:
         raise McpSurfaceError(
             f"previous_evidence exceeds {_MAX_PREVIOUS_EVIDENCE_BYTES} encoded bytes"
+        )
+    return value
+
+
+def _bounded_json(
+    value: Any, *, name: str, maximum: int, expected_type: type
+) -> Any:
+    if not isinstance(value, expected_type):
+        kind = "an object" if expected_type is dict else "a list"
+        raise McpSurfaceError(f"{name} must be {kind}")
+    try:
+        encoded = json.dumps(
+            value, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise McpSurfaceError(
+            f"{name} must contain JSON-compatible values"
+        ) from exc
+    if len(encoded) > maximum:
+        raise McpSurfaceError(
+            f"{name} exceeds {maximum} encoded bytes"
         )
     return value
 
@@ -150,6 +172,64 @@ class HashmarksMcpSurface:
                 ),
             )
         )
+
+    def correlate_evidence(
+        self,
+        bundles: list[dict[str, Any]],
+        *,
+        path_mappings: list[dict[str, Any]] | None = None,
+        previous_correlation: dict[str, Any] | None = None,
+        include_relationships: bool = True,
+        relationship_limit_per_path: int = 100,
+    ) -> dict[str, object]:
+        bundles = _bounded_json(
+            bundles,
+            name="bundles",
+            maximum=_MAX_CORRELATION_INPUT_BYTES,
+            expected_type=list,
+        )
+        mappings = (
+            None
+            if path_mappings is None
+            else _bounded_json(
+                path_mappings,
+                name="path_mappings",
+                maximum=_MAX_CORRELATION_INPUT_BYTES,
+                expected_type=list,
+            )
+        )
+        previous = (
+            None
+            if previous_correlation is None
+            else _bounded_json(
+                previous_correlation,
+                name="previous_correlation",
+                maximum=_MAX_CORRELATION_INPUT_BYTES,
+                expected_type=dict,
+            )
+        )
+        if not isinstance(include_relationships, bool):
+            raise McpSurfaceError("include_relationships must be a boolean")
+        relationship_limit_per_path = _bounded_int(
+            relationship_limit_per_path,
+            name="relationship_limit_per_path",
+            minimum=1,
+            maximum=1000,
+        )
+
+        def correlate() -> dict[str, object]:
+            try:
+                return self._map.correlate_evidence(
+                    bundles,
+                    path_mappings=mappings,
+                    previous_correlation=previous,
+                    include_relationships=include_relationships,
+                    relationship_limit_per_path=relationship_limit_per_path,
+                )
+            except ValueError as exc:
+                raise McpSurfaceError(str(exc)) from exc
+
+        return self._read(correlate)
 
     def post_change(
         self,

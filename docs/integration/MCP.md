@@ -22,7 +22,7 @@ One server process binds one canonical workspace. Start another process for anot
 
 ## Tool surface
 
-Hashmarks intentionally exposes only five tools:
+Hashmarks intentionally exposes only six tools:
 
 | Tool | Purpose |
 | --- | --- |
@@ -30,9 +30,12 @@ Hashmarks intentionally exposes only five tools:
 | `find` | bounded repository path/symbol discovery |
 | `task_evidence` | compact pre-edit authority, edit, verification, freshness, ambiguity, next-read evidence |
 | `change_impact` | bounded structural impact for caller-reported changed paths |
+| `correlate_evidence` | correlate bounded external/derived observations to canonical repository evidence without inferring causation |
 | `post_change` | refresh changed paths against a previous `task_evidence` packet and return evidence deltas |
 
 The tools are read-only from the repository consumer's perspective. Hashmarks may update its own disposable derived cache while answering them.
+
+`correlate_evidence` accepts structured evidence bundles, not raw log streams. Producer-specific parsing/ingestion remains outside the MCP adapter. The tool preserves external claims, ambiguity, completeness, source equivalence, and repository deltas; interpretation and action remain consumer-owned. See [Evidence correlation](../reference/EVIDENCE_CORRELATION.md).
 
 ## Freshness and concurrency
 

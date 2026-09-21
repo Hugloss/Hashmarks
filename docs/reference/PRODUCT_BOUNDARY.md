@@ -232,6 +232,20 @@ The general rule is:
 
 > **Consumer experience may trigger a new repository query; it must not silently become repository evidence.**
 
+## Evidence correlation boundary
+
+Hashmarks may accept bounded, structured external or derived observations and correlate them to canonical repository evidence when that strengthens repository understanding without acquiring consumer or runtime authority.
+
+The governing rule is:
+
+> **Hashmarks establishes repository truth and correlates evidence to it. The consuming agent decides what the evidence means and what action to take.**
+
+External observations remain claims. Repository-native material such as source, tests, manifests, and admitted lockfiles remains governed by existing repository authorities. Derived/runtime material such as resolver output, dependency trees, CI failures, tracebacks, logs, profiler samples, compiler diagnostics, or scanner findings may point into that truth but may not overwrite it.
+
+Correlation may preserve path/symbol/location correspondence, provenance, ambiguity, completeness, qualified source equivalence, and before/after repository deltas. It must not infer causation, root cause, sufficiency, repair choice, retry policy, execution policy, or certification.
+
+Producer-specific ingestion, monitoring, storage, and search remain outside Hashmarks. External observations are request-local inputs unless a separate admitted repository-intelligence contract proves persistence is necessary.
+
 ## Execution-layer boundary
 
 Hashmarks may describe deterministic, replayable repository-derived selection contracts and the evidence necessary to validate them. It must not become the executor for those contracts.

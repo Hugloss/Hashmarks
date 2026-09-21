@@ -13,6 +13,7 @@ _EXPECTED_TOOLS = [
     "find",
     "task_evidence",
     "change_impact",
+    "correlate_evidence",
     "post_change",
 ]
 

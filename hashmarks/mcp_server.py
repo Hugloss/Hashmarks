@@ -102,6 +102,28 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         )
 
     @server.tool(
+        name="correlate_evidence",
+        description="Correlate bounded external or derived observations to repository evidence while preserving ambiguity, provenance, completeness, and source equivalence.",
+        annotations=annotations,
+    )
+    def correlate_evidence(
+        bundles: list[dict[str, Any]],
+        path_mappings: list[dict[str, Any]] | None = None,
+        previous_correlation: dict[str, Any] | None = None,
+        include_relationships: bool = True,
+        relationship_limit_per_path: int = 100,
+    ) -> dict[str, object]:
+        return _call_surface(
+            ToolError,
+            surface.correlate_evidence,
+            bundles,
+            path_mappings=path_mappings,
+            previous_correlation=previous_correlation,
+            include_relationships=include_relationships,
+            relationship_limit_per_path=relationship_limit_per_path,
+        )
+
+    @server.tool(
         name="post_change",
         description="Refresh caller-reported changed paths against a previous task_evidence packet and return only invalidated/reused/replacement evidence.",
         annotations=annotations,

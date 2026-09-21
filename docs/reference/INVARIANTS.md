@@ -176,6 +176,8 @@ Hashmarks is a repository observer that exposes repository intelligence, not an 
 
 **PB10. Derived evidence may never silently strengthen its authority source.** Hashmarks has distinct authority domains rather than one universal confidence order. Cached/indexed/provider/reconstructed evidence, findings, rankings, selections, compact packets, overviews, and other consumer projections must remain bounded by the repository bytes/metadata, provenance, freshness, visibility, and kind-specific qualification rules that support them. They may not convert `STALE`, `UNKNOWN`, `INCOMPLETE`, `AMBIGUOUS`, or unresolved evidence into stronger truth. When no existing authority rule proves a unique resolution, preserve ambiguity/unknown. Human/model interpretation and consumer outcomes never become repository facts without corresponding repository-derived evidence.
 
+**PB11. External observations are correlation inputs, not repository authority.** Runtime logs, tracebacks, CI/test failures, resolver/dependency-tree output, profiler/compiler/scanner findings, and similar consumer-supplied observations remain typed or opaque claims unless an existing Hashmarks authority independently proves the corresponding repository fact. Correlation may expose matching repository evidence and deltas, but the consumer owns interpretation, causal conclusions, and action.
+
 ## Evidence, interchange, and consumer conformance
 
 **E1. Hashmarks-produced evidence identities bind the exact authority-relevant fields they claim to represent.** Consumers compare or validate producer-owned identities; they do not recreate hidden canonicalization rules.
@@ -219,6 +221,8 @@ Hashmarks is a repository observer that exposes repository intelligence, not an 
 **G66. Repository-intelligence state families have one semantic owner.** A new projection or schema must reuse the existing repository observation, generation, member revision, freshness, completeness, relationship, and delta authorities when they already define the fact. A new CodeMap mixin or public state word may not silently become a second owner merely because a consumer needs a different projection shape.
 
 **G67. Repository evidence bindings are projections, not a second change authority.** Binding definitions may be consumer-declared and opaque, but observed member/range identities, relationships, freshness, completeness, and change facts remain bound to the canonical Hashmarks owners. Definition/configuration change must remain distinguishable from repository content or relationship change.
+
+**G68. Evidence correlation preserves claims without acquiring interpretation authority.** Bounded external or derived observations may be correlated to canonical repository evidence only through existing repository observation, identity, freshness, completeness, relationship, and delta owners. Path/symbol correspondence and qualified source equivalence may be reported; arbitrary metadata cannot strengthen repository truth. Correlation must not become causation, diagnosis, recommendation, execution, recovery, certification, or persistent consumer/runtime history.
 
 ## Historical evidence
 
