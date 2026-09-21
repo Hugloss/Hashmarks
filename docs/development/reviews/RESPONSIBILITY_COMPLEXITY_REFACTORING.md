@@ -92,6 +92,11 @@ Compatibility aliases may preserve v0.11 public names, but new internal names sh
 
 ## Qualification protocol
 
+Two evidence gates are now mandatory before a complexity owner can close:
+
+- **Exact direct-test ownership:** the selected production owner must have at least one confirmed direct owning test or an explicit unresolved ownership item. Exact first-party static re-exports may establish ownership only when the symbol resolves unambiguously to one defining source; naming similarity or facade adjacency is not authority.
+- **Complete structural-locality evidence:** behavior preservation plus lower Ruff debt is insufficient when new internal structure is introduced. Pre/post locality must be comparable and complete; unresolved repository call targets keep the phase open rather than being waived. Every introduced helper/stage must bind an independent responsibility value, and observed caller count <= 1 remains review evidence only, never proof of global single-use.
+
 For each phase:
 1. freeze the exact parent artifact identity;
 2. record pre-change complexity metrics for the selected owner;
