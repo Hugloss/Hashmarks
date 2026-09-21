@@ -119,3 +119,22 @@ def test_structural_owner_resolves_residual_candidate_ambiguity() -> None:
     assert trace["confidence"] == "high"
     assert authority["owner_resolved"] is True
     assert authority["resolved_owner"] == "src/a.py"
+
+
+def test_unique_edit_candidate_resolves_without_structural_edge() -> None:
+    trace = ownership_decision_trace(
+        OwnershipDecisionState(
+            edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},
+            competing=[
+                {"path": "tests/test_owner.py", "canonical_rank": 2, "roles": ["verify"]}
+            ],
+            structural_owner=None,
+            ambiguous=False,
+            ambiguity_reason="resolved-by-role",
+        )
+    )
+    authority = ownership_authority_contract(trace)
+
+    assert trace["status"] == "resolved"
+    assert authority["owner_resolved"] is True
+    assert authority["resolved_owner"] == "src/owner.py"
