@@ -102,6 +102,7 @@ evaluation-help:
 	  '  make metrics-worker-multistep-ab' \
 	  '  make metrics-worker-failed-verification-ab' \
 	  '  make metrics-agent-economics' \
+	  '  make metrics-context-economics-csv  Project native/hashmarks Codex evidence to CSV' \
 	  '  make metrics-bm25-economics' \
 	  '  make metrics-agent-suite' \
 	  '  make metrics-agent-trace' \
@@ -491,3 +492,10 @@ codex-economics-matrix-plan:
 	  --variant cheap-selective:CHEAP_MODEL:low:selective-real \
 	  --variant strong-native:STRONG_MODEL:medium:native \
 	  --output .hashmarks/metrics/codex-economics-matrix-plan.json
+
+metrics-context-economics-csv:
+	@test -n "$$REPORT" || (echo "REPORT is required: path to codex-agent-economics JSON" >&2; exit 2)
+	@$(UV) run --offline --no-sync python -m scripts.agent_evaluation.context_economics_csv \
+	  --input "$$REPORT" \
+	  --raw-csv "$${RAW_CSV:-.hashmarks/benchmarks/context-economics-raw.csv}" \
+	  --summary-csv "$${SUMMARY_CSV:-.hashmarks/benchmarks/context-economics-summary.csv}"
