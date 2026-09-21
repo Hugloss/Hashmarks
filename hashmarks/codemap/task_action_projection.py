@@ -149,8 +149,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             structural_owner_origin=owner.structural_owner_origin,
             archive_live_owner_ambiguity=owner.archive_live_owner_ambiguity,
             exact_identifier_paths=owner.exact_identifier_paths,
-            exact_identifier_displacement_guard=owner.exact_identifier_displacement_guard,
-            exact_identifier_surface_selected=owner.exact_identifier_surface_selected,
             inspect_rows=[row for row in context.rows if "inspect" in row["roles"]][
                 :per_role
             ],
@@ -184,6 +182,14 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         )
         if (
             selection.structural_owner is None
+            and selection.owner_basis
+            not in {
+                "literal-path",
+                "qualified-symbol",
+                "unique-exact-symbol",
+                "exact-symbol",
+                "exact-import-owner",
+            }
             and not selection.localized_config_edit
             and not selection.explicit_edit_surface_selected
             and promote_contract_surface
@@ -646,8 +652,14 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             selection.explicit_edit_surface_selected
             or context.cues.explicit_architecture_contract
             or explicit_field_contract
-            or selection.exact_identifier_displacement_guard
-            or selection.exact_identifier_surface_selected
+            or selection.owner_basis
+            in {
+                "literal-path",
+                "qualified-symbol",
+                "unique-exact-symbol",
+                "exact-symbol",
+                "exact-import-owner",
+            }
         )
         multi_identifier_edit_ambiguity = (
             self._task_action_multi_identifier_edit_ambiguity(
@@ -763,8 +775,14 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             selection.structural_owner,
             selection.localized_config_edit,
             bool(
-                selection.exact_identifier_displacement_guard
-                or selection.exact_identifier_surface_selected
+                selection.owner_basis
+                in {
+                    "literal-path",
+                    "qualified-symbol",
+                    "unique-exact-symbol",
+                    "exact-symbol",
+                    "exact-import-owner",
+                }
             ),
             (
                 selection.explicit_surface_ambiguity,
