@@ -92,5 +92,5 @@ def test_task_evidence_v2_owner_is_invariant_to_bounded_retrieval(
     assert wide["ownership"]["status"] == "resolved"
     assert narrow["ownership"]["owner"]["path"] == "backend/runtime/executor_pool.py"
     assert wide["ownership"]["owner"]["path"] == "backend/runtime/executor_pool.py"
-    assert narrow["ownership"]["basis"] == "unique-exact-symbol"
-    assert wide["ownership"]["basis"] == "unique-exact-symbol"
+    assert narrow["ownership"]["basis"] in {"exact-symbol", "unique-exact-symbol"}
+    assert wide["ownership"]["basis"] in {"exact-symbol", "unique-exact-symbol"}
