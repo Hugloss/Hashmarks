@@ -77,20 +77,21 @@ class TaskActionOwnerResolutionMixin:
         bounded request-role discriminator, not a second repository resolver.
         """
         lowered = task.lower()
-        dependency_markers = (
-            " so ",
-            " using ",
-            " with ",
-            " by ",
-            " via ",
-            " through ",
-            " to use ",
-            " to call ",
-        )
-        for marker in dependency_markers:
-            index = lowered.find(marker)
-            if index > 0:
-                return task[:index]
+        marker_positions = [
+            lowered.find(marker)
+            for marker in (
+                " so ",
+                " using ",
+                " with ",
+                " by ",
+                " via ",
+                " through ",
+                " to use ",
+                " to call ",
+            )
+        ]
+        if positions := [position for position in marker_positions if position > 0]:
+            return task[: min(positions)]
 
         dependency_first = re.match(
             r"^\s*(?:use|call|apply)\s+.+?\s+(?:in|from|inside|within)\s+(.+)$",
