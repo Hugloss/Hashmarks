@@ -1270,10 +1270,15 @@ class EvidenceCorrelationMixin:
         identity_payload = dict(packet)
         identity_payload.pop("correlation_identity", None)
         identity_payload.pop("delta_from_previous", None)
-        expected_identity = "sha256:" + EvidenceCorrelationMixin._packet_digest(
-            "hashmarks.evidence-correlation.v1",
-            identity_payload,
-        )
+        expected_identity = "sha256:" + hashlib.sha256(
+            b"hashmarks.evidence-correlation.v1\\0"
+            + json.dumps(
+                identity_payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ).encode("utf-8")
+        ).hexdigest()
         if supplied_identity != expected_identity:
             raise ValueError(f"{label} correlation_identity does not match packet content")
 
