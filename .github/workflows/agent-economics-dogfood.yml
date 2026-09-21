@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Hugloss/agentsCookbook
-          ref: b0e7ed310e9690e5a7a8ec20067b75ec6712a0ca
+          ref: 3ebcd0c9bcf852f00b4ed89d5a716ed11c970eae
           path: .agentsCookbook
           persist-credentials: false
 
