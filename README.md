@@ -64,7 +64,7 @@ Hashmarks exposes one local, read-only **stdio MCP server** with six focused too
 | --- | --- |
 | `repository_context` | compact repository orientation, languages, projects, generation and freshness |
 | `find` | bounded codebase search across paths and symbols |
-| `task_evidence` | pre-edit ownership, ambiguity, verification and next-read evidence |
+| `task_evidence` | role-separated retrieval, ownership, ambiguity, verification, freshness and next-read evidence |
 | `change_impact` | structural impact for changed or candidate paths |
 | `post_change` | refreshed evidence and deltas after the caller changes files |
 
@@ -323,7 +323,7 @@ Run `hashmarks --help` for the complete command surface.
 | `tests QUERY` | Structurally related verification surfaces |
 | `structural-locality PATH::QUALNAME` | Fresh bounded structural-locality facts for one exact symbol |
 | `structural-locality-delta --before A --after B` | Compare two locality packets without deciding whether the tradeoff is good |
-| `task-evidence TASK` | Resolve a task into bounded edit/verify/source evidence |
+| `task-evidence TASK` | Project bounded retrieval, explicit-target, ownership, verification, freshness, and related repository evidence |
 | `change-impact TASK --changed PATH` | Recompute impact and verification relevance from changed paths |
 | `post-change TASK --changed PATH --previous-evidence FILE` | Reconcile changed paths and return evidence deltas |
 | `doctor` | Show runtime/observer configuration |
