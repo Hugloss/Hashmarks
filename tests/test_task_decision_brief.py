@@ -64,8 +64,9 @@ def test_decision_brief_keeps_ambiguous_candidate_out_of_edit_authority(
         packet = c.task_decision_packet("Fix publish_result")
         brief = c.task_decision_brief("Fix publish_result")
 
-    assert packet["edit"]["path"] in {"src/a.py", "src/b.py"}
-    assert packet["ownership_authority"]["owner_resolved"] is False
+    assert packet["edit"] is None
+    assert packet["candidate"]["path"] in {"src/a.py", "src/b.py"}
+    assert packet["owner_resolved"] is False
     assert brief["safe"] is False
     assert brief["edit"] is None
     assert brief["candidate"]["path"] in {"src/a.py", "src/b.py"}
