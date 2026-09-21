@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
-
-import hashlib
-import json
 
 SCHEMA = "hashmarks.repository-quality-case.v1"
 REPORT_SCHEMA = "hashmarks.repository-quality-report.v1"
