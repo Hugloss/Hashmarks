@@ -534,6 +534,70 @@ def test_previous_correlation_rejects_missing_or_malformed_identity(
             codemap.evidence_correlation_delta(before, malformed)
 
 
+def test_duplicate_bundle_ids_fail_closed_before_correlation(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    bundle = {
+        "bundle_id": "duplicate",
+        "producer": {"kind": "test-fixture"},
+        "completeness": "complete",
+        "anchors": [{"anchor_id": "owner", "path": "owner.py"}],
+    }
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="duplicate bundle_id: duplicate"):
+            codemap.correlate_evidence(
+                [bundle, dict(bundle)],
+                include_relationships=False,
+            )
+
+
+def test_duplicate_anchor_ids_fail_closed_within_bundle(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="duplicate anchor_id in bundle observation:1: owner",
+        ):
+            codemap.correlate_evidence(
+                _bundle(
+                    {"anchor_id": "owner", "path": "owner.py"},
+                    {"anchor_id": "owner", "path": "owner.py"},
+                ),
+                include_relationships=False,
+            )
+
+
+def test_previous_correlation_rejects_tampered_authority_definition_and_bounds(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.correlate_evidence(
+            _bundle({"anchor_id": "owner", "path": "owner.py"}),
+            include_relationships=False,
+        )
+        mutations = [
+            ("authority", "consumer-owned"),
+            ("evidence_definition_identity", "sha256:" + "0" * 64),
+            ("bounds", {"request_max_bytes": 1, "packet_max_bytes": 1, "max_anchors": 1}),
+            ("path_mappings", [{"external_prefix": "/app", "repository_prefix": "src"}]),
+        ]
+        for field, value in mutations:
+            tampered = json.loads(json.dumps(before))
+            tampered[field] = value
+            with pytest.raises(
+                ValueError,
+                match="correlation_identity does not match packet content",
+            ):
+                codemap.evidence_correlation_delta(tampered, before)
+
+
 def test_correlation_request_reuses_binding_total_bound(
     tmp_path: Path,
 ) -> None:
