@@ -317,10 +317,11 @@ class EvidenceCorrelationMixin:
         )
         line = _positive_line(raw_anchor.get("line"))
         symbol = _bounded_symbol(raw_anchor.get("symbol"))
-        if claimed_path is None and symbol is None:
-            raise ValueError("each anchor requires path and/or symbol")
-        if line is not None and claimed_path is None:
-            raise ValueError("line requires path")
+        module = _bounded_module(raw_anchor.get("module"))
+        if claimed_path is None and symbol is None and module is None:
+            raise ValueError("each anchor requires path, symbol, and/or module")
+        if line is not None and claimed_path is None and module is None:
+            raise ValueError("line requires path or module")
         metadata = raw_anchor.get("metadata", {})
         if not isinstance(metadata, Mapping):
             raise ValueError("anchor metadata must be an object")
@@ -338,6 +339,7 @@ class EvidenceCorrelationMixin:
             path=claimed_path,
             line=line,
             symbol=symbol,
+            module=module,
             metadata=metadata_dict,
             metadata_bytes=metadata_bytes,
             member_revision=_member_revision(raw_anchor.get("member_revision")),
@@ -351,6 +353,25 @@ class EvidenceCorrelationMixin:
         mappings: Sequence[Mapping[str, str]],
     ) -> _Resolution:
         if claims.path is None:
+            if claims.module is not None:
+                module_resolution = self._resolve_module_only(claims.module)
+                if module_resolution.state != "resolved-unique":
+                    return module_resolution
+                assert module_resolution.repository_path is not None
+                if claims.symbol is not None:
+                    return self._resolve_symbol_at_path(
+                        module_resolution.repository_path,
+                        claims.symbol,
+                        line=claims.line,
+                        path_origin="module",
+                    )
+                if claims.line is not None:
+                    return self._resolve_line_at_path(
+                        module_resolution.repository_path,
+                        claims.line,
+                        path_origin="module",
+                    )
+                return module_resolution
             assert claims.symbol is not None
             return self._resolve_symbol_only(claims.symbol)
         repository_path, path_origin = self._map_external_path(
@@ -370,6 +391,12 @@ class EvidenceCorrelationMixin:
                 path_origin,
                 repository_path,
             )
+        if claims.module is not None:
+            module_conflict = self._module_path_conflict(
+                repository_path, claims.module, path_origin=path_origin
+            )
+            if module_conflict is not None:
+                return module_conflict
         if claims.symbol is not None:
             return self._resolve_symbol_at_path(
                 repository_path,
@@ -388,6 +415,69 @@ class EvidenceCorrelationMixin:
             "path-member",
             path_origin,
             repository_path,
+        )
+
+    def _resolve_module_only(self, module: str) -> _Resolution:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        rows = self.store.visible_module_paths(
+            module, limit=_MAX_MODULE_CANDIDATES + 1
+        )
+        admitted: list[str] = []
+        for path in rows:
+            member, _raw = self._repository_member_observation(path)
+            if member.get("state") == "known-present":
+                admitted.append(path)
+        candidates = tuple(admitted[:_MAX_MODULE_CANDIDATES])
+        truncated = len(admitted) > _MAX_MODULE_CANDIDATES
+        if len(admitted) == 1:
+            return _Resolution(
+                "resolved-unique",
+                "module-only",
+                "module",
+                admitted[0],
+                module_candidates=candidates,
+            )
+        if admitted:
+            return _Resolution(
+                "resolved-ambiguous",
+                (
+                    "module-match-bound-exhausted"
+                    if truncated
+                    else "module-matches-multiple-repository-members"
+                ),
+                "module",
+                module_candidates=candidates,
+                candidates_truncated=truncated,
+            )
+        return _Resolution(
+            "unresolved",
+            "module-not-found",
+            "module",
+        )
+
+    def _module_path_conflict(
+        self,
+        path: str,
+        module: str,
+        *,
+        path_origin: str,
+    ) -> _Resolution | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        row = self._session_file_row(path)
+        observed = "" if row is None else str(row.get("module_name") or "")
+        if observed == module:
+            return None
+        return _Resolution(
+            "claim-conflict",
+            (
+                "module-does-not-match-resolved-path"
+                if observed
+                else "module-not-proven-for-resolved-path"
+            ),
+            path_origin,
+            path,
         )
 
     def _resolve_symbol_only(self, symbol: str) -> _Resolution:
