@@ -117,6 +117,12 @@ def _baseline_failures(
         return ["debt baseline schema mismatch; regenerate from exact Ruff inventory"]
     if baseline.get("limits") != summary["limits"]:
         return ["Ruff limits changed; review the configured thresholds and baseline"]
+    if baseline.get("max_python_file_lines") != summary["max_python_file_lines"]:
+        return [
+            "production line ceiling changed: "
+            f"{baseline.get('max_python_file_lines')} -> "
+            f"{summary['max_python_file_lines']}"
+        ]
     current_files = dict(summary["files"])
     baseline_files = dict(baseline["files"])
     failures: list[str] = []
@@ -150,6 +156,7 @@ def _parse_args():
     parser.add_argument("--summary-only", action="store_true")
     parser.add_argument("--write-baseline", type=Path)
     parser.add_argument("--baseline", type=Path)
+    parser.add_argument("--previous-baseline", type=Path)
     return parser.parse_args()
 
 
@@ -162,13 +169,38 @@ def _write_baseline(path: Path | None, summary: dict[str, object]) -> None:
 
 def _report_baseline(args, summary: dict[str, object]) -> int | None:
     if args.baseline is None:
+        if args.previous_baseline is not None:
+            raise ValueError("--previous-baseline requires --baseline")
         return None
     baseline = json.loads(args.baseline.read_text(encoding="utf-8"))
-    failures = _baseline_failures(summary, baseline)
+    failures: list[str] = []
+    previous = None
+    if args.previous_baseline is not None:
+        previous = json.loads(args.previous_baseline.read_text(encoding="utf-8"))
+        failures.extend(
+            f"baseline mutation: {failure}"
+            for failure in _baseline_failures(baseline, previous)
+        )
+    failures.extend(_baseline_failures(summary, baseline))
     if args.json:
-        print(json.dumps({"summary": summary, "failures": failures}, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    "summary": summary,
+                    "baseline": baseline,
+                    "previous_baseline": previous,
+                    "failures": failures,
+                },
+                sort_keys=True,
+            )
+        )
     else:
         print(f"Ruff debt excess: {summary['excess']} (baseline {baseline['excess']})")
+        if previous is not None:
+            print(
+                "Previous-main baseline excess: "
+                f"{previous['excess']} -> candidate {baseline['excess']}"
+            )
         print(
             "Production file line ceiling: "
             f"{MAX_PYTHON_FILE_LINES} (oversized={len(dict(summary['oversized_files']))})"
