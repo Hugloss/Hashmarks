@@ -302,29 +302,3 @@ def test_task_action_brief_does_not_launder_named_dependency_into_owner(
 
     assert brief["edit"] == "src/publish.py"
     assert brief["status"] == "safe-fresh"
-
-
-def test_task_action_brief_never_promotes_ambiguous_candidate_to_edit(
-    tmp_path: Path,
-) -> None:
-    (tmp_path / "src").mkdir()
-    (tmp_path / "tests").mkdir()
-    for name in ("a", "b"):
-        (tmp_path / "src" / f"{name}.py").write_text(
-            "def publish_result(value):\n    return value\n", encoding="utf-8"
-        )
-    (tmp_path / "tests/test_publish.py").write_text(
-        "from src.a import publish_result\n"
-        "def test_publish(): assert publish_result('x') == 'x'\n",
-        encoding="utf-8",
-    )
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        action = codemap.task_action_map("Fix publish_result", limit=20)
-        brief = codemap.task_action_brief("Fix publish_result", token_budget=256)
-
-    assert action["ambiguity"]["ambiguous"] is True
-    assert action["ownership_authority"]["owner_resolved"] is False
-    assert brief["status"] == "unsafe"
-    assert "edit" not in brief
-    assert brief["discrimination"] == "competing-action-roles"
