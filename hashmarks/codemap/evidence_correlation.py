@@ -1246,8 +1246,8 @@ class EvidenceCorrelationMixin:
         )
         return payload
 
-    @staticmethod
     def _validate_correlation_packet(
+        self,
         packet: Mapping[str, object],
         *,
         label: str,
@@ -1270,15 +1270,10 @@ class EvidenceCorrelationMixin:
         identity_payload = dict(packet)
         identity_payload.pop("correlation_identity", None)
         identity_payload.pop("delta_from_previous", None)
-        expected_identity = "sha256:" + hashlib.sha256(
-            b"hashmarks.evidence-correlation.v1\\0"
-            + json.dumps(
-                identity_payload,
-                sort_keys=True,
-                separators=(",", ":"),
-                ensure_ascii=False,
-            ).encode("utf-8")
-        ).hexdigest()
+        expected_identity = "sha256:" + self._packet_digest(
+            "hashmarks.evidence-correlation.v1",
+            identity_payload,
+        )
         if supplied_identity != expected_identity:
             raise ValueError(f"{label} correlation_identity does not match packet content")
 
