@@ -120,6 +120,7 @@ class WorkspaceMapQueryMixin:
                 """SELECT s.*, f.evidence_visibility
                 FROM symbol s JOIN file_map f ON f.path=s.path
                 WHERE s.path=? AND s.start_line<=? AND s.end_line>=?
+                  AND f.evidence_visibility!='deny'
                 ORDER BY (s.end_line-s.start_line),s.start_line,s.qualname
                 LIMIT ?""",
                 (path, line, line, limit),
@@ -140,6 +141,7 @@ class WorkspaceMapQueryMixin:
                 """SELECT s.*, f.evidence_visibility
                 FROM symbol s JOIN file_map f ON f.path=s.path
                 WHERE s.path=? AND (s.qualname=? OR s.name=?)
+                  AND f.evidence_visibility!='deny'
                 ORDER BY CASE WHEN s.qualname=? THEN 0 ELSE 1 END,
                          s.start_line,s.qualname
                 LIMIT ?""",
