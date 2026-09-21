@@ -50,7 +50,14 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 row["symbol"] = str(symbol)
             return row
 
-        edit = anchor(packet.get("edit"))
+        candidate = anchor(packet.get("edit"))
+        authority = (
+            packet.get("ownership_authority")
+            if isinstance(packet.get("ownership_authority"), dict)
+            else {}
+        )
+        owner_resolved = bool(authority.get("owner_resolved"))
+        edit = candidate if owner_resolved else None
         verify = anchor(packet.get("verify"))
         contract = anchor(packet.get("contract"))
         used = {row["path"] for row in (edit, verify) if row is not None}
@@ -87,11 +94,12 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         result: dict[str, object] = {
             "schema": "hashmarks.task-decision-brief.v1",
             "edit": edit,
+            "candidate": candidate,
             "verify": verify,
             "verification_argv": list(plan.get("argv") or [])
             if plan.get("available")
             else None,
-            "safe": bool(context.get("safe")),
+            "safe": bool(context.get("safe")) and owner_resolved,
             "stale": bool(identity.get("stale")),
             "decision_generation": identity.get("decision_generation"),
             "evidence_receipt": dict(packet.get("evidence_receipt") or {}),
@@ -239,11 +247,19 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             self = cast("CodeMap", self)
         context = self.work_context(action, token_budget=token_budget)
         _generation, _identity_generation, stale = self._generation_status()
-        edit, verify, contract = self._task_action_selected_rows(action)
+        candidate, verify, contract = self._task_action_selected_rows(action)
+        authority = (
+            action.get("ownership_authority")
+            if isinstance(action.get("ownership_authority"), Mapping)
+            else {}
+        )
+        owner_resolved = bool(authority.get("owner_resolved"))
+        edit = candidate if owner_resolved else None
         verification = self._task_action_verification_plan(verify)
 
         safe = (
             bool(context.get("safe"))
+            and owner_resolved
             and edit is not None
             and bool(verification.get("available"))
         )
@@ -257,6 +273,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         }
         if edit and edit.get("path"):
             result["edit"] = str(edit["path"])
+        elif candidate and candidate.get("path"):
+            result["candidate"] = str(candidate["path"])
         if bool(verification.get("available")):
             argv = verification.get("argv")
             if isinstance(argv, list) and argv:
