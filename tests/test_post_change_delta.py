@@ -33,8 +33,8 @@ def test_task_post_change_delta_invalidates_only_changed_revision_and_reuses_aut
             task, ["src/owner.py"], previous_evidence=previous
         )
 
-    assert delta["schema"] == "hashmarks.task-post-change-delta.v1"
-    assert delta["status"] == "changed"
+    assert delta["schema"] == "hashmarks.task-post-change-delta.v2"
+    assert delta["change"] == "changed"
     assert delta["scope"] == "changed-paths-only"
     assert delta["consumer_owner"] == "external"
     assert "previous_index_binding" not in delta
@@ -43,13 +43,12 @@ def test_task_post_change_delta_invalidates_only_changed_revision_and_reuses_aut
     assert delta["generation_after"] > delta["generation_before"]
     assert delta["invalidated"] == [
         "previous-evidence-generation",
-        "edit-source-revision",
+        "candidate-source-revision",
     ]
     assert set(delta["reused"]) >= {
-        "edit-authority",
+        "task-candidate",
         "verification-surface",
-        "verification-command",
-        "owner-path",
+        "verification-plan",
         "selection-provenance",
     }
     assert delta["path_changes"][0]["revision"] != old_revision
@@ -71,11 +70,11 @@ def test_task_post_change_delta_noop_keeps_generation_and_revision_reusable(
             task, ["src/owner.py"], previous_evidence=previous
         )
 
-    assert delta["status"] == "unchanged"
+    assert delta["change"] == "unchanged"
     assert delta["generation_after"] == delta["generation_before"]
     assert delta["path_changes"] == [{"path": "src/owner.py", "state": "unchanged"}]
     assert delta["invalidated"] == []
-    assert "edit-source-revision" in delta["reused"]
+    assert "candidate-source-revision" in delta["reused"]
 
 
 def test_task_post_change_delta_reports_new_owner_without_replaying_unchanged_verification(
@@ -102,7 +101,7 @@ def test_task_post_change_delta_reports_new_owner_without_replaying_unchanged_ve
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         previous = codemap.task_evidence(task)
-        assert previous["edit"] == "src/engine_a.py"
+        assert previous["ownership"]["candidate"]["path"] == "src/engine_a.py"
         route.write_text(
             "from src.engine_b import widget\ndef route(): return widget()\n",
             encoding="utf-8",
@@ -111,13 +110,14 @@ def test_task_post_change_delta_reports_new_owner_without_replaying_unchanged_ve
             task, ["src/route.py"], previous_evidence=previous
         )
 
-    assert delta["replacement"]["edit"] == "src/engine_b.py"
-    assert "src/engine_b.py" in delta["replacement"]["owner_path"]
-    assert "edit-authority" in delta["invalidated"]
-    assert "owner-path" in delta["invalidated"]
+    assert (
+        delta["replacement"]["ownership"]["candidate"]["path"]
+        == "src/engine_b.py"
+    )
+    assert "task-candidate" in delta["invalidated"]
     assert "verification-surface" in delta["reused"]
-    assert "verification-command" in delta["reused"]
-    assert "verify" not in delta["replacement"]
+    assert "verification-plan" in delta["reused"]
+    assert "verification" not in delta["replacement"]
 
 
 def test_task_post_change_delta_rejects_non_start_packet(tmp_path: Path) -> None:
@@ -129,7 +129,7 @@ def test_task_post_change_delta_rejects_non_start_packet(tmp_path: Path) -> None
                 task, ["src/owner.py"], previous_evidence={"schema": "wrong"}
             )
         except ValueError as exc:
-            assert "hashmarks.task-evidence.v1" in str(exc)
+            assert "hashmarks.task-evidence.v2" in str(exc)
         else:
             raise AssertionError("invalid previous_evidence must fail closed")
 
@@ -162,9 +162,9 @@ def test_post_change_cli_reads_exact_previous_evidence_packet(
         == 0
     )
     output = json.loads(capsys.readouterr().out)
-    assert output["schema"] == "hashmarks.task-post-change-delta.v1"
+    assert output["schema"] == "hashmarks.task-post-change-delta.v2"
     assert output["path_changes"][0]["state"] == "changed"
-    assert "edit-source-revision" in output["invalidated"]
+    assert "candidate-source-revision" in output["invalidated"]
 
 
 def _wait(client: CodeMapServiceClient) -> None:
@@ -193,9 +193,9 @@ def test_service_task_post_change_delta_preserves_external_execution_owner(
         delta = client.task_post_change_delta(
             task, ["src/owner.py"], previous_evidence=previous
         )
-        assert delta["schema"] == "hashmarks.task-post-change-delta.v1"
+        assert delta["schema"] == "hashmarks.task-post-change-delta.v2"
         assert delta["consumer_owner"] == "external"
-        assert "edit-source-revision" in delta["invalidated"]
+        assert "candidate-source-revision" in delta["invalidated"]
     finally:
         client.stop()
         thread.join(timeout=5)
@@ -219,8 +219,9 @@ def test_external_evaluation_post_change_qualification_freezes_before_secret_joi
     assert payload["summary"]["path_change_detected"] == 6
     assert payload["summary"]["revision_invalidated"] == 6
     assert payload["summary"]["generation_invalidated"] == 6
-    assert payload["summary"]["edit_authority_reused"] == 6
+    assert payload["summary"]["candidate_reused"] == 6
     assert payload["summary"]["verification_surface_reused"] == 6
+    assert payload["summary"]["verification_plan_reused"] == 6
     assert payload["summary"]["replacement_absent"] == 6
     assert (
         payload["summary"]["delta_visible_bytes"]
