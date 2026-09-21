@@ -493,3 +493,162 @@ def test_structural_locality_imported_class_alias_resolves_exact_member(
         "pkg/worker.py::Worker.helper",
     }
     assert packet["dimensions"]["unresolved_call_count"] == 0
+def test_structural_locality_resolves_exact_self_method_and_caller(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+class Worker:
+    def authority(self, value):
+        return self._normalize(value)
+
+    def _normalize(self, value):
+        return value + 1
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::Worker.authority",
+            max_depth=2,
+        )
+        helper = codemap.structural_locality(
+            "pkg/core.py::Worker._normalize",
+            max_depth=0,
+        )
+
+    assert {row["symbol_id"] for row in packet["nodes"]} == {
+        "pkg/core.py::Worker.authority",
+        "pkg/core.py::Worker._normalize",
+    }
+    assert packet["dimensions"]["unresolved_call_count"] == 0
+    target = helper["nodes"][0]
+    assert target["exact_caller_count"] == 1
+    assert {
+        (row["path"], row["source"]) for row in target["exact_callers"]
+    } == {("pkg/core.py", "Worker.authority")}
+
+
+def test_structural_locality_resolves_exact_cls_method(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+class Worker:
+    @classmethod
+    def build(cls, value):
+        return cls._normalize(value)
+
+    @staticmethod
+    def _normalize(value):
+        return value + 1
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::Worker.build",
+            max_depth=2,
+        )
+
+    assert {row["symbol_id"] for row in packet["nodes"]} == {
+        "pkg/core.py::Worker.build",
+        "pkg/core.py::Worker._normalize",
+    }
+    assert packet["dimensions"]["unresolved_call_count"] == 0
+
+
+def test_structural_locality_resolves_unambiguous_inherited_self_method(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/base.py",
+        """
+class Base:
+    def _normalize(self, value):
+        return value + 1
+""".lstrip(),
+    )
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+from pkg.base import Base
+
+
+class Worker(Base):
+    def authority(self, value):
+        return self._normalize(value)
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::Worker.authority",
+            max_depth=2,
+        )
+        helper = codemap.structural_locality(
+            "pkg/base.py::Base._normalize",
+            max_depth=0,
+        )
+
+    assert {row["symbol_id"] for row in packet["nodes"]} == {
+        "pkg/core.py::Worker.authority",
+        "pkg/base.py::Base._normalize",
+    }
+    assert packet["dimensions"]["unresolved_call_count"] == 0
+    target = helper["nodes"][0]
+    assert target["exact_caller_count"] == 1
+    assert {
+        (row["path"], row["source"]) for row in target["exact_callers"]
+    } == {("pkg/core.py", "Worker.authority")}
+
+
+def test_structural_locality_keeps_ambiguous_inherited_self_method_unresolved(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+class First:
+    def helper(self, value):
+        return value + 1
+
+
+class Second:
+    def helper(self, value):
+        return value - 1
+
+
+class Worker(First, Second):
+    def authority(self, value):
+        return self.helper(value)
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::Worker.authority",
+            max_depth=2,
+        )
+
+    assert [row["symbol_id"] for row in packet["nodes"]] == [
+        "pkg/core.py::Worker.authority"
+    ]
+    assert packet["dimensions"]["unresolved_call_count"] == 1
+    unresolved = packet["unresolved_calls"][0]
+    assert unresolved["target_text"] == "self.helper"
+    assert unresolved["candidate_symbol_ids"] == [
+        "pkg/core.py::First.helper",
+        "pkg/core.py::Second.helper",
+    ]
