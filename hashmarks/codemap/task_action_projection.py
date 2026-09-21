@@ -698,6 +698,24 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             decisive_qualified_verification,
         )
 
+    def _task_action_local_owner_ambiguity_evidence(
+        self,
+        task: str,
+        context: _TaskActionMapContext,
+        selection: _TaskActionSelectionState,
+        limit: int,
+    ) -> tuple[dict[str, dict[str, object]], list[dict[str, object]]]:
+        if selection.structural_owner is None or selection.localized_config_edit:
+            return {}, []
+        return self._task_action_local_structural_owner_evidence(
+            task,
+            context.rows,
+            context.failed,
+            selection.discrimination,
+            limit,
+            selection.structural_owner_origin,
+        )
+
     def _task_action_projection_ambiguity_state(
         self,
         task: str,
@@ -714,23 +732,12 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         limit, per_role = bounds
-        task_local_structural_owners: dict[str, dict[str, object]] = {}
-        task_local_verification_origins: list[dict[str, object]] = []
-        if (
-            selection.structural_owner is not None
-            and not selection.localized_config_edit
-        ):
-            (
-                task_local_structural_owners,
-                task_local_verification_origins,
-            ) = self._task_action_local_structural_owner_evidence(
-                task,
-                context.rows,
-                context.failed,
-                selection.discrimination,
-                limit,
-                selection.structural_owner_origin,
-            )
+        (
+            task_local_structural_owners,
+            task_local_verification_origins,
+        ) = self._task_action_local_owner_ambiguity_evidence(
+            task, context, selection, limit
+        )
         multi_structural_owner_ambiguity = len(task_local_structural_owners) > 1
 
         competing = self._task_action_competing_rows(choices.edit, context.rows)
