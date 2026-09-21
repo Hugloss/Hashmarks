@@ -78,6 +78,8 @@ def test_mcp_surface_correlates_external_evidence_without_interpreting_it(
                     "bundle_id": "runtime:1",
                     "producer": {"kind": "traceback"},
                     "completeness": "complete",
+                    "scope": {"kind": "traceback-request"},
+                    "truncation": "complete",
                     "anchors": [
                         {
                             "anchor_id": "frame:0",
@@ -174,6 +176,8 @@ def test_mcp_correlation_round_trips_max_repeated_anchor_set(
             "bundle_id": "traceback-sample",
             "producer": {"kind": "traceback"},
             "completeness": "complete",
+            "scope": {"kind": "traceback-sample"},
+            "truncation": "complete",
             "anchors": anchors,
         }
     ]

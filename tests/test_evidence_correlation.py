@@ -20,6 +20,8 @@ def _bundle(
             "bundle_id": "observation:1",
             "producer": {"kind": "test-fixture"},
             "completeness": completeness,
+            "scope": {"kind": "test-fixture"},
+            "truncation": "complete" if completeness == "complete" else "unknown",
             "anchors": list(anchors),
         }
     ]
@@ -274,12 +276,16 @@ def test_bundle_reordering_does_not_change_correlation_identity(
             "bundle_id": "b",
             "producer": {},
             "completeness": "complete",
+            "scope": {"kind": "test-fixture"},
+            "truncation": "complete",
             "anchors": [{"anchor_id": "b:0", "path": "b.py"}],
         },
         {
             "bundle_id": "a",
             "producer": {},
             "completeness": "complete",
+            "scope": {"kind": "test-fixture"},
+            "truncation": "complete",
             "anchors": [{"anchor_id": "a:0", "path": "a.py"}],
         },
     ]
@@ -416,7 +422,115 @@ def test_bundle_completeness_is_preserved_not_inferred(
     assert packet["completeness"] == {
         "state": "incomplete",
         "scope": "caller-declared-external-observations",
+        "authority": "caller-claimed",
+        "negative_evidence": "not-admissible",
     }
+
+
+def test_complete_external_bundle_requires_explicit_non_truncation(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    bundle = _bundle({"anchor_id": "owner", "path": "owner.py"})[0]
+    bundle.pop("truncation")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="completeness=complete requires truncation=complete",
+        ):
+            codemap.correlate_evidence([bundle], include_relationships=False)
+
+
+def test_truncated_external_bundle_cannot_authorize_negative_evidence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    bundle = _bundle(
+        {"anchor_id": "owner", "path": "owner.py"},
+        completeness="incomplete",
+    )[0]
+    bundle["scope"] = {"stream": "masked-runtime", "window": "bounded-sample"}
+    bundle["truncation"] = "truncated"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence([bundle], include_relationships=False)
+
+    assert packet["bundles"][0]["scope"] == bundle["scope"]
+    assert packet["bundles"][0]["truncation"] == "truncated"
+    assert packet["bundles"][0]["producer_authority"] == "caller-claimed"
+    assert packet["completeness"] == {
+        "state": "incomplete",
+        "scope": "caller-declared-external-observations",
+        "authority": "caller-claimed",
+        "negative_evidence": "not-admissible",
+    }
+
+
+def test_complete_scoped_external_bundle_marks_negative_evidence_scope_only(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    bundle = _bundle({"anchor_id": "owner", "path": "owner.py"})[0]
+    bundle["scope"] = {
+        "stream": "masked-runtime",
+        "window": "2026-09-21T08:00:00Z/2026-09-21T09:00:00Z",
+    }
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence([bundle], include_relationships=False)
+
+    assert packet["completeness"] == {
+        "state": "complete",
+        "scope": "caller-declared-external-observations",
+        "authority": "caller-claimed",
+        "negative_evidence": "admissible-within-declared-scopes",
+    }
+    assert packet["bundles"][0]["scope"] == bundle["scope"]
+
+
+def test_scope_and_truncation_change_definition_identity(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    first_bundle = _bundle(
+        {"anchor_id": "owner", "path": "owner.py"},
+        completeness="incomplete",
+    )[0]
+    first_bundle["scope"] = {"window": "first"}
+    first_bundle["truncation"] = "truncated"
+    second_bundle = json.loads(json.dumps(first_bundle))
+    second_bundle["scope"] = {"window": "second"}
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        first = codemap.correlate_evidence([first_bundle], include_relationships=False)
+        second = codemap.correlate_evidence([second_bundle], include_relationships=False)
+        delta = codemap.evidence_correlation_delta(first, second)
+
+    assert (
+        first["evidence_definition_identity"]
+        != second["evidence_definition_identity"]
+    )
+    assert delta["definition"]["state"] == "changed"
+
+
+def test_bundle_scope_is_bounded_and_json_compatible(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        bundle = _bundle(
+            {"anchor_id": "missing", "path": "missing.py"},
+            completeness="incomplete",
+        )[0]
+        bundle["scope"] = {"bad": object()}
+        with pytest.raises(
+            ValueError,
+            match="evidence correlation request must contain JSON-compatible values",
+        ):
+            codemap.correlate_evidence([bundle], include_relationships=False)
+
+        bundle["scope"] = {"value": "x" * 9000}
+        with pytest.raises(ValueError, match="bundle scope exceeds 8192 encoded bytes"):
+            codemap.correlate_evidence([bundle], include_relationships=False)
 
 
 def test_uv_lock_upgrade_delta_reuses_repository_binding_authority(
@@ -542,6 +656,8 @@ def test_duplicate_bundle_ids_fail_closed_before_correlation(
         "bundle_id": "duplicate",
         "producer": {"kind": "test-fixture"},
         "completeness": "complete",
+        "scope": {"kind": "test-fixture"},
+        "truncation": "complete",
         "anchors": [{"anchor_id": "owner", "path": "owner.py"}],
     }
     with CodeMap(tmp_path) as codemap:
@@ -613,12 +729,16 @@ def test_correlation_request_reuses_binding_total_bound(
             "bundle_id": "too-many",
             "producer": {},
             "completeness": "complete",
+            "scope": {"kind": "test-fixture"},
+            "truncation": "complete",
             "anchors": anchors[:256],
         },
         {
             "bundle_id": "one-more",
             "producer": {},
             "completeness": "complete",
+            "scope": {"kind": "test-fixture"},
+            "truncation": "complete",
             "anchors": anchors[256:],
         },
     ]
