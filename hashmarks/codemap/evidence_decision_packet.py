@@ -224,9 +224,7 @@ class DecisionPacketMixin:
         )
 
         timing.begin_phase()
-        context_action = dict(action)
-        context_action["edit"] = edit
-        work_context = self.work_context(context_action, token_budget=token_budget)
+        work_context = self.work_context(action, token_budget=token_budget)
         timing.record("work_context")
         timing.begin_phase()
         verification = self._task_decision_verification_plan(verify)
