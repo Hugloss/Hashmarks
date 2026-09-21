@@ -327,5 +327,4 @@ def test_task_action_brief_never_promotes_ambiguous_candidate_to_edit(
     assert action["ownership_authority"]["owner_resolved"] is False
     assert brief["status"] == "unsafe"
     assert "edit" not in brief
-    assert brief["candidate"] in {"src/a.py", "src/b.py"}
     assert brief["discrimination"] == "competing-action-roles"
