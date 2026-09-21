@@ -652,3 +652,133 @@ class Worker(First, Second):
         "pkg/core.py::First.helper",
         "pkg/core.py::Second.helper",
     ]
+def test_structural_locality_resolves_subclass_override(tmp_path: Path) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+class Base:
+    def helper(self, value):
+        return value
+
+
+class Worker(Base):
+    def helper(self, value):
+        return value + 1
+
+    def authority(self, value):
+        return self.helper(value)
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::Worker.authority", max_depth=2
+        )
+
+    assert {row["symbol_id"] for row in packet["nodes"]} == {
+        "pkg/core.py::Worker.authority",
+        "pkg/core.py::Worker.helper",
+    }
+    assert packet["dimensions"]["unresolved_call_count"] == 0
+
+
+def test_structural_locality_resolves_unique_multiple_inheritance_owner(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+class First:
+    def helper(self, value):
+        return value + 1
+
+
+class Second:
+    pass
+
+
+class Worker(First, Second):
+    def authority(self, value):
+        return self.helper(value)
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::Worker.authority", max_depth=2
+        )
+
+    assert {row["symbol_id"] for row in packet["nodes"]} == {
+        "pkg/core.py::Worker.authority",
+        "pkg/core.py::First.helper",
+    }
+    assert packet["dimensions"]["unresolved_call_count"] == 0
+
+
+def test_structural_locality_keeps_external_base_member_unresolved(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+from external_package import ExternalBase
+
+
+class Worker(ExternalBase):
+    def authority(self, value):
+        return self.helper(value)
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::Worker.authority", max_depth=2
+        )
+
+    assert [row["symbol_id"] for row in packet["nodes"]] == [
+        "pkg/core.py::Worker.authority"
+    ]
+    assert packet["dimensions"]["unresolved_call_count"] == 1
+    assert packet["unresolved_calls"][0]["target_text"] == "self.helper"
+
+
+def test_structural_locality_mixed_known_unknown_bases_fail_closed(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+from external_package import ExternalBase
+
+
+class KnownBase:
+    def helper(self, value):
+        return value + 1
+
+
+class Worker(KnownBase, ExternalBase):
+    def authority(self, value):
+        return self.helper(value)
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::Worker.authority", max_depth=2
+        )
+
+    assert [row["symbol_id"] for row in packet["nodes"]] == [
+        "pkg/core.py::Worker.authority"
+    ]
+    assert packet["dimensions"]["unresolved_call_count"] == 1
+    unresolved = packet["unresolved_calls"][0]
+    assert unresolved["target_text"] == "self.helper"
+    assert unresolved["candidate_symbol_ids"] == ["pkg/core.py::KnownBase.helper"]

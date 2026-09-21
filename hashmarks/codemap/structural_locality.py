@@ -4,6 +4,7 @@ import ast
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -19,6 +20,14 @@ if TYPE_CHECKING:
 
 STRUCTURAL_LOCALITY_SCHEMA = "hashmarks.structural-locality.v1"
 STRUCTURAL_LOCALITY_DELTA_SCHEMA = "hashmarks.structural-locality-delta.v1"
+
+
+@dataclass(frozen=True)
+class _SelfClsCallTarget:
+    receiver: str
+    method: str
+    class_qualname: str
+    source_method: str
 
 
 def _identity(payload: Mapping[str, object]) -> str:
@@ -322,16 +331,11 @@ class StructuralLocalityMixin:
         key = (path, class_qualname)
         if key in seen:
             return None, True
-        direct = [
-            row
-            for row in candidates
-            if str(row.get("path") or "") == path
-            and str(row.get("qualname") or "") == f"{class_qualname}.{method}"
-        ]
-        if len(direct) == 1:
-            return direct[0], False
-        if len(direct) > 1:
-            return None, True
+        direct = self._python_direct_method_owners(
+            path, class_qualname, method, candidates
+        )
+        if direct:
+            return (direct[0], False) if len(direct) == 1 else (None, True)
 
         bases, unresolved = self._python_class_bases(path, class_qualname)
         if unresolved:
@@ -351,40 +355,58 @@ class StructuralLocalityMixin:
                 owners[_symbol_id(owner)] = owner
         if ambiguous or len(owners) > 1:
             return None, True
-        if len(owners) == 1:
-            return next(iter(owners.values())), False
-        return None, False
+        owner = next(iter(owners.values())) if owners else None
+        return owner, False
 
-    def _python_self_cls_call_binding(
-        self,
-        *,
-        source_path: str,
-        source_qualname: str,
-        target: str,
-        candidates: list[dict[str, object]],
-    ) -> tuple[dict[str, object] | None, list[str], bool] | None:
+    @staticmethod
+    def _python_direct_method_owners(
+        path: str,
+        class_qualname: str,
+        method: str,
+        candidates: Sequence[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        return [
+            row
+            for row in candidates
+            if str(row.get("path") or "") == path
+            and str(row.get("qualname") or "") == f"{class_qualname}.{method}"
+        ]
+
+    @staticmethod
+    def _python_self_cls_target(
+        source_qualname: str, target: str
+    ) -> _SelfClsCallTarget | None:
         parts = target.split(".")
-        if len(parts) != 2 or parts[0] not in {"self", "cls"}:
-            return None
-        receiver, method = parts
-        if "." not in source_qualname:
+        if (
+            len(parts) != 2
+            or parts[0] not in {"self", "cls"}
+            or "." not in source_qualname
+        ):
             return None
         class_qualname, source_method = source_qualname.rsplit(".", 1)
-        class_node = self._python_class_node(source_path, class_qualname)
-        if class_node is None:
-            return None
+        return _SelfClsCallTarget(
+            receiver=parts[0],
+            method=parts[1],
+            class_qualname=class_qualname,
+            source_method=source_method,
+        )
+
+    @staticmethod
+    def _python_receiver_matches_method(
+        class_node: ast.ClassDef, target: _SelfClsCallTarget
+    ) -> bool:
         methods = [
             node
             for node in class_node.body
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name == source_method
+            and node.name == target.source_method
         ]
         if len(methods) != 1:
-            return None
+            return False
         source_node = methods[0]
         positional = [*source_node.args.posonlyargs, *source_node.args.args]
-        if not positional or positional[0].arg != receiver:
-            return None
+        if not positional or positional[0].arg != target.receiver:
+            return False
         decorators = {
             (
                 decorator.id
@@ -395,15 +417,31 @@ class StructuralLocalityMixin:
             )
             for decorator in source_node.decorator_list
         }
-        if receiver == "cls" and "classmethod" not in decorators:
+        if target.receiver == "cls":
+            return "classmethod" in decorators
+        return not {"classmethod", "staticmethod"} & decorators
+
+    def _python_self_cls_call_binding(
+        self,
+        *,
+        source_path: str,
+        source_qualname: str,
+        target: str,
+        candidates: list[dict[str, object]],
+    ) -> tuple[dict[str, object] | None, list[str], bool] | None:
+        call_target = self._python_self_cls_target(source_qualname, target)
+        if call_target is None:
             return None
-        if receiver == "self" and {"classmethod", "staticmethod"} & decorators:
+        class_node = self._python_class_node(source_path, call_target.class_qualname)
+        if class_node is None or not self._python_receiver_matches_method(
+            class_node, call_target
+        ):
             return None
 
         owner, unresolved = self._python_method_owner(
             path=source_path,
-            class_qualname=class_qualname,
-            method=method,
+            class_qualname=call_target.class_qualname,
+            method=call_target.method,
             candidates=candidates,
         )
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
@@ -419,10 +457,6 @@ class StructuralLocalityMixin:
         target: str,
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        candidate_ids = sorted(_symbol_id(row) for row in candidates)
-        root = target.split(".", 1)[0]
         self_cls_binding = self._python_self_cls_call_binding(
             source_path=source_path,
             source_qualname=source_qualname,
@@ -431,6 +465,25 @@ class StructuralLocalityMixin:
         )
         if self_cls_binding is not None:
             return self_cls_binding
+        return self._python_repository_qualified_call_binding(
+            source_path=source_path,
+            source_qualname=source_qualname,
+            target=target,
+            candidates=candidates,
+        )
+
+    def _python_repository_qualified_call_binding(
+        self,
+        *,
+        source_path: str,
+        source_qualname: str,
+        target: str,
+        candidates: list[dict[str, object]],
+    ) -> tuple[dict[str, object] | None, list[str], bool]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        candidate_ids = sorted(_symbol_id(row) for row in candidates)
+        root = target.split(".", 1)[0]
         if not root or self._python_function_locally_binds(
             source_path, source_qualname, root
         ):
