@@ -118,7 +118,7 @@ def test_evidence_correlation_preserves_repository_truth_and_consumer_authority(
     )
     assert "Correlation never becomes causation" in contract
     assert "It must not infer causation" in boundary
-    assert "interpretation and action remain consumer-owned" in contract
+    assert "Interpretation and action remain consumer-owned." in contract
 
 
 def test_agent_boundary_keeps_solution_authority_external() -> None:
