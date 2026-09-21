@@ -13,22 +13,13 @@ from .evidence_decision_packet import DecisionPacketMixin
 from .evidence_freshness import freshness_state
 from .model import EvidenceVisibility
 from .python_ast import estimate_tokens
+from .task_action_types import compact_owner_candidate
 
 if TYPE_CHECKING:
     from .engine import CodeMap
 
 
 class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
-    @staticmethod
-    def _compact_owner_candidate(
-        source: Mapping[str, object],
-    ) -> tuple[object | None, bool]:
-        """Return the projected candidate and whether repository ownership resolved."""
-        candidate = source.get("edit")
-        authority = source.get("ownership_authority")
-        resolved = isinstance(authority, Mapping) and bool(authority.get("owner_resolved"))
-        return candidate, resolved
-
     @decision_scoped
     def task_decision_brief(
         self,
@@ -60,7 +51,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 row["symbol"] = str(symbol)
             return row
 
-        raw_candidate, owner_resolved = self._compact_owner_candidate(packet)
+        raw_candidate, owner_resolved = compact_owner_candidate(packet)
         candidate = anchor(raw_candidate)
         edit = candidate if owner_resolved else None
         verify = anchor(packet.get("verify"))
@@ -253,7 +244,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         context = self.work_context(action, token_budget=token_budget)
         _generation, _identity_generation, stale = self._generation_status()
         candidate, verify, contract = self._task_action_selected_rows(action)
-        _raw_candidate, owner_resolved = self._compact_owner_candidate(action)
+        _raw_candidate, owner_resolved = compact_owner_candidate(action)
         edit = candidate if owner_resolved else None
         verification = self._task_action_verification_plan(verify)
 
