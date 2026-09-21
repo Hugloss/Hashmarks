@@ -28,8 +28,8 @@ jobs:
       - name: Install Hashmarks Ruff supply
         run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --only-group lint --python 3.11
 
-      - name: Install focused test supply
-        run: UV_PROJECT_ENVIRONMENT=.test-venv uv sync --only-group test --python 3.11
+      - name: Install repository test supply
+        run: UV_PROJECT_ENVIRONMENT=.test-venv uv sync --group test --python 3.11
 
       - name: Checkout qualified agentsCookbook authority
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
