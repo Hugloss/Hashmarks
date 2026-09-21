@@ -466,6 +466,74 @@ def test_uv_lock_upgrade_delta_reuses_repository_binding_authority(
     assert delta["interpretation_authority"] == "consumer-owned"
 
 
+def test_previous_correlation_rejects_tampered_top_level_packet(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.correlate_evidence(
+            _bundle({"anchor_id": "owner", "path": "owner.py"}),
+            include_relationships=False,
+        )
+        tampered = dict(before)
+        tampered["causation"] = "producer-claimed"
+        with pytest.raises(
+            ValueError,
+            match="correlation_identity does not match packet content",
+        ):
+            codemap.correlate_evidence(
+                _bundle({"anchor_id": "owner", "path": "owner.py"}),
+                include_relationships=False,
+                previous_correlation=tampered,
+            )
+
+
+def test_previous_correlation_rejects_tampered_nested_repository_evidence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.correlate_evidence(
+            _bundle({"anchor_id": "owner", "path": "owner.py"}),
+            include_relationships=False,
+        )
+        tampered = json.loads(json.dumps(before))
+        bindings = tampered["repository_evidence"]["bindings"]
+        bindings[0]["evidence"][0]["state"] = "known-absent"
+        with pytest.raises(
+            ValueError,
+            match="correlation_identity does not match packet content",
+        ):
+            codemap.correlate_evidence(
+                _bundle({"anchor_id": "owner", "path": "owner.py"}),
+                include_relationships=False,
+                previous_correlation=tampered,
+            )
+
+
+def test_previous_correlation_rejects_missing_or_malformed_identity(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.correlate_evidence(
+            _bundle({"anchor_id": "owner", "path": "owner.py"}),
+            include_relationships=False,
+        )
+        missing = dict(before)
+        missing.pop("correlation_identity")
+        with pytest.raises(ValueError, match="correlation_identity must use sha256"):
+            codemap.evidence_correlation_delta(missing, before)
+
+        malformed = dict(before)
+        malformed["correlation_identity"] = "opaque"
+        with pytest.raises(ValueError, match="correlation_identity must use sha256"):
+            codemap.evidence_correlation_delta(before, malformed)
+
+
 def test_correlation_request_reuses_binding_total_bound(
     tmp_path: Path,
 ) -> None:

@@ -172,6 +172,8 @@ after = codemap.correlate_evidence(
 
 The result includes a **`hashmarks.evidence-correlation-delta.v1`** packet. Repository change classification is delegated to the existing repository-evidence-binding delta authority.
 
+A supplied previous packet is treated as untrusted serialized evidence. Hashmarks validates its schema and recomputes the packet's `correlation_identity` over the authoritative packet content before it may participate in a delta. Missing, malformed, or content-mismatched identities fail closed; changing nested repository evidence while retaining the old identity is rejected. A derived `delta_from_previous` field is excluded from the base packet identity because it describes comparison history rather than the correlation observation itself.
+
 This supports dependency/toolchain upgrade investigations without adding causal reasoning to Hashmarks. For example:
 
 1. repository state A contains one `uv.lock`;
