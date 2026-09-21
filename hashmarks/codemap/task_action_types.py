@@ -91,6 +91,19 @@ class _TaskActionInitialSurfaceState:
 
 
 @dataclass
+class _TaskActionOwnerResolutionState:
+    edit: dict[str, object] | None
+    basis: str | None
+    owner_basis: str | None
+    structural_owner: dict[str, object] | None
+    structural_owner_origin: Mapping[str, object] | None
+    archive_live_owner_ambiguity: bool
+    exact_identifier_paths: tuple[str, ...]
+    exact_identifier_displacement_guard: bool
+    exact_identifier_surface_selected: bool
+
+
+@dataclass
 class _TaskActionSelectionState:
     edit: dict[str, object] | None
     verify: dict[str, object] | None
