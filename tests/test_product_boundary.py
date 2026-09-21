@@ -97,6 +97,32 @@ def test_evidence_authority_precedence_is_explicit_and_non_strengthening() -> No
     assert "There is no universal confidence score" in contributing
 
 
+def test_evidence_correlation_preserves_repository_truth_and_consumer_authority() -> None:
+    boundary = _text("docs/reference/PRODUCT_BOUNDARY.md")
+    invariants = _text("docs/reference/INVARIANTS.md")
+    contract = _text("docs/reference/EVIDENCE_CORRELATION.md")
+
+    rule = (
+        "Hashmarks establishes repository truth and correlates evidence to it. "
+        "The consuming agent decides what the evidence means and what action to take."
+    )
+    assert rule in boundary
+    assert rule in contract
+    assert (
+        "G68. Evidence correlation preserves claims without acquiring interpretation authority."
+        in invariants
+    )
+    assert (
+        "PB11. External observations are correlation inputs, not repository authority."
+        in invariants
+    )
+    for forbidden_authority in (
+        "Correlation must not become causation",
+        "interpretation and action remain consumer-owned",
+    ):
+        assert forbidden_authority in boundary or forbidden_authority in contract
+
+
 def test_agent_boundary_keeps_solution_authority_external() -> None:
     text = _text("AGENTS.md")
     for authority in (
