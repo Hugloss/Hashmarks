@@ -176,7 +176,20 @@ def test_daemon_preserves_hot_manifest_state_across_clients(
     assert socket_path.exists()
     assert fake.started
 
+    # Socket-path publication is not the same as accept readiness. On a
+    # sufficiently contended runner UnixStreamServer can create the socket
+    # inode before serve_forever starts accepting connections. Probe through
+    # the public client contract so this test waits for actual readiness.
     client1 = IdentityClient(workspace, socket_path=socket_path)
+    while time.monotonic() < deadline:
+        try:
+            client1.status()
+        except Exception:
+            time.sleep(0.01)
+        else:
+            break
+    else:
+        raise AssertionError("identity daemon did not become ready before deadline")
     first = client1.input_root(["f00.txt", "f01.txt"])
     assert client1.status()["observation"] == "clean"
 
