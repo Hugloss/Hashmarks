@@ -355,6 +355,76 @@ class DependencyResolutionEvidenceMixin:
             )
         return sorted(result, key=lambda row: str(row["path"]))
 
+    def dependency_evidence_correlation(
+        self,
+        observation: Mapping[str, object],
+        request: Mapping[str, object],
+    ) -> dict[str, object]:
+        """Compose dependency-owner projections with generic evidence correlation.
+
+        Package semantics remain owned here.  The generic correlation owner receives
+        only ordinary external anchors and repository locators.
+        """
+        if observation.get("schema") != _SCHEMA:
+            raise ValueError("dependency evidence correlation requires qualified v1 observation")
+        raw_correlations = request.get("correlations", ())
+        correlations = _objects(raw_correlations, label="correlations", limit=256)
+        bundles: list[dict[str, object]] = []
+        dependency_links: list[dict[str, object]] = []
+        ownership = {
+            str(row["module"]): row
+            for row in observation.get("module_ownership", ())
+            if isinstance(row, Mapping) and row.get("module")
+        }
+        for index, raw in enumerate(correlations):
+            module = _text(raw.get("module"), label="correlation module", required=True)
+            anchors = raw.get("anchors", ())
+            if not isinstance(anchors, Sequence) or isinstance(
+                anchors, (str, bytes, bytearray)
+            ):
+                raise ValueError("correlation anchors must be a sequence")
+            owner = ownership.get(module)
+            dependency_links.append(
+                {
+                    "module": module,
+                    "distribution_state": "unknown" if owner is None else owner["state"],
+                    "distribution_nodes": [] if owner is None else list(owner["owners"]),
+                    "ownership_completeness": (
+                        "unknown" if owner is None else owner["completeness"]
+                    ),
+                    "causation": "not-inferred",
+                }
+            )
+            bundles.append(
+                {
+                    "bundle_id": f"dependency-correlation-{index}",
+                    "producer": {
+                        "kind": "dependency-correlation-adapter",
+                        "resolution_identity": observation.get("resolution_identity"),
+                    },
+                    "completeness": str(raw.get("completeness") or "unknown"),
+                    "scope": {
+                        "kind": "dependency-module-correlation",
+                        "module": module,
+                    },
+                    "truncation": str(raw.get("truncation") or "unknown"),
+                    "anchors": list(anchors),
+                }
+            )
+        packet = self.correlate_evidence(
+            bundles,
+            path_mappings=list(request.get("path_mappings") or ()),
+        )
+        return {
+            "schema": "hashmarks.dependency-evidence-correlation.v1",
+            "resolution_identity": observation.get("resolution_identity"),
+            "correlation": packet,
+            "dependency_links": dependency_links,
+            "authority": "repository-intelligence-only",
+            "interpretation_authority": "consumer-owned",
+            "causation": "not-inferred",
+        }
+
     @staticmethod
     def dependency_resolution_delta(
         before: Mapping[str, object],
