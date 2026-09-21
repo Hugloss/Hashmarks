@@ -276,12 +276,16 @@ def test_bundle_reordering_does_not_change_correlation_identity(
             "bundle_id": "b",
             "producer": {},
             "completeness": "complete",
+            "scope": {"kind": "test-fixture"},
+            "truncation": "complete",
             "anchors": [{"anchor_id": "b:0", "path": "b.py"}],
         },
         {
             "bundle_id": "a",
             "producer": {},
             "completeness": "complete",
+            "scope": {"kind": "test-fixture"},
+            "truncation": "complete",
             "anchors": [{"anchor_id": "a:0", "path": "a.py"}],
         },
     ]
@@ -418,6 +422,8 @@ def test_bundle_completeness_is_preserved_not_inferred(
     assert packet["completeness"] == {
         "state": "incomplete",
         "scope": "caller-declared-external-observations",
+        "authority": "caller-claimed",
+        "negative_evidence": "not-admissible",
     }
 
 
@@ -516,7 +522,10 @@ def test_bundle_scope_is_bounded_and_json_compatible(tmp_path: Path) -> None:
             completeness="incomplete",
         )[0]
         bundle["scope"] = {"bad": object()}
-        with pytest.raises(ValueError, match="bundle scope must contain JSON-compatible"):
+        with pytest.raises(
+            ValueError,
+            match="evidence correlation request must contain JSON-compatible values",
+        ):
             codemap.correlate_evidence([bundle], include_relationships=False)
 
         bundle["scope"] = {"value": "x" * 9000}
@@ -718,12 +727,16 @@ def test_correlation_request_reuses_binding_total_bound(
             "bundle_id": "too-many",
             "producer": {},
             "completeness": "complete",
+            "scope": {"kind": "test-fixture"},
+            "truncation": "complete",
             "anchors": anchors[:256],
         },
         {
             "bundle_id": "one-more",
             "producer": {},
             "completeness": "complete",
+            "scope": {"kind": "test-fixture"},
+            "truncation": "complete",
             "anchors": anchors[256:],
         },
     ]
