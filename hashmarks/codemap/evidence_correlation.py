@@ -21,6 +21,9 @@ _MAX_PATH_MAPPINGS = 64
 _MAX_METADATA_BYTES_PER_ANCHOR = 8_192
 _MAX_TOTAL_METADATA_BYTES = 262_144
 _MAX_SYMBOL_CANDIDATES = 32
+_MAX_MODULE_CANDIDATES = 20
+CORRELATION_REQUEST_MAX_BYTES = 1_048_576
+CORRELATION_PACKET_MAX_BYTES = 1_048_576
 _MAX_ID_CHARS = 512
 _MAX_SYMBOL_CHARS = 1_024
 _MAX_EXTERNAL_PATH_CHARS = 8_192
@@ -36,6 +39,7 @@ class _AnchorClaims:
     path: str | None
     line: int | None
     symbol: str | None
+    module: str | None
     metadata: dict[str, object]
     metadata_bytes: int
     member_revision: str | None
@@ -46,6 +50,7 @@ class _AnchorClaims:
             **({"path": self.path} if self.path is not None else {}),
             **({"line": self.line} if self.line is not None else {}),
             **({"symbol": self.symbol} if self.symbol is not None else {}),
+            **({"module": self.module} if self.module is not None else {}),
             **(
                 {"member_revision": self.member_revision}
                 if self.member_revision is not None
@@ -68,6 +73,7 @@ class _Resolution:
     repository_path: str | None = None
     symbol: Mapping[str, object] | None = None
     candidates: tuple[Mapping[str, object], ...] = ()
+    module_candidates: tuple[str, ...] = ()
     candidates_truncated: bool = False
 
 
@@ -109,6 +115,21 @@ def _bounded_symbol(value: object) -> str | None:
         return None
     if len(text) > _MAX_SYMBOL_CHARS:
         raise ValueError(f"symbol exceeds {_MAX_SYMBOL_CHARS} characters")
+    return text
+
+
+def _bounded_module(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip().strip(".")
+    if not text:
+        return None
+    if len(text) > _MAX_SYMBOL_CHARS:
+        raise ValueError(f"module exceeds {_MAX_SYMBOL_CHARS} characters")
+    if any(char.isspace() for char in text) or "/" in text or "\\" in text:
+        raise ValueError("module must be an exact dotted module identity")
+    if any(not part for part in text.split(".")):
+        raise ValueError("module must be an exact dotted module identity")
     return text
 
 
@@ -188,12 +209,15 @@ def _span_identity(value: object) -> str | None:
     return text
 
 
-def _binding_id(bundle_id: str, anchor_id: str) -> str:
+def _binding_id(evidence: Sequence[Mapping[str, object]]) -> str:
+    encoded = json.dumps(
+        list(evidence),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
     digest = hashlib.sha256(
-        b"hashmarks.external-evidence-binding.v1\0"
-        + bundle_id.encode("utf-8")
-        + b"\0"
-        + anchor_id.encode("utf-8")
+        b"hashmarks.external-evidence-binding.v2\0" + encoded
     ).hexdigest()
     return "external-evidence:" + digest
 
