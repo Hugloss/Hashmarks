@@ -87,6 +87,7 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 - `change_intelligence.py`, `repository_delta.py`, `evidence_profiles.py`, `cross_repository_evidence.py`, `intelligence_economics.py` — derived repository-intelligence projections. `repository_delta.py` owns snapshot composition and repository/observer delta vocabulary; inside one explicit decision session, an exact snapshot request may be reused by profile/economics/delta consumers without creating a second truth source.
 - `repository_evidence_bindings.py`, `repository_evidence_binding_delta.py`, `repository_evidence_coverage.py` — opaque consumer binding projections over existing repository observation, member revision, relationship, freshness, completeness, and delta authorities. They may own binding declaration/projection shape but must not create a second repository change/freshness model.
 - `evidence_correlation.py` — request-scoped correlation of bounded external/derived claims to existing repository member, symbol, binding, relationship, completeness, freshness, and delta authorities. It owns only claim/correspondence/source-equivalence projection semantics; interpretation, causation, persistence, execution, and recovery remain external.
+- **Dependency/distribution evidence (admitted next owner; implementation pending)** — owns only typed external dependency-resolution observations, module/distribution ownership observations, their explicit scope/identity/completeness, and correspondence/delta over existing repository manifest/lock/import/project evidence. It must not duplicate `project_graph.py`, `import_resolution.py`, repository freshness/delta, or `evidence_correlation.py`; it must not run package managers or index external dependency implementations. Add the concrete module name here in the same change that introduces the owner.
 - `repository_intelligence_query.py` — thin query facade over those producers; it is not a second source of truth.
 
 ### Task evidence packets
@@ -189,6 +190,8 @@ Use these questions in order:
 6. **Is a new serialized state word or delta concept necessary?** Read `docs/reference/STATE_AND_SEMANTIC_OWNERS.md` and reuse the existing state family/owner first.
 
 Every direct `CodeMap` mixin is a responsibility boundary and must be named in this responsibility map. CI enforces that rule so adding a mixin cannot silently add an undocumented semantic owner.
+
+Before adding any evidence owner or public evidence schema, also complete the admission/persistence template in `docs/reference/STATE_AND_SEMANTIC_OWNERS.md`. The review must name existing owners first, state the missing fact, classify persistence, and justify any public Python or MCP promotion. A useful agent workflow is not sufficient admission evidence.
 
 ## Reading strategy for a new maintainer
 

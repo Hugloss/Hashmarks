@@ -38,6 +38,66 @@ Similar-looking state words are not interchangeable. A consumer must know which 
 | Evidence correlation resolution | Whether a bounded path/line/symbol/module claim maps uniquely, ambiguously, not at all, or conflicts with admitted repository evidence | `evidence_correlation.py` over canonical member observation plus bounded indexed symbol/module queries | State vocabulary is `resolved-unique | resolved-ambiguous | unresolved | claim-conflict`; it describes correspondence, never causation. |
 | Source equivalence | Whether explicitly qualified external source identity matches the correlated repository member/range identity | `evidence_correlation.py` comparison over repository-evidence binding identities | State vocabulary is `proven | mismatch | unknown`. Keep it independent from repository freshness and correlation resolution. |
 
+## Evidence strengthening admission and persistence contract
+
+Before an evidence domain adds production state or a new semantic owner, its change must record:
+
+```text
+Repository fact being represented:
+Concrete repository-intelligence use case / defect:
+Existing semantic owner(s):
+Missing fact:
+Canonical owner after this change:
+Repository-derived or external observation:
+Persistence class:
+Freshness owner:
+Completeness owner:
+Identity owner:
+Delta / comparability owner:
+Sensitivity / redaction handling:
+Public Python surface: NONE / <surface and justification>
+MCP surface: NONE / <surface and justification>
+Explicit non-goals:
+```
+
+The persistence class is one of:
+
+1. **canonical repository input** — admitted repository bytes or explicit repository-owned metadata;
+2. **reconstructible derived state** — indexes/caches/projections that can be rebuilt from admitted authority;
+3. **qualified external observation** — caller/producer evidence, request-scoped by default; persistence requires a separate admitted repository-intelligence contract;
+4. **consumer/workflow history** — outside Hashmarks authority and never persisted as repository truth.
+
+A useful consumer workflow is not by itself evidence for a new Hashmarks owner. When an existing owner already represents the fact, extend or project it instead.
+
+### Shared evidence axes
+
+A domain may introduce typed facts, but it must identify how these independent axes are represented: authority/origin, definition/scope, identity, freshness, completeness, provenance, ambiguity, bounds/truncation, delta/comparability, persistence, and sensitivity. Reuse the canonical state families in this document rather than introducing local synonyms.
+
+This is a shared vocabulary rule, **not** a universal polymorphic evidence schema. Domain facts remain typed and owned by their domain producer.
+
+### Negative evidence and comparability
+
+Absence is authoritative only for an explicitly declared scope whose relevant producer and Hashmarks projection completeness axes are all complete. Partial evidence may prove observed presence; it cannot prove absence outside the complete scope.
+
+Before a semantic delta is reported, the owning domain must distinguish the same question observed twice from a changed definition, changed scope, changed producer semantics, or otherwise non-comparable observations. Definition/scope change must not masquerade as repository change.
+
+### Public-surface rule
+
+An internal semantic owner does not automatically earn a top-level `CodeMap` method or MCP tool. Public/API/MCP promotion requires a distinct consumer responsibility that existing bounded surfaces cannot represent without weakening semantics. A new schema or transport shape never creates a second semantic owner.
+
+### Dependency/distribution handoff
+
+The admitted dependency-evidence work must keep four layers distinct:
+
+1. repository-declared dependency intent (for example manifests);
+2. repository lock state as canonical repository bytes;
+3. externally produced dependency-resolution graph observations;
+4. externally produced installed/import-module ownership observations.
+
+`project_graph.py` remains the owner of repository/workspace project topology. `import_resolution.py` remains the owner of repository import identity. The dependency-evidence owner may correlate those repository facts with qualified external distribution/resolution observations, but it must not index dependency implementation source, run a resolver/package manager, mutate an environment, infer module ownership from name similarity, or turn dependency correspondence into causal/upgrade advice.
+
+Workspace/local projects may simultaneously have repository-project identity and resolution-node identity; appearing in a resolution graph does not make repository-owned code an external dependency.
+
 ## Orthogonal state rule
 
 Do not overload one field with multiple axes.

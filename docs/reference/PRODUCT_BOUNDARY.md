@@ -179,6 +179,10 @@ When ownership is ambiguous, prefer the **smaller Hashmarks**:
 
 The burden of proof is on adding product responsibility, not on keeping it out.
 
+### External-evidence admission corollary
+
+External evidence may enrich Hashmarks' understanding of repository correspondence; Hashmarks does not acquire ownership of the system that produced the evidence. An admitted external-evidence capability must terminate in repository evidence, qualified correspondence, provenance, completeness, freshness, uncertainty, identity, or delta. If making the result true requires reasoning, diagnosis, execution, workflow history, remote discovery, runtime control, recommendation, or deciding what should happen next, that responsibility remains outside Hashmarks.
+
 ## What Hashmarks may own
 
 The following categories fit the product profile when they remain repository-derived and evidence-oriented:
