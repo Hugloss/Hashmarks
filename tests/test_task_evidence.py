@@ -22,6 +22,18 @@ def _semantic_repo(root: Path) -> None:
     )
 
 
+def _ownership(packet: dict[str, object]) -> dict[str, object]:
+    value = packet.get("ownership")
+    assert isinstance(value, dict)
+    return value
+
+
+def _verification(packet: dict[str, object]) -> dict[str, object]:
+    value = packet.get("verification")
+    assert isinstance(value, dict)
+    return value
+
+
 def _task() -> str:
     return (
         "Change normalize_widget so it lowercases the trimmed value and reports "
@@ -29,7 +41,7 @@ def _task() -> str:
     )
 
 
-def test_task_evidence_supplies_exact_edit_source_and_verify_command(
+def test_task_evidence_supplies_exact_owner_source_and_verification(
     tmp_path: Path,
 ) -> None:
     _semantic_repo(tmp_path)
@@ -37,25 +49,25 @@ def test_task_evidence_supplies_exact_edit_source_and_verify_command(
         codemap.sync()
         start = codemap.task_evidence(_task(), token_budget=512)
 
-    assert start["schema"] == "hashmarks.task-evidence.v1"
-    assert start["status"] == "safe-fresh"
-    assert start["edit"] == "src/engine.py"
-    assert start["verify"] == [
+    ownership = _ownership(start)
+    verification = _verification(start)
+    assert start["schema"] == "hashmarks.task-evidence.v2"
+    assert "status" not in start
+    assert ownership["status"] == "resolved"
+    assert ownership["owner"]["path"] == "src/engine.py"
+    assert verification["plan"]["argv"] == [
         "python",
         "-m",
         "pytest",
         "-q",
         "tests/test_engine.py::test_normalize_widget_semantics",
     ]
-    assert start["verify_path"] == "tests/test_engine.py"
-    assert start["source_budget"]["complete"] is True
-    assert start["edit_evidence"]["representation"] == "source-range"
-    assert "len(value)" in start["edit_evidence"]["content"]
-    # The verification argv is a mechanically derived repository-bound description; its source body is
-    # intentionally not preloaded into the consumer's starting context.
+    assert verification["selected"]["path"] == "tests/test_engine.py"
+    assert ownership["source_budget"]["complete"] is True
+    assert ownership["source_evidence"]["representation"] == "source-range"
+    assert "len(value)" in ownership["source_evidence"]["content"]
     assert "'length': 3" not in json.dumps(start, sort_keys=True)
-    assert start["next_read"] is None
-
+    assert ownership["next_read"] is None
 
 def test_task_evidence_never_emits_partial_source_when_exact_range_exceeds_budget(
     tmp_path: Path,
@@ -65,16 +77,14 @@ def test_task_evidence_never_emits_partial_source_when_exact_range_exceeds_budge
         codemap.sync()
         start = codemap.task_evidence(_task(), token_budget=4)
 
-    assert start["status"] == "safe-fresh"
-    assert start["source_budget"]["complete"] is False
-    assert start["next_read"]["reason"] == "exact-source-range-exceeds-start-budget"
-    # A tiny budget may carry no structural fallback at all, but it must never
-    # return a clipped implementation body as if it were complete evidence.
+    ownership = _ownership(start)
+    assert ownership["status"] == "resolved"
+    assert ownership["source_budget"]["complete"] is False
+    assert ownership["next_read"]["reason"] == "exact-source-range-exceeds-start-budget"
     assert (
-        start["edit_evidence"] is None
-        or start["edit_evidence"]["representation"] != "source-range"
+        ownership["source_evidence"] is None
+        or ownership["source_evidence"]["representation"] != "source-range"
     )
-
 
 def test_task_evidence_respects_outline_only_policy(tmp_path: Path) -> None:
     _semantic_repo(tmp_path)
@@ -85,11 +95,12 @@ def test_task_evidence_respects_outline_only_policy(tmp_path: Path) -> None:
         codemap.sync()
         start = codemap.task_evidence(_task(), token_budget=512)
 
-    assert start["edit_evidence"]
-    assert start["edit_evidence"]["representation"] in {"signature", "outline"}
+    ownership = _ownership(start)
+    assert ownership["source_evidence"]
+    assert ownership["source_evidence"]["representation"] in {"signature", "outline"}
     assert "len(value)" not in json.dumps(start, sort_keys=True)
-    assert start["next_read"]["reason"] == "source-body-not-authorized"
-    assert start["source_budget"]["complete"] is False
+    assert ownership["next_read"]["reason"] == "source-body-not-authorized"
+    assert ownership["source_budget"]["complete"] is False
 
 
 def test_task_evidence_fails_closed_before_disclosing_evidence_without_edit_authority(
@@ -104,10 +115,12 @@ def test_task_evidence_fails_closed_before_disclosing_evidence_without_edit_auth
         codemap.sync()
         start = codemap.task_evidence("Change the scarlet field behavior and verify it")
 
-    assert start["status"] == "unsafe"
-    assert start["edit_evidence"] is None
-    assert start["next_read"] is None
-    assert start["discrimination"] == "no-supported-owner-candidate"
+    ownership = _ownership(start)
+    assert ownership["status"] == "unresolved"
+    assert ownership["owner"] is None
+    assert ownership["source_evidence"] is None
+    assert ownership["next_read"] is None
+    assert ownership["ambiguity"]["reason"] == "no-edit-candidate"
 
 
 def test_task_evidence_computes_action_map_once(tmp_path: Path) -> None:
@@ -125,7 +138,7 @@ def test_task_evidence_computes_action_map_once(tmp_path: Path) -> None:
         codemap.task_action_map = counted  # type: ignore[method-assign]
         start = codemap.task_evidence(_task())
 
-    assert start["status"] == "safe-fresh"
+    assert _ownership(start)["status"] == "resolved"
     assert calls == 1
 
 
@@ -145,9 +158,9 @@ def test_task_evidence_cli_exposes_native_start_packet(tmp_path: Path, capsys) -
         == 0
     )
     output = json.loads(capsys.readouterr().out)
-    assert output["schema"] == "hashmarks.task-evidence.v1"
-    assert output["edit"] == "src/engine.py"
-    assert output["source_budget"]["complete"] is True
+    assert output["schema"] == "hashmarks.task-evidence.v2"
+    assert output["ownership"]["owner"]["path"] == "src/engine.py"
+    assert output["ownership"]["source_budget"]["complete"] is True
 
 
 def test_task_evidence_and_owner_graph_never_cross_agent_deny_boundary(
@@ -185,7 +198,7 @@ def test_task_evidence_and_owner_graph_never_cross_agent_deny_boundary(
     encoded = json.dumps({"graph": graph, "start": start}, sort_keys=True)
     assert "hidden/engine.py" not in encoded
     assert "implementation-secret" not in encoded
-    assert start.get("edit") != "hidden/engine.py"
+    assert (_ownership(start).get("owner") or {}).get("path") != "hidden/engine.py"
 
 
 def test_task_evidence_qualification_freezes_before_secret_join(tmp_path: Path) -> None:
@@ -201,14 +214,17 @@ def test_task_evidence_qualification_freezes_before_secret_join(tmp_path: Path) 
 
     assert payload["summary"]["tasks"] == 6
     assert payload["summary"]["fully_correct"] == 6
+    assert payload["summary"]["candidate_correct"] == 6
+    assert payload["summary"]["verify_correct"] == 6
     assert payload["summary"]["stable_packets"] == 6
     assert payload["protocol"]["secret_join_after_two_frozen_passes"] is True
-    assert payload["summary"]["source_complete"] == 6
-    assert payload["summary"]["next_read_reasons"] == {}
+    assert (
+        payload["summary"]["source_complete"]
+        == payload["summary"]["owner_resolved"]
+    )
     assert payload["summary"]["provenance_complete"] == 6
     assert payload["summary"]["revision_current"] == 6
     assert sum(payload["summary"]["freshness_states"].values()) == 6
-    assert payload["categories"]["configuration-ownership"]["source_complete"] == 1
 
 
 def test_task_evidence_keeps_typescript_test_path_when_runner_is_project_scoped(
@@ -236,9 +252,11 @@ def test_task_evidence_keeps_typescript_test_path_when_runner_is_project_scoped(
             "For TSCOBALT41 change the accepted response from old to new and verify the route behavior",
             token_budget=512,
         )
-    assert start["status"] == "safe-fresh"
-    assert start["edit"] == "src/engine.ts"
-    assert start["verify"] == ["tsc", "--noEmit", "-p", "tsconfig.json"]
-    assert start["verify_path"] == "tests/cobalt.test.ts"
+    ownership = _ownership(start)
+    verification = _verification(start)
+    assert ownership["status"] == "resolved"
+    assert ownership["owner"]["path"] == "src/engine.ts"
+    assert verification["plan"]["argv"] == ["tsc", "--noEmit", "-p", "tsconfig.json"]
+    assert verification["selected"]["path"] == "tests/cobalt.test.ts"
     encoded = json.dumps(start, sort_keys=True)
     assert "throw new Error" not in encoded

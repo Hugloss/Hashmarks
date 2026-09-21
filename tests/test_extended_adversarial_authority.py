@@ -22,15 +22,37 @@ def _hard_repo(root: Path, *, cases_per_category: int = 4):
     return repo, tasks
 
 
+def _candidate_path(packet: dict[str, object]) -> str:
+    ownership = packet.get("ownership")
+    assert isinstance(ownership, dict)
+    candidate = ownership.get("candidate")
+    assert isinstance(candidate, dict)
+    return str(candidate.get("path") or "")
+
+
+def _verification_path(packet: dict[str, object]) -> str:
+    verification = packet.get("verification")
+    assert isinstance(verification, dict)
+    selected = verification.get("selected")
+    assert isinstance(selected, dict)
+    return str(selected.get("path") or "")
+
+
+def _freshness_state(packet: dict[str, object]) -> str:
+    freshness = packet.get("freshness")
+    assert isinstance(freshness, dict)
+    return str(freshness.get("state") or "")
+
+
 def test_cross_task_previous_evidence_never_launders_authority(tmp_path: Path) -> None:
     repo, tasks = _hard_repo(tmp_path)
     with CodeMap(repo) as codemap:
         codemap.sync()
         starts = [codemap.task_evidence(row["query"]) for row in tasks]
-        assert all(start["status"].startswith("safe-") for start in starts)
+        assert all(_candidate_path(start) for start in starts)
         for index, row in enumerate(tasks):
             foreign = starts[(index + 1) % len(starts)]
-            changed = [foreign["edit"]]
+            changed = [_candidate_path(foreign)]
             with pytest.raises(ValueError, match="task-mismatch"):
                 codemap.task_post_change_delta(
                     row["query"], changed, previous_evidence=foreign
@@ -47,7 +69,7 @@ def test_context_identity_mutation_matrix_fails_closed(tmp_path: Path) -> None:
             tampered["provenance"]["context_identity"] = "sha256:" + "0" * 64
             with pytest.raises(ValueError, match="context-identity-mismatch"):
                 codemap.task_post_change_delta(
-                    row["query"], [start["edit"]], previous_evidence=tampered
+                    row["query"], [_candidate_path(start)], previous_evidence=tampered
                 )
 
 
@@ -59,13 +81,13 @@ def test_selected_verification_mutation_is_never_safe_fresh_across_hard_corpus(
         codemap.sync()
         for row in tasks:
             start = codemap.task_evidence(row["query"])
-            verify_path = repo / start["verify_path"]
+            verify_path = repo / _verification_path(start)
             original = verify_path.read_text(encoding="utf-8")
             verify_path.write_text(
                 original + "\n# adversarial verification mutation\n", encoding="utf-8"
             )
             stale = codemap.task_evidence(row["query"])
-            assert stale["status"] == "safe-stale"
+            assert _freshness_state(stale) == "stale"
             assert stale["provenance"]["freshness"] == "stale"
             assert (
                 stale["provenance"]["freshness_reason"]

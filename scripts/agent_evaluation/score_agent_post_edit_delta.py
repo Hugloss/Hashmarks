@@ -44,6 +44,25 @@ def _bytes(value: object) -> int:
     )
 
 
+def _task_candidate(packet: dict[str, object]) -> dict[str, object] | None:
+    ownership = packet.get("ownership")
+    if not isinstance(ownership, dict):
+        return None
+    candidate = ownership.get("candidate")
+    return candidate if isinstance(candidate, dict) else None
+
+
+def _task_verification_argv(packet: dict[str, object]) -> list[str]:
+    verification = packet.get("verification")
+    if not isinstance(verification, dict):
+        return []
+    plan = verification.get("plan")
+    if not isinstance(plan, dict):
+        return []
+    argv = plan.get("argv")
+    return [str(value) for value in argv] if isinstance(argv, list) else []
+
+
 def _append_probe(path: Path, task_id: str) -> None:
     suffix = path.suffix.lower()
     if suffix in {".py", ".toml", ".yaml", ".yml", ".sh"}:
@@ -102,9 +121,12 @@ def run(
             task_id = str(task["id"])
             query = str(task["query"])
             previous = codemap.task_evidence(query, token_budget=token_budget)
-            edit_path = str(previous.get("edit") or "")
+            candidate = _task_candidate(previous)
+            edit_path = (
+                str(candidate.get("path") or "") if candidate is not None else ""
+            )
             if not edit_path:
-                raise ValueError(f"PUBLIC task {task_id} has no safe edit authority")
+                raise ValueError(f"PUBLIC task {task_id} has no repository candidate")
             _append_probe(repo / edit_path, task_id)
 
             started = time.perf_counter()
@@ -161,10 +183,7 @@ def run(
         previous = row["previous"]
         delta = row["delta"]
         refreshed = row["full_refreshed_start"]
-        verify = refreshed.get("verify")
-        verify_surface = verification_surface(
-            verify if isinstance(verify, list) else ()
-        )
+        verify_surface = verification_surface(_task_verification_argv(refreshed))
         path_changes = (
             delta.get("path_changes")
             if isinstance(delta.get("path_changes"), list)
@@ -184,18 +203,23 @@ def run(
         graded = {
             "id": row["id"],
             "category": str(truth.get("category") or "unknown"),
-            "previous_edit_correct": str(previous.get("edit") or "")
-            == str(truth["expected_edit_path"]),
-            "refreshed_edit_correct": str(refreshed.get("edit") or "")
-            == str(truth["expected_edit_path"]),
+            "previous_candidate_correct": (
+                str((_task_candidate(previous) or {}).get("path") or "")
+                == str(truth["expected_edit_path"])
+            ),
+            "refreshed_candidate_correct": (
+                str((_task_candidate(refreshed) or {}).get("path") or "")
+                == str(truth["expected_edit_path"])
+            ),
             "refreshed_verify_correct": str(verify_surface.get("surface") or "")
             == str(truth["expected_verify_path"]),
             "path_change_detected": state == "changed"
             and str(path_change.get("path") or "") == str(truth["expected_edit_path"]),
-            "revision_invalidated": "edit-source-revision" in invalidated,
+            "revision_invalidated": "candidate-source-revision" in invalidated,
             "generation_invalidated": "previous-evidence-generation" in invalidated,
-            "edit_authority_reused": "edit-authority" in reused,
+            "candidate_reused": "owner" in reused or "task-candidate" in reused,
             "verification_surface_reused": "verification-surface" in reused,
+            "verification_plan_reused": "verification-plan" in reused,
             "selection_provenance_reused": "selection-provenance" in reused,
             "replacement_absent": "replacement" not in delta,
             "delta_bytes": int(row["delta_bytes"]),
@@ -211,14 +235,15 @@ def run(
         graded["fully_correct"] = all(
             bool(graded[key])
             for key in (
-                "previous_edit_correct",
-                "refreshed_edit_correct",
+                "previous_candidate_correct",
+                "refreshed_candidate_correct",
                 "refreshed_verify_correct",
                 "path_change_detected",
                 "revision_invalidated",
                 "generation_invalidated",
-                "edit_authority_reused",
+                "candidate_reused",
                 "verification_surface_reused",
+                "verification_plan_reused",
                 "selection_provenance_reused",
                 "replacement_absent",
             )
@@ -241,11 +266,14 @@ def run(
         "generation_invalidated": sum(
             bool(row["generation_invalidated"]) for row in results
         ),
-        "edit_authority_reused": sum(
-            bool(row["edit_authority_reused"]) for row in results
+        "candidate_reused": sum(
+            bool(row["candidate_reused"]) for row in results
         ),
         "verification_surface_reused": sum(
             bool(row["verification_surface_reused"]) for row in results
+        ),
+        "verification_plan_reused": sum(
+            bool(row["verification_plan_reused"]) for row in results
         ),
         "selection_provenance_reused": sum(
             bool(row["selection_provenance_reused"]) for row in results
@@ -281,7 +309,7 @@ def run(
         ],
         "secret_join_after_start_edit_delta_and_counterfactual_freeze": True,
         "external_edit": "syntax-preserving comment appended to the selected edit path before delta refresh",
-        "changed_paths_source": "exact path selected by the PUBLIC-only prior task-evidence packet",
+        "changed_paths_source": "repository candidate from the PUBLIC-only prior task-evidence packet; mutation remains external",
         "source_budget_tokens": token_budget,
         "public_sha256": _sha(public_path),
         "secret_sha256": _sha(secret_path),

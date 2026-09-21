@@ -617,27 +617,90 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
 
     @staticmethod
     def _task_evidence_base_result(
-        action_brief: Mapping[str, object],
+        task: str,
         action: Mapping[str, object],
+        evidence_receipt: Mapping[str, object],
+        verification_plan: Mapping[str, object],
     ) -> dict[str, object]:
-        """Build the current packet skeleton from selected evidence."""
-        result: dict[str, object] = {
-            "schema": "hashmarks.task-evidence.v1",
-            "status": str(action_brief.get("status") or "unsafe"),
-            "evidence_receipt": dict(action_brief.get("evidence_receipt") or {}),
+        """Project task evidence into role-separated repository observations."""
+        authority = (
+            action.get("ownership_authority")
+            if isinstance(action.get("ownership_authority"), Mapping)
+            else {}
+        )
+        ambiguity = (
+            action.get("ambiguity")
+            if isinstance(action.get("ambiguity"), Mapping)
+            else {}
+        )
+        owner = action.get("edit") if isinstance(action.get("edit"), Mapping) else None
+        owner_resolved = bool(authority.get("owner_resolved")) and owner is not None
+        basis = str(action.get("owner_basis") or "") or None
+        explicit_bases = {
+            "literal-path",
+            "qualified-symbol",
+            "unique-exact-symbol",
+            "exact-symbol",
         }
-        for key in (
-            "edit",
-            "verify",
-            "verify_path",
-            "owner_path",
-            "contract",
-            "missing",
-            "discrimination",
-        ):
-            if key in action_brief:
-                result[key] = action_brief[key]
-        return result
+        explicit_target = (
+            {
+                "status": "resolved",
+                "basis": basis,
+                "path": str(owner.get("path") or ""),
+                "symbol": owner.get("qualname") or owner.get("name"),
+            }
+            if owner_resolved and basis in explicit_bases
+            else {
+                "status": "not-explicit",
+                "basis": None,
+                "path": None,
+                "symbol": None,
+            }
+        )
+        verify = (
+            action.get("verify") if isinstance(action.get("verify"), Mapping) else None
+        )
+        contract = (
+            action.get("contract")
+            if isinstance(action.get("contract"), Mapping)
+            else None
+        )
+        return {
+            "schema": "hashmarks.task-evidence.v2",
+            "task": task,
+            "evidence_receipt": dict(evidence_receipt),
+            "retrieval": {
+                "results": list(action.get("canonical") or []),
+                "bounds": dict(action.get("bounds") or {}),
+                "ordering": "retrieval-relevance-only",
+                "ownership_authority": False,
+            },
+            "explicit_target": explicit_target,
+            "ownership": {
+                "status": str(authority.get("status") or "unresolved"),
+                "owner": dict(owner) if owner_resolved else None,
+                "candidate": None if owner is None else dict(owner),
+                "basis": basis if owner_resolved else None,
+                "candidate_basis": basis,
+                "ambiguity": dict(ambiguity),
+                "authority": "repository-ownership-only",
+                "source_evidence": None,
+                "next_read": None,
+                "source_budget": None,
+            },
+            "verification": {
+                "selected": None if verify is None else dict(verify),
+                "relevance": action.get("verification_relevance"),
+                "plan": dict(verification_plan),
+                "authority": "repository-verification-evidence-only",
+            },
+            "related": {
+                "contract": None if contract is None else dict(contract),
+                "inspect": list(action.get("inspect") or []),
+                "candidates": list(action.get("related") or []),
+            },
+            "consumer_action": "external",
+        }
 
     @staticmethod
     def _task_evidence_compact_evidence(
@@ -704,19 +767,24 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         selection_generation: int,
         verification_stale: bool = False,
     ) -> None:
-        """Attach freshness/context provenance to a packet without changing evidence selection."""
+        """Attach freshness independently from owner-resolution authority."""
         provenance = self._task_evidence_provenance(
             dict(action),
             selection_generation=selection_generation,
             verification_stale=verification_stale,
         )
+        receipt = result.get("evidence_receipt")
+        if not isinstance(receipt, Mapping):
+            raise ValueError("task evidence is missing its evidence receipt")
         provenance = self._bind_task_evidence_evidence_context(
             provenance,
-            result["evidence_receipt"],
+            receipt,
         )
         result["provenance"] = provenance
-        if provenance.get("freshness") == "stale" and result["status"] != "unsafe":
-            result["status"] = "safe-stale"
+        result["freshness"] = {
+            "state": str(provenance.get("freshness") or "unknown"),
+            "reason": provenance.get("freshness_reason"),
+        }
 
     def task_evidence(
         self,
@@ -726,21 +794,12 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         per_role: int = 3,
         token_budget: int = 1536,
     ) -> dict[str, object]:
-        """Return one compact native start packet for an external coding agent.
-
-        Selection remains owned by repository evidence surfaces. This method only
-        composes their already-selected result into the current start
-        packet; it does not execute, schedule, retry, or certify work.
-        """
+        """Return role-separated repository evidence for an external consumer."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if token_budget < 1:
             raise ValueError("token_budget must be >= 1")
         reconciled_task_paths = set(self._reconcile_cached_task_paths(task, limit))
-        # Bind selection and action-brief projection to one immutable freshness
-        # sample.  Leave this strict session before source projection: task-evidence
-        # intentionally permits a source mutation after selection and reports that
-        # packet as safe-stale via the independent closing provenance sample.
         with self.decision_session():
             action = self.task_action_map(
                 task,
@@ -748,36 +807,35 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 per_role=per_role,
             )
             selection_generation = self.store.generation()
-            action_budget = self._minimum_safe_action_budget(action)
-            action_brief = self._task_action_brief_from_action(
-                action,
-                task=task,
-                token_budget=max(1, action_budget),
-                limit=limit,
+            verify_row = (
+                action.get("verify")
+                if isinstance(action.get("verify"), Mapping)
+                else None
             )
-            result = self._task_evidence_base_result(action_brief, action)
-
-        if result["status"] == "unsafe":
-            result["edit_evidence"] = None
-            result["next_read"] = None
-            result["source_budget"] = {
-                "requested_tokens": token_budget,
-                "estimated_tokens": 0,
-                "complete": False,
-            }
-            self._task_evidence_attach_provenance(
-                result,
-                action,
-                selection_generation=selection_generation,
+            verification_plan = self._task_action_verification_plan(verify_row)
+            evidence_receipt = self._decision_evidence_receipt(
+                task, action, verification_plan
             )
-            return result
+            result = self._task_evidence_base_result(
+                task,
+                action,
+                evidence_receipt,
+                verification_plan,
+            )
 
-        edit_row = action.get("edit")
+        ownership = result["ownership"]
+        if not isinstance(ownership, dict):
+            raise AssertionError("task evidence ownership projection must be a mapping")
+        owner_row = action.get("edit")
         item = pending = None
-        if isinstance(edit_row, dict) and edit_row.get("path"):
+        if (
+            ownership.get("status") == "resolved"
+            and isinstance(owner_row, dict)
+            and owner_row.get("path")
+        ):
             item, pending = self._task_evidence_evidence_item(
-                edit_row,
-                role="edit",
+                owner_row,
+                role="owner",
                 token_budget=token_budget,
                 task=task,
             )
@@ -788,9 +846,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 token_budget=token_budget,
             )
         )
-        result["edit_evidence"] = compact_item
-        result["next_read"] = compact_pending
-        result["source_budget"] = source_budget
+        ownership["source_evidence"] = compact_item
+        ownership["next_read"] = compact_pending
+        ownership["source_budget"] = source_budget
+
         selected_verify = action.get("verify")
         selected_verify_path = (
             str(selected_verify.get("path"))

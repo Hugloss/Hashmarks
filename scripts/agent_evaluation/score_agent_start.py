@@ -36,6 +36,19 @@ def _identity(value: object) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
+def _task_candidate(packet: dict[str, object]) -> dict[str, object] | None:
+    ownership = packet.get("ownership")
+    if not isinstance(ownership, dict):
+        return None
+    candidate = ownership.get("candidate")
+    return candidate if isinstance(candidate, dict) else None
+
+
+def _task_verification(packet: dict[str, object]) -> dict[str, object]:
+    value = packet.get("verification")
+    return value if isinstance(value, dict) else {}
+
+
 def _packet_bytes(packet: dict[str, object]) -> int:
     return len(
         json.dumps(
@@ -80,7 +93,10 @@ def run(
                 if isinstance(packet.get("provenance"), dict)
                 else {}
             )
-            edit_path = str(packet.get("edit") or "")
+            candidate = _task_candidate(packet)
+            edit_path = (
+                str(candidate.get("path") or "") if candidate is not None else ""
+            )
             file_row = codemap.store.file_row(edit_path) if edit_path else None
             indexed_revision = (
                 str(file_row["file_digest"]) if file_row is not None else None
@@ -94,14 +110,17 @@ def run(
                     "provenance_complete": bool(
                         provenance.get("why")
                         and provenance.get("revision")
-                        and provenance.get("freshness")
-                        in {"proven", "stale", "unknown"}
+                        and isinstance(packet.get("freshness"), dict)
+                        and packet["freshness"].get("state")
+                        in {"current", "stale", "unknown"}
                     ),
                     "revision_current": bool(
                         indexed_revision
                         and provenance.get("revision") == indexed_revision
                     ),
-                    "freshness_state": str(provenance.get("freshness") or "missing"),
+                    "freshness_state": str(
+                        (packet.get("freshness") or {}).get("state", "missing")
+                    ),
                     "selection_reason": str(provenance.get("why") or "missing"),
                 }
             )
@@ -134,29 +153,34 @@ def run(
     for row in frozen:
         truth = expected[row["id"]]
         packet = row["packet"]
-        edit_correct = str(packet.get("edit") or "") == str(truth["expected_edit_path"])
-        verify = packet.get("verify")
-        surface = verification_surface(verify if isinstance(verify, list) else ())
+        candidate = _task_candidate(packet)
+        edit_correct = (
+            str(candidate.get("path") or "") if candidate is not None else ""
+        ) == str(truth["expected_edit_path"])
+        verification = _task_verification(packet)
+        plan = verification.get("plan") if isinstance(verification.get("plan"), dict) else {}
+        argv = plan.get("argv")
+        surface = verification_surface(argv if isinstance(argv, list) else ())
         verify_correct = str(surface.get("surface") or "") == str(
             truth["expected_verify_path"]
         )
-        next_read = packet.get("next_read")
+        ownership = packet.get("ownership") if isinstance(packet.get("ownership"), dict) else {}
+        next_read = ownership.get("next_read")
         if isinstance(next_read, dict) and next_read.get("reason"):
             next_read_reasons[str(next_read["reason"])] += 1
         source_budget = (
-            packet.get("source_budget")
-            if isinstance(packet.get("source_budget"), dict)
+            ownership.get("source_budget")
+            if isinstance(ownership.get("source_budget"), dict)
             else {}
         )
         graded = {
             "id": row["id"],
             "category": str(truth.get("category") or "unknown"),
-            "status": str(packet.get("status") or "unsafe"),
-            "edit_correct": edit_correct,
+            "ownership_status": str(ownership.get("status") or "unresolved"),
+            "owner_resolved": str(ownership.get("status") or "") == "resolved",
+            "candidate_correct": edit_correct,
             "verify_correct": verify_correct,
-            "fully_correct": edit_correct
-            and verify_correct
-            and str(packet.get("status") or "") != "unsafe",
+            "fully_correct": edit_correct and verify_correct,
             "source_complete": bool(source_budget.get("complete")),
             "packet_bytes": int(row["packet_bytes"]),
             "first_warm_ms": float(row["first_warm_ms"]),
@@ -175,10 +199,13 @@ def run(
     selection_reasons = Counter(str(row["selection_reason"]) for row in results)
     summary = {
         "tasks": count,
-        "edit_correct": sum(bool(row["edit_correct"]) for row in results),
+        "candidate_correct": sum(bool(row["candidate_correct"]) for row in results),
         "verify_correct": sum(bool(row["verify_correct"]) for row in results),
         "fully_correct": sum(bool(row["fully_correct"]) for row in results),
-        "unsafe": sum(row["status"] == "unsafe" for row in results),
+        "owner_resolved": sum(bool(row["owner_resolved"]) for row in results),
+        "owner_unresolved_or_ambiguous": sum(
+            row["ownership_status"] != "resolved" for row in results
+        ),
         "source_complete": sum(bool(row["source_complete"]) for row in results),
         "stable_packets": sum(bool(row["stable"]) for row in results),
         "provenance_complete": sum(bool(row["provenance_complete"]) for row in results),

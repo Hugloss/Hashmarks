@@ -38,6 +38,22 @@ def _repo(root: Path) -> str:
     return "Accepted responses are transformed by the wrong active owner for ember"
 
 
+def _task_candidate_path(packet: dict[str, object]) -> str:
+    ownership = packet.get("ownership")
+    assert isinstance(ownership, dict)
+    candidate = ownership.get("candidate")
+    assert isinstance(candidate, dict)
+    return str(candidate.get("path") or "")
+
+
+def _task_verification_path(packet: dict[str, object]) -> str:
+    verification = packet.get("verification")
+    assert isinstance(verification, dict)
+    selected = verification.get("selected")
+    assert isinstance(selected, dict)
+    return str(selected.get("path") or "")
+
+
 def test_task_change_impact_composes_owner_path_and_verification(
     tmp_path: Path,
 ) -> None:
@@ -45,7 +61,7 @@ def test_task_change_impact_composes_owner_path_and_verification(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         start = codemap.task_evidence(task)
-        assert start["edit"] == "src/case/engine.py"
+        assert _task_candidate_path(start) == "src/case/engine.py"
         (tmp_path / "src/case/engine.py").write_text(
             "def apply_ember(value: str) -> str:\n    return 'new' if value == 'accepted' else value\n",
             encoding="utf-8",
@@ -82,8 +98,9 @@ def test_task_change_impact_config_root_is_typed_and_gets_verification(
     with CodeMap(repo) as codemap:
         codemap.sync()
         start = codemap.task_evidence(config_task["query"])
-        assert start["edit"].endswith("policy.toml")
-        impact = codemap.task_change_impact(config_task["query"], [start["edit"]])
+        candidate_path = _task_candidate_path(start)
+        assert candidate_path.endswith("policy.toml")
+        impact = codemap.task_change_impact(config_task["query"], [candidate_path])
     changed = impact["changed"][0]
     assert "contract" in changed["roles"]
     assert "build_config" in changed["roles"]
@@ -259,9 +276,8 @@ def test_task_change_impact_reconstructs_same_package_go_owner_chain(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         start = codemap.task_evidence(task)
-        assert start["edit"] == "engine/engine.go"
-        assert start["verify_path"] == "route/cobaltridgealpha_test.go"
-        assert "owner_path" not in start
+        assert _task_candidate_path(start) == "engine/engine.go"
+        assert _task_verification_path(start) == "route/cobaltridgealpha_test.go"
         impact = codemap.task_change_impact(task, ["engine/engine.go"])
 
     implementation = [row["path"] for row in impact["surfaces"]["implementation"]]
