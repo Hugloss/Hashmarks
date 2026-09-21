@@ -753,9 +753,22 @@ class EvidenceCorrelationMixin:
         raw_anchor: Mapping[str, object],
         *,
         mappings: Sequence[Mapping[str, str]],
+        resolution_cache: dict[
+            tuple[str | None, int | None, str | None, str | None],
+            _Resolution,
+        ],
     ) -> tuple[dict[str, object], dict[str, object], int]:
         claims = self._anchor_claims(raw_anchor)
-        resolution = self._resolve_anchor(claims, mappings=mappings)
+        resolution_key = (
+            claims.path,
+            claims.line,
+            claims.symbol,
+            claims.module,
+        )
+        resolution = resolution_cache.get(resolution_key)
+        if resolution is None:
+            resolution = self._resolve_anchor(claims, mappings=mappings)
+            resolution_cache[resolution_key] = resolution
         references = self._repository_references(claims, resolution)
         binding_id = _binding_id(references)
         packet = {
@@ -776,6 +789,10 @@ class EvidenceCorrelationMixin:
         raw_bundle: Mapping[str, object],
         *,
         mappings: Sequence[Mapping[str, str]],
+        resolution_cache: dict[
+            tuple[str | None, int | None, str | None, str | None],
+            _Resolution,
+        ],
     ) -> _PreparedBundle:
         bundle_id = _bounded_identifier(
             raw_bundle.get("bundle_id"),
@@ -796,6 +813,7 @@ class EvidenceCorrelationMixin:
             completeness,
             raw_anchors,
             mappings=mappings,
+            resolution_cache=resolution_cache,
         )
 
     @staticmethod
@@ -834,6 +852,10 @@ class EvidenceCorrelationMixin:
         raw_anchors: Sequence[object],
         *,
         mappings: Sequence[Mapping[str, str]],
+        resolution_cache: dict[
+            tuple[str | None, int | None, str | None, str | None],
+            _Resolution,
+        ],
     ) -> _PreparedBundle:
         anchors: list[dict[str, object]] = []
         bindings: list[dict[str, object]] = []
@@ -844,6 +866,7 @@ class EvidenceCorrelationMixin:
             anchor, binding, anchor_metadata_bytes = self._prepare_anchor(
                 raw_anchor,
                 mappings=mappings,
+                resolution_cache=resolution_cache,
             )
             anchor_id = str(anchor["anchor_id"])
             if anchor_id in seen:
@@ -877,8 +900,16 @@ class EvidenceCorrelationMixin:
         seen: set[str] = set()
         total_metadata = 0
         total_anchors = 0
+        resolution_cache: dict[
+            tuple[str | None, int | None, str | None, str | None],
+            _Resolution,
+        ] = {}
         for raw_bundle in bundles:
-            result = self._prepare_bundle(raw_bundle, mappings=mappings)
+            result = self._prepare_bundle(
+                raw_bundle,
+                mappings=mappings,
+                resolution_cache=resolution_cache,
+            )
             bundle_id = str(result.packet["bundle_id"])
             if bundle_id in seen:
                 raise ValueError(f"duplicate bundle_id: {bundle_id}")
