@@ -13,7 +13,6 @@ from .evidence_decision_packet import DecisionPacketMixin
 from .evidence_freshness import freshness_state
 from .model import EvidenceVisibility
 from .python_ast import estimate_tokens
-from .task_action_types import compact_owner_candidate
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -51,8 +50,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 row["symbol"] = str(symbol)
             return row
 
-        raw_edit, owner_resolved = compact_owner_candidate(packet)
-        edit = anchor(raw_edit) if owner_resolved else None
+        edit = anchor(packet.get("edit"))
         verify = anchor(packet.get("verify"))
         contract = anchor(packet.get("contract"))
         used = {row["path"] for row in (edit, verify) if row is not None}
@@ -93,14 +91,12 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "verification_argv": list(plan.get("argv") or [])
             if plan.get("available")
             else None,
-            "safe": bool(context.get("safe")) and owner_resolved,
+            "safe": bool(context.get("safe")),
             "stale": bool(identity.get("stale")),
             "decision_generation": identity.get("decision_generation"),
             "evidence_receipt": dict(packet.get("evidence_receipt") or {}),
             "full_packet_available": True,
         }
-        if not owner_resolved:
-            result["candidate"] = anchor(raw_edit)
         if owner_path:
             result["owner_path"] = [
                 {
@@ -244,12 +240,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         context = self.work_context(action, token_budget=token_budget)
         _generation, _identity_generation, stale = self._generation_status()
         edit, verify, contract = self._task_action_selected_rows(action)
-        _candidate, owner_resolved = compact_owner_candidate(action)
         verification = self._task_action_verification_plan(verify)
 
         safe = (
             bool(context.get("safe"))
-            and owner_resolved
             and edit is not None
             and bool(verification.get("available"))
         )
@@ -262,7 +256,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             ),
         }
         if edit and edit.get("path"):
-            result["edit" if owner_resolved else "candidate"] = str(edit["path"])
+            result["edit"] = str(edit["path"])
         if bool(verification.get("available")):
             argv = verification.get("argv")
             if isinstance(argv, list) and argv:
