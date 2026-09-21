@@ -26,3 +26,7 @@ Launch/release operations:
 
 - [`LAUNCH_DISCOVERY.md`](LAUNCH_DISCOVERY.md) — GitHub/PyPI/MCP Registry discovery language, repository topics, and launch metadata checklist.
 - [`PUBLISHING_CHECKLIST.md`](PUBLISHING_CHECKLIST.md) — release-publication checklist and external promotion requirements.
+
+Current development plans:
+
+- [`reviews/EVIDENCE_STRENGTHENING_MASTER_PLAN.md`](reviews/EVIDENCE_STRENGTHENING_MASTER_PLAN.md) — current post-PR #28 evidence-strengthening master plan. It supersedes the pre-PR #28 evidence-correlation continuation plan as development guidance; normative product authority remains under `docs/reference/`.
