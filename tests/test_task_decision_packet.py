@@ -196,3 +196,39 @@ def test_decision_packet_preserves_explicit_owner_with_named_dependency(
     assert packet["ambiguity"]["ambiguous"] is False
     assert packet["discrimination"]["needed"] is False
     assert packet["discrimination"]["reason"] == "resolved"
+
+
+def test_leading_dependency_context_does_not_steal_explicit_edit_owner(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/publish.py").write_text(
+        "def publish_result(value):\n    return value\n", encoding="utf-8"
+    )
+    (tmp_path / "src/authority.py").write_text(
+        "class AuthorityReceipt:\n"
+        "    canonical_identity = 'canonical'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_publish.py").write_text(
+        "from src.publish import publish_result\n"
+        "def test_publish(): assert publish_result('x') == 'x'\n",
+        encoding="utf-8",
+    )
+    task = (
+        "With AuthorityReceipt.canonical_identity available, "
+        "fix publish_result to use the canonical identity."
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20, per_role=3)
+        packet = codemap.task_decision_packet(task, limit=20, token_budget=256)
+
+    assert action["edit"]["path"] == "src/publish.py"
+    assert action["ownership_authority"]["owner_resolved"] is True
+    assert action["admitted_edit"]["path"] == "src/publish.py"
+    assert packet["edit"]["path"] == "src/publish.py"
+    assert packet["candidate"]["path"] == "src/publish.py"
+    assert packet["discrimination"]["needed"] is False
