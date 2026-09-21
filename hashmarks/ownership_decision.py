@@ -14,6 +14,7 @@ class OwnershipDecisionState:
     structural_owner: Mapping[str, object] | None
     ambiguous: bool
     ambiguity_reason: str
+    owner_eligible: bool = True
 
 
 def _candidate_identity(row: Mapping[str, object]) -> dict[str, object]:
@@ -27,7 +28,7 @@ def _candidate_identity(row: Mapping[str, object]) -> dict[str, object]:
 
 
 def _decision_status(state: OwnershipDecisionState) -> str:
-    if state.edit is None:
+    if state.edit is None or not state.owner_eligible:
         return "unresolved"
     if state.ambiguous:
         return "ambiguous"
