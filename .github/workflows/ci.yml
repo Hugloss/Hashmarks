@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
@@ -31,7 +32,11 @@ jobs:
       - name: Ruff formatting diagnostic
         continue-on-error: true
         run: make ruff-format-check
+      - name: Resolve previous-main Ruff debt baseline
+        run: git show HEAD^1:ruff-debt-baseline.json > "$RUNNER_TEMP/ruff-debt-baseline.previous.json"
       - name: Ruff maintainability debt gate
+        env:
+          RUFF_DEBT_PREVIOUS_BASELINE: ${{ runner.temp }}/ruff-debt-baseline.previous.json
         run: make lint-debt-gate
       - name: Exact current Ruff debt inventory
         continue-on-error: true
