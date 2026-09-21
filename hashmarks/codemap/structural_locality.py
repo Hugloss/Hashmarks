@@ -126,6 +126,28 @@ def _freshness(stale: object) -> str:
     return "unknown"
 
 
+def _python_node_binds_name(node: ast.AST, name: str) -> bool:
+    if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+        return node.id == name
+    if isinstance(node, (ast.Import, ast.ImportFrom)):
+        return any(
+            (alias.asname or alias.name.rsplit(".", 1)[-1]) == name
+            for alias in node.names
+        )
+    return False
+
+
+def _binding_result(
+    rows: Sequence[dict[str, object]],
+    fallback: Sequence[dict[str, object]],
+    *,
+    unresolved: bool,
+) -> tuple[dict[str, object] | None, list[str], bool]:
+    if len(rows) == 1:
+        return rows[0], [_symbol_id(rows[0])], False
+    return None, sorted(_symbol_id(row) for row in rows or fallback), unresolved
+
+
 class StructuralLocalityMixin:
     """Project bounded structural-locality facts without refactor recommendations."""
 
@@ -195,22 +217,12 @@ class StructuralLocalityMixin:
             *function.args.posonlyargs,
             *function.args.args,
             *function.args.kwonlyargs,
+            *(() if function.args.vararg is None else (function.args.vararg,)),
+            *(() if function.args.kwarg is None else (function.args.kwarg,)),
         ]
-        if function.args.vararg is not None:
-            arguments.append(function.args.vararg)
-        if function.args.kwarg is not None:
-            arguments.append(function.args.kwarg)
-        if any(argument.arg == name for argument in arguments):
-            return True
-        for node in ast.walk(function):
-            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
-                if node.id == name:
-                    return True
-            elif isinstance(node, (ast.Import, ast.ImportFrom)):
-                for alias in node.names:
-                    if (alias.asname or alias.name.rsplit(".", 1)[-1]) == name:
-                        return True
-        return False
+        return any(argument.arg == name for argument in arguments) or any(
+            _python_node_binds_name(node, name) for node in ast.walk(function)
+        )
 
     def _python_plain_call_binding(
         self,
@@ -232,12 +244,8 @@ class StructuralLocalityMixin:
                 for row in candidates
                 if str(row.get("path") or "") == source_path
             ]
-            if len(local) == 1:
-                return local[0], [_symbol_id(local[0])], False
-            return (
-                None,
-                sorted(_symbol_id(row) for row in local or candidates),
-                len(local) > 1,
+            return _binding_result(
+                local, candidates, unresolved=len(local) > 1
             )
         if kind == "reexport" and len(targets) == 1:
             owners, unresolved = self._resolve_import_owner_evidence(
@@ -251,9 +259,9 @@ class StructuralLocalityMixin:
                 for row in candidates
                 if str(row.get("path") or "") in owner_paths
             ]
-            if len(owned) == 1:
-                return owned[0], [_symbol_id(owned[0])], False
-            return None, sorted(_symbol_id(row) for row in owned or candidates), bool(owners)
+            return _binding_result(
+                owned, candidates, unresolved=bool(owners)
+            )
         if kind in {"ambiguous", "star"}:
             return None, candidate_ids, True
         return None, candidate_ids, False
@@ -504,10 +512,8 @@ class StructuralLocalityMixin:
                 if str(row.get("path") or "") == source_path
                 and str(row.get("qualname") or "") == root
             ]
-            return (
-                None,
-                sorted(_symbol_id(row) for row in qualified or candidates),
-                bool(root_symbols),
+            return _binding_result(
+                qualified, candidates, unresolved=bool(root_symbols)
             )
         if kind == "reexport" and len(targets) == 1:
             owners, unresolved = self._resolve_import_owner_evidence(
@@ -537,13 +543,7 @@ class StructuralLocalityMixin:
                 if str(row.get("path") or "") in owner_paths
                 and str(row.get("qualname") or "") == qualified_name
             ]
-            if len(qualified) == 1:
-                return qualified[0], [_symbol_id(qualified[0])], False
-            return (
-                None,
-                sorted(_symbol_id(row) for row in qualified or candidates),
-                True,
-            )
+            return _binding_result(qualified, candidates, unresolved=True)
         if kind in {"ambiguous", "star"}:
             return None, candidate_ids, True
         return None, candidate_ids, False
