@@ -77,7 +77,8 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 ### Change impact and verification
 
 - `change_impact.py`, `post_change.py` — impact evidence around repository changes.
-- `evidence_verification.py` — repository-derived verification relevance and selection evidence.
+- `evidence_verification.py` — repository-derived verification relevance, ownership links, and selection evidence.
+- `verification_plan.py` — bounded runner/argv projection for an already-known verification surface; it does not execute verification or choose repository work.
 - `verification_explanation.py` — explanation projection over verification selection.
 
 ### Freshness and higher-level repository intelligence
@@ -176,7 +177,7 @@ Those are intentionally separate.
 
 ### Verification bug
 
-Start at `evidence_verification.py`, then follow existing bulk/session helpers in `decision_session.py` and store primitives before adding a new cache or query API.
+Start at `evidence_verification.py` for relevance/selection or `verification_plan.py` for bounded runner/argv projection, then follow existing bulk/session helpers in `decision_session.py` and store primitives before adding a new cache or query API.
 
 ## How to choose where new code belongs
 
