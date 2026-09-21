@@ -67,14 +67,14 @@ def _append_probe(path: Path, task_id: str) -> None:
     path.write_text(original.rstrip("\n") + "\n" + marker + "\n", encoding="utf-8")
 
 
-def _task_owner_path(packet: dict[str, object]) -> str:
+def _task_candidate_path(packet: dict[str, object]) -> str:
     ownership = packet.get("ownership")
-    if not isinstance(ownership, dict) or ownership.get("status") != "resolved":
+    if not isinstance(ownership, dict):
         return ""
-    owner = ownership.get("owner")
-    if not isinstance(owner, dict):
+    candidate = ownership.get("candidate")
+    if not isinstance(candidate, dict):
         return ""
-    return str(owner.get("path") or "")
+    return str(candidate.get("path") or "")
 
 
 def _surface_paths(packet: dict[str, Any], role: str) -> set[str]:
@@ -112,10 +112,10 @@ def run(
             task_id = str(task["id"])
             query = str(task["query"])
             start = codemap.task_evidence(query)
-            edit_path = _task_owner_path(start)
+            edit_path = _task_candidate_path(start)
             if not edit_path:
                 raise ValueError(
-                    f"PUBLIC task {task_id} has no resolved repository owner"
+                    f"PUBLIC task {task_id} has no repository candidate"
                 )
             _append_probe(repo / edit_path, task_id)
             impact_started = time.perf_counter()
@@ -258,7 +258,7 @@ def run(
         ],
         "secret_join_after_start_external_edit_and_impact_freeze": True,
         "external_edit": "syntax-preserving comment appended to PUBLIC-only selected edit path",
-        "changed_paths_source": "exact PUBLIC-only task_evidence ownership authority",
+        "changed_paths_source": "PUBLIC-only task_evidence ownership candidate; qualification mutator remains external",
         "impact_authority": "existing reverse/project impact plus proven task ownership path and selected verification authority",
         "solution_loop_owner": "external-agent",
         "public_sha256": _sha(public_path),
