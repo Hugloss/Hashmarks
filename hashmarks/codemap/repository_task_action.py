@@ -1395,13 +1395,24 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         ambiguous: bool,
         ambiguity_reason: str,
     ) -> dict[str, object]:
+        explicit_target_basis = (
+            str(edit.get("explicit_target_basis") or "")
+            if isinstance(edit, Mapping)
+            else ""
+        )
+        owner_eligible = explicit_target_basis != "explicit-test-edit"
         trace = ownership_decision_trace(
             OwnershipDecisionState(
                 edit=edit,
                 competing=competing,
                 structural_owner=structural_owner,
                 ambiguous=ambiguous,
-                ambiguity_reason=ambiguity_reason,
+                ambiguity_reason=(
+                    ambiguity_reason
+                    if owner_eligible
+                    else "explicit-target-not-ownership"
+                ),
+                owner_eligible=owner_eligible,
             )
         )
         return {
