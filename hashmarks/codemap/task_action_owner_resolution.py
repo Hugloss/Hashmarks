@@ -76,14 +76,18 @@ class TaskActionOwnerResolutionMixin:
             task,
             flags=re.IGNORECASE,
         )
-        if dependency_first:
-            return dependency_first.group(1)
         match = re.search(
             r"\s(?:so|using|with|by|via|through|to use|to call)\s",
             task,
             flags=re.IGNORECASE,
         )
-        return task[: match.start()] if match else task
+        return (
+            dependency_first.group(1)
+            if dependency_first
+            else task[: match.start()]
+            if match
+            else task
+        )
 
     @classmethod
     def _task_action_requested_exact_identifier_edits(
