@@ -38,6 +38,8 @@ def _snapshot(*, scope: dict[str, object] | None = None) -> dict[str, object]:
             }
         ],
         "repository_inputs": [],
+        "completeness": "complete",
+        "truncation": "complete",
     }
 
 
@@ -160,6 +162,29 @@ def test_repository_input_binding_requires_independent_member_revision(
         ]
         third = codemap.dependency_resolution_evidence(mismatch)
         assert third["repository_inputs"][0]["source_equivalence"] == "mismatch"
+
+
+def test_incomplete_resolution_cannot_prove_dependency_absence(tmp_path: Path) -> None:
+    snapshot = _snapshot()
+    snapshot["completeness"] = "incomplete"
+    snapshot["truncation"] = "truncated"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(snapshot)
+
+    assert packet["negative_evidence"] == "not-admissible"
+
+
+def test_complete_resolution_requires_explicit_non_truncation(tmp_path: Path) -> None:
+    snapshot = _snapshot()
+    snapshot["truncation"] = "unknown"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="completeness=complete requires truncation=complete",
+        ):
+            codemap.dependency_resolution_evidence(snapshot)
 
 
 def test_owner_never_executes_dependency_tooling(tmp_path: Path, monkeypatch) -> None:
