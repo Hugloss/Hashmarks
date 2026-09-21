@@ -96,9 +96,13 @@ class TaskActionOwnerResolutionMixin:
             task,
             flags=re.IGNORECASE,
         )
-        if dependency_first:
-            return dependency_first.group(1)
-        return task[: min(positions)] if positions else task
+        return (
+            dependency_first.group(1)
+            if dependency_first
+            else task[: min(positions)]
+            if positions
+            else task
+        )
 
     @classmethod
     def _task_action_requested_exact_identifier_edits(
