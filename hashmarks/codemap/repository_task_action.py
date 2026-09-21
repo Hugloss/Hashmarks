@@ -840,6 +840,89 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             )
         return candidates
 
+    def _task_action_plain_identifier_index_candidates(
+        self,
+        terms: set[str],
+        failed: set[str],
+        *,
+        canonical_rank: int,
+    ) -> list[dict[str, object]]:
+        """Recover strong explicit identifiers omitted by bounded retrieval.
+
+        Only identifiers already admitted by the exact-identifier task parser
+        may use this path. Generic prose therefore gains no discovery authority.
+        Test-shaped rows retain the existing reference-backed production proof,
+        while ordinary source/script symbols may participate directly.
+        """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        plain_terms = tuple(sorted(term for term in terms if "." not in term))
+        if not plain_terms:
+            return []
+        indexed = self._session_exact_symbol_candidates(plain_terms, limit=1024)
+        candidates: list[dict[str, object]] = []
+        seen: set[tuple[str, str]] = set()
+        for symbol in indexed:
+            path = str(symbol.get("path") or "")
+            name = str(symbol.get("name") or "").lower()
+            qualname = str(symbol.get("qualname") or "").lower()
+            if (
+                not path
+                or path in failed
+                or self._task_action_is_archive_path(path)
+                or (name not in terms and qualname not in terms)
+            ):
+                continue
+            domains = [domain.value for domain in classify_repository_path(path)]
+            if (
+                RepositoryDomain.SOURCE.value not in domains
+                and RepositoryDomain.SCRIPT.value not in domains
+            ):
+                continue
+            file_row = self._session_file_row(path)
+            if (
+                isinstance(file_row, Mapping)
+                and str(file_row.get("evidence_visibility") or "")
+                == EvidenceVisibility.DENY.value
+            ):
+                continue
+            candidate: dict[str, object] = {
+                "path": path,
+                "canonical_rank": canonical_rank,
+                "canonical_score": 0.0,
+                "domains": domains,
+                "roles": ["edit", "related"],
+                "name": symbol.get("name"),
+                "qualname": symbol.get("qualname"),
+                "signature": symbol.get("signature"),
+                "start_line": symbol.get("start_line"),
+                "end_line": symbol.get("end_line"),
+                "evidence_visibility": (
+                    str(file_row["evidence_visibility"])
+                    if isinstance(file_row, Mapping)
+                    else EvidenceVisibility.SOURCE.value
+                ),
+                "exact_identifier_projection": True,
+                "plain_identifier_index_projection": True,
+            }
+            if RepositoryDomain.TEST.value in domains:
+                projected = self._task_action_reference_backed_source_projection(
+                    candidate,
+                    {str(symbol.get("name") or "")},
+                )
+                if projected is None:
+                    continue
+                candidate = projected
+            key = (
+                path,
+                str(symbol.get("qualname") or symbol.get("name") or ""),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(candidate)
+        return candidates
+
     def _task_action_exact_identifier_edit_candidates(
         self,
         task: str,
@@ -926,11 +1009,18 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             )
             + 1
         )
-        indexed = self._task_action_qualified_identifier_index_candidates(
-            qualified_terms,
-            failed,
-            canonical_rank=projection_rank,
-        )
+        indexed = [
+            *self._task_action_qualified_identifier_index_candidates(
+                qualified_terms,
+                failed,
+                canonical_rank=projection_rank,
+            ),
+            *self._task_action_plain_identifier_index_candidates(
+                terms,
+                failed,
+                canonical_rank=projection_rank,
+            ),
+        ]
         existing = {
             (
                 str(row.get("path") or ""),
