@@ -173,10 +173,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         del limit
         ambiguity = action.get("ambiguity")
         ambiguity = ambiguity if isinstance(ambiguity, dict) else {}
-        if edit is None:
-            return "no-supported-owner-candidate"
         if bool(ambiguity.get("ambiguous")):
             return "competing-action-roles"
+        if edit is None:
+            return "no-supported-owner-candidate"
         if verify is None:
             return "missing-verification-evidence"
         return None
