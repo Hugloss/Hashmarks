@@ -4,6 +4,8 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.ownership_decision import project_owner_candidate
+
 from .decision_session import incomplete_decision_scoped
 from .evidence_verification import _VerificationSelectionState
 
@@ -211,9 +213,7 @@ class DecisionPacketMixin:
             per_role=per_role,
         )
         timing.record("action_map")
-        candidate = action.get("edit") if isinstance(action.get("edit"), dict) else None
-        edit, _candidate, owner_resolved = project_owner_candidate(action)
-        edit = edit if isinstance(edit, dict) else None
+        edit, candidate, owner_resolved = project_owner_candidate(action)
         verify = (
             action.get("verify") if isinstance(action.get("verify"), dict) else None
         )
