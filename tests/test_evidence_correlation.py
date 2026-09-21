@@ -192,8 +192,97 @@ def test_conflicting_symbol_and_line_stays_a_claim_conflict(
     assert resolution["state"] == "claim-conflict"
     assert (
         resolution["reason"]
-        == "symbol-does-not-match-containing-repository-symbol"
+        == "symbol-does-not-contain-claimed-line"
     )
+
+
+def test_missing_repository_member_does_not_become_resolved_by_mapping(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence(
+            _bundle(
+                {
+                    "anchor_id": "missing",
+                    "path": "/app/src/missing.py",
+                    "line": 8,
+                }
+            ),
+            path_mappings=[
+                {"external_prefix": "/app", "repository_prefix": ""}
+            ],
+            include_relationships=False,
+        )
+
+    anchor = packet["bundles"][0]["anchors"][0]
+    assert anchor["resolution"]["state"] == "unresolved"
+    assert anchor["resolution"]["repository_path"] == "src/missing.py"
+    assert anchor["repository_evidence"]["evidence"][0]["state"] == "known-absent"
+
+
+def test_bundle_reordering_does_not_change_correlation_identity(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.py").write_text("A = 1\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("B = 1\n", encoding="utf-8")
+    left = [
+        {
+            "bundle_id": "b",
+            "producer": {},
+            "completeness": "complete",
+            "anchors": [{"anchor_id": "b:0", "path": "b.py"}],
+        },
+        {
+            "bundle_id": "a",
+            "producer": {},
+            "completeness": "complete",
+            "anchors": [{"anchor_id": "a:0", "path": "a.py"}],
+        },
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        first = codemap.correlate_evidence(
+            left, include_relationships=False
+        )
+        second = codemap.correlate_evidence(
+            list(reversed(left)), include_relationships=False
+        )
+
+    assert first == second
+    assert [row["bundle_id"] for row in first["bundles"]] == ["a", "b"]
+
+
+def test_symbol_candidate_bound_preserves_ambiguity(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "many.py"
+    source.write_text(
+        "\n\n".join(
+            f"class C{index}:\n    def duplicate(self):\n        return {index}"
+            for index in range(40)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence(
+            _bundle(
+                {
+                    "anchor_id": "dense",
+                    "path": "many.py",
+                    "symbol": "duplicate",
+                }
+            ),
+            include_relationships=False,
+        )
+
+    resolution = packet["bundles"][0]["anchors"][0]["resolution"]
+    assert resolution["state"] == "resolved-ambiguous"
+    assert resolution["reason"] == "symbol-match-bound-exhausted"
+    assert resolution["candidate_completeness"] == "bounded"
+    assert len(resolution["candidates"]) == 32
 
 
 def test_absolute_external_path_requires_explicit_mapping(
