@@ -5,6 +5,10 @@ from threading import RLock
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from .codemap import ChangeImpactOptions, CodeMap
+from .codemap.evidence_correlation import (
+    CORRELATION_PACKET_MAX_BYTES,
+    CORRELATION_REQUEST_MAX_BYTES,
+)
 from .repository_retry import retry_transient_repository_race
 
 if TYPE_CHECKING:
@@ -16,7 +20,6 @@ _MAX_CHANGED_PATHS = 256
 _MAX_LIMIT = 50
 _MAX_TOKEN_BUDGET = 8_192
 _MAX_PREVIOUS_EVIDENCE_BYTES = 262_144
-_MAX_CORRELATION_INPUT_BYTES = 524_288
 
 _T = TypeVar("_T")
 
@@ -185,7 +188,7 @@ class HashmarksMcpSurface:
         bundles = _bounded_json(
             bundles,
             name="bundles",
-            maximum=_MAX_CORRELATION_INPUT_BYTES,
+            maximum=CORRELATION_REQUEST_MAX_BYTES,
             expected_type=list,
         )
         mappings = (
@@ -194,7 +197,7 @@ class HashmarksMcpSurface:
             else _bounded_json(
                 path_mappings,
                 name="path_mappings",
-                maximum=_MAX_CORRELATION_INPUT_BYTES,
+                maximum=CORRELATION_REQUEST_MAX_BYTES,
                 expected_type=list,
             )
         )
@@ -204,7 +207,7 @@ class HashmarksMcpSurface:
             else _bounded_json(
                 previous_correlation,
                 name="previous_correlation",
-                maximum=_MAX_CORRELATION_INPUT_BYTES,
+                maximum=CORRELATION_PACKET_MAX_BYTES,
                 expected_type=dict,
             )
         )
