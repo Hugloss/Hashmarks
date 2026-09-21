@@ -30,3 +30,4 @@ Launch/release operations:
 Current development plans:
 
 - [`reviews/EVIDENCE_STRENGTHENING_MASTER_PLAN.md`](reviews/EVIDENCE_STRENGTHENING_MASTER_PLAN.md) — current post-PR #28 evidence-strengthening master plan. It supersedes the pre-PR #28 evidence-correlation continuation plan as development guidance; normative product authority remains under `docs/reference/`.
+- [`reviews/DECISION_EVIDENCE_CONTRACT.md`](reviews/DECISION_EVIDENCE_CONTRACT.md) — no-backcompat contract freeze for separating bounded retrieval from repository ownership, verification, ambiguity and related evidence before the task-evidence rewrite.
