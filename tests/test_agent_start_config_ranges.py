@@ -31,11 +31,17 @@ def _start(root: Path, query: str, *, token_budget: int = 128) -> dict[str, obje
         return codemap.task_evidence(query, token_budget=token_budget)
 
 
+def _ownership(start: dict[str, object]) -> dict[str, object]:
+    value = start.get("ownership")
+    assert isinstance(value, dict)
+    return value
+
+
 def test_toml_key_range_replaces_symbol_less_next_read(tmp_path: Path) -> None:
     _repo(tmp_path, "policy.toml", "mode='active'\nfeature='ember'\n")
     start = _start(tmp_path, "Change ember policy config accepted response mode")
-    assert start["edit"] == "src/case/policy.toml"
-    assert start["edit_evidence"] == {
+    assert _ownership(start)["owner"]["path"] == "src/case/policy.toml"
+    assert _ownership(start)["source_evidence"] == {
         "symbol": "mode",
         "lines": [1, 1],
         "representation": "config-key-range",
@@ -48,8 +54,8 @@ def test_toml_key_range_replaces_symbol_less_next_read(tmp_path: Path) -> None:
             "locator": "exact-task-key",
         },
     }
-    assert start["next_read"] is None
-    assert start["source_budget"]["complete"] is True
+    assert _ownership(start)["next_read"] is None
+    assert _ownership(start)["source_budget"]["complete"] is True
 
 
 def test_toml_section_range_is_bounded_to_named_section(tmp_path: Path) -> None:
@@ -59,7 +65,7 @@ def test_toml_section_range_is_bounded_to_named_section(tmp_path: Path) -> None:
         "global='keep'\n\n[response]\nmode='active'\nfeature='ember'\n\n[other]\nmode='legacy'\n",
     )
     start = _start(tmp_path, "Inspect the response section in the ember policy config")
-    evidence = start["edit_evidence"]
+    evidence = _ownership(start)["source_evidence"]
     assert evidence["representation"] == "config-key-range"
     assert evidence["config"] == {
         "format": "toml",
@@ -75,7 +81,7 @@ def test_toml_section_range_is_bounded_to_named_section(tmp_path: Path) -> None:
 def test_json_key_range_uses_valid_json_and_one_key_line(tmp_path: Path) -> None:
     _repo(tmp_path, "policy.json", '{\n  "mode": "active",\n  "feature": "ember"\n}\n')
     start = _start(tmp_path, "Change ember policy config accepted response mode")
-    evidence = start["edit_evidence"]
+    evidence = _ownership(start)["source_evidence"]
     assert evidence["representation"] == "config-key-range"
     assert evidence["lines"] == [2, 2]
     assert evidence["content"] == '  "mode": "active",'
@@ -92,7 +98,7 @@ def test_json_nested_value_range_ignores_brackets_inside_strings(
         '    "modes": [\n      "active"\n    ]\n  },\n  "other": true\n}\n',
     )
     start = _start(tmp_path, "Inspect the ember response config")
-    evidence = start["edit_evidence"]
+    evidence = _ownership(start)["source_evidence"]
     assert evidence["config"]["name"] == "response"
     assert evidence["lines"] == [2, 7]
     assert '"other": true' not in evidence["content"]
@@ -105,7 +111,7 @@ def test_yaml_nested_key_range_uses_task_supported_path(tmp_path: Path) -> None:
         "response:\n  mode: active\n  feature: ember\nother:\n  mode: legacy\n",
     )
     start = _start(tmp_path, "Change ember response mode in the policy config")
-    evidence = start["edit_evidence"]
+    evidence = _ownership(start)["source_evidence"]
     assert evidence["representation"] == "config-key-range"
     assert evidence["config"] == {
         "format": "yaml",
@@ -125,10 +131,10 @@ def test_ambiguous_yaml_key_fails_closed_instead_of_guessing(tmp_path: Path) -> 
     )
     start = _start(tmp_path, "Change ember policy config mode")
     assert start["edit"] == "src/case/policy.yaml"
-    assert start["edit_evidence"] is None
-    assert start["next_read"]["reason"] == "ambiguous-task-local-config-key"
-    assert start["next_read"]["candidate_count"] == 2
-    assert start["source_budget"]["complete"] is False
+    assert _ownership(start)["source_evidence"] is None
+    assert _ownership(start)["next_read"]["reason"] == "ambiguous-task-local-config-key"
+    assert _ownership(start)["next_read"]["candidate_count"] == 2
+    assert _ownership(start)["source_budget"]["complete"] is False
 
 
 def test_config_range_over_budget_is_not_clipped(tmp_path: Path) -> None:
@@ -140,14 +146,14 @@ def test_config_range_over_budget_is_not_clipped(tmp_path: Path) -> None:
     start = _start(
         tmp_path, "Change ember policy config accepted response mode", token_budget=1
     )
-    assert start["edit_evidence"] is None
-    assert start["next_read"]["reason"] == "exact-config-range-exceeds-start-budget"
-    assert start["next_read"]["lines"] == [1, 1]
-    assert start["next_read"]["config"]["name"] == "mode"
+    assert _ownership(start)["source_evidence"] is None
+    assert _ownership(start)["next_read"]["reason"] == "exact-config-range-exceeds-start-budget"
+    assert _ownership(start)["next_read"]["lines"] == [1, 1]
+    assert _ownership(start)["next_read"]["config"]["name"] == "mode"
 
 
 def test_invalid_json_config_does_not_project_source(tmp_path: Path) -> None:
     _repo(tmp_path, "policy.json", '{\n  "mode": "active",\n}\n')
     start = _start(tmp_path, "Change ember policy config accepted response mode")
-    assert start["edit_evidence"] is None
-    assert start["next_read"]["reason"] == "invalid-config-syntax"
+    assert _ownership(start)["source_evidence"] is None
+    assert _ownership(start)["next_read"]["reason"] == "invalid-config-syntax"
