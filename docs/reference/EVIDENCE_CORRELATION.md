@@ -147,9 +147,13 @@ A current repository observation therefore never implies that an older runtime f
 
 ## Completeness
 
-Each bundle declares `complete | incomplete | unknown`. Hashmarks preserves that declaration and never infers that a supplied sample contains every runtime or derived observation.
+Each bundle declares `complete | incomplete | unknown`, an explicit caller-owned `scope` object, and `truncation = complete | truncated | unknown`. Hashmarks preserves those declarations and never infers that a supplied sample contains every runtime or derived observation.
 
-Bounds are fail-closed. Oversized bundle counts, anchor counts, path mappings, identifiers, or metadata are rejected rather than silently truncated into stronger evidence.
+A bundle may declare `completeness=complete` only when it also declares `truncation=complete`. This means only that the caller claims the supplied observations are complete for the declared scope; it does not make the producer authoritative about repository truth. Packet output marks producer/completeness authority as caller-claimed.
+
+Negative external evidence is admissible only within declared scopes when every supplied bundle is complete and explicitly non-truncated. An incomplete, truncated, or unknown bundle may prove that an observation was supplied, but it cannot prove absence. Scope and truncation are part of the evidence-definition identity, so changing a time window, source selection, sampling boundary, or truncation state cannot masquerade as the same observation definition.
+
+Bounds are fail-closed. Oversized bundle counts, anchor counts, path mappings, identifiers, scope metadata, or anchor metadata are rejected rather than silently truncated into stronger evidence.
 
 The correlation request and emitted correlation packet each have one core-owned encoded JSON budget of **1 MiB**. MCP reuses these exact limits and must not add a stricter transport-only evidence budget. The emitted packet includes its active bounds. When independent relationship evidence would exceed the packet budget, Hashmarks fails closed and the consumer must reduce relationship bounds or split the external evidence set.
 
