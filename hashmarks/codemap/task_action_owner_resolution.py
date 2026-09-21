@@ -3,6 +3,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.paths import normalize_relative_path
+
+from .model import EvidenceVisibility
 from .task_action_types import _TaskActionOwnerResolutionState
 
 if TYPE_CHECKING:
@@ -10,6 +13,35 @@ if TYPE_CHECKING:
 
 
 class TaskActionOwnerResolutionMixin:
+    def _task_action_literal_task_paths(
+        self,
+        task: str,
+        failed: set[str],
+    ) -> tuple[str, ...]:
+        """Resolve explicitly named current repository paths without lexical retrieval."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        paths: list[str] = []
+        for raw in task.split():
+            token = raw.strip("`'\"()[]{}<>,:;").replace("\\", "/")
+            if "::" in token:
+                token = token.split("::", 1)[0]
+            try:
+                path = normalize_relative_path(token, allow_root=False)
+            except ValueError:
+                continue
+            if path in failed:
+                continue
+            row = self._session_file_row(path)
+            if row is None:
+                continue
+            if EvidenceVisibility(str(row.get("evidence_visibility") or "deny")) is EvidenceVisibility.DENY:
+                continue
+            if not self._indexed_path_current(path):
+                continue
+            paths.append(path)
+        return tuple(dict.fromkeys(paths))
+
     def _task_action_exact_owner_basis(
         self,
         task: str,
@@ -61,20 +93,28 @@ class TaskActionOwnerResolutionMixin:
                 edit, rows, failed, discrimination, verification_anchor_tokens
             )
         )
-        task_path_tokens = {
-            token.strip("`'\"()[]{}<>,:;").replace("\\", "/")
-            for token in task.split()
-        }
-        literal_task_paths = tuple(
-            dict.fromkeys(
-                str(row.get("path") or "")
-                for row in rows
-                if row.get("path") and str(row.get("path") or "") in task_path_tokens
-            )
-        )
+        literal_task_paths = self._task_action_literal_task_paths(task, failed)
         literal_task_path = (
             literal_task_paths[0] if len(literal_task_paths) == 1 else ""
         )
+        if literal_task_path:
+            literal_row = next(
+                (
+                    row
+                    for row in rows
+                    if str(row.get("path") or "") == literal_task_path
+                ),
+                None,
+            )
+            if literal_row is None:
+                literal_row = self._task_action_projected_owner_row(
+                    literal_task_path,
+                    {"depth": 0},
+                    rows,
+                    limit,
+                )
+            edit = literal_row
+            owner_basis = "literal-path"
 
         exact_identifier_edits: list[dict[str, object]] = []
         if (
@@ -94,9 +134,10 @@ class TaskActionOwnerResolutionMixin:
                 ]
             if len(exact_identifier_edits) == 1:
                 edit = exact_identifier_edits[0]
-                owner_basis = self._task_action_exact_owner_basis(
-                    task, exact_identifier_edits[0]
-                )
+                if not literal_task_path:
+                    owner_basis = self._task_action_exact_owner_basis(
+                        task, exact_identifier_edits[0]
+                    )
 
         exact_identifier_surface_selected = bool(
             len(exact_identifier_edits) == 1
