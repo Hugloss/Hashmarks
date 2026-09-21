@@ -40,7 +40,11 @@ def test_mcp_surface_exposes_only_bounded_repository_intelligence(
         assert any(row["path"] == "src/feature.py" for row in found["results"])
 
         evidence = surface.task_evidence("change flare041 behavior", token_budget=256)
-        assert evidence["schema"] == "hashmarks.task-evidence.v1"
+        assert evidence["schema"] == "hashmarks.task-evidence.v2"
+        assert evidence["retrieval"]["ownership_authority"] is False
+        assert evidence["ownership"]["authority"] == "repository-ownership-only"
+        assert evidence["freshness"]["state"] in {"unknown", "current", "stale"}
+        assert "status" not in evidence
         assert "provenance" in evidence
     finally:
         surface.close()
@@ -57,7 +61,7 @@ def test_mcp_surface_rejects_unbounded_or_empty_inputs(tmp_path: Path) -> None:
             surface.find("flare041", limit=51)
         with pytest.raises(McpSurfaceError, match="changed_paths exceeds"):
             surface.change_impact("task", [f"p{i}.py" for i in range(257)])
-        huge = {"schema": "hashmarks.task-evidence.v1", "payload": "x" * 300_000}
+        huge = {"schema": "hashmarks.task-evidence.v2", "payload": "x" * 300_000}
         with pytest.raises(McpSurfaceError, match="encoded bytes"):
             surface.post_change("task", ["src/feature.py"], huge)
         with pytest.raises((ValueError, McpSurfaceError)):
