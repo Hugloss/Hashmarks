@@ -828,7 +828,7 @@ class EvidenceCorrelationMixin:
         return {"state": state, "basis": basis}
 
     @staticmethod
-    def _binding_rows(
+    def _correlation_binding_rows(
         repository_evidence: Mapping[str, object],
     ) -> dict[str, Mapping[str, object]]:
         rows = repository_evidence.get("bindings", [])
@@ -845,7 +845,7 @@ class EvidenceCorrelationMixin:
         bundles: Sequence[dict[str, object]],
         repository_evidence: Mapping[str, object],
     ) -> None:
-        binding_rows = EvidenceCorrelationMixin._binding_rows(repository_evidence)
+        binding_rows = EvidenceCorrelationMixin._correlation_binding_rows(repository_evidence)
         for bundle in bundles:
             anchors = bundle.get("anchors", [])
             if not isinstance(anchors, list):
