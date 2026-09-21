@@ -245,3 +245,12 @@ Evidence correlation is already a bounded normalized projection rather than a re
 The MCP surface exposes the same correlation owner and the same request/packet bounds. Evidence payloads are product inputs and outputs, not operational telemetry. Hashmarks does not emit those payloads as OpenTelemetry/logging data by default, persist them as an event store, or acquire producer query credentials.
 
 Producer kind is descriptive provenance, not a dispatch authority. Normalized pytest, Ruff/type/compiler, coverage, dependency, SBOM/scanner, Splunk/Loki/CloudWatch/Sentry-style, and OpenTelemetry-style observations use the same bounded correlation contract. Producer-specific collection, parsing, retry, retention, diagnosis, and remediation remain outside Hashmarks.
+
+
+## Cross-bundle correspondence
+
+When independently normalized anchors from different bundles resolve uniquely to the same repository member or symbol, the canonical packet may expose `same-repository-target` correspondence. This is repository correspondence only. It does not establish that the observations belong to the same incident, share a cause, identify a culprit, or imply a repair.
+
+Ambiguous and unresolved anchors do not participate in same-target correspondence. Correspondence is part of canonical packet identity, so post-issuance mutation is detected by the existing correlation packet integrity owner.
+
+Final qualification includes deterministic replay and bounded projection at 1, 10, 100, and the maximum 256 anchors, alongside the existing ambiguity, conflict, truncation, oversized-packet, malicious/opaque metadata, source-equivalence, path-mapping, and tamper regressions.
