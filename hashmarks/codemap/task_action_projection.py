@@ -292,6 +292,15 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                     if isinstance(choices.verify, Mapping)
                     else ""
                 )
+        ownership = self._task_action_ownership_payload_fields(
+            edit,
+            competing[:per_role],
+            structural_owner,
+            ambiguous,
+            ambiguity_reason,
+        )
+        if not bool(ownership["ownership_authority"]["owner_resolved"]):
+            edit = None
         return _TaskActionFinalState(
             edit=edit,
             verify=choices.verify,
