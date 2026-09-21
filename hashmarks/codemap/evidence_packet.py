@@ -51,6 +51,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             return row
 
         edit = anchor(packet.get("edit"))
+        candidate = anchor(packet.get("candidate"))
         verify = anchor(packet.get("verify"))
         contract = anchor(packet.get("contract"))
         used = {row["path"] for row in (edit, verify) if row is not None}
@@ -87,6 +88,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         result: dict[str, object] = {
             "schema": "hashmarks.task-decision-brief.v1",
             "edit": edit,
+            "candidate": candidate,
             "verify": verify,
             "verification_argv": list(plan.get("argv") or [])
             if plan.get("available")
@@ -251,6 +253,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         result: dict[str, object] = {
             "schema": "hashmarks.task-action-brief.v1",
             "status": status,
+            "candidate": action.get("candidate_path"),
             "evidence_receipt": self._decision_evidence_receipt(
                 task, action, verification
             ),
@@ -874,6 +877,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         )
         return result
 
+    @decision_scoped
     def task_action_brief(
         self,
         task: str,
