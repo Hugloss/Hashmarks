@@ -28,6 +28,15 @@ class PostChangeMixin(ChangeImpactMixin):
             if isinstance(packet.get("verification"), Mapping)
             else {}
         )
+        if key == "candidate_path":
+            candidate = (
+                ownership.get("candidate")
+                if isinstance(ownership.get("candidate"), Mapping)
+                else {}
+            )
+            return str(candidate.get("path") or "") or None
+        if key == "candidate_basis":
+            return str(ownership.get("candidate_basis") or "") or None
         if key == "owner_path":
             owner = (
                 ownership.get("owner")
@@ -145,15 +154,17 @@ class PostChangeMixin(ChangeImpactMixin):
     ) -> tuple[str, str | None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        previous_owner = self._post_change_previous_value(previous_evidence, "owner_path")
+        previous_candidate = self._post_change_previous_value(
+            previous_evidence, "candidate_path"
+        )
         previous_revision = (
             str(previous_provenance.get("revision"))
             if previous_provenance.get("revision")
             else None
         )
-        if not isinstance(previous_owner, str) or not previous_revision:
+        if not isinstance(previous_candidate, str) or not previous_revision:
             return "unbound", previous_revision
-        row = self._session_file_row(previous_owner)
+        row = self._session_file_row(previous_candidate)
         indexed_before = (
             None if row is None or not row["file_digest"] else str(row["file_digest"])
         )
@@ -207,6 +218,8 @@ class PostChangeMixin(ChangeImpactMixin):
         ownership_changed = False
         verification_changed = False
         for key, label, domain in (
+            ("candidate_path", "task-candidate", "ownership"),
+            ("candidate_basis", "candidate-basis", "ownership"),
             ("owner_path", "owner", "ownership"),
             ("owner_basis", "owner-basis", "ownership"),
             ("verification_path", "verification-surface", "verification"),
@@ -248,14 +261,14 @@ class PostChangeMixin(ChangeImpactMixin):
             and current_revision
             and previous_revision == current_revision
         ):
-            reused.append("owner-source-revision")
+            reused.append("candidate-source-revision")
         elif previous_revision != current_revision:
-            invalidated.append("owner-source-revision")
+            invalidated.append("candidate-source-revision")
 
         if (
             previous_why != current_why
-            or self._post_change_previous_value(previous_evidence, "owner_path")
-            != self._post_change_previous_value(current, "owner_path")
+            or self._post_change_previous_value(previous_evidence, "candidate_path")
+            != self._post_change_previous_value(current, "candidate_path")
         ):
             replacement["provenance"] = {
                 key: provenance[key] for key in ("why", "revision") if key in provenance
