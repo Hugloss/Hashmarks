@@ -254,14 +254,14 @@ dev-check: setup
 	@printf '%s\n' '=== HASHMARKS DEV CHECK ==='
 	@printf '%s\n' '[1/4] Compile'
 	@$(MAKE) --no-print-directory compile
-	@printf '%s\n' '[2/4] Ruff debt diagnostic (non-blocking)'
-	@$(MAKE) --no-print-directory lint-debt-summary || true
+	@printf '%s\n' '[2/4] Ruff debt no-growth gate'
+	@$(MAKE) --no-print-directory lint-debt-gate
 	@printf '%s\n' '[3/4] CodeMap sync'
 	@$(MAKE) --no-print-directory map >/dev/null
 	@printf '%s\n' '[4/4] Deterministic resumable pytest batches ($(TEST_SHARDS) shards, $(DEV_BATCH_SIZE) shards/batch)'
 	@$(MAKE) --no-print-directory dev-check-tests
 	@VERSION=`$(UV) run --offline hashmarks version`; \
-	printf '\n%s\n' '========================================' " HASHMARKS DEV CHECK: PASS ($$VERSION)" ' Setup:       PASS' ' Compile:     PASS' ' Ruff debt:   DIAGNOSTIC ONLY' ' CodeMap:     PASS' ' Tests:       PASS' '========================================'
+	printf '\n%s\n' '========================================' " HASHMARKS DEV CHECK: PASS ($$VERSION)" ' Setup:       PASS' ' Compile:     PASS' ' Ruff debt:   PASS (no growth)' ' CodeMap:     PASS' ' Tests:       PASS' '========================================'
 
 dev-check-batch:
 	@test -n "$(DEV_BATCH)" || (echo "DEV_BATCH is required (0-based)" >&2; exit 2)
