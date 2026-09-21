@@ -895,3 +895,82 @@ def test_core_packet_budget_fails_closed_for_dense_relationship_evidence(
                 include_relationships=True,
                 relationship_limit_per_path=100,
             )
+
+
+def test_external_temporal_provenance_is_preserved_but_not_repository_freshness(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    bundle = _bundle({"anchor_id": "owner", "path": "owner.py"})[0]
+    bundle["provenance"] = {
+        "event_time": "2026-09-21T08:00:00Z",
+        "observed_time": "2026-09-21T08:00:02Z",
+        "collected_time": "2026-09-21T08:01:00Z",
+        "source": {"service": "worker", "placement": "pod-a"},
+    }
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence([bundle], include_relationships=False)
+
+    emitted = packet["bundles"][0]
+    assert emitted["provenance"] == bundle["provenance"]
+    assert emitted["provenance_authority"] == "caller-claimed"
+    assert emitted["repository_freshness_authority"] == "independent"
+
+
+def test_temporal_provenance_changes_definition_not_repository_delta(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    first_bundle = _bundle({"anchor_id": "owner", "path": "owner.py"})[0]
+    first_bundle["provenance"] = {"observed_time": "2026-09-21T08:00:00Z"}
+    second_bundle = json.loads(json.dumps(first_bundle))
+    second_bundle["provenance"] = {"observed_time": "2026-09-21T09:00:00Z"}
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        first = codemap.correlate_evidence([first_bundle], include_relationships=False)
+        second = codemap.correlate_evidence([second_bundle], include_relationships=False)
+        delta = codemap.evidence_correlation_delta(first, second)
+
+    assert delta["comparability"] == "not-comparable"
+    assert delta["definition"]["state"] == "changed"
+    assert delta["repository_evidence_delta"] is None
+
+
+def test_same_definition_keeps_correlation_delta_comparable(tmp_path: Path) -> None:
+    path = tmp_path / "owner.py"
+    path.write_text("VALUE = 1\n", encoding="utf-8")
+    bundle = _bundle({"anchor_id": "owner", "path": "owner.py"})
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.correlate_evidence(bundle, include_relationships=False)
+        path.write_text("VALUE = 2\n", encoding="utf-8")
+        codemap.sync(["owner.py"])
+        after = codemap.correlate_evidence(bundle, include_relationships=False)
+        delta = codemap.evidence_correlation_delta(before, after)
+
+    assert delta["comparability"] == "comparable"
+    assert delta["definition"]["state"] == "preserved"
+    assert delta["repository_evidence_delta"] is not None
+
+
+def test_bundle_provenance_is_bounded_and_json_compatible(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        bundle = _bundle(
+            {"anchor_id": "missing", "path": "missing.py"},
+            completeness="incomplete",
+        )[0]
+        bundle["provenance"] = {"bad": object()}
+        with pytest.raises(
+            ValueError,
+            match="evidence correlation request must contain JSON-compatible values",
+        ):
+            codemap.correlate_evidence([bundle], include_relationships=False)
+
+        bundle["provenance"] = {"value": "x" * 9000}
+        with pytest.raises(
+            ValueError,
+            match="bundle provenance exceeds 8192 encoded bytes",
+        ):
+            codemap.correlate_evidence([bundle], include_relationships=False)
