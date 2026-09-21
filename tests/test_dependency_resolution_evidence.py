@@ -380,7 +380,8 @@ def test_dependency_correlation_reuses_generic_repository_locator_owner(tmp_path
         }
     ]
     bundle = packet["correlation"]["bundles"][0]
-    assert bundle["anchors"][0]["resolution"] == "resolved-unique"
+    assert bundle["anchors"][0]["resolution"]["state"] == "resolved-unique"
+    assert bundle["anchors"][0]["resolution"]["repository_path"] == "consumer.py"
     assert packet["causation"] == "not-inferred"
     assert packet["interpretation_authority"] == "consumer-owned"
 
