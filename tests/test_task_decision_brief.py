@@ -45,3 +45,32 @@ def test_brief_deduplicates_contract_when_edit_is_contract(tmp_path: Path) -> No
         brief = c.task_decision_brief("change policy config test")
     if brief["edit"] and brief.get("contract"):
         assert brief["edit"]["path"] != brief["contract"]["path"]
+
+
+def test_decision_brief_keeps_ambiguous_candidate_out_of_edit_authority(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    for name in ("a", "b"):
+        (tmp_path / "src" / f"{name}.py").write_text(
+            "def publish_result(value):\n    return value\n", encoding="utf-8"
+        )
+    (tmp_path / "tests/test_publish.py").write_text(
+        "def test_publish(): assert True\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as c:
+        c.sync()
+        packet = c.task_decision_packet("Fix publish_result")
+        brief = c.task_decision_brief("Fix publish_result")
+
+    assert packet["edit"] is None
+    assert packet["candidate"]["path"] in {"src/a.py", "src/b.py"}
+    assert packet["ownership_authority"]["owner_resolved"] is False
+    assert brief["safe"] is False
+    assert brief["edit"] is None
+    assert brief["candidate"]["path"] in {"src/a.py", "src/b.py"}
+    assert brief["discrimination"] == {
+        "needed": True,
+        "reason": "competing-action-roles",
+    }

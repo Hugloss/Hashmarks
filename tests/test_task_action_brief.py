@@ -302,3 +302,48 @@ def test_task_action_brief_does_not_launder_named_dependency_into_owner(
 
     assert brief["edit"] == "src/publish.py"
     assert brief["status"] == "safe-fresh"
+
+
+def test_task_action_brief_keeps_ambiguous_candidate_out_of_edit_authority(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    for name in ("a", "b"):
+        (tmp_path / "src" / f"{name}.py").write_text(
+            "def publish_result(value):\n    return value\n", encoding="utf-8"
+        )
+    (tmp_path / "tests/test_publish.py").write_text(
+        "def test_publish(): assert True\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map("Fix publish_result")
+        brief = codemap.task_action_brief("Fix publish_result", token_budget=256)
+
+    assert action["edit"]["path"] in {"src/a.py", "src/b.py"}
+    assert action["ownership_authority"]["owner_resolved"] is False
+    assert action["admitted_edit"] is None
+    assert brief["status"] == "unsafe"
+    assert "edit" not in brief
+    assert brief["candidate"] in {"src/a.py", "src/b.py"}
+    assert brief["discrimination"] == "competing-action-roles"
+
+
+def test_task_action_brief_receipt_is_assembled_inside_decision_session(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        original = codemap._decision_evidence_receipt
+
+        def observed(*args, **kwargs):
+            assert codemap._decision_session_depth > 0
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(codemap, "_decision_evidence_receipt", observed)
+        brief = codemap.task_action_brief("widget implementation test", token_budget=64)
+
+    assert brief["status"] == "safe-fresh"

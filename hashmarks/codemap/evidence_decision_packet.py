@@ -106,10 +106,12 @@ class DecisionPacketMixin:
         reason = "resolved"
         if not bool(build.get("complete")):
             needed, reason = True, "codemap-generation-incomplete"
-        elif edit is None:
+        elif action.get("edit") is None:
             needed, reason = True, "no-supported-owner-candidate"
         elif bool(ambiguity.get("ambiguous")):
             needed, reason = True, "competing-action-roles"
+        elif edit is None:
+            needed, reason = True, "ownership-unresolved"
         elif verify is None:
             needed, reason = True, "missing-verification-evidence"
         return {
@@ -211,7 +213,8 @@ class DecisionPacketMixin:
             per_role=per_role,
         )
         timing.record("action_map")
-        edit = action.get("edit") if isinstance(action.get("edit"), dict) else None
+        candidate = action.get("edit")
+        edit = action.get("admitted_edit")
         verify = (
             action.get("verify") if isinstance(action.get("verify"), dict) else None
         )
@@ -245,6 +248,8 @@ class DecisionPacketMixin:
             "schema": "hashmarks.task-decision-packet.v2",
             "task": task,
             "edit": edit,
+            "candidate": candidate,
+            "ownership_authority": action.get("ownership_authority"),
             "verify": verify,
             "verification_relevance": action.get("verification_relevance"),
             "symbolic_nomination": self._symbolic_task_nomination(task),
@@ -273,7 +278,9 @@ class DecisionPacketMixin:
             "context_budget": {
                 "requested_tokens": token_budget,
                 "estimated_tokens": work_context["estimated_tokens"],
-                "safe": bool(work_context["safe"]) and bool(build.get("complete")),
+                "safe": all(
+                    (bool(work_context["safe"]), bool(build.get("complete")), edit is not None)
+                ),
                 "missing_roles": work_context["missing_roles"],
             },
             "authority": "repository-observation-only",

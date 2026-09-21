@@ -30,7 +30,10 @@ def _candidate_identity(row: Mapping[str, object]) -> dict[str, object]:
 def _decision_status(state: OwnershipDecisionState) -> str:
     if state.edit is None or not state.owner_eligible:
         return "unresolved"
-    if state.ambiguous:
+    structural = state.structural_owner or {}
+    selected = str(structural.get("selected") or "")
+    edit_path = str(state.edit.get("path") or "")
+    if state.ambiguous and selected != edit_path:
         return "ambiguous"
     return "resolved"
 
@@ -133,3 +136,21 @@ def ownership_authority_contract(
         "authority": "repository-ownership-only",
         "consumer_action": "external",
     }
+
+
+def project_owner_candidate(
+    source: Mapping[str, object],
+) -> tuple[Mapping[str, object] | None, Mapping[str, object] | None, bool]:
+    """Separate repository candidate evidence from admitted edit authority."""
+    value = source.get("edit")
+    candidate = value if isinstance(value, Mapping) else None
+    authority = source.get("ownership_authority")
+    resolved = isinstance(authority, Mapping) and bool(authority.get("owner_resolved"))
+    return (candidate if resolved else None, candidate, resolved)
+
+
+def ownership_candidate_path(source: Mapping[str, object]) -> str | None:
+    """Return the candidate path without implying admitted edit authority."""
+    value = source.get("edit")
+    candidate = value if isinstance(value, Mapping) else {}
+    return str(candidate.get("path") or "") or None

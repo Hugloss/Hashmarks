@@ -8,7 +8,9 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.ownership_decision import (
     OwnershipDecisionState,
     ownership_authority_contract,
+    ownership_candidate_path,
     ownership_decision_trace,
+    project_owner_candidate,
 )
 
 from .model import EvidenceVisibility, SearchHit
@@ -926,6 +928,12 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
     @staticmethod
     def _task_action_requested_edit_span(task: str) -> str:
         """Return the bounded request span that names the edit surface."""
+        task = re.sub(
+            r"^\s*with\s+.+?,\s*(?=(?:fix|change|update|replace|edit|modify)\b)",
+            "",
+            task,
+            flags=re.IGNORECASE,
+        )
         dependency_first = re.match(
             r"^\s*(?:use|call|apply)\s+.+?\s+(?:in|from|inside|within)\s+(.+)$",
             task,
@@ -1443,7 +1451,10 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             if isinstance(edit, Mapping)
             else ""
         )
-        owner_eligible = explicit_target_basis != "explicit-test-edit"
+        owner_eligible = (
+            explicit_target_basis != "explicit-test-edit"
+            and (not ambiguous or structural_owner is not None)
+        )
         trace = ownership_decision_trace(
             OwnershipDecisionState(
                 edit=edit,
@@ -1458,7 +1469,13 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 owner_eligible=owner_eligible,
             )
         )
+        authority = ownership_authority_contract(trace)
+        admitted_edit, _candidate, _resolved = project_owner_candidate(
+            {"edit": edit, "ownership_authority": authority}
+        )
         return {
             "ownership_decision_trace": trace,
-            "ownership_authority": ownership_authority_contract(trace),
+            "ownership_authority": authority,
+            "admitted_edit": admitted_edit,
+            "candidate_path": ownership_candidate_path({"edit": edit}),
         }
