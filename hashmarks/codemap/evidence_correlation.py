@@ -1123,6 +1123,63 @@ class EvidenceCorrelationMixin:
         }
 
     @staticmethod
+    def _cross_bundle_correspondence(
+        bundles: Sequence[Mapping[str, object]],
+    ) -> list[dict[str, object]]:
+        groups: dict[tuple[str, str, int, int], list[dict[str, str]]] = {}
+        for bundle in bundles:
+            bundle_id = str(bundle.get("bundle_id") or "")
+            anchors = bundle.get("anchors", [])
+            if not isinstance(anchors, Sequence) or isinstance(anchors, (str, bytes)):
+                continue
+            for anchor in anchors:
+                if not isinstance(anchor, Mapping):
+                    continue
+                resolution = anchor.get("resolution")
+                if not isinstance(resolution, Mapping):
+                    continue
+                if resolution.get("state") != "resolved-unique":
+                    continue
+                path = resolution.get("repository_path")
+                if not isinstance(path, str):
+                    continue
+                symbol = resolution.get("symbol")
+                if isinstance(symbol, Mapping):
+                    key = (
+                        path,
+                        str(symbol.get("name") or ""),
+                        int(symbol.get("start_line") or 0),
+                        int(symbol.get("end_line") or 0),
+                    )
+                    scope = "symbol"
+                else:
+                    key = (path, "", 0, 0)
+                    scope = "member"
+                groups.setdefault(key, []).append(
+                    {"bundle_id": bundle_id, "anchor_id": str(anchor.get("anchor_id") or "")}
+                )
+        rows: list[dict[str, object]] = []
+        for (path, symbol, start_line, end_line), observations in sorted(groups.items()):
+            bundle_ids = {row["bundle_id"] for row in observations}
+            if len(bundle_ids) < 2:
+                continue
+            rows.append(
+                {
+                    "state": "same-repository-target",
+                    "scope": "symbol" if symbol else "member",
+                    "repository_path": path,
+                    **({"symbol": symbol, "start_line": start_line, "end_line": end_line} if symbol else {}),
+                    "observations": sorted(
+                        observations,
+                        key=lambda row: (row["bundle_id"], row["anchor_id"]),
+                    ),
+                    "causation": "not-inferred",
+                    "incident_identity": "not-inferred",
+                }
+            )
+        return rows
+
+    @staticmethod
     def _overall_completeness(
         bundles: Sequence[Mapping[str, object]],
     ) -> dict[str, str]:
@@ -1185,6 +1242,11 @@ class EvidenceCorrelationMixin:
             repository_evidence,
             definition,
             mappings=mappings,
+        )
+        packet["correspondence"] = self._cross_bundle_correspondence(prepared)
+        packet["correlation_identity"] = "sha256:" + self._packet_digest(
+            "hashmarks.evidence-correlation.v1",
+            {key: value for key, value in packet.items() if key != "correlation_identity"},
         )
         if previous_correlation is not None:
             packet["delta_from_previous"] = self.evidence_correlation_delta(
