@@ -20,6 +20,7 @@ Key archives:
 - `handoffs/` — historical continuation checkpoints.
 - `evidence/` — measurement and qualification receipts.
 - `audits/` / `reviews/` — bounded development investigations.
+- [`reviews/EVIDENCE_CORRELATION_HARDENING_PLAN.md`](reviews/EVIDENCE_CORRELATION_HARDENING_PLAN.md) — current evidence-correlation hardening and observability-interoperability continuation plan.
 - `status/` — historical status ledgers.
 
 Launch/release operations:
