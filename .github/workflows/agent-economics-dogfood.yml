@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Hugloss/agentsCookbook
-          ref: 3ebcd0c9bcf852f00b4ed89d5a716ed11c970eae
+          ref: e32c6930c83fbdf124252afa68eaa48935f876d6
           path: .agentsCookbook
           persist-credentials: false
 
@@ -96,3 +96,154 @@ jobs:
             --cov=hashmarks.codemap.structural_locality \
             --cov-branch \
             --cov-report=term-missing:skip-covered
+
+      - name: Prepare exact binding-delta pre-edit worktree
+        run: git worktree add "$RUNNER_TEMP/hashmarks-binding-before" 50b0e3be83fc0dd445bae9494367ece2f25179fe
+
+      - name: Observe pre-edit binding-delta locality
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
+        run: |
+          python3 -m agent_economics refactor-locality observe-hashmarks \
+            'hashmarks/codemap/repository_evidence_binding_delta.py::RepositoryEvidenceBindingDeltaMixin._binding_change' \
+            --repository-root "$RUNNER_TEMP/hashmarks-binding-before" \
+            --hashmarks-executable "$GITHUB_WORKSPACE/.test-venv/bin/hashmarks" \
+            --artifact .agent-artifacts/binding-locality-before-observed.json
+
+      - name: Observe post-edit binding-delta locality identity
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
+        run: |
+          python3 -m agent_economics refactor-locality observe-hashmarks \
+            'hashmarks/codemap/repository_evidence_binding_delta.py::RepositoryEvidenceBindingDeltaMixin._binding_change' \
+            --repository-root . \
+            --hashmarks-executable "$GITHUB_WORKSPACE/.test-venv/bin/hashmarks" \
+            --artifact .agent-artifacts/binding-locality-post-seed.json
+
+      - name: Bind semantic responsibility evidence
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          artifact = Path(".agent-artifacts")
+          observed = json.loads(
+              (artifact / "binding-locality-post-seed.json").read_text(encoding="utf-8")
+          )
+          repository_identity = observed["packet"]["repository_identity"]
+          responsibilities = {
+              "RepositoryEvidenceBindingDeltaMixin._direct_locator_evidence_changes":
+                  "Owns direct-content and locator-state delta classification.",
+              "RepositoryEvidenceBindingDeltaMixin._member_evidence_changes":
+                  "Owns repository-member observation transition classification.",
+              "RepositoryEvidenceBindingDeltaMixin._comparable_relationship_evidence":
+                  "Owns comparable relationship fact and locator delta projection.",
+              "RepositoryEvidenceBindingDeltaMixin._relationship_evidence_delta":
+                  "Owns relationship observation comparability and completeness projection.",
+          }
+          values = []
+          for qualname, summary in responsibilities.items():
+              identity = "sha256:" + hashlib.sha256(summary.encode("utf-8")).hexdigest()
+              values.append(
+                  {
+                      "symbol_id": (
+                          "hashmarks/codemap/repository_evidence_binding_delta.py::"
+                          + qualname
+                      ),
+                      "structure_kind": "implementation",
+                      "value_kind": "semantic_responsibility_owner",
+                      "repository_identity": repository_identity,
+                      "evidence_provider": "repository-refactor-audit",
+                      "evidence_identity": identity,
+                      "edit_required": True,
+                  }
+              )
+          (artifact / "binding-structural-values.json").write_text(
+              json.dumps(values, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+
+          evidence_rows = []
+          for kind, summary in [
+              (
+                  "mixed_responsibilities",
+                  "_binding_change previously combined direct/locator, member, dependency, relationship, and definition delta responsibilities.",
+              ),
+              (
+                  "bounded_locality_tradeoff",
+                  "The cohesive module keeps one owner while same-file semantic stages make each delta responsibility explicit.",
+              ),
+          ]:
+              evidence_rows.append(
+                  {
+                      "kind": kind,
+                      "evidence_identity": "sha256:"
+                      + hashlib.sha256(summary.encode("utf-8")).hexdigest(),
+                      "summary": summary,
+                  }
+              )
+          (artifact / "binding-decomposition-evidence.json").write_text(
+              json.dumps(evidence_rows, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Observe valued post-edit binding-delta locality
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
+        run: |
+          python3 -m agent_economics refactor-locality observe-hashmarks \
+            'hashmarks/codemap/repository_evidence_binding_delta.py::RepositoryEvidenceBindingDeltaMixin._binding_change' \
+            --repository-root . \
+            --hashmarks-executable "$GITHUB_WORKSPACE/.test-venv/bin/hashmarks" \
+            --values .agent-artifacts/binding-structural-values.json \
+            --artifact .agent-artifacts/binding-locality-post-observed.json
+
+      - name: Compare binding-delta locality
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          artifact = Path(".agent-artifacts")
+          for source, target in [
+              ("binding-locality-before-observed.json", "binding-locality-before.json"),
+              ("binding-locality-post-observed.json", "binding-locality-post.json"),
+          ]:
+              payload = json.loads((artifact / source).read_text(encoding="utf-8"))
+              (artifact / target).write_text(
+                  json.dumps(payload["snapshot"], indent=2, sort_keys=True) + "\n",
+                  encoding="utf-8",
+              )
+          PY
+          python3 -m agent_economics refactor-locality compare \
+            .agent-artifacts/binding-locality-before.json \
+            .agent-artifacts/binding-locality-post.json \
+            --evidence .agent-artifacts/binding-decomposition-evidence.json \
+            --artifact .agent-artifacts/binding-locality-decision.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(
+              Path(".agent-artifacts/binding-locality-decision.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          comparison = payload["comparison"]
+          decision = payload["decision"]
+          print(json.dumps(payload, indent=2, sort_keys=True))
+          if comparison["unjustified_new_structures"]:
+              raise SystemExit(
+                  "new binding-delta structure lacks semantic value evidence"
+              )
+          if decision["status"] != "DECOMPOSITION_JUSTIFIED":
+              raise SystemExit(
+                  "binding-delta decomposition did not earn locality closure: "
+                  + str(decision["status"])
+              )
+          PY
+
