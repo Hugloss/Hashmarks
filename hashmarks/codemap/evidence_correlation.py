@@ -873,7 +873,7 @@ class EvidenceCorrelationMixin:
         mappings: Sequence[Mapping[str, str]],
     ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
         prepared: list[dict[str, object]] = []
-        bindings: list[dict[str, object]] = []
+        bindings_by_id: dict[str, dict[str, object]] = {}
         seen: set[str] = set()
         total_metadata = 0
         total_anchors = 0
@@ -887,8 +887,10 @@ class EvidenceCorrelationMixin:
             total_anchors += result.anchor_count
             self._validate_request_totals(total_metadata, total_anchors)
             prepared.append(result.packet)
-            bindings.extend(result.bindings)
+            for binding in result.bindings:
+                bindings_by_id[str(binding["binding_id"])] = binding
         prepared.sort(key=lambda row: str(row["bundle_id"]))
+        bindings = [bindings_by_id[key] for key in sorted(bindings_by_id)]
         return prepared, bindings
 
     @staticmethod
@@ -988,14 +990,13 @@ class EvidenceCorrelationMixin:
             anchor, binding
         )
         anchor["repository_evidence"] = {
+            "binding_id": binding_id,
             "binding_definition_identity": binding.get(
                 "binding_definition_identity"
             ),
             "binding_observation_identity": binding.get(
                 "binding_observation_identity"
             ),
-            "evidence": binding.get("evidence", []),
-            "relationships": binding.get("relationships", {}),
         }
 
     @staticmethod
