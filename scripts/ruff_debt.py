@@ -110,19 +110,28 @@ def _summary(findings: list[dict[str, object]]) -> dict[str, object]:
     }
 
 
-def _baseline_failures(
+def _baseline_contract_failure(
     summary: dict[str, object], baseline: dict[str, object]
-) -> list[str]:
+) -> str | None:
     if baseline.get("schema") != summary["schema"]:
-        return ["debt baseline schema mismatch; regenerate from exact Ruff inventory"]
+        return "debt baseline schema mismatch; regenerate from exact Ruff inventory"
     if baseline.get("limits") != summary["limits"]:
-        return ["Ruff limits changed; review the configured thresholds and baseline"]
+        return "Ruff limits changed; review the configured thresholds and baseline"
     if baseline.get("max_python_file_lines") != summary["max_python_file_lines"]:
-        return [
+        return (
             "production line ceiling changed: "
             f"{baseline.get('max_python_file_lines')} -> "
             f"{summary['max_python_file_lines']}"
-        ]
+        )
+    return None
+
+
+def _baseline_failures(
+    summary: dict[str, object], baseline: dict[str, object]
+) -> list[str]:
+    contract_failure = _baseline_contract_failure(summary, baseline)
+    if contract_failure is not None:
+        return [contract_failure]
     current_files = dict(summary["files"])
     baseline_files = dict(baseline["files"])
     failures: list[str] = []
