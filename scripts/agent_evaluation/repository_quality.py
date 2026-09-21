@@ -12,7 +12,12 @@ REPORT_SCHEMA = "hashmarks.repository-quality-report.v1"
 METRIC_POLICY = "hashmarks.lexicographic-quality.v1"
 BENCHMARK_REGISTRY = "hashmarks.repository-quality-registry.v1"
 
-GROUND_TRUTH_STATUS = {"valid", "ambiguous-ground-truth", "invalid-case", "insufficient-ground-truth"}
+GROUND_TRUTH_STATUS = {
+    "valid",
+    "ambiguous-ground-truth",
+    "invalid-case",
+    "insufficient-ground-truth",
+}
 CORPUS_CLASS = {"qualification", "shadow", "canary", "fresh-dogfood"}
 CASE_LIFECYCLE = {"active", "shadow", "historical", "superseded"}
 
@@ -237,7 +242,8 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         and row["lifecycle"] == "active"
     ]
     adjudication = sum(
-        row["ground_truth_status"] in {"ambiguous-ground-truth", "insufficient-ground-truth"}
+        row["ground_truth_status"]
+        in {"ambiguous-ground-truth", "insufficient-ground-truth"}
         for row in rows
     )
     invalid = sum(row["ground_truth_status"] == "invalid-case" for row in rows)
@@ -256,9 +262,8 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     return {
         "schema": REPORT_SCHEMA,
         "metric_policy": METRIC_POLICY,
-        "qualification": qualification or (
-            "qualified" if sum(totals.values()) == 0 else "not-qualified"
-        ),
+        "qualification": qualification
+        or ("qualified" if sum(totals.values()) == 0 else "not-qualified"),
         "benchmark_health": {
             "registry": BENCHMARK_REGISTRY,
             "total_cases": len(rows),
