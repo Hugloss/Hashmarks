@@ -9,6 +9,7 @@ from hashmarks.file_store import UnstableFileError
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import diagnostic_producer
+from .freshness_map import FreshnessMapOptions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -625,10 +626,12 @@ class RepositoryDeltaMixin:
         freshness = self.evidence_freshness_map(
             task,
             changed_paths,
-            limit=limit,
-            per_role=per_role,
-            impact_limit_per_surface=impact_limit_per_surface,
-            max_depth=max_depth,
+            options=FreshnessMapOptions(
+                limit=limit,
+                per_role=per_role,
+                impact_limit_per_surface=impact_limit_per_surface,
+                max_depth=max_depth,
+            ),
         )
         payload: dict[str, object] = {
             "schema": "hashmarks.repository-intelligence-snapshot.v1",

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from .change_impact import ChangeImpactOptions
+from .freshness_map import FreshnessMapOptions
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -80,7 +81,12 @@ class RepositoryIntelligenceQueryMixin:
                     changed_paths,
                     negative_members=negative_members,
                     previous_map=previous_map,
-                    **common,
+                    options=FreshnessMapOptions(
+                        limit=limit,
+                        per_role=per_role,
+                        impact_limit_per_surface=impact_limit_per_surface,
+                        max_depth=max_depth,
+                    ),
                 )
             elif surface == "snapshot":
                 result = self.repository_intelligence_snapshot(

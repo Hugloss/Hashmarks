@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, cast
 
 from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
+from .freshness_map import FreshnessMapOptions
 from .project_impact_codec import expand_project_impact
 
 if TYPE_CHECKING:
@@ -178,10 +179,12 @@ class CrossRepositoryEvidenceMixin:
         freshness = self.evidence_freshness_map(
             task,
             changed_paths,
-            limit=limit,
-            per_role=per_role,
-            impact_limit_per_surface=options.impact_limit_per_surface,
-            max_depth=options.max_depth,
+            options=FreshnessMapOptions(
+                limit=limit,
+                per_role=per_role,
+                impact_limit_per_surface=options.impact_limit_per_surface,
+                max_depth=options.max_depth,
+            ),
         )
 
         project_impact = impact.get("project_impact")

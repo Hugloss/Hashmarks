@@ -24,6 +24,16 @@ class _FreshnessScope:
     continuity_state: str
 
 
+@dataclass(frozen=True, slots=True)
+class FreshnessMapOptions:
+    """Bounds shared by one evidence-freshness projection."""
+
+    limit: int = 20
+    per_role: int = 3
+    impact_limit_per_surface: int = 4
+    max_depth: int = 3
+
+
 class EvidenceFreshnessMapMixin:
     """Derived freshness projection over existing repository-intelligence facts.
 
@@ -120,10 +130,16 @@ class EvidenceFreshnessMapMixin:
     def _impact_freshness_entry(
         self,
         scope: _FreshnessScope,
-        revisions: list[dict[str, object]],
-        surfaces: Mapping[str, object],
-        bounds: Mapping[str, object],
+        impact: Mapping[str, object],
     ) -> dict[str, object]:
+        changed = impact.get("changed")
+        revisions = self._freshness_changed_revisions(
+            changed if isinstance(changed, list) else []
+        )
+        raw_surfaces = impact.get("surfaces")
+        surfaces = raw_surfaces if isinstance(raw_surfaces, Mapping) else {}
+        raw_bounds = impact.get("bounds")
+        bounds = raw_bounds if isinstance(raw_bounds, Mapping) else {}
         fact = {
             "repository_identity": scope.repository_identity,
             "task_identity": scope.task_identity,
@@ -296,10 +312,7 @@ class EvidenceFreshnessMapMixin:
         *,
         negative_members: Sequence[str | Path] = (),
         previous_map: Mapping[str, object] | None = None,
-        limit: int = 20,
-        per_role: int = 3,
-        impact_limit_per_surface: int = 4,
-        max_depth: int = 3,
+        options: FreshnessMapOptions = FreshnessMapOptions(),
     ) -> dict[str, object]:
         """Return current and prior freshness without persisting duplicate truth."""
         if TYPE_CHECKING:
@@ -307,15 +320,19 @@ class EvidenceFreshnessMapMixin:
         impact = self.task_change_impact(
             task,
             changed_paths,
-            limit=limit,
-            per_role=per_role,
+            limit=options.limit,
+            per_role=options.per_role,
             options=ChangeImpactOptions(
-                impact_limit_per_surface=impact_limit_per_surface,
-                max_depth=max_depth,
+                impact_limit_per_surface=options.impact_limit_per_surface,
+                max_depth=options.max_depth,
                 project_impact_encoding="compact",
             ),
         )
-        action = self.task_action_map(task, limit=limit, per_role=per_role)
+        action = self.task_action_map(
+            task,
+            limit=options.limit,
+            per_role=options.per_role,
+        )
         verify = (
             action.get("verify") if isinstance(action.get("verify"), Mapping) else None
         )
@@ -323,7 +340,7 @@ class EvidenceFreshnessMapMixin:
         selected_explanation = self.explain_verification_selection(
             task,
             selected_member or None,
-            limit=limit,
+            limit=options.limit,
             candidate_limit=16,
         )
         generation, identity_generation, stale = self._generation_status()
@@ -333,25 +350,12 @@ class EvidenceFreshnessMapMixin:
             continuity_state=freshness_state(stale),
         )
 
-        ownership = self._ownership_projection(action)
-        changed_rows = (
-            impact.get("changed") if isinstance(impact.get("changed"), list) else []
-        )
-        revisions = self._freshness_changed_revisions(changed_rows)
-        surfaces = (
-            impact.get("surfaces")
-            if isinstance(impact.get("surfaces"), Mapping)
-            else {}
-        )
-        bounds = impact.get("bounds")
         entries = [
-            self._ownership_freshness_entry(scope, ownership),
-            self._impact_freshness_entry(
+            self._ownership_freshness_entry(
                 scope,
-                revisions,
-                surfaces,
-                bounds if isinstance(bounds, Mapping) else {},
+                self._ownership_projection(action),
             ),
+            self._impact_freshness_entry(scope, impact),
             self._verification_freshness_entry(
                 scope,
                 selected_member,
@@ -363,7 +367,7 @@ class EvidenceFreshnessMapMixin:
                 scope,
                 task,
                 raw_member,
-                limit,
+                options.limit,
             )
             for raw_member in negative_members
         )
