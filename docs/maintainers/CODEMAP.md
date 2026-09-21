@@ -65,6 +65,7 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 - `import_resolution.py` — repository import identity/re-export resolution. **Produces import identity; does not rank ownership.**
 - `evidence_graph.py` — file/reverse graph traversal, SCIP import, project enrichment.
 - `relationships.py`, `project_graph.py`, `typescript_resolver.py` — relationship/project/language-specific enrichment.
+- `structural_locality.py` — fresh exact-symbol call/caller/navigation locality and forwarding-shape evidence; observes repository structure only and never decides whether a refactor is desirable.
 
 ### Ownership
 

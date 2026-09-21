@@ -43,6 +43,7 @@ Useful repository-intelligence commands:
 hashmarks --workspace . outline path/to/file.py
 hashmarks --workspace . refs SymbolName
 hashmarks --workspace . tests SymbolName
+hashmarks --workspace . structural-locality path/to/file.py::qualified_symbol
 hashmarks --workspace . map status
 hashmarks --workspace . map findings
 ```
@@ -151,6 +152,7 @@ For the complete tool schemas, freshness behavior, concurrency guarantees, and h
 | Change impact analysis | Reverse impact, affected files/projects, structurally related tests, post-change evidence |
 | Freshness | Generation-bound observations, invalidation, stale/unknown/current evidence semantics |
 | Verification evidence | Bounded verification relevance and repository-bound verification descriptions |
+| Structural locality | Exact-symbol call/caller closure, forwarding shape, context/file fan-out, verifier paths, ambiguity and pre/post structural deltas without refactor policy |
 | Content identity | Canonical file, directory, manifest, and repository identities |
 | Interchange | Strict producer/consumer contracts, provenance, validation, and conformance surfaces |
 | Evidence bindings | Opaque consumer bindings to exact line/member evidence, declared dependencies, relationship evidence, deltas, and change coverage |
@@ -319,6 +321,8 @@ Run `hashmarks --help` for the complete command surface.
 | `deps QUERY` / `refs QUERY` | Inspect static dependency/reference evidence |
 | `affected PATH` | Reverse change impact from repository relationships |
 | `tests QUERY` | Structurally related verification surfaces |
+| `structural-locality PATH::QUALNAME` | Fresh bounded structural-locality facts for one exact symbol |
+| `structural-locality-delta --before A --after B` | Compare two locality packets without deciding whether the tradeoff is good |
 | `task-evidence TASK` | Resolve a task into bounded edit/verify/source evidence |
 | `change-impact TASK --changed PATH` | Recompute impact and verification relevance from changed paths |
 | `post-change TASK --changed PATH --previous-evidence FILE` | Reconcile changed paths and return evidence deltas |
@@ -372,6 +376,7 @@ See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs
 - [Architecture](docs/reference/ARCHITECTURE.md)
 - [Observer and delta model](docs/reference/OBSERVER_DELTA.md)
 - [Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md)
+- [Structural locality evidence](docs/reference/STRUCTURAL_LOCALITY.md)
 - [Product boundary](docs/reference/PRODUCT_BOUNDARY.md)
 - [Normative invariants](docs/reference/INVARIANTS.md)
 - [Public API and stability policy](docs/reference/API_STABILITY.md)
