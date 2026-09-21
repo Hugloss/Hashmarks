@@ -196,34 +196,6 @@ jobs:
           )
           PY
 
-      - name: Report pre-edit locality incompleteness
-        run: |
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          payload = json.loads(
-              Path(".agent-artifacts/binding-locality-before-observed.json").read_text(
-                  encoding="utf-8"
-              )
-          )
-          packet = payload["packet"]
-          print(
-              json.dumps(
-                  {
-                      "target": packet.get("target"),
-                      "unresolved_calls": packet.get("unresolved_calls"),
-                      "external_or_unindexed_calls": packet.get(
-                          "external_or_unindexed_calls"
-                      ),
-                      "dimensions": packet.get("dimensions"),
-                  },
-                  indent=2,
-                  sort_keys=True,
-              )
-          )
-          PY
-
       - name: Observe post-edit binding-delta locality identity
         env:
           PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
