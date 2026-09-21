@@ -27,7 +27,20 @@ A unique owner with insufficient admitted evidence is expected to remain unresol
 that is not a missed-resolution defect. The hard missed-resolution counters apply only
 when admitted evidence is sufficient.
 
-Missing measurements are unknown, never zero. Every validated ground-truth case receives a deterministic SHA-256 identity over its complete canonical JSON payload. Reports also carry an order-independent corpus identity over the exact evaluated case identities, so adding, removing, or relabeling a case changes the qualification evidence identity rather than silently changing the benchmark beneath a score.\n
+Missing measurements are unknown, never zero. Every validated ground-truth case receives a deterministic SHA-256 identity over its complete canonical JSON payload. Reports also carry an order-independent corpus identity over the exact evaluated case identities, so adding, removing, or relabeling a case changes the qualification evidence identity rather than silently changing the benchmark beneath a score.
+
+## Benchmark readiness
+
+Benchmark health is evaluated before product quality. Every case binds a ground-truth
+status, corpus class, lifecycle, task family, risk class, and label basis. Only active,
+valid qualification cases are score-bearing. Shadow, canary, fresh-dogfood, historical,
+and superseded cases remain evidence but cannot silently change the qualification score.
+
+An empty or non-score-bearing corpus is `benchmark-not-ready`. Invalid cases also make
+the benchmark not ready. Ambiguous or insufficient ground truth requires
+`needs-adjudication` before the harness may report `qualified` or `not-qualified`.
+These are evaluator states, never edit or release permissions.
+
 ## Hard-zero authority metrics
 
 The canonical vocabulary is owned by
