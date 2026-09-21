@@ -170,6 +170,27 @@ Repository evidence bindings are a consumer-facing projection over existing Hash
 
 The binding implementation must therefore converge on the existing owners above before it becomes public.
 
+## Dependency/distribution evidence work
+
+`dependency_resolution_evidence.py` owns qualified external dependency-resolution observations. Its admitted fact is correspondence between a caller-supplied producer-neutral resolution graph and existing repository evidence.
+
+It owns:
+- the `hashmarks.dependency-resolution.v1` observation contract;
+- opaque producer node identity, graph validation, and graph observation identity;
+- resolution definition identity over producer semantics, selected roots, and explicit scope;
+- comparability and factual node-level delta for equivalent definitions;
+- explicit repository-input correspondence using canonical repository member observation.
+
+It does not own:
+- repository project topology (`project_graph.py`);
+- repository import identity (`import_resolution.py`);
+- repository freshness or repository delta;
+- package-manager execution, environment synchronization, dependency source indexing, or remote discovery;
+- module/distribution ownership inference;
+- causal diagnosis, upgrade advice, or repair recommendation.
+
+A producer claim that a resolution came from a repository input is not source-equivalence proof. Without an independently comparable member revision, source equivalence remains `unknown`; matching and mismatching revisions produce `proven` and `mismatch` respectively.
+
 ## Evidence correlation work
 
 Evidence correlation is a request-scoped projection over external claims plus existing repository authorities. Its only new semantic ownership is the declaration/correspondence layer: the exact claim supplied by the caller, the conservative resolution state, and qualified source-equivalence comparison.

@@ -21,6 +21,7 @@ from .change_intelligence import ChangeIntelligenceMixin
 from .context_cache import ContextCache
 from .cross_repository_evidence import CrossRepositoryEvidenceMixin
 from .decision_session import DecisionSessionMixin
+from .dependency_resolution_evidence import DependencyResolutionEvidenceMixin
 from .evidence_correlation import EvidenceCorrelationMixin
 from .evidence_freshness import EvidenceFreshnessMixin
 from .evidence_graph import EvidenceGraphMixin
@@ -81,6 +82,7 @@ from .work_context import WorkContextMixin
 
 class CodeMap(
     TaskEvidencePacketMixin,
+    DependencyResolutionEvidenceMixin,
     ChangeIntelligenceMixin,
     EvidenceFreshnessMapMixin,
     RepositoryDeltaMixin,
