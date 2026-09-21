@@ -66,6 +66,51 @@ def test_mcp_surface_rejects_unbounded_or_empty_inputs(tmp_path: Path) -> None:
         surface.close()
 
 
+def test_mcp_surface_correlates_external_evidence_without_interpreting_it(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
+    try:
+        packet = surface.correlate_evidence(
+            [
+                {
+                    "bundle_id": "runtime:1",
+                    "producer": {"kind": "traceback"},
+                    "completeness": "complete",
+                    "anchors": [
+                        {
+                            "anchor_id": "frame:0",
+                            "path": "/app/src/feature.py",
+                            "line": 2,
+                            "symbol": "flare041",
+                            "metadata": {"commit": "opaque-runtime-value"},
+                        }
+                    ],
+                }
+            ],
+            path_mappings=[
+                {"external_prefix": "/app", "repository_prefix": ""}
+            ],
+            include_relationships=False,
+        )
+        anchor = packet["bundles"][0]["anchors"][0]
+        assert packet["schema"] == "hashmarks.evidence-correlation.v1"
+        assert packet["causation"] == "not-inferred"
+        assert packet["interpretation_authority"] == "consumer-owned"
+        assert anchor["resolution"]["repository_path"] == "src/feature.py"
+        assert anchor["source_equivalence"]["state"] == "unknown"
+
+        with pytest.raises(McpSurfaceError, match="bundles must be a list"):
+            surface.correlate_evidence({})  # type: ignore[arg-type]
+        with pytest.raises(
+            McpSurfaceError, match="relationship_limit_per_path"
+        ):
+            surface.correlate_evidence([], relationship_limit_per_path=1001)
+    finally:
+        surface.close()
+
+
 def test_mcp_find_truncated_only_when_an_extra_hit_exists(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     (repo / "src" / "feature_two.py").write_text(
@@ -233,6 +278,7 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             "find",
             "task_evidence",
             "change_impact",
+            "correlate_evidence",
             "post_change",
         ]
         for row in registered:
@@ -310,6 +356,7 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             "find",
             "task_evidence",
             "change_impact",
+            "correlate_evidence",
             "post_change",
         ]
         # Construction may initialize empty SQLite files, but it must not build a generation.
