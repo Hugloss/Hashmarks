@@ -1260,6 +1260,22 @@ class EvidenceCorrelationMixin:
             raise ValueError(
                 "correlation packets must contain repository_evidence"
             )
+        supplied_identity = packet.get("correlation_identity")
+        if not isinstance(supplied_identity, str) or not _SHA256.fullmatch(
+            supplied_identity
+        ):
+            raise ValueError(
+                f"{label} correlation_identity must use sha256:<64 lowercase hex characters>"
+            )
+        identity_payload = dict(packet)
+        identity_payload.pop("correlation_identity", None)
+        identity_payload.pop("delta_from_previous", None)
+        expected_identity = "sha256:" + EvidenceCorrelationMixin._packet_digest(
+            "hashmarks.evidence-correlation.v1",
+            identity_payload,
+        )
+        if supplied_identity != expected_identity:
+            raise ValueError(f"{label} correlation_identity does not match packet content")
 
     @staticmethod
     def _correlation_delta_packet(
