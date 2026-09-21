@@ -280,3 +280,39 @@ def test_requested_edit_role_does_not_hide_true_duplicate_target_ambiguity(
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-exact-identifier-edit-owners"
     assert action["ownership_authority"]["owner_resolved"] is False
+
+
+def test_requested_edit_role_is_stable_across_dependency_phrasings(tmp_path: Path) -> None:
+    _write_publish_dependency_fixture(tmp_path)
+    tasks = (
+        "Update publish_result using AuthorityReceipt.canonical_identity",
+        "Refactor publish_result to call AuthorityReceipt.canonical_identity",
+        "Change publish_result via AuthorityReceipt.canonical_identity",
+        "Call AuthorityReceipt.canonical_identity from publish_result",
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        actions = [codemap.task_action_map(task, limit=20) for task in tasks]
+
+    assert all(action["edit"]["path"] == "src/publish.py" for action in actions)
+    assert all(action["edit"]["name"] == "publish_result" for action in actions)
+    assert all(action["ambiguity"]["ambiguous"] is False for action in actions)
+    assert all(
+        action["ownership_authority"]["owner_resolved"] is True for action in actions
+    )
+
+
+def test_two_requested_exact_edit_targets_remain_ambiguous(tmp_path: Path) -> None:
+    _write(tmp_path, "src/publish.py", "def publish_result(value):\n    return value\n")
+    _write(tmp_path, "src/store.py", "def store_result(value):\n    return value\n")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(
+            "Change publish_result and store_result",
+            limit=20,
+        )
+
+    assert action["ambiguity"]["ambiguous"] is True
+    assert action["ownership_authority"]["owner_resolved"] is False
