@@ -272,3 +272,33 @@ def test_multi_term_lexical_island_does_not_intercept_plain_compound_symbol_look
         assert codemap.find_task("NxImpactAdapter")[0].path == "src/adapter.py"
     finally:
         codemap.close()
+
+
+def test_task_action_brief_does_not_launder_named_dependency_into_owner(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/publish.py").write_text(
+        "def publish_result(value):\n    return value\n", encoding="utf-8"
+    )
+    (tmp_path / "src/authority.py").write_text(
+        "class AuthorityReceipt:\n"
+        "    def canonical_identity(self):\n"
+        "        return 'canonical'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_publish.py").write_text(
+        "from src.publish import publish_result\n"
+        "def test_publish(): assert publish_result('x') == 'x'\n",
+        encoding="utf-8",
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        brief = codemap.task_action_brief(
+            "Fix publish_result so it uses AuthorityReceipt.canonical_identity"
+        )
+
+    assert brief["edit"] == "src/publish.py"
+    assert brief["status"] == "safe-fresh"

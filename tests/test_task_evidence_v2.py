@@ -94,3 +94,34 @@ def test_task_evidence_v2_owner_is_invariant_to_bounded_retrieval(
     assert wide["ownership"]["owner"]["path"] == "backend/runtime/executor_pool.py"
     assert narrow["ownership"]["basis"] in {"exact-symbol", "unique-exact-symbol"}
     assert wide["ownership"]["basis"] in {"exact-symbol", "unique-exact-symbol"}
+
+
+def test_task_evidence_v2_keeps_dependency_as_related_evidence_not_owner(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "src/publish.py", "def publish_result(value):\n    return value\n")
+    _write(
+        tmp_path,
+        "src/authority.py",
+        "class AuthorityReceipt:\n"
+        "    def canonical_identity(self):\n"
+        "        return 'canonical'\n",
+    )
+    task = "Fix publish_result so it uses AuthorityReceipt.canonical_identity"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20)
+        packet = codemap.task_evidence(task, limit=20, token_budget=256)
+
+    assert packet["ownership"]["status"] == "resolved"
+    assert packet["ownership"]["owner"]["path"] == "src/publish.py"
+    assert packet["ownership"]["candidate"]["path"] == "src/publish.py"
+    assert packet["explicit_target"]["path"] == "src/publish.py"
+    assert packet["ownership"]["ambiguity"]["ambiguous"] is False
+
+    retrieval_paths = {row["path"] for row in packet["retrieval"]["results"]}
+    canonical_paths = {row["path"] for row in action["canonical"]}
+    assert "src/authority.py" in canonical_paths
+    assert "src/authority.py" in retrieval_paths
+    assert packet["related"]["candidates"] == action["related"]

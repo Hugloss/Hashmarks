@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
@@ -66,6 +67,7 @@ class TaskActionOwnerResolutionMixin:
         if candidate.get("plain_identifier_index_projection"):
             return "unique-exact-symbol"
         return "exact-symbol"
+
 
     def _task_action_resolve_owner(
         self,
