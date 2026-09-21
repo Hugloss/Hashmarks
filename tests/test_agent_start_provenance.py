@@ -20,6 +20,24 @@ def _task() -> str:
     return "Change cobalt_value from old to new and verify cobalt_value"
 
 
+def _ownership(start: dict[str, object]) -> dict[str, object]:
+    value = start.get("ownership")
+    assert isinstance(value, dict)
+    return value
+
+
+def _verification(start: dict[str, object]) -> dict[str, object]:
+    value = start.get("verification")
+    assert isinstance(value, dict)
+    return value
+
+
+def _freshness(start: dict[str, object]) -> dict[str, object]:
+    value = start.get("freshness")
+    assert isinstance(value, dict)
+    return value
+
+
 def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_freshness(
     tmp_path: Path,
 ) -> None:
@@ -34,6 +52,7 @@ def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_fre
     assert provenance["why"] == "structural-import"
     assert provenance["revision"] == expected
     assert provenance["freshness"] == "unknown"
+    assert _freshness(start)["state"] == "unknown"
     assert "generation" not in provenance
     assert "freshness_reason" not in provenance
 
@@ -52,6 +71,7 @@ def test_task_evidence_maps_generation_bound_continuity_to_current(
 
     provenance = start["provenance"]
     assert provenance["freshness"] == "current"
+    assert _freshness(start)["state"] == "current"
     assert "identity_generation" not in provenance
     assert "freshness_reason" not in provenance
 
@@ -68,7 +88,7 @@ def test_task_evidence_reports_stale_when_continuity_reports_change(
         )
         start = codemap.task_evidence(_task(), token_budget=512)
 
-    assert start["status"] == "safe-stale"
+    assert _freshness(start)["state"] == "stale"
     assert start["provenance"]["freshness"] == "stale"
     assert start["provenance"]["freshness_reason"] == "continuity-reported-change"
 
@@ -94,7 +114,7 @@ def test_task_evidence_marks_action_stale_if_selected_source_refresh_changes_gen
         )
         start = codemap.task_evidence(_task(), token_budget=512)
 
-    assert start["status"] == "safe-stale"
+    assert _freshness(start)["state"] == "stale"
     provenance = start["provenance"]
     assert provenance["freshness"] == "stale"
     assert provenance["freshness_reason"] == "generation-changed-during-start"
@@ -116,8 +136,8 @@ def test_config_projection_provenance_stays_post_selection(tmp_path: Path) -> No
         codemap.sync()
         start = codemap.task_evidence(task["query"], token_budget=512)
 
-    assert start["edit"].endswith("policy.toml")
-    assert start["edit_evidence"]["representation"] == "config-key-range"
+    assert _ownership(start)["owner"]["path"].endswith("policy.toml")
+    assert _ownership(start)["source_evidence"]["representation"] == "config-key-range"
     assert start["provenance"]["why"] == "contract-authority"
     assert len(start["provenance"]["revision"]) == 64
 
@@ -174,8 +194,8 @@ def test_task_evidence_marks_stale_when_selected_verification_contents_change_af
             "def test_unrelated():\n    assert True\n", encoding="utf-8"
         )
         start = codemap.task_evidence(_task(), token_budget=512)
-    assert start["status"] == "safe-stale"
-    assert start["verify_path"] == "tests/test_engine.py"
+    assert _freshness(start)["state"] == "stale"
+    assert _verification(start)["selected"]["path"] == "tests/test_engine.py"
     assert start["provenance"]["freshness"] == "stale"
     assert (
         start["provenance"]["freshness_reason"]
@@ -191,7 +211,7 @@ def test_task_evidence_marks_stale_when_selected_verification_is_deleted_after_s
         codemap.sync()
         (tmp_path / "tests" / "test_engine.py").unlink()
         start = codemap.task_evidence(_task(), token_budget=512)
-    assert start["status"] == "safe-stale"
+    assert _freshness(start)["state"] == "stale"
     assert (
         start["provenance"]["freshness_reason"]
         == "verification-changed-since-selection"
@@ -208,7 +228,7 @@ def test_task_evidence_marks_stale_when_selected_verification_is_renamed_after_s
             tmp_path / "tests" / "test_engine_renamed.py"
         )
         start = codemap.task_evidence(_task(), token_budget=512)
-    assert start["status"] == "safe-stale"
+    assert _freshness(start)["state"] == "stale"
     assert (
         start["provenance"]["freshness_reason"]
         == "verification-changed-since-selection"
@@ -233,7 +253,7 @@ def test_task_evidence_closing_fence_catches_verification_mutation_during_packet
             codemap, "_task_evidence_evidence_item", mutate_verification_then_project
         )
         start = codemap.task_evidence(_task(), token_budget=512)
-    assert start["status"] == "safe-stale"
+    assert _freshness(start)["state"] == "stale"
     assert (
         start["provenance"]["freshness_reason"]
         == "verification-changed-since-selection"
