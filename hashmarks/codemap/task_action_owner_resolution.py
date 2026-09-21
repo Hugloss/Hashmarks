@@ -70,39 +70,20 @@ class TaskActionOwnerResolutionMixin:
 
     @staticmethod
     def _task_action_requested_edit_span(task: str) -> str:
-        """Return the task span that explicitly names the requested edit surface.
-
-        Exact identifiers outside this span remain evidence, but they do not
-        automatically become competing edit owners. This is deliberately a
-        bounded request-role discriminator, not a second repository resolver.
-        """
-        lowered = task.lower()
-        marker_positions = [
-            lowered.find(marker)
-            for marker in (
-                " so ",
-                " using ",
-                " with ",
-                " by ",
-                " via ",
-                " through ",
-                " to use ",
-                " to call ",
-            )
-        ]
-        positions = [position for position in marker_positions if position > 0]
+        """Return the bounded task span that names the requested edit surface."""
         dependency_first = re.match(
             r"^\s*(?:use|call|apply)\s+.+?\s+(?:in|from|inside|within)\s+(.+)$",
             task,
             flags=re.IGNORECASE,
         )
-        return (
-            dependency_first.group(1)
-            if dependency_first
-            else task[: min(positions)]
-            if positions
-            else task
+        if dependency_first:
+            return dependency_first.group(1)
+        match = re.search(
+            r"\s(?:so|using|with|by|via|through|to use|to call)\s",
+            task,
+            flags=re.IGNORECASE,
         )
+        return task[: match.start()] if match else task
 
     @classmethod
     def _task_action_requested_exact_identifier_edits(
