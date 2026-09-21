@@ -180,12 +180,13 @@ class TaskActionOwnerResolutionMixin:
             owner_basis = "literal-path"
 
         exact_identifier_edits: list[dict[str, object]] = []
-        if (
+        can_resolve_exact = (
             structural_owner is None
             and not localized_config_edit
             and not explicit_config_surface_request
             and not explicit_edit_surface_selected
-        ):
+        )
+        if can_resolve_exact:
             exact_identifier_edits = self._task_action_exact_identifier_edit_candidates(
                 task, rows, failed
             )
@@ -235,13 +236,7 @@ class TaskActionOwnerResolutionMixin:
                 exact_identifier_paths=exact_identifier_paths,
             )
 
-        should_resolve = (
-            structural_owner is None
-            and not localized_config_edit
-            and not explicit_config_surface_request
-            and not explicit_edit_surface_selected
-        )
-        if not should_resolve:
+        if not can_resolve_exact:
             return _TaskActionOwnerResolutionState(
                 edit=edit,
                 basis=owner_basis,
