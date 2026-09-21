@@ -679,7 +679,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "ownership": {
                 "status": str(authority.get("status") or "unresolved"),
                 "owner": dict(owner) if owner_resolved else None,
+                "candidate": None if owner is None else dict(owner),
                 "basis": basis if owner_resolved else None,
+                "candidate_basis": basis,
                 "ambiguity": dict(ambiguity),
                 "authority": "repository-ownership-only",
                 "source_evidence": None,
