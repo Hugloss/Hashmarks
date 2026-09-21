@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -54,6 +56,14 @@ class QualityTruth:
     semantic_truth: str
     admitted_evidence_truth: str
     expected_owner: str | None = None
+
+
+def case_identity(case: Mapping[str, Any]) -> str:
+    validate_case(case)
+    payload = json.dumps(
+        case, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _choice(value: object, allowed: set[str], field: str) -> str:
@@ -157,6 +167,7 @@ def evaluate_case(
     )
     return {
         "case_id": case["case_id"],
+        "case_identity": case_identity(case),
         "semantic_truth": truth.semantic_truth,
         "admitted_evidence_truth": truth.admitted_evidence_truth,
         "reported_state": state,
@@ -181,8 +192,7 @@ def _selective_counts(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
         "explicit_test_laundered_to_implementation_owner",
     }
     incorrect = sum(
-        any(int(row["hard_zero"][key]) > 0 for key in unsafe_keys)
-        for row in resolved
+        any(int(row["hard_zero"][key]) > 0 for key in unsafe_keys) for row in resolved
     )
     return {
         "resolved": len(resolved),
@@ -194,6 +204,14 @@ def _selective_counts(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
 
 def _ratio(numerator: int, denominator: int) -> float | None:
     return numerator / denominator if denominator else None
+
+
+def _corpus_identity(rows: Sequence[Mapping[str, Any]]) -> str:
+    payload = json.dumps(
+        sorted(str(row["case_identity"]) for row in rows),
+        separators=(",", ":"),
+    )
+    return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -224,6 +242,7 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         },
         "corpus": {
             "cases": len(rows),
+            "identity": _corpus_identity(rows),
             "semantic_slices": dict(sorted(semantic_counts.items())),
         },
         "lexicographic_order": [
