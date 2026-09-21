@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from .change_impact import ChangeImpactOptions
+from .freshness_map import FreshnessMapOptions
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -22,6 +24,22 @@ _QUERY_SURFACES = (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class RepositoryIntelligenceQueryOptions:
+    """Optional inputs and bounds for one repository-intelligence query."""
+
+    member_path: str | None = None
+    profile: str = "compact"
+    negative_members: Sequence[str | Path] = ()
+    previous_map: Mapping[str, object] | None = None
+    previous_snapshot: Mapping[str, object] | None = None
+    limit: int = 20
+    per_role: int = 3
+    impact_limit_per_surface: int = 4
+    max_depth: int = 3
+    project_impact_limit: int = 12
+
+
 class RepositoryIntelligenceQueryMixin:
     """Thin deterministic facade over existing repository-intelligence producers.
 
@@ -36,19 +54,9 @@ class RepositoryIntelligenceQueryMixin:
         task: str,
         changed_paths: Sequence[str | Path] = (),
         *,
-        member_path: str | None = None,
-        profile: str = "compact",
-        negative_members: Sequence[str | Path] = (),
-        previous_map: Mapping[str, object] | None = None,
-        previous_snapshot: Mapping[str, object] | None = None,
-        limit: int = 20,
-        per_role: int = 3,
-        impact_limit_per_surface: int = 4,
-        max_depth: int = 3,
-        project_impact_limit: int = 12,
+        options: RepositoryIntelligenceQueryOptions = RepositoryIntelligenceQueryOptions(),
     ) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+        self = cast("CodeMap", self)
         if surface not in _QUERY_SURFACES:
             raise ValueError(f"surface must be one of {list(_QUERY_SURFACES)}")
         if not task.strip():
@@ -57,8 +65,8 @@ class RepositoryIntelligenceQueryMixin:
         if surface == "verification-explanation":
             result = self.explain_verification_selection(
                 task,
-                member_path,
-                limit=limit,
+                options.member_path,
+                limit=options.limit,
                 candidate_limit=16,
             )
         else:
@@ -67,61 +75,78 @@ class RepositoryIntelligenceQueryMixin:
                     f"changed_paths must not be empty for surface {surface}"
                 )
             common = {
-                "limit": limit,
-                "per_role": per_role,
-                "impact_limit_per_surface": impact_limit_per_surface,
-                "max_depth": max_depth,
+                "limit": options.limit,
+                "per_role": options.per_role,
+                "impact_limit_per_surface": options.impact_limit_per_surface,
+                "max_depth": options.max_depth,
             }
-            if surface == "change-intelligence":
-                result = self.change_intelligence_brief(task, changed_paths, **common)
-            elif surface == "freshness":
-                result = self.evidence_freshness_map(
-                    task,
-                    changed_paths,
-                    negative_members=negative_members,
-                    previous_map=previous_map,
-                    **common,
-                )
-            elif surface == "snapshot":
-                result = self.repository_intelligence_snapshot(
+            impact_options = ChangeImpactOptions(
+                impact_limit_per_surface=options.impact_limit_per_surface,
+                max_depth=options.max_depth,
+            )
+            producers = {
+                "change-intelligence": lambda: self.change_intelligence_brief(
                     task, changed_paths, **common
-                )
-            elif surface == "profile":
-                result = self.repository_intelligence_profile(
+                ),
+                "freshness": lambda: self.evidence_freshness_map(
                     task,
                     changed_paths,
-                    profile=profile,
-                    **common,
-                )
-            elif surface == "economics":
-                result = self.intelligence_economics_receipt(
+                    negative_members=options.negative_members,
+                    previous_map=options.previous_map,
+                    options=FreshnessMapOptions(
+                        limit=options.limit,
+                        per_role=options.per_role,
+                        impact_limit_per_surface=options.impact_limit_per_surface,
+                        max_depth=options.max_depth,
+                    ),
+                ),
+                "snapshot": lambda: self.repository_intelligence_snapshot(
+                    task, changed_paths, **common
+                ),
+                "profile": lambda: self.repository_intelligence_profile(
                     task,
                     changed_paths,
-                    previous_snapshot=previous_snapshot,
-                    **common,
-                )
-            elif surface == "delta":
-                if previous_snapshot is None:
-                    raise ValueError("previous_snapshot is required for surface delta")
+                    profile=options.profile,
+                    limit=options.limit,
+                    per_role=options.per_role,
+                    options=impact_options,
+                ),
+                "economics": lambda: self.intelligence_economics_receipt(
+                    task,
+                    changed_paths,
+                    previous_snapshot=options.previous_snapshot,
+                    limit=options.limit,
+                    per_role=options.per_role,
+                    options=impact_options,
+                ),
+                "cross-repository": lambda: self.cross_repository_evidence_packet(
+                    task,
+                    changed_paths,
+                    limit=options.limit,
+                    per_role=options.per_role,
+                    options=ChangeImpactOptions(
+                        impact_limit_per_surface=options.impact_limit_per_surface,
+                        max_depth=options.max_depth,
+                        project_impact_limit=options.project_impact_limit,
+                        project_impact_encoding="compact",
+                    ),
+                ),
+            }
+            if surface == "delta":
+                if options.previous_snapshot is None:
+                    raise ValueError(
+                        "previous_snapshot is required for surface delta"
+                    )
                 result = self.repository_intelligence_delta(
                     task,
                     changed_paths,
-                    previous_snapshot=previous_snapshot,
-                    **common,
+                    previous_snapshot=options.previous_snapshot,
+                    limit=options.limit,
+                    per_role=options.per_role,
+                    options=impact_options,
                 )
             else:
-                result = self.cross_repository_evidence_packet(
-                    task,
-                    changed_paths,
-                    limit=limit,
-                    per_role=per_role,
-                    options=ChangeImpactOptions(
-                        impact_limit_per_surface=impact_limit_per_surface,
-                        max_depth=max_depth,
-                        project_impact_limit=project_impact_limit,
-                        project_impact_encoding="compact",
-                    ),
-                )
+                result = producers[surface]()
 
         producer_schema = str(result.get("schema") or "")
         envelope: dict[str, object] = {

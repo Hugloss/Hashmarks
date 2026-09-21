@@ -5,6 +5,10 @@ import time
 from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.freshness_map import FreshnessMapOptions
+from hashmarks.codemap.repository_intelligence_query import (
+    RepositoryIntelligenceQueryOptions,
+)
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
 if TYPE_CHECKING:
@@ -74,6 +78,26 @@ def test_freshness_map_is_derived_bounded_repository_truth(tmp_path: Path) -> No
         "canonical-selection-retained",
         "not-in-bounded-candidate-set",
     }
+
+
+def test_freshness_map_identity_includes_typed_bounds(tmp_path: Path) -> None:
+    task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        default = codemap.evidence_freshness_map(task, ["src/case/engine.py"])
+        bounded = codemap.evidence_freshness_map(
+            task,
+            ["src/case/engine.py"],
+            options=FreshnessMapOptions(
+                limit=2,
+                per_role=1,
+                impact_limit_per_surface=2,
+                max_depth=1,
+            ),
+        )
+
+    default_impact = _by_key(default)[("impact", None)]
+    bounded_impact = _by_key(bounded)[("impact", None)]
+    assert bounded_impact["evidence_identity"] != default_impact["evidence_identity"]
 
 
 def test_prior_map_invalidates_only_changed_evidence_identity(tmp_path: Path) -> None:
@@ -169,7 +193,9 @@ def test_service_exposes_freshness_map(tmp_path: Path) -> None:
             "freshness",
             task,
             ["src/case/engine.py"],
-            negative_members=["tests/test_other.py"],
+            options=RepositoryIntelligenceQueryOptions(
+                negative_members=("tests/test_other.py",)
+            ),
         )["result"]
         assert freshness["schema"] == "hashmarks.evidence-freshness-map.v1"
     finally:

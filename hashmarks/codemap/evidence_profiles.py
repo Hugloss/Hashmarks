@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast
 
+from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
 
 if TYPE_CHECKING:
@@ -169,8 +170,10 @@ class EvidenceProfilesMixin:
         profile: str = "compact",
         limit: int = 20,
         per_role: int = 3,
-        impact_limit_per_surface: int = 4,
-        max_depth: int = 3,
+        options: ChangeImpactOptions = ChangeImpactOptions(
+            impact_limit_per_surface=4,
+            max_depth=3,
+        ),
     ) -> dict[str, object]:
         """Project one bounded F3 snapshot at compact, standard, or audit density."""
         if TYPE_CHECKING:
@@ -180,7 +183,7 @@ class EvidenceProfilesMixin:
             changed_paths,
             limit=limit,
             per_role=per_role,
-            impact_limit_per_surface=impact_limit_per_surface,
-            max_depth=max_depth,
+            impact_limit_per_surface=options.impact_limit_per_surface,
+            max_depth=options.max_depth,
         )
         return self._profile_from_snapshot(snapshot, profile=profile)

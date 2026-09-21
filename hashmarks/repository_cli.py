@@ -561,10 +561,15 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     structural_code.add_argument("--limit", type=int, default=100)
     structural_code.set_defaults(func=_structural_code)
 
-    symbol_code = sub.add_parser("symbol", help="show matching symbol records")
-    add_common_arguments(symbol_code, inherited=True)
-    symbol_code.add_argument("query")
-    symbol_code.set_defaults(func=_symbol_code)
+    for name, help_text, handler in (
+        ("symbol", "show matching symbol records", _symbol_code),
+        ("deps", "show static dependency/call evidence", _deps_code),
+        ("refs", "show static references/calls to a symbol name", _refs_code),
+    ):
+        query_command = sub.add_parser(name, help=help_text)
+        add_common_arguments(query_command, inherited=True)
+        query_command.add_argument("query")
+        query_command.set_defaults(func=handler)
 
     source_code = sub.add_parser(
         "source", help="return one exact symbol body under an explicit token budget"
@@ -573,18 +578,6 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     source_code.add_argument("query", help="symbol name or path::qualname")
     source_code.add_argument("--budget", type=int, default=4000)
     source_code.set_defaults(func=_source_code)
-
-    deps_code = sub.add_parser("deps", help="show static dependency/call evidence")
-    add_common_arguments(deps_code, inherited=True)
-    deps_code.add_argument("query")
-    deps_code.set_defaults(func=_deps_code)
-
-    refs_code = sub.add_parser(
-        "refs", help="show static references/calls to a symbol name"
-    )
-    add_common_arguments(refs_code, inherited=True)
-    refs_code.add_argument("query")
-    refs_code.set_defaults(func=_refs_code)
 
     affected_code = sub.add_parser(
         "affected", help="show reverse file dependents from the CodeMap graph"

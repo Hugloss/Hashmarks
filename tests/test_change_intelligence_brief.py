@@ -8,6 +8,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.repository_intelligence_query import (
+    RepositoryIntelligenceQueryOptions,
+)
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
 if TYPE_CHECKING:
@@ -190,7 +193,11 @@ def test_service_exposes_change_brief_and_verification_explanation(
             "change-intelligence", task, ["src/case/engine.py"]
         )["result"]
         explanation = client.repository_intelligence_query(
-            "verification-explanation", task, member_path="tests/test_ember.py"
+            "verification-explanation",
+            task,
+            options=RepositoryIntelligenceQueryOptions(
+                member_path="tests/test_ember.py"
+            ),
         )["result"]
         assert brief["verification"]["member"] == "tests/test_ember.py"
         assert explanation["status"] == "selected"

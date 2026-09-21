@@ -56,7 +56,15 @@ def test_authority():
             "pkg/core.py::authority",
             max_depth=3,
         )
+        packet_without_refresh = codemap.structural_locality(
+            "pkg/core.py::authority",
+            max_depth=3,
+            refresh=False,
+        )
 
+    assert packet_without_refresh["nodes"] == packet["nodes"]
+    assert packet_without_refresh["dimensions"] == packet["dimensions"]
+    assert packet_without_refresh["freshness"]["state"] == "unknown"
     assert packet["schema"] == "hashmarks.structural-locality.v1"
     assert packet["freshness"]["state"] == "current"
     assert packet["freshness"]["basis"] == "explicit-sync"
@@ -217,6 +225,37 @@ def authority(client, value):
     row = packet["external_or_unindexed_calls"][0]
     assert row["target_text"] == "client.helper"
     assert row["candidate_symbol_ids"] == ["pkg/core.py::helper"]
+
+
+def test_structural_locality_keeps_missing_local_class_member_unresolved(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        """
+class Local:
+    pass
+
+
+class Other:
+    def helper(self):
+        return 1
+
+
+def authority():
+    return Local.helper()
+""".lstrip(),
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality("pkg/core.py::authority")
+
+    assert packet["dimensions"]["unresolved_call_count"] == 1
+    unresolved = packet["unresolved_calls"][0]
+    assert unresolved["target_text"] == "Local.helper"
+    assert unresolved["candidate_symbol_ids"] == ["pkg/core.py::Other.helper"]
 
 
 def test_structural_locality_does_not_resolve_shadowed_plain_call(

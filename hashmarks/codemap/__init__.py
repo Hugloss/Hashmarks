@@ -15,11 +15,13 @@ from .model import (
     SyncResult,
 )
 from .policy import ContextPolicy
+from .post_change import PostChangeOptions
 from .project_impact_codec import (
     COMPACT_PROJECT_IMPACT_SCHEMA,
     compact_project_impact,
     expand_project_impact,
 )
+from .repository_intelligence_query import RepositoryIntelligenceQueryOptions
 from .service import CodeMapService, CodeMapServiceClient, default_codemap_socket
 from .structural_locality import structural_locality_delta
 from .worktree_overlay import WorktreeOverlay
@@ -27,6 +29,8 @@ from .worktree_overlay import WorktreeOverlay
 __all__ = [
     "CodeMap",
     "ChangeImpactOptions",
+    "PostChangeOptions",
+    "RepositoryIntelligenceQueryOptions",
     "CodeMapService",
     "CodeMapServiceClient",
     "default_codemap_socket",

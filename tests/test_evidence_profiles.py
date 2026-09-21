@@ -6,6 +6,10 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.change_impact import ChangeImpactOptions
+from hashmarks.codemap.repository_intelligence_query import (
+    RepositoryIntelligenceQueryOptions,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -112,6 +116,26 @@ def test_audit_profile_contains_exact_snapshot(tmp_path: Path) -> None:
     assert audit["evidence"]["snapshot"] == snapshot
 
 
+def test_profile_applies_typed_impact_bounds(tmp_path: Path) -> None:
+    _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        profile = codemap.repository_intelligence_profile(
+            "Fix widget accepted response behavior",
+            ["src/owner.py"],
+            profile="audit",
+            limit=2,
+            per_role=1,
+            options=ChangeImpactOptions(
+                impact_limit_per_surface=2,
+                max_depth=1,
+            ),
+        )
+
+    bounds = profile["evidence"]["snapshot"]["bounds"]
+    assert bounds["depth"] == 1
+    assert bounds["per_surface"] == 2
+
+
 def test_invalid_profile_fails_closed(tmp_path: Path) -> None:
     _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -151,7 +175,7 @@ def test_profile_service_roundtrip(tmp_path: Path) -> None:
             "profile",
             "Fix widget accepted response behavior",
             ["src/owner.py"],
-            profile="compact",
+            options=RepositoryIntelligenceQueryOptions(profile="compact"),
         )["result"]
         assert profile["schema"] == "hashmarks.evidence-profile.v1"
         assert profile["profile"] == "compact"

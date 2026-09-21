@@ -332,6 +332,27 @@ class _SyncIndexState:
 
 
 @dataclass(frozen=True)
+class _SyncDiscovery:
+    files: list[_DiscoveredFile]
+    full: bool
+    requested_paths: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _SyncBaseSnapshot:
+    identity: str | None
+    overlay_paths: set[str] | None
+    payload: dict[str, object] | None
+
+
+@dataclass(frozen=True)
+class _SyncIdentity:
+    generation: int
+    fingerprint: str
+    identity_generation: int | None
+
+
+@dataclass(frozen=True)
 class _FileReuseState:
     digest: str | None
     artifact: str | None
@@ -538,8 +559,7 @@ class IndexingLifecycleMixin:
         return artifact, False
 
     def _discover_subtree(self, rel: str) -> list[_DiscoveredFile]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+        self = cast("CodeMap", self)
         if not self._path_admitted_for_analysis(rel):
             return []
         path = self.workspace / rel
@@ -779,12 +799,12 @@ class IndexingLifecycleMixin:
         self,
         paths: Iterable[str | Path] | None,
         warnings: list[str],
-    ) -> tuple[list[_DiscoveredFile], bool, tuple[str, ...]]:
+    ) -> _SyncDiscovery:
         """Resolve the exact repository surface admitted to this indexing pass."""
         if paths is None:
             discovered, discovered_warnings = self._discover()
             warnings.extend(discovered_warnings)
-            return discovered, True, ()
+            return _SyncDiscovery(discovered, True, ())
         requested_paths = tuple(
             normalize_relative_path(raw, allow_root=False) for raw in paths
         )
@@ -796,7 +816,7 @@ class IndexingLifecycleMixin:
                     continue
                 discovered.append(item)
                 seen.add(item.rel)
-        return discovered, False, requested_paths
+        return _SyncDiscovery(discovered, False, requested_paths)
 
     def _sync_begin_build(
         self,
@@ -837,9 +857,7 @@ class IndexingLifecycleMixin:
         )
         return cache_state
 
-    def _sync_base_snapshot(
-        self, *, full: bool
-    ) -> tuple[str | None, set[str] | None, dict[str, object] | None]:
+    def _sync_base_snapshot(self, *, full: bool) -> _SyncBaseSnapshot:
         """Load reusable clean-base evidence without changing repository state."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -850,19 +868,19 @@ class IndexingLifecycleMixin:
             else None
         )
         if not (full and base_identity is not None and overlay_paths is not None):
-            return base_identity, overlay_paths, None
+            return _SyncBaseSnapshot(base_identity, overlay_paths, None)
         snapshot_path = default_base_snapshot(self.workspace, base_identity)
         try:
             candidate = json.loads(snapshot_path.read_text(encoding="utf-8"))
         except (OSError, ValueError, json.JSONDecodeError):
-            return base_identity, overlay_paths, None
+            return _SyncBaseSnapshot(base_identity, overlay_paths, None)
         if not isinstance(candidate, dict):
-            return base_identity, overlay_paths, None
+            return _SyncBaseSnapshot(base_identity, overlay_paths, None)
         if candidate.get("schema") != "hashmarks.codemap-base-snapshot.v1":
-            return base_identity, overlay_paths, None
+            return _SyncBaseSnapshot(base_identity, overlay_paths, None)
         if candidate.get("base_identity") != base_identity:
-            return base_identity, overlay_paths, None
-        return base_identity, overlay_paths, candidate
+            return _SyncBaseSnapshot(base_identity, overlay_paths, None)
+        return _SyncBaseSnapshot(base_identity, overlay_paths, candidate)
 
     def _sync_base_entry(
         self,
@@ -1081,8 +1099,7 @@ class IndexingLifecycleMixin:
         warnings: list[str],
     ) -> _SyncIndexState:
         """Persist repository evidence for the discovered surface in bounded batches."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+        self = cast("CodeMap", self)
         state = _SyncIndexState()
 
         def publish_persisted(committed: int) -> None:
@@ -1156,7 +1173,7 @@ class IndexingLifecycleMixin:
         changed: bool,
         identity_generation_before: int | None,
         warnings: list[str],
-    ) -> tuple[int, str, int | None]:
+    ) -> _SyncIdentity:
         """Seal workspace and observation identities after repository rows are stable."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -1191,7 +1208,7 @@ class IndexingLifecycleMixin:
         )
         self.store.set_meta("last_sync_unix", str(time.time()))
         self.store.set_meta("artifact_db", str(self.artifacts.db_path))
-        return generation, fingerprint, identity_generation
+        return _SyncIdentity(generation, fingerprint, identity_generation)
 
     def _sync_refresh_python_import_roots(
         self,
@@ -1299,59 +1316,59 @@ class IndexingLifecycleMixin:
             return self.sync()
         started = time.perf_counter()
         warnings: list[str] = []
-        scope_removed = self._reconcile_persisted_analysis_scope()
-        observation_before = self._daemon_observation()
-        identity_generation_before = (
-            None if observation_before is None else observation_before.generation
+        removed = self._reconcile_persisted_analysis_scope()
+        identity_generation_before = getattr(
+            self._daemon_observation(), "generation", None
         )
-        discovered, full, requested_paths = self._sync_discovery(paths, warnings)
+        discovery = self._sync_discovery(paths, warnings)
         previous_python_import_roots = self._python_import_roots
         self._sync_refresh_python_import_roots(
-            discovered, full=full, requested_paths=requested_paths
+            discovery.files,
+            full=discovery.full,
+            requested_paths=discovery.requested_paths,
         )
         reprojection_removed = self._sync_expand_python_reprojection(
-            discovered, full=full, previous_roots=previous_python_import_roots
+            discovery.files,
+            full=discovery.full,
+            previous_roots=previous_python_import_roots,
         )
-        preflight = self._preflight_from_discovered(discovered)
+        preflight = self._preflight_from_discovered(discovery.files)
         cache_state = self._sync_begin_build(
-            discovered=discovered,
-            full=full,
-            requested_paths=requested_paths,
+            discovered=discovery.files,
+            full=discovery.full,
+            requested_paths=discovery.requested_paths,
             preflight=preflight,
         )
-        base_identity, overlay_paths, base_snapshot_payload = self._sync_base_snapshot(
-            full=full
-        )
+        base = self._sync_base_snapshot(full=discovery.full)
         state = self._sync_index_discovered(
-            discovered=discovered,
-            overlay_paths=overlay_paths,
-            base_snapshot_payload=base_snapshot_payload,
+            discovered=discovery.files,
+            overlay_paths=base.overlay_paths,
+            base_snapshot_payload=base.payload,
             warnings=warnings,
         )
-        removed = reprojection_removed + self._sync_remove_stale_paths(
-            full=full,
+        removed += reprojection_removed + self._sync_remove_stale_paths(
+            full=discovery.full,
             present=state.present,
-            discovered=discovered,
-            requested_paths=requested_paths,
+            discovered=discovery.files,
+            requested_paths=discovery.requested_paths,
         )
-        generation, fingerprint, identity_generation = self._sync_finalize_identity(
+        identity = self._sync_finalize_identity(
             changed=state.changed or bool(removed),
             identity_generation_before=identity_generation_before,
             warnings=warnings,
         )
         self._sync_write_base_snapshot(
-            full=full,
-            base_identity=base_identity,
-            overlay_paths=overlay_paths,
+            full=discovery.full,
+            base_identity=base.identity,
+            overlay_paths=base.overlay_paths,
             skipped=state.skipped,
         )
         elapsed = time.perf_counter() - started
-        source_bytes = int(preflight.get("source_bytes") or 0)
         economics = self._sync_economics(
             cache_state=cache_state,
             elapsed=elapsed,
-            discovered_count=len(discovered),
-            source_bytes=source_bytes,
+            discovered_count=len(discovery.files),
+            source_bytes=int(preflight.get("source_bytes") or 0),
             persisted_file_writes=state.persisted_file_writes,
         )
         self.store.set_meta_many(
@@ -1366,23 +1383,25 @@ class IndexingLifecycleMixin:
         )
         self._reverse_file_graph_cache = None
         return SyncResult(
-            generation=generation,
-            discovered=len(discovered),
+            generation=identity.generation,
+            discovered=len(discovery.files),
             indexed=state.indexed,
             reused_artifacts=state.reused,
             parsed_artifacts=state.parsed,
-            removed=scope_removed + removed,
+            removed=removed,
             skipped=state.skipped,
             parse_errors=state.parse_errors,
             seconds=elapsed,
-            workspace_fingerprint=fingerprint,
-            identity_generation=identity_generation,
+            workspace_fingerprint=identity.fingerprint,
+            identity_generation=identity.identity_generation,
             derived_surfaces_changed=state.derived_changed,
             derived_surfaces_preserved=state.derived_preserved,
             semantic_invalidation_shields=state.semantic_shields,
             base_snapshot_reused=state.base_snapshot_reused,
-            base_identity=base_identity,
-            overlay_paths=0 if overlay_paths is None else len(overlay_paths),
+            base_identity=base.identity,
+            overlay_paths=(
+                0 if base.overlay_paths is None else len(base.overlay_paths)
+            ),
             warnings=tuple(warnings),
             preflight=preflight,
             economics=economics,
@@ -1576,4 +1595,3 @@ class IndexingLifecycleMixin:
             index_surface=self._index_surface_for_path(rel),
         )
         self.store.bump_generation()
-

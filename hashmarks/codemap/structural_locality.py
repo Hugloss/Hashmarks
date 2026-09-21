@@ -488,8 +488,7 @@ class StructuralLocalityMixin:
         target: str,
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+        self = cast("CodeMap", self)
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
         root = target.split(".", 1)[0]
         if not root or self._python_function_locally_binds(
@@ -505,16 +504,18 @@ class StructuralLocalityMixin:
                 and str(row.get("qualname") or "") == target
             ]
             if len(qualified) == 1:
-                return qualified[0], [_symbol_id(qualified[0])], False
-            root_symbols = [
-                row
-                for row in self._visible_named_symbol_candidates(root)
-                if str(row.get("path") or "") == source_path
-                and str(row.get("qualname") or "") == root
-            ]
-            return _binding_result(
-                qualified, candidates, unresolved=bool(root_symbols)
-            )
+                binding = qualified[0], [_symbol_id(qualified[0])], False
+            else:
+                root_symbols = [
+                    row
+                    for row in self._visible_named_symbol_candidates(root)
+                    if str(row.get("path") or "") == source_path
+                    and str(row.get("qualname") or "") == root
+                ]
+                binding = _binding_result(
+                    qualified, candidates, unresolved=bool(root_symbols)
+                )
+            return binding
         if kind == "reexport" and len(targets) == 1:
             owners, unresolved = self._resolve_import_owner_evidence(
                 source_path, targets[0]
@@ -544,9 +545,7 @@ class StructuralLocalityMixin:
                 and str(row.get("qualname") or "") == qualified_name
             ]
             return _binding_result(qualified, candidates, unresolved=True)
-        if kind in {"ambiguous", "star"}:
-            return None, candidate_ids, True
-        return None, candidate_ids, False
+        return None, candidate_ids, kind in {"ambiguous", "star"}
 
     def _resolve_call_target(
         self, edge: Mapping[str, object]
@@ -772,9 +771,13 @@ class StructuralLocalityMixin:
             ref_limit_per_symbol=ref_limit_per_symbol,
         )
         files = sorted({str(row["path"]) for row in ordered_nodes})
-        verification = self.tests(str(target_row["path"]), max_depth=3)
         verification_paths = sorted(
-            {str(path) for path in verification.get("tests", [])}
+            {
+                str(path)
+                for path in self.tests(str(target_row["path"]), max_depth=3).get(
+                    "tests", []
+                )
+            }
         )
         target_node = next(
             row for row in ordered_nodes if row["symbol_id"] == _symbol_id(target_row)

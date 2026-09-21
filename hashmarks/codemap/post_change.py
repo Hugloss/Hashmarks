@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.evidence_context import validate_evidence_context
@@ -13,6 +14,17 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from .engine import CodeMap
+
+
+@dataclass(frozen=True, slots=True)
+class PostChangeOptions:
+    """Previous anchors and bounds for one post-change projection."""
+
+    previous_edit_path: str | None = None
+    previous_verify_path: str | None = None
+    limit: int = 20
+    per_role: int = 3
+    token_budget: int = 512
 
 
 class PostChangeMixin(ChangeImpactMixin):
@@ -383,11 +395,7 @@ class PostChangeMixin(ChangeImpactMixin):
         task: str,
         changed_paths: Sequence[str | Path],
         *,
-        previous_edit_path: str | None = None,
-        previous_verify_path: str | None = None,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 512,
+        options: PostChangeOptions = PostChangeOptions(),
     ) -> dict[str, object]:
         """Refresh changed paths and expose only changed action anchors."""
         if TYPE_CHECKING:
@@ -406,9 +414,9 @@ class PostChangeMixin(ChangeImpactMixin):
         sync_result = self.sync(normalized)
         brief = self.task_decision_brief(
             task,
-            limit=limit,
-            per_role=per_role,
-            token_budget=token_budget,
+            limit=options.limit,
+            per_role=options.per_role,
+            token_budget=options.token_budget,
         )
         edit = brief.get("edit") if isinstance(brief.get("edit"), dict) else None
         verify = brief.get("verify") if isinstance(brief.get("verify"), dict) else None
@@ -417,13 +425,13 @@ class PostChangeMixin(ChangeImpactMixin):
             str(verify.get("path")) if verify and verify.get("path") else None
         )
         prior_edit = (
-            normalize_relative_path(previous_edit_path, allow_root=False)
-            if previous_edit_path
+            normalize_relative_path(options.previous_edit_path, allow_root=False)
+            if options.previous_edit_path
             else None
         )
         prior_verify = (
-            normalize_relative_path(previous_verify_path, allow_root=False)
-            if previous_verify_path
+            normalize_relative_path(options.previous_verify_path, allow_root=False)
+            if options.previous_verify_path
             else None
         )
         result: dict[str, object] = {

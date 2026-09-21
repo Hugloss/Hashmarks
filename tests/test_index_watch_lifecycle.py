@@ -142,3 +142,56 @@ def test_watch_forever_unknown_observation_forces_full_reconciliation(
             ({"call": 2, "paths": None}, []),
         ]
         assert codemap.store.meta("watcher_state") == "stopped"
+
+
+def test_watch_forever_incremental_callback_reconciles_observed_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    updates: list[tuple[object, list[str]]] = []
+    callback = None
+    external_state = tmp_path.parent / f"{tmp_path.name}-state"
+
+    with CodeMap(tmp_path, state_dir=external_state) as codemap:
+        owner = _watch_owner(codemap)
+
+        def fake_factory(
+            root,
+            update_callback,
+            *,
+            debounce_seconds,
+            change_tracker,
+            exclude_relative_paths,
+        ):
+            nonlocal callback
+            del root, debounce_seconds, change_tracker
+            callback = update_callback
+            assert set(exclude_relative_paths) == {".git", ".fastidentity"}
+            return _FakeWatcher([])
+
+        sync_calls: list[object] = []
+
+        def fake_sync(paths=None):
+            sync_calls.append(paths)
+            return {"paths": paths}
+
+        def drive_update_then_stop(_seconds: float) -> None:
+            if len(sync_calls) == 1:
+                assert callback is not None
+                callback(["src/owner.py"])
+                return
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(owner, "create_default_watcher", fake_factory)
+        monkeypatch.setattr(owner.time, "sleep", drive_update_then_stop)
+        monkeypatch.setattr(codemap, "sync", fake_sync)
+
+        codemap.watch_forever(
+            on_update=lambda result, paths: updates.append((result, list(paths)))
+        )
+
+    assert sync_calls == [None, ["src/owner.py"]]
+    assert updates == [
+        ({"paths": None}, []),
+        ({"paths": ["src/owner.py"]}, ["src/owner.py"]),
+    ]

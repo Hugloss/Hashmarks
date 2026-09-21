@@ -16,6 +16,8 @@ from hashmarks.paths import canonical_host_path
 
 from .change_impact import ChangeImpactOptions
 from .engine import CodeMap
+from .post_change import PostChangeOptions
+from .repository_intelligence_query import RepositoryIntelligenceQueryOptions
 
 PROTOCOL = "hashmarks.codemap-service.v2"
 MAX_REQUEST = 1024 * 1024
@@ -325,19 +327,21 @@ class CodeMapService:
             surface,
             task,
             changed,
-            member_path=member_path,
-            profile=str(request.get("profile", "compact")),
-            negative_members=negative_members,
-            previous_map=previous_map,
-            previous_snapshot=previous_snapshot,
-            limit=self._bounded_int(request, "limit", 20, 1, 100),
-            per_role=self._bounded_int(request, "per_role", 3, 1, 20),
-            impact_limit_per_surface=self._bounded_int(
-                request, "impact_limit_per_surface", 4, 1, 100
-            ),
-            max_depth=self._bounded_int(request, "max_depth", 3, 1, 32),
-            project_impact_limit=self._bounded_int(
-                request, "project_impact_limit", 12, 1, 100000
+            options=RepositoryIntelligenceQueryOptions(
+                member_path=member_path,
+                profile=str(request.get("profile", "compact")),
+                negative_members=negative_members,
+                previous_map=previous_map,
+                previous_snapshot=previous_snapshot,
+                limit=self._bounded_int(request, "limit", 20, 1, 100),
+                per_role=self._bounded_int(request, "per_role", 3, 1, 20),
+                impact_limit_per_surface=self._bounded_int(
+                    request, "impact_limit_per_surface", 4, 1, 100
+                ),
+                max_depth=self._bounded_int(request, "max_depth", 3, 1, 32),
+                project_impact_limit=self._bounded_int(
+                    request, "project_impact_limit", 12, 1, 100000
+                ),
             ),
         )
         return {"ok": True, "repository_intelligence_query": result}
@@ -363,11 +367,13 @@ class CodeMapService:
         result = self._map().refresh_after_change_delta(
             task,
             changed,
-            previous_edit_path=request.get("previous_edit_path"),
-            previous_verify_path=request.get("previous_verify_path"),
-            limit=limit,
-            per_role=per_role,
-            token_budget=budget,
+            options=PostChangeOptions(
+                previous_edit_path=request.get("previous_edit_path"),
+                previous_verify_path=request.get("previous_verify_path"),
+                limit=limit,
+                per_role=per_role,
+                token_budget=budget,
+            ),
         )
         return {"ok": True, "refresh_delta": result}
 
@@ -774,35 +780,26 @@ class CodeMapServiceClient:
         task: str,
         changed_paths: tuple[str, ...] | list[str] = (),
         *,
-        member_path: str | None = None,
-        profile: str = "compact",
-        negative_members: tuple[str, ...] | list[str] = (),
-        previous_map: dict[str, Any] | None = None,
-        previous_snapshot: dict[str, Any] | None = None,
-        limit: int = 20,
-        per_role: int = 3,
-        impact_limit_per_surface: int = 4,
-        max_depth: int = 3,
-        project_impact_limit: int = 12,
+        options: RepositoryIntelligenceQueryOptions = RepositoryIntelligenceQueryOptions(),
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "surface": surface,
             "task": task,
             "changed_paths": list(changed_paths),
-            "profile": profile,
-            "negative_members": list(negative_members),
-            "limit": limit,
-            "per_role": per_role,
-            "impact_limit_per_surface": impact_limit_per_surface,
-            "max_depth": max_depth,
-            "project_impact_limit": project_impact_limit,
+            "profile": options.profile,
+            "negative_members": list(options.negative_members),
+            "limit": options.limit,
+            "per_role": options.per_role,
+            "impact_limit_per_surface": options.impact_limit_per_surface,
+            "max_depth": options.max_depth,
+            "project_impact_limit": options.project_impact_limit,
         }
-        if member_path is not None:
-            payload["member_path"] = member_path
-        if previous_map is not None:
-            payload["previous_map"] = previous_map
-        if previous_snapshot is not None:
-            payload["previous_snapshot"] = previous_snapshot
+        if options.member_path is not None:
+            payload["member_path"] = options.member_path
+        if options.previous_map is not None:
+            payload["previous_map"] = options.previous_map
+        if options.previous_snapshot is not None:
+            payload["previous_snapshot"] = options.previous_snapshot
         return dict(
             self.request(
                 "repository_intelligence_query",
@@ -860,22 +857,18 @@ class CodeMapServiceClient:
         task: str,
         changed_paths: tuple[str, ...] | list[str],
         *,
-        previous_edit_path: str | None = None,
-        previous_verify_path: str | None = None,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 512,
+        options: PostChangeOptions = PostChangeOptions(),
     ) -> dict[str, Any]:
         return dict(
             self.request(
                 "refresh_after_change_delta",
                 task=task,
                 changed_paths=list(changed_paths),
-                previous_edit_path=previous_edit_path,
-                previous_verify_path=previous_verify_path,
-                limit=limit,
-                per_role=per_role,
-                token_budget=token_budget,
+                previous_edit_path=options.previous_edit_path,
+                previous_verify_path=options.previous_verify_path,
+                limit=options.limit,
+                per_role=options.per_role,
+                token_budget=options.token_budget,
             )["refresh_delta"]
         )
 

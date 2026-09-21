@@ -4,6 +4,7 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
+from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
 
 if TYPE_CHECKING:
@@ -68,8 +69,10 @@ class IntelligenceEconomicsMixin:
         previous_snapshot: Mapping[str, object] | None = None,
         limit: int = 20,
         per_role: int = 3,
-        impact_limit_per_surface: int = 4,
-        max_depth: int = 3,
+        options: ChangeImpactOptions = ChangeImpactOptions(
+            impact_limit_per_surface=4,
+            max_depth=3,
+        ),
     ) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -83,8 +86,8 @@ class IntelligenceEconomicsMixin:
             changed_paths,
             limit=limit,
             per_role=per_role,
-            impact_limit_per_surface=impact_limit_per_surface,
-            max_depth=max_depth,
+            impact_limit_per_surface=options.impact_limit_per_surface,
+            max_depth=options.max_depth,
         )
         profiles = {
             name: self._profile_from_snapshot(snapshot, profile=name)
@@ -136,8 +139,7 @@ class IntelligenceEconomicsMixin:
                 previous_snapshot=previous_snapshot,
                 limit=limit,
                 per_role=per_role,
-                impact_limit_per_surface=impact_limit_per_surface,
-                max_depth=max_depth,
+                options=options,
             )
             previous_bytes = self._economics_bytes(previous_snapshot)
             current_bytes = self._economics_bytes(snapshot)
