@@ -23,6 +23,33 @@ def _bundle(
     ]
 
 
+def test_evidence_correlation_extension_preserves_repository_coverage_owner(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [
+        {
+            "binding_id": "coverage-owner",
+            "evidence": [
+                {"path": "owner.py", "start_line": 1, "end_line": 1}
+            ],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+        coverage = codemap.repository_evidence_coverage(
+            packet,
+            changed_paths=[],
+            change_set_complete=True,
+        )
+
+    assert coverage["schema"] == "hashmarks.repository-evidence-coverage.v1"
+    assert coverage["binding_impacts"] == []
+
+
 def test_external_runtime_path_maps_to_repository_symbol_without_gaining_authority(
     tmp_path: Path,
 ) -> None:
