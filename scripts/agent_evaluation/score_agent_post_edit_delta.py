@@ -215,7 +215,7 @@ def run(
             == str(truth["expected_verify_path"]),
             "path_change_detected": state == "changed"
             and str(path_change.get("path") or "") == str(truth["expected_edit_path"]),
-            "revision_invalidated": "owner-source-revision" in invalidated,
+            "revision_invalidated": "candidate-source-revision" in invalidated,
             "generation_invalidated": "previous-evidence-generation" in invalidated,
             "candidate_reused": "owner" in reused or "task-candidate" in reused,
             "verification_surface_reused": "verification-surface" in reused,
