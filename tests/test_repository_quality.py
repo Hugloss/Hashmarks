@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from scripts.agent_evaluation.repository_quality import case_identity, evaluate_case, summarize
+from scripts.agent_evaluation.repository_quality import (\n    case_identity,\n    evaluate_case,\n    summarize,\n)
 
 
 def _case(**overrides):
