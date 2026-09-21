@@ -656,6 +656,8 @@ def test_duplicate_bundle_ids_fail_closed_before_correlation(
         "bundle_id": "duplicate",
         "producer": {"kind": "test-fixture"},
         "completeness": "complete",
+        "scope": {"kind": "test-fixture"},
+        "truncation": "complete",
         "anchors": [{"anchor_id": "owner", "path": "owner.py"}],
     }
     with CodeMap(tmp_path) as codemap:
