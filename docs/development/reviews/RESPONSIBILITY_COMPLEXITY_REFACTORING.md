@@ -166,3 +166,23 @@ Re-run the full complexity inventory. Continue only where measured complexity pl
 - RCR-06: CLOSED in BP — import resolution remains evidence-graph owned; language-specific resolver stages make identity semantics discoverable without creating a second resolver owner.
 - RCR-07: NEXT — CLI command-family ownership review.
 - RCR-08: follows RCR-07 — re-inventory and explicit stop/continue decision.
+
+## Closed phase evidence: repository evidence binding delta
+
+The first continuation phase is closed against exact evidence rather than Ruff reduction alone.
+
+- Pre-edit authority: `50b0e3be83fc0dd445bae9494367ece2f25179fe`
+- Production refactor: `2258affd0a5612b1005c6b4e0ac9dab910424f92`
+- Frozen direct test: `tests/test_repository_evidence_bindings.py`
+- Frozen test identity: `sha256:0ed74a9786d9f8c1c5723f31368afe022f3ddf52e32e7c773b9278e0878b6d4b`
+- BP2 receipt: `sha256:9fe191f4d65530e60481b2062cb938a8c1bad854fd02cd7a641d81788582c84d` — `BEHAVIOR_PRESERVATION_VERIFIED`
+- Locality decision: `sha256:d3664be1f0826be11cb8f575822d899136a50984f5b88e440d936435069e2dae` — `DECOMPOSITION_JUSTIFIED`
+- Post locality snapshot: `sha256:fdf774403751679e47b3f10f22da68835cb5ddcc77f687bd28b92baab967e43c`
+- Comparable debt closure: `sha256:f2b9069e81c7a851dac014d59bc290cbab20de23e560b7cf9ee60cc0ec2ce3d8` — `VERIFIED`
+- Repository excess: 1,571 → 1,500
+- Target excess: 71 → 0
+- Outside-target delta: 0
+- Exact proof runs: Agent Economics dogfood #41 PASS; CI #553 PASS.
+
+The original depth-2 locality observation hit `call-limit-reached` at the default 64-call bound. The proof was rerun at the explicit 256-call bound with the same depth and then closed cleanly; the scope was not narrowed to manufacture a pass.
+
