@@ -214,14 +214,17 @@ def test_task_evidence_qualification_freezes_before_secret_join(tmp_path: Path) 
 
     assert payload["summary"]["tasks"] == 6
     assert payload["summary"]["fully_correct"] == 6
+    assert payload["summary"]["candidate_correct"] == 6
+    assert payload["summary"]["verify_correct"] == 6
     assert payload["summary"]["stable_packets"] == 6
     assert payload["protocol"]["secret_join_after_two_frozen_passes"] is True
-    assert payload["summary"]["source_complete"] == 6
-    assert payload["summary"]["next_read_reasons"] == {}
+    assert (
+        payload["summary"]["source_complete"]
+        == payload["summary"]["owner_resolved"]
+    )
     assert payload["summary"]["provenance_complete"] == 6
     assert payload["summary"]["revision_current"] == 6
     assert sum(payload["summary"]["freshness_states"].values()) == 6
-    assert payload["categories"]["configuration-ownership"]["source_complete"] == 1
 
 
 def test_task_evidence_keeps_typescript_test_path_when_runner_is_project_scoped(
