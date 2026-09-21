@@ -328,7 +328,8 @@ jobs:
             --repository-root "$GITHUB_WORKSPACE/.binding-before" \
             --hashmarks-executable "$RUNNER_TEMP/hashmarks-current-observer" \
             --max-depth 2 \
-            --artifact "$RUNNER_TEMP/binding-locality-before-depth2.json"
+            --call-limit 256 \
+            --artifact "$RUNNER_TEMP/binding-locality-before-observed.json"
 
       - name: Diagnose pre-edit locality completeness
         run: |
@@ -338,7 +339,7 @@ jobs:
           from pathlib import Path
 
           payload = json.loads(
-              (Path(os.environ["RUNNER_TEMP"]) / "binding-locality-before-depth2.json").read_text(
+              (Path(os.environ["RUNNER_TEMP"]) / "binding-locality-before-observed.json").read_text(
                   encoding="utf-8"
               )
           )
@@ -355,25 +356,13 @@ jobs:
                   sort_keys=True,
               )
           )
-          if any(
-              row.get("source_symbol_id") == packet.get("target_symbol_id")
-              for row in packet.get("unresolved_calls", [])
-          ):
+          unresolved = payload["snapshot"].get("unresolved_evidence", [])
+          if unresolved:
               raise SystemExit(
-                  "direct binding-delta calls remain unresolved at the target boundary"
+                  "pre-edit binding-delta locality remains incomplete: "
+                  + repr(unresolved)
               )
           PY
-
-      - name: Observe pre-edit binding-delta comparison scope
-        env:
-          PYTHONPATH: ${{ github.workspace }}/.agentsCookbook/scripts
-        run: |
-          python3 -m agent_economics refactor-locality observe-hashmarks \
-            'hashmarks/codemap/repository_evidence_binding_delta.py::RepositoryEvidenceBindingDeltaMixin._binding_change' \
-            --repository-root "$GITHUB_WORKSPACE/.binding-before" \
-            --hashmarks-executable "$RUNNER_TEMP/hashmarks-current-observer" \
-            --max-depth 1 \
-            --artifact "$RUNNER_TEMP/binding-locality-before-observed.json"
 
       - name: Observe post-edit binding-delta locality identity
         env:
@@ -383,7 +372,8 @@ jobs:
             'hashmarks/codemap/repository_evidence_binding_delta.py::RepositoryEvidenceBindingDeltaMixin._binding_change' \
             --repository-root . \
             --hashmarks-executable "$RUNNER_TEMP/hashmarks-current-observer" \
-            --max-depth 1 \
+            --max-depth 2 \
+            --call-limit 256 \
             --artifact "$RUNNER_TEMP/binding-locality-post-seed.json"
 
       - name: Bind semantic responsibility evidence
@@ -464,7 +454,8 @@ jobs:
             'hashmarks/codemap/repository_evidence_binding_delta.py::RepositoryEvidenceBindingDeltaMixin._binding_change' \
             --repository-root . \
             --hashmarks-executable "$RUNNER_TEMP/hashmarks-current-observer" \
-            --max-depth 1 \
+            --max-depth 2 \
+            --call-limit 256 \
             --values "$RUNNER_TEMP/binding-structural-values.json" \
             --artifact "$RUNNER_TEMP/binding-locality-post-observed.json"
 
