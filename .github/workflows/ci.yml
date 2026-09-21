@@ -34,6 +34,9 @@ jobs:
       - name: Ruff maintainability debt diagnostic
         continue-on-error: true
         run: make lint-debt-summary
+      - name: Exact current Ruff debt inventory
+        continue-on-error: true
+        run: make lint-debt-json
       - run: make compile
   authority-diagnostics:
     name: Workspace authority diagnostics
