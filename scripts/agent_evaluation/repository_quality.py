@@ -60,7 +60,9 @@ class QualityTruth:
 
 def case_identity(case: Mapping[str, Any]) -> str:
     validate_case(case)
-    payload = json.dumps(case, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    payload = json.dumps(
+        case, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
     return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -190,8 +192,7 @@ def _selective_counts(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
         "explicit_test_laundered_to_implementation_owner",
     }
     incorrect = sum(
-        any(int(row["hard_zero"][key]) > 0 for key in unsafe_keys)
-        for row in resolved
+        any(int(row["hard_zero"][key]) > 0 for key in unsafe_keys) for row in resolved
     )
     return {
         "resolved": len(resolved),
