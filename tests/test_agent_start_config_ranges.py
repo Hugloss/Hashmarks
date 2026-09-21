@@ -130,7 +130,7 @@ def test_ambiguous_yaml_key_fails_closed_instead_of_guessing(tmp_path: Path) -> 
         "primary:\n  mode: active\nsecondary:\n  mode: legacy\n",
     )
     start = _start(tmp_path, "Change ember policy config mode")
-    assert start["edit"] == "src/case/policy.yaml"
+    assert _ownership(start)["candidate"]["path"] == "src/case/policy.yaml"
     assert _ownership(start)["source_evidence"] is None
     assert _ownership(start)["next_read"]["reason"] == "ambiguous-task-local-config-key"
     assert _ownership(start)["next_read"]["candidate_count"] == 2
