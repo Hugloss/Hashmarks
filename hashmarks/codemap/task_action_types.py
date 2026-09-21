@@ -94,7 +94,6 @@ class _TaskActionInitialSurfaceState:
 class _TaskActionOwnerResolutionState:
     edit: dict[str, object] | None
     basis: str | None
-    owner_basis: str | None
     structural_owner: dict[str, object] | None
     structural_owner_origin: Mapping[str, object] | None
     archive_live_owner_ambiguity: bool
@@ -114,6 +113,7 @@ class _TaskActionSelectionState:
     verification_anchor_tokens: Sequence[str]
     localized_config_edit: bool
     explicit_config_surface_request: bool
+    owner_basis: str | None
     structural_owner: dict[str, object] | None
     structural_owner_origin: Mapping[str, object] | None
     archive_live_owner_ambiguity: bool
