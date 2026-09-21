@@ -5,6 +5,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+import hashlib
+import json
+
 SCHEMA = "hashmarks.repository-quality-case.v1"
 REPORT_SCHEMA = "hashmarks.repository-quality-report.v1"
 METRIC_POLICY = "hashmarks.lexicographic-quality.v1"
@@ -54,6 +57,12 @@ class QualityTruth:
     semantic_truth: str
     admitted_evidence_truth: str
     expected_owner: str | None = None
+
+
+def case_identity(case: Mapping[str, Any]) -> str:
+    validate_case(case)
+    payload = json.dumps(case, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _choice(value: object, allowed: set[str], field: str) -> str:
@@ -157,6 +166,7 @@ def evaluate_case(
     )
     return {
         "case_id": case["case_id"],
+        "case_identity": case_identity(case),
         "semantic_truth": truth.semantic_truth,
         "admitted_evidence_truth": truth.admitted_evidence_truth,
         "reported_state": state,
@@ -196,6 +206,14 @@ def _ratio(numerator: int, denominator: int) -> float | None:
     return numerator / denominator if denominator else None
 
 
+def _corpus_identity(rows: Sequence[Mapping[str, Any]]) -> str:
+    payload = json.dumps(
+        sorted(str(row["case_identity"]) for row in rows),
+        separators=(",", ":"),
+    )
+    return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     totals = _hard_zero_counts()
     semantic_counts: Counter[str] = Counter()
@@ -224,6 +242,7 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         },
         "corpus": {
             "cases": len(rows),
+            "identity": _corpus_identity(rows),
             "semantic_slices": dict(sorted(semantic_counts.items())),
         },
         "lexicographic_order": [
