@@ -190,7 +190,7 @@ lint-debt-summary:
 	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint python scripts/ruff_debt.py --summary-only
 
 lint-debt-json:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint python scripts/ruff_debt.py --json || test $? -eq 1
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint python scripts/ruff_debt.py --json; status=$?; test $status -eq 0 -o $status -eq 1
 
 lint-debt-gate:
 	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint python scripts/ruff_debt.py --baseline ruff-debt-baseline.json
