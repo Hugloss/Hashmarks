@@ -18,6 +18,7 @@ _MAX_ID_CHARS = 512
 _MAX_TEXT_CHARS = 4096
 _MAX_REQUEST_BYTES = 1_048_576
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
+_MEMBER_REVISION = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _canonical(value: object) -> bytes:
@@ -241,9 +242,9 @@ class DependencyResolutionEvidenceMixin:
                 raise ValueError(f"duplicate repository input path: {path}")
             seen.add(path)
             claimed = raw.get("member_revision")
-            if claimed is not None and not _SHA256.fullmatch(str(claimed)):
+            if claimed is not None and not _MEMBER_REVISION.fullmatch(str(claimed)):
                 raise ValueError(
-                    "repository input member_revision must use sha256:<64 lowercase hex characters>"
+                    "repository input member_revision must be a lowercase 64-character sha256 hex digest"
                 )
             member, _raw = self._repository_member_observation(path)
             observed = member.get("member_revision")
