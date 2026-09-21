@@ -1069,6 +1069,9 @@ class EvidenceCorrelationMixin:
         """Correlate bounded evidence bundles with current repository truth."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
+        self._validate_request_size(bundles, path_mappings)
+        if previous_correlation is not None:
+            self._validate_previous_correlation_size(previous_correlation)
         self._validate_bundles(bundles)
         mappings = self._correlation_path_mappings(path_mappings)
         prepared, bindings = self._prepare_bundles(bundles, mappings=mappings)
@@ -1094,7 +1097,42 @@ class EvidenceCorrelationMixin:
             packet["delta_from_previous"] = self.evidence_correlation_delta(
                 previous_correlation, packet
             )
+        self._validate_packet_size(packet)
         return packet
+
+    @staticmethod
+    def _validate_request_size(
+        bundles: object,
+        path_mappings: object,
+    ) -> None:
+        size = _json_size(
+            {"bundles": bundles, "path_mappings": path_mappings or []},
+            label="evidence correlation request",
+        )
+        if size > CORRELATION_REQUEST_MAX_BYTES:
+            raise ValueError(
+                "evidence correlation request exceeds "
+                f"{CORRELATION_REQUEST_MAX_BYTES} encoded bytes"
+            )
+
+    @staticmethod
+    def _validate_previous_correlation_size(packet: Mapping[str, object]) -> None:
+        size = _json_size(packet, label="previous correlation")
+        if size > CORRELATION_PACKET_MAX_BYTES:
+            raise ValueError(
+                "previous correlation exceeds "
+                f"{CORRELATION_PACKET_MAX_BYTES} encoded bytes"
+            )
+
+    @staticmethod
+    def _validate_packet_size(packet: Mapping[str, object]) -> None:
+        size = _json_size(packet, label="evidence correlation packet")
+        if size > CORRELATION_PACKET_MAX_BYTES:
+            raise ValueError(
+                "evidence correlation packet exceeds "
+                f"{CORRELATION_PACKET_MAX_BYTES} encoded bytes; "
+                "reduce anchors or relationship_limit_per_path and split the evidence set"
+            )
 
     @staticmethod
     def _validate_bundles(
@@ -1136,6 +1174,11 @@ class EvidenceCorrelationMixin:
             "interpretation_authority": "consumer-owned",
             "causation": "not-inferred",
             "execution_effect": "none",
+            "bounds": {
+                "request_max_bytes": CORRELATION_REQUEST_MAX_BYTES,
+                "packet_max_bytes": CORRELATION_PACKET_MAX_BYTES,
+                "max_anchors": _MAX_TOTAL_ANCHORS,
+            },
         }
         packet["correlation_identity"] = "sha256:" + self._packet_digest(
             "hashmarks.evidence-correlation.v1",
