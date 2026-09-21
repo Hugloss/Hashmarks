@@ -48,6 +48,7 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 ### Indexing and repository ingestion
 
 - `indexing_lifecycle.py` — discovery, incremental/full sync lifecycle, stale-row removal, preflight economics, base snapshot reuse, build-state publication.
+- `index_watch.py` — foreground CodeMap watcher orchestration over the existing sync and observation authorities; it starts/stops the observer, publishes watcher state, and forces full reconciliation when observation continuity becomes UNKNOWN.
   - Discovery owns the admission-time file-size observation in an immutable internal record; preflight consumes that observation instead of re-reading file metadata. Later digest/freshness checks remain authoritative for indexing bytes.
 - `parsers.py` — source parsing dispatch and parse-artifact keys.
 - `index_surfaces.py` — classifies indexed paths into source/test/docs/config-like surfaces.
@@ -127,6 +128,18 @@ Do not optimize one of those by silently changing the semantic meaning of anothe
 
 Stale-prefix reconciliation crosses a responsibility boundary: `indexing_lifecycle.py` owns *when* stale paths must be reconciled, while `repository_index_store.py` owns *how* persisted exact/descendant paths are queried. When profiling path-batch slowdowns, follow that handoff instead of assuming the lifecycle caller owns the query shape. Descendant lookup must remain segment-safe: `src` may include `src/a.py`, but must never capture lexical neighbors such as `src0` or `src2`.
 
+
+### `CodeMap.watch_forever()`
+
+```text
+CodeMap.watch_forever
+  -> index_watch.py
+       -> hashmarks.watcher.create_default_watcher()
+       -> CodeMap.sync()
+       -> observation.ChangeTracker
+```
+
+Watcher backends remain in `hashmarks/watcher.py`; repository reconciliation remains in `indexing_lifecycle.py`; observation state remains in `observation.py`. `index_watch.py` owns only their foreground orchestration and must not create a second sync or freshness model.
 
 ### Repository-intelligence snapshot composition
 
