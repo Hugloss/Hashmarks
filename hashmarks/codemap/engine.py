@@ -70,6 +70,7 @@ from .structural_search import AstGrepSearchProvider
 from .task_retrieval import TaskRetrievalMixin
 from .typescript_resolver import TypeScriptResolverProvider
 from .verification_explanation import VerificationExplanationMixin
+from .verification_plan import VerificationPlanMixin
 from .work_context import WorkContextMixin
 
 # Generic repository evidence families. These are query-formulation hints only:
@@ -97,6 +98,7 @@ class CodeMap(
     VerificationExplanationMixin,
     PostChangeMixin,
     TaskActionMixin,
+    VerificationPlanMixin,
     VerificationMixin,
     RelationshipsMixin,
     ImportResolutionMixin,
