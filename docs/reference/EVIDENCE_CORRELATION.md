@@ -188,6 +188,8 @@ The same primitive is exposed through the read-only `correlate_evidence` MCP too
 
 For large logs or exports, the external parser should recover/validate the producer format, preserve parser diagnostics in its own provenance, mark incomplete or recovered samples accordingly, and submit bounded structured anchors. Hashmarks correlates those anchors; it does not become the CSV/log parser or retain the source stream.
 
+For high-volume streams, consumers should aggregate repeated events into **unique repository locators** before correlation when event identity itself is not needed for repository truth. Occurrence counts, time windows, representative event IDs, and similar summary fields remain opaque consumer metadata. Hashmarks may also reuse repeated locators within one request, but its anchor/count bounds remain a repository-intelligence economics guard rather than a log-retention mechanism. Consumers should split independent locator sets only after aggregation; separate correlation packets do not imply that Hashmarks owns cross-chunk incident state.
+
 ## Permanent boundary
 
 Evidence correlation must not add:
