@@ -130,7 +130,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             self = cast("CodeMap", self)
         used = 0
         seen: set[str] = set()
-        for role in ("edit", "verify", "contract"):
+        for role in ("admitted_edit", "verify", "contract"):
             row = action.get(role)
             if not isinstance(row, dict):
                 continue
