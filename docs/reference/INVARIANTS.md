@@ -152,6 +152,8 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **G44. Omitted task identifiers require repository-backed locality proof.** An explicit lowercase letter+digit token omitted by normal bounded task-query formulation may strengthen task-local retrieval only when existing indexed repository evidence proves that token. Recovery stays bounded, does not rewrite public query views or widen ordinary retrieval limits, ignores unproven version/protocol-like tokens, and must preserve multi-owner ambiguity rather than manufacture uniqueness.
 
+**G45. Task evidence separates retrieval, ownership, verification, and freshness authority.** Bounded retrieval order is relevance evidence only and cannot establish implementation ownership. Exact target/owner evidence may resolve outside the bounded retrieval rows through maintained repository indexes. Freshness is independent: current evidence may remain ambiguous or unresolved, and an ownership result may never be labeled safe merely because its evidence is current.
+
 ## Product-boundary constitution
 
 Hashmarks is a repository observer that exposes repository intelligence, not an autonomous coding agent, policy engine, or execution engine.
