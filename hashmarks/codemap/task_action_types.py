@@ -139,13 +139,3 @@ class _TaskActionFinalState:
     competing: list[dict[str, object]]
     ambiguous: bool
     ambiguity_reason: str
-
-
-def compact_owner_candidate(
-    source: Mapping[str, object],
-) -> tuple[object | None, bool]:
-    """Project a candidate without granting unresolved ownership authority."""
-    candidate = source.get("edit")
-    authority = source.get("ownership_authority")
-    resolved = isinstance(authority, Mapping) and bool(authority.get("owner_resolved"))
-    return candidate, resolved
