@@ -313,6 +313,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             "inspect": selection.inspect_rows,
             "related": selection.related_rows,
             "ownership_resolution": final.structural_owner,
+            "owner_basis": selection.owner_basis,
             **self._task_action_ownership_payload_fields(
                 final.edit,
                 final.competing[:per_role],
