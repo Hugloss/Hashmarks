@@ -187,6 +187,33 @@ def test_complete_resolution_requires_explicit_non_truncation(tmp_path: Path) ->
             codemap.dependency_resolution_evidence(snapshot)
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("schema", "wrong", "dependency resolution schema"),
+        ("producer", None, "producer must be an object"),
+        ("scope", None, "scope must be an object"),
+        ("scope", {}, "scope must not be empty"),
+        ("roots", "root", "roots must be a sequence"),
+        ("roots", ["root", "root"], "duplicate dependency resolution root"),
+        ("roots", ["missing"], "dangling dependency resolution root"),
+        ("completeness", "partial", "completeness must be"),
+        ("truncation", "partial", "truncation must be"),
+    ],
+)
+def test_resolution_definition_and_bounds_fail_closed(
+    tmp_path: Path,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    snapshot = _snapshot()
+    snapshot[field] = value
+    with CodeMap(tmp_path) as codemap:
+        with pytest.raises(ValueError, match=message):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
 def test_owner_never_executes_dependency_tooling(tmp_path: Path, monkeypatch) -> None:
     import subprocess
 

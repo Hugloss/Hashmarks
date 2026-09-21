@@ -78,25 +78,20 @@ class DependencyResolutionEvidenceMixin:
     package manager, environment synchronizer, or dependency implementation scan.
     """
 
-    def dependency_resolution_evidence(
-        self,
+    @staticmethod
+    def _dependency_resolution_definition(
         snapshot: Mapping[str, object],
     ) -> dict[str, object]:
-        if not isinstance(snapshot, Mapping):
-            raise ValueError("dependency resolution snapshot must be an object")
-        if len(_canonical(snapshot)) > _MAX_REQUEST_BYTES:
-            raise ValueError(
-                f"dependency resolution snapshot exceeds {_MAX_REQUEST_BYTES} encoded bytes"
-            )
-        if snapshot.get("schema") != _SCHEMA:
-            raise ValueError(f"dependency resolution schema must be {_SCHEMA}")
-
         producer = snapshot.get("producer")
         if not isinstance(producer, Mapping):
             raise ValueError("dependency resolution producer must be an object")
         producer_packet = dict(producer)
         _identifier(producer_packet.get("kind"), label="producer kind")
-        _text(producer_packet.get("schema_version"), label="producer schema_version", required=True)
+        _text(
+            producer_packet.get("schema_version"),
+            label="producer schema_version",
+            required=True,
+        )
 
         scope = snapshot.get("scope")
         if not isinstance(scope, Mapping):
@@ -116,20 +111,16 @@ class DependencyResolutionEvidenceMixin:
             raise ValueError(f"roots exceeds {_MAX_ROOTS} entries")
         if len(set(roots)) != len(roots):
             raise ValueError("duplicate dependency resolution root")
+        return {
+            "producer": producer_packet,
+            "scope": scope_packet,
+            "roots": sorted(roots),
+        }
 
-        nodes = self._dependency_resolution_nodes(snapshot.get("nodes", ()))
-        node_ids = {str(row["node_id"]) for row in nodes}
-        for root in roots:
-            if root not in node_ids:
-                raise ValueError(f"dangling dependency resolution root: {root}")
-        edges = self._dependency_resolution_edges(snapshot.get("edges", ()), node_ids)
-
-        repository_inputs = self._dependency_repository_inputs(
-            snapshot.get("repository_inputs", ())
-        )
-        module_ownership = self._dependency_module_ownership(
-            snapshot.get("module_ownership", ()), node_ids
-        )
+    @staticmethod
+    def _dependency_resolution_completion(
+        snapshot: Mapping[str, object],
+    ) -> tuple[str, str]:
         completeness = str(snapshot.get("completeness") or "unknown").strip()
         if completeness not in {"complete", "incomplete", "unknown"}:
             raise ValueError(
@@ -144,11 +135,36 @@ class DependencyResolutionEvidenceMixin:
             raise ValueError(
                 "dependency resolution completeness=complete requires truncation=complete"
             )
-        definition = {
-            "producer": producer_packet,
-            "scope": scope_packet,
-            "roots": sorted(roots),
-        }
+        return completeness, truncation
+
+    def dependency_resolution_evidence(
+        self,
+        snapshot: Mapping[str, object],
+    ) -> dict[str, object]:
+        if not isinstance(snapshot, Mapping):
+            raise ValueError("dependency resolution snapshot must be an object")
+        if len(_canonical(snapshot)) > _MAX_REQUEST_BYTES:
+            raise ValueError(
+                f"dependency resolution snapshot exceeds {_MAX_REQUEST_BYTES} encoded bytes"
+            )
+        if snapshot.get("schema") != _SCHEMA:
+            raise ValueError(f"dependency resolution schema must be {_SCHEMA}")
+
+        definition = self._dependency_resolution_definition(snapshot)
+        nodes = self._dependency_resolution_nodes(snapshot.get("nodes", ()))
+        node_ids = {str(row["node_id"]) for row in nodes}
+        for root in definition["roots"]:
+            if root not in node_ids:
+                raise ValueError(f"dangling dependency resolution root: {root}")
+        edges = self._dependency_resolution_edges(snapshot.get("edges", ()), node_ids)
+
+        repository_inputs = self._dependency_repository_inputs(
+            snapshot.get("repository_inputs", ())
+        )
+        module_ownership = self._dependency_module_ownership(
+            snapshot.get("module_ownership", ()), node_ids
+        )
+        completeness, truncation = self._dependency_resolution_completion(snapshot)
         graph = {
             "nodes": sorted(nodes, key=lambda row: str(row["node_id"])),
             "edges": sorted(
@@ -174,9 +190,7 @@ class DependencyResolutionEvidenceMixin:
             "producer_authority": "caller-claimed",
             "definition_identity": definition_identity,
             "resolution_identity": resolution_identity,
-            "producer": producer_packet,
-            "scope": scope_packet,
-            "roots": sorted(roots),
+            **definition,
             **graph,
             "repository_inputs": repository_inputs,
             "module_ownership": module_ownership,
