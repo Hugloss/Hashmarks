@@ -8,6 +8,8 @@ The governing rule is:
 
 Evidence correlation lets a consumer submit bounded, structured observations and ask Hashmarks where those observations correspond to the current repository. Hashmarks preserves the distinction between external claims and canonical repository evidence. Correlation never becomes causation, diagnosis, recommendation, execution, or certification authority.
 
+Interpretation and action remain consumer-owned. Hashmarks reports correspondence, provenance, uncertainty, qualified source equivalence, and repository deltas; it does not decide what those observations mean for the consumer's next step.
+
 ## Evidence classes
 
 Hashmarks may correlate several classes of evidence without collapsing their authority.
