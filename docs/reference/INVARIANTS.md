@@ -134,7 +134,7 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **G34. Dynamic Python module loading is repository ownership evidence, not runtime authority.** CodeMap may report repository-owned dynamic-loading chains and safer mechanically resolved import identities. Hashmarks must not rewrite imports, execute loaders, or claim runtime failure/repair certification from static evidence alone.
 
-**G35. Repository intelligence and execution authority remain separate by constitution.** Hashmarks tells the agent what the repository means, who owns what, what is risky, what should probably change, and what should verify it. Oh-Goon decides whether execution is admitted, runs it safely, manages processes/timeouts/recovery, and certifies the result.
+**G35. Repository intelligence and execution authority remain separate by constitution.** Hashmarks tells the agent what the repository means, who owns what, what repository evidence indicates risk, what surfaces are affected, and what verification is relevant. The consumer decides what should change. Oh-Goon decides whether execution is admitted, runs it safely, manages processes/timeouts/recovery, and certifies the result.
 
 **G36. Static cache-invalidation ownership remains repository evidence only.** Exact local/import identity may establish an invalidation relationship; same-name lexical coincidence may not. Hashmarks never executes invalidators or owns runtime cache lifecycle.
 
