@@ -239,7 +239,7 @@ def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None
     mcp = _text("docs/integration/MCP.md")
     assert "Apache License 2.0" in readme
     assert "integration/MCP.md" in docs
-    assert "only five tools" in mcp
+    assert "only six tools" in mcp
     for tool in (
         "repository_context",
         "find",
