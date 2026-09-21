@@ -702,6 +702,7 @@ class EvidenceCorrelationMixin:
                 EvidenceCorrelationMixin._symbol_projection(row)
                 for row in resolution.candidates
             ],
+            "module_candidates": list(resolution.module_candidates),
             "candidate_completeness": (
                 "bounded" if resolution.candidates_truncated else "complete"
             ),
@@ -730,6 +731,11 @@ class EvidenceCorrelationMixin:
                 EvidenceCorrelationMixin._symbol_reference(row)
                 for row in resolution.candidates
             ]
+        if resolution.module_candidates:
+            return [
+                {"scope": "member", "path": candidate}
+                for candidate in resolution.module_candidates
+            ]
         if path is not None:
             return [{"scope": "member", "path": path}]
         return []
@@ -746,12 +752,12 @@ class EvidenceCorrelationMixin:
         self,
         raw_anchor: Mapping[str, object],
         *,
-        bundle_id: str,
         mappings: Sequence[Mapping[str, str]],
     ) -> tuple[dict[str, object], dict[str, object], int]:
         claims = self._anchor_claims(raw_anchor)
         resolution = self._resolve_anchor(claims, mappings=mappings)
-        binding_id = _binding_id(bundle_id, claims.anchor_id)
+        references = self._repository_references(claims, resolution)
+        binding_id = _binding_id(references)
         packet = {
             "anchor_id": claims.anchor_id,
             "claims": claims.as_dict(),
@@ -761,7 +767,7 @@ class EvidenceCorrelationMixin:
         }
         binding = {
             "binding_id": binding_id,
-            "evidence": self._repository_references(claims, resolution),
+            "evidence": references,
         }
         return packet, binding, claims.metadata_bytes
 
@@ -837,7 +843,6 @@ class EvidenceCorrelationMixin:
             assert isinstance(raw_anchor, Mapping)
             anchor, binding, anchor_metadata_bytes = self._prepare_anchor(
                 raw_anchor,
-                bundle_id=bundle_id,
                 mappings=mappings,
             )
             anchor_id = str(anchor["anchor_id"])
