@@ -49,6 +49,60 @@ _EXECUTION_FORBIDDEN = frozenset(
 )
 _SHA256_IDENTITY = re.compile(r"^sha256:[0-9a-f]{64}$")
 _REPOSITORY_IDENTITY = re.compile(r"^sha256:[0-9a-f]{64}:[0-9]+$")
+_UNIT_REQUIRED_FIELDS = frozenset(
+    {
+        "schema",
+        "name",
+        "kind",
+        "nodeids",
+        "membership_identity",
+        "classification_identity",
+        "preferred_granularity",
+        "execution_authority",
+        "result_authority",
+        "certification_authority",
+        "may_regroup",
+        "unit_identity",
+    }
+)
+_PLAN_REQUIRED_FIELDS = frozenset(
+    {
+        "schema",
+        "producer",
+        "repository_identity",
+        "membership_identity",
+        "classification_identity",
+        "classification_policy_identity",
+        "unit_count",
+        "test_node_count",
+        "units",
+        "authority",
+        "plan_identity",
+    }
+)
+_HANDOFF_REQUIRED_FIELDS = frozenset(
+    {
+        "schema",
+        "producer",
+        "repository_identity",
+        "membership_identity",
+        "classification_identity",
+        "classification_policy_identity",
+        "plan_identity",
+        "units",
+        "provenance",
+        "execution_authority",
+        "result_authority",
+        "certification_authority",
+        "may_regroup",
+        "handoff_identity",
+    }
+)
+_EXTERNAL_AUTHORITY_FIELDS = (
+    "execution_authority",
+    "result_authority",
+    "certification_authority",
+)
 
 
 def _canonical_bytes(value: Mapping[str, object]) -> bytes:
@@ -234,29 +288,11 @@ def _producer_reasons(producer: object) -> list[str]:
     return reasons
 
 
-def _unit_reasons(
-    unit: object,
-    *,
-    classification_identity: object | None = None,
-) -> list[str]:
-    if not isinstance(unit, Mapping):
-        return ["invalid-qualification-unit"]
-    required = {
-        "schema",
-        "name",
-        "kind",
-        "nodeids",
-        "membership_identity",
-        "classification_identity",
-        "preferred_granularity",
-        "execution_authority",
-        "result_authority",
-        "certification_authority",
-        "may_regroup",
-        "unit_identity",
-    }
+def _unit_header_reasons(
+    unit: Mapping[str, object],
+) -> tuple[list[str], object, object, object]:
     reasons: list[str] = []
-    if set(unit) != required:
+    if set(unit) != _UNIT_REQUIRED_FIELDS:
         reasons.append("qualification-unit-fields-mismatch")
     if unit.get("schema") != UNIT_SCHEMA:
         reasons.append("unsupported-qualification-unit-schema")
@@ -274,25 +310,39 @@ def _unit_reasons(
         and preferred != "singleton"
     ):
         reasons.append("qualification-unit-isolation-mismatch")
+    return reasons, name, kind, preferred
+
+
+def _unit_nodeid_reasons(
+    unit: Mapping[str, object],
+) -> tuple[list[str], list[str]]:
+    reasons: list[str] = []
     nodeids = unit.get("nodeids")
-    normalized_nodeids: list[str] = []
     if (
         not isinstance(nodeids, list)
         or not nodeids
         or not all(isinstance(nodeid, str) and nodeid for nodeid in nodeids)
     ):
+        return ["invalid-qualification-unit-nodeids"], []
+
+    normalized = list(nodeids)
+    if normalized != sorted(set(normalized)):
+        reasons.append("noncanonical-qualification-unit-nodeids")
+    try:
+        membership = node_membership_identity(normalized)
+    except ValueError:
+        membership = None
         reasons.append("invalid-qualification-unit-nodeids")
-    else:
-        normalized_nodeids = list(nodeids)
-        if normalized_nodeids != sorted(set(normalized_nodeids)):
-            reasons.append("noncanonical-qualification-unit-nodeids")
-        try:
-            membership = node_membership_identity(normalized_nodeids)
-        except ValueError:
-            membership = None
-            reasons.append("invalid-qualification-unit-nodeids")
-        if unit.get("membership_identity") != membership:
-            reasons.append("qualification-unit-membership-identity-mismatch")
+    if unit.get("membership_identity") != membership:
+        reasons.append("qualification-unit-membership-identity-mismatch")
+    return reasons, normalized
+
+
+def _unit_classification_reasons(
+    unit: Mapping[str, object],
+    classification_identity: object | None,
+) -> list[str]:
+    reasons: list[str] = []
     unit_classification = unit.get("classification_identity")
     if not _valid_sha256_identity(unit_classification):
         reasons.append("invalid-qualification-unit-classification-identity")
@@ -301,27 +351,47 @@ def _unit_reasons(
         and unit_classification != classification_identity
     ):
         reasons.append("qualification-unit-classification-identity-mismatch")
-    if preferred == "singleton" and normalized_nodeids:
-        if len(normalized_nodeids) != 1 or name != f"{kind}:{normalized_nodeids[0]}":
+    return reasons
+
+
+def _unit_shape_reasons(
+    *,
+    name: object,
+    kind: object,
+    preferred: object,
+    nodeids: list[str],
+) -> list[str]:
+    reasons: list[str] = []
+    if preferred == "singleton" and nodeids:
+        if len(nodeids) != 1 or name != f"{kind}:{nodeids[0]}":
             reasons.append("qualification-unit-singleton-shape-mismatch")
-    if preferred == "file" and normalized_nodeids:
-        files = {_node_file(nodeid) for nodeid in normalized_nodeids}
+    if preferred == "file" and nodeids:
+        files = {_node_file(nodeid) for nodeid in nodeids}
         if (
             kind != "release-correctness"
             or len(files) != 1
             or name != f"release-correctness:{next(iter(files))}"
         ):
             reasons.append("qualification-unit-file-shape-mismatch")
-    for field in ("execution_authority", "result_authority", "certification_authority"):
-        if unit.get(field) != "external":
-            reasons.append(
-                f"qualification-unit-{field.replace('_', '-')}-must-be-external"
-            )
+    return reasons
+
+
+def _unit_authority_reasons(unit: Mapping[str, object]) -> list[str]:
+    reasons = [
+        f"qualification-unit-{field.replace('_', '-')}-must-be-external"
+        for field in _EXTERNAL_AUTHORITY_FIELDS
+        if unit.get(field) != "external"
+    ]
     if unit.get("may_regroup") is not True:
         reasons.append("qualification-unit-may-regroup-must-be-true")
     if _forbidden_execution_fields(unit):
         reasons.append("qualification-unit-execution-policy-present")
+    return reasons
+
+
+def _unit_identity_reasons(unit: Mapping[str, object]) -> list[str]:
     payload = {key: value for key, value in unit.items() if key != "unit_identity"}
+    reasons: list[str] = []
     try:
         expected = _identity(UNIT_SCHEMA, payload)
     except (TypeError, ValueError):
@@ -332,24 +402,35 @@ def _unit_reasons(
     return reasons
 
 
-def _qualification_plan_reasons(plan: object) -> list[str]:
-    if not isinstance(plan, Mapping):
-        return ["invalid-qualification-plan"]
-    required = {
-        "schema",
-        "producer",
-        "repository_identity",
-        "membership_identity",
-        "classification_identity",
-        "classification_policy_identity",
-        "unit_count",
-        "test_node_count",
-        "units",
-        "authority",
-        "plan_identity",
-    }
+def _unit_reasons(
+    unit: object,
+    *,
+    classification_identity: object | None = None,
+) -> list[str]:
+    if not isinstance(unit, Mapping):
+        return ["invalid-qualification-unit"]
+    reasons, name, kind, preferred = _unit_header_reasons(unit)
+    nodeid_reasons, nodeids = _unit_nodeid_reasons(unit)
+    reasons.extend(nodeid_reasons)
+    reasons.extend(_unit_classification_reasons(unit, classification_identity))
+    reasons.extend(
+        _unit_shape_reasons(
+            name=name,
+            kind=kind,
+            preferred=preferred,
+            nodeids=nodeids,
+        )
+    )
+    reasons.extend(_unit_authority_reasons(unit))
+    reasons.extend(_unit_identity_reasons(unit))
+    return reasons
+
+
+def _plan_header_reasons(
+    plan: Mapping[str, object],
+) -> tuple[list[str], object]:
     reasons: list[str] = []
-    if set(plan) != required:
+    if set(plan) != _PLAN_REQUIRED_FIELDS:
         reasons.append("qualification-plan-fields-mismatch")
     if plan.get("schema") != PLAN_SCHEMA:
         reasons.append("unsupported-qualification-plan-schema")
@@ -364,40 +445,71 @@ def _qualification_plan_reasons(plan: object) -> list[str]:
         reasons.append("invalid-qualification-classification-identity")
     if not _valid_sha256_identity(plan.get("classification_policy_identity")):
         reasons.append("invalid-qualification-classification-policy-identity")
-    units = plan.get("units")
+    return reasons, classification_identity
+
+
+def _plan_unit_metadata(
+    unit: object,
+) -> tuple[list[str], list[str], list[str]]:
+    if not isinstance(unit, Mapping):
+        return [], [], []
+    name = unit.get("name")
+    identity = unit.get("unit_identity")
+    raw_nodeids = unit.get("nodeids")
+    names = [str(name)] if isinstance(name, str) else []
+    identities = [str(identity)] if isinstance(identity, str) else []
+    nodeids = (
+        [str(nodeid) for nodeid in raw_nodeids if isinstance(nodeid, str)]
+        if isinstance(raw_nodeids, list)
+        else []
+    )
+    return names, identities, nodeids
+
+
+def _plan_unit_reasons(
+    units: object,
+    *,
+    classification_identity: object,
+) -> tuple[list[str], list[str]]:
+    if not isinstance(units, list) or not units:
+        return ["invalid-qualification-units"], []
+
+    reasons: list[str] = []
     nodeids: list[str] = []
     unit_names: list[str] = []
     unit_ids: list[str] = []
-    if not isinstance(units, list) or not units:
-        reasons.append("invalid-qualification-units")
-    else:
-        for unit in units:
-            reasons.extend(
-                _unit_reasons(unit, classification_identity=classification_identity)
-            )
-            if isinstance(unit, Mapping):
-                if isinstance(unit.get("name"), str):
-                    unit_names.append(str(unit["name"]))
-                if isinstance(unit.get("unit_identity"), str):
-                    unit_ids.append(str(unit["unit_identity"]))
-                raw_nodeids = unit.get("nodeids")
-                if isinstance(raw_nodeids, list):
-                    nodeids.extend(
-                        str(nodeid) for nodeid in raw_nodeids if isinstance(nodeid, str)
-                    )
-        if unit_names != sorted(unit_names) or len(unit_names) != len(set(unit_names)):
-            reasons.append("noncanonical-qualification-units")
-        if len(unit_ids) != len(set(unit_ids)):
-            reasons.append("duplicate-qualification-unit-identity")
-        if len(nodeids) != len(set(nodeids)):
-            reasons.append("duplicate-qualification-nodeid")
-    if type(plan.get("unit_count")) is not int or plan.get("unit_count") != (
-        len(units) if isinstance(units, list) else 0
-    ):
+    for unit in units:
+        reasons.extend(
+            _unit_reasons(unit, classification_identity=classification_identity)
+        )
+        names, identities, members = _plan_unit_metadata(unit)
+        unit_names.extend(names)
+        unit_ids.extend(identities)
+        nodeids.extend(members)
+
+    if unit_names != sorted(unit_names) or len(unit_names) != len(set(unit_names)):
+        reasons.append("noncanonical-qualification-units")
+    if len(unit_ids) != len(set(unit_ids)):
+        reasons.append("duplicate-qualification-unit-identity")
+    if len(nodeids) != len(set(nodeids)):
+        reasons.append("duplicate-qualification-nodeid")
+    return reasons, nodeids
+
+
+def _plan_count_membership_reasons(
+    plan: Mapping[str, object],
+    *,
+    units: object,
+    nodeids: list[str],
+) -> list[str]:
+    reasons: list[str] = []
+    unit_count = len(units) if isinstance(units, list) else 0
+    if type(plan.get("unit_count")) is not int or plan.get("unit_count") != unit_count:
         reasons.append("qualification-unit-count-mismatch")
-    if type(plan.get("test_node_count")) is not int or plan.get(
-        "test_node_count"
-    ) != len(nodeids):
+    if (
+        type(plan.get("test_node_count")) is not int
+        or plan.get("test_node_count") != len(nodeids)
+    ):
         reasons.append("qualification-test-node-count-mismatch")
     if nodeids:
         try:
@@ -406,8 +518,12 @@ def _qualification_plan_reasons(plan: object) -> list[str]:
             membership = None
         if plan.get("membership_identity") != membership:
             reasons.append("qualification-membership-identity-mismatch")
-    authority = plan.get("authority")
-    if authority != {
+    return reasons
+
+
+def _plan_authority_identity_reasons(plan: Mapping[str, object]) -> list[str]:
+    reasons: list[str] = []
+    if plan.get("authority") != {
         "classification": "hashmarks",
         "execution": "external",
         "result": "external",
@@ -424,6 +540,21 @@ def _qualification_plan_reasons(plan: object) -> list[str]:
         reasons.append("qualification-plan-not-canonical-json")
     if expected is None or plan.get("plan_identity") != expected:
         reasons.append("qualification-plan-identity-mismatch")
+    return reasons
+
+
+def _qualification_plan_reasons(plan: object) -> list[str]:
+    if not isinstance(plan, Mapping):
+        return ["invalid-qualification-plan"]
+    reasons, classification_identity = _plan_header_reasons(plan)
+    units = plan.get("units")
+    unit_reasons, nodeids = _plan_unit_reasons(
+        units,
+        classification_identity=classification_identity,
+    )
+    reasons.extend(unit_reasons)
+    reasons.extend(_plan_count_membership_reasons(plan, units=units, nodeids=nodeids))
+    reasons.extend(_plan_authority_identity_reasons(plan))
     return reasons
 
 
@@ -685,42 +816,19 @@ def _handoff_authority_reasons(handoff: Mapping[str, object]) -> list[str]:
     return reasons
 
 
-def validate_native_qualification_handoff(
-    handoff: Mapping[str, object],
-) -> dict[str, object]:
-    handoff, root_reasons = require_mapping_for_validation(
-        handoff, reason="invalid-qualification-handoff"
-    )
+def _handoff_identity(handoff: Mapping[str, object]) -> str | None:
     payload = {
         key: value for key, value in handoff.items() if key != "handoff_identity"
     }
     try:
-        expected = _identity(HANDOFF_SCHEMA, payload)
+        return _identity(HANDOFF_SCHEMA, payload)
     except (TypeError, ValueError):
-        expected = None
-    reasons = [
-        *root_reasons,
-        *_handoff_shape_reasons(handoff),
-        *_handoff_provenance_reasons(handoff),
-        *_handoff_authority_reasons(handoff),
-    ]
-    required = {
-        "schema",
-        "producer",
-        "repository_identity",
-        "membership_identity",
-        "classification_identity",
-        "classification_policy_identity",
-        "plan_identity",
-        "units",
-        "provenance",
-        "execution_authority",
-        "result_authority",
-        "certification_authority",
-        "may_regroup",
-        "handoff_identity",
-    }
-    if set(handoff) != required:
+        return None
+
+
+def _handoff_content_reasons(handoff: Mapping[str, object]) -> list[str]:
+    reasons: list[str] = []
+    if set(handoff) != _HANDOFF_REQUIRED_FIELDS:
         reasons.append("handoff-fields-mismatch")
     reasons.extend(_producer_reasons(handoff.get("producer")))
     repository_identity = handoff.get("repository_identity")
@@ -735,25 +843,59 @@ def validate_native_qualification_handoff(
         reasons.append("invalid-qualification-classification-policy-identity")
     if not _valid_sha256_identity(handoff.get("plan_identity")):
         reasons.append("invalid-qualification-plan-identity")
+    reasons.extend(
+        _handoff_unit_reasons(
+            handoff,
+            classification_identity=classification_identity,
+        )
+    )
+    return reasons
+
+
+def _handoff_unit_reasons(
+    handoff: Mapping[str, object],
+    *,
+    classification_identity: object,
+) -> list[str]:
     units = handoff.get("units")
-    nodeids: list[str] = []
     if not isinstance(units, list) or not units:
-        reasons.append("invalid-qualification-units")
-    else:
-        for unit in units:
-            reasons.extend(
-                _unit_reasons(unit, classification_identity=classification_identity)
+        return ["invalid-qualification-units"]
+
+    reasons: list[str] = []
+    nodeids: list[str] = []
+    for unit in units:
+        reasons.extend(
+            _unit_reasons(unit, classification_identity=classification_identity)
+        )
+        if isinstance(unit, Mapping) and isinstance(unit.get("nodeids"), list):
+            nodeids.extend(
+                str(nodeid)
+                for nodeid in unit["nodeids"]
+                if isinstance(nodeid, str)
             )
-            if isinstance(unit, Mapping) and isinstance(unit.get("nodeids"), list):
-                nodeids.extend(
-                    str(nodeid) for nodeid in unit["nodeids"] if isinstance(nodeid, str)
-                )
-        try:
-            membership = node_membership_identity(nodeids)
-        except ValueError:
-            membership = None
-        if handoff.get("membership_identity") != membership:
-            reasons.append("qualification-membership-identity-mismatch")
+    try:
+        membership = node_membership_identity(nodeids)
+    except ValueError:
+        membership = None
+    if handoff.get("membership_identity") != membership:
+        reasons.append("qualification-membership-identity-mismatch")
+    return reasons
+
+
+def validate_native_qualification_handoff(
+    handoff: Mapping[str, object],
+) -> dict[str, object]:
+    handoff, root_reasons = require_mapping_for_validation(
+        handoff, reason="invalid-qualification-handoff"
+    )
+    expected = _handoff_identity(handoff)
+    reasons = [
+        *root_reasons,
+        *_handoff_shape_reasons(handoff),
+        *_handoff_provenance_reasons(handoff),
+        *_handoff_authority_reasons(handoff),
+        *_handoff_content_reasons(handoff),
+    ]
     return {
         "valid": not reasons,
         "reasons": list(dict.fromkeys(reasons)),

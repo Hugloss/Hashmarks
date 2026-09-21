@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -14,7 +15,128 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+_CHANGE_IMPACT_SURFACES = (
+    "implementation",
+    "contract",
+    "verification",
+    "build_config",
+    "orientation",
+    "other",
+)
+
+
+def _instruction_scope(authority: str) -> str:
+    parent = Path(authority).parent.as_posix()
+    return "." if parent in {"", "."} else parent
+
+
+def _instruction_applies(authority: str, target: str) -> bool:
+    scope = _instruction_scope(authority)
+    return scope == "." or target == scope or target.startswith(scope + "/")
+
+
+def _instruction_specificity(authority: str) -> int:
+    scope = _instruction_scope(authority)
+    return 0 if scope == "." else len(Path(scope).parts)
+
+
+def _change_impact_roles(path: str) -> tuple[str, ...]:
+    domains = set(classify_repository_path(path))
+    roles: list[str] = []
+    if RepositoryDomain.TEST in domains:
+        roles.append("verification")
+    if domains & {RepositoryDomain.CONTRACT, RepositoryDomain.OWNERSHIP}:
+        roles.append("contract")
+    if domains & {
+        RepositoryDomain.BUILD,
+        RepositoryDomain.CONFIG,
+        RepositoryDomain.PLAN,
+        RepositoryDomain.SCRIPT,
+    }:
+        roles.append("build_config")
+    if domains & {RepositoryDomain.ARCHITECTURE, RepositoryDomain.DOC}:
+        roles.append("orientation")
+    if RepositoryDomain.SOURCE in domains and RepositoryDomain.TEST not in domains:
+        roles.append("implementation")
+    return tuple(dict.fromkeys(roles)) or ("other",)
+
+
+@dataclass
+class _ChangeImpactAccumulator:
+    roots: set[str]
+    limit_per_surface: int
+    surfaces: dict[str, list[dict[str, object]]] = field(
+        default_factory=lambda: {key: [] for key in _CHANGE_IMPACT_SURFACES}
+    )
+    seen: set[tuple[str, str]] = field(default_factory=set)
+
+    def add(
+        self,
+        path: str,
+        *,
+        depth: int,
+        provenance: str,
+        relation: str | None = None,
+    ) -> None:
+        if path in self.roots:
+            return
+        domains = [domain.value for domain in classify_repository_path(path)]
+        for role in _change_impact_roles(path):
+            key = (role, path)
+            if key in self.seen or len(self.surfaces[role]) >= self.limit_per_surface:
+                continue
+            row: dict[str, object] = {
+                "path": path,
+                "depth": depth,
+                "domains": domains,
+                "provenance": provenance,
+            }
+            if relation is not None:
+                row["relation"] = relation
+            self.surfaces[role].append(row)
+            self.seen.add(key)
+
+
 class QuerySurfaceMixin:
+    def _grep_candidate_match(
+        self,
+        candidate: dict[str, object],
+        *,
+        lowered: str,
+        tokens: list[str],
+        context_lines: int,
+    ) -> dict[str, object] | None:
+        path = str(candidate["path"])
+        visibility = EvidenceVisibility(str(candidate["evidence_visibility"]))
+        if visibility is not EvidenceVisibility.SOURCE:
+            return None
+        self._ensure_path_current(path)
+        try:
+            lines = (
+                (self.workspace / path)
+                .read_text(encoding="utf-8", errors="replace")
+                .splitlines()
+            )
+        except OSError:
+            return None
+        line_no = int(candidate["line"])
+        if line_no < 1 or line_no > len(lines):
+            return None
+        line = lines[line_no - 1]
+        if lowered not in line.lower() and not all(
+            token in line.lower() for token in tokens
+        ):
+            return None
+        start = max(1, line_no - max(0, context_lines))
+        end = min(len(lines), line_no + max(0, context_lines))
+        return {
+            "path": path,
+            "line": line_no,
+            "range": [start, end],
+            "content": "\n".join(lines[start - 1 : end]),
+            "evidence_visibility": visibility.value,
+        }
+
     def grep(
         self, query: str, *, limit: int = 50, context_lines: int = 0
     ) -> dict[str, object]:
@@ -29,45 +151,15 @@ class QuerySurfaceMixin:
         matches: list[dict[str, object]] = []
         lowered = raw.lower()
         for candidate in candidates:
-            path = str(candidate["path"])
-            visibility = EvidenceVisibility(str(candidate["evidence_visibility"]))
-            if visibility is not EvidenceVisibility.SOURCE:
-                # Lexical grep is implementation-content disclosure. OUTLINE
-                # visibility may expose names/signatures/relationships only.
-                continue
-            self._ensure_path_current(path)
-            # The refresh above may invalidate this candidate line. Verify the
-            # actual current line before returning it.
-            try:
-                lines = (
-                    (self.workspace / path)
-                    .read_text(encoding="utf-8", errors="replace")
-                    .splitlines()
-                )
-            except OSError:
-                continue
-            line_no = int(candidate["line"])
-            if line_no < 1 or line_no > len(lines):
-                continue
-            line = lines[line_no - 1]
-            if lowered not in line.lower() and not all(
-                token in line.lower() for token in tokens
-            ):
-                continue
-            start = max(1, line_no - max(0, context_lines))
-            end = min(len(lines), line_no + max(0, context_lines))
-            content = None
-            if visibility is EvidenceVisibility.SOURCE:
-                content = "\n".join(lines[start - 1 : end])
-            matches.append(
-                {
-                    "path": path,
-                    "line": line_no,
-                    "range": [start, end],
-                    "content": content,
-                    "evidence_visibility": visibility.value,
-                }
+            match = self._grep_candidate_match(
+                dict(candidate),
+                lowered=lowered,
+                tokens=tokens,
+                context_lines=context_lines,
             )
+            if match is None:
+                continue
+            matches.append(match)
             if len(matches) >= limit:
                 break
         generation, identity_generation, stale = self._generation_status()
@@ -102,12 +194,10 @@ class QuerySurfaceMixin:
             "matches": visible,
         }
 
-    def source(self, query: str, *, token_budget: int = 4000) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        self._ensure_map_ready()
-        if token_budget < 16:
-            raise ValueError("token budget must be at least 16")
+    def _source_visible_matches(
+        self,
+        query: str,
+    ) -> list[dict[str, object]]:
         if "::" in query:
             raw_path, qualname = query.split("::", 1)
             path = normalize_relative_path(raw_path, allow_root=False)
@@ -117,13 +207,45 @@ class QuerySurfaceMixin:
         else:
             matches = self.store.symbol(query)
         visible = [
-            row
+            dict(row)
             for row in matches
             if EvidenceVisibility(str(row["evidence_visibility"]))
             is not EvidenceVisibility.DENY
         ]
         if not visible:
             raise KeyError(f"symbol not found: {query}")
+        return visible
+
+    def _source_current_content(
+        self,
+        query: str,
+        row: dict[str, object],
+    ) -> tuple[str, str, dict[str, object], str]:
+        path = str(row["path"])
+        qualname = str(row["qualname"])
+        self._ensure_path_current(path)
+        current_row = self.store.symbol_at(path, qualname)
+        if current_row is None:
+            raise KeyError(f"symbol changed or disappeared during refresh: {query}")
+        current = dict(current_row)
+        visibility = EvidenceVisibility(str(current["evidence_visibility"]))
+        if visibility is not EvidenceVisibility.SOURCE:
+            raise PermissionError(f"source body is not agent-visible: {path}")
+        content = self._source_slice(
+            path,
+            int(current["start_line"]),
+            int(current["end_line"]),
+            qualname=qualname,
+        )
+        return path, qualname, current, content
+
+    def source(self, query: str, *, token_budget: int = 4000) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        self._ensure_map_ready()
+        if token_budget < 16:
+            raise ValueError("token budget must be at least 16")
+        visible = self._source_visible_matches(query)
         if len(visible) > 1 and "::" not in query:
             return {
                 "schema": "hashmarks.source.v1",
@@ -139,23 +261,9 @@ class QuerySurfaceMixin:
                     for row in visible[:20]
                 ],
             }
-        row = visible[0]
-        path = str(row["path"])
-        qualname = str(row["qualname"])
-        self._ensure_path_current(path)
-        current = self.store.symbol_at(path, qualname)
-        if current is None:
-            raise KeyError(f"symbol changed or disappeared during refresh: {query}")
-        visibility = EvidenceVisibility(str(current["evidence_visibility"]))
-        if visibility is not EvidenceVisibility.SOURCE:
-            raise PermissionError(f"source body is not agent-visible: {path}")
-        content = self._source_slice(
-            path,
-            int(current["start_line"]),
-            int(current["end_line"]),
-            qualname=qualname,
-        )
-        tokens = estimate_tokens(content)
+
+        path, qualname, current, body = self._source_current_content(query, visible[0])
+        tokens = estimate_tokens(body)
         if tokens > token_budget:
             return {
                 "schema": "hashmarks.source.v1",
@@ -181,7 +289,7 @@ class QuerySurfaceMixin:
             "estimated_tokens": tokens,
             "budget": token_budget,
             "too_large": False,
-            "content": content,
+            "content": body,
         }
 
     def projects(self) -> dict[str, object]:
@@ -257,50 +365,59 @@ class QuerySurfaceMixin:
             "warnings": list(warnings),
         }
 
+    def _affected_roots(self, query: str) -> set[str]:
+        roots = self._query_paths(query)
+        if roots:
+            return roots
+        try:
+            rel_query = normalize_relative_path(query, allow_root=False)
+        except ValueError:
+            rel_query = None
+        candidate = None if rel_query is None else self.workspace / rel_query
+        if (
+            rel_query is not None
+            and candidate is not None
+            and candidate.is_file()
+            and not candidate.is_symlink()
+        ):
+            return {rel_query}
+        raise KeyError(f"path or symbol not found: {query}")
+
+    def _affected_levels(
+        self,
+        roots: set[str],
+        *,
+        max_depth: int,
+    ) -> tuple[list[list[str]], set[str]]:
+        levels = self._python_reverse_levels(roots, max_depth=max_depth)
+        if levels is not None:
+            seen = set(roots)
+            for level in levels:
+                seen.update(level)
+            return levels, seen
+
+        reverse = self._reverse_file_graph()
+        seen = set(roots)
+        frontier = set(roots)
+        resolved: list[list[str]] = []
+        for _ in range(max_depth):
+            next_frontier: set[str] = set()
+            for path in frontier:
+                next_frontier.update(reverse.get(path, ()))
+            next_frontier -= seen
+            if not next_frontier:
+                break
+            resolved.append(sorted(next_frontier))
+            seen.update(next_frontier)
+            frontier = next_frontier
+        return resolved, seen
+
     def affected(self, query: str, *, max_depth: int = 12) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         self._ensure_map_ready()
-        roots = self._query_paths(query)
-        if not roots:
-            # Project/shared-input evidence may intentionally refer to files
-            # that are identity-relevant but not source-indexable (OpenAPI,
-            # lock/config files, generated manifests, etc.). Allow an existing
-            # workspace file to seed project-level impact without forcing it
-            # into the agent source index.
-            try:
-                rel_query = normalize_relative_path(query, allow_root=False)
-            except ValueError:
-                rel_query = None
-            candidate = None if rel_query is None else self.workspace / rel_query
-            if (
-                candidate is not None
-                and candidate.is_file()
-                and not candidate.is_symlink()
-            ):
-                roots = {rel_query}
-            else:
-                raise KeyError(f"path or symbol not found: {query}")
-        levels = self._python_reverse_levels(roots, max_depth=max_depth)
-        if levels is None:
-            reverse = self._reverse_file_graph()
-            seen = set(roots)
-            frontier = set(roots)
-            levels = []
-            for _ in range(max_depth):
-                next_frontier: set[str] = set()
-                for path in frontier:
-                    next_frontier.update(reverse.get(path, ()))
-                next_frontier -= seen
-                if not next_frontier:
-                    break
-                levels.append(sorted(next_frontier))
-                seen.update(next_frontier)
-                frontier = next_frontier
-        else:
-            seen = set(roots)
-            for level in levels:
-                seen.update(level)
+        roots = self._affected_roots(query)
+        levels, seen = self._affected_levels(roots, max_depth=max_depth)
         affected = sorted(seen - roots)
         tests = [path for path in affected if self._is_test_path(path)]
         root_projects = {
@@ -340,6 +457,80 @@ class QuerySurfaceMixin:
             "evidence": value["evidence"],
         }
 
+    def _instruction_seed_paths(
+        self,
+        query: str,
+        *,
+        seed_limit: int,
+    ) -> tuple[list[str], str]:
+        try:
+            rel = normalize_relative_path(query, allow_root=False)
+        except ValueError:
+            rel = None
+        candidate = None if rel is None else self.workspace / rel
+        if rel is not None and candidate is not None and candidate.exists():
+            return [rel], "explicit-path"
+
+        seed_paths: list[str] = []
+        for hit in self.find_task(query, limit=seed_limit):
+            if hit.path not in seed_paths:
+                seed_paths.append(hit.path)
+        return seed_paths, "task-retrieval"
+
+    @staticmethod
+    def _instruction_authority_projection(
+        seed_paths: list[str],
+        indexed_authority: dict[str, dict[str, object]],
+        authority_paths: set[str],
+    ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+        chains: list[dict[str, object]] = []
+        merged: dict[str, dict[str, object]] = {}
+        for seed in seed_paths:
+            applicable = [
+                path for path in authority_paths if _instruction_applies(path, seed)
+            ]
+            applicable.sort(
+                key=lambda path: (
+                    _instruction_specificity(path),
+                    0 if Path(path).name == "AGENTS.md" else 1,
+                    path,
+                )
+            )
+            chain: list[dict[str, object]] = []
+            for order, path in enumerate(applicable):
+                row = indexed_authority[path]
+                entry = {
+                    "path": path,
+                    "scope": _instruction_scope(path),
+                    "specificity": _instruction_specificity(path),
+                    "kind": (
+                        "override"
+                        if Path(path).name == "AGENTS.override.md"
+                        else "agents"
+                    ),
+                    "precedence": order,
+                    "evidence_visibility": str(row.get("evidence_visibility") or ""),
+                }
+                chain.append(entry)
+                previous = merged.get(path)
+                if previous is None:
+                    merged[path] = {**entry, "applies_to": [seed]}
+                    continue
+                applies_to = previous["applies_to"]
+                if isinstance(applies_to, list) and seed not in applies_to:
+                    applies_to.append(seed)
+            chains.append({"path": seed, "authority": chain})
+
+        ordered = sorted(
+            merged.values(),
+            key=lambda row: (
+                int(row["specificity"]),
+                0 if row["kind"] == "agents" else 1,
+                str(row["path"]),
+            ),
+        )
+        return chains, ordered
+
     def repository_instruction_scope(
         self, query: str, *, seed_limit: int = 8
     ) -> dict[str, object]:
@@ -359,82 +550,20 @@ class QuerySurfaceMixin:
             raise ValueError("seed_limit must be >= 1")
         self._ensure_map_ready()
         rows = self.store.repository_instruction_file_rows()
-        indexed_authority = {str(row["path"]): row for row in rows}
-        authority_names = {"AGENTS.md", "AGENTS.override.md"}
+        indexed_authority = {str(row["path"]): dict(row) for row in rows}
         authority_paths = {
-            path for path in indexed_authority if Path(path).name in authority_names
+            path
+            for path in indexed_authority
+            if Path(path).name in {"AGENTS.md", "AGENTS.override.md"}
         }
-
-        try:
-            rel = normalize_relative_path(query, allow_root=False)
-        except ValueError:
-            rel = None
-        candidate = None if rel is None else self.workspace / rel
-        if rel is not None and candidate is not None and candidate.exists():
-            seed_paths = [rel]
-            source = "explicit-path"
-        else:
-            seed_paths = []
-            for hit in self.find_task(query, limit=seed_limit):
-                if hit.path not in seed_paths:
-                    seed_paths.append(hit.path)
-            source = "task-retrieval"
-
-        def scope_for(authority: str) -> str:
-            parent = Path(authority).parent.as_posix()
-            return "." if parent in {"", "."} else parent
-
-        def applies(authority: str, target: str) -> bool:
-            scope = scope_for(authority)
-            if scope == ".":
-                return True
-            return target == scope or target.startswith(scope + "/")
-
-        def specificity(authority: str) -> int:
-            scope = scope_for(authority)
-            return 0 if scope == "." else len(Path(scope).parts)
-
-        chains: list[dict[str, object]] = []
-        merged: dict[str, dict[str, object]] = {}
-        for seed in seed_paths:
-            applicable = [path for path in authority_paths if applies(path, seed)]
-            applicable.sort(
-                key=lambda path: (
-                    specificity(path),
-                    0 if Path(path).name == "AGENTS.md" else 1,
-                    path,
-                )
-            )
-            chain: list[dict[str, object]] = []
-            for order, path in enumerate(applicable):
-                row = indexed_authority[path]
-                entry = {
-                    "path": path,
-                    "scope": scope_for(path),
-                    "specificity": specificity(path),
-                    "kind": "override"
-                    if Path(path).name == "AGENTS.override.md"
-                    else "agents",
-                    "precedence": order,
-                    "evidence_visibility": str(row.get("evidence_visibility") or ""),
-                }
-                chain.append(entry)
-                previous = merged.get(path)
-                if previous is None:
-                    merged[path] = {**entry, "applies_to": [seed]}
-                else:
-                    applies_to = previous["applies_to"]
-                    if isinstance(applies_to, list) and seed not in applies_to:
-                        applies_to.append(seed)
-            chains.append({"path": seed, "authority": chain})
-
-        ordered = sorted(
-            merged.values(),
-            key=lambda row: (
-                int(row["specificity"]),
-                0 if row["kind"] == "agents" else 1,
-                str(row["path"]),
-            ),
+        seed_paths, source = self._instruction_seed_paths(
+            query,
+            seed_limit=seed_limit,
+        )
+        chains, ordered = self._instruction_authority_projection(
+            seed_paths,
+            indexed_authority,
+            authority_paths,
         )
         return {
             "schema": "hashmarks.codemap-scoped-authority.v1",
@@ -448,6 +577,54 @@ class QuerySurfaceMixin:
             "evidence": "indexed repository path hierarchy only; no semantic authority inference",
             "ranking_effect": "none",
         }
+
+    @staticmethod
+    def _change_impact_depths(
+        roots: set[str],
+        levels: list[list[str]],
+    ) -> dict[str, int]:
+        depth_by_path: dict[str, int] = dict.fromkeys(roots, 0)
+        for depth, level in enumerate(levels, start=1):
+            for path in level:
+                depth_by_path.setdefault(path, depth)
+        return depth_by_path
+
+    def _change_impact_adjacency(
+        self,
+        query: str,
+        roots: set[str],
+        *,
+        limit_per_surface: int,
+    ) -> dict[str, object]:
+        adjacency_limit = max(12, limit_per_surface * 2)
+        exact_path_roots = self._query_paths(query)
+        if len(exact_path_roots) == 1 and exact_path_roots == roots:
+            try:
+                normalized_query = normalize_relative_path(query, allow_root=False)
+            except ValueError:
+                normalized_query = ""
+            if normalized_query in roots:
+                return self._path_graph_adjacency(
+                    query,
+                    roots,
+                    limit=adjacency_limit,
+                )
+        return self.task_graph_adjacency(
+            query,
+            seed_limit=min(12, max(4, limit_per_surface)),
+            limit=adjacency_limit,
+        )
+
+    @staticmethod
+    def _change_impact_relation(row: dict[str, object]) -> str | None:
+        provenance_rows = row.get("provenance")
+        if (
+            isinstance(provenance_rows, list)
+            and provenance_rows
+            and isinstance(provenance_rows[0], dict)
+        ):
+            return str(provenance_rows[0].get("relation") or "") or None
+        return None
 
     def change_impact(
         self, query: str, *, max_depth: int = 4, limit_per_surface: int = 20
@@ -466,110 +643,32 @@ class QuerySurfaceMixin:
         value = self.affected(query, max_depth=max_depth)
         roots = {str(path) for path in value["roots"]}
         levels = [list(map(str, level)) for level in value["levels"]]
-        depth_by_path: dict[str, int] = dict.fromkeys(roots, 0)
-        for depth, level in enumerate(levels, start=1):
-            for path in level:
-                depth_by_path.setdefault(path, depth)
+        depth_by_path = self._change_impact_depths(roots, levels)
+        accumulator = _ChangeImpactAccumulator(roots, limit_per_surface)
 
-        def roles(path: str) -> tuple[str, ...]:
-            domains = set(classify_repository_path(path))
-            out: list[str] = []
-            if RepositoryDomain.TEST in domains:
-                out.append("verification")
-            if domains & {RepositoryDomain.CONTRACT, RepositoryDomain.OWNERSHIP}:
-                out.append("contract")
-            if domains & {
-                RepositoryDomain.BUILD,
-                RepositoryDomain.CONFIG,
-                RepositoryDomain.PLAN,
-                RepositoryDomain.SCRIPT,
-            }:
-                out.append("build_config")
-            if domains & {RepositoryDomain.ARCHITECTURE, RepositoryDomain.DOC}:
-                out.append("orientation")
-            if (
-                RepositoryDomain.SOURCE in domains
-                and RepositoryDomain.TEST not in domains
-            ):
-                out.append("implementation")
-            return tuple(dict.fromkeys(out)) or ("other",)
-
-        surfaces: dict[str, list[dict[str, object]]] = {
-            key: []
-            for key in (
-                "implementation",
-                "contract",
-                "verification",
-                "build_config",
-                "orientation",
-                "other",
+        for path in sorted(
+            depth_by_path,
+            key=lambda item: (depth_by_path[item], item),
+        ):
+            accumulator.add(
+                path,
+                depth=depth_by_path[path],
+                provenance="reverse-file-graph",
             )
-        }
-        seen: set[tuple[str, str]] = set()
 
-        def add(
-            path: str, *, depth: int, provenance: str, relation: str | None = None
-        ) -> None:
-            if path in roots:
-                return
-            domains = [domain.value for domain in classify_repository_path(path)]
-            for role in roles(path):
-                key = (role, path)
-                if key in seen or len(surfaces[role]) >= limit_per_surface:
-                    continue
-                row: dict[str, object] = {
-                    "path": path,
-                    "depth": depth,
-                    "domains": domains,
-                    "provenance": provenance,
-                }
-                if relation is not None:
-                    row["relation"] = relation
-                surfaces[role].append(row)
-                seen.add(key)
-
-        for path in sorted(depth_by_path, key=lambda item: (depth_by_path[item], item)):
-            add(path, depth=depth_by_path[path], provenance="reverse-file-graph")
-
-        adjacency_limit = max(12, limit_per_surface * 2)
-        exact_path_roots = self._query_paths(query)
-        if len(exact_path_roots) == 1 and exact_path_roots == roots:
-            try:
-                normalized_query = normalize_relative_path(query, allow_root=False)
-            except ValueError:
-                normalized_query = ""
-            if normalized_query in roots:
-                adjacency = self._path_graph_adjacency(
-                    query, roots, limit=adjacency_limit
-                )
-            else:
-                adjacency = self.task_graph_adjacency(
-                    query,
-                    seed_limit=min(12, max(4, limit_per_surface)),
-                    limit=adjacency_limit,
-                )
-        else:
-            adjacency = self.task_graph_adjacency(
-                query,
-                seed_limit=min(12, max(4, limit_per_surface)),
-                limit=adjacency_limit,
-            )
+        adjacency = self._change_impact_adjacency(
+            query,
+            roots,
+            limit_per_surface=limit_per_surface,
+        )
         for row in adjacency["adjacent"]:
             if not isinstance(row, dict):
                 continue
-            provenance_rows = row.get("provenance")
-            relation = None
-            if (
-                isinstance(provenance_rows, list)
-                and provenance_rows
-                and isinstance(provenance_rows[0], dict)
-            ):
-                relation = str(provenance_rows[0].get("relation") or "") or None
-            add(
+            accumulator.add(
                 str(row.get("path") or ""),
                 depth=1,
                 provenance="task-graph-adjacency",
-                relation=relation,
+                relation=self._change_impact_relation(row),
             )
 
         return {
@@ -579,7 +678,7 @@ class QuerySurfaceMixin:
             "identity_generation": value["identity_generation"],
             "stale": value["stale"],
             "roots": sorted(roots),
-            "surfaces": surfaces,
+            "surfaces": accumulator.surfaces,
             "affected_projects": value["affected_projects"],
             "root_projects": value["root_projects"],
             "bounds": {
@@ -590,3 +689,4 @@ class QuerySurfaceMixin:
             "evidence": value["evidence"] + "; plus bounded task graph adjacency",
             "authority": "advisory-navigation-only",
         }
+
