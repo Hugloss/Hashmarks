@@ -25,13 +25,14 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
+      - name: Install Ruff only for cheap admission
+        run: uv tool install "ruff>=0.12,<0.17"
+      - name: Ruff formatting gate
+        run: ruff format --check .
+      - name: Ruff correctness/import gate
+        run: ruff check .
       - run: uv python install 3.11
       - run: uv sync --group test --python 3.11
-      - name: Ruff correctness/import gate
-        run: make ruff-check
-      - name: Ruff formatting diagnostic
-        continue-on-error: true
-        run: make ruff-format-check
       - name: Resolve previous-main Ruff debt baseline
         run: git show HEAD^1:ruff-debt-baseline.json > "$RUNNER_TEMP/ruff-debt-baseline.previous.json"
       - name: Ruff maintainability debt gate
