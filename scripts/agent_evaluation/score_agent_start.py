@@ -178,7 +178,7 @@ def run(
             "category": str(truth.get("category") or "unknown"),
             "ownership_status": str(ownership.get("status") or "unresolved"),
             "owner_resolved": str(ownership.get("status") or "") == "resolved",
-            "edit_correct": edit_correct,
+            "candidate_correct": edit_correct,
             "verify_correct": verify_correct,
             "fully_correct": edit_correct and verify_correct,
             "source_complete": bool(source_budget.get("complete")),
@@ -199,7 +199,7 @@ def run(
     selection_reasons = Counter(str(row["selection_reason"]) for row in results)
     summary = {
         "tasks": count,
-        "edit_correct": sum(bool(row["edit_correct"]) for row in results),
+        "candidate_correct": sum(bool(row["candidate_correct"]) for row in results),
         "verify_correct": sum(bool(row["verify_correct"]) for row in results),
         "fully_correct": sum(bool(row["fully_correct"]) for row in results),
         "owner_resolved": sum(bool(row["owner_resolved"]) for row in results),
