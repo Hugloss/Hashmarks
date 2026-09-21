@@ -31,6 +31,7 @@ from .evidence_verification import VerificationMixin
 from .find_engine import FindEngineMixin
 from .freshness_map import EvidenceFreshnessMapMixin
 from .import_resolution import ImportResolutionMixin
+from .index_watch import IndexWatchMixin
 from .indexing_lifecycle import (
     _MAX_INDEX_BYTES,
     IndexingLifecycleMixin,
@@ -109,6 +110,7 @@ class CodeMap(
     StructuralLocalityMixin,
     QuerySurfaceMixin,
     WorkContextMixin,
+    IndexWatchMixin,
     IndexingLifecycleMixin,
     TaskRetrievalMixin,
     OwnershipGraphMixin,
