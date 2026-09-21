@@ -32,9 +32,7 @@ def test_sufficient_unique_owner_resolves_without_authority_violation() -> None:
 
 
 def test_wrong_resolved_owner_is_non_compensatory_failure() -> None:
-    row = evaluate_case(
-        _case(), {"state": "resolved", "owner": "src/other.py::widget"}
-    )
+    row = evaluate_case(_case(), {"state": "resolved", "owner": "src/other.py::widget"})
     report = summarize([row])
     assert report["qualification"] == "not-qualified"
     assert report["hard_zero"]["false_owner"] == 1
@@ -104,6 +102,10 @@ def test_case_schema_requires_owner_only_for_unique_truth() -> None:
 
 def test_missing_metrics_are_unknown_not_zero() -> None:
     report = summarize(
-        [evaluate_case(_case(), {"state": "resolved", "owner": "src/widget.py::widget"})]
+        [
+            evaluate_case(
+                _case(), {"state": "resolved", "owner": "src/widget.py::widget"}
+            )
+        ]
     )
     assert report["missing_metric_policy"] == "unknown-not-zero"
