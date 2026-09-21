@@ -880,7 +880,28 @@ class VerificationMixin:
             return best, reason
         if selected is None:
             return best, "best-bounded-verification-evidence"
+        if cls._verification_locality_can_replace(best, selected):
+            return best, "stronger-namespace-task-locality"
         return selected, reason
+
+    @staticmethod
+    def _verification_locality_can_replace(
+        best: Mapping[str, object], selected: Mapping[str, object]
+    ) -> bool:
+        if any(
+            bool(row.get("direct_reference") or row.get("indirect_reference"))
+            for row in (best, selected)
+        ):
+            return False
+        best_namespace = int(best.get("namespace_overlap") or 0)
+        selected_namespace = int(selected.get("namespace_overlap") or 0)
+        best_anchors = int(best.get("task_anchor_count") or 0)
+        selected_anchors = int(selected.get("task_anchor_count") or 0)
+        return (
+            bool(best.get("runner_available"))
+            and best_namespace > selected_namespace
+            and best_anchors > selected_anchors
+        )
 
     @classmethod
     def _verification_best_can_replace(
