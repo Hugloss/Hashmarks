@@ -419,10 +419,11 @@ def test_structural_owner_projection_preserves_unique_qualified_symbol_evidence(
     assert action["edit"]["name"] == "target"
     assert action["edit"]["qualname"] == "target"
     assert action["edit"]["exact_identifier_projection"] is True
-    assert evidence["edit"] == "src/capability.py"
-    assert evidence["edit_evidence"]["symbol"] == "target"
-    assert evidence["edit_evidence"]["content"].startswith("def target(value):")
-    assert "UnrelatedError" not in evidence["edit_evidence"]["content"]
+    ownership = evidence["ownership"]
+    assert ownership["candidate"]["path"] == "src/capability.py"
+    assert ownership["source_evidence"]["symbol"] == "target"
+    assert ownership["source_evidence"]["content"].startswith("def target(value):")
+    assert "UnrelatedError" not in ownership["source_evidence"]["content"]
 
 def test_qualified_identifier_does_not_inherit_plain_same_name_ambiguity(
     tmp_path: Path,
