@@ -227,3 +227,12 @@ Provenance participates in evidence-definition identity. Changing the external o
 Evidence-correlation delta is authoritative only when `evidence_definition_identity` is preserved. A preserved definition emits `comparability=comparable` and may include repository evidence delta. A changed definition emits `comparability=not-comparable` and suppresses repository evidence delta rather than presenting changes from two different questions as repository change.
 
 This is deliberately non-causal: comparable correspondence changes still do not establish incident identity, culprit, root cause, or repair action.
+
+
+## Locator portability and source equivalence
+
+External absolute paths are correspondence claims, not repository identities. Explicit path mappings translate container, Linux, Windows, or WSL-style producer paths into repository-relative candidates; the longest matching prefix wins deterministically. Mappings remain confined to repository-relative paths and cannot escape through `..`.
+
+Path translation proves only where to ask the repository owners for evidence. Source equivalence remains `unknown` unless an external anchor supplies an independently comparable typed identity. The admitted typed bases are repository `member_revision` and `span_identity`; exact agreement produces `proven`, any admitted disagreement produces `mismatch`, and absence of a comparable typed claim remains `unknown`.
+
+Opaque commit labels, image digests, package versions, timestamps, and arbitrary metadata never strengthen source equivalence merely because their text resembles a repository identity.
