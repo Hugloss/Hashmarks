@@ -84,7 +84,7 @@ class TaskActionOwnerResolutionMixin:
         explicit_edit_surface_selected: bool,
         limit: int,
     ) -> _TaskActionOwnerResolutionState:
-        """Resolve implementation ownership from repository evidence."""
+        """Resolve ownership once, preferring stronger repository identity evidence."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         structural_owner = literal_reference_owner
@@ -96,6 +96,7 @@ class TaskActionOwnerResolutionMixin:
                 edit, rows, failed, discrimination, verification_anchor_tokens
             )
         )
+
         literal_task_paths = self._task_action_literal_task_paths(task, failed)
         literal_task_path = (
             literal_task_paths[0] if len(literal_task_paths) == 1 else ""
@@ -142,12 +143,6 @@ class TaskActionOwnerResolutionMixin:
                         task, exact_identifier_edits[0]
                     )
 
-        exact_identifier_surface_selected = bool(
-            len(exact_identifier_edits) == 1
-            and str(exact_identifier_edits[0].get("signature") or "")
-            .lstrip()
-            .startswith(("def ", "async def "))
-        )
         exact_identifier_paths = tuple(
             sorted(
                 {
@@ -166,13 +161,23 @@ class TaskActionOwnerResolutionMixin:
         if literal_edit_path:
             owner_basis = "literal-path"
 
-        exact_identifier_displacement_guard = False
+        # Exact path/symbol authority terminates resolution. A weaker structural
+        # walk is not allowed to displace it and therefore needs no repair guard.
+        if literal_edit_path or len(exact_identifier_edits) == 1:
+            return _TaskActionOwnerResolutionState(
+                edit=edit,
+                basis=owner_basis,
+                structural_owner=structural_owner,
+                structural_owner_origin=None,
+                archive_live_owner_ambiguity=archive_live_owner_ambiguity,
+                exact_identifier_paths=exact_identifier_paths,
+            )
+
         should_resolve = (
             structural_owner is None
             and not localized_config_edit
             and not explicit_config_surface_request
             and not explicit_edit_surface_selected
-            and not literal_edit_path
         )
         if not should_resolve:
             return _TaskActionOwnerResolutionState(
@@ -182,8 +187,6 @@ class TaskActionOwnerResolutionMixin:
                 structural_owner_origin=None,
                 archive_live_owner_ambiguity=archive_live_owner_ambiguity,
                 exact_identifier_paths=exact_identifier_paths,
-                exact_identifier_displacement_guard=exact_identifier_displacement_guard,
-                exact_identifier_surface_selected=exact_identifier_surface_selected,
             )
 
         task_specific = self._task_action_specific_entry_candidate(
@@ -219,8 +222,6 @@ class TaskActionOwnerResolutionMixin:
                 structural_owner_origin=None,
                 archive_live_owner_ambiguity=archive_live_owner_ambiguity,
                 exact_identifier_paths=exact_identifier_paths,
-                exact_identifier_displacement_guard=exact_identifier_displacement_guard,
-                exact_identifier_surface_selected=exact_identifier_surface_selected,
             )
 
         resolved = self._structural_owner_candidate(owner_start, max_depth=3, task=task)
@@ -232,8 +233,6 @@ class TaskActionOwnerResolutionMixin:
                 structural_owner_origin=None,
                 archive_live_owner_ambiguity=archive_live_owner_ambiguity,
                 exact_identifier_paths=exact_identifier_paths,
-                exact_identifier_displacement_guard=exact_identifier_displacement_guard,
-                exact_identifier_surface_selected=exact_identifier_surface_selected,
             )
 
         owner_path = str(resolved["path"])
@@ -251,30 +250,22 @@ class TaskActionOwnerResolutionMixin:
                     structural_owner_origin=None,
                     archive_live_owner_ambiguity=archive_live_owner_ambiguity,
                     exact_identifier_paths=exact_identifier_paths,
-                    exact_identifier_displacement_guard=exact_identifier_displacement_guard,
-                    exact_identifier_surface_selected=exact_identifier_surface_selected,
                 )
             exact_identifier_paths = (discriminated_exact_path,)
             owner_basis = "exact-import-owner"
 
-        exact_identifier_path = (
-            exact_identifier_paths[0] if len(exact_identifier_paths) == 1 else None
-        )
-        exact_identifier_displacement_guard = bool(
-            exact_identifier_path and owner_path != exact_identifier_path
-        )
         archive_owner = self._task_action_is_archive_path(owner_path)
         live_current_edit = self._task_action_live_current_edit(
             edit, discrimination, verification_anchor_tokens
         )
-        if not exact_identifier_displacement_guard and not (
-            archive_owner and live_current_edit
-        ):
+        if not (archive_owner and live_current_edit):
+            exact_owner_rows = [
+                row
+                for row in exact_identifier_edits
+                if str(row.get("path") or "") == owner_path
+            ]
             exact_owner_edit = (
-                exact_identifier_edits[0]
-                if len(exact_identifier_edits) == 1
-                and str(exact_identifier_edits[0].get("path") or "") == owner_path
-                else None
+                exact_owner_rows[0] if len(exact_owner_rows) == 1 else None
             )
             edit = (
                 exact_owner_edit
@@ -301,6 +292,4 @@ class TaskActionOwnerResolutionMixin:
             else None,
             archive_live_owner_ambiguity=archive_live_owner_ambiguity,
             exact_identifier_paths=exact_identifier_paths,
-            exact_identifier_displacement_guard=exact_identifier_displacement_guard,
-            exact_identifier_surface_selected=exact_identifier_surface_selected,
         )
