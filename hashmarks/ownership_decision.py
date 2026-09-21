@@ -133,3 +133,13 @@ def ownership_authority_contract(
         "authority": "repository-ownership-only",
         "consumer_action": "external",
     }
+
+
+def project_owner_candidate(
+    source: Mapping[str, object],
+) -> tuple[object | None, object | None, bool]:
+    """Separate repository candidate evidence from admitted edit authority."""
+    candidate = source.get("edit")
+    authority = source.get("ownership_authority")
+    resolved = isinstance(authority, Mapping) and bool(authority.get("owner_resolved"))
+    return (candidate if resolved else None, candidate, resolved)
