@@ -928,6 +928,12 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
     @staticmethod
     def _task_action_requested_edit_span(task: str) -> str:
         """Return the bounded request span that names the edit surface."""
+        task = re.sub(
+            r"^\s*with\s+.+?,\s*(?=(?:fix|change|update|replace|edit|modify)\b)",
+            "",
+            task,
+            flags=re.IGNORECASE,
+        )
         dependency_first = re.match(
             r"^\s*(?:use|call|apply)\s+.+?\s+(?:in|from|inside|within)\s+(.+)$",
             task,
