@@ -427,3 +427,69 @@ def authority(gaps, payload, seen, observations_path):
         "observations_path.read_text",
     ]
     assert all(row["candidate_symbol_ids"] for row in external)
+
+
+def test_structural_locality_imported_data_method_is_external_not_repository_ambiguity(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(tmp_path, "pkg/data.py", "CONTROLS = {'enabled': True}\n")
+    _write(
+        tmp_path,
+        "pkg/unrelated.py",
+        "class Unrelated:\n"
+        "    def items(self):\n"
+        "        return []\n",
+    )
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        "from pkg.data import CONTROLS\n\n"
+        "def authority():\n"
+        "    return list(CONTROLS.items())\n",
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::authority",
+            max_depth=2,
+        )
+
+    assert packet["dimensions"]["unresolved_call_count"] == 0
+    assert any(
+        row["target_text"] == "CONTROLS.items"
+        for row in packet["external_or_unindexed_calls"]
+    )
+
+
+def test_structural_locality_imported_class_alias_resolves_exact_member(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(
+        tmp_path,
+        "pkg/worker.py",
+        "class Worker:\n"
+        "    @staticmethod\n"
+        "    def helper(value):\n"
+        "        return value + 1\n",
+    )
+    _write(
+        tmp_path,
+        "pkg/core.py",
+        "from pkg.worker import Worker as W\n\n"
+        "def authority(value):\n"
+        "    return W.helper(value)\n",
+    )
+
+    with _codemap(tmp_path) as codemap:
+        packet = codemap.structural_locality(
+            "pkg/core.py::authority",
+            max_depth=2,
+        )
+
+    assert {row["symbol_id"] for row in packet["nodes"]} == {
+        "pkg/core.py::authority",
+        "pkg/worker.py::Worker.helper",
+    }
+    assert packet["dimensions"]["unresolved_call_count"] == 0

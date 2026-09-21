@@ -293,15 +293,34 @@ class StructuralLocalityMixin:
             if unresolved:
                 return None, candidate_ids, True
             owner_paths = set(owners)
+            imported_name = targets[0].rsplit(".", 1)[-1]
+            root_symbols = [
+                row
+                for row in self._visible_named_symbol_candidates(imported_name)
+                if str(row.get("path") or "") in owner_paths
+                and str(row.get("qualname") or "") == imported_name
+                and str(row.get("kind") or "") == "class"
+            ]
+            if not root_symbols:
+                # Imported data/functions can expose runtime methods such as
+                # dict.items().  Without an indexed class namespace there is no
+                # repository member authority to make that call ambiguous.
+                return None, candidate_ids, False
+            member = target.split(".", 1)[1]
+            qualified_name = f"{imported_name}.{member}"
             qualified = [
                 row
                 for row in candidates
                 if str(row.get("path") or "") in owner_paths
-                and str(row.get("qualname") or "") == target
+                and str(row.get("qualname") or "") == qualified_name
             ]
             if len(qualified) == 1:
                 return qualified[0], [_symbol_id(qualified[0])], False
-            return None, sorted(_symbol_id(row) for row in qualified or candidates), bool(owners)
+            return (
+                None,
+                sorted(_symbol_id(row) for row in qualified or candidates),
+                True,
+            )
         if kind in {"ambiguous", "star"}:
             return None, candidate_ids, True
         return None, candidate_ids, False
