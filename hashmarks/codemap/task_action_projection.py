@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, cast
 
 from .decision_session import decision_scoped, diagnostic_producer
+from .model import EvidenceVisibility
 from .repository_domains import RepositoryDomain
 from .task_action_owner_resolution import TaskActionOwnerResolutionMixin
 from .task_action_types import (
@@ -76,7 +77,11 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         failed: set[str] = set()
-        hits = self.find_task(task, limit=limit)
+        hits = [
+            hit
+            for hit in self.find_task(task, limit=limit)
+            if hit.evidence_visibility is not EvidenceVisibility.DENY
+        ]
         cues = self._task_action_cues(task)
         strong_config_cues = self._strong_config_cues()
         rows = [
@@ -417,6 +422,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             if test_surface is not None and not test_surface_ambiguous:
                 test_surface = {
                     **test_surface,
+                    "explicit_target_basis": "explicit-test-edit",
                     "roles": list(
                         dict.fromkeys(
                             [*test_surface.get("roles", []), "edit", "verify"]
@@ -483,7 +489,10 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                     context.cues.explicit_test_edit
                     and not explicit_edit_surface_selected
                 ):
-                    edit = local_verify
+                    edit = {
+                        **local_verify,
+                        "explicit_target_basis": "explicit-test-edit",
+                    }
                     explicit_edit_surface_selected = True
 
         literal_reference_owner: dict[str, object] | None = None
