@@ -104,6 +104,49 @@ class WorkspaceMapQueryMixin:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def symbols_containing_line(
+        self, path: str, line: int, *, limit: int = 33
+    ) -> list[dict]:
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        if line < 1:
+            raise ValueError("line must be >= 1")
+        if limit < 1:
+            raise ValueError("limit must be >= 1")
+        limit = min(int(limit), 1024)
+        self._count_read("symbols_containing_line")
+        with self._lock:
+            rows = self._db.execute(
+                """SELECT s.*, f.evidence_visibility
+                FROM symbol s JOIN file_map f ON f.path=s.path
+                WHERE s.path=? AND s.start_line<=? AND s.end_line>=?
+                ORDER BY (s.end_line-s.start_line),s.start_line,s.qualname
+                LIMIT ?""",
+                (path, line, line, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def symbol_candidates_at_path(
+        self, path: str, query: str, *, limit: int = 33
+    ) -> list[dict]:
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        if limit < 1:
+            raise ValueError("limit must be >= 1")
+        limit = min(int(limit), 1024)
+        self._count_read("symbol_candidates_at_path")
+        with self._lock:
+            rows = self._db.execute(
+                """SELECT s.*, f.evidence_visibility
+                FROM symbol s JOIN file_map f ON f.path=s.path
+                WHERE s.path=? AND (s.qualname=? OR s.name=?)
+                ORDER BY CASE WHEN s.qualname=? THEN 0 ELSE 1 END,
+                         s.start_line,s.qualname
+                LIMIT ?""",
+                (path, query, query, query, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def symbol(self, query: str) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
