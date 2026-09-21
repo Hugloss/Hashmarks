@@ -194,5 +194,5 @@ def test_decision_packet_preserves_explicit_owner_with_named_dependency(
 
     assert packet["edit"]["path"] == "src/publish.py"
     assert packet["ambiguity"]["ambiguous"] is False
-    assert packet["ownership_authority"]["owner_resolved"] is True
     assert packet["discrimination"]["needed"] is False
+    assert packet["discrimination"]["reason"] == "resolved"
