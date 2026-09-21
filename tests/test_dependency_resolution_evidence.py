@@ -336,3 +336,159 @@ def test_dependency_delta_reports_edges_and_module_ownership(tmp_path: Path) -> 
     assert delta["edges_added"] == [["crypto-registry", "helper", "dependency", ""]]
     assert delta["module_ownership_changed"] == ["cryptography"]
     assert delta["causation"] == "not-inferred"
+
+
+def test_dependency_correlation_reuses_generic_repository_locator_owner(tmp_path: Path) -> None:
+    (tmp_path / "consumer.py").write_text("import cryptography\n")
+    snapshot = _snapshot()
+    snapshot["module_ownership"] = [
+        {
+            "module": "cryptography",
+            "owners": ["crypto-registry"],
+            "completeness": "complete",
+        }
+    ]
+    request = {
+        "correlations": [
+            {
+                "module": "cryptography",
+                "completeness": "complete",
+                "truncation": "complete",
+                "anchors": [
+                    {
+                        "anchor_id": "failure",
+                        "path": "consumer.py",
+                        "line": 1,
+                        "metadata": {"kind": "pytest-failure"},
+                    }
+                ],
+            }
+        ]
+    }
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        packet = codemap.dependency_evidence_correlation(observation, request)
+
+    assert packet["dependency_links"] == [
+        {
+            "module": "cryptography",
+            "distribution_state": "resolved-unique",
+            "distribution_nodes": ["crypto-registry"],
+            "ownership_completeness": "complete",
+            "causation": "not-inferred",
+        }
+    ]
+    bundle = packet["correlation"]["bundles"][0]
+    assert bundle["anchors"][0]["resolution"] == "resolved-unique"
+    assert packet["causation"] == "not-inferred"
+    assert packet["interpretation_authority"] == "consumer-owned"
+
+
+def test_cryptography_upgrade_dogfood_preserves_correlation_without_causation(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        "[project]\nname='demo'\nversion='0.1.0'\ndependencies=['cryptography>=46.0.4']\n"
+    )
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_tls.py").write_text("def test_tls():\n    assert True\n")
+    before_raw = _snapshot()
+    before_raw["module_ownership"] = [
+        {"module": "cryptography", "owners": ["crypto-registry"], "completeness": "complete"}
+    ]
+    after_raw = _snapshot()
+    after_raw["nodes"][1]["version"] = "46.0.7"
+    after_raw["module_ownership"] = [
+        {"module": "cryptography", "owners": ["crypto-registry"], "completeness": "complete"}
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(before_raw)
+        after = codemap.dependency_resolution_evidence(after_raw)
+        delta = codemap.dependency_resolution_delta(before, after)
+        correlated = codemap.dependency_evidence_correlation(
+            after,
+            {
+                "correlations": [
+                    {
+                        "module": "cryptography",
+                        "completeness": "complete",
+                        "truncation": "complete",
+                        "anchors": [
+                            {
+                                "anchor_id": "pytest-tls",
+                                "path": "tests/test_tls.py",
+                                "line": 1,
+                                "metadata": {
+                                    "producer": "pytest",
+                                    "message": "TLS setup failed after environment change",
+                                },
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+
+    assert delta["nodes_changed"] == ["crypto-registry"]
+    assert delta["causation"] == "not-inferred"
+    assert correlated["dependency_links"][0]["distribution_nodes"] == ["crypto-registry"]
+    assert correlated["causation"] == "not-inferred"
+    assert "recommendation" not in correlated
+
+
+@pytest.mark.parametrize("count", [1, 10, 100, 256])
+def test_dependency_correlation_bounded_anchor_scale(tmp_path: Path, count: int) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n")
+    snapshot = _snapshot()
+    snapshot["module_ownership"] = [
+        {"module": "cryptography", "owners": ["crypto-registry"], "completeness": "complete"}
+    ]
+    anchors = [
+        {"anchor_id": f"a-{index}", "path": "owner.py", "line": 1}
+        for index in range(count)
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        packet = codemap.dependency_evidence_correlation(
+            observation,
+            {
+                "correlations": [
+                    {
+                        "module": "cryptography",
+                        "completeness": "complete",
+                        "truncation": "complete",
+                        "anchors": anchors,
+                    }
+                ]
+            },
+        )
+
+    assert len(packet["correlation"]["bundles"][0]["anchors"]) == count
+
+
+def test_dependency_correlation_incomplete_external_failure_cannot_prove_absence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot())
+        packet = codemap.dependency_evidence_correlation(
+            observation,
+            {
+                "correlations": [
+                    {
+                        "module": "cryptography",
+                        "completeness": "incomplete",
+                        "truncation": "truncated",
+                        "anchors": [{"anchor_id": "one", "path": "owner.py"}],
+                    }
+                ]
+            },
+        )
+
+    assert packet["correlation"]["completeness"]["state"] == "incomplete"
+    assert packet["correlation"]["completeness"]["negative_evidence"] == "not-admissible"
