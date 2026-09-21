@@ -412,11 +412,8 @@ class DependencyResolutionEvidenceMixin:
                 }
             )
         packet = self.correlate_evidence(
-            {
-                "schema": "hashmarks.evidence-correlation.request.v1",
-                "bundles": bundles,
-                "path_mappings": list(request.get("path_mappings") or ()),
-            }
+            bundles,
+            path_mappings=list(request.get("path_mappings") or ()),
         )
         return {
             "schema": "hashmarks.dependency-evidence-correlation.v1",
