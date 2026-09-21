@@ -17,15 +17,42 @@ if TYPE_CHECKING:
 
 class PostChangeMixin(ChangeImpactMixin):
     @staticmethod
-    def _post_change_previous_value(packet: dict[str, object], key: str) -> object:
-        value = packet.get(key)
-        if key == "verify" and isinstance(value, list):
-            return tuple(str(item) for item in value)
-        if key == "owner_path" and isinstance(value, str):
-            return value
-        if key in {"edit", "verify_path"} and value is not None:
-            return str(value)
-        return value
+    def _post_change_previous_value(packet: Mapping[str, object], key: str) -> object:
+        ownership = (
+            packet.get("ownership")
+            if isinstance(packet.get("ownership"), Mapping)
+            else {}
+        )
+        verification = (
+            packet.get("verification")
+            if isinstance(packet.get("verification"), Mapping)
+            else {}
+        )
+        if key == "owner_path":
+            owner = (
+                ownership.get("owner")
+                if isinstance(ownership.get("owner"), Mapping)
+                else {}
+            )
+            return str(owner.get("path") or "") or None
+        if key == "owner_basis":
+            return str(ownership.get("basis") or "") or None
+        if key == "verification_path":
+            selected = (
+                verification.get("selected")
+                if isinstance(verification.get("selected"), Mapping)
+                else {}
+            )
+            return str(selected.get("path") or "") or None
+        if key == "verification_argv":
+            plan = (
+                verification.get("plan")
+                if isinstance(verification.get("plan"), Mapping)
+                else {}
+            )
+            argv = plan.get("argv")
+            return tuple(str(item) for item in argv) if isinstance(argv, list) else None
+        return packet.get(key)
 
     def _post_change_revision_snapshot(
         self, paths: Sequence[str]
@@ -118,15 +145,15 @@ class PostChangeMixin(ChangeImpactMixin):
     ) -> tuple[str, str | None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        previous_edit = self._post_change_previous_value(previous_evidence, "edit")
+        previous_owner = self._post_change_previous_value(previous_evidence, "owner_path")
         previous_revision = (
             str(previous_provenance.get("revision"))
             if previous_provenance.get("revision")
             else None
         )
-        if not isinstance(previous_edit, str) or not previous_revision:
+        if not isinstance(previous_owner, str) or not previous_revision:
             return "unbound", previous_revision
-        row = self._session_file_row(previous_edit)
+        row = self._session_file_row(previous_owner)
         indexed_before = (
             None if row is None or not row["file_digest"] else str(row["file_digest"])
         )
@@ -140,52 +167,27 @@ class PostChangeMixin(ChangeImpactMixin):
         *,
         limit: int,
         per_role: int,
-    ) -> tuple[dict[str, object], dict[str, object], str]:
+        token_budget: int,
+    ) -> tuple[dict[str, object], Mapping[str, object], str]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        action = self.task_action_map(
+        current = self.task_evidence(
             task,
             limit=limit,
             per_role=per_role,
+            token_budget=token_budget,
         )
-        selection_generation = self.store.generation()
-        action_budget = self._minimum_safe_action_budget(action)
-        brief = self._task_action_brief_from_action(
-            action,
-            task=task,
-            token_budget=max(1, action_budget),
-            limit=limit,
+        provenance = (
+            current.get("provenance")
+            if isinstance(current.get("provenance"), Mapping)
+            else {}
         )
-        provenance = self._task_evidence_provenance(
-            action, selection_generation=selection_generation
+        ownership = (
+            current.get("ownership")
+            if isinstance(current.get("ownership"), Mapping)
+            else {}
         )
-        evidence_receipt = dict(brief.get("evidence_receipt") or {})
-        provenance = self._bind_task_evidence_evidence_context(
-            provenance, evidence_receipt
-        )
-        current_status = (
-            "safe-stale"
-            if provenance.get("freshness") == "stale"
-            and brief.get("status") != "unsafe"
-            else str(brief.get("status") or "unsafe")
-        )
-        current: dict[str, object] = {
-            "status": current_status,
-            "provenance": provenance,
-            "evidence_receipt": evidence_receipt,
-        }
-        for key in (
-            "edit",
-            "verify",
-            "verify_path",
-            "owner_path",
-            "contract",
-            "missing",
-            "discrimination",
-        ):
-            if key in brief:
-                current[key] = brief[key]
-        return current, provenance, current_status
+        return current, provenance, str(ownership.get("status") or "unresolved")
 
     def _post_change_evidence_diff(
         self,
@@ -202,21 +204,30 @@ class PostChangeMixin(ChangeImpactMixin):
         )
         reused: list[str] = []
         replacement: dict[str, object] = {}
-        for key, label in (
-            ("edit", "edit-authority"),
-            ("verify_path", "verification-surface"),
-            ("verify", "verification-command"),
-            ("owner_path", "owner-path"),
+        ownership_changed = False
+        verification_changed = False
+        for key, label, domain in (
+            ("owner_path", "owner", "ownership"),
+            ("owner_basis", "owner-basis", "ownership"),
+            ("verification_path", "verification-surface", "verification"),
+            ("verification_argv", "verification-plan", "verification"),
         ):
             previous_value = self._post_change_previous_value(previous_evidence, key)
             current_value = self._post_change_previous_value(current, key)
             if previous_value == current_value:
                 if current_value not in (None, "", (), []):
                     reused.append(label)
+                continue
+            invalidated.append(label)
+            if domain == "ownership":
+                ownership_changed = True
             else:
-                invalidated.append(label)
-                if key in current:
-                    replacement[key] = current[key]
+                verification_changed = True
+
+        if ownership_changed and isinstance(current.get("ownership"), Mapping):
+            replacement["ownership"] = dict(current["ownership"])
+        if verification_changed and isinstance(current.get("verification"), Mapping):
+            replacement["verification"] = dict(current["verification"])
 
         previous_why = (
             str(previous_provenance.get("why"))
@@ -237,13 +248,15 @@ class PostChangeMixin(ChangeImpactMixin):
             and current_revision
             and previous_revision == current_revision
         ):
-            reused.append("edit-source-revision")
+            reused.append("owner-source-revision")
         elif previous_revision != current_revision:
-            invalidated.append("edit-source-revision")
+            invalidated.append("owner-source-revision")
 
-        if previous_why != current_why or self._post_change_previous_value(
-            previous_evidence, "edit"
-        ) != self._post_change_previous_value(current, "edit"):
+        if (
+            previous_why != current_why
+            or self._post_change_previous_value(previous_evidence, "owner_path")
+            != self._post_change_previous_value(current, "owner_path")
+        ):
             replacement["provenance"] = {
                 key: provenance[key] for key in ("why", "revision") if key in provenance
             }
@@ -259,17 +272,17 @@ class PostChangeMixin(ChangeImpactMixin):
         per_role: int = 3,
         token_budget: int = 1536,
     ) -> dict[str, object]:
-        """Refresh caller-reported changed paths and return only changed repository evidence."""
+        """Refresh changed paths and report role-separated evidence invalidation."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if token_budget < 1:
             raise ValueError("token_budget must be >= 1")
         if (
             not isinstance(previous_evidence, dict)
-            or previous_evidence.get("schema") != "hashmarks.task-evidence.v1"
+            or previous_evidence.get("schema") != "hashmarks.task-evidence.v2"
         ):
             raise ValueError(
-                "previous_evidence must be a hashmarks.task-evidence.v1 packet"
+                "previous_evidence must be a hashmarks.task-evidence.v2 packet"
             )
         normalized = tuple(
             dict.fromkeys(
@@ -291,7 +304,7 @@ class PostChangeMixin(ChangeImpactMixin):
         before_revisions = self._post_change_revision_snapshot(normalized)
         previous_provenance = (
             previous_evidence.get("provenance")
-            if isinstance(previous_evidence.get("provenance"), dict)
+            if isinstance(previous_evidence.get("provenance"), Mapping)
             else {}
         )
         previous_index_binding, previous_revision = (
@@ -302,10 +315,11 @@ class PostChangeMixin(ChangeImpactMixin):
         )
         sync_result = self.sync(normalized)
         path_changes = self._post_change_path_changes(normalized, before_revisions)
-        current, provenance, current_status = self._post_change_current_evidence(
+        current, provenance, ownership_status = self._post_change_current_evidence(
             task,
             limit=limit,
             per_role=per_role,
+            token_budget=token_budget,
         )
         invalidated, reused, replacement = self._post_change_evidence_diff(
             previous_evidence,
@@ -315,24 +329,21 @@ class PostChangeMixin(ChangeImpactMixin):
             generation_changed=sync_result.generation != generation_before,
             previous_revision=previous_revision,
         )
-        status = (
-            "unsafe"
-            if current_status == "unsafe"
-            else "stale"
-            if current_status == "safe-stale"
-            else "changed"
-            if invalidated
-            else "unchanged"
+        freshness = (
+            current.get("freshness")
+            if isinstance(current.get("freshness"), Mapping)
+            else {}
         )
         result: dict[str, object] = {
-            "schema": "hashmarks.task-post-change-delta.v1",
-            "status": status,
+            "schema": "hashmarks.task-post-change-delta.v2",
+            "change": "changed" if invalidated else "unchanged",
+            "ownership_status": ownership_status,
             "path_changes": path_changes,
             "generation_before": generation_before,
             "generation_after": sync_result.generation,
             "invalidated": invalidated,
             "reused": reused,
-            "freshness": provenance.get("freshness", "unknown"),
+            "freshness": str(freshness.get("state") or "unknown"),
             "scope": "changed-paths-only",
             "consumer_owner": "external",
         }
@@ -352,10 +363,6 @@ class PostChangeMixin(ChangeImpactMixin):
             }
         if replacement:
             result["replacement"] = replacement
-        if current_status == "unsafe":
-            for key in ("missing", "discrimination"):
-                if key in current:
-                    result[key] = current[key]
         return result
 
     def refresh_after_change_delta(
