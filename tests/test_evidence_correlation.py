@@ -565,10 +565,12 @@ def test_repeated_observations_share_one_repository_binding(
     ]
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        packet = codemap.correlate_evidence(
-            _bundle(*anchors),
-            include_relationships=True,
-        )
+        with codemap.decision_session(diagnostics=True):
+            packet = codemap.correlate_evidence(
+                _bundle(*anchors),
+                include_relationships=True,
+            )
+        diagnostics = codemap.decision_session_diagnostics()
 
     emitted = packet["bundles"][0]["anchors"]
     assert len(packet["repository_evidence"]["bindings"]) == 1
@@ -586,6 +588,7 @@ def test_repeated_observations_share_one_repository_binding(
     )
     encoded = json.dumps(packet, separators=(",", ":")).encode("utf-8")
     assert len(encoded) <= CORRELATION_PACKET_MAX_BYTES
+    assert diagnostics["store_reads"]["store_symbol_candidates_at_path"] == 1
 
 
 def test_core_packet_budget_fails_closed_for_dense_relationship_evidence(
