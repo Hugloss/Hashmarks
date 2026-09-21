@@ -236,3 +236,12 @@ External absolute paths are correspondence claims, not repository identities. Ex
 Path translation proves only where to ask the repository owners for evidence. Source equivalence remains `unknown` unless an external anchor supplies an independently comparable typed identity. The admitted typed bases are repository `member_revision` and `span_identity`; exact agreement produces `proven`, any admitted disagreement produces `mismatch`, and absence of a comparable typed claim remains `unknown`.
 
 Opaque commit labels, image digests, package versions, timestamps, and arbitrary metadata never strengthen source equivalence merely because their text resembles a repository identity.
+
+
+## Compactness, MCP, and producer neutrality
+
+Evidence correlation is already a bounded normalized projection rather than a retained copy of producer payloads. Repeated anchors reuse normalized repository-evidence bindings, and packet/request byte ceilings fail closed instead of silently dropping arrays, strings, provenance, completeness, truncation, or source-equivalence facts. A separate lossy `compact` mode is therefore not admitted: it would create a second representation whose authority would need to remain synchronized with the canonical packet.
+
+The MCP surface exposes the same correlation owner and the same request/packet bounds. Evidence payloads are product inputs and outputs, not operational telemetry. Hashmarks does not emit those payloads as OpenTelemetry/logging data by default, persist them as an event store, or acquire producer query credentials.
+
+Producer kind is descriptive provenance, not a dispatch authority. Normalized pytest, Ruff/type/compiler, coverage, dependency, SBOM/scanner, Splunk/Loki/CloudWatch/Sentry-style, and OpenTelemetry-style observations use the same bounded correlation contract. Producer-specific collection, parsing, retry, retention, diagnosis, and remediation remain outside Hashmarks.

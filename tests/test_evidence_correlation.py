@@ -1113,3 +1113,69 @@ def test_member_revision_and_span_identity_disagreement_is_mismatch(tmp_path: Pa
         "member-revision",
         "span-identity",
     }
+
+
+@pytest.mark.parametrize(
+    ("producer_kind", "metadata"),
+    [
+        ("pytest", {"test": "tests/test_owner.py::test_owner", "outcome": "failed"}),
+        ("ruff", {"code": "F821", "message": "undefined name"}),
+        ("type-checker", {"diagnostic": "incompatible-return-value"}),
+        ("compiler", {"diagnostic": "syntax-error"}),
+        ("coverage", {"covered": False, "line": 1}),
+        ("sbom-scanner", {"component": "example", "finding": "observed"}),
+        ("splunk-style", {"logger": "worker", "event_id": "opaque"}),
+        ("loki-style", {"stream": "worker", "event_id": "opaque"}),
+        ("cloudwatch-style", {"log_group": "worker", "event_id": "opaque"}),
+        ("sentry-style", {"event_id": "opaque", "issue": "caller-claimed"}),
+        ("otel-style", {"trace_id": "opaque", "span_id": "opaque"}),
+    ],
+)
+def test_producer_neutral_evidence_uses_same_repository_correlation_owner(
+    tmp_path: Path,
+    producer_kind: str,
+    metadata: dict[str, object],
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    bundle = _bundle(
+        {
+            "anchor_id": producer_kind,
+            "path": "owner.py",
+            "line": 1,
+            "metadata": metadata,
+        }
+    )[0]
+    bundle["producer"] = {"kind": producer_kind}
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence([bundle], include_relationships=False)
+
+    emitted = packet["bundles"][0]
+    anchor = emitted["anchors"][0]
+    assert emitted["producer"] == {"kind": producer_kind}
+    assert emitted["producer_authority"] == "caller-claimed"
+    assert anchor["resolution"]["state"] == "resolved-unique"
+    assert anchor["resolution"]["repository_path"] == "owner.py"
+    assert packet["causation"] == "not-inferred"
+    assert packet["interpretation_authority"] == "consumer-owned"
+
+
+def test_evidence_payload_is_not_operational_telemetry(tmp_path: Path) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    secret_marker = "evidence-payload-must-not-be-telemetry"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence(
+            _bundle(
+                {
+                    "anchor_id": "otel",
+                    "path": "owner.py",
+                    "metadata": {"message": secret_marker},
+                }
+            ),
+            include_relationships=False,
+        )
+
+    assert packet["bundles"][0]["anchors"][0]["claims"]["metadata"]["message"] == secret_marker
+    assert packet["storage"] == "request-scoped-not-persisted"
+    assert packet["execution_effect"] == "none"
