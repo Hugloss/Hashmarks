@@ -776,6 +776,9 @@ class StructuralLocalityMixin:
         verification_paths = sorted(
             {str(path) for path in verification.get("tests", [])}
         )
+        target_node = next(
+            row for row in ordered_nodes if row["symbol_id"] == _symbol_id(target_row)
+        )
         dimensions = {
             "symbol_count": len(ordered_nodes),
             "file_count": len(files),
@@ -797,13 +800,7 @@ class StructuralLocalityMixin:
             ),
             "unresolved_call_count": len(unresolved_calls),
             "external_or_unindexed_call_count": len(external_or_unindexed_calls),
-            "target_exact_caller_count": int(
-                next(
-                    row["exact_caller_count"]
-                    for row in ordered_nodes
-                    if row["symbol_id"] == _symbol_id(target_row)
-                )
-            ),
+            "target_exact_caller_count": int(target_node["exact_caller_count"]),
         }
         repository_identity = "sha256:" + self._workspace_fingerprint_from_store()
         configuration = {
@@ -823,7 +820,7 @@ class StructuralLocalityMixin:
             "provider_version": __version__,
             "provider_implementation_identity": native_producer_implementation_identity(),
             "repository_identity": repository_identity,
-            "source_identity": nodes[_symbol_id(target_row)]["symbol_source_identity"],
+            "source_identity": target_node["symbol_source_identity"],
             "measurement_configuration_identity": _identity(configuration),
             "target": target,
             "target_symbol_id": _symbol_id(target_row),
