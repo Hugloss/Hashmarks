@@ -305,3 +305,98 @@ def test_unique_exact_callable_can_discriminate_competing_verification_rows(
     assert action["ownership_resolution"] is None
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
+
+
+def test_strong_plain_identifier_recovers_exact_owner_from_index(
+    tmp_path: Path,
+) -> None:
+    """Oh-Goon dogfood: bounded retrieval must not hide an exact mutation owner."""
+    _write(
+        tmp_path,
+        "backend/runtime/executor_pool.py",
+        "def cancel_queued_admission(*, expected_sequence: int) -> None:\n"
+        "    del expected_sequence\n",
+    )
+    _write(
+        tmp_path,
+        "frontend/src/createApiClient.ts",
+        "export function cancelQueuedAdmission(expected_sequence: number) {\n"
+        "  return { action: 'cancel_queued_admission', expected_sequence };\n"
+        "}\n"
+        "// cancel_queued_admission expected_sequence consumer surface\n",
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        candidates = codemap._task_action_plain_identifier_index_candidates(
+            {"cancel_queued_admission"},
+            set(),
+            canonical_rank=2,
+        )
+
+    assert len(candidates) == 1
+    assert candidates[0]["path"] == "backend/runtime/executor_pool.py"
+    assert candidates[0]["name"] == "cancel_queued_admission"
+    assert candidates[0]["exact_identifier_projection"] is True
+    assert candidates[0]["plain_identifier_index_projection"] is True
+
+
+def test_plain_identifier_index_does_not_promote_verification_symbol(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "src/worker.py", "def run_task():\n    return 1\n")
+    _write(
+        tmp_path,
+        "tests/test_worker.py",
+        "from src.worker import run_task\n\n"
+        "def test_run_task_contract():\n"
+        "    assert run_task() == 1\n",
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        candidates = codemap._task_action_plain_identifier_index_candidates(
+            {"test_run_task_contract"},
+            set(),
+            canonical_rank=2,
+        )
+
+    assert candidates == []
+
+
+def test_plain_identifier_index_keeps_test_shaped_source_fail_closed_without_import_proof(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "")
+    _write(tmp_path, "pkg/test_support.py", "def runtime_probe():\n    return 1\n")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        candidates = codemap._task_action_plain_identifier_index_candidates(
+            {"runtime_probe"},
+            set(),
+            canonical_rank=2,
+        )
+
+    assert candidates == []
+
+
+def test_plain_identifier_index_preserves_duplicate_owner_ambiguity(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "src/a.py", "def cancel_queued_admission():\n    return 1\n")
+    _write(tmp_path, "src/b.py", "def cancel_queued_admission():\n    return 2\n")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        candidates = codemap._task_action_plain_identifier_index_candidates(
+            {"cancel_queued_admission"},
+            set(),
+            canonical_rank=2,
+        )
+        action = codemap.task_action_map("fix cancel_queued_admission", limit=1)
+
+    assert {row["path"] for row in candidates} == {"src/a.py", "src/b.py"}
+    assert action["ambiguity"]["ambiguous"] is True
+    assert action["ambiguity"]["reason"] == "multiple-exact-identifier-edit-owners"
+    assert action["ownership_authority"]["owner_resolved"] is False
