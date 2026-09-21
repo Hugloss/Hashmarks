@@ -106,6 +106,7 @@ def _summary(findings: list[dict[str, object]]) -> dict[str, object]:
         ),
         "by_root": dict(sorted(roots.items())),
         "files": dict(sorted(files.items())),
+        "findings": findings,
     }
 
 
