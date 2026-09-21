@@ -590,6 +590,23 @@ class WorkspaceMapQueryMixin:
             ).fetchall()
         return [str(row[0]) for row in rows]
 
+    def visible_module_paths(self, module: str, *, limit: int = 21) -> list[str]:
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        candidate = module.strip(".")
+        if limit < 1:
+            raise ValueError("limit must be >= 1")
+        limit = min(int(limit), 1024)
+        self._count_read("visible_module_paths")
+        with self._lock:
+            rows = self._db.execute(
+                """SELECT path FROM file_map
+                WHERE module_name=? AND evidence_visibility!='deny'
+                ORDER BY path LIMIT ?""",
+                (candidate, limit),
+            ).fetchall()
+        return [str(row[0]) for row in rows]
+
     def module_paths_many(self, modules: Iterable[str]) -> dict[str, list[str]]:
         """Resolve many exact module identities in one indexed read.
 

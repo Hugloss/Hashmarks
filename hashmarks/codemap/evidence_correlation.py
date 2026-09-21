@@ -21,6 +21,9 @@ _MAX_PATH_MAPPINGS = 64
 _MAX_METADATA_BYTES_PER_ANCHOR = 8_192
 _MAX_TOTAL_METADATA_BYTES = 262_144
 _MAX_SYMBOL_CANDIDATES = 32
+_MAX_MODULE_CANDIDATES = 20
+CORRELATION_REQUEST_MAX_BYTES = 1_048_576
+CORRELATION_PACKET_MAX_BYTES = 1_048_576
 _MAX_ID_CHARS = 512
 _MAX_SYMBOL_CHARS = 1_024
 _MAX_EXTERNAL_PATH_CHARS = 8_192
@@ -36,6 +39,7 @@ class _AnchorClaims:
     path: str | None
     line: int | None
     symbol: str | None
+    module: str | None
     metadata: dict[str, object]
     metadata_bytes: int
     member_revision: str | None
@@ -46,6 +50,7 @@ class _AnchorClaims:
             **({"path": self.path} if self.path is not None else {}),
             **({"line": self.line} if self.line is not None else {}),
             **({"symbol": self.symbol} if self.symbol is not None else {}),
+            **({"module": self.module} if self.module is not None else {}),
             **(
                 {"member_revision": self.member_revision}
                 if self.member_revision is not None
@@ -68,6 +73,7 @@ class _Resolution:
     repository_path: str | None = None
     symbol: Mapping[str, object] | None = None
     candidates: tuple[Mapping[str, object], ...] = ()
+    module_candidates: tuple[str, ...] = ()
     candidates_truncated: bool = False
 
 
@@ -109,6 +115,21 @@ def _bounded_symbol(value: object) -> str | None:
         return None
     if len(text) > _MAX_SYMBOL_CHARS:
         raise ValueError(f"symbol exceeds {_MAX_SYMBOL_CHARS} characters")
+    return text
+
+
+def _bounded_module(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip().strip(".")
+    if not text:
+        return None
+    if len(text) > _MAX_SYMBOL_CHARS:
+        raise ValueError(f"module exceeds {_MAX_SYMBOL_CHARS} characters")
+    if any(char.isspace() for char in text) or "/" in text or "\\" in text:
+        raise ValueError("module must be an exact dotted module identity")
+    if any(not part for part in text.split(".")):
+        raise ValueError("module must be an exact dotted module identity")
     return text
 
 
@@ -188,12 +209,15 @@ def _span_identity(value: object) -> str | None:
     return text
 
 
-def _binding_id(bundle_id: str, anchor_id: str) -> str:
+def _binding_id(evidence: Sequence[Mapping[str, object]]) -> str:
+    encoded = json.dumps(
+        list(evidence),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
     digest = hashlib.sha256(
-        b"hashmarks.external-evidence-binding.v1\0"
-        + bundle_id.encode("utf-8")
-        + b"\0"
-        + anchor_id.encode("utf-8")
+        b"hashmarks.external-evidence-binding.v2\0" + encoded
     ).hexdigest()
     return "external-evidence:" + digest
 
@@ -293,10 +317,11 @@ class EvidenceCorrelationMixin:
         )
         line = _positive_line(raw_anchor.get("line"))
         symbol = _bounded_symbol(raw_anchor.get("symbol"))
-        if claimed_path is None and symbol is None:
-            raise ValueError("each anchor requires path and/or symbol")
-        if line is not None and claimed_path is None:
-            raise ValueError("line requires path")
+        module = _bounded_module(raw_anchor.get("module"))
+        if claimed_path is None and symbol is None and module is None:
+            raise ValueError("each anchor requires path, symbol, and/or module")
+        if line is not None and claimed_path is None and module is None:
+            raise ValueError("line requires path or module")
         metadata = raw_anchor.get("metadata", {})
         if not isinstance(metadata, Mapping):
             raise ValueError("anchor metadata must be an object")
@@ -314,6 +339,7 @@ class EvidenceCorrelationMixin:
             path=claimed_path,
             line=line,
             symbol=symbol,
+            module=module,
             metadata=metadata_dict,
             metadata_bytes=metadata_bytes,
             member_revision=_member_revision(raw_anchor.get("member_revision")),
@@ -327,6 +353,25 @@ class EvidenceCorrelationMixin:
         mappings: Sequence[Mapping[str, str]],
     ) -> _Resolution:
         if claims.path is None:
+            if claims.module is not None:
+                module_resolution = self._resolve_module_only(claims.module)
+                if module_resolution.state != "resolved-unique":
+                    return module_resolution
+                assert module_resolution.repository_path is not None
+                if claims.symbol is not None:
+                    return self._resolve_symbol_at_path(
+                        module_resolution.repository_path,
+                        claims.symbol,
+                        line=claims.line,
+                        path_origin="module",
+                    )
+                if claims.line is not None:
+                    return self._resolve_line_at_path(
+                        module_resolution.repository_path,
+                        claims.line,
+                        path_origin="module",
+                    )
+                return module_resolution
             assert claims.symbol is not None
             return self._resolve_symbol_only(claims.symbol)
         repository_path, path_origin = self._map_external_path(
@@ -346,6 +391,12 @@ class EvidenceCorrelationMixin:
                 path_origin,
                 repository_path,
             )
+        if claims.module is not None:
+            module_conflict = self._module_path_conflict(
+                repository_path, claims.module, path_origin=path_origin
+            )
+            if module_conflict is not None:
+                return module_conflict
         if claims.symbol is not None:
             return self._resolve_symbol_at_path(
                 repository_path,
@@ -364,6 +415,69 @@ class EvidenceCorrelationMixin:
             "path-member",
             path_origin,
             repository_path,
+        )
+
+    def _resolve_module_only(self, module: str) -> _Resolution:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        rows = self.store.visible_module_paths(
+            module, limit=_MAX_MODULE_CANDIDATES + 1
+        )
+        admitted: list[str] = []
+        for path in rows:
+            member, _raw = self._repository_member_observation(path)
+            if member.get("state") == "known-present":
+                admitted.append(path)
+        candidates = tuple(admitted[:_MAX_MODULE_CANDIDATES])
+        truncated = len(admitted) > _MAX_MODULE_CANDIDATES
+        if len(admitted) == 1:
+            return _Resolution(
+                "resolved-unique",
+                "module-only",
+                "module",
+                admitted[0],
+                module_candidates=candidates,
+            )
+        if admitted:
+            return _Resolution(
+                "resolved-ambiguous",
+                (
+                    "module-match-bound-exhausted"
+                    if truncated
+                    else "module-matches-multiple-repository-members"
+                ),
+                "module",
+                module_candidates=candidates,
+                candidates_truncated=truncated,
+            )
+        return _Resolution(
+            "unresolved",
+            "module-not-found",
+            "module",
+        )
+
+    def _module_path_conflict(
+        self,
+        path: str,
+        module: str,
+        *,
+        path_origin: str,
+    ) -> _Resolution | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        row = self._session_file_row(path)
+        observed = "" if row is None else str(row.get("module_name") or "")
+        if observed == module:
+            return None
+        return _Resolution(
+            "claim-conflict",
+            (
+                "module-does-not-match-resolved-path"
+                if observed
+                else "module-not-proven-for-resolved-path"
+            ),
+            path_origin,
+            path,
         )
 
     def _resolve_symbol_only(self, symbol: str) -> _Resolution:
@@ -588,6 +702,7 @@ class EvidenceCorrelationMixin:
                 EvidenceCorrelationMixin._symbol_projection(row)
                 for row in resolution.candidates
             ],
+            "module_candidates": list(resolution.module_candidates),
             "candidate_completeness": (
                 "bounded" if resolution.candidates_truncated else "complete"
             ),
@@ -616,6 +731,11 @@ class EvidenceCorrelationMixin:
                 EvidenceCorrelationMixin._symbol_reference(row)
                 for row in resolution.candidates
             ]
+        if resolution.module_candidates:
+            return [
+                {"scope": "member", "path": candidate}
+                for candidate in resolution.module_candidates
+            ]
         if path is not None:
             return [{"scope": "member", "path": path}]
         return []
@@ -632,12 +752,25 @@ class EvidenceCorrelationMixin:
         self,
         raw_anchor: Mapping[str, object],
         *,
-        bundle_id: str,
         mappings: Sequence[Mapping[str, str]],
+        resolution_cache: dict[
+            tuple[str | None, int | None, str | None, str | None],
+            _Resolution,
+        ],
     ) -> tuple[dict[str, object], dict[str, object], int]:
         claims = self._anchor_claims(raw_anchor)
-        resolution = self._resolve_anchor(claims, mappings=mappings)
-        binding_id = _binding_id(bundle_id, claims.anchor_id)
+        resolution_key = (
+            claims.path,
+            claims.line,
+            claims.symbol,
+            claims.module,
+        )
+        resolution = resolution_cache.get(resolution_key)
+        if resolution is None:
+            resolution = self._resolve_anchor(claims, mappings=mappings)
+            resolution_cache[resolution_key] = resolution
+        references = self._repository_references(claims, resolution)
+        binding_id = _binding_id(references)
         packet = {
             "anchor_id": claims.anchor_id,
             "claims": claims.as_dict(),
@@ -647,7 +780,7 @@ class EvidenceCorrelationMixin:
         }
         binding = {
             "binding_id": binding_id,
-            "evidence": self._repository_references(claims, resolution),
+            "evidence": references,
         }
         return packet, binding, claims.metadata_bytes
 
@@ -656,6 +789,10 @@ class EvidenceCorrelationMixin:
         raw_bundle: Mapping[str, object],
         *,
         mappings: Sequence[Mapping[str, str]],
+        resolution_cache: dict[
+            tuple[str | None, int | None, str | None, str | None],
+            _Resolution,
+        ],
     ) -> _PreparedBundle:
         bundle_id = _bounded_identifier(
             raw_bundle.get("bundle_id"),
@@ -676,6 +813,7 @@ class EvidenceCorrelationMixin:
             completeness,
             raw_anchors,
             mappings=mappings,
+            resolution_cache=resolution_cache,
         )
 
     @staticmethod
@@ -714,6 +852,10 @@ class EvidenceCorrelationMixin:
         raw_anchors: Sequence[object],
         *,
         mappings: Sequence[Mapping[str, str]],
+        resolution_cache: dict[
+            tuple[str | None, int | None, str | None, str | None],
+            _Resolution,
+        ],
     ) -> _PreparedBundle:
         anchors: list[dict[str, object]] = []
         bindings: list[dict[str, object]] = []
@@ -723,8 +865,8 @@ class EvidenceCorrelationMixin:
             assert isinstance(raw_anchor, Mapping)
             anchor, binding, anchor_metadata_bytes = self._prepare_anchor(
                 raw_anchor,
-                bundle_id=bundle_id,
                 mappings=mappings,
+                resolution_cache=resolution_cache,
             )
             anchor_id = str(anchor["anchor_id"])
             if anchor_id in seen:
@@ -754,12 +896,20 @@ class EvidenceCorrelationMixin:
         mappings: Sequence[Mapping[str, str]],
     ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
         prepared: list[dict[str, object]] = []
-        bindings: list[dict[str, object]] = []
+        bindings_by_id: dict[str, dict[str, object]] = {}
         seen: set[str] = set()
         total_metadata = 0
         total_anchors = 0
+        resolution_cache: dict[
+            tuple[str | None, int | None, str | None, str | None],
+            _Resolution,
+        ] = {}
         for raw_bundle in bundles:
-            result = self._prepare_bundle(raw_bundle, mappings=mappings)
+            result = self._prepare_bundle(
+                raw_bundle,
+                mappings=mappings,
+                resolution_cache=resolution_cache,
+            )
             bundle_id = str(result.packet["bundle_id"])
             if bundle_id in seen:
                 raise ValueError(f"duplicate bundle_id: {bundle_id}")
@@ -768,8 +918,10 @@ class EvidenceCorrelationMixin:
             total_anchors += result.anchor_count
             self._validate_request_totals(total_metadata, total_anchors)
             prepared.append(result.packet)
-            bindings.extend(result.bindings)
+            for binding in result.bindings:
+                bindings_by_id[str(binding["binding_id"])] = binding
         prepared.sort(key=lambda row: str(row["bundle_id"]))
+        bindings = [bindings_by_id[key] for key in sorted(bindings_by_id)]
         return prepared, bindings
 
     @staticmethod
@@ -869,14 +1021,13 @@ class EvidenceCorrelationMixin:
             anchor, binding
         )
         anchor["repository_evidence"] = {
+            "binding_id": binding_id,
             "binding_definition_identity": binding.get(
                 "binding_definition_identity"
             ),
             "binding_observation_identity": binding.get(
                 "binding_observation_identity"
             ),
-            "evidence": binding.get("evidence", []),
-            "relationships": binding.get("relationships", {}),
         }
 
     @staticmethod
@@ -949,6 +1100,9 @@ class EvidenceCorrelationMixin:
         """Correlate bounded evidence bundles with current repository truth."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
+        self._validate_request_size(bundles, path_mappings)
+        if previous_correlation is not None:
+            self._validate_previous_correlation_size(previous_correlation)
         self._validate_bundles(bundles)
         mappings = self._correlation_path_mappings(path_mappings)
         prepared, bindings = self._prepare_bundles(bundles, mappings=mappings)
@@ -974,7 +1128,42 @@ class EvidenceCorrelationMixin:
             packet["delta_from_previous"] = self.evidence_correlation_delta(
                 previous_correlation, packet
             )
+        self._validate_packet_size(packet)
         return packet
+
+    @staticmethod
+    def _validate_request_size(
+        bundles: object,
+        path_mappings: object,
+    ) -> None:
+        size = _json_size(
+            {"bundles": bundles, "path_mappings": path_mappings or []},
+            label="evidence correlation request",
+        )
+        if size > CORRELATION_REQUEST_MAX_BYTES:
+            raise ValueError(
+                "evidence correlation request exceeds "
+                f"{CORRELATION_REQUEST_MAX_BYTES} encoded bytes"
+            )
+
+    @staticmethod
+    def _validate_previous_correlation_size(packet: Mapping[str, object]) -> None:
+        size = _json_size(packet, label="previous correlation")
+        if size > CORRELATION_PACKET_MAX_BYTES:
+            raise ValueError(
+                "previous correlation exceeds "
+                f"{CORRELATION_PACKET_MAX_BYTES} encoded bytes"
+            )
+
+    @staticmethod
+    def _validate_packet_size(packet: Mapping[str, object]) -> None:
+        size = _json_size(packet, label="evidence correlation packet")
+        if size > CORRELATION_PACKET_MAX_BYTES:
+            raise ValueError(
+                "evidence correlation packet exceeds "
+                f"{CORRELATION_PACKET_MAX_BYTES} encoded bytes; "
+                "reduce anchors or relationship_limit_per_path and split the evidence set"
+            )
 
     @staticmethod
     def _validate_bundles(
@@ -1016,6 +1205,11 @@ class EvidenceCorrelationMixin:
             "interpretation_authority": "consumer-owned",
             "causation": "not-inferred",
             "execution_effect": "none",
+            "bounds": {
+                "request_max_bytes": CORRELATION_REQUEST_MAX_BYTES,
+                "packet_max_bytes": CORRELATION_PACKET_MAX_BYTES,
+                "max_anchors": _MAX_TOTAL_ANCHORS,
+            },
         }
         packet["correlation_identity"] = "sha256:" + self._packet_digest(
             "hashmarks.evidence-correlation.v1",

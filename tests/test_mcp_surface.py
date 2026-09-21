@@ -111,6 +111,92 @@ def test_mcp_surface_correlates_external_evidence_without_interpreting_it(
         surface.close()
 
 
+def test_mcp_correlation_accepts_core_legal_request_above_old_transport_cap(
+    tmp_path: Path,
+) -> None:
+    surface = HashmarksMcpSurface(
+        str(tmp_path),
+        state_dir=str(tmp_path / "state"),
+    )
+    module = "m" * 1000
+    symbol = "s" * 1000
+    anchors = [
+        {
+            "anchor_id": (f"a{index:03d}-" + "x" * 490)[:500],
+            "module": module,
+            "symbol": symbol,
+        }
+        for index in range(256)
+    ]
+    bundles = [
+        {
+            "bundle_id": "large-legal-input",
+            "producer": {"kind": "dogfood"},
+            "completeness": "unknown",
+            "anchors": anchors,
+        }
+    ]
+    try:
+        packet = surface.correlate_evidence(
+            bundles,
+            include_relationships=False,
+        )
+    finally:
+        surface.close()
+
+    assert packet["schema"] == "hashmarks.evidence-correlation.v1"
+    assert packet["bounds"]["request_max_bytes"] == 1_048_576
+    assert all(
+        anchor["resolution"]["state"] == "unresolved"
+        for anchor in packet["bundles"][0]["anchors"]
+    )
+
+
+def test_mcp_correlation_round_trips_max_repeated_anchor_set(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "worker.py").write_text(
+        "def process_output_data(value: int) -> int:\n"
+        "    return value + 1\n",
+        encoding="utf-8",
+    )
+    anchors = [
+        {
+            "anchor_id": f"frame:{index}",
+            "path": "worker.py",
+            "line": 2,
+            "symbol": "process_output_data",
+        }
+        for index in range(256)
+    ]
+    bundles = [
+        {
+            "bundle_id": "traceback-sample",
+            "producer": {"kind": "traceback"},
+            "completeness": "complete",
+            "anchors": anchors,
+        }
+    ]
+    surface = HashmarksMcpSurface(
+        str(tmp_path),
+        state_dir=str(tmp_path / "state"),
+    )
+    try:
+        before = surface.correlate_evidence(bundles)
+        after = surface.correlate_evidence(
+            bundles,
+            previous_correlation=before,
+        )
+    finally:
+        surface.close()
+
+    assert len(before["repository_evidence"]["bindings"]) == 1
+    assert (
+        after["delta_from_previous"]["schema"]
+        == "hashmarks.evidence-correlation-delta.v1"
+    )
+
+
 def test_mcp_find_truncated_only_when_an_extra_hit_exists(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     (repo / "src" / "feature_two.py").write_text(

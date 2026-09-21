@@ -35,7 +35,7 @@ Similar-looking state words are not interchangeable. A consumer must know which 
 | Consumer binding definition | Opaque consumer-declared repository evidence scope | repository-evidence binding projection | Definition identity is separate from repository observation identity. Changing the declaration is not a repository change. |
 | Consumer binding impact | Which declared bindings intersect changed repository evidence | repository-evidence coverage/delta projection consuming canonical repository observation/delta facts | Report projection facts and reasons; do not create a feature-local change authority. |
 | External evidence claim | Request-scoped caller observation that may point into repository truth | `evidence_correlation.py` owns only the claim/correlation projection; repository facts remain with existing owners | Preserve the claim separately. Opaque metadata never becomes repository authority by naming convention. |
-| Evidence correlation resolution | Whether a bounded path/line/symbol claim maps uniquely, ambiguously, not at all, or conflicts with admitted repository evidence | `evidence_correlation.py` over canonical member observation plus bounded symbol queries | State vocabulary is `resolved-unique | resolved-ambiguous | unresolved | claim-conflict`; it describes correspondence, never causation. |
+| Evidence correlation resolution | Whether a bounded path/line/symbol/module claim maps uniquely, ambiguously, not at all, or conflicts with admitted repository evidence | `evidence_correlation.py` over canonical member observation plus bounded indexed symbol/module queries | State vocabulary is `resolved-unique | resolved-ambiguous | unresolved | claim-conflict`; it describes correspondence, never causation. |
 | Source equivalence | Whether explicitly qualified external source identity matches the correlated repository member/range identity | `evidence_correlation.py` comparison over repository-evidence binding identities | State vocabulary is `proven | mismatch | unknown`. Keep it independent from repository freshness and correlation resolution. |
 
 ## Orthogonal state rule
@@ -117,7 +117,7 @@ Evidence correlation is a request-scoped projection over external claims plus ex
 It must reuse:
 
 - canonical repository member observation for presence/admission/revision;
-- bounded indexed symbol evidence for structural correspondence;
+- bounded indexed symbol and exact module evidence for structural correspondence;
 - repository evidence bindings for range/member identities, relationships, freshness, completeness, and provenance;
 - repository evidence binding delta for before/after repository change.
 

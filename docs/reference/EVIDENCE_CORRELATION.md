@@ -92,8 +92,9 @@ The result contains the original claims, resolution state, canonical repository 
 Each anchor has a caller-controlled opaque `anchor_id` and at least one repository locator:
 
 - `path` — repository-relative, or an absolute external path requiring an explicit mapping;
-- `line` — one-based line, valid only with `path`;
-- `symbol` — a symbol name, qualname, or exact `path::qualname` identifier.
+- `line` — one-based line, valid with an exact `path` or exact `module`;
+- `symbol` — a symbol name, qualname, or exact `path::qualname` identifier;
+- `module` — an exact dotted module identity resolved only through the existing indexed repository module owner.
 
 Optional `metadata` is opaque JSON-compatible correlation material. Hashmarks does not interpret fields such as `commit`, `revision`, `version`, request IDs, timestamps, topic/partition values, or application correlation IDs unless a separate typed Hashmarks contract explicitly assigns semantics to them.
 
@@ -113,7 +114,7 @@ Hashmarks resolves evidence conservatively. Relevant outcomes include:
 - `unresolved`;
 - `claim-conflict`.
 
-A path can resolve even when no containing symbol exists. Symbol-only evidence may resolve to multiple candidates. A conflicting line and symbol remains a conflict rather than allowing one hint to silently override the other.
+A path can resolve even when no containing symbol exists. Symbol-only evidence may resolve to multiple candidates. Exact module evidence may resolve only to admitted repository members; an external dependency module therefore remains unresolved unless the repository itself owns that module. Conflicting path/module or line/symbol claims remain conflicts rather than allowing one hint to silently override the other.
 
 Hashmarks does not perform basename guessing, nearest-symbol guessing, hidden prefix stripping, or other fuzzy repairs that would strengthen a weak external claim.
 
@@ -150,6 +151,10 @@ Each bundle declares `complete | incomplete | unknown`. Hashmarks preserves that
 
 Bounds are fail-closed. Oversized bundle counts, anchor counts, path mappings, identifiers, or metadata are rejected rather than silently truncated into stronger evidence.
 
+The correlation request and emitted correlation packet each have one core-owned encoded JSON budget of **1 MiB**. MCP reuses these exact limits and must not add a stricter transport-only evidence budget. The emitted packet includes its active bounds. When independent relationship evidence would exceed the packet budget, Hashmarks fails closed and the consumer must reduce relationship bounds or split the external evidence set.
+
+Repeated observations that resolve to the same repository evidence share one canonical repository-evidence binding. Anchors retain their individual external claims and opaque metadata, but the full canonical repository evidence is emitted once at packet scope and anchors reference it by binding identity. Repeated locator resolution is request-local reused work; it does not create persistent state or a new evidence authority.
+
 ## Request-scoped external evidence
 
 External evidence is **request-scoped and not persisted** by the correlation contract. Hashmarks may continue to use its normal disposable repository-intelligence caches, but it does not acquire ownership of production logs, traces, incident history, agent memory, or observability storage.
@@ -179,7 +184,11 @@ Hashmarks may report that the lockfile changed, a traceback resolves to a reposi
 
 ## MCP
 
-The same primitive is exposed through the read-only `correlate_evidence` MCP tool. MCP is only a bounded transport adapter; parsing raw Splunk exports, JSONL streams, Sentry payloads, OpenTelemetry streams, or other producer-specific formats remains outside Hashmarks core.
+The same primitive is exposed through the read-only `correlate_evidence` MCP tool. MCP is only a bounded transport adapter and reuses the core correlation request/packet budgets; parsing raw Splunk exports, JSONL streams, Sentry payloads, OpenTelemetry streams, or other producer-specific formats remains outside Hashmarks core.
+
+For large logs or exports, the external parser should recover/validate the producer format, preserve parser diagnostics in its own provenance, mark incomplete or recovered samples accordingly, and submit bounded structured anchors. Hashmarks correlates those anchors; it does not become the CSV/log parser or retain the source stream.
+
+For high-volume streams, consumers should aggregate repeated events into **unique repository locators** before correlation when event identity itself is not needed for repository truth. Occurrence counts, time windows, representative event IDs, and similar summary fields remain opaque consumer metadata. Hashmarks may also reuse repeated locators within one request, but its anchor/count bounds remain a repository-intelligence economics guard rather than a log-retention mechanism. Consumers should split independent locator sets only after aggregation; separate correlation packets do not imply that Hashmarks owns cross-chunk incident state.
 
 ## Permanent boundary
 
