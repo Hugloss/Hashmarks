@@ -25,6 +25,19 @@ def _bundle(
     ]
 
 
+
+def _binding(
+    packet: dict[str, object],
+    anchor: dict[str, object],
+) -> dict[str, object]:
+    binding_id = anchor["repository_evidence_binding_id"]
+    rows = packet["repository_evidence"]["bindings"]
+    return next(
+        row
+        for row in rows
+        if row["binding_id"] == binding_id
+    )
+
 def test_evidence_correlation_extension_preserves_repository_coverage_owner(
     tmp_path: Path,
 ) -> None:
@@ -136,9 +149,10 @@ def test_qualified_member_revision_proves_or_rejects_source_equivalence(
         observed = codemap.correlate_evidence(
             base, include_relationships=False
         )
-        revision = observed["bundles"][0]["anchors"][0][
-            "repository_evidence"
-        ]["evidence"][0]["member_revision"]
+        observed_anchor = observed["bundles"][0]["anchors"][0]
+        revision = _binding(observed, observed_anchor)["evidence"][0][
+            "member_revision"
+        ]
         proven = codemap.correlate_evidence(
             _bundle(
                 {
@@ -247,7 +261,7 @@ def test_missing_repository_member_does_not_become_resolved_by_mapping(
     anchor = packet["bundles"][0]["anchors"][0]
     assert anchor["resolution"]["state"] == "unresolved"
     assert anchor["resolution"]["repository_path"] == "src/missing.py"
-    assert anchor["repository_evidence"]["evidence"][0]["state"] == "known-absent"
+    assert _binding(packet, anchor)["evidence"][0]["state"] == "known-absent"
 
 
 def test_bundle_reordering_does_not_change_correlation_identity(
@@ -339,7 +353,7 @@ def test_absolute_external_path_requires_explicit_mapping(
         anchor["resolution"]["reason"]
         == "external-path-mapping-required"
     )
-    assert anchor["repository_evidence"]["evidence"] == []
+    assert _binding(packet, anchor)["evidence"] == []
 
 
 def test_external_paths_and_mapping_prefixes_fail_closed_on_escape(
