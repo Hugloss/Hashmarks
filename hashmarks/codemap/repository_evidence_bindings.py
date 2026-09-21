@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
@@ -38,6 +38,15 @@ class EvidenceMember:
 
 
 EvidenceReference = EvidenceSpan | EvidenceMember
+
+
+@dataclass(slots=True)
+class _BindingObservationRequest:
+    dependency_paths: Mapping[str, Sequence[str]]
+    relationship_limit_per_path: int
+    include_relationships: bool
+    seen: set[str] = field(default_factory=set)
+    unique_paths: set[str] = field(default_factory=set)
 
 
 class RepositoryEvidenceBindingsMixin:
@@ -233,6 +242,106 @@ class RepositoryEvidenceBindingsMixin:
                 "limit_per_path": limit_per_path,
             },
             "completeness": "bounded-not-claimed",
+        }
+
+    @classmethod
+    def _binding_references(cls, value: object) -> list[EvidenceReference]:
+        if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+            raise ValueError("binding evidence must be a sequence")
+        if len(value) > _MAX_EVIDENCE_PER_BINDING:
+            raise ValueError(
+                "binding evidence exceeds "
+                f"{_MAX_EVIDENCE_PER_BINDING} entries"
+            )
+        references = [
+            cls._binding_reference(raw)
+            for raw in value
+            if isinstance(raw, Mapping)
+        ]
+        if len(references) != len(value):
+            raise ValueError("each evidence item must be an object")
+        references.sort(key=cls._reference_sort_key)
+        return references
+
+    def _observe_binding(
+        self,
+        raw_binding: Mapping[str, object],
+        request: _BindingObservationRequest,
+    ) -> dict[str, object]:
+        binding_id = str(raw_binding.get("binding_id") or "").strip()
+        if not binding_id:
+            raise ValueError("binding_id must not be empty")
+        if binding_id in request.seen:
+            raise ValueError(f"duplicate binding_id: {binding_id}")
+        request.seen.add(binding_id)
+        references = self._binding_references(raw_binding.get("evidence"))
+        evidence = [self._observe_reference(ref) for ref in references]
+        declared_dependencies = sorted(
+            {
+                normalize_relative_path(path, allow_root=False)
+                for path in request.dependency_paths.get(binding_id, ())
+            }
+        )
+        if len(declared_dependencies) > _MAX_DEPENDENCIES_PER_BINDING:
+            raise ValueError(
+                "binding dependencies exceeds "
+                f"{_MAX_DEPENDENCIES_PER_BINDING} entries"
+            )
+        request.unique_paths.update(ref.path for ref in references)
+        request.unique_paths.update(declared_dependencies)
+        if len(request.unique_paths) > _MAX_UNIQUE_PATHS:
+            raise ValueError(
+                f"binding request exceeds {_MAX_UNIQUE_PATHS} unique paths"
+            )
+        dependencies = [
+            self._repository_member_observation(path)[0]
+            for path in declared_dependencies
+        ]
+        definition_payload = {
+            "binding_id": binding_id,
+            "evidence": [self._reference_definition(ref) for ref in references],
+            "dependencies": declared_dependencies,
+            "include_relationships": request.include_relationships,
+            "relationship_limit_per_path": (
+                request.relationship_limit_per_path
+                if request.include_relationships
+                else None
+            ),
+        }
+        relationships = (
+            self._binding_relationships(
+                evidence, limit_per_path=request.relationship_limit_per_path
+            )
+            if request.include_relationships
+            else {
+                "state": "not-requested",
+                "scope_paths": [],
+                "relationships": [],
+                "bounds": {
+                    "paths": 0,
+                    "limit_per_path": request.relationship_limit_per_path,
+                },
+                "completeness": "not-observed",
+            }
+        )
+        binding_payload = {
+            "binding_id": binding_id,
+            "evidence": evidence,
+            "dependencies": dependencies,
+            "relationships": relationships,
+        }
+        return {
+            **binding_payload,
+            "binding_definition_identity": "sha256:"
+            + self._packet_digest(
+                "hashmarks.repository-evidence-binding-definition.v1",
+                definition_payload,
+            ),
+            "binding_observation_identity": "sha256:"
+            + self._packet_digest(
+                "hashmarks.repository-evidence-binding-observation.v1",
+                binding_payload,
+            ),
         }
 
     @decision_scoped
