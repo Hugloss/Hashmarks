@@ -25,8 +25,7 @@ REPORTED_STATE = {
     "no-edit-authority",
     "explicit-test-target",
 }
-
-HARD_ZERO_METRICS = (
+DERIVED_METRICS = {
     "false_owner",
     "false_unique",
     "sufficient_unique_reported_ambiguous",
@@ -34,6 +33,9 @@ HARD_ZERO_METRICS = (
     "true_ambiguity_collapsed",
     "non_edit_promoted_to_edit",
     "explicit_test_laundered_to_implementation_owner",
+}
+HARD_ZERO_METRICS = (
+    *sorted(DERIVED_METRICS),
     "denied_evidence_authority_leak",
     "external_evidence_authority_leak",
     "stale_or_unknown_promoted_to_current",
@@ -64,12 +66,19 @@ def _choice(value: object, allowed: set[str], field: str) -> str:
 def validate_case(case: Mapping[str, Any]) -> QualityTruth:
     if case.get("schema") != SCHEMA:
         raise ValueError("unsupported repository quality case schema")
-    for field in ("case_id", "repository_identity", "source_identity", "ground_truth_basis"):
+    for field in (
+        "case_id",
+        "repository_identity",
+        "source_identity",
+        "ground_truth_basis",
+    ):
         if not isinstance(case.get(field), str) or not str(case[field]).strip():
             raise ValueError(f"{field} must be a non-empty string")
     semantic = _choice(case.get("semantic_truth"), SEMANTIC_TRUTH, "semantic_truth")
     evidence = _choice(
-        case.get("admitted_evidence_truth"), EVIDENCE_TRUTH, "admitted_evidence_truth"
+        case.get("admitted_evidence_truth"),
+        EVIDENCE_TRUTH,
+        "admitted_evidence_truth",
     )
     owner = case.get("expected_owner")
     if semantic == "unique-owner" and (not isinstance(owner, str) or not owner):
@@ -83,46 +92,63 @@ def _hard_zero_counts() -> Counter[str]:
     return Counter({name: 0 for name in HARD_ZERO_METRICS})
 
 
-def evaluate_case(case: Mapping[str, Any], observed: Mapping[str, Any]) -> dict[str, Any]:
+def _grade_resolved(
+    truth: QualityTruth,
+    owner: object,
+    counts: Counter[str],
+) -> None:
+    if truth.semantic_truth == "unique-owner":
+        if truth.admitted_evidence_truth != "sufficient":
+            counts["false_unique"] += 1
+        elif owner != truth.expected_owner:
+            counts["false_owner"] += 1
+        return
+    if truth.semantic_truth in {"true-ambiguity", "multi-edit"}:
+        counts["true_ambiguity_collapsed"] += 1
+        counts["false_unique"] += 1
+    elif truth.semantic_truth == "non-edit":
+        counts["non_edit_promoted_to_edit"] += 1
+    elif truth.semantic_truth == "explicit-test-edit":
+        counts["explicit_test_laundered_to_implementation_owner"] += 1
+
+
+def _grade_abstention(
+    truth: QualityTruth,
+    state: str,
+    counts: Counter[str],
+) -> None:
+    if (
+        truth.semantic_truth != "unique-owner"
+        or truth.admitted_evidence_truth != "sufficient"
+    ):
+        return
+    if state == "ambiguous":
+        counts["sufficient_unique_reported_ambiguous"] += 1
+    elif state == "unresolved":
+        counts["sufficient_unique_reported_unresolved"] += 1
+
+
+def _grade_observed_flags(
+    observed: Mapping[str, Any],
+    counts: Counter[str],
+) -> None:
+    for metric in HARD_ZERO_METRICS:
+        if metric not in DERIVED_METRICS and observed.get(metric) is True:
+            counts[metric] += 1
+
+
+def evaluate_case(
+    case: Mapping[str, Any],
+    observed: Mapping[str, Any],
+) -> dict[str, Any]:
     truth = validate_case(case)
     state = _choice(observed.get("state"), REPORTED_STATE, "observed state")
     owner = observed.get("owner")
     counts = _hard_zero_counts()
-
     if state == "resolved":
-        if truth.semantic_truth == "unique-owner":
-            if truth.admitted_evidence_truth != "sufficient":
-                counts["false_unique"] += 1
-            elif owner != truth.expected_owner:
-                counts["false_owner"] += 1
-        elif truth.semantic_truth in {"true-ambiguity", "multi-edit"}:
-            counts["true_ambiguity_collapsed"] += 1
-            counts["false_unique"] += 1
-        elif truth.semantic_truth == "non-edit":
-            counts["non_edit_promoted_to_edit"] += 1
-        elif truth.semantic_truth == "explicit-test-edit":
-            counts["explicit_test_laundered_to_implementation_owner"] += 1
-
-    if truth.semantic_truth == "unique-owner" and truth.admitted_evidence_truth == "sufficient":
-        if state == "ambiguous":
-            counts["sufficient_unique_reported_ambiguous"] += 1
-        elif state == "unresolved":
-            counts["sufficient_unique_reported_unresolved"] += 1
-
-    for metric in HARD_ZERO_METRICS:
-        if metric in {
-            "false_owner",
-            "false_unique",
-            "sufficient_unique_reported_ambiguous",
-            "sufficient_unique_reported_unresolved",
-            "true_ambiguity_collapsed",
-            "non_edit_promoted_to_edit",
-            "explicit_test_laundered_to_implementation_owner",
-        }:
-            continue
-        if observed.get(metric) is True:
-            counts[metric] += 1
-
+        _grade_resolved(truth, owner, counts)
+    _grade_abstention(truth, state, counts)
+    _grade_observed_flags(observed, counts)
     correct_resolution = (
         truth.semantic_truth == "unique-owner"
         and truth.admitted_evidence_truth == "sufficient"
@@ -139,50 +165,61 @@ def evaluate_case(case: Mapping[str, Any], observed: Mapping[str, Any]) -> dict[
     }
 
 
+def _selective_counts(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    sufficient = [
+        row
+        for row in rows
+        if row["semantic_truth"] == "unique-owner"
+        and row["admitted_evidence_truth"] == "sufficient"
+    ]
+    resolved = [row for row in rows if row["reported_state"] == "resolved"]
+    unsafe_keys = {
+        "false_owner",
+        "false_unique",
+        "true_ambiguity_collapsed",
+        "non_edit_promoted_to_edit",
+        "explicit_test_laundered_to_implementation_owner",
+    }
+    incorrect = sum(
+        any(int(row["hard_zero"][key]) > 0 for key in unsafe_keys)
+        for row in resolved
+    )
+    return {
+        "resolved": len(resolved),
+        "incorrect": incorrect,
+        "sufficient": len(sufficient),
+        "correct": sum(bool(row["correct_resolution"]) for row in sufficient),
+    }
+
+
+def _ratio(numerator: int, denominator: int) -> float | None:
+    return numerator / denominator if denominator else None
+
+
 def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     totals = _hard_zero_counts()
-    sufficient_unique = 0
-    correct_unique = 0
-    resolved = 0
-    incorrect_resolved = 0
     semantic_counts: Counter[str] = Counter()
     for row in rows:
         semantic_counts[str(row["semantic_truth"])] += 1
-        for name, count in row["hard_zero"].items():
-            totals[name] += int(count)
-        if (
-            row["semantic_truth"] == "unique-owner"
-            and row["admitted_evidence_truth"] == "sufficient"
-        ):
-            sufficient_unique += 1
-            correct_unique += int(bool(row["correct_resolution"]))
-        if row["reported_state"] == "resolved":
-            resolved += 1
-            unsafe = (
-                int(row["hard_zero"]["false_owner"])
-                + int(row["hard_zero"]["false_unique"])
-                + int(row["hard_zero"]["true_ambiguity_collapsed"])
-                + int(row["hard_zero"]["non_edit_promoted_to_edit"])
-                + int(row["hard_zero"]["explicit_test_laundered_to_implementation_owner"])
-            )
-            incorrect_resolved += int(unsafe > 0)
-
-    violations = sum(totals.values())
+        totals.update({name: int(count) for name, count in row["hard_zero"].items()})
+    selective = _selective_counts(rows)
     return {
         "schema": REPORT_SCHEMA,
         "metric_policy": METRIC_POLICY,
-        "qualification": "qualified" if violations == 0 else "not-qualified",
+        "qualification": (
+            "qualified" if sum(totals.values()) == 0 else "not-qualified"
+        ),
         "hard_zero": dict(totals),
         "selective_quality": {
-            "resolved_cases": resolved,
-            "incorrect_resolved_cases": incorrect_resolved,
-            "selective_owner_risk": (
-                incorrect_resolved / resolved if resolved else None
+            "resolved_cases": selective["resolved"],
+            "incorrect_resolved_cases": selective["incorrect"],
+            "selective_owner_risk": _ratio(
+                selective["incorrect"], selective["resolved"]
             ),
-            "sufficient_unique_cases": sufficient_unique,
-            "correctly_resolved_unique_cases": correct_unique,
-            "resolvable_owner_coverage": (
-                correct_unique / sufficient_unique if sufficient_unique else None
+            "sufficient_unique_cases": selective["sufficient"],
+            "correctly_resolved_unique_cases": selective["correct"],
+            "resolvable_owner_coverage": _ratio(
+                selective["correct"], selective["sufficient"]
             ),
         },
         "corpus": {
