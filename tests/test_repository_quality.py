@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from scripts.agent_evaluation.repository_quality import evaluate_case, summarize
+from scripts.agent_evaluation.repository_quality import case_identity, evaluate_case, summarize
 
 
 def _case(**overrides):
@@ -109,3 +109,27 @@ def test_missing_metrics_are_unknown_not_zero() -> None:
         ]
     )
     assert report["missing_metric_policy"] == "unknown-not-zero"
+
+
+def test_case_identity_binds_ground_truth_and_repository_authority() -> None:
+    original = _case()
+    changed_truth = _case(expected_owner="src/other.py::widget")
+    changed_source = _case(source_identity="sha256:other-source")
+    assert case_identity(original) != case_identity(changed_truth)
+    assert case_identity(original) != case_identity(changed_source)
+
+
+def test_corpus_identity_is_order_independent_but_membership_sensitive() -> None:
+    first = evaluate_case(
+        _case(case_id="first"),
+        {"state": "resolved", "owner": "src/widget.py::widget"},
+    )
+    second = evaluate_case(
+        _case(case_id="second"),
+        {"state": "resolved", "owner": "src/widget.py::widget"},
+    )
+    forward = summarize([first, second])["corpus"]["identity"]
+    reverse = summarize([second, first])["corpus"]["identity"]
+    singleton = summarize([first])["corpus"]["identity"]
+    assert forward == reverse
+    assert forward != singleton
