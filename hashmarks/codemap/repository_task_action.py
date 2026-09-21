@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.ownership_decision import (
     OwnershipDecisionState,
     ownership_authority_contract,
+    ownership_candidate_path,
     ownership_decision_trace,
     project_owner_candidate,
 )
@@ -1467,4 +1468,5 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             "ownership_decision_trace": trace,
             "ownership_authority": authority,
             "admitted_edit": admitted_edit,
+            "candidate_path": ownership_candidate_path({"edit": edit}),
         }
