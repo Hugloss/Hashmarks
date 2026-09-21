@@ -432,8 +432,7 @@ class VerificationMixin:
         facade_path: str,
         exported_name: str,
     ) -> bool | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+        self = cast("CodeMap", self)
         if not facade_path.endswith(".py") or not exported_name:
             return None
         binding_kind, _binding_targets = self._python_export_binding(
@@ -479,14 +478,13 @@ class VerificationMixin:
         ref_path: str,
         target: str,
     ) -> bool | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        if not ref_path.endswith(".py") or "." not in target:
-            return None
-        index = self._verification_reference_index_for_path(state, ref_path)
-        if index is None:
-            return None
-        if target not in index.reachable_attribute_chains:
+        self = cast("CodeMap", self)
+        index = (
+            self._verification_reference_index_for_path(state, ref_path)
+            if ref_path.endswith(".py") and "." in target
+            else None
+        )
+        if index is None or target not in index.reachable_attribute_chains:
             return None
 
         bound_name, attribute_chain = target.split(".", 1)
@@ -510,10 +508,8 @@ class VerificationMixin:
                 )
                 for facade_path in sorted(resolved_paths)[:8]
             ]
-            if any(match is True for match in reexport_matches):
-                return True
-            if any(match is None for match in reexport_matches):
-                return None
+            if True in reexport_matches or None in reexport_matches:
+                return True if True in reexport_matches else None
         return False if resolved_alias else None
 
     def _verification_collect_direct_symbol_refs(
