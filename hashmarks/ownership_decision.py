@@ -137,9 +137,10 @@ def ownership_authority_contract(
 
 def project_owner_candidate(
     source: Mapping[str, object],
-) -> tuple[object | None, object | None, bool]:
+) -> tuple[Mapping[str, object] | None, Mapping[str, object] | None, bool]:
     """Separate repository candidate evidence from admitted edit authority."""
-    candidate = source.get("edit")
+    value = source.get("edit")
+    candidate = value if isinstance(value, Mapping) else None
     authority = source.get("ownership_authority")
     resolved = isinstance(authority, Mapping) and bool(authority.get("owner_resolved"))
     return (candidate if resolved else None, candidate, resolved)
