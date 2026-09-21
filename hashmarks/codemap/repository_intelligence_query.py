@@ -109,7 +109,12 @@ class RepositoryIntelligenceQueryMixin:
                     task,
                     changed_paths,
                     previous_snapshot=previous_snapshot,
-                    **common,
+                    limit=limit,
+                    per_role=per_role,
+                    options=ChangeImpactOptions(
+                        impact_limit_per_surface=impact_limit_per_surface,
+                        max_depth=max_depth,
+                    ),
                 )
             elif surface == "delta":
                 if previous_snapshot is None:

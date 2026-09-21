@@ -5,6 +5,7 @@ import time
 from typing import TYPE_CHECKING
 
 from hashmarks import CodeMap
+from hashmarks.codemap.change_impact import ChangeImpactOptions
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
 if TYPE_CHECKING:
@@ -81,6 +82,22 @@ def test_economics_receipt_delta_economics_use_existing_delta_authority(
     assert delta["to_snapshot_identity"] == receipt["source_snapshot_identity"]
     assert delta["delta_bytes"] > 0
     assert delta["retransmit_pair_bytes"] > 0
+
+
+def test_economics_receipt_applies_typed_impact_bounds(tmp_path: Path) -> None:
+    _source, task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        receipt = codemap.intelligence_economics_receipt(
+            task,
+            ["src/owner.py"],
+            options=ChangeImpactOptions(
+                impact_limit_per_surface=2,
+                max_depth=1,
+            ),
+        )
+
+    assert receipt["bounds"]["depth"] == 1
+    assert receipt["bounds"]["per_surface"] == 2
 
 
 def test_query_facade_exposes_economics_without_changing_receipt(
