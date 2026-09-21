@@ -106,10 +106,12 @@ class DecisionPacketMixin:
         reason = "resolved"
         if not bool(build.get("complete")):
             needed, reason = True, "codemap-generation-incomplete"
+        elif action.get("edit") is None:
+            needed, reason = True, "no-supported-owner-candidate"
         elif bool(ambiguity.get("ambiguous")):
             needed, reason = True, "competing-action-roles"
         elif edit is None:
-            needed, reason = True, "no-supported-owner-candidate"
+            needed, reason = True, "ownership-unresolved"
         elif verify is None:
             needed, reason = True, "missing-verification-evidence"
         return {
@@ -276,7 +278,9 @@ class DecisionPacketMixin:
             "context_budget": {
                 "requested_tokens": token_budget,
                 "estimated_tokens": work_context["estimated_tokens"],
-                "safe": bool(work_context["safe"]) and bool(build.get("complete")),
+                "safe": all(
+                    (bool(work_context["safe"]), bool(build.get("complete")), edit is not None)
+                ),
                 "missing_roles": work_context["missing_roles"],
             },
             "authority": "repository-observation-only",
