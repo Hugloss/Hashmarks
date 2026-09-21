@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Public release / multi-host MCP hardening
+## 0.15.0 — Repository authority and agent evidence closure
 
 - Add public repository evidence bindings for opaque consumer IDs over exact physical line ranges and whole repository members, with stable definition/observation identities, declared dependency and relationship evidence, binding deltas, per-binding change coverage, explicit bounds, context-policy isolation, and fail-closed stable-read/member-revision checks. These remain repository intelligence only; consumer execution/certification policy stays external.
 - Normalize the serialized freshness state axis to `current | stale | unknown` across current pre-1.0 evidence projections. Proof strength such as `proven` is kept separate from freshness state, and `invalidated` remains a delta consequence rather than a second freshness spelling.
