@@ -260,14 +260,8 @@ class RepositoryEvidenceBindingDeltaMixin:
         old: Mapping[str, Mapping[str, object]],
         new: Mapping[str, Mapping[str, object]],
     ) -> dict[str, object]:
-        added = [
-            deepcopy(new[key])
-            for key in sorted(set(new) - set(old))
-        ]
-        removed = [
-            deepcopy(old[key])
-            for key in sorted(set(old) - set(new))
-        ]
+        added = [deepcopy(new[key]) for key in sorted(set(new) - set(old))]
+        removed = [deepcopy(old[key]) for key in sorted(set(old) - set(new))]
         locator_changes = [
             {
                 "identity": key,
