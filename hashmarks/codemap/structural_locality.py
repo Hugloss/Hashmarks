@@ -126,6 +126,28 @@ def _freshness(stale: object) -> str:
     return "unknown"
 
 
+def _python_node_binds_name(node: ast.AST, name: str) -> bool:
+    if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+        return node.id == name
+    if isinstance(node, (ast.Import, ast.ImportFrom)):
+        return any(
+            (alias.asname or alias.name.rsplit(".", 1)[-1]) == name
+            for alias in node.names
+        )
+    return False
+
+
+def _binding_result(
+    rows: Sequence[dict[str, object]],
+    fallback: Sequence[dict[str, object]],
+    *,
+    unresolved: bool,
+) -> tuple[dict[str, object] | None, list[str], bool]:
+    if len(rows) == 1:
+        return rows[0], [_symbol_id(rows[0])], False
+    return None, sorted(_symbol_id(row) for row in rows or fallback), unresolved
+
+
 class StructuralLocalityMixin:
     """Project bounded structural-locality facts without refactor recommendations."""
 
@@ -195,22 +217,12 @@ class StructuralLocalityMixin:
             *function.args.posonlyargs,
             *function.args.args,
             *function.args.kwonlyargs,
+            *(() if function.args.vararg is None else (function.args.vararg,)),
+            *(() if function.args.kwarg is None else (function.args.kwarg,)),
         ]
-        if function.args.vararg is not None:
-            arguments.append(function.args.vararg)
-        if function.args.kwarg is not None:
-            arguments.append(function.args.kwarg)
-        if any(argument.arg == name for argument in arguments):
-            return True
-        for node in ast.walk(function):
-            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
-                if node.id == name:
-                    return True
-            elif isinstance(node, (ast.Import, ast.ImportFrom)):
-                for alias in node.names:
-                    if (alias.asname or alias.name.rsplit(".", 1)[-1]) == name:
-                        return True
-        return False
+        return any(argument.arg == name for argument in arguments) or any(
+            _python_node_binds_name(node, name) for node in ast.walk(function)
+        )
 
     def _python_plain_call_binding(
         self,
@@ -232,12 +244,8 @@ class StructuralLocalityMixin:
                 for row in candidates
                 if str(row.get("path") or "") == source_path
             ]
-            if len(local) == 1:
-                return local[0], [_symbol_id(local[0])], False
-            return (
-                None,
-                sorted(_symbol_id(row) for row in local or candidates),
-                len(local) > 1,
+            return _binding_result(
+                local, candidates, unresolved=len(local) > 1
             )
         if kind == "reexport" and len(targets) == 1:
             owners, unresolved = self._resolve_import_owner_evidence(
@@ -251,9 +259,9 @@ class StructuralLocalityMixin:
                 for row in candidates
                 if str(row.get("path") or "") in owner_paths
             ]
-            if len(owned) == 1:
-                return owned[0], [_symbol_id(owned[0])], False
-            return None, sorted(_symbol_id(row) for row in owned or candidates), bool(owners)
+            return _binding_result(
+                owned, candidates, unresolved=bool(owners)
+            )
         if kind in {"ambiguous", "star"}:
             return None, candidate_ids, True
         return None, candidate_ids, False
@@ -504,10 +512,8 @@ class StructuralLocalityMixin:
                 if str(row.get("path") or "") == source_path
                 and str(row.get("qualname") or "") == root
             ]
-            return (
-                None,
-                sorted(_symbol_id(row) for row in qualified or candidates),
-                bool(root_symbols),
+            return _binding_result(
+                qualified, candidates, unresolved=bool(root_symbols)
             )
         if kind == "reexport" and len(targets) == 1:
             owners, unresolved = self._resolve_import_owner_evidence(
@@ -537,13 +543,7 @@ class StructuralLocalityMixin:
                 if str(row.get("path") or "") in owner_paths
                 and str(row.get("qualname") or "") == qualified_name
             ]
-            if len(qualified) == 1:
-                return qualified[0], [_symbol_id(qualified[0])], False
-            return (
-                None,
-                sorted(_symbol_id(row) for row in qualified or candidates),
-                True,
-            )
+            return _binding_result(qualified, candidates, unresolved=True)
         if kind in {"ambiguous", "star"}:
             return None, candidate_ids, True
         return None, candidate_ids, False
@@ -678,6 +678,62 @@ class StructuralLocalityMixin:
             "symbol_evidence_identity": _identity(semantic),
         }
 
+    def _locality_graph(
+        self,
+        target_row: Mapping[str, object],
+        *,
+        max_depth: int,
+        call_limit_per_symbol: int,
+        ref_limit_per_symbol: int,
+    ) -> tuple[
+        list[dict[str, object]],
+        list[dict[str, object]],
+        list[dict[str, object]],
+        list[dict[str, object]],
+    ]:
+        queue: list[tuple[dict[str, object], int]] = [(dict(target_row), 0)]
+        nodes: dict[str, dict[str, object]] = {}
+        edges: list[dict[str, object]] = []
+        unresolved_calls: list[dict[str, object]] = []
+        external_calls: list[dict[str, object]] = []
+        while queue:
+            row, depth = queue.pop(0)
+            symbol_id = _symbol_id(row)
+            if symbol_id in nodes:
+                continue
+            nodes[symbol_id] = self._locality_node(
+                row, navigation_depth=depth, ref_limit=ref_limit_per_symbol
+            )
+            if depth >= max_depth:
+                continue
+            outgoing = [
+                dict(edge)
+                for edge in self.store.edges_from(
+                    str(row["path"]), str(row["qualname"])
+                )
+                if str(edge.get("kind") or "") == "call"
+            ]
+            for edge in outgoing[:call_limit_per_symbol]:
+                resolved, candidates, repository_unresolved = self._resolve_call_target(edge)
+                record = _locality_edge_record(symbol_id, edge, resolved, candidates)
+                edges.append(record)
+                if resolved is not None:
+                    queue.append((resolved, depth + 1))
+                elif repository_unresolved:
+                    unresolved_calls.append(record)
+                else:
+                    external_calls.append(record)
+            if len(outgoing) > call_limit_per_symbol:
+                unresolved_calls.append(
+                    {
+                        "source_symbol_id": symbol_id,
+                        "reason": "call-limit-reached",
+                        "limit": call_limit_per_symbol,
+                    }
+                )
+        ordered_nodes = sorted(nodes.values(), key=_locality_node_sort_key)
+        return ordered_nodes, edges, unresolved_calls, external_calls
+
     def structural_locality(
         self,
         target: str,
@@ -704,73 +760,24 @@ class StructuralLocalityMixin:
             self._ensure_map_ready()
         target_row = self._exact_locality_target(target)
 
-        queue: list[tuple[dict[str, object], int]] = [(target_row, 0)]
-        nodes: dict[str, dict[str, object]] = {}
-        edges: list[dict[str, object]] = []
-        unresolved_calls: list[dict[str, object]] = []
-        external_or_unindexed_calls: list[dict[str, object]] = []
-        while queue:
-            row, depth = queue.pop(0)
-            symbol_id = _symbol_id(row)
-            if symbol_id in nodes:
-                continue
-            node = self._locality_node(
-                row, navigation_depth=depth, ref_limit=ref_limit_per_symbol
-            )
-            nodes[symbol_id] = node
-            if depth >= max_depth:
-                continue
-            outgoing = [
-                dict(edge)
-                for edge in self.store.edges_from(
-                    str(row["path"]), str(row["qualname"])
-                )
-                if str(edge.get("kind") or "") == "call"
-            ]
-            truncated = len(outgoing) > call_limit_per_symbol
-            for edge in outgoing[:call_limit_per_symbol]:
-                resolved, candidates, repository_unresolved = self._resolve_call_target(edge)
-                record = {
-                    "source_symbol_id": symbol_id,
-                    "path": str(edge.get("path") or ""),
-                    "line": edge.get("line"),
-                    "target_text": str(edge.get("target") or ""),
-                    "confidence": str(edge.get("confidence") or ""),
-                    "resolved_symbol_id": None
-                    if resolved is None
-                    else _symbol_id(resolved),
-                    "candidate_symbol_ids": candidates,
-                }
-                edges.append(record)
-                if resolved is None:
-                    if repository_unresolved:
-                        unresolved_calls.append(record)
-                    else:
-                        external_or_unindexed_calls.append(record)
-                    continue
-                queue.append((resolved, depth + 1))
-            if truncated:
-                unresolved_calls.append(
-                    {
-                        "source_symbol_id": symbol_id,
-                        "reason": "call-limit-reached",
-                        "limit": call_limit_per_symbol,
-                    }
-                )
-
-        ordered_nodes = sorted(
-            nodes.values(),
-            key=lambda item: (
-                int(item["navigation_depth"]),
-                str(item["path"]),
-                int(item["lines"][0]),
-                str(item["qualname"]),
-            ),
+        (
+            ordered_nodes,
+            edges,
+            unresolved_calls,
+            external_or_unindexed_calls,
+        ) = self._locality_graph(
+            target_row,
+            max_depth=max_depth,
+            call_limit_per_symbol=call_limit_per_symbol,
+            ref_limit_per_symbol=ref_limit_per_symbol,
         )
         files = sorted({str(row["path"]) for row in ordered_nodes})
         verification = self.tests(str(target_row["path"]), max_depth=3)
         verification_paths = sorted(
             {str(path) for path in verification.get("tests", [])}
+        )
+        target_node = next(
+            row for row in ordered_nodes if row["symbol_id"] == _symbol_id(target_row)
         )
         dimensions = {
             "symbol_count": len(ordered_nodes),
@@ -793,9 +800,7 @@ class StructuralLocalityMixin:
             ),
             "unresolved_call_count": len(unresolved_calls),
             "external_or_unindexed_call_count": len(external_or_unindexed_calls),
-            "target_exact_caller_count": int(
-                nodes[_symbol_id(target_row)]["exact_caller_count"]
-            ),
+            "target_exact_caller_count": int(target_node["exact_caller_count"]),
         }
         repository_identity = "sha256:" + self._workspace_fingerprint_from_store()
         configuration = {
@@ -815,7 +820,7 @@ class StructuralLocalityMixin:
             "provider_version": __version__,
             "provider_implementation_identity": native_producer_implementation_identity(),
             "repository_identity": repository_identity,
-            "source_identity": nodes[_symbol_id(target_row)]["symbol_source_identity"],
+            "source_identity": target_node["symbol_source_identity"],
             "measurement_configuration_identity": _identity(configuration),
             "target": target,
             "target_symbol_id": _symbol_id(target_row),
@@ -862,6 +867,34 @@ class StructuralLocalityMixin:
         return {**semantic, "evidence_identity": _identity(semantic)}
 
 
+def _locality_edge_record(
+    source_symbol_id: str,
+    edge: Mapping[str, object],
+    resolved: Mapping[str, object] | None,
+    candidates: list[str],
+) -> dict[str, object]:
+    return {
+        "source_symbol_id": source_symbol_id,
+        "path": str(edge.get("path") or ""),
+        "line": edge.get("line"),
+        "target_text": str(edge.get("target") or ""),
+        "confidence": str(edge.get("confidence") or ""),
+        "resolved_symbol_id": None if resolved is None else _symbol_id(resolved),
+        "candidate_symbol_ids": candidates,
+    }
+
+
+def _locality_node_sort_key(item: Mapping[str, object]) -> tuple[int, str, int, str]:
+    lines = item["lines"]
+    assert isinstance(lines, Sequence) and not isinstance(lines, (str, bytes, bytearray))
+    return (
+        int(item["navigation_depth"]),
+        str(item["path"]),
+        int(lines[0]),
+        str(item["qualname"]),
+    )
+
+
 def _packet_identity_valid(packet: Mapping[str, object]) -> bool:
     identity = packet.get("evidence_identity")
     if not isinstance(identity, str) or not identity:
@@ -872,81 +905,64 @@ def _packet_identity_valid(packet: Mapping[str, object]) -> bool:
     return identity == _identity(semantic)
 
 
-def structural_locality_delta(
-    before: Mapping[str, object], after: Mapping[str, object]
-) -> dict[str, object]:
-    """Compare two structural-locality packets without interpreting the tradeoff."""
-    issues: list[str] = []
-    if before.get("schema") != STRUCTURAL_LOCALITY_SCHEMA:
-        issues.append("before-schema")
-    if after.get("schema") != STRUCTURAL_LOCALITY_SCHEMA:
-        issues.append("after-schema")
-    if before.get("provider") != "hashmarks":
-        issues.append("before-provider")
-    if after.get("provider") != "hashmarks":
-        issues.append("after-provider")
-    if before.get("provider_version") != after.get("provider_version"):
-        issues.append("provider-version")
-    if (
-        before.get("provider_implementation_identity")
-        != after.get("provider_implementation_identity")
-    ):
-        issues.append("provider-implementation")
-    if not _packet_identity_valid(before):
-        issues.append("before-evidence-identity")
-    if not _packet_identity_valid(after):
-        issues.append("after-evidence-identity")
-    if before.get("target") != after.get("target"):
-        issues.append("target")
-    if (
-        before.get("measurement_configuration_identity")
-        != after.get("measurement_configuration_identity")
-    ):
-        issues.append("measurement-configuration")
-    if before.get("repository_identity") == after.get("repository_identity"):
-        issues.append("repository-state-not-distinct")
+def _delta_incomparability_reasons(before: Mapping[str, object], after: Mapping[str, object]) -> list[str]:
+    checks = (
+        ("before-schema", before.get("schema") == STRUCTURAL_LOCALITY_SCHEMA),
+        ("after-schema", after.get("schema") == STRUCTURAL_LOCALITY_SCHEMA),
+        ("before-provider", before.get("provider") == "hashmarks"),
+        ("after-provider", after.get("provider") == "hashmarks"),
+        ("provider-version", before.get("provider_version") == after.get("provider_version")),
+        ("provider-implementation", before.get("provider_implementation_identity") == after.get("provider_implementation_identity")),
+        ("before-evidence-identity", _packet_identity_valid(before)),
+        ("after-evidence-identity", _packet_identity_valid(after)),
+        ("target", before.get("target") == after.get("target")),
+        ("measurement-configuration", before.get("measurement_configuration_identity") == after.get("measurement_configuration_identity")),
+        ("repository-state-not-distinct", before.get("repository_identity") != after.get("repository_identity")),
+    )
+    issues = [label for label, valid in checks if not valid]
     for label, packet in (("before", before), ("after", after)):
         freshness = packet.get("freshness")
         if not isinstance(freshness, Mapping) or freshness.get("state") != "current":
             issues.append(f"{label}-freshness")
         if not isinstance(packet.get("evidence_identity"), str):
             issues.append(f"{label}-identity")
+    return issues
 
-    before_nodes = {
-        str(row.get("symbol_id")): row
-        for row in before.get("nodes", [])
-        if isinstance(row, Mapping) and row.get("symbol_id")
-    }
-    after_nodes = {
-        str(row.get("symbol_id")): row
-        for row in after.get("nodes", [])
-        if isinstance(row, Mapping) and row.get("symbol_id")
-    }
-    before_dimensions = before.get("dimensions")
-    after_dimensions = after.get("dimensions")
-    dimension_delta: dict[str, int] = {}
-    if not isinstance(before_dimensions, Mapping) or not isinstance(
-        after_dimensions, Mapping
-    ):
+
+def _delta_nodes(packet: Mapping[str, object]) -> dict[str, Mapping[str, object]]:
+    rows = packet.get("nodes", [])
+    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)):
+        return {}
+    return {str(row.get("symbol_id")): row for row in rows if isinstance(row, Mapping) and row.get("symbol_id")}
+
+
+def _integer_dimension_delta(before: object, after: object) -> tuple[dict[str, int], bool]:
+    if not isinstance(before, Mapping) or not isinstance(after, Mapping):
+        return {}, False
+    delta: dict[str, int] = {}
+    for key in sorted(set(before) & set(after)):
+        left, right = before.get(key), after.get(key)
+        if isinstance(left, int) and not isinstance(left, bool) and isinstance(right, int) and not isinstance(right, bool):
+            delta[str(key)] = right - left
+    return delta, True
+
+
+def _string_set(packet: Mapping[str, object], key: str) -> set[str]:
+    values = packet.get(key, [])
+    if not isinstance(values, Sequence) or isinstance(values, (str, bytes, bytearray)):
+        return set()
+    return {str(value) for value in values if value}
+
+
+def structural_locality_delta(before: Mapping[str, object], after: Mapping[str, object]) -> dict[str, object]:
+    """Compare two structural-locality packets without interpreting the tradeoff."""
+    issues = _delta_incomparability_reasons(before, after)
+    before_nodes, after_nodes = _delta_nodes(before), _delta_nodes(after)
+    dimension_delta, dimensions_valid = _integer_dimension_delta(before.get("dimensions"), after.get("dimensions"))
+    if not dimensions_valid:
         issues.append("dimensions")
-    else:
-        for key in sorted(set(before_dimensions) & set(after_dimensions)):
-            left = before_dimensions.get(key)
-            right = after_dimensions.get(key)
-            if (
-                isinstance(left, int)
-                and not isinstance(left, bool)
-                and isinstance(right, int)
-                and not isinstance(right, bool)
-            ):
-                dimension_delta[str(key)] = right - left
-
-    before_verifiers = {
-        str(value) for value in before.get("verification_paths", []) if value
-    }
-    after_verifiers = {
-        str(value) for value in after.get("verification_paths", []) if value
-    }
+    before_verifiers = _string_set(before, "verification_paths")
+    after_verifiers = _string_set(after, "verification_paths")
     semantic = {
         "schema": STRUCTURAL_LOCALITY_DELTA_SCHEMA,
         "target": before.get("target"),
@@ -954,9 +970,7 @@ def structural_locality_delta(
         "after_evidence_identity": after.get("evidence_identity"),
         "before_repository_identity": before.get("repository_identity"),
         "after_repository_identity": after.get("repository_identity"),
-        "measurement_configuration_identity": before.get(
-            "measurement_configuration_identity"
-        ),
+        "measurement_configuration_identity": before.get("measurement_configuration_identity"),
         "comparable": not issues,
         "incomparability_reasons": sorted(set(issues)),
         "introduced_symbol_ids": sorted(set(after_nodes) - set(before_nodes)),
@@ -964,10 +978,6 @@ def structural_locality_delta(
         "dimension_delta": dimension_delta,
         "verification_paths_added": sorted(after_verifiers - before_verifiers),
         "verification_paths_removed": sorted(before_verifiers - after_verifiers),
-        "claims": {
-            "architectural_improvement": False,
-            "refactor_recommendation": False,
-            "consumer_policy_applied": False,
-        },
+        "claims": {"architectural_improvement": False, "refactor_recommendation": False, "consumer_policy_applied": False},
     }
     return {**semantic, "evidence_identity": _identity(semantic)}
