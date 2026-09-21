@@ -180,12 +180,13 @@ def test_service_agent_task_start_returns_bounded_source_evidence(
             "Change normalize_widget to lowercase the trimmed value and verify normalize_widget",
             token_budget=512,
         )
-        assert start["schema"] == "hashmarks.task-evidence.v1"
-        assert start["status"] == "safe-fresh"
-        assert start["edit"] == "src/engine.py"
-        assert start["source_budget"]["complete"] is True
-        assert start["edit_evidence"]["representation"] == "source-range"
-        assert "test_normalize_widget" not in start["edit_evidence"]["content"]
+        assert start["schema"] == "hashmarks.task-evidence.v2"
+        ownership = start["ownership"]
+        assert ownership["status"] == "resolved"
+        assert ownership["owner"]["path"] == "src/engine.py"
+        assert ownership["source_budget"]["complete"] is True
+        assert ownership["source_evidence"]["representation"] == "source-range"
+        assert "test_normalize_widget" not in ownership["source_evidence"]["content"]
     finally:
         client.stop()
         thread.join(timeout=5)
