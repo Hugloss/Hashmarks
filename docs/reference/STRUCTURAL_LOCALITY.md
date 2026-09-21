@@ -40,6 +40,8 @@ For a static call such as `helper(...)`, Hashmarks resolves the target only when
 
 The same rule applies to caller evidence. A candidate caller that cannot be proven to target the selected symbol remains unresolved. `exact_caller_count` is therefore safe as positive evidence (for example, two exact callers prove at least two callers) but must not be interpreted as global caller-set completeness or as proof that a symbol is single-use.
 
+For Python class methods, `self.member(...)` and `cls.member(...)` may be promoted to an exact call only when the containing method/class is statically known and the member has one unambiguous owner through the local/import-resolved class inheritance graph. Competing inherited owners, unsupported/dynamic bases, or receiver shapes other than proven `self`/`cls` remain unresolved or external evidence rather than being guessed.
+
 ## Forwarding-only syntax
 
 For supported Python symbols, Hashmarks reports whether the function body is syntactically just one call/return-call after an optional docstring. This is a structural observation only.
