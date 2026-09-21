@@ -130,7 +130,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             self = cast("CodeMap", self)
         used = 0
         seen: set[str] = set()
-        for role in ("admitted_edit", "verify", "contract"):
+        for role in ("edit", "verify", "contract"):
             row = action.get(role)
             if not isinstance(row, dict):
                 continue
@@ -185,9 +185,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
     ) -> tuple[
         dict[str, object] | None, dict[str, object] | None, dict[str, object] | None
     ]:
-        """Return the already-selected edit, verification, and contract evidence rows."""
+        """Return the admitted edit, verification, and contract evidence rows."""
         selected = []
-        for role in ("edit", "verify", "contract"):
+        for role in ("admitted_edit", "verify", "contract"):
             value = action.get(role)
             selected.append(value if isinstance(value, dict) else None)
         return selected[0], selected[1], selected[2]
