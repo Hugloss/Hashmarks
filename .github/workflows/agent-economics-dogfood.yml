@@ -98,6 +98,26 @@ jobs:
             --cov-branch \
             --cov-report=term-missing:skip-covered
 
+      - name: Create current-source Hashmarks observer executable
+        run: |
+          cat > "$RUNNER_TEMP/hashmarks-current-observer" <<'PY'
+          #!/usr/bin/env python3
+          import os
+          import sys
+
+          workspace = os.environ["GITHUB_WORKSPACE"]
+          sys.path = [
+              entry
+              for entry in sys.path
+              if entry not in {"", os.getcwd(), workspace}
+          ]
+          sys.path.insert(0, workspace)
+          from hashmarks.cli import main
+
+          raise SystemExit(main())
+          PY
+          chmod +x "$RUNNER_TEMP/hashmarks-current-observer"
+
       - name: Prepare exact binding-delta pre-edit worktree
         run: git worktree add "$RUNNER_TEMP/hashmarks-binding-before" 50b0e3be83fc0dd445bae9494367ece2f25179fe
 
@@ -108,7 +128,7 @@ jobs:
           python3 -m agent_economics refactor-locality observe-hashmarks \
             'hashmarks/codemap/repository_evidence_binding_delta.py::RepositoryEvidenceBindingDeltaMixin._binding_change' \
             --repository-root "$RUNNER_TEMP/hashmarks-binding-before" \
-            --hashmarks-executable "$GITHUB_WORKSPACE/.test-venv/bin/hashmarks" \
+            --hashmarks-executable "$RUNNER_TEMP/hashmarks-current-observer" \
             --artifact .agent-artifacts/binding-locality-before-observed.json
 
       - name: Observe post-edit binding-delta locality identity
@@ -118,7 +138,7 @@ jobs:
           python3 -m agent_economics refactor-locality observe-hashmarks \
             'hashmarks/codemap/repository_evidence_binding_delta.py::RepositoryEvidenceBindingDeltaMixin._binding_change' \
             --repository-root . \
-            --hashmarks-executable "$GITHUB_WORKSPACE/.test-venv/bin/hashmarks" \
+            --hashmarks-executable "$RUNNER_TEMP/hashmarks-current-observer" \
             --artifact .agent-artifacts/binding-locality-post-seed.json
 
       - name: Bind semantic responsibility evidence
@@ -197,7 +217,7 @@ jobs:
           python3 -m agent_economics refactor-locality observe-hashmarks \
             'hashmarks/codemap/repository_evidence_binding_delta.py::RepositoryEvidenceBindingDeltaMixin._binding_change' \
             --repository-root . \
-            --hashmarks-executable "$GITHUB_WORKSPACE/.test-venv/bin/hashmarks" \
+            --hashmarks-executable "$RUNNER_TEMP/hashmarks-current-observer" \
             --values .agent-artifacts/binding-structural-values.json \
             --artifact .agent-artifacts/binding-locality-post-observed.json
 
