@@ -5,9 +5,11 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.digest import Digest
 from hashmarks.file_store import UnstableFileError
 from hashmarks.paths import normalize_relative_path
 
+from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
 from .freshness_map import FreshnessMapOptions
 
@@ -22,6 +24,21 @@ if TYPE_CHECKING:
 class RepositoryGenerationBinding:
     repository_identity: str
     codemap_generation: int
+
+
+@dataclass(frozen=True, slots=True)
+class _RepositoryMemberSource:
+    rel: str
+    path: Path
+    row: Mapping[str, object] | None
+    visibility: str
+    indexed_revision: str
+
+
+@dataclass(frozen=True, slots=True)
+class _RepositoryMemberRead:
+    raw: bytes | None
+    digest: Digest | None
 
 
 def _observer_descriptor() -> dict[str, object]:
@@ -81,62 +98,40 @@ class RepositoryDeltaMixin:
             raise ValueError(f"{field} must be an object")
         return value
 
-    def _repository_member_observation(
-        self,
-        relpath: str,
-        *,
-        include_bytes: bool = False,
-    ) -> tuple[dict[str, object], bytes | None]:
-        """Observe one repository member through canonical policy/revision authority."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+    def _repository_member_source(
+        self, relpath: str
+    ) -> _RepositoryMemberSource | dict[str, object]:
+        self = cast("CodeMap", self)
         rel = normalize_relative_path(relpath, allow_root=False)
         decision = self.policy.decide(rel)
-        base: dict[str, object] = {"path": rel}
-
         if not decision.index or decision.evidence_visibility.value == "deny":
-            return (
-                {
-                    **base,
-                    "state": "unsupported",
-                    "reason": "repository-evidence-denied",
-                },
-                None,
-            )
+            return {
+                "path": rel,
+                "state": "unsupported",
+                "reason": "repository-evidence-denied",
+            }
         if not self._path_admitted_for_analysis(rel):
-            return (
-                {
-                    **base,
-                    "state": "unsupported",
-                    "reason": "repository-evidence-not-admitted",
-                },
-                None,
-            )
-
+            return {
+                "path": rel,
+                "state": "unsupported",
+                "reason": "repository-evidence-not-admitted",
+            }
+        path = self.workspace / rel
         cursor = self.workspace
         for part in rel.split("/"):
             cursor = cursor / part
             if cursor.is_symlink():
-                return (
-                    {
-                        **base,
-                        "state": "unsupported",
-                        "reason": "symlink-evidence-not-observed",
-                    },
-                    None,
-                )
-
-        path = self.workspace / rel
+                return {
+                    "path": rel,
+                    "state": "unsupported",
+                    "reason": "symlink-evidence-not-observed",
+                }
         if not path.is_file():
-            return (
-                {
-                    **base,
-                    "state": "known-absent",
-                    "reason": "member-not-present",
-                },
-                None,
-            )
-
+            return {
+                "path": rel,
+                "state": "known-absent",
+                "reason": "member-not-present",
+            }
         row = self._session_file_row(rel)
         visibility = (
             str(row.get("evidence_visibility") or decision.evidence_visibility.value)
@@ -146,6 +141,71 @@ class RepositoryDeltaMixin:
         indexed_revision = (
             str(row.get("file_digest") or "") if row is not None else ""
         )
+        return _RepositoryMemberSource(
+            rel=rel,
+            path=path,
+            row=row,
+            visibility=visibility,
+            indexed_revision=indexed_revision,
+        )
+
+    def _read_repository_member_source(
+        self,
+        source: _RepositoryMemberSource,
+        *,
+        include_bytes: bool,
+    ) -> _RepositoryMemberRead | dict[str, object]:
+        self = cast("CodeMap", self)
+        try:
+            if include_bytes:
+                raw, digest = self.file_store.read_bytes_stable(source.path)
+            elif source.row is None:
+                digest = self.file_store.digest(
+                    source.path,
+                    workspace=self.workspace,
+                    relative_path=source.rel,
+                    force=True,
+                )
+                raw = None
+            else:
+                digest = None
+                raw = None
+        except FileNotFoundError:
+            return {
+                "path": source.rel,
+                "state": "known-absent",
+                "reason": "member-not-present",
+            }
+        except (OSError, UnstableFileError):
+            return {
+                "path": source.rel,
+                "state": "unknown",
+                "reason": "member-read-unstable-or-unavailable",
+                **(
+                    {"member_revision": source.indexed_revision}
+                    if source.indexed_revision
+                    else {}
+                ),
+                "evidence_visibility": source.visibility,
+                "index_state": "indexed" if source.row is not None else "unindexed",
+            }
+        return _RepositoryMemberRead(raw, digest)
+
+    def _repository_member_observation(
+        self,
+        relpath: str,
+        *,
+        include_bytes: bool = False,
+    ) -> tuple[dict[str, object], bytes | None]:
+        """Observe one repository member through canonical policy/revision authority."""
+        self = cast("CodeMap", self)
+        source = self._repository_member_source(relpath)
+        if isinstance(source, dict):
+            return source, None
+        base: dict[str, object] = {"path": source.rel}
+        row = source.row
+        visibility = source.visibility
+        indexed_revision = source.indexed_revision
 
         if include_bytes and visibility != "source":
             return (
@@ -164,45 +224,12 @@ class RepositoryDeltaMixin:
                 None,
             )
 
-        try:
-            if include_bytes:
-                raw, digest = self.file_store.read_bytes_stable(path)
-            elif row is None:
-                digest = self.file_store.digest(
-                    path,
-                    workspace=self.workspace,
-                    relative_path=rel,
-                    force=True,
-                )
-                raw = None
-            else:
-                digest = None
-                raw = None
-        except FileNotFoundError:
-            return (
-                {
-                    **base,
-                    "state": "known-absent",
-                    "reason": "member-not-present",
-                },
-                None,
-            )
-        except (OSError, UnstableFileError):
-            return (
-                {
-                    **base,
-                    "state": "unknown",
-                    "reason": "member-read-unstable-or-unavailable",
-                    **(
-                        {"member_revision": indexed_revision}
-                        if indexed_revision
-                        else {}
-                    ),
-                    "evidence_visibility": visibility,
-                    "index_state": "indexed" if row is not None else "unindexed",
-                },
-                None,
-            )
+        read = self._read_repository_member_source(
+            source, include_bytes=include_bytes
+        )
+        if isinstance(read, dict):
+            return read, None
+        raw, digest = read.raw, read.digest
 
         if row is not None:
             if digest is not None and digest.hash != indexed_revision:
@@ -847,8 +874,10 @@ class RepositoryDeltaMixin:
         previous_snapshot: Mapping[str, object],
         limit: int = 20,
         per_role: int = 3,
-        impact_limit_per_surface: int = 4,
-        max_depth: int = 3,
+        options: ChangeImpactOptions = ChangeImpactOptions(
+            impact_limit_per_surface=4,
+            max_depth=3,
+        ),
     ) -> dict[str, object]:
         """Return changed repository-intelligence facts between admitted states."""
         if TYPE_CHECKING:
@@ -861,8 +890,8 @@ class RepositoryDeltaMixin:
             changed_paths,
             limit=limit,
             per_role=per_role,
-            impact_limit_per_surface=impact_limit_per_surface,
-            max_depth=max_depth,
+            impact_limit_per_surface=options.impact_limit_per_surface,
+            max_depth=options.max_depth,
         )
         current_repository = self._delta_mapping(
             current.get("repository"), field="current.repository"

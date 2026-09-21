@@ -139,8 +139,7 @@ class IntelligenceEconomicsMixin:
                 previous_snapshot=previous_snapshot,
                 limit=limit,
                 per_role=per_role,
-                impact_limit_per_surface=options.impact_limit_per_surface,
-                max_depth=options.max_depth,
+                options=options,
             )
             previous_bytes = self._economics_bytes(previous_snapshot)
             current_bytes = self._economics_bytes(snapshot)

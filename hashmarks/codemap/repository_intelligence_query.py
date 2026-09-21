@@ -141,7 +141,9 @@ class RepositoryIntelligenceQueryMixin:
                     task,
                     changed_paths,
                     previous_snapshot=options.previous_snapshot,
-                    **common,
+                    limit=options.limit,
+                    per_role=options.per_role,
+                    options=impact_options,
                 )
             else:
                 result = producers[surface]()
