@@ -1186,3 +1186,39 @@ def test_binding_delta_rejects_malformed_before_packet(
         with pytest.raises(ValueError, match=match):
             codemap.repository_evidence_binding_delta(before, packet)
 
+def test_binding_delta_reports_unsupported_member_becoming_present_as_state_change(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    linked = tmp_path / "linked"
+    linked.symlink_to(outside, target_is_directory=True)
+    binding = [
+        {
+            "binding_id": "state-transition",
+            "evidence": [
+                {"path": "linked/owner.py", "start_line": 1, "end_line": 1}
+            ],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+        linked.unlink()
+        linked.mkdir()
+        (linked / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+        codemap.sync(["linked/owner.py"])
+        after = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+        delta = codemap.repository_evidence_binding_delta(before, after)
+
+    change = delta["bindings"]["changed"][0]["member_evidence"]["changes"][0]
+    assert change["state"] == "state-changed"
+    assert change["before_state"] == "unsupported"
+    assert change["after_state"] == "known-present"
+    assert change["observation_state_changed"] is True
+
