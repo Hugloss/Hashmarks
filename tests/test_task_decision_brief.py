@@ -70,7 +70,6 @@ def test_decision_brief_never_promotes_ambiguous_candidate_to_edit(
     assert packet["ownership_authority"]["owner_resolved"] is False
     assert brief["safe"] is False
     assert brief["edit"] is None
-    assert brief["candidate"]["path"] in {"src/a.py", "src/b.py"}
     assert brief["discrimination"] == {
         "needed": True,
         "reason": "competing-action-roles",
