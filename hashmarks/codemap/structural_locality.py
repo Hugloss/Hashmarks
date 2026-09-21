@@ -678,6 +678,62 @@ class StructuralLocalityMixin:
             "symbol_evidence_identity": _identity(semantic),
         }
 
+    def _locality_graph(
+        self,
+        target_row: Mapping[str, object],
+        *,
+        max_depth: int,
+        call_limit_per_symbol: int,
+        ref_limit_per_symbol: int,
+    ) -> tuple[
+        list[dict[str, object]],
+        list[dict[str, object]],
+        list[dict[str, object]],
+        list[dict[str, object]],
+    ]:
+        queue: list[tuple[dict[str, object], int]] = [(dict(target_row), 0)]
+        nodes: dict[str, dict[str, object]] = {}
+        edges: list[dict[str, object]] = []
+        unresolved_calls: list[dict[str, object]] = []
+        external_calls: list[dict[str, object]] = []
+        while queue:
+            row, depth = queue.pop(0)
+            symbol_id = _symbol_id(row)
+            if symbol_id in nodes:
+                continue
+            nodes[symbol_id] = self._locality_node(
+                row, navigation_depth=depth, ref_limit=ref_limit_per_symbol
+            )
+            if depth >= max_depth:
+                continue
+            outgoing = [
+                dict(edge)
+                for edge in self.store.edges_from(
+                    str(row["path"]), str(row["qualname"])
+                )
+                if str(edge.get("kind") or "") == "call"
+            ]
+            for edge in outgoing[:call_limit_per_symbol]:
+                resolved, candidates, repository_unresolved = self._resolve_call_target(edge)
+                record = _locality_edge_record(symbol_id, edge, resolved, candidates)
+                edges.append(record)
+                if resolved is not None:
+                    queue.append((resolved, depth + 1))
+                elif repository_unresolved:
+                    unresolved_calls.append(record)
+                else:
+                    external_calls.append(record)
+            if len(outgoing) > call_limit_per_symbol:
+                unresolved_calls.append(
+                    {
+                        "source_symbol_id": symbol_id,
+                        "reason": "call-limit-reached",
+                        "limit": call_limit_per_symbol,
+                    }
+                )
+        ordered_nodes = sorted(nodes.values(), key=_locality_node_sort_key)
+        return ordered_nodes, edges, unresolved_calls, external_calls
+
     def structural_locality(
         self,
         target: str,
@@ -704,68 +760,16 @@ class StructuralLocalityMixin:
             self._ensure_map_ready()
         target_row = self._exact_locality_target(target)
 
-        queue: list[tuple[dict[str, object], int]] = [(target_row, 0)]
-        nodes: dict[str, dict[str, object]] = {}
-        edges: list[dict[str, object]] = []
-        unresolved_calls: list[dict[str, object]] = []
-        external_or_unindexed_calls: list[dict[str, object]] = []
-        while queue:
-            row, depth = queue.pop(0)
-            symbol_id = _symbol_id(row)
-            if symbol_id in nodes:
-                continue
-            node = self._locality_node(
-                row, navigation_depth=depth, ref_limit=ref_limit_per_symbol
-            )
-            nodes[symbol_id] = node
-            if depth >= max_depth:
-                continue
-            outgoing = [
-                dict(edge)
-                for edge in self.store.edges_from(
-                    str(row["path"]), str(row["qualname"])
-                )
-                if str(edge.get("kind") or "") == "call"
-            ]
-            truncated = len(outgoing) > call_limit_per_symbol
-            for edge in outgoing[:call_limit_per_symbol]:
-                resolved, candidates, repository_unresolved = self._resolve_call_target(edge)
-                record = {
-                    "source_symbol_id": symbol_id,
-                    "path": str(edge.get("path") or ""),
-                    "line": edge.get("line"),
-                    "target_text": str(edge.get("target") or ""),
-                    "confidence": str(edge.get("confidence") or ""),
-                    "resolved_symbol_id": None
-                    if resolved is None
-                    else _symbol_id(resolved),
-                    "candidate_symbol_ids": candidates,
-                }
-                edges.append(record)
-                if resolved is None:
-                    if repository_unresolved:
-                        unresolved_calls.append(record)
-                    else:
-                        external_or_unindexed_calls.append(record)
-                    continue
-                queue.append((resolved, depth + 1))
-            if truncated:
-                unresolved_calls.append(
-                    {
-                        "source_symbol_id": symbol_id,
-                        "reason": "call-limit-reached",
-                        "limit": call_limit_per_symbol,
-                    }
-                )
-
-        ordered_nodes = sorted(
-            nodes.values(),
-            key=lambda item: (
-                int(item["navigation_depth"]),
-                str(item["path"]),
-                int(item["lines"][0]),
-                str(item["qualname"]),
-            ),
+        (
+            ordered_nodes,
+            edges,
+            unresolved_calls,
+            external_or_unindexed_calls,
+        ) = self._locality_graph(
+            target_row,
+            max_depth=max_depth,
+            call_limit_per_symbol=call_limit_per_symbol,
+            ref_limit_per_symbol=ref_limit_per_symbol,
         )
         files = sorted({str(row["path"]) for row in ordered_nodes})
         verification = self.tests(str(target_row["path"]), max_depth=3)
@@ -860,6 +864,34 @@ class StructuralLocalityMixin:
             },
         }
         return {**semantic, "evidence_identity": _identity(semantic)}
+
+
+def _locality_edge_record(
+    source_symbol_id: str,
+    edge: Mapping[str, object],
+    resolved: Mapping[str, object] | None,
+    candidates: list[str],
+) -> dict[str, object]:
+    return {
+        "source_symbol_id": source_symbol_id,
+        "path": str(edge.get("path") or ""),
+        "line": edge.get("line"),
+        "target_text": str(edge.get("target") or ""),
+        "confidence": str(edge.get("confidence") or ""),
+        "resolved_symbol_id": None if resolved is None else _symbol_id(resolved),
+        "candidate_symbol_ids": candidates,
+    }
+
+
+def _locality_node_sort_key(item: Mapping[str, object]) -> tuple[int, str, int, str]:
+    lines = item["lines"]
+    assert isinstance(lines, Sequence) and not isinstance(lines, (str, bytes, bytearray))
+    return (
+        int(item["navigation_depth"]),
+        str(item["path"]),
+        int(lines[0]),
+        str(item["qualname"]),
+    )
 
 
 def _packet_identity_valid(packet: Mapping[str, object]) -> bool:
