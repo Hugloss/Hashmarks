@@ -86,6 +86,7 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 - `freshness_map.py` — consumer-facing freshness-map projection.
 - `change_intelligence.py`, `repository_delta.py`, `evidence_profiles.py`, `cross_repository_evidence.py`, `intelligence_economics.py` — derived repository-intelligence projections. `repository_delta.py` owns snapshot composition and repository/observer delta vocabulary; inside one explicit decision session, an exact snapshot request may be reused by profile/economics/delta consumers without creating a second truth source.
 - `repository_evidence_bindings.py`, `repository_evidence_binding_delta.py`, `repository_evidence_coverage.py` — opaque consumer binding projections over existing repository observation, member revision, relationship, freshness, completeness, and delta authorities. They may own binding declaration/projection shape but must not create a second repository change/freshness model.
+- `evidence_correlation.py` — request-scoped correlation of bounded external/derived claims to existing repository member, symbol, binding, relationship, completeness, freshness, and delta authorities. It owns only claim/correspondence/source-equivalence projection semantics; interpretation, causation, persistence, execution, and recovery remain external.
 - `repository_intelligence_query.py` — thin query facade over those producers; it is not a second source of truth.
 
 ### Task evidence packets
