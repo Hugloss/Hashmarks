@@ -29,6 +29,7 @@ DIAGNOSTIC_BATCH ?= 0
 DIAGNOSTIC_BATCH_LIMIT ?= 8
 DIAGNOSTIC_SHARD ?= 0
 DIAGNOSTIC_EXTRA_MARKER ?=
+RUFF_DEBT_PREVIOUS_BASELINE ?=
 
 .PHONY: help evaluation-help lock init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help lint ruff ruff-check ruff-format-check typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json lint-debt-gate test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
 
@@ -193,7 +194,7 @@ lint-debt-json:
 	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint python scripts/ruff_debt.py --json; status=$$?; test $$status -eq 0 -o $$status -eq 1
 
 lint-debt-gate:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint python scripts/ruff_debt.py --baseline ruff-debt-baseline.json
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV) run --only-group lint python scripts/ruff_debt.py --baseline ruff-debt-baseline.json $(if $(strip $(RUFF_DEBT_PREVIOUS_BASELINE)),--previous-baseline "$(RUFF_DEBT_PREVIOUS_BASELINE)",)
 
 test:
 	@if [ "$${HASHMARKS_CONSTRAINED_HOST:-0}" = "1" ]; then \
