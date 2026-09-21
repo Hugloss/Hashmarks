@@ -212,3 +212,18 @@ Evidence correlation must not add:
 The permanent split remains:
 
 > **Hashmarks establishes repository truth and correlates evidence to it. The consuming agent decides what the evidence means and what action to take.**
+
+
+## Temporal and source provenance
+
+A bundle may carry bounded JSON-compatible `provenance` describing external observation facts such as event time, observation time, collection time, source service, or source placement. Hashmarks preserves these values as caller-claimed external provenance; it does not translate them into repository freshness.
+
+Repository freshness remains independently established by repository evidence owners. A recent external timestamp cannot make stale or mismatched repository evidence current, and a repository revision cannot prove when an external event occurred.
+
+Provenance participates in evidence-definition identity. Changing the external observation window/time/source question therefore changes the definition rather than masquerading as repository change.
+
+## Delta comparability
+
+Evidence-correlation delta is authoritative only when `evidence_definition_identity` is preserved. A preserved definition emits `comparability=comparable` and may include repository evidence delta. A changed definition emits `comparability=not-comparable` and suppresses repository evidence delta rather than presenting changes from two different questions as repository change.
+
+This is deliberately non-causal: comparable correspondence changes still do not establish incident identity, culprit, root cause, or repair action.
