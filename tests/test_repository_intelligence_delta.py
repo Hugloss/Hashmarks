@@ -12,6 +12,9 @@ from hashmarks.codemap.repository_delta import (
     RepositoryDeltaMixin,
     RepositoryGenerationBinding,
 )
+from hashmarks.codemap.repository_intelligence_query import (
+    RepositoryIntelligenceQueryOptions,
+)
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
 if TYPE_CHECKING:
@@ -234,7 +237,10 @@ def test_repository_snapshot_and_delta_service_surface(tmp_path: Path) -> None:
         source.write_text("def widget(): return 'new'\n", encoding="utf-8")
         client.sync()
         delta = client.repository_intelligence_query(
-            "delta", task, ["src/owner.py"], previous_snapshot=previous
+            "delta",
+            task,
+            ["src/owner.py"],
+            options=RepositoryIntelligenceQueryOptions(previous_snapshot=previous),
         )["result"]
         assert delta["schema"] == "hashmarks.repository-intelligence-delta.v1"
         assert delta["execution_effect"] == "none"

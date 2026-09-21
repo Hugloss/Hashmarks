@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.freshness_map import FreshnessMapOptions
+from hashmarks.codemap.repository_intelligence_query import (
+    RepositoryIntelligenceQueryOptions,
+)
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
 if TYPE_CHECKING:
@@ -190,7 +193,9 @@ def test_service_exposes_freshness_map(tmp_path: Path) -> None:
             "freshness",
             task,
             ["src/case/engine.py"],
-            negative_members=["tests/test_other.py"],
+            options=RepositoryIntelligenceQueryOptions(
+                negative_members=("tests/test_other.py",)
+            ),
         )["result"]
         assert freshness["schema"] == "hashmarks.evidence-freshness-map.v1"
     finally:

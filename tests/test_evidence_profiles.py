@@ -7,6 +7,9 @@ import pytest
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.change_impact import ChangeImpactOptions
+from hashmarks.codemap.repository_intelligence_query import (
+    RepositoryIntelligenceQueryOptions,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -172,7 +175,7 @@ def test_profile_service_roundtrip(tmp_path: Path) -> None:
             "profile",
             "Fix widget accepted response behavior",
             ["src/owner.py"],
-            profile="compact",
+            options=RepositoryIntelligenceQueryOptions(profile="compact"),
         )["result"]
         assert profile["schema"] == "hashmarks.evidence-profile.v1"
         assert profile["profile"] == "compact"

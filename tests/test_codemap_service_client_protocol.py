@@ -7,6 +7,10 @@ from pathlib import Path
 import pytest
 
 from hashmarks.codemap import service as service_module
+from hashmarks.codemap.post_change import PostChangeOptions
+from hashmarks.codemap.repository_intelligence_query import (
+    RepositoryIntelligenceQueryOptions,
+)
 
 
 class _FakeSocket:
@@ -84,3 +88,52 @@ def test_client_request_retries_blocked_local_connect(
 
     assert service_module.CodeMapServiceClient(tmp_path).request("example")["ok"]
     assert fake_socket.connects == 2
+
+
+def test_client_serializes_typed_query_and_refresh_options(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = service_module.CodeMapServiceClient(tmp_path)
+    requests: list[tuple[str, dict[str, object]]] = []
+
+    def request(operation: str, **payload: object) -> dict[str, object]:
+        requests.append((operation, payload))
+        key = (
+            "repository_intelligence_query"
+            if operation == "repository_intelligence_query"
+            else "refresh_delta"
+        )
+        return {key: {"schema": "test"}}
+
+    monkeypatch.setattr(client, "request", request)
+    client.repository_intelligence_query(
+        "profile",
+        "inspect widget",
+        ["src/widget.py"],
+        options=RepositoryIntelligenceQueryOptions(profile="audit", limit=7),
+    )
+    client.refresh_after_change_delta(
+        "inspect widget",
+        ["src/widget.py"],
+        options=PostChangeOptions(
+            previous_edit_path="src/widget.py",
+            previous_verify_path="tests/test_widget.py",
+            token_budget=256,
+        ),
+    )
+
+    assert requests[0][0] == "repository_intelligence_query"
+    assert requests[0][1]["profile"] == "audit"
+    assert requests[0][1]["limit"] == 7
+    assert requests[1] == (
+        "refresh_after_change_delta",
+        {
+            "task": "inspect widget",
+            "changed_paths": ["src/widget.py"],
+            "previous_edit_path": "src/widget.py",
+            "previous_verify_path": "tests/test_widget.py",
+            "limit": 20,
+            "per_role": 3,
+            "token_budget": 256,
+        },
+    )

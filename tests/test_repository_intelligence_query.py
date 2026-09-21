@@ -7,6 +7,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks import CodeMap
+from hashmarks.codemap.repository_intelligence_query import (
+    RepositoryIntelligenceQueryOptions,
+)
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 
 if TYPE_CHECKING:
@@ -54,9 +57,13 @@ def test_query_facade_delegates_without_changing_producer_semantics(
                 surface,
                 task,
                 ["src/owner.py"] if surface != "verification-explanation" else (),
-                member_path="tests/test_owner.py"
-                if surface == "verification-explanation"
-                else None,
+                options=RepositoryIntelligenceQueryOptions(
+                    member_path=(
+                        "tests/test_owner.py"
+                        if surface == "verification-explanation"
+                        else None
+                    )
+                ),
             )
             for surface in expected
         }
@@ -86,7 +93,7 @@ def test_query_facade_delta_matches_direct_delta(tmp_path: Path) -> None:
             "delta",
             task,
             ["src/owner.py"],
-            previous_snapshot=previous,
+            options=RepositoryIntelligenceQueryOptions(previous_snapshot=previous),
         )
     assert query["result"] == direct
 
@@ -130,7 +137,7 @@ def test_query_facade_service_roundtrip(tmp_path: Path) -> None:
             "profile",
             task,
             ["src/owner.py"],
-            profile="compact",
+            options=RepositoryIntelligenceQueryOptions(profile="compact"),
         )
         assert result["schema"] == "hashmarks.repository-intelligence-query.v1"
         assert result["producer_schema"] == "hashmarks.evidence-profile.v1"
