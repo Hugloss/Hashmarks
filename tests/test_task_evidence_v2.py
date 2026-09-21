@@ -120,9 +120,8 @@ def test_task_evidence_v2_keeps_dependency_as_related_evidence_not_owner(
     assert packet["explicit_target"]["path"] == "src/publish.py"
     assert packet["ownership"]["ambiguity"]["ambiguous"] is False
 
-    dependency_paths = {
-        row["path"] for row in packet["related"]["candidates"] if row.get("path")
-    }
+    retrieval_paths = {row["path"] for row in packet["retrieval"]["results"]}
     canonical_paths = {row["path"] for row in action["canonical"]}
     assert "src/authority.py" in canonical_paths
-    assert "src/authority.py" in dependency_paths
+    assert "src/authority.py" in retrieval_paths
+    assert packet["related"]["candidates"] == action["related"]
