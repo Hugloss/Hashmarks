@@ -208,3 +208,75 @@ def test_exact_owner_cannot_be_displaced_by_contract_projection(
     assert action["edit"]["path"] == "src/authority.py"
     assert action["owner_basis"] == "exact-symbol"
     assert action["ownership_authority"]["owner_resolved"] is True
+
+
+def _write_publish_dependency_fixture(root: Path, *, duplicate_target: bool = False) -> None:
+    _write(
+        root,
+        "src/publish.py",
+        "def publish_result(value):\n"
+        "    return value\n",
+    )
+    if duplicate_target:
+        _write(
+            root,
+            "src/alternate_publish.py",
+            "def publish_result(value):\n"
+            "    return value\n",
+        )
+    _write(
+        root,
+        "src/authority.py",
+        "class AuthorityReceipt:\n"
+        "    def canonical_identity(self):\n"
+        "        return 'canonical'\n",
+    )
+
+
+def test_requested_edit_target_owns_dependency_identifier_evidence(tmp_path: Path) -> None:
+    _write_publish_dependency_fixture(tmp_path)
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(
+            "Fix publish_result so it uses AuthorityReceipt.canonical_identity",
+            limit=20,
+        )
+
+    assert action["edit"]["path"] == "src/publish.py"
+    assert action["edit"]["name"] == "publish_result"
+    assert action["ambiguity"]["ambiguous"] is False
+    assert action["ownership_authority"]["owner_resolved"] is True
+
+
+def test_requested_edit_target_role_survives_dependency_first_wording(tmp_path: Path) -> None:
+    _write_publish_dependency_fixture(tmp_path)
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(
+            "Use AuthorityReceipt.canonical_identity in publish_result",
+            limit=20,
+        )
+
+    assert action["edit"]["path"] == "src/publish.py"
+    assert action["edit"]["name"] == "publish_result"
+    assert action["ambiguity"]["ambiguous"] is False
+    assert action["ownership_authority"]["owner_resolved"] is True
+
+
+def test_requested_edit_role_does_not_hide_true_duplicate_target_ambiguity(
+    tmp_path: Path,
+) -> None:
+    _write_publish_dependency_fixture(tmp_path, duplicate_target=True)
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(
+            "Fix publish_result so it uses AuthorityReceipt.canonical_identity",
+            limit=20,
+        )
+
+    assert action["ambiguity"]["ambiguous"] is True
+    assert action["ambiguity"]["reason"] == "multiple-exact-identifier-edit-owners"
+    assert action["ownership_authority"]["owner_resolved"] is False
