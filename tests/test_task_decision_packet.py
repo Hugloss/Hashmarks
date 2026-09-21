@@ -165,3 +165,34 @@ def test_decision_packet_is_observation_not_consumer_decision(tmp_path: Path) ->
     assert packet["discrimination"]["interpretation"] == (
         "evidence-discrimination-only"
     )
+
+
+def test_decision_packet_preserves_explicit_owner_with_named_dependency(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/publish.py").write_text(
+        "def publish_result(value):\n    return value\n", encoding="utf-8"
+    )
+    (tmp_path / "src/authority.py").write_text(
+        "class AuthorityReceipt:\n"
+        "    def canonical_identity(self):\n"
+        "        return 'canonical'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_publish.py").write_text(
+        "from src.publish import publish_result\n"
+        "def test_publish(): assert publish_result('x') == 'x'\n",
+        encoding="utf-8",
+    )
+    task = "Fix publish_result so it uses AuthorityReceipt.canonical_identity"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_decision_packet(task, limit=20, token_budget=256)
+
+    assert packet["edit"]["path"] == "src/publish.py"
+    assert packet["ambiguity"]["ambiguous"] is False
+    assert packet["ownership_authority"]["owner_resolved"] is True
+    assert packet["discrimination"]["needed"] is False
