@@ -96,6 +96,7 @@ Two evidence gates are now mandatory before a complexity owner can close:
 
 - **Exact direct-test ownership:** the selected production owner must have at least one confirmed direct owning test or an explicit unresolved ownership item. Exact first-party static re-exports may establish ownership only when the symbol resolves unambiguously to one defining source; naming similarity or facade adjacency is not authority.
 - **Complete structural-locality evidence:** behavior preservation plus lower Ruff debt is insufficient when new internal structure is introduced. Pre/post locality must be comparable and complete; unresolved repository call targets keep the phase open rather than being waived. Every introduced helper/stage must bind an independent responsibility value, and observed caller count <= 1 remains review evidence only, never proof of global single-use.
+- **Behavior-preservation closure:** BP1 freezes exact pre-edit source identity, direct owning test bytes, behavior boundaries, and the broader repository gate. BP2 must replay unchanged frozen test bytes against the complete changed/new production source set, bind the same post-edit repository identity used by locality evidence, execute the declared broader gate on that state, and combine the preservation receipt with comparable pre/post analyzer measurements. Lower Ruff debt alone never closes a phase.
 
 For each phase:
 1. freeze the exact parent artifact identity;
