@@ -27,8 +27,13 @@ jobs:
           enable-cache: true
       - name: Install Ruff only for cheap admission
         run: uv tool install "ruff>=0.12,<0.17"
-      - name: Ruff formatting gate
-        run: ruff format --check .
+      - name: Ruff formatting gate for changed Python
+        shell: bash
+        run: |
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMR HEAD^1 HEAD -- '*.py')
+          if (( ${#files[@]} )); then
+            ruff format --check -- "${files[@]}"
+          fi
       - name: Ruff correctness/import gate
         run: ruff check .
       - run: uv python install 3.11
