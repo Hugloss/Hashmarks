@@ -49,7 +49,8 @@ def test_task_evidence_exposes_compact_selection_source_revision_and_unknown_fre
     with CodeMap(tmp_path) as codemap:
         expected = str(codemap.store.file_row("src/engine.py")["file_digest"])
     provenance = start["provenance"]
-    assert provenance["why"] == "structural-import"
+    assert _ownership(start)["basis"] in {"exact-symbol", "unique-exact-symbol"}
+    assert provenance["why"] == "canonical-edit-role"
     assert provenance["revision"] == expected
     assert provenance["freshness"] == "unknown"
     assert _freshness(start)["state"] == "unknown"
