@@ -813,12 +813,14 @@ class EvidenceCorrelationMixin:
                 "bundle completeness=complete requires truncation=complete"
             )
         producer = self._bundle_producer(raw_bundle)
+        provenance = self._bundle_provenance(raw_bundle)
         raw_anchors = raw_bundle.get("anchors")
         self._validate_raw_anchors(raw_anchors)
         assert isinstance(raw_anchors, Sequence)
         return self._prepare_bundle_anchors(
             bundle_id,
             producer,
+            provenance,
             completeness,
             scope,
             truncation,
@@ -856,6 +858,19 @@ class EvidenceCorrelationMixin:
         return packet
 
     @staticmethod
+    def _bundle_provenance(raw_bundle: Mapping[str, object]) -> dict[str, object]:
+        provenance = raw_bundle.get("provenance", {})
+        if not isinstance(provenance, Mapping):
+            raise ValueError("bundle provenance must be an object")
+        packet = dict(provenance)
+        if _json_size(packet, label="bundle provenance") > _MAX_METADATA_BYTES_PER_ANCHOR:
+            raise ValueError(
+                "bundle provenance exceeds "
+                f"{_MAX_METADATA_BYTES_PER_ANCHOR} encoded bytes"
+            )
+        return packet
+
+    @staticmethod
     def _validate_raw_anchors(raw_anchors: object) -> None:
         if not isinstance(raw_anchors, Sequence) or isinstance(
             raw_anchors, (str, bytes, bytearray)
@@ -872,6 +887,7 @@ class EvidenceCorrelationMixin:
         self,
         bundle_id: str,
         producer: dict[str, object],
+        provenance: dict[str, object],
         completeness: str,
         scope: dict[str, object],
         truncation: str,
@@ -908,6 +924,9 @@ class EvidenceCorrelationMixin:
                 "bundle_id": bundle_id,
                 "producer": producer,
                 "producer_authority": "caller-claimed",
+                "provenance": provenance,
+                "provenance_authority": "caller-claimed",
+                "repository_freshness_authority": "independent",
                 "completeness": completeness,
                 "scope": scope,
                 "truncation": truncation,
@@ -1089,6 +1108,7 @@ class EvidenceCorrelationMixin:
         return {
             "bundle_id": bundle.get("bundle_id"),
             "producer": bundle.get("producer", {}),
+            "provenance": bundle.get("provenance", {}),
             "completeness": bundle.get("completeness"),
             "scope": bundle.get("scope", {}),
             "truncation": bundle.get("truncation", "unknown"),
@@ -1331,14 +1351,16 @@ class EvidenceCorrelationMixin:
             == after.get("evidence_definition_identity")
             else "changed"
         )
+        comparable = definition_state == "preserved"
         return {
             "schema": "hashmarks.evidence-correlation-delta.v1",
+            "comparability": "comparable" if comparable else "not-comparable",
             "definition": {
                 "state": definition_state,
                 "before": before.get("evidence_definition_identity"),
                 "after": after.get("evidence_definition_identity"),
             },
-            "repository_evidence_delta": repository_delta,
+            "repository_evidence_delta": repository_delta if comparable else None,
             "before_correlation_identity": before.get("correlation_identity"),
             "after_correlation_identity": after.get("correlation_identity"),
             "authority": "repository-intelligence-only",
