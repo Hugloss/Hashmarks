@@ -116,11 +116,9 @@ def test_evidence_correlation_preserves_repository_truth_and_consumer_authority(
         "PB11. External observations are correlation inputs, not repository authority."
         in invariants
     )
-    for forbidden_authority in (
-        "Correlation must not become causation",
-        "interpretation and action remain consumer-owned",
-    ):
-        assert forbidden_authority in boundary or forbidden_authority in contract
+    assert "Correlation never becomes causation" in contract
+    assert "It must not infer causation" in boundary
+    assert "interpretation and action remain consumer-owned" in contract
 
 
 def test_agent_boundary_keeps_solution_authority_external() -> None:
