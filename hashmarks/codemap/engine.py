@@ -28,6 +28,7 @@ from .evidence_graph import EvidenceGraphMixin
 from .evidence_packet import TaskEvidencePacketMixin
 from .evidence_profiles import EvidenceProfilesMixin
 from .evidence_verification import VerificationMixin
+from .verification_plan import VerificationPlanMixin
 from .find_engine import FindEngineMixin
 from .freshness_map import EvidenceFreshnessMapMixin
 from .import_resolution import ImportResolutionMixin
@@ -97,6 +98,7 @@ class CodeMap(
     VerificationExplanationMixin,
     PostChangeMixin,
     TaskActionMixin,
+    VerificationPlanMixin,
     VerificationMixin,
     RelationshipsMixin,
     ImportResolutionMixin,
