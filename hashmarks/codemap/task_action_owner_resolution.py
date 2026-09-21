@@ -71,21 +71,22 @@ class TaskActionOwnerResolutionMixin:
     @staticmethod
     def _task_action_requested_edit_span(task: str) -> str:
         """Return the bounded task span that names the requested edit surface."""
-        match = re.match(
+        dependency_first = re.match(
             r"^\s*(?:use|call|apply)\s+.+?\s+(?:in|from|inside|within)\s+(.+)$",
             task,
             flags=re.IGNORECASE,
-        ) or re.search(
+        )
+        dependency_tail = re.search(
             r"\s(?:so|using|with|by|via|through|to use|to call)\s",
             task,
             flags=re.IGNORECASE,
         )
         return (
-            task
-            if match is None
-            else match.group(1)
-            if match.lastindex
-            else task[: match.start()]
+            dependency_first.group(1)
+            if dependency_first
+            else task[: dependency_tail.start()]
+            if dependency_tail
+            else task
         )
 
     @classmethod
