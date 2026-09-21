@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 import re
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
@@ -77,14 +77,23 @@ class TaskActionOwnerResolutionMixin:
         bounded request-role discriminator, not a second repository resolver.
         """
         lowered = task.lower()
-        dependency_markers = (" so ", " using ", " with ", " by ")
+        dependency_markers = (
+            " so ",
+            " using ",
+            " with ",
+            " by ",
+            " via ",
+            " through ",
+            " to use ",
+            " to call ",
+        )
         for marker in dependency_markers:
             index = lowered.find(marker)
             if index > 0:
                 return task[:index]
 
         dependency_first = re.match(
-            r"^\s*(?:use|apply)\s+.+?\s+(?:in|inside|within)\s+(.+)$",
+            r"^\s*(?:use|call|apply)\s+.+?\s+(?:in|from|inside|within)\s+(.+)$",
             task,
             flags=re.IGNORECASE,
         )
