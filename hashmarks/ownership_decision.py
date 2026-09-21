@@ -144,3 +144,10 @@ def project_owner_candidate(
     authority = source.get("ownership_authority")
     resolved = isinstance(authority, Mapping) and bool(authority.get("owner_resolved"))
     return (candidate if resolved else None, candidate, resolved)
+
+
+def ownership_candidate_path(source: Mapping[str, object]) -> str | None:
+    """Return the candidate path without implying admitted edit authority."""
+    value = source.get("edit")
+    candidate = value if isinstance(value, Mapping) else {}
+    return str(candidate.get("path") or "") or None
