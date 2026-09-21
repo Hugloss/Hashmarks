@@ -68,50 +68,6 @@ class TaskActionOwnerResolutionMixin:
             return "unique-exact-symbol"
         return "exact-symbol"
 
-    @staticmethod
-    def _task_action_requested_edit_span(task: str) -> str:
-        """Return the bounded task span that names the requested edit surface."""
-        dependency_first = re.match(
-            r"^\s*(?:use|call|apply)\s+.+?\s+(?:in|from|inside|within)\s+(.+)$",
-            task,
-            flags=re.IGNORECASE,
-        )
-        dependency_tail = re.search(
-            r"\s(?:so|using|with|by|via|through|to use|to call)\s",
-            task,
-            flags=re.IGNORECASE,
-        )
-        return (
-            dependency_first.group(1)
-            if dependency_first
-            else task[: dependency_tail.start()]
-            if dependency_tail
-            else task
-        )
-
-    @classmethod
-    def _task_action_requested_exact_identifier_edits(
-        cls,
-        task: str,
-        candidates: Sequence[dict[str, object]],
-    ) -> list[dict[str, object]]:
-        """Narrow exact identities only when request grammar proves one edit role."""
-        if len(candidates) < 2:
-            return list(candidates)
-        span = cls._task_action_requested_edit_span(task).lower()
-        matched: list[dict[str, object]] = []
-        for candidate in candidates:
-            identities = {
-                str(candidate.get(key) or "").lower()
-                for key in ("name", "qualname")
-                if candidate.get(key)
-            }
-            if any(
-                re.search(rf"(?<![a-z0-9_]){re.escape(identity)}(?![a-z0-9_])", span)
-                for identity in identities
-            ):
-                matched.append(candidate)
-        return matched if len(matched) == 1 else list(candidates)
 
     def _task_action_resolve_owner(
         self,
