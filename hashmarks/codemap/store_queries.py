@@ -149,6 +149,28 @@ class WorkspaceMapQueryMixin:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def visible_symbol_candidates(
+        self, query: str, *, limit: int = 33
+    ) -> list[dict]:
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        if limit < 1:
+            raise ValueError("limit must be >= 1")
+        limit = min(int(limit), 1024)
+        self._count_read("visible_symbol_candidates")
+        with self._lock:
+            rows = self._db.execute(
+                """SELECT s.*, f.evidence_visibility
+                FROM symbol s JOIN file_map f ON f.path=s.path
+                WHERE (s.qualname=? OR s.name=?)
+                  AND f.evidence_visibility!='deny'
+                ORDER BY CASE WHEN s.qualname=? THEN 0 ELSE 1 END,
+                         s.path,s.start_line,s.qualname
+                LIMIT ?""",
+                (query, query, query, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def symbol(self, query: str) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
