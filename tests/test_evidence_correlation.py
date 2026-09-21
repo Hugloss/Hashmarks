@@ -974,3 +974,142 @@ def test_bundle_provenance_is_bounded_and_json_compatible(tmp_path: Path) -> Non
             match="bundle provenance exceeds 8192 encoded bytes",
         ):
             codemap.correlate_evidence([bundle], include_relationships=False)
+
+
+@pytest.mark.parametrize(
+    ("external_path", "external_prefix"),
+    [
+        ("/app/src/owner.py", "/app/src"),
+        ("C:\\workspace\\src\\owner.py", "C:\\workspace\\src"),
+        ("C:/workspace/src/owner.py", "C:/workspace/src"),
+        ("/mnt/c/workspace/src/owner.py", "/mnt/c/workspace/src"),
+    ],
+)
+def test_path_mapping_portability_preserves_repository_identity(
+    tmp_path: Path,
+    external_path: str,
+    external_prefix: str,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence(
+            _bundle({"anchor_id": "portable", "path": external_path}),
+            path_mappings=[
+                {"external_prefix": external_prefix, "repository_prefix": "src"}
+            ],
+            include_relationships=False,
+        )
+
+    resolution = packet["bundles"][0]["anchors"][0]["resolution"]
+    assert resolution["state"] == "resolved-unique"
+    assert resolution["repository_path"] == "src/owner.py"
+    assert resolution["path_origin"] == "explicit-path-mapping"
+
+
+def test_longest_path_mapping_prefix_wins_deterministically(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    mappings = [
+        {"external_prefix": "/app", "repository_prefix": ""},
+        {"external_prefix": "/app/pkg", "repository_prefix": "src"},
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence(
+            _bundle({"anchor_id": "owner", "path": "/app/pkg/owner.py"}),
+            path_mappings=list(reversed(mappings)),
+            include_relationships=False,
+        )
+
+    resolution = packet["bundles"][0]["anchors"][0]["resolution"]
+    assert resolution["repository_path"] == "src/owner.py"
+
+
+def test_source_equivalence_requires_independent_repository_identity(tmp_path: Path) -> None:
+    source = tmp_path / "owner.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observed, _raw = codemap._repository_member_observation("owner.py")
+        revision = observed["member_revision"]
+        proven = codemap.correlate_evidence(
+            _bundle(
+                {
+                    "anchor_id": "proven",
+                    "path": "owner.py",
+                    "member_revision": revision,
+                    "metadata": {
+                        "commit": "opaque-producer-label",
+                        "image": "sha256:not-repository-identity",
+                    },
+                }
+            ),
+            include_relationships=False,
+        )
+        mismatch = codemap.correlate_evidence(
+            _bundle(
+                {
+                    "anchor_id": "mismatch",
+                    "path": "owner.py",
+                    "member_revision": "0" * 64,
+                }
+            ),
+            include_relationships=False,
+        )
+        unknown = codemap.correlate_evidence(
+            _bundle(
+                {
+                    "anchor_id": "unknown",
+                    "path": "owner.py",
+                    "metadata": {"commit": revision, "version": "1.2.3"},
+                }
+            ),
+            include_relationships=False,
+        )
+
+    assert proven["bundles"][0]["anchors"][0]["source_equivalence"]["state"] == "proven"
+    assert mismatch["bundles"][0]["anchors"][0]["source_equivalence"]["state"] == "mismatch"
+    assert unknown["bundles"][0]["anchors"][0]["source_equivalence"] == {
+        "state": "unknown",
+        "basis": [],
+    }
+
+
+def test_member_revision_and_span_identity_disagreement_is_mismatch(tmp_path: Path) -> None:
+    source = tmp_path / "owner.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        baseline = codemap.correlate_evidence(
+            _bundle({"anchor_id": "baseline", "path": "owner.py", "line": 1}),
+            include_relationships=False,
+        )
+        anchor = baseline["bundles"][0]["anchors"][0]
+        binding_id = anchor["repository_evidence_binding_id"]
+        binding = next(
+            row
+            for row in baseline["repository_evidence"]["bindings"]
+            if row["binding_id"] == binding_id
+        )
+        evidence = binding["evidence"][0]
+        packet = codemap.correlate_evidence(
+            _bundle(
+                {
+                    "anchor_id": "conflict",
+                    "path": "owner.py",
+                    "line": 1,
+                    "member_revision": evidence["member_revision"],
+                    "span_identity": "sha256:" + "0" * 64,
+                }
+            ),
+            include_relationships=False,
+        )
+
+    equivalence = packet["bundles"][0]["anchors"][0]["source_equivalence"]
+    assert equivalence["state"] == "mismatch"
+    assert {row["kind"] for row in equivalence["basis"]} == {
+        "member-revision",
+        "span-identity",
+    }
