@@ -158,7 +158,7 @@ def test_repository_input_binding_requires_independent_member_revision(
 
         mismatch = _snapshot()
         mismatch["repository_inputs"] = [
-            {"path": "pyproject.toml", "member_revision": "sha256:" + "0" * 64}
+            {"path": "pyproject.toml", "member_revision": "0" * 64}
         ]
         third = codemap.dependency_resolution_evidence(mismatch)
         assert third["repository_inputs"][0]["source_equivalence"] == "mismatch"
@@ -190,12 +190,13 @@ def test_complete_resolution_requires_explicit_non_truncation(tmp_path: Path) ->
 def test_owner_never_executes_dependency_tooling(tmp_path: Path, monkeypatch) -> None:
     import subprocess
 
-    def forbidden(*args, **kwargs):
-        raise AssertionError("dependency evidence owner must not execute tooling")
-
-    monkeypatch.setattr(subprocess, "run", forbidden)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
+
+        def forbidden(*args, **kwargs):
+            raise AssertionError("dependency evidence owner must not execute tooling")
+
+        monkeypatch.setattr(subprocess, "run", forbidden)
         packet = codemap.dependency_resolution_evidence(_snapshot())
 
     assert packet["producer_authority"] == "caller-claimed"
