@@ -97,7 +97,12 @@ class RepositoryIntelligenceQueryMixin:
                     task,
                     changed_paths,
                     profile=profile,
-                    **common,
+                    limit=limit,
+                    per_role=per_role,
+                    options=ChangeImpactOptions(
+                        impact_limit_per_surface=impact_limit_per_surface,
+                        max_depth=max_depth,
+                    ),
                 )
             elif surface == "economics":
                 result = self.intelligence_economics_receipt(
