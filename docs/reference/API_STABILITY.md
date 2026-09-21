@@ -15,6 +15,8 @@ The documented `CodeMap.repository_evidence_bindings()`, `repository_evidence_bi
 
 The documented `CodeMap.correlate_evidence()` and `evidence_correlation_delta()` methods are also supported Python API. Their schemas are `hashmarks.evidence-correlation.v1` and `hashmarks.evidence-correlation-delta.v1`; see [`EVIDENCE_CORRELATION.md`](EVIDENCE_CORRELATION.md). Correlation remains a projection over existing repository evidence authorities and does not grant causal or action authority.
 
+`CodeMap.task_evidence()` is the current role-separated task-evidence API. Its schema is `hashmarks.task-evidence.v2`: bounded retrieval, explicit-target evidence, ownership, verification, related evidence, freshness and provenance are distinct authority domains. The unpublished v1 task-evidence shape is not retained as a compatibility reader or alias.
+
 Importable implementation submodules under `hashmarks.*` are **not automatically public** merely because Python allows importing them. Internal helpers, storage classes, parsers, adapters, and mixins may change without compatibility guarantees unless a current public document explicitly promotes them into the contract.
 
 Development material under `scripts/agent_evaluation/`, `benchmarks/agent_evaluation/`, `tests/`, and `docs/development/` is measurement/evidence infrastructure, not installed product API.
