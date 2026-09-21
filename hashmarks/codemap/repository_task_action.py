@@ -923,6 +923,49 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             candidates.append(candidate)
         return candidates
 
+    @staticmethod
+    def _task_action_requested_edit_span(task: str) -> str:
+        """Return the bounded request span that names the edit surface."""
+        dependency_first = re.match(
+            r"^\s*(?:use|call|apply)\s+.+?\s+(?:in|from|inside|within)\s+(.+)$",
+            task,
+            flags=re.IGNORECASE,
+        )
+        dependency_tail = re.search(
+            r"\s(?:so|using|with|by|via|through|to use|to call)\s",
+            task,
+            flags=re.IGNORECASE,
+        )
+        return (
+            dependency_first.group(1)
+            if dependency_first
+            else task[: dependency_tail.start()]
+            if dependency_tail
+            else task
+        )
+
+    @classmethod
+    def _task_action_requested_exact_identifier_edits(
+        cls,
+        task: str,
+        candidates: Sequence[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        """Keep dependency identifiers as evidence when one edit role is explicit."""
+        span = cls._task_action_requested_edit_span(task).lower()
+        matched = [
+            candidate
+            for candidate in candidates
+            if any(
+                re.search(
+                    rf"(?<![a-z0-9_]){re.escape(str(candidate.get(key) or '').lower())}(?![a-z0-9_])",
+                    span,
+                )
+                for key in ("name", "qualname")
+                if candidate.get(key)
+            )
+        ]
+        return matched if len(matched) == 1 else list(candidates)
+
     def _task_action_exact_identifier_edit_candidates(
         self,
         task: str,
