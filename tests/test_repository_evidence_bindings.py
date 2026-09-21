@@ -1087,3 +1087,138 @@ def test_binding_delta_rejects_cross_repository_comparison(tmp_path: Path) -> No
         after = codemap.repository_evidence_bindings(binding)
         with pytest.raises(ValueError, match="repository-mismatch"):
             codemap.repository_evidence_binding_delta(before, after)
+
+def test_binding_delta_reports_added_and_removed_bindings_deterministically(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.py").write_text("A = 1\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("B = 1\n", encoding="utf-8")
+    before_definition = [
+        {
+            "binding_id": "z:removed",
+            "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}],
+        },
+        {
+            "binding_id": "stable",
+            "evidence": [{"path": "b.py", "start_line": 1, "end_line": 1}],
+        },
+    ]
+    after_definition = [
+        {
+            "binding_id": "a:added",
+            "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}],
+        },
+        {
+            "binding_id": "stable",
+            "evidence": [{"path": "b.py", "start_line": 1, "end_line": 1}],
+        },
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(
+            before_definition, include_relationships=False
+        )
+        after = codemap.repository_evidence_bindings(
+            after_definition, include_relationships=False
+        )
+        delta = codemap.repository_evidence_binding_delta(before, after)
+
+    assert delta["bindings"] == {
+        "added": ["a:added"],
+        "removed": ["z:removed"],
+        "preserved": ["stable"],
+        "changed": [],
+    }
+
+
+def test_binding_delta_reports_previously_absent_member_as_added(
+    tmp_path: Path,
+) -> None:
+    binding = [
+        {
+            "binding_id": "created-member",
+            "evidence": [{"path": "created.py", "start_line": 1, "end_line": 1}],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+        (tmp_path / "created.py").write_text("VALUE = 1\n", encoding="utf-8")
+        codemap.sync(["created.py"])
+        after = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+        delta = codemap.repository_evidence_binding_delta(before, after)
+
+    changed = delta["bindings"]["changed"][0]
+    member_change = changed["member_evidence"]["changes"][0]
+    assert member_change["state"] == "added"
+    assert member_change["before_state"] == "known-absent"
+    assert member_change["after_state"] == "known-present"
+    assert member_change["observation_state_changed"] is True
+
+
+@pytest.mark.parametrize(
+    ("mutation", "match"),
+    [
+        ({"schema": "wrong"}, "before must be a repository evidence bindings packet"),
+        ({"bindings_identity": None}, "before must contain bindings_identity"),
+    ],
+)
+def test_binding_delta_rejects_malformed_before_packet(
+    tmp_path: Path,
+    mutation: dict[str, object],
+    match: str,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [
+        {
+            "binding_id": "malformed",
+            "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(binding)
+        before = {**packet, **mutation}
+        with pytest.raises(ValueError, match=match):
+            codemap.repository_evidence_binding_delta(before, packet)
+
+def test_binding_delta_reports_unsupported_member_becoming_present_as_state_change(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    linked = tmp_path / "linked"
+    linked.symlink_to(outside, target_is_directory=True)
+    binding = [
+        {
+            "binding_id": "state-transition",
+            "evidence": [
+                {"path": "linked/owner.py", "start_line": 1, "end_line": 1}
+            ],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+        linked.unlink()
+        linked.mkdir()
+        (linked / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+        codemap.sync(["linked/owner.py"])
+        after = codemap.repository_evidence_bindings(
+            binding, include_relationships=False
+        )
+        delta = codemap.repository_evidence_binding_delta(before, after)
+
+    change = delta["bindings"]["changed"][0]["member_evidence"]["changes"][0]
+    assert change["state"] == "state-changed"
+    assert change["before_state"] == "unsupported"
+    assert change["after_state"] == "known-present"
+    assert change["observation_state_changed"] is True
+
