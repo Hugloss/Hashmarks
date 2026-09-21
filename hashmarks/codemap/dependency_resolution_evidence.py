@@ -104,10 +104,12 @@ class DependencyResolutionEvidenceMixin:
             raise ValueError("dependency resolution scope must not be empty")
         _canonical(scope_packet)
 
-        roots = [
-            _identifier(value, label="root")
-            for value in list(snapshot.get("roots") or ())
-        ]
+        raw_roots = snapshot.get("roots", ())
+        if not isinstance(raw_roots, Sequence) or isinstance(
+            raw_roots, (str, bytes, bytearray)
+        ):
+            raise ValueError("roots must be a sequence")
+        roots = [_identifier(value, label="root") for value in raw_roots]
         if len(roots) > _MAX_ROOTS:
             raise ValueError(f"roots exceeds {_MAX_ROOTS} entries")
         if len(set(roots)) != len(roots):
@@ -123,6 +125,20 @@ class DependencyResolutionEvidenceMixin:
         repository_inputs = self._dependency_repository_inputs(
             snapshot.get("repository_inputs", ())
         )
+        completeness = str(snapshot.get("completeness") or "unknown").strip()
+        if completeness not in {"complete", "incomplete", "unknown"}:
+            raise ValueError(
+                "dependency resolution completeness must be complete, incomplete, or unknown"
+            )
+        truncation = str(snapshot.get("truncation") or "unknown").strip()
+        if truncation not in {"complete", "truncated", "unknown"}:
+            raise ValueError(
+                "dependency resolution truncation must be complete, truncated, or unknown"
+            )
+        if completeness == "complete" and truncation != "complete":
+            raise ValueError(
+                "dependency resolution completeness=complete requires truncation=complete"
+            )
         definition = {
             "producer": producer_packet,
             "scope": scope_packet,
@@ -158,6 +174,13 @@ class DependencyResolutionEvidenceMixin:
             "roots": sorted(roots),
             **graph,
             "repository_inputs": repository_inputs,
+            "completeness": completeness,
+            "truncation": truncation,
+            "negative_evidence": (
+                "admissible-within-declared-scope"
+                if completeness == "complete" and truncation == "complete"
+                else "not-admissible"
+            ),
         }
 
     @staticmethod
