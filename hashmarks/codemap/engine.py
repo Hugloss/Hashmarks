@@ -28,7 +28,6 @@ from .evidence_graph import EvidenceGraphMixin
 from .evidence_packet import TaskEvidencePacketMixin
 from .evidence_profiles import EvidenceProfilesMixin
 from .evidence_verification import VerificationMixin
-from .verification_plan import VerificationPlanMixin
 from .find_engine import FindEngineMixin
 from .freshness_map import EvidenceFreshnessMapMixin
 from .import_resolution import ImportResolutionMixin
@@ -71,6 +70,7 @@ from .structural_search import AstGrepSearchProvider
 from .task_retrieval import TaskRetrievalMixin
 from .typescript_resolver import TypeScriptResolverProvider
 from .verification_explanation import VerificationExplanationMixin
+from .verification_plan import VerificationPlanMixin
 from .work_context import WorkContextMixin
 
 # Generic repository evidence families. These are query-formulation hints only:
