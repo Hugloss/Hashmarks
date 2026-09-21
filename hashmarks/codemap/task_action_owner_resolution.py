@@ -35,7 +35,10 @@ class TaskActionOwnerResolutionMixin:
             row = self._session_file_row(path)
             if row is None:
                 continue
-            if EvidenceVisibility(str(row.get("evidence_visibility") or "deny")) is EvidenceVisibility.DENY:
+            visibility = EvidenceVisibility(
+                str(row.get("evidence_visibility") or EvidenceVisibility.DENY.value)
+            )
+            if visibility is EvidenceVisibility.DENY:
                 continue
             if not self._indexed_path_current(path):
                 continue
