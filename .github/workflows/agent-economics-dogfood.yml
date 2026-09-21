@@ -82,6 +82,41 @@ jobs:
             --artifact .agent-artifacts/test-focus.json \
             --format json
       
+      - name: Assert structural locality direct test ownership
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(
+              Path(".agent-artifacts/test-focus.json").read_text(encoding="utf-8")
+          )
+          target = "hashmarks/codemap/structural_locality.py"
+          candidates = [
+              row for row in payload.get("candidates", [])
+              if row.get("target") == target
+          ]
+          if len(candidates) != 1:
+              raise SystemExit(f"missing exact test-focus candidate for {target}")
+          confirmed = candidates[0].get("evidence", {}).get("confirmed", [])
+          owners = {
+              row.get("test_path")
+              for row in confirmed
+              if row.get("match_type") == "import_exact"
+          }
+          required = "tests/test_structural_locality.py"
+          if required not in owners:
+              raise SystemExit(
+                  f"static re-export direct ownership not recovered: {sorted(owners)}"
+              )
+          if any(
+              item.get("code") == "direct_test_ownership_missing"
+              for item in candidates[0].get("uncertainty", [])
+          ):
+              raise SystemExit("structural locality still reports missing direct ownership")
+          print(json.dumps({"target": target, "confirmed_direct_owners": sorted(owners)}))
+          PY
+
       - name: Focused branch coverage - binding delta
         run: |
           UV_PROJECT_ENVIRONMENT=.test-venv uv run --only-group test pytest \
