@@ -249,6 +249,168 @@ class StructuralLocalityMixin:
             return None, candidate_ids, True
         return None, candidate_ids, False
 
+    def _python_class_node(self, path: str, qualname: str) -> ast.ClassDef | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if not path.endswith(".py") or not qualname:
+            return None
+        try:
+            tree = read_python_ast(self.workspace / path, errors="replace").tree
+        except (OSError, SyntaxError, UnicodeError, ValueError):
+            return None
+        body: Sequence[ast.stmt] = tree.body
+        selected: ast.ClassDef | None = None
+        for part in qualname.split("."):
+            matches = [
+                node
+                for node in body
+                if isinstance(node, ast.ClassDef) and node.name == part
+            ]
+            if len(matches) != 1:
+                return None
+            selected = matches[0]
+            body = selected.body
+        return selected
+
+    def _python_class_bases(
+        self, path: str, qualname: str
+    ) -> tuple[list[tuple[str, str]], bool]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        node = self._python_class_node(path, qualname)
+        if node is None:
+            return [], True
+        bases: list[tuple[str, str]] = []
+        unresolved = False
+        for base in node.bases:
+            if not isinstance(base, ast.Name):
+                unresolved = True
+                continue
+            if self._python_class_node(path, base.id) is not None:
+                bases.append((path, base.id))
+                continue
+            kind, targets = self._python_export_binding(path, base.id)
+            if kind != "reexport" or len(targets) != 1:
+                unresolved = True
+                continue
+            owners, import_unresolved = self._resolve_import_owner_evidence(
+                path, targets[0]
+            )
+            class_name = targets[0].lstrip(".").rsplit(".", 1)[-1]
+            matching_paths = sorted(
+                {
+                    owner
+                    for owner in owners
+                    if self._python_class_node(owner, class_name) is not None
+                }
+            )
+            if import_unresolved or len(matching_paths) != 1:
+                unresolved = True
+                continue
+            bases.append((matching_paths[0], class_name))
+        return list(dict.fromkeys(bases)), unresolved
+
+    def _python_method_owner(
+        self,
+        *,
+        path: str,
+        class_qualname: str,
+        method: str,
+        candidates: list[dict[str, object]],
+        seen: frozenset[tuple[str, str]] = frozenset(),
+    ) -> tuple[dict[str, object] | None, bool]:
+        key = (path, class_qualname)
+        if key in seen:
+            return None, True
+        direct = [
+            row
+            for row in candidates
+            if str(row.get("path") or "") == path
+            and str(row.get("qualname") or "") == f"{class_qualname}.{method}"
+        ]
+        if len(direct) == 1:
+            return direct[0], False
+        if len(direct) > 1:
+            return None, True
+
+        bases, unresolved = self._python_class_bases(path, class_qualname)
+        if unresolved:
+            return None, True
+        owners: dict[str, dict[str, object]] = {}
+        ambiguous = False
+        for base_path, base_qualname in bases:
+            owner, base_ambiguous = self._python_method_owner(
+                path=base_path,
+                class_qualname=base_qualname,
+                method=method,
+                candidates=candidates,
+                seen=seen | {key},
+            )
+            ambiguous = ambiguous or base_ambiguous
+            if owner is not None:
+                owners[_symbol_id(owner)] = owner
+        if ambiguous or len(owners) > 1:
+            return None, True
+        if len(owners) == 1:
+            return next(iter(owners.values())), False
+        return None, False
+
+    def _python_self_cls_call_binding(
+        self,
+        *,
+        source_path: str,
+        source_qualname: str,
+        target: str,
+        candidates: list[dict[str, object]],
+    ) -> tuple[dict[str, object] | None, list[str], bool] | None:
+        parts = target.split(".")
+        if len(parts) != 2 or parts[0] not in {"self", "cls"}:
+            return None
+        receiver, method = parts
+        if "." not in source_qualname:
+            return None
+        class_qualname, source_method = source_qualname.rsplit(".", 1)
+        class_node = self._python_class_node(source_path, class_qualname)
+        if class_node is None:
+            return None
+        methods = [
+            node
+            for node in class_node.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == source_method
+        ]
+        if len(methods) != 1:
+            return None
+        source_node = methods[0]
+        positional = [*source_node.args.posonlyargs, *source_node.args.args]
+        if not positional or positional[0].arg != receiver:
+            return None
+        decorators = {
+            (
+                decorator.id
+                if isinstance(decorator, ast.Name)
+                else decorator.attr
+                if isinstance(decorator, ast.Attribute)
+                else ""
+            )
+            for decorator in source_node.decorator_list
+        }
+        if receiver == "cls" and "classmethod" not in decorators:
+            return None
+        if receiver == "self" and {"classmethod", "staticmethod"} & decorators:
+            return None
+
+        owner, unresolved = self._python_method_owner(
+            path=source_path,
+            class_qualname=class_qualname,
+            method=method,
+            candidates=candidates,
+        )
+        candidate_ids = sorted(_symbol_id(row) for row in candidates)
+        if owner is None:
+            return None, candidate_ids, unresolved
+        return owner, [_symbol_id(owner)], False
+
     def _python_qualified_call_binding(
         self,
         *,
@@ -261,6 +423,14 @@ class StructuralLocalityMixin:
             self = cast("CodeMap", self)
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
         root = target.split(".", 1)[0]
+        self_cls_binding = self._python_self_cls_call_binding(
+            source_path=source_path,
+            source_qualname=source_qualname,
+            target=target,
+            candidates=candidates,
+        )
+        if self_cls_binding is not None:
+            return self_cls_binding
         if not root or self._python_function_locally_binds(
             source_path, source_qualname, root
         ):
