@@ -4,8 +4,6 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
-from hashmarks.ownership_decision import project_owner_candidate
-
 from .decision_session import incomplete_decision_scoped
 from .evidence_verification import _VerificationSelectionState
 
@@ -108,10 +106,10 @@ class DecisionPacketMixin:
         reason = "resolved"
         if not bool(build.get("complete")):
             needed, reason = True, "codemap-generation-incomplete"
-        elif edit is None:
-            needed, reason = True, "no-supported-owner-candidate"
         elif bool(ambiguity.get("ambiguous")):
             needed, reason = True, "competing-action-roles"
+        elif edit is None:
+            needed, reason = True, "no-supported-owner-candidate"
         elif verify is None:
             needed, reason = True, "missing-verification-evidence"
         return {
@@ -213,7 +211,8 @@ class DecisionPacketMixin:
             per_role=per_role,
         )
         timing.record("action_map")
-        edit, candidate, owner_resolved = project_owner_candidate(action)
+        candidate = action.get("edit")
+        edit = action.get("admitted_edit")
         verify = (
             action.get("verify") if isinstance(action.get("verify"), dict) else None
         )
@@ -248,7 +247,7 @@ class DecisionPacketMixin:
             "task": task,
             "edit": edit,
             "candidate": candidate,
-            "owner_resolved": owner_resolved,
+            "ownership_authority": action.get("ownership_authority"),
             "verify": verify,
             "verification_relevance": action.get("verification_relevance"),
             "symbolic_nomination": self._symbolic_task_nomination(task),
