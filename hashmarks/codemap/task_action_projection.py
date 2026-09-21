@@ -107,7 +107,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             self = cast("CodeMap", self)
         surface = self._task_action_initial_surface_selection(task, context, limit)
         discrimination = self._task_action_discrimination_state(task, context.rows)
-        owner = self._task_action_resolve_structural_owner(
+        owner = self._task_action_resolve_owner(
             task=task,
             hits=context.hits,
             rows=context.rows,
@@ -129,7 +129,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             limit=limit,
         )
         return _TaskActionSelectionState(
-            edit=cast("dict[str, object] | None", owner["edit"]),
+            edit=owner.edit,
             verify=surface.verify,
             contract=surface.contract,
             discrimination=discrimination,
@@ -144,22 +144,13 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             explicit_config_surface_request=bool(
                 surface.explicit_config_surface_request
             ),
-            structural_owner=cast(
-                "dict[str, object] | None", owner["structural_owner"]
-            ),
-            structural_owner_origin=cast(
-                "Mapping[str, object] | None", owner["structural_owner_origin"]
-            ),
-            archive_live_owner_ambiguity=bool(owner["archive_live_owner_ambiguity"]),
-            exact_identifier_paths=tuple(
-                cast("Sequence[str]", owner["exact_identifier_paths"])
-            ),
-            exact_identifier_displacement_guard=bool(
-                owner["exact_identifier_displacement_guard"]
-            ),
-            exact_identifier_surface_selected=bool(
-                owner["exact_identifier_surface_selected"]
-            ),
+            owner_basis=owner.basis,
+            structural_owner=owner.structural_owner,
+            structural_owner_origin=owner.structural_owner_origin,
+            archive_live_owner_ambiguity=owner.archive_live_owner_ambiguity,
+            exact_identifier_paths=owner.exact_identifier_paths,
+            exact_identifier_displacement_guard=owner.exact_identifier_displacement_guard,
+            exact_identifier_surface_selected=owner.exact_identifier_surface_selected,
             inspect_rows=[row for row in context.rows if "inspect" in row["roles"]][
                 :per_role
             ],
