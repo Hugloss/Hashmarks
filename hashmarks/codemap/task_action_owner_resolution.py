@@ -80,9 +80,13 @@ class TaskActionOwnerResolutionMixin:
             task,
             flags=re.IGNORECASE,
         )
-        if match is None:
-            return task
-        return match.group(1) if match.lastindex else task[: match.start()]
+        return (
+            task
+            if match is None
+            else match.group(1)
+            if match.lastindex
+            else task[: match.start()]
+        )
 
     @classmethod
     def _task_action_requested_exact_identifier_edits(
