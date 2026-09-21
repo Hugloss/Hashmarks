@@ -28,6 +28,7 @@ _MAX_ID_CHARS = 512
 _MAX_SYMBOL_CHARS = 1_024
 _MAX_EXTERNAL_PATH_CHARS = 8_192
 _COMPLETENESS = frozenset({"complete", "incomplete", "unknown"})
+_TRUNCATION = frozenset({"complete", "truncated", "unknown"})
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:/")
@@ -803,6 +804,14 @@ class EvidenceCorrelationMixin:
             raise ValueError(
                 "bundle completeness must be complete, incomplete, or unknown"
             )
+        scope = self._bundle_scope(raw_bundle)
+        truncation = str(raw_bundle.get("truncation") or "unknown").strip()
+        if truncation not in _TRUNCATION:
+            raise ValueError("bundle truncation must be complete, truncated, or unknown")
+        if completeness == "complete" and truncation != "complete":
+            raise ValueError(
+                "bundle completeness=complete requires truncation=complete"
+            )
         producer = self._bundle_producer(raw_bundle)
         raw_anchors = raw_bundle.get("anchors")
         self._validate_raw_anchors(raw_anchors)
@@ -811,10 +820,25 @@ class EvidenceCorrelationMixin:
             bundle_id,
             producer,
             completeness,
+            scope,
+            truncation,
             raw_anchors,
             mappings=mappings,
             resolution_cache=resolution_cache,
         )
+
+    @staticmethod
+    def _bundle_scope(raw_bundle: Mapping[str, object]) -> dict[str, object]:
+        scope = raw_bundle.get("scope", {})
+        if not isinstance(scope, Mapping):
+            raise ValueError("bundle scope must be an object")
+        packet = dict(scope)
+        if _json_size(packet, label="bundle scope") > _MAX_METADATA_BYTES_PER_ANCHOR:
+            raise ValueError(
+                "bundle scope exceeds "
+                f"{_MAX_METADATA_BYTES_PER_ANCHOR} encoded bytes"
+            )
+        return packet
 
     @staticmethod
     def _bundle_producer(
@@ -849,6 +873,8 @@ class EvidenceCorrelationMixin:
         bundle_id: str,
         producer: dict[str, object],
         completeness: str,
+        scope: dict[str, object],
+        truncation: str,
         raw_anchors: Sequence[object],
         *,
         mappings: Sequence[Mapping[str, str]],
@@ -881,7 +907,10 @@ class EvidenceCorrelationMixin:
             packet={
                 "bundle_id": bundle_id,
                 "producer": producer,
+                "producer_authority": "caller-claimed",
                 "completeness": completeness,
+                "scope": scope,
+                "truncation": truncation,
                 "anchors": anchors,
             },
             bindings=tuple(bindings),
@@ -1061,6 +1090,8 @@ class EvidenceCorrelationMixin:
             "bundle_id": bundle.get("bundle_id"),
             "producer": bundle.get("producer", {}),
             "completeness": bundle.get("completeness"),
+            "scope": bundle.get("scope", {}),
+            "truncation": bundle.get("truncation", "unknown"),
             "anchors": [
                 {
                     "anchor_id": anchor.get("anchor_id"),
@@ -1076,15 +1107,26 @@ class EvidenceCorrelationMixin:
         bundles: Sequence[Mapping[str, object]],
     ) -> dict[str, str]:
         states = [str(bundle.get("completeness") or "unknown") for bundle in bundles]
-        if states and all(state == "complete" for state in states):
-            state = "complete"
-        elif "incomplete" in states:
+        truncations = [str(bundle.get("truncation") or "unknown") for bundle in bundles]
+        if "incomplete" in states or "truncated" in truncations:
             state = "incomplete"
+        elif (
+            states
+            and all(item == "complete" for item in states)
+            and all(item == "complete" for item in truncations)
+        ):
+            state = "complete"
         else:
             state = "unknown"
         return {
             "state": state,
             "scope": "caller-declared-external-observations",
+            "authority": "caller-claimed",
+            "negative_evidence": (
+                "admissible-within-declared-scopes"
+                if state == "complete"
+                else "not-admissible"
+            ),
         }
 
     @decision_scoped
