@@ -23,7 +23,7 @@ Coding agents repeatedly spend context and tool calls rediscovering the same cod
 - **Code navigation and ownership.** Trace symbols, references, imports, callers, project boundaries, and likely implementation owners.
 - **Freshness-aware evidence.** Distinguish current, stale, and unknown repository evidence instead of silently serving an old index as truth.
 - **Observer-aware deltas.** Keep repository change separate from observer-capability change, and compare stable evidence identities instead of treating every newly visible fact as a repository edit.
-- **Repository evidence bindings.** Bind opaque consumer IDs to exact line ranges or whole repository members, then compare direct/member/dependency/relationship evidence without transferring consumer policy into Hashmarks.
+- **Repository evidence bindings.** Bind opaque consumer IDs to exact line ranges or whole repository members, then compare direct/member/dependency/relationship evidence without transferring consumer policy into Hashmarks.\n- **Evidence correlation.** Map bounded runtime/derived observations such as tracebacks, CI failures, resolver output, or dependency-tree evidence back to canonical repository truth while preserving ambiguity, completeness, and source equivalence.
 - **Local and read-only for agent consumers.** Hashmarks maintains disposable derived state, while editing, execution, git, planning, and model decisions stay with the caller.
 
 ## Quick start
@@ -58,7 +58,7 @@ Install the optional MCP support:
 pip install "hashmarks[mcp]"
 ```
 
-Hashmarks exposes one local, read-only **stdio MCP server** with five focused tools:
+Hashmarks exposes one local, read-only **stdio MCP server** with six focused tools:
 
 | MCP tool | What it gives the coding agent |
 | --- | --- |
@@ -155,7 +155,7 @@ For the complete tool schemas, freshness behavior, concurrency guarantees, and h
 | Structural locality | Exact-symbol call/caller closure, forwarding shape, context/file fan-out, verifier paths, ambiguity and pre/post structural deltas without refactor policy |
 | Content identity | Canonical file, directory, manifest, and repository identities |
 | Interchange | Strict producer/consumer contracts, provenance, validation, and conformance surfaces |
-| Evidence bindings | Opaque consumer bindings to exact line/member evidence, declared dependencies, relationship evidence, deltas, and change coverage |
+| Evidence bindings | Opaque consumer bindings to exact line/member evidence, declared dependencies, relationship evidence, deltas, and change coverage |\n| Evidence correlation | Request-scoped external/derived anchors correlated to repository paths, symbols, source equivalence, relationships, and before/after deltas |
 
 Built-in lightweight structural parsing covers Python, JavaScript/TypeScript, Go, and Rust. Optional Tree-sitter range enrichment can add precise symbol ranges for additional languages when available. Native/project evidence can also be imported from supported adapters and SCIP.
 
@@ -375,7 +375,7 @@ See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs
 - [Hashmarks MCP server for coding agents](docs/integration/MCP.md)
 - [Architecture](docs/reference/ARCHITECTURE.md)
 - [Observer and delta model](docs/reference/OBSERVER_DELTA.md)
-- [Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md)
+- [Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md)\n- [Evidence correlation](docs/reference/EVIDENCE_CORRELATION.md)
 - [Structural locality evidence](docs/reference/STRUCTURAL_LOCALITY.md)
 - [Product boundary](docs/reference/PRODUCT_BOUNDARY.md)
 - [Normative invariants](docs/reference/INVARIANTS.md)
