@@ -201,3 +201,138 @@ def test_owner_never_executes_dependency_tooling(tmp_path: Path, monkeypatch) ->
 
     assert packet["producer_authority"] == "caller-claimed"
     assert packet["authority"] == "qualified-external-observation"
+
+
+def test_module_distribution_ownership_requires_explicit_observation(tmp_path: Path) -> None:
+    snapshot = _snapshot()
+    snapshot["module_ownership"] = [
+        {
+            "module": "cryptography",
+            "owners": ["crypto-registry"],
+            "completeness": "complete",
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(snapshot)
+
+    ownership = packet["module_ownership"][0]
+    assert ownership["module"] == "cryptography"
+    assert ownership["owners"] == ["crypto-registry"]
+    assert ownership["state"] == "resolved-unique"
+
+
+def test_distribution_name_never_implies_module_ownership(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(_snapshot())
+        result = codemap.dependency_import_correspondence(
+            packet, source_path="consumer.py", import_target="cryptography"
+        )
+
+    assert result["distribution_state"] == "unknown"
+    assert result["distribution_nodes"] == []
+
+
+def test_import_correspondence_reuses_repository_import_identity(tmp_path: Path) -> None:
+    (tmp_path / "consumer.py").write_text("import yaml\n")
+    snapshot = _snapshot()
+    snapshot["nodes"].append(
+        {
+            "node_id": "pyyaml-dist",
+            "name": "PyYAML",
+            "version": "6.0.2",
+            "source": "registry",
+            "marker": "",
+        }
+    )
+    snapshot["module_ownership"] = [
+        {"module": "yaml", "owners": ["pyyaml-dist"], "completeness": "complete"}
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(snapshot)
+        result = codemap.dependency_import_correspondence(
+            packet, source_path="consumer.py", import_target="yaml"
+        )
+
+    assert result["module"] == "yaml"
+    assert result["distribution_nodes"] == ["pyyaml-dist"]
+    assert result["causation"] == "not-inferred"
+
+
+def test_namespace_module_ownership_preserves_ambiguity(tmp_path: Path) -> None:
+    snapshot = _snapshot()
+    snapshot["nodes"].append(
+        {
+            "node_id": "namespace-two",
+            "name": "namespace-provider",
+            "version": "1",
+            "source": "registry",
+            "marker": "",
+        }
+    )
+    snapshot["module_ownership"] = [
+        {
+            "module": "shared.namespace",
+            "owners": ["crypto-registry", "namespace-two"],
+            "completeness": "complete",
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(snapshot)
+
+    assert packet["module_ownership"][0]["state"] == "resolved-ambiguous"
+
+
+def test_module_ownership_dangling_node_fails_closed(tmp_path: Path) -> None:
+    snapshot = _snapshot()
+    snapshot["module_ownership"] = [
+        {"module": "yaml", "owners": ["missing"], "completeness": "complete"}
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="dangling module ownership node"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_dependency_delta_reports_edges_and_module_ownership(tmp_path: Path) -> None:
+    before_raw = _snapshot()
+    before_raw["module_ownership"] = [
+        {
+            "module": "cryptography",
+            "owners": ["crypto-registry"],
+            "completeness": "complete",
+        }
+    ]
+    after_raw = _snapshot()
+    after_raw["nodes"].append(
+        {
+            "node_id": "helper",
+            "name": "helper",
+            "version": "1",
+            "source": "registry",
+            "marker": "",
+        }
+    )
+    after_raw["edges"].append(
+        {"source": "crypto-registry", "target": "helper", "kind": "dependency", "marker": ""}
+    )
+    after_raw["module_ownership"] = [
+        {
+            "module": "cryptography",
+            "owners": ["crypto-registry", "helper"],
+            "completeness": "complete",
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(before_raw)
+        after = codemap.dependency_resolution_evidence(after_raw)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert delta["nodes_added"] == ["helper"]
+    assert delta["edges_added"] == [["crypto-registry", "helper", "dependency", ""]]
+    assert delta["module_ownership_changed"] == ["cryptography"]
+    assert delta["causation"] == "not-inferred"
