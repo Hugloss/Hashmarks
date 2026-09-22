@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -40,10 +41,10 @@ def proof_mode_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _dcg(relevances: Sequence[float]) -> float:
-    import math
-
-    return sum(value / math.log2(index + 2) for index, value in enumerate(relevances))
+def _rank_discount(rank: int) -> float:
+    if rank < 1:
+        raise ValueError("ranking rank must be >= 1")
+    return 1.0 if rank == 1 else 1 / math.log2(rank + 1)
 
 
 def rank_metrics(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any]:
@@ -52,6 +53,8 @@ def rank_metrics(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any
         for row in rows
         if isinstance(row.get(field), Mapping) and row[field].get("rank") is not None
     ]
+    if any(rank < 1 for rank in ranks):
+        raise ValueError(f"{field} rank must be >= 1")
     if not ranks:
         return {
             "cases": 0,
@@ -65,11 +68,7 @@ def rank_metrics(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any
         "recall_at_1": sum(rank <= 1 for rank in ranks) / len(ranks),
         "recall_at_5": sum(rank <= 5 for rank in ranks) / len(ranks),
         "mrr": sum(1 / rank for rank in ranks) / len(ranks),
-        "ndcg": sum(
-            1 / (1 if rank == 1 else __import__("math").log2(rank + 1))
-            for rank in ranks
-        )
-        / len(ranks),
+        "ndcg": sum(_rank_discount(rank) for rank in ranks) / len(ranks),
     }
 
 
@@ -86,7 +85,10 @@ def stability_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "generation_authority_stable",
     )
     return {
-        key: _ratio(sum(item.get(key) is True for item in observed), len(observed))
+        key: _ratio(
+            sum(item.get(key) is True for item in observed if key in item),
+            sum(key in item for item in observed),
+        )
         for key in keys
     }
 
@@ -95,6 +97,8 @@ def _economics_metric(
     observed: Sequence[Mapping[str, Any]], key: str
 ) -> dict[str, Any]:
     values = [item[key] for item in observed if item.get(key) is not None]
+    if any(not isinstance(value, (int, float)) or value < 0 for value in values):
+        raise ValueError(f"economics {key} must be a non-negative number")
     return {
         "samples": len(values),
         "min": min(values) if values else None,
@@ -130,7 +134,10 @@ def evidence_retention(rows: Sequence[Mapping[str, Any]]) -> dict[str, float | N
         and row["evidence_retention"]
     ]
     return {
-        key: _ratio(sum(item.get(key) is True for item in observed), len(observed))
+        key: _ratio(
+            sum(item.get(key) is True for item in observed if key in item),
+            sum(key in item for item in observed),
+        )
         for key in keys
     }
 
@@ -141,7 +148,13 @@ def environment_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         for row in rows
         if isinstance(row.get("environment"), Mapping) and row["environment"]
     ]
+    allowed_modes = {"cold", "warm", "incremental"}
     modes = Counter(str(item.get("mode") or "unknown") for item in observed)
+    invalid_modes = sorted(mode for mode in modes if mode not in allowed_modes)
+    if invalid_modes:
+        raise ValueError(f"environment mode must be one of {sorted(allowed_modes)}")
+    if any(not str(item.get("fingerprint") or "").strip() for item in observed):
+        raise ValueError("environment fingerprint must be non-empty when environment is observed")
     identities = sorted(
         {str(item["fingerprint"]) for item in observed if item.get("fingerprint")}
     )
