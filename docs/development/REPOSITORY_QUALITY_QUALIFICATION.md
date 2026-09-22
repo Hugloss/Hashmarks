@@ -39,7 +39,7 @@ and superseded cases remain evidence but cannot silently change the qualificatio
 An empty or non-score-bearing corpus is `benchmark-not-ready`. Invalid cases also make
 the benchmark not ready. Ambiguous or insufficient ground truth requires
 `needs-adjudication` before the harness may report `qualified` or `not-qualified`.
-These are evaluator states, never edit or release permissions.
+These are evaluator states, never edit or release permissions. Qualification also requires minimum active coverage of the critical semantic slices: unique owner, true ambiguity, non-edit, and explicit test edit. Missing a critical slice makes the benchmark not ready; zero observed violations in an unrepresentative corpus are not evidence of qualification.
 
 ## Hard-zero authority metrics
 
