@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
@@ -8,8 +9,6 @@ from .decision_session import incomplete_decision_scoped
 from .evidence_verification import _VerificationSelectionState
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from .engine import CodeMap
 
 
