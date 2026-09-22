@@ -7,6 +7,7 @@ import statistics
 import sys
 import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -28,6 +29,15 @@ if TYPE_CHECKING:
 
 PROFILE_SCHEMA = "hashmarks.repository-evaluation-profile.v1"
 PAIRED_PROFILE_SCHEMA = "hashmarks.repository-evaluation-paired-profile.v1"
+
+
+@dataclass(frozen=True)
+class PairedProfileProtocol:
+    warmups: int = 2
+    pairs: int = 9
+    shard_count: int = 1
+    shard_index: int = 0
+    max_control_mad_pct: float = 10.0
 
 
 def _semantic_fingerprint(action: Mapping[str, object]) -> str:
@@ -131,27 +141,71 @@ def profile_cases(
     }
 
 
+def _paired_case_row(
+    a: CodeMap,
+    b: CodeMap,
+    case: Mapping[str, object],
+    protocol: PairedProfileProtocol,
+) -> dict[str, object]:
+    for _ in range(protocol.warmups):
+        _run_action(a, case)
+        _run_action(b, case)
+    deltas = []
+    semantic_equal = True
+    fingerprints = {"a": [], "b": []}
+    for index in range(protocol.pairs):
+        if index % 2 == 0:
+            ae, ax = _run_action(a, case)
+            be, bx = _run_action(b, case)
+        else:
+            be, bx = _run_action(b, case)
+            ae, ax = _run_action(a, case)
+        fingerprints["a"].append(ax)
+        fingerprints["b"].append(bx)
+        semantic_equal &= ax == bx
+        deltas.append((ae - be) / ae * 100.0 if ae else 0.0)
+    median = float(statistics.median(deltas))
+    mad = float(statistics.median(abs(value - median) for value in deltas))
+    semantic_stable = all(len(set(values)) == 1 for values in fingerprints.values())
+    admitted = (
+        semantic_equal and semantic_stable and mad <= protocol.max_control_mad_pct
+    )
+    return {
+        "id": str(case.get("id") or ""),
+        "task": str(case.get("task") or ""),
+        "paired_gain_pct": deltas,
+        "paired_median_gain_pct": median,
+        "paired_mad_pct": mad,
+        "semantic_equal": semantic_equal,
+        "semantic_stable": semantic_stable,
+        "admitted": admitted,
+        "admission_reason": "ADMITTED"
+        if admitted
+        else "SEMANTIC_CHANGE"
+        if not semantic_equal
+        else "UNSTABLE_NOISE",
+    }
+
+
 def paired_profile_cases(
     *,
     workspace_a: Path,
     workspace_b: Path,
     cases_path: Path,
-    warmups: int = 2,
-    pairs: int = 9,
-    shard_count: int = 1,
-    shard_index: int = 0,
-    max_control_mad_pct: float = 10.0,
+    protocol: PairedProfileProtocol = PairedProfileProtocol(),
 ) -> dict[str, Any]:
     if (
-        warmups < 0
-        or pairs < 3
-        or shard_count < 1
-        or not 0 <= shard_index < shard_count
-        or max_control_mad_pct < 0
+        protocol.warmups < 0
+        or protocol.pairs < 3
+        or protocol.shard_count < 1
+        or not 0 <= protocol.shard_index < protocol.shard_count
+        or protocol.max_control_mad_pct < 0
     ):
         raise ValueError("invalid paired profile protocol")
     doc = load_json(cases_path, schema=CASES_SCHEMA)
-    selected = _selected_cases(doc, shard_count=shard_count, shard_index=shard_index)
+    selected = _selected_cases(
+        doc, shard_count=protocol.shard_count, shard_index=protocol.shard_index
+    )
     workspace_a = workspace_a.resolve()
     workspace_b = workspace_b.resolve()
     rows = []
@@ -178,49 +232,7 @@ def paired_profile_cases(
                 workspace_b, excluded_paths=(b.state_dir,)
             )
             for case in selected:
-                for _ in range(warmups):
-                    _run_action(a, case)
-                    _run_action(b, case)
-                deltas = []
-                semantic_equal = True
-                af = []
-                bf = []
-                for index in range(pairs):
-                    if index % 2 == 0:
-                        ae, ax = _run_action(a, case)
-                        be, bx = _run_action(b, case)
-                    else:
-                        be, bx = _run_action(b, case)
-                        ae, ax = _run_action(a, case)
-                    af.append(ax)
-                    bf.append(bx)
-                    semantic_equal &= ax == bx
-                    deltas.append((ae - be) / ae * 100.0 if ae else 0.0)
-                median = float(statistics.median(deltas))
-                mad = float(statistics.median(abs(x - median) for x in deltas))
-                stable = (
-                    semantic_equal
-                    and len(set(af)) == 1
-                    and len(set(bf)) == 1
-                    and mad <= max_control_mad_pct
-                )
-                rows.append(
-                    {
-                        "id": str(case.get("id") or ""),
-                        "task": str(case.get("task") or ""),
-                        "paired_gain_pct": deltas,
-                        "paired_median_gain_pct": median,
-                        "paired_mad_pct": mad,
-                        "semantic_equal": semantic_equal,
-                        "semantic_stable": len(set(af)) == 1 and len(set(bf)) == 1,
-                        "admitted": stable,
-                        "admission_reason": "ADMITTED"
-                        if stable
-                        else "SEMANTIC_CHANGE"
-                        if not semantic_equal
-                        else "UNSTABLE_NOISE",
-                    }
-                )
+                rows.append(_paired_case_row(a, b, case, protocol))
     return {
         "schema": PAIRED_PROFILE_SCHEMA,
         "suite": doc.get("suite"),
@@ -228,11 +240,11 @@ def paired_profile_cases(
         "repository_identity_a": aid,
         "repository_identity_b": bid,
         "producer_implementation_identity": native_producer_implementation_identity(),
-        "warmups": warmups,
-        "pairs": pairs,
-        "shard_count": shard_count,
-        "shard_index": shard_index,
-        "max_control_mad_pct": max_control_mad_pct,
+        "warmups": protocol.warmups,
+        "pairs": protocol.pairs,
+        "shard_count": protocol.shard_count,
+        "shard_index": protocol.shard_index,
+        "max_control_mad_pct": protocol.max_control_mad_pct,
         "cases": rows,
         "authority": "performance-measurement-only",
     }
@@ -259,11 +271,13 @@ def main() -> int:
             workspace_a=a.workspace_a,
             workspace_b=a.workspace_b,
             cases_path=a.cases,
-            warmups=a.warmups,
-            pairs=a.pairs or a.samples,
-            shard_count=a.shard_count,
-            shard_index=a.shard_index,
-            max_control_mad_pct=a.max_control_mad_pct,
+            protocol=PairedProfileProtocol(
+                warmups=a.warmups,
+                pairs=a.pairs or a.samples,
+                shard_count=a.shard_count,
+                shard_index=a.shard_index,
+                max_control_mad_pct=a.max_control_mad_pct,
+            ),
         )
     else:
         if not a.workspace:

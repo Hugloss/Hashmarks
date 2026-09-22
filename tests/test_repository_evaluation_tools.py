@@ -431,9 +431,11 @@ def test_paired_profile_interleaves_semantics_and_fails_closed_on_noise(
         workspace_a=repo_a,
         workspace_b=repo_b,
         cases_path=cases,
-        warmups=0,
-        pairs=5,
-        max_control_mad_pct=10.0,
+        protocol=profiles.PairedProfileProtocol(
+            warmups=0,
+            pairs=5,
+            max_control_mad_pct=10.0,
+        ),
     )
     row = result["cases"][0]
     assert row["semantic_equal"] is True
