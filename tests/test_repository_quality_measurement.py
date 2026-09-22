@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from scripts.agent_evaluation.repository_quality_measurement import (
+    MeasurementInputs,
     comparable_economics,
     measurement_health,
     measurement_receipt,
