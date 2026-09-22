@@ -134,7 +134,7 @@ def test_negative_economics_fail_closed(economics) -> None:
 def test_retained_benchmark_artifacts_are_real_repository_evidence() -> None:
     root = Path(__file__).resolve().parents[1] / "benchmarks/agent_evaluation/retained"
     corpora = sorted(root.glob("challenge/base/corpora/*.json"))
-    repos = sorted(path for path in (root / "challenge/base/repos").iterdir() if path.is_dir())
+    repos = sorted(\n        path for path in (root / "challenge/base/repos").iterdir() if path.is_dir()\n    )
     outputs = sorted(root.glob("outputs/*.json"))
     assert len(corpora) >= 3
     assert len(repos) >= 3
