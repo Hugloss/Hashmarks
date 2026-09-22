@@ -681,6 +681,14 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
     def _task_action_ambiguous_plain_identifiers(
         self, task: str, rows: Sequence[dict[str, object]], failed: set[str]
     ) -> set[str]:
+        """Return prose identifiers that are repository-globally non-unique.
+
+        Bounded canonical retrieval is presentation evidence only. Duplicate exact
+        symbol identity must therefore be established from the maintained exact
+        index so a small limit cannot manufacture unique ownership.
+        """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         masked = task
         for value in _QUALIFIED_IDENTIFIER_RE.findall(task):
             masked = masked.replace(value, " ")
@@ -689,21 +697,30 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             for token in _WORD_RE.findall(masked)
             if len(token) >= 4 and token.lower() not in _TASK_STOPWORDS
         }
-        exact_row_paths: dict[str, set[str]] = {}
-        for row in rows:
-            path = str(row.get("path") or "")
+        if not plain_tokens:
+            return set()
+        indexed = self._session_exact_symbol_candidates(
+            tuple(sorted(plain_tokens)), limit=1024
+        )
+        exact_paths: dict[str, set[str]] = {}
+        for symbol in indexed:
+            path = str(symbol.get("path") or "")
+            name = str(symbol.get("name") or "").lower()
             if (
-                not path
+                name not in plain_tokens
+                or not path
                 or path in failed
-                or "edit" not in row.get("roles", [])
-                or RepositoryDomain.TEST.value in row.get("domains", [])
                 or self._task_action_is_archive_path(path)
             ):
                 continue
-            name = str(row.get("name") or "").lower()
-            if name in plain_tokens:
-                exact_row_paths.setdefault(name, set()).add(path)
-        return {token for token, paths in exact_row_paths.items() if len(paths) > 1}
+            domains = classify_repository_path(path)
+            if RepositoryDomain.TEST in domains or not {
+                RepositoryDomain.SOURCE,
+                RepositoryDomain.SCRIPT,
+            }.intersection(domains):
+                continue
+            exact_paths.setdefault(name, set()).add(path)
+        return {token for token, paths in exact_paths.items() if len(paths) > 1}
 
     @staticmethod
     def _task_action_path_module_aliases(path: str) -> set[str]:

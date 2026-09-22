@@ -444,3 +444,97 @@ def test_qualified_identifier_does_not_inherit_plain_same_name_ambiguity(
     assert action["edit"]["exact_identifier_projection"] is True
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
+
+
+def test_exact_identifier_authority_is_invariant_across_presentation_limits(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "src/target.py").write_text(
+        "def globally_unique_owner(value):\n    return value\n",
+        encoding="utf-8",
+    )
+    for index in range(12):
+        (tmp_path / "tests" / f"test_noise_{index}.py").write_text(
+            f"def test_globally_unique_owner_noise_{index}():\n    assert True\n",
+            encoding="utf-8",
+        )
+
+    task = "Refactor target.globally_unique_owner without changing behavior"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        results = [
+            codemap.task_action_map(task, limit=limit, per_role=1)
+            for limit in (1, 10, 100)
+        ]
+
+    assert {row["edit"]["path"] for row in results} == {"src/target.py"}
+    assert {row["owner_basis"] for row in results} == {"qualified-symbol"}
+    assert {row["ownership_authority"]["resolved_owner"] for row in results} == {
+        "src/target.py"
+    }
+    assert {
+        row["ownership_authority"]["authority_proof_identity"] for row in results
+    } == {results[0]["ownership_authority"]["authority_proof_identity"]}
+    assert all(
+        row["ownership_authority"]["proof_scope"] == "repository-global-symbol-identity"
+        for row in results
+    )
+    assert all(row["ownership_authority"]["proof_scope_complete"] for row in results)
+
+
+def test_duplicate_exact_identifier_stays_ambiguous_across_presentation_limits(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src/a").mkdir(parents=True)
+    (tmp_path / "src/b").mkdir(parents=True)
+    for package in ("a", "b"):
+        (tmp_path / f"src/{package}/policy.py").write_text(
+            "def evaluate(value):\n    return value\n",
+            encoding="utf-8",
+        )
+
+    task = "Refactor evaluate without changing behavior"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        results = [
+            codemap.task_action_map(task, limit=limit, per_role=1)
+            for limit in (1, 10, 100)
+        ]
+
+    assert all(row["ambiguity"]["ambiguous"] for row in results)
+    assert all(
+        row["ambiguity"]["reason"] == "multiple-exact-identifier-edit-owners"
+        for row in results
+    )
+    assert all(not row["ownership_authority"]["owner_resolved"] for row in results)
+    assert all(row["ownership_authority"]["resolved_owner"] is None for row in results)
+
+
+def test_literal_path_authority_is_invariant_across_presentation_limits(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/owner.py").write_text(
+        "def owner(value):\n    return value\n",
+        encoding="utf-8",
+    )
+    task = "Change src/owner.py owner behavior"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        results = [
+            codemap.task_action_map(task, limit=limit, per_role=1)
+            for limit in (1, 10, 100)
+        ]
+
+    assert {row["edit"]["path"] for row in results} == {"src/owner.py"}
+    assert {row["owner_basis"] for row in results} == {"literal-path"}
+    assert {
+        row["ownership_authority"]["authority_proof_identity"] for row in results
+    } == {results[0]["ownership_authority"]["authority_proof_identity"]}
+    assert all(
+        row["ownership_authority"]["proof_scope"] == "repository-global-path-identity"
+        for row in results
+    )
