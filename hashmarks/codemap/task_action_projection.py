@@ -780,6 +780,11 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             task, context, selection, limit
         )
         multi_structural_owner_ambiguity = len(task_local_structural_owners) > 1
+        unproven_structural_owner = bool(
+            selection.owner_basis == "structural-owner"
+            and selection.structural_owner is not None
+            and selection.structural_owner.get("authority_admissible") is not True
+        )
 
         competing = self._task_action_competing_rows(choices.edit, context.rows)
         verification_identity_ambiguity = bool(
@@ -828,6 +833,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 weak_contract_anchor_ambiguity,
                 selection.archive_live_owner_ambiguity,
                 multi_structural_owner_ambiguity,
+                unproven_structural_owner,
                 verification_identity_ambiguity,
             ),
         )
@@ -847,6 +853,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                     "multiple-task-local-structural-owners",
                     multi_structural_owner_ambiguity,
                 ),
+                ("unproven-structural-owner", unproven_structural_owner),
                 (
                     "unresolved-qualified-import-identity",
                     verification_identity_ambiguity,
