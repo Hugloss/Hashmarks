@@ -11,7 +11,9 @@ def test_source_hygiene_accepts_valid_lf_python(tmp_path: Path) -> None:
     assert _check(path) == []
 
 
-def test_source_hygiene_rejects_literal_newline_source_corruption(tmp_path: Path) -> None:
+def test_source_hygiene_rejects_literal_newline_source_corruption(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "broken.py"
     path.write_bytes(b"def value():\\n    return 1\\n")
     errors = _check(path)
