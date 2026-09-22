@@ -33,9 +33,15 @@ def _case(**overrides):
 def _qualification_rows():
     cases = [
         _case(case_id="unique"),
-        _case(case_id="ambiguous", semantic_truth="true-ambiguity", expected_owner=None),
+        _case(
+            case_id="ambiguous", semantic_truth="true-ambiguity", expected_owner=None
+        ),
         _case(case_id="non-edit", semantic_truth="non-edit", expected_owner=None),
-        _case(case_id="test-edit", semantic_truth="explicit-test-edit", expected_owner=None),
+        _case(
+            case_id="test-edit",
+            semantic_truth="explicit-test-edit",
+            expected_owner=None,
+        ),
     ]
     observed = [
         {"state": "resolved", "owner": "src/widget.py::widget"},
@@ -190,7 +196,7 @@ def test_uncertain_ground_truth_requires_adjudication_before_qualification() -> 
         ),
         {"state": "unresolved", "owner": None},
     )
-    report = summarize([valid, uncertain])
+    report = summarize([valid, *_qualification_rows()[1:], uncertain])
     assert report["qualification"] == "needs-adjudication"
     assert report["benchmark_health"]["needs_adjudication"] == 1
 
