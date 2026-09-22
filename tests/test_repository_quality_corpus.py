@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from scripts.agent_evaluation.repository_quality_corpus import (
+    corpus_layer_health,
     corpus_manifest_identity,
     promotion_transition,
     qualification_membership_identity,
@@ -117,3 +118,12 @@ def test_mutation_harness_detects_limit_sensitive_authority_bug() -> None:
     )
     assert results[0]["violation"] is True
     assert results[0]["presentation_only"] is True
+
+
+
+def test_corpus_health_distinguishes_retained_from_fresh_dogfood() -> None:
+    health = corpus_layer_health(_manifest())
+    assert health["has_retained_real_world"] is True
+    assert health["has_fresh_dogfood"] is False
+    assert health["fresh_dogfood_qualified"] is False
+    assert health["qualification_layers"]["L2-retained-real-world"] == 2
