@@ -30,11 +30,27 @@ def _case(**overrides):
     return value
 
 
+def _qualification_rows():
+    cases = [
+        _case(case_id="unique"),
+        _case(case_id="ambiguous", semantic_truth="true-ambiguity", expected_owner=None),
+        _case(case_id="non-edit", semantic_truth="non-edit", expected_owner=None),
+        _case(case_id="test-edit", semantic_truth="explicit-test-edit", expected_owner=None),
+    ]
+    observed = [
+        {"state": "resolved", "owner": "src/widget.py::widget"},
+        {"state": "ambiguous", "owner": None},
+        {"state": "no-edit-authority", "owner": None},
+        {"state": "explicit-test-target", "owner": None},
+    ]
+    return [evaluate_case(case, result) for case, result in zip(cases, observed)]
+
+
 def test_sufficient_unique_owner_resolves_without_authority_violation() -> None:
     row = evaluate_case(
         _case(), {"state": "resolved", "owner": "src/widget.py::widget"}
     )
-    report = summarize([row])
+    report = summarize([row, *_qualification_rows()[1:]])
     assert report["qualification"] == "qualified"
     assert report["hard_zero"]["false_owner"] == 0
     assert report["selective_quality"]["selective_owner_risk"] == 0
@@ -211,3 +227,26 @@ def test_historical_and_canary_cases_are_evidence_but_not_score_bearing() -> Non
     assert report["benchmark_health"]["total_cases"] == 3
     assert report["benchmark_health"]["score_bearing_cases"] == 1
     assert report["hard_zero"]["false_owner"] == 0
+
+
+def test_missing_critical_semantic_slice_prevents_qualification() -> None:
+    report = summarize(
+        [
+            evaluate_case(
+                _case(),
+                {"state": "resolved", "owner": "src/widget.py::widget"},
+            )
+        ]
+    )
+    assert report["qualification"] == "benchmark-not-ready"
+    assert report["benchmark_health"]["critical_slices"]["missing"] == {
+        "true-ambiguity": 1,
+        "non-edit": 1,
+        "explicit-test-edit": 1,
+    }
+
+
+def test_complete_critical_semantic_slices_allow_qualification() -> None:
+    report = summarize(_qualification_rows())
+    assert report["qualification"] == "qualified"
+    assert report["benchmark_health"]["critical_slices"]["adequate"] is True
