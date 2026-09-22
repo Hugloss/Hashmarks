@@ -757,6 +757,16 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             selection.structural_owner_origin,
         )
 
+    @staticmethod
+    def _task_action_unproven_structural_owner(
+        selection: _TaskActionSelectionState,
+    ) -> bool:
+        return bool(
+            selection.owner_basis == "structural-owner"
+            and selection.structural_owner is not None
+            and selection.structural_owner.get("authority_admissible") is not True
+        )
+
     def _task_action_projection_ambiguity_state(
         self,
         task: str,
@@ -780,12 +790,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             task, context, selection, limit
         )
         multi_structural_owner_ambiguity = len(task_local_structural_owners) > 1
-        unproven_structural_owner = bool(
-            selection.owner_basis == "structural-owner"
-            and selection.structural_owner is not None
-            and selection.structural_owner.get("authority_admissible") is not True
-        )
-
         competing = self._task_action_competing_rows(choices.edit, context.rows)
         verification_identity_ambiguity = bool(
             choices.verification_relevance.get("qualified_identity_ambiguous")
@@ -833,7 +837,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 weak_contract_anchor_ambiguity,
                 selection.archive_live_owner_ambiguity,
                 multi_structural_owner_ambiguity,
-                unproven_structural_owner,
+                self._task_action_unproven_structural_owner(selection),
                 verification_identity_ambiguity,
             ),
         )
@@ -853,7 +857,10 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                     "multiple-task-local-structural-owners",
                     multi_structural_owner_ambiguity,
                 ),
-                ("unproven-structural-owner", unproven_structural_owner),
+                (
+                    "unproven-structural-owner",
+                    self._task_action_unproven_structural_owner(selection),
+                ),
                 (
                     "unresolved-qualified-import-identity",
                     verification_identity_ambiguity,
