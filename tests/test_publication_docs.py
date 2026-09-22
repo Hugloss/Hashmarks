@@ -1,4 +1,5 @@
 import ast
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -141,6 +142,17 @@ def test_current_integration_contract_is_not_version_pinned() -> None:
     assert "Hashmarks must never become Oh-Goon's execution motor." in integration
     assert "canonical Oh-Goon 1267.0.147" not in integration
     assert "## v0.10." not in integration
+
+
+def test_public_readme_tracks_release_version_and_markdown_boundaries() -> None:
+    readme = _text("README.md")
+    project_version = tomllib.loads(_text("pyproject.toml"))["project"]["version"]
+
+    assert f"Current package version: **{project_version}**." in readme
+    assert "Hashmarks.\\n- **Evidence correlation.**" not in readme
+    assert "REPOSITORY_EVIDENCE_BINDINGS.md)\\n- [Evidence correlation]" not in readme
+    assert "Hashmarks.\n- **Evidence correlation.**" in readme
+    assert "REPOSITORY_EVIDENCE_BINDINGS.md)\n- [Evidence correlation]" in readme
 
 
 def test_public_release_contract_documents_stability_and_changelog() -> None:
