@@ -39,15 +39,9 @@ def test_retained_real_repositories_keep_search_deterministic_across_rebuild() -
     query = "OrderService submit_order implementation"
     with CodeMap(repo) as codemap:
         codemap.sync()
-        first = [
-            (row["path"], row.get("name"), row.get("kind"))
-            for row in codemap.find(query, limit=8)
-        ]
+        first = [(row.path, row.name, row.kind) for row in codemap.find(query, limit=8)]
         codemap.sync(force=True)
-        rebuilt = [
-            (row["path"], row.get("name"), row.get("kind"))
-            for row in codemap.search(query, limit=8)
-        ]
+        rebuilt = [(row.path, row.name, row.kind) for row in codemap.find(query, limit=8)]
     assert first == rebuilt
 
 
