@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.agent_evaluation.repository_quality_corpus import (
+from scripts.agent_evaluation.repository_quality_convergence import (\n    require_surface_convergence,\n)\nfrom scripts.agent_evaluation.repository_quality_corpus import (
     corpus_layer_health,
     corpus_manifest_identity,
     promotion_transition,
@@ -127,3 +127,26 @@ def test_corpus_health_distinguishes_retained_from_fresh_dogfood() -> None:
     assert health["has_fresh_dogfood"] is False
     assert health["fresh_dogfood_qualified"] is False
     assert health["qualification_layers"]["L2-retained-real-world"] == 2
+
+
+
+def test_cross_surface_authority_convergence_requires_one_proof_identity() -> None:
+    rows = [
+        {"surface": surface, "authority_proof_identity": "sha256:proof"}
+        for surface in ("task-evidence", "mcp", "compact", "tests")
+    ]
+    result = require_surface_convergence(
+        rows, ("task-evidence", "mcp", "compact", "tests")
+    )
+    assert result["complete"] is True
+    assert result["authority_proof_identities"] == ["sha256:proof"]
+
+
+def test_cross_surface_authority_drift_remains_visible() -> None:
+    rows = [
+        {"surface": "task-evidence", "authority_proof_identity": "sha256:a"},
+        {"surface": "mcp", "authority_proof_identity": "sha256:b"},
+    ]
+    result = require_surface_convergence(rows, ("task-evidence", "mcp"))
+    assert result["converged"] is False
+    assert result["complete"] is False
