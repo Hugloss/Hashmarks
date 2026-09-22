@@ -64,6 +64,27 @@ def _rejection_reason(
     return "lower-ranked-alternative"
 
 
+
+def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, bool]:
+    retrieved = state.edit is not None
+    inferred = bool(state.edit and state.edit.get("structural_projection"))
+    structural = state.structural_owner is not None
+    explicit_basis = bool(state.authority_basis)
+    owner_eligible = bool(state.owner_eligible)
+    ambiguity_cleared = status == "resolved" and not state.ambiguous
+    admissible = retrieved and owner_eligible and (explicit_basis or structural)
+    proven = admissible and ambiguity_cleared
+    return {
+        "retrieved": retrieved,
+        "inferred": inferred,
+        "structural": structural,
+        "explicit_basis": explicit_basis,
+        "owner_eligible": owner_eligible,
+        "ambiguity_cleared": ambiguity_cleared,
+        "admissible": admissible,
+        "proven": proven,
+    }
+
 def ownership_decision_trace(
     state: OwnershipDecisionState,
 ) -> dict[str, object]:
@@ -106,13 +127,7 @@ def ownership_decision_trace(
             "reason": state.ambiguity_reason,
         },
         "authority_basis": state.authority_basis,
-        "evidence_state": {
-            "retrieved": state.edit is not None,
-            "inferred": bool(state.edit and state.edit.get("structural_projection")),
-            "structural": state.structural_owner is not None,
-            "admissible": status == "resolved",
-            "proven": status == "resolved",
-        },
+        "evidence_state": _evidence_state(state, status),
     }
 
 
@@ -212,7 +227,13 @@ def ownership_authority_contract(
 ) -> dict[str, object]:
     status = str(trace.get("status") or "unresolved")
     selected_path = _trace_selected_path(trace)
-    safe = status == "resolved" and bool(selected_path)
+    evidence_state = trace.get("evidence_state")
+    evidence_state = evidence_state if isinstance(evidence_state, Mapping) else {}
+    safe = (
+        status == "resolved"
+        and bool(selected_path)
+        and bool(evidence_state.get("proven"))
+    )
     reason = "unique-owner-established" if safe else _trace_unresolved_reason(trace)
     proof_identity = authority_proof_identity(trace)
     return {
