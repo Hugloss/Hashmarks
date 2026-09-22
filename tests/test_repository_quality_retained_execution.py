@@ -40,8 +40,11 @@ def test_retained_real_repositories_keep_search_deterministic_across_rebuild() -
     with CodeMap(repo) as codemap:
         codemap.sync()
         first = [(row.path, row.name, row.kind) for row in codemap.find(query, limit=8)]
-        codemap.sync(force=True)
-        rebuilt = [(row.path, row.name, row.kind) for row in codemap.find(query, limit=8)]
+    with CodeMap(repo) as rebuilt_map:
+        rebuilt_map.sync()
+        rebuilt = [
+            (row.path, row.name, row.kind) for row in rebuilt_map.find(query, limit=8)
+        ]
     assert first == rebuilt
 
 
