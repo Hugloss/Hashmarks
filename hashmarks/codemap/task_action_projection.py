@@ -4,9 +4,9 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast
 
+from ..ownership_decision import bounded_presentation_contract
 from .decision_session import decision_scoped, diagnostic_producer
 from .model import EvidenceVisibility
-from ..ownership_decision import bounded_presentation_contract
 from .repository_domains import RepositoryDomain
 from .task_action_owner_resolution import TaskActionOwnerResolutionMixin
 from .task_action_types import (

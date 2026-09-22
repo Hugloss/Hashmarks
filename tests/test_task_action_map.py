@@ -572,9 +572,11 @@ def test_authority_proof_identity_ignores_per_role_presentation_bounds(
     assert [
         row["authority_non_interference"]["returned_candidates"] for row in results
     ] == [1, 2, 4]
-    assert [
-        row["authority_non_interference"]["complete"] for row in results
-    ] == [False, False, True]
+    assert [row["authority_non_interference"]["complete"] for row in results] == [
+        False,
+        False,
+        True,
+    ]
 
 
 def test_resolved_authority_proof_identity_ignores_per_role_bounds(
@@ -598,15 +600,16 @@ def test_resolved_authority_proof_identity_ignores_per_role_bounds(
     assert {row["ownership_authority"]["resolved_owner"] for row in results} == {
         "src/owner.py"
     }
-    assert len(
-        {
-            row["ownership_authority"]["authority_proof_identity"]
-            for row in results
-        }
-    ) == 1
-    assert len(
-        {
-            row["authority_non_interference"]["presentation_identity"]
-            for row in results
-        }
-    ) == 3
+    assert (
+        len({row["ownership_authority"]["authority_proof_identity"] for row in results})
+        == 1
+    )
+    assert (
+        len(
+            {
+                row["authority_non_interference"]["presentation_identity"]
+                for row in results
+            }
+        )
+        == 3
+    )
