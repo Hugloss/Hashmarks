@@ -44,10 +44,7 @@ def measurement_receipt(
     execution_receipt_identity: str,
     environment_fingerprint: str,
     mode: str,
-    ranking: Mapping[str, Any],
-    verification: Mapping[str, Any],
-    retention: Mapping[str, Any],
-    economics: Mapping[str, Any],
+    measurements: MeasurementInputs,
 ) -> dict[str, Any]:
     if not execution_receipt_identity or not environment_fingerprint:
         raise ValueError(
@@ -61,10 +58,10 @@ def measurement_receipt(
         "execution_receipt_identity": execution_receipt_identity,
         "environment_fingerprint": environment_fingerprint,
         "mode": mode,
-        "ranking": dict(ranking),
-        "verification": dict(verification),
-        "retention": dict(retention),
-        "economics": dict(economics),
+        "ranking": dict(measurements.ranking),
+        "verification": dict(measurements.verification),
+        "retention": dict(measurements.retention),
+        "economics": dict(measurements.economics),
     }
     return {**payload, "measurement_identity": _identity(payload)}
 
