@@ -217,6 +217,10 @@ def evaluate_case(
         "risk_class": case["risk_class"],
         "evaluation_profile": case["evaluation_profile"],
         "proof_mode": case["proof_mode"],
+        "ranking": dict(observed.get("ranking") or {}),
+        "verification": dict(observed.get("verification") or {}),
+        "stability": dict(observed.get("stability") or {}),
+        "economics": dict(observed.get("economics") or {}),
         "semantic_truth": truth.semantic_truth,
         "admitted_evidence_truth": truth.admitted_evidence_truth,
         "reported_state": state,
@@ -345,6 +349,61 @@ def _proof_mode_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _rank_metrics(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any]:
+    ranks = [
+        int(row[field]["rank"])
+        for row in rows
+        if isinstance(row.get(field), Mapping) and row[field].get("rank") is not None
+    ]
+    if not ranks:
+        return {"cases": 0, "recall_at_1": None, "recall_at_5": None, "mrr": None}
+    return {
+        "cases": len(ranks),
+        "recall_at_1": sum(rank <= 1 for rank in ranks) / len(ranks),
+        "recall_at_5": sum(rank <= 5 for rank in ranks) / len(ranks),
+        "mrr": sum(1 / rank for rank in ranks) / len(ranks),
+    }
+
+
+def _stability_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    observed = [
+        row["stability"]
+        for row in rows
+        if isinstance(row.get("stability"), Mapping) and row["stability"]
+    ]
+    keys = (
+        "paraphrase_owner_stable",
+        "retrieval_bound_owner_stable",
+        "projection_authority_stable",
+        "generation_authority_stable",
+    )
+    return {
+        key: _ratio(sum(item.get(key) is True for item in observed), len(observed))
+        for key in keys
+    }
+
+
+def _economics_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    observed = [
+        row["economics"]
+        for row in rows
+        if isinstance(row.get("economics"), Mapping) and row["economics"]
+    ]
+    keys = ("latency_ms", "rows_inspected", "candidate_count", "peak_memory_bytes")
+    return {
+        "cases": len(observed),
+        "metrics": {
+            key: {
+                "samples": len(values),
+                "min": min(values) if values else None,
+                "max": max(values) if values else None,
+            }
+            for key in keys
+            for values in [[item[key] for item in observed if item.get(key) is not None]]
+        },
+    }
+
+
 def _qualification_identity(rows: Sequence[Mapping[str, Any]]) -> str:
     return _corpus_identity(rows)
 
@@ -398,6 +457,12 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "hard_zero": dict(totals),
         "state_confusion": dict(sorted(confusion.items())),
         "abstention_quality": abstention,
+        "ranking_quality": {
+            "owner": _rank_metrics(score_rows, "ranking"),
+            "verification": _rank_metrics(score_rows, "verification"),
+        },
+        "stability_quality": _stability_metrics(score_rows),
+        "economics": _economics_summary(score_rows),
         "slice_quality": {
             "macro_by_task_family": _group_quality(score_rows, "task_family"),
             "macro_by_risk_class": _group_quality(score_rows, "risk_class"),
