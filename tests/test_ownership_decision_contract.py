@@ -190,7 +190,6 @@ def test_presentation_bounds_do_not_change_authority_proof_identity() -> None:
     assert ownership_authority_contract(trace)["authority_proof_identity"] == proof
 
 
-
 def test_bounded_presentation_reports_truncation_without_mutating_proof() -> None:
     proof = "sha256:proof"
     bounded = bounded_presentation_contract(

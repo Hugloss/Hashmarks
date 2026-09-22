@@ -196,9 +196,7 @@ def _wilson_interval(successes: int, total: int) -> dict[str, float | int | None
     center = (estimate + z * z / (2 * total)) / denominator
     margin = (
         z
-        * math.sqrt(
-            estimate * (1 - estimate) / total + z * z / (4 * total * total)
-        )
+        * math.sqrt(estimate * (1 - estimate) / total + z * z / (4 * total * total))
         / denominator
     )
     return {
@@ -219,7 +217,9 @@ def uncertainty_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     ]
     correct = sum(bool(row["correct_resolution"]) for row in resolvable)
     resolved = [row for row in rows if row["reported_state"] == "resolved"]
-    safe = sum(not any(int(value) for value in row["hard_zero"].values()) for row in resolved)
+    safe = sum(
+        not any(int(value) for value in row["hard_zero"].values()) for row in resolved
+    )
     return {
         "resolvable_owner_coverage_95pct": _wilson_interval(correct, len(resolvable)),
         "resolved_without_hard_zero_95pct": _wilson_interval(safe, len(resolved)),

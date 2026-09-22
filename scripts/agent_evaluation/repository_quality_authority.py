@@ -66,7 +66,8 @@ def derived_finding_vetoes(observed: Mapping[str, Any]) -> dict[str, bool]:
     admissible = bool(finding.get("admissible_evidence"))
     contradicted = bool(finding.get("contradicted"))
     return {
-        "unjustified_actionable_finding": actionable and (not admissible or contradicted),
+        "unjustified_actionable_finding": actionable
+        and (not admissible or contradicted),
     }
 
 
@@ -76,11 +77,15 @@ def metamorphic_observation(observed: Mapping[str, Any]) -> dict[str, Any]:
         return {}
     family = str(value.get("family") or "")
     if family not in METAMORPHIC_FAMILIES:
-        raise ValueError(f"metamorphic family must be one of {sorted(METAMORPHIC_FAMILIES)}")
+        raise ValueError(
+            f"metamorphic family must be one of {sorted(METAMORPHIC_FAMILIES)}"
+        )
     baseline = str(value.get("baseline_authority_proof_identity") or "")
     candidate = str(value.get("candidate_authority_proof_identity") or "")
     if not baseline or not candidate:
-        raise ValueError("metamorphic observations require baseline and candidate proof identity")
+        raise ValueError(
+            "metamorphic observations require baseline and candidate proof identity"
+        )
     expected = str(value.get("expected_relation") or "invariant")
     if expected not in {"invariant", "change"}:
         raise ValueError("metamorphic expected_relation must be invariant or change")
@@ -128,10 +133,14 @@ def authority_transition(observed: Mapping[str, Any]) -> dict[str, Any] | None:
     after = str(value.get("after") or "")
     evidence = str(value.get("admissible_evidence") or "")
     if not before or not after:
-        raise ValueError("authority transition requires before and after proof identities")
+        raise ValueError(
+            "authority transition requires before and after proof identities"
+        )
     changed = before != after
     if changed and not evidence:
-        raise ValueError("changed authority transition requires named admissible evidence")
+        raise ValueError(
+            "changed authority transition requires named admissible evidence"
+        )
     return {
         "changed": changed,
         "admissible_evidence": evidence or None,

@@ -670,7 +670,6 @@ def test_new_top_level_authority_vetoes_are_non_compensatory() -> None:
         assert report["hard_zero"][metric] == 1
 
 
-
 def test_structured_authority_observation_derives_false_authority_veto() -> None:
     row = evaluate_case(
         _case(case_id="derived-false-authority"),
@@ -777,7 +776,9 @@ def test_changed_authority_transition_requires_named_admissible_evidence() -> No
         )
 
 
-def test_proof_profile_minimums_are_visible_without_silently_granting_readiness() -> None:
+def test_proof_profile_minimums_are_visible_without_silently_granting_readiness() -> (
+    None
+):
     report = summarize(_qualification_rows())
     profiles = report["benchmark_health"]["proof_profiles"]
     assert profiles["change-support.v1"]["adequate"] is False
