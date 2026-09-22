@@ -171,4 +171,57 @@ def metamorphic_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     families = Counter(
         str(row["metamorphic_family"]) for row in rows if row.get("metamorphic_family")
     )
-    return {"families": dict(sorted(families.items())), "cases": sum(families.values())}
+    observations = [
+        row["metamorphic_observation"]
+        for row in rows
+        if isinstance(row.get("metamorphic_observation"), Mapping)
+        and row["metamorphic_observation"]
+    ]
+    observed_families = Counter(str(item["family"]) for item in observations)
+    return {
+        "families": dict(sorted(families.items())),
+        "cases": sum(families.values()),
+        "executed": len(observations),
+        "executed_families": dict(sorted(observed_families.items())),
+        "violations": sum(bool(item.get("violation")) for item in observations),
+    }
+
+
+def _wilson_interval(successes: int, total: int) -> dict[str, float | int | None]:
+    if total == 0:
+        return {"successes": 0, "total": 0, "estimate": None, "low": None, "high": None}
+    z = 1.959963984540054
+    estimate = successes / total
+    denominator = 1 + z * z / total
+    center = (estimate + z * z / (2 * total)) / denominator
+    margin = (
+        z
+        * math.sqrt(
+            estimate * (1 - estimate) / total + z * z / (4 * total * total)
+        )
+        / denominator
+    )
+    return {
+        "successes": successes,
+        "total": total,
+        "estimate": estimate,
+        "low": max(0.0, center - margin),
+        "high": min(1.0, center + margin),
+    }
+
+
+def uncertainty_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    resolvable = [
+        row
+        for row in rows
+        if row["semantic_truth"] == "unique-owner"
+        and row["admitted_evidence_truth"] == "sufficient"
+    ]
+    correct = sum(bool(row["correct_resolution"]) for row in resolvable)
+    resolved = [row for row in rows if row["reported_state"] == "resolved"]
+    safe = sum(not any(int(value) for value in row["hard_zero"].values()) for row in resolved)
+    return {
+        "resolvable_owner_coverage_95pct": _wilson_interval(correct, len(resolvable)),
+        "resolved_without_hard_zero_95pct": _wilson_interval(safe, len(resolved)),
+        "interpretation": "descriptive-only-no-qualification-threshold",
+    }
