@@ -19,12 +19,12 @@ from .index_surfaces import index_surface_for_path
 from .model import EvidenceVisibility, SyncResult
 from .parsers import artifact_key_for, parse_source
 from .policy import ContextPolicy
-from .source_languages import SOURCE_LANGUAGES
 from .repository_index_store import (
     default_base_snapshot,
     git_base_identity,
     git_overlay_paths,
 )
+from .source_languages import SOURCE_LANGUAGES
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
