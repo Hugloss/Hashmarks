@@ -168,6 +168,17 @@ def _broad_handler_names(handler: ast.ExceptHandler) -> set[str]:
     return set()
 
 
+def _enclosing_function(
+    node: ast.AST, parents: dict[ast.AST, ast.AST]
+) -> str:
+    owner = node
+    while owner in parents:
+        owner = parents[owner]
+        if isinstance(owner, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return owner.name
+    return "<module>"
+
+
 def test_broad_exception_handlers_are_restricted_to_explicit_failure_boundaries() -> (
     None
 ):
@@ -199,14 +210,9 @@ def test_broad_exception_handlers_are_restricted_to_explicit_failure_boundaries(
             names = _broad_handler_names(node)
             if not ({"Exception", "BaseException"} & names):
                 continue
-            owner = node
-            function = "<module>"
-            while owner in parents:
-                owner = parents[owner]
-                if isinstance(owner, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    function = owner.name
-                    break
-            found.add((path.relative_to(ROOT).as_posix(), function))
+            found.add(
+                (path.relative_to(ROOT).as_posix(), _enclosing_function(node, parents))
+            )
 
     assert found == allowed
 

@@ -30,6 +30,17 @@ class _FakeWatcher:
         return True
 
 
+def _wait_for_identity_client(client: IdentityClient, deadline: float) -> None:
+    while time.monotonic() < deadline:
+        try:
+            client.status()
+        except Exception:
+            time.sleep(0.01)
+        else:
+            return
+    raise AssertionError("identity daemon did not become ready before deadline")
+
+
 def test_manifest_hot_equality_cutoff_skips_all_file_metadata(
     tmp_path: Path, monkeypatch
 ):
@@ -181,15 +192,7 @@ def test_daemon_preserves_hot_manifest_state_across_clients(
     # inode before serve_forever starts accepting connections. Probe through
     # the public client contract so this test waits for actual readiness.
     client1 = IdentityClient(workspace, socket_path=socket_path)
-    while time.monotonic() < deadline:
-        try:
-            client1.status()
-        except Exception:
-            time.sleep(0.01)
-        else:
-            break
-    else:
-        raise AssertionError("identity daemon did not become ready before deadline")
+    _wait_for_identity_client(client1, deadline)
     first = client1.input_root(["f00.txt", "f01.txt"])
     assert client1.status()["observation"] == "clean"
 
