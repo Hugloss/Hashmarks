@@ -290,12 +290,11 @@ def test_anchor_reordering_within_bundle_does_not_change_correlation_identity(
 
     assert first == second
     assert first["correlation_identity"] == second["correlation_identity"]
-    assert [
-        anchor["anchor_id"] for anchor in first["bundles"][0]["anchors"]
-    ] == ["a:0", "b:0"]
-    assert first["bundles"][0]["anchors"][0]["claims"]["metadata"] == {
-        "ordinal": 1
-    }
+    assert [anchor["anchor_id"] for anchor in first["bundles"][0]["anchors"]] == [
+        "a:0",
+        "b:0",
+    ]
+    assert first["bundles"][0]["anchors"][0]["claims"]["metadata"] == {"ordinal": 1}
 
 
 def test_symbol_candidate_bound_preserves_ambiguity(
@@ -756,7 +755,11 @@ def test_exact_module_locator_reuses_repository_module_identity(
             include_relationships=False,
         )
 
-    owned, external = packet["bundles"][0]["anchors"]
+    anchors = {
+        anchor["anchor_id"]: anchor for anchor in packet["bundles"][0]["anchors"]
+    }
+    owned = anchors["owned"]
+    external = anchors["external"]
     assert owned["resolution"]["state"] == "resolved-unique"
     assert owned["resolution"]["repository_path"] == "src/utils/kafka.py"
     assert owned["resolution"]["reason"] == "module-only"
