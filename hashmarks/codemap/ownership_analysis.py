@@ -177,6 +177,31 @@ class OwnershipAnalysisMixin:
             "evidence": dict(owner),
         }
 
+    @staticmethod
+    def _adjudicate_repository_finding(
+        finding: dict[str, object],
+    ) -> dict[str, object]:
+        """Attach interpretation state without erasing analyzer observations."""
+        evidence = finding.get("evidence")
+        counter_evidence: list[dict[str, object]] = []
+        if isinstance(evidence, dict) and bool(evidence.get("guarded")):
+            counter_evidence.append(
+                {
+                    "kind": "visible-guard",
+                    "effect": "contradicts-actionability",
+                }
+            )
+        result = dict(finding)
+        result["observation"] = "retained"
+        result["counter_evidence"] = counter_evidence
+        result["interpretation"] = {
+            "actionability": (
+                "not-actionable" if counter_evidence else "actionable"
+            ),
+            "authority": "repository-evidence-only",
+        }
+        return result
+
     def repository_findings(
         self, paths: Sequence[str] | None = None
     ) -> dict[str, object]:
@@ -217,6 +242,7 @@ class OwnershipAnalysisMixin:
                 if not bool(item.get("guarded"))
             ),
         ]
+        findings = [self._adjudicate_repository_finding(item) for item in findings]
         severity_order = {"warning": 0, "advisory": 1}
         findings.sort(
             key=lambda item: (
