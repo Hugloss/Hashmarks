@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.0 — Authority non-interference and evidence qualification
+
+- Separate repository authority proof from bounded retrieval and presentation so limits, candidate truncation, compact projections, persistent reopen, and MCP projection cannot manufacture or erase ownership authority.
+- Preserve caller-reported changed evidence explicitly, including missing or excluded paths, and extend canonical source evidence coverage to CSS, SCSS, Sass, and Less.
+- Separate finding observations from interpretation and counter-evidence so contradictory evidence can change actionability without erasing the underlying observation.
+- Continue release qualification with fresh downstream Oh-Goon dogfood, mutation/adversarial proof, ranking/retention measurement, and economics before final 0.16.0 closure.
+
 ## 0.15.0 — Repository authority and agent evidence closure
 
 - Add public repository evidence bindings for opaque consumer IDs over exact physical line ranges and whole repository members, with stable definition/observation identities, declared dependency and relationship evidence, binding deltas, per-binding change coverage, explicit bounds, context-policy isolation, and fail-closed stable-read/member-revision checks. These remain repository intelligence only; consumer execution/certification policy stays external.
