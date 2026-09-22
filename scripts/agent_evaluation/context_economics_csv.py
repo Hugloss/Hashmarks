@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import statistics
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -39,71 +40,112 @@ def _raw_runs_by_task(lane_report: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return raw
 
 
-def _rows(report: dict[str, Any]) -> list[dict[str, object]]:
-    rows: list[dict[str, object]] = []
+@dataclass
+class _ProjectionContext:
+    protocol: dict[str, Any]
+    protocol_identity: object
+    seen: set[tuple[str, str, str]] = field(default_factory=set)
+
+    def task_row(
+        self,
+        repository: str,
+        lane: str,
+        task: object,
+        raw: dict[str, dict[str, Any]],
+    ) -> dict[str, object]:
+        if not isinstance(task, dict):
+            raise ValueError("task rows must be objects")
+        task_id = str(task.get("id") or "")
+        if not task_id:
+            raise ValueError("task id must not be empty")
+        identity = (repository, task_id, lane)
+        if identity in self.seen:
+            raise ValueError(
+                f"duplicate economics row: repository={repository} "
+                f"task_id={task_id} condition={lane}"
+            )
+        self.seen.add(identity)
+        usage = task.get("usage") or {}
+        if not isinstance(usage, dict):
+            raise ValueError("task usage must be an object")
+        run = raw.get(task_id, {})
+        return self._project_task(repository, lane, task_id, task, usage, run)
+
+    def _project_task(
+        self,
+        repository: str,
+        lane: str,
+        task_id: str,
+        task: dict[str, Any],
+        usage: dict[str, Any],
+        run: dict[str, Any],
+    ) -> dict[str, object]:
+        return {
+            "schema": SCHEMA,
+            "protocol_identity": self.protocol_identity,
+            "family": self.protocol.get("family"),
+            "model": self.protocol.get("model"),
+            "reasoning_effort": self.protocol.get("reasoning_effort"),
+            "repository": repository,
+            "task_id": task_id,
+            "condition": lane,
+            "completed": bool(task.get("completed")),
+            "correct_first_edit": bool(task.get("correct_first_edit")),
+            "correct_verification": bool(task.get("correct_verification")),
+            "joint_success": bool(task.get("correct_first_edit"))
+            and bool(task.get("correct_verification")),
+            "elapsed_ms": float(task.get("elapsed_ms") or 0),
+            "input_tokens": usage.get("input_tokens"),
+            "cached_input_tokens": usage.get("cached_input_tokens"),
+            "output_tokens": usage.get("output_tokens"),
+            "reasoning_output_tokens": usage.get("reasoning_output_tokens"),
+            "total_tokens": usage.get("total_tokens"),
+            "token_metrics_available": usage.get("total_tokens") is not None,
+            "events_sha256": run.get("events_sha256"),
+            "stderr_sha256": run.get("stderr_sha256"),
+        }
+
+
+def _projection_context(report: dict[str, Any]) -> _ProjectionContext:
     protocol = report.get("protocol", {})
     if not isinstance(protocol, dict):
         raise ValueError("input protocol must be an object")
-    protocol_identity = report.get("protocol_identity")
-    seen: set[tuple[str, str, str]] = set()
+    return _ProjectionContext(
+        protocol=protocol,
+        protocol_identity=report.get("protocol_identity"),
+    )
+
+
+def _repository_rows(
+    repo: object,
+    context: _ProjectionContext,
+) -> list[dict[str, object]]:
+    if not isinstance(repo, dict):
+        raise ValueError("repository rows must be objects")
+    name = str(repo.get("name") or "")
+    if not name:
+        raise ValueError("repository name must not be empty")
+    lanes = repo.get("lanes", {})
+    if not isinstance(lanes, dict):
+        raise ValueError("repository lanes must be an object")
+    rows: list[dict[str, object]] = []
+    for lane in LANES:
+        lane_report = lanes.get(lane)
+        if not isinstance(lane_report, dict):
+            continue
+        raw = _raw_runs_by_task(lane_report)
+        rows.extend(
+            context.task_row(name, lane, task, raw)
+            for task in lane_report.get("tasks", [])
+        )
+    return rows
+
+
+def _rows(report: dict[str, Any]) -> list[dict[str, object]]:
+    context = _projection_context(report)
+    rows: list[dict[str, object]] = []
     for repo in report.get("repositories", []):
-        if not isinstance(repo, dict):
-            raise ValueError("repository rows must be objects")
-        name = str(repo.get("name") or "")
-        if not name:
-            raise ValueError("repository name must not be empty")
-        lanes = repo.get("lanes", {})
-        if not isinstance(lanes, dict):
-            raise ValueError("repository lanes must be an object")
-        for lane in LANES:
-            lane_report = lanes.get(lane)
-            if not isinstance(lane_report, dict):
-                continue
-            raw = _raw_runs_by_task(lane_report)
-            for task in lane_report.get("tasks", []):
-                if not isinstance(task, dict):
-                    raise ValueError("task rows must be objects")
-                task_id = str(task.get("id") or "")
-                if not task_id:
-                    raise ValueError("task id must not be empty")
-                identity = (name, task_id, lane)
-                if identity in seen:
-                    raise ValueError(
-                        f"duplicate economics row: repository={name} "
-                        f"task_id={task_id} condition={lane}"
-                    )
-                seen.add(identity)
-                run = raw.get(task_id, {})
-                usage = task.get("usage") or {}
-                if not isinstance(usage, dict):
-                    raise ValueError("task usage must be an object")
-                rows.append(
-                    {
-                        "schema": SCHEMA,
-                        "protocol_identity": protocol_identity,
-                        "family": protocol.get("family"),
-                        "model": protocol.get("model"),
-                        "reasoning_effort": protocol.get("reasoning_effort"),
-                        "repository": name,
-                        "task_id": task_id,
-                        "condition": lane,
-                        "completed": bool(task.get("completed")),
-                        "correct_first_edit": bool(task.get("correct_first_edit")),
-                        "correct_verification": bool(task.get("correct_verification")),
-                        "joint_success": bool(task.get("correct_first_edit"))
-                        and bool(task.get("correct_verification")),
-                        "elapsed_ms": float(task.get("elapsed_ms") or 0),
-                        "input_tokens": usage.get("input_tokens"),
-                        "cached_input_tokens": usage.get("cached_input_tokens"),
-                        "output_tokens": usage.get("output_tokens"),
-                        "reasoning_output_tokens": usage.get("reasoning_output_tokens"),
-                        "total_tokens": usage.get("total_tokens"),
-                        "token_metrics_available": usage.get("total_tokens")
-                        is not None,
-                        "events_sha256": run.get("events_sha256"),
-                        "stderr_sha256": run.get("stderr_sha256"),
-                    }
-                )
+        rows.extend(_repository_rows(repo, context))
     return rows
 
 
