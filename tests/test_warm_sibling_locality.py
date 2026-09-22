@@ -110,3 +110,23 @@ def test_rare_identifier_component_is_preserved_before_generic_siblings(
     assert target["verify"] in paths
     assert "src/unit_012/route.py" in paths
     assert paths.index(target["verify"]) < 6
+
+
+def test_unique_identifier_anchor_excludes_generic_contract_sibling_owners(
+    tmp_path: Path,
+) -> None:
+    tasks = _build_repetitive_repo(tmp_path, count=10)
+    target = tasks[0]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(target["query"], limit=20, per_role=3)
+        brief = codemap.task_action_brief(target["query"])
+
+    assert action["edit"]["path"] == target["edit"]
+    assert action["verify"]["path"] == target["verify"]
+    assert action["ambiguity"]["ambiguous"] is False
+    assert action["ambiguity"]["task_local_structural_owners"] == [target["edit"]]
+    assert action["ownership_authority"]["owner_resolved"] is False
+    assert brief["status"] == "safe-fresh"
+    assert brief["edit"] == target["edit"]

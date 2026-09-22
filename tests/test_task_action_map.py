@@ -667,3 +667,96 @@ def test_duplicate_owner_ambiguity_survives_codemap_reopen(tmp_path: Path) -> No
         cold["ownership_authority"]["authority_proof_identity"]
         == warm["ownership_authority"]["authority_proof_identity"]
     )
+
+
+def test_unresolved_edit_owner_cannot_rerank_verification(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/a.py").write_text(
+        'def target():\n    return "a"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "src/b.py").write_text(
+        'def target():\n    return "b"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_a.py").write_text(
+        'from src.a import target\n\ndef test_a(): assert target() == "a"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_b.py").write_text(
+        'from src.b import target\n\ndef test_b(): assert target() == "b"\n',
+        encoding="utf-8",
+    )
+    task = "Fix target behavior and verify the b regression"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        context = codemap._task_action_map_context(task, 20)
+        selection = codemap._task_action_surface_owner_state(task, context, 20, 3)
+        assert selection.owner_basis is None
+        assert selection.structural_owner is None
+        assert selection.verify is not None
+        initial_verify = str(selection.verify["path"])
+
+        def fail_if_provisional_edit_drives_verification(*_args, **_kwargs):
+            raise AssertionError(
+                "unadmitted edit must not drive verification relevance"
+            )
+
+        monkeypatch.setattr(
+            codemap,
+            "_verification_relevance",
+            fail_if_provisional_edit_drives_verification,
+        )
+        choices = codemap._task_action_projection_choices(task, context, selection, 20)
+
+    assert choices.verify is not None
+    assert choices.verify["path"] == initial_verify
+    assert (
+        choices.verification_relevance["selected"]["selection_reason"]
+        == "canonical-verification-without-edit-owner"
+    )
+
+
+def test_ranked_candidate_without_positive_proof_is_not_owner_authority(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "src/policy.py").write_text(
+        "def evaluate(value):\n    return value\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "src/other.py").write_text(
+        "def evaluate(value):\n    return value\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_policy.py").write_text(
+        "from src import policy as subject\n\n"
+        "def test_evaluate_policy():\n"
+        "    assert subject.evaluate('x') == 'x'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_other.py").write_text(
+        "from src import other as subject\n\n"
+        "def test_evaluate_other():\n"
+        "    assert subject.evaluate('x') == 'x'\n",
+        encoding="utf-8",
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map("Change policy.evaluate behavior", limit=20)
+
+    assert action["edit"]["path"] == "src/policy.py"
+    assert action["owner_basis"] is None
+    assert action["ownership_authority"]["owner_resolved"] is False
+    assert action["ownership_authority"]["candidate_owner"] == "src/policy.py"
+    assert (
+        action["verification_relevance"]["selected"]["path"] == "tests/test_policy.py"
+    )
+    assert action["verification_relevance"]["selected"]["direct_reference"] is True

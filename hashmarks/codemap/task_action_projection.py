@@ -212,6 +212,16 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             return None
         return contract
 
+    @staticmethod
+    def _task_action_verification_edit_is_admitted(
+        selection: _TaskActionSelectionState,
+    ) -> bool:
+        return not (
+            len(selection.exact_identifier_paths) > 1
+            and selection.owner_basis is None
+            and selection.structural_owner is None
+        )
+
     def _task_action_projection_choices(
         self,
         task: str,
@@ -223,13 +233,23 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             self = cast("CodeMap", self)
         edit = self._task_action_promoted_edit(context, selection)
         contract = self._task_action_local_contract(selection, edit)
-        verification_relevance = self._verification_relevance(
-            task,
-            edit=edit,
-            current_verify=selection.verify,
-            rows=context.rows,
-            limit=8,
-        )
+        if self._task_action_verification_edit_is_admitted(selection):
+            verification_relevance = self._verification_relevance(
+                task,
+                edit=edit,
+                current_verify=selection.verify,
+                rows=context.rows,
+                limit=8,
+            )
+        else:
+            current_verify_path = (
+                str(selection.verify.get("path") or "")
+                if isinstance(selection.verify, Mapping)
+                else ""
+            )
+            verification_relevance = self._verification_without_edit_owner(
+                current_verify_path
+            )
         verify = self._task_action_finalize_verification_selection(
             verification_relevance.get("selected"), context.rows, limit
         )
@@ -760,7 +780,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             task, context, selection, limit
         )
         multi_structural_owner_ambiguity = len(task_local_structural_owners) > 1
-
         competing = self._task_action_competing_rows(choices.edit, context.rows)
         verification_identity_ambiguity = bool(
             choices.verification_relevance.get("qualified_identity_ambiguous")

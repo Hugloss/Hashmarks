@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_decision_packet_does_not_require_discrimination_when_action_is_resolved(
+def test_decision_packet_discriminates_unproven_ranked_candidate(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "src").mkdir()
@@ -22,8 +22,9 @@ def test_decision_packet_does_not_require_discrimination_when_action_is_resolved
         packet = codemap.task_decision_packet("Adapter implementation test", limit=20)
     assert packet["edit"]["path"] == "src/adapter.py"
     assert packet["verify"]["path"] == "tests/test_adapter.py"
-    assert packet["discrimination"]["needed"] is False
-    assert packet["discrimination"]["reason"] == "resolved"
+    assert packet["discrimination"]["needed"] is True
+    assert packet["discrimination"]["reason"] == "ownership-unresolved"
+    assert packet["ownership_authority"]["owner_resolved"] is False
     metrics = packet["decision_metrics"]
     assert metrics["schema"] == "hashmarks.task-decision-metrics.v1"
     assert set(metrics["seconds"]) == {
@@ -49,7 +50,7 @@ def test_decision_packet_requires_discrimination_when_no_supported_owner_exists(
     assert packet["discrimination"]["reason"] == "no-supported-owner-candidate"
 
 
-def test_structural_owner_resolution_does_not_admit_redundant_discrimination(
+def test_structural_candidate_without_authority_requires_discrimination(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "src").mkdir()
@@ -72,8 +73,9 @@ def test_structural_owner_resolution_does_not_admit_redundant_discrimination(
             "Fix widget accepted response to '-new'", limit=20
         )
     assert packet["edit"]["path"] == "src/engine.py"
-    assert packet["discrimination"]["needed"] is False
-    assert packet["discrimination"]["reason"] == "resolved"
+    assert packet["ownership_authority"]["owner_resolved"] is False
+    assert packet["discrimination"]["needed"] is True
+    assert packet["discrimination"]["reason"] == "ownership-unresolved"
 
 
 def test_decision_packet_exposes_provenance_bound_verification_selection(

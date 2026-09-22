@@ -32,14 +32,24 @@ def _candidate_identity(row: Mapping[str, object]) -> dict[str, object]:
     }
 
 
+_STRUCTURALLY_RESOLVABLE_AMBIGUITY_REASONS = frozenset(
+    {"competing-ranked-candidate", "competing-action-roles"}
+)
+
+
 def _decision_status(state: OwnershipDecisionState) -> str:
     if state.edit is None or not state.owner_eligible:
         return "unresolved"
     structural = state.structural_owner or {}
     selected = str(structural.get("selected") or "")
     edit_path = str(state.edit.get("path") or "")
-    if state.ambiguous and selected != edit_path:
-        return "ambiguous"
+    if state.ambiguous:
+        structurally_resolved = (
+            selected == edit_path
+            and state.ambiguity_reason in _STRUCTURALLY_RESOLVABLE_AMBIGUITY_REASONS
+        )
+        if not structurally_resolved:
+            return "ambiguous"
     return "resolved"
 
 
@@ -87,7 +97,7 @@ def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, boo
         and scoped_basis
         and state.proof_scope_complete
     )
-    admissible = canonical_selection or scoped_proof
+    admissible = scoped_proof
     proven = admissible and ambiguity_cleared
     return {
         "retrieved": retrieved,
@@ -176,20 +186,41 @@ def _stable_identity(schema: str, payload: Mapping[str, object]) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
+def _proof_selected_identity(trace: Mapping[str, object]) -> dict[str, object] | None:
+    if str(trace.get("status") or "unresolved") != "resolved":
+        return None
+    selected = trace.get("selected")
+    if not isinstance(selected, Mapping):
+        return None
+    return {
+        "path": str(selected.get("path") or ""),
+        "name": selected.get("name"),
+        "qualname": selected.get("qualname"),
+    }
+
+
+def _authority_proof_payload(trace: Mapping[str, object]) -> dict[str, object]:
+    status = str(trace.get("status") or "unresolved")
+    evidence_state = trace.get("evidence_state")
+    proven = isinstance(evidence_state, Mapping) and bool(evidence_state.get("proven"))
+    if status != "resolved" or not proven:
+        return {"status": "unresolved"}
+    return {
+        "status": status,
+        "selected": _proof_selected_identity(trace),
+        "structural_evidence": trace.get("structural_evidence"),
+        "authority_basis": trace.get("authority_basis"),
+        "proof_scope": trace.get("proof_scope"),
+        "proof_scope_complete": trace.get("proof_scope_complete"),
+        "evidence_state": trace.get("evidence_state"),
+    }
+
+
 def authority_proof_identity(trace: Mapping[str, object]) -> str:
     """Identify proof-bearing semantics without presentation/retrieval controls."""
     return _stable_identity(
         "hashmarks.ownership-authority-proof.v1",
-        {
-            "status": trace.get("status"),
-            "selected": trace.get("selected"),
-            "structural_evidence": trace.get("structural_evidence"),
-            "ambiguity": trace.get("ambiguity"),
-            "authority_basis": trace.get("authority_basis"),
-            "proof_scope": trace.get("proof_scope"),
-            "proof_scope_complete": trace.get("proof_scope_complete"),
-            "evidence_state": trace.get("evidence_state"),
-        },
+        _authority_proof_payload(trace),
     )
 
 
