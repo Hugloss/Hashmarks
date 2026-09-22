@@ -39,6 +39,10 @@ _SOURCE_SUFFIXES = {
     ".php",
     ".swift",
     ".sql",
+    ".css",
+    ".scss",
+    ".sass",
+    ".less",
 }
 _CONFIG_SUFFIXES = {".toml", ".yaml", ".yml", ".json", ".ini", ".cfg", ".conf"}
 _SCRIPT_SUFFIXES = {".sh", ".bash", ".zsh", ".fish", ".ps1", ".cmd", ".bat"}
