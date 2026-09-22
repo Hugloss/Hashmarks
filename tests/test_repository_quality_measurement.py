@@ -138,7 +138,7 @@ def test_measurement_health_reports_ranking_retention_and_comparability() -> Non
 )
 def test_negative_economics_fail_closed(economics) -> None:
     with pytest.raises(ValueError, match="non-negative"):
-        _measurement(economics=economics)
+        _measurement(\n            measurements=MeasurementInputs(\n                ranking={"rank": 1},\n                verification={"rank": 2},\n                retention={},\n                economics=economics,\n            )\n        )
 
 
 def test_retained_benchmark_artifacts_are_real_repository_evidence() -> None:
