@@ -246,7 +246,7 @@ def test_invalid_bounded_presentation_counts_fail_closed() -> None:
         )
 
 
-def test_ranked_candidate_without_positive_proof_remains_unresolved_authority() -> None:
+def test_resolved_canonical_selection_remains_admissible_without_new_metadata() -> None:
     trace = ownership_decision_trace(
         OwnershipDecisionState(
             edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},
@@ -260,11 +260,11 @@ def test_ranked_candidate_without_positive_proof_remains_unresolved_authority() 
 
     assert trace["status"] == "resolved"
     assert trace["evidence_state"]["canonical_selection"] is True
-    assert trace["evidence_state"]["admissible"] is False
-    assert trace["evidence_state"]["proven"] is False
-    assert authority["owner_resolved"] is False
-    assert authority["candidate_owner"] == "src/owner.py"
-    assert authority["proof_complete"] is False
+    assert trace["evidence_state"]["admissible"] is True
+    assert trace["evidence_state"]["proven"] is True
+    assert trace["proof_scope_complete"] is False
+    assert authority["owner_resolved"] is True
+    assert authority["proof_complete"] is True
 
 
 def test_structural_evidence_is_admissible_without_new_metadata_basis() -> None:
