@@ -17,6 +17,27 @@ def _call_name(node: ast.Call) -> str:
     return ".".join(reversed(parts))
 
 
+def _cache_ownership_violation(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    parent: ast.AST | None,
+) -> str | None:
+    decorator_names = {
+        target.attr if isinstance(target, ast.Attribute) else target.id
+        for decorator in node.decorator_list
+        if isinstance(
+            target := decorator.func if isinstance(decorator, ast.Call) else decorator,
+            (ast.Attribute, ast.Name),
+        )
+    }
+    if not decorator_names.intersection({"lru_cache", "cache"}):
+        return None
+    if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return "nested cached function"
+    if isinstance(parent, ast.ClassDef) and "staticmethod" not in decorator_names:
+        return "instance/class-owned cache"
+    return None
+
+
 def test_ordinary_tests_do_not_dynamically_reexecute_modules_per_test() -> None:
     forbidden = {
         "importlib.util.spec_from_file_location",
@@ -56,35 +77,9 @@ def test_lru_cache_ownership_is_module_level_or_explicit_static_pure_wrapper() -
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            cached = False
-            for decorator in node.decorator_list:
-                target = (
-                    decorator.func if isinstance(decorator, ast.Call) else decorator
-                )
-                name = (
-                    target.attr
-                    if isinstance(target, ast.Attribute)
-                    else target.id
-                    if isinstance(target, ast.Name)
-                    else ""
-                )
-                if name in {"lru_cache", "cache"}:
-                    cached = True
-            if not cached:
-                continue
-            parent = parents.get(node)
-            if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                violations.append(
-                    f"{path.relative_to(ROOT)}:{node.lineno}:nested cached function"
-                )
-            elif isinstance(parent, ast.ClassDef):
-                decorators = {
-                    d.id for d in node.decorator_list if isinstance(d, ast.Name)
-                }
-                if "staticmethod" not in decorators:
-                    violations.append(
-                        f"{path.relative_to(ROOT)}:{node.lineno}:instance/class-owned cache"
-                    )
+            violation = _cache_ownership_violation(node, parents.get(node))
+            if violation:
+                violations.append(f"{path.relative_to(ROOT)}:{node.lineno}:{violation}")
     assert violations == [], (
         "cache lifetime must not be owned by mutable objects or recreated inside calls: "
         + ", ".join(violations)
