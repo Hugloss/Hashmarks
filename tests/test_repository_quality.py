@@ -560,3 +560,100 @@ def test_review_provenance_changes_case_identity() -> None:
     assert case_identity(_case()) != case_identity(
         _case(reviewer_identity="reviewer:other")
     )
+
+
+def test_partial_stability_observations_remain_unknown_per_metric() -> None:
+    row = evaluate_case(
+        _case(case_id="partial-stability"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "stability": {"paraphrase_owner_stable": True},
+        },
+    )
+    report = summarize([row, *_qualification_rows()[1:]])
+    assert report["stability_quality"]["paraphrase_owner_stable"] == 1
+    assert report["stability_quality"]["retrieval_bound_owner_stable"] is None
+
+
+def test_partial_retention_observations_remain_unknown_per_metric() -> None:
+    row = evaluate_case(
+        _case(case_id="partial-retention"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "evidence_retention": {"related_dependency_retained": True},
+        },
+    )
+    report = summarize([row, *_qualification_rows()[1:]])
+    assert report["evidence_retention"]["related_dependency_retained"] == 1
+    assert report["evidence_retention"]["impact_evidence_retained"] is None
+
+
+@pytest.mark.parametrize("rank", [0, -1])
+def test_invalid_ranking_rank_fails_closed(rank: int) -> None:
+    row = evaluate_case(
+        _case(case_id=f"rank-{rank}"),
+        {"state": "resolved", "owner": "src/widget.py::widget", "ranking": {"rank": rank}},
+    )
+    with pytest.raises(ValueError, match="rank must be >= 1"):
+        summarize([row, *_qualification_rows()[1:]])
+
+
+def test_negative_economics_fail_closed() -> None:
+    row = evaluate_case(
+        _case(case_id="negative-economics"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "economics": {"latency_ms": -1},
+        },
+    )
+    with pytest.raises(ValueError, match="non-negative"):
+        summarize([row, *_qualification_rows()[1:]])
+
+
+def test_invalid_environment_mode_and_missing_fingerprint_fail_closed() -> None:
+    invalid_mode = evaluate_case(
+        _case(case_id="invalid-mode"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "environment": {"fingerprint": "sha256:env", "mode": "cached-ish"},
+        },
+    )
+    with pytest.raises(ValueError, match="environment mode"):
+        summarize([invalid_mode, *_qualification_rows()[1:]])
+
+    missing_fingerprint = evaluate_case(
+        _case(case_id="missing-fingerprint"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "environment": {"mode": "cold"},
+        },
+    )
+    with pytest.raises(ValueError, match="environment fingerprint"):
+        summarize([missing_fingerprint, *_qualification_rows()[1:]])
+
+
+def test_pending_active_case_is_not_mislabeled_as_diagnostic() -> None:
+    pending = evaluate_case(
+        _case(case_id="pending-active", adjudication_state="pending"),
+        {"state": "resolved", "owner": "src/widget.py::widget"},
+    )
+    report = summarize([*_qualification_rows(), pending])
+    assert report["qualification"] == "needs-adjudication"
+    assert report["benchmark_health"]["needs_adjudication"] == 1
+    assert report["benchmark_health"]["diagnostic_needs_adjudication"] == 0
+
+
+def test_new_top_level_authority_vetoes_are_non_compensatory() -> None:
+    for metric in ("false_authority", "false_safe_edit", "unjustified_actionable_finding"):
+        row = evaluate_case(
+            _case(case_id=metric),
+            {"state": "resolved", "owner": "src/widget.py::widget", metric: True},
+        )
+        report = summarize([row, *_qualification_rows()[1:]])
+        assert report["qualification"] == "not-qualified"
+        assert report["hard_zero"][metric] == 1
