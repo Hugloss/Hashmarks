@@ -756,5 +756,7 @@ def test_ranked_candidate_without_positive_proof_is_not_owner_authority(
     assert action["owner_basis"] is None
     assert action["ownership_authority"]["owner_resolved"] is False
     assert action["ownership_authority"]["candidate_owner"] == "src/policy.py"
-    assert action["verification_relevance"]["selected"]["path"] == "tests/test_policy.py"
+    assert (
+        action["verification_relevance"]["selected"]["path"] == "tests/test_policy.py"
+    )
     assert action["verification_relevance"]["selected"]["direct_reference"] is True
