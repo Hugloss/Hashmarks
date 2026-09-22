@@ -7,7 +7,12 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 MEASUREMENT_SCHEMA = "hashmarks.repository-quality-measurement.v1"
-ECONOMICS_KEYS = ("latency_ms", "rows_inspected", "candidate_count", "peak_memory_bytes")
+ECONOMICS_KEYS = (
+    "latency_ms",
+    "rows_inspected",
+    "candidate_count",
+    "peak_memory_bytes",
+)
 
 
 def _identity(payload: object) -> str:
@@ -77,7 +82,8 @@ def ranking_distribution(
     ranks = [
         int(value["rank"])
         for row in receipts
-        if isinstance((value := row.get(field)), Mapping) and value.get("rank") is not None
+        if isinstance((value := row.get(field)), Mapping)
+        and value.get("rank") is not None
     ]
     if any(rank < 1 for rank in ranks):
         raise ValueError("ranking positions must be >= 1")

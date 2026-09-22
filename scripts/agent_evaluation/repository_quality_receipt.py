@@ -105,14 +105,15 @@ def external_evidence_receipt(
     }
 
 
-
 def validate_execution_receipt(receipt: Mapping[str, Any]) -> None:
     if receipt.get("schema") != RECEIPT_SCHEMA:
         raise ValueError("unsupported execution receipt schema")
     identity = str(receipt.get("receipt_identity") or "")
     if not identity:
         raise ValueError("execution receipt has no identity")
-    payload = {key: value for key, value in receipt.items() if key != "receipt_identity"}
+    payload = {
+        key: value for key, value in receipt.items() if key != "receipt_identity"
+    }
     if _identity(payload) != identity:
         raise ValueError("execution receipt identity mismatch")
     identities = receipt.get("identities")
@@ -129,10 +130,10 @@ def validate_execution_receipt(receipt: Mapping[str, Any]) -> None:
     mutations = receipt.get("mutations")
     if not isinstance(mutations, Sequence) or isinstance(mutations, (str, bytes)):
         raise ValueError("execution receipt mutations are invalid")
-    if any(isinstance(row, Mapping) and row.get("violation") is True for row in mutations):
-        raise ValueError(
-            "execution receipt contains metamorphic violations"
-        )
+    if any(
+        isinstance(row, Mapping) and row.get("violation") is True for row in mutations
+    ):
+        raise ValueError("execution receipt contains metamorphic violations")
 
 
 def execution_receipt_health(

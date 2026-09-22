@@ -104,7 +104,9 @@ def test_measurement_identity_binds_execution_and_environment() -> None:
     changed_execution = _measurement(execution_receipt_identity="sha256:other")
     changed_environment = _measurement(environment_fingerprint="env:other")
     assert baseline["measurement_identity"] != changed_execution["measurement_identity"]
-    assert baseline["measurement_identity"] != changed_environment["measurement_identity"]
+    assert (
+        baseline["measurement_identity"] != changed_environment["measurement_identity"]
+    )
 
 
 def test_economics_are_comparable_only_inside_same_environment_and_mode() -> None:

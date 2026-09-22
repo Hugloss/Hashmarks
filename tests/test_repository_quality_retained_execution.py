@@ -27,7 +27,9 @@ def test_retained_real_repositories_preserve_expected_top_file() -> None:
         checked += 1
         paths = [str(row.path) for row in results]
         if not any(expected in paths for expected in task["expected_files"]):
-            misses.append(f"{task['id']}: expected={task['expected_files']} got={paths}")
+            misses.append(
+                f"{task['id']}: expected={task['expected_files']} got={paths}"
+            )
     assert checked >= 18
     assert not misses, "\n".join(misses)
 
@@ -49,7 +51,9 @@ def test_retained_real_repositories_keep_search_deterministic_across_rebuild() -
     assert first == rebuilt
 
 
-def test_retained_real_repository_irrelevant_query_terms_do_not_erase_owner_file() -> None:
+def test_retained_real_repository_irrelevant_query_terms_do_not_erase_owner_file() -> (
+    None
+):
     repo = RETAINED / "repos/python-orders"
     with CodeMap(repo) as codemap:
         codemap.sync()
