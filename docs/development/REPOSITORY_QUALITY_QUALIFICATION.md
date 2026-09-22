@@ -60,19 +60,42 @@ reported only after those gates.
 The first implementation intentionally does not add a global numeric quality score,
 product confidence probability, or agent permission state.
 
+## Batched qualification stack
+
+The qualification case now binds the benchmark registry, ground-truth schema, metric
+policy, qualification policy, evaluation profile, and proof mode into its immutable
+case identity. Profiles are descriptive evidence-use classes
+(`navigation.v1`, `change-support.v1`, `release-critical.v1`), never permissions.
+
+Reports distinguish the identity of the full evidence set from the active score-bearing
+qualification corpus. Adding a shadow, canary, fresh-dogfood, historical, or superseded
+case therefore changes the evidence-set identity without silently changing the
+qualification-corpus identity.
+
+Positive quality is sliced by task family, risk class, and evaluation profile. Ranking
+quality is diagnostic and reports Recall@1, Recall@5, and MRR for owner and verification
+ranking observations. Ranking never grants ownership or verification authority.
+
+Stability observations cover paraphrase owner stability, retrieval-bound owner stability,
+projection authority stability, and generation authority stability. Missing observations
+remain unknown. Proof-mode coverage reports unit, boundary, lifecycle, adversarial, and
+mutation evidence separately rather than treating raw test count as proof strength.
+
+Economics are deliberately last in the lexicographic stack and diagnostic only. The
+initial surface records sample counts and bounded observed latency, inspected rows,
+candidate counts, and peak memory; absent measurements remain unknown.
+
 ## Next increments
 
 The same evaluator will be extended with:
 
-- benchmark registry label lifecycle and independent review metadata;
-- semantic-slice floors and minimum case counts;
-- macro and micro positive metrics with descriptive uncertainty;
-- projection/generation/provenance observations derived from frozen public outputs;
-- verification relevance separate from verification authority;
-- metamorphic families (irrelevant mutation, decisive evidence removal, duplicate
-  owner introduction, stale/denied evidence);
-- proof-mode registry: unit, boundary, lifecycle, adversarial, mutation;
+- independent label review/adjudication metadata and corpus-registry manifests;
+- descriptive uncertainty for positive metrics once the baseline corpus is large enough;
+- projection/generation/provenance observations derived directly from frozen public outputs;
+- nDCG and richer evidence-retention metrics after ranking ground truth is available;
+- metamorphic family execution against frozen repository generations;
+- selected mutation challenges for high-risk authority invariants;
 - retained real-world cases including Oh-Goon 1267.0.993 / Hashmarks #67;
-- economics with environment fingerprints and cold/warm/incremental states.
+- economics environment fingerprints and cold/warm/incremental comparability.
 
 This infrastructure remains separate from Hashmarks runtime authority.
