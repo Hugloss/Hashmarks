@@ -105,10 +105,10 @@ def external_evidence_receipt(
     }
 
 
-def validate_execution_receipt(receipt: Mapping[str, Any]) -> None:
+def _validated_receipt_payload(receipt: Mapping[str, Any]) -> None:
+    identity = str(receipt.get("receipt_identity") or "")
     if receipt.get("schema") != RECEIPT_SCHEMA:
         raise ValueError("unsupported execution receipt schema")
-    identity = str(receipt.get("receipt_identity") or "")
     if not identity:
         raise ValueError("execution receipt has no identity")
     payload = {
@@ -116,12 +116,18 @@ def validate_execution_receipt(receipt: Mapping[str, Any]) -> None:
     }
     if _identity(payload) != identity:
         raise ValueError("execution receipt identity mismatch")
+
+
+def _validated_receipt_identities(receipt: Mapping[str, Any]) -> None:
     identities = receipt.get("identities")
     if not isinstance(identities, Mapping):
         raise ValueError("execution receipt identities are missing")
     missing = [name for name in _REQUIRED_IDENTITIES if not identities.get(name)]
     if missing:
         raise ValueError(f"execution receipt missing identities: {missing}")
+
+
+def _validated_receipt_evidence(receipt: Mapping[str, Any]) -> None:
     surfaces = receipt.get("surfaces")
     if not isinstance(surfaces, Sequence) or isinstance(surfaces, (str, bytes)):
         raise ValueError("execution receipt surfaces are invalid")
@@ -136,36 +142,8 @@ def validate_execution_receipt(receipt: Mapping[str, Any]) -> None:
         raise ValueError("execution receipt contains metamorphic violations")
 
 
-def execution_receipt_health(
-    receipts: Sequence[Mapping[str, Any]],
-    *,
-    repository_identity: str,
-    generation_identity: str,
-) -> dict[str, Any]:
-    valid = 0
-    fresh = 0
-    invalid = 0
-    stale = 0
-    for receipt in receipts:
-        try:
-            validate_execution_receipt(receipt)
-        except ValueError:
-            invalid += 1
-            continue
-        valid += 1
-        if receipt_is_fresh(
-            receipt,
-            repository_identity=repository_identity,
-            generation_identity=generation_identity,
-        ):
-            fresh += 1
-        else:
-            stale += 1
-    return {
-        "receipts": len(receipts),
-        "valid": valid,
-        "invalid": invalid,
-        "fresh": fresh,
-        "stale": stale,
-        "ready": bool(receipts) and invalid == 0 and stale == 0,
-    }
+def validate_execution_receipt(receipt: Mapping[str, Any]) -> None:
+    _validated_receipt_payload(receipt)
+    _validated_receipt_identities(receipt)
+    _validated_receipt_evidence(receipt)
+
