@@ -130,7 +130,7 @@ def validate_execution_receipt(receipt: Mapping[str, Any]) -> None:
     if not isinstance(mutations, Sequence) or isinstance(mutations, (str, bytes)):
         raise ValueError("execution receipt mutations are invalid")
     if any(isinstance(row, Mapping) and row.get("violation") is True for row in mutations):
-        raise ValueError("execution receipt contains metamorphic violations")
+        raise ValueError(\n            "execution receipt contains metamorphic violations"\n        )
 
 
 def execution_receipt_health(
