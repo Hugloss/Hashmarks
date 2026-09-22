@@ -1,0 +1,43 @@
+{
+  "schema": "hashmarks.repository-quality-corpus.v1",
+  "corpus_id": "hashmarks.retained-real-world.v1",
+  "repository_identity": "multi-repository-reviewed-evidence",
+  "reviewer_identity": "reviewed:hashmarks-maintainers",
+  "cases": [
+    {
+      "case_id": "oh-goon-993-publish-strict-attempt-outputs",
+      "layer": "L2-retained-real-world",
+      "state": "qualification",
+      "task": "Fix publish_strict_attempt_outputs so it consumes RuntimeAuthorityReceipt.receipt_identity.",
+      "source_identity": "sha256:d6379602-authority-archive",
+      "ground_truth_basis": "retained Oh-Goon 1267.0.993 repository authority and downstream dogfood review",
+      "provenance_reference": "Oh-Goon 1267.0.993 immutable source archive; Hashmarks PR #67 regression"
+    },
+    {
+      "case_id": "oh-goon-993-verification-locality",
+      "layer": "L2-retained-real-world",
+      "state": "qualification",
+      "task": "Select verification evidence for publish_strict_attempt_outputs without replacing stronger integration-local evidence with unrelated canonical tests.",
+      "source_identity": "sha256:d6379602-authority-archive",
+      "ground_truth_basis": "retained downstream verification-selection defect reproduced from immutable Oh-Goon 1267.0.993 bytes",
+      "provenance_reference": "Hashmarks PR #67 stronger-namespace-task-locality closure"
+    },
+    {
+      "case_id": "oh-goon-physical-attempt-reincarnation",
+      "layer": "L2-retained-real-world",
+      "state": "shadow",
+      "task": "Prevent physical attempt slot reuse/reincarnation in PreparedPlanRun._create_physical_attempt.",
+      "source_identity": "oh-goon:retained-followup",
+      "ground_truth_basis": "reviewed downstream task retained for fresh execution before promotion",
+      "provenance_reference": "retained Hashmarks dogfood plan phase 43"
+    },
+    {
+      "case_id": "hashmarks-negative-language-non-edit",
+      "layer": "L1-synthetic",
+      "state": "qualification",
+      "task": "Investigate and explain publish_strict_attempt_outputs ownership without changing it.",
+      "source_identity": "hashmarks:synthetic-authority-adversary-v1",
+      "ground_truth_basis": "negative-language authority invariant"
+    }
+  ]
+}

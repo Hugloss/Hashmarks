@@ -56,3 +56,14 @@ The qualification vocabulary now includes retrieval limit, pagination, candidate
 ### Remaining retained program
 
 This batch does not close the program. Real repository executions must still populate the retained L2 and fresh L3 corpora, especially Oh-Goon 993; cross-surface CLI/MCP/task-evidence/findings convergence must be exercised against actual bytes; generation and counterfactual ownership mutations need retained fixtures; selected mutation-testing challenges must be run; external-evidence correlation needs end-to-end qualification; ranking and evidence-retention quality need real corpus measurements; economics need comparable environment fingerprints; and final convergence must remain green with every hard-zero authority counter at zero.
+
+
+## Retained corpus and mutation batch
+
+The qualification program now owns an immutable corpus-manifest contract with explicit L1 synthetic, L2 retained real-world, and L3 fresh-dogfood layers. Real-world cases require provenance references; qualification membership has a separate identity from diagnostic membership; and promotion from shadow/canary to qualification requires reviewer and evidence identities. Historical evidence cannot be silently re-promoted.
+
+The first L2 manifest retains the Oh-Goon 1267.0.993 publish-strict-attempt ownership and verification-locality defects as qualification cases. The physical-attempt reincarnation task remains shadow evidence until it is freshly executed and reviewed. This deliberately distinguishes retained proof from fresh L3 dogfood instead of pretending historical evidence is current execution.
+
+A selected mutation harness now executes presentation-invariance challenges for retrieval limit, pagination, candidate ordering, compact/full projection, and irrelevant additions, plus an expected-change generation mutation. The harness reports proof-identity drift rather than granting product authority. A cross-surface convergence contract likewise requires orient/outline/affected/tests/task-evidence/findings/MCP/compact observations to converge on one authority-proof identity when those surfaces are claimed as a proof set.
+
+This still does not close the retained plan: fresh L3 Oh-Goon execution, actual surface-output adapters, counterfactual repository fixtures, external-evidence end-to-end correlation, richer related-evidence ranking, comparable economics, and final convergence remain required.
