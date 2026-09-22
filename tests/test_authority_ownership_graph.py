@@ -161,4 +161,3 @@ def test_scoped_repository_ownership_graph_reuses_rows_without_collapsing_eviden
     assert calls == 1
     assert not any(item["relation"] == "owns-cache" for item in graph["edges"])
     assert not any(item["relation"] == "invalidates-cache" for item in graph["edges"])
-
