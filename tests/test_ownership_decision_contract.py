@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import pytest
+
 from hashmarks.ownership_decision import (
     OwnershipDecisionState,
+    bounded_presentation_contract,
     ownership_authority_contract,
     ownership_decision_trace,
     presentation_identity,
@@ -122,9 +125,7 @@ def test_structural_owner_resolves_residual_candidate_ambiguity() -> None:
     assert authority["resolved_owner"] == "src/a.py"
 
 
-def test_unique_retrieval_candidate_without_positive_authority_evidence_fails_closed() -> (
-    None
-):
+def test_unique_canonical_owner_without_structural_edge_remains_resolved() -> None:
     trace = ownership_decision_trace(
         OwnershipDecisionState(
             edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},
@@ -187,3 +188,44 @@ def test_presentation_bounds_do_not_change_authority_proof_identity() -> None:
 
     assert compact != full
     assert ownership_authority_contract(trace)["authority_proof_identity"] == proof
+
+
+
+def test_bounded_presentation_reports_truncation_without_mutating_proof() -> None:
+    proof = "sha256:proof"
+    bounded = bounded_presentation_contract(
+        proof,
+        total_candidates=12,
+        returned_candidates=3,
+        limit=3,
+        per_role=1,
+        compact=True,
+    )
+    complete = bounded_presentation_contract(
+        proof,
+        total_candidates=12,
+        returned_candidates=12,
+        limit=20,
+        per_role=3,
+        compact=False,
+    )
+
+    assert bounded["authority_proof_identity"] == proof
+    assert complete["authority_proof_identity"] == proof
+    assert bounded["presentation_identity"] != complete["presentation_identity"]
+    assert bounded["complete"] is False
+    assert bounded["truncated"] is True
+    assert complete["complete"] is True
+    assert complete["truncated"] is False
+
+
+def test_invalid_bounded_presentation_counts_fail_closed() -> None:
+    with pytest.raises(ValueError, match="cannot exceed"):
+        bounded_presentation_contract(
+            "sha256:proof",
+            total_candidates=1,
+            returned_candidates=2,
+            limit=2,
+            per_role=1,
+            compact=False,
+        )
