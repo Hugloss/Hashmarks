@@ -345,6 +345,21 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             ),
             "canonical": [hit.as_dict() for hit in context.hits],
             "bounds": self._task_action_bounds_payload(limit, per_role),
+            "authority_non_interference": {
+                "presentation_bounded": True,
+                "authority_proof_identity": final_authority_proof_identity := str(
+                    self._task_action_ownership_payload_fields(
+                        final.edit,
+                        final.competing[:per_role],
+                        final.structural_owner,
+                        final.ambiguous,
+                        final.ambiguity_reason,
+                        selection.owner_basis,
+                    )["ownership_authority"].get("authority_proof_identity") or ""
+                ),
+                "presentation_limit": limit,
+                "per_role": per_role,
+            },
             "ranking_effect": "none",
             "discovery_effect": self._task_action_discovery_effect(
                 final.verification_relevance
