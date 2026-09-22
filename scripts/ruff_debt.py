@@ -214,8 +214,23 @@ def _report_baseline(args, summary: dict[str, object]) -> int | None:
             "Production file line ceiling: "
             f"{MAX_PYTHON_FILE_LINES} (oversized={len(dict(summary['oversized_files']))})"
         )
-        for failure in failures:
-            print(f"FAIL: {failure}")
+        if failures:
+            print("NEW MAINTAINABILITY DEBT — BLOCKED")
+            baseline_files = dict(baseline["files"])
+            for finding in summary["findings"]:
+                path = str(finding["path"])
+                current = dict(summary["files"])[path]
+                before = baseline_files.get(path)
+                if before is not None and current["excess"] <= before["excess"]:
+                    continue
+                rules = ", ".join(
+                    f"{rule} {value} > {LIMITS[rule]}"
+                    for rule, value in dict(finding["violations"]).items()
+                )
+                print(f"  {path}:{finding['line']}  {rules}")
+            for failure in failures:
+                print(f"FAIL: {failure}")
+            print("Baseline increase permitted: no")
     return 1 if failures else 0
 
 
