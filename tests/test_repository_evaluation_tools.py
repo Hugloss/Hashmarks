@@ -8,6 +8,7 @@ import pytest
 
 from scripts.repository_evaluation.compare_runs import compare_runs
 from scripts.repository_evaluation.grade_cases import grade_run
+from scripts.repository_evaluation.merge_runs import merge_runs
 from scripts.repository_evaluation.run_cases import run_cases
 
 
@@ -211,8 +212,6 @@ def test_repository_evaluation_comparison_suppresses_resumed_timing() -> None:
 def test_repository_evaluation_shards_merge_without_duplicate_work(
     tmp_path: Path,
 ) -> None:
-    from scripts.repository_evaluation.merge_runs import merge_runs
-
     repo = tmp_path / "repo"
     _write(repo, "src/live.py", "def active_target():\n    return 1\n")
     cases = tmp_path / "cases.json"
@@ -239,6 +238,30 @@ def test_repository_evaluation_shards_merge_without_duplicate_work(
     merged = merge_runs([first, second])
     assert merged["complete"] is True
     assert [row["id"] for row in merged["cases"]] == ["a", "b"]
+
+
+def test_repository_evaluation_merge_rejects_invalid_identity_and_membership() -> None:
+    base = {
+        "suite": "suite",
+        "protocol_identity": "sha256:protocol",
+        "repository_identity": "sha256:repository",
+        "producer_implementation_identity": "sha256:producer",
+        "producer_artifact_identity": None,
+        "cases_sha256": "sha256:cases",
+        "shard_count": 2,
+        "shard_index": 0,
+        "cases": [{"id": "case-a"}],
+    }
+    with pytest.raises(ValueError, match="at least one"):
+        merge_runs([])
+    with pytest.raises(ValueError, match="identity mismatch: protocol_identity"):
+        merge_runs([base, {**base, "protocol_identity": "sha256:other"}])
+    with pytest.raises(ValueError, match="shard-count mismatch"):
+        merge_runs([base, {**base, "shard_count": 3}])
+    with pytest.raises(ValueError, match="case must be an object"):
+        merge_runs([{**base, "cases": ["invalid"]}])
+    with pytest.raises(ValueError, match="duplicate or empty"):
+        merge_runs([base, {**base, "shard_index": 1}])
 
 
 def test_repository_evaluation_grader_distinguishes_over_and_wrong_ambiguity() -> None:
