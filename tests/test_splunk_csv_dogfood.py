@@ -6,8 +6,7 @@ from scripts.agent_evaluation.splunk_csv_dogfood import collect, correlate
 
 
 HEADER = (
-    '"_serial","_time","source","sourcetype","host","index",'
-    '"splunk_server","_raw"\n'
+    '"_serial","_time","source","sourcetype","host","index","splunk_server","_raw"\n'
 )
 
 
