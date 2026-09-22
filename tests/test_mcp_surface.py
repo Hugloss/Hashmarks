@@ -456,3 +456,23 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
         assert status["files"] == 0
     finally:
         server._hashmarks_surface.close()
+
+
+def test_mcp_task_evidence_preserves_canonical_authority_proof_identity(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
+    try:
+        task = "change flare041 behavior"
+        direct = surface._read(
+            lambda: surface._map.task_action_map(task, limit=20, per_role=3)
+        )
+        evidence = surface.task_evidence(task, token_budget=256)
+    finally:
+        surface.close()
+
+    assert evidence["ownership"]["authority_proof_identity"] == (
+        direct["ownership_authority"]["authority_proof_identity"]
+    )
+    assert evidence["ownership"]["status"] == direct["ownership_authority"]["status"]
