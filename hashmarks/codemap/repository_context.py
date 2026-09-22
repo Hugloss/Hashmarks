@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
@@ -20,6 +20,25 @@ from .query_router import route_query
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+
+
+@dataclass(frozen=True, slots=True)
+class _ContextPackMetadata:
+    query: str
+    token_budget: int
+    level: ContextDisclosure
+    confidence: str
+    generation: int
+    identity_generation: int
+    stale: bool | None
+
+
+@dataclass(slots=True)
+class _ContextItemState:
+    items: list[ContextItem]
+    used: int
+    seen: set[tuple[str, str | None]]
+    item_index: dict[tuple[str, str | None], int]
 
 
 class ContextPlanningMixin:
@@ -395,15 +414,8 @@ class ContextPlanningMixin:
 
     def _context_cached_pack(
         self,
-        *,
         action: dict[str, object],
-        query: str,
-        token_budget: int,
-        level: ContextDisclosure,
-        confidence: str,
-        generation: int,
-        identity_generation: int,
-        stale: bool | None,
+        metadata: _ContextPackMetadata,
     ) -> ContextPack | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -426,20 +438,20 @@ class ContextPlanningMixin:
             if isinstance(item, dict)
         )
         return ContextPack(
-            query=query,
-            budget=token_budget,
-            disclosure=level,
+            query=metadata.query,
+            budget=metadata.token_budget,
+            disclosure=metadata.level,
             estimated_tokens=int(cached.payload.get("estimated_tokens", 0)),
-            confidence=str(cached.payload.get("confidence", confidence)),
+            confidence=str(cached.payload.get("confidence", metadata.confidence)),
             abstained=False,
-            generation=generation,
-            identity_generation=identity_generation,
-            stale=stale,
+            generation=metadata.generation,
+            identity_generation=metadata.identity_generation,
+            stale=metadata.stale,
             cache_hit=True,
             context_action_hash=cached.action_hash,
             context_result_digest=cached.result_digest.as_key(),
             items=cached_items,
-            warnings=self._context_freshness_warnings(stale),
+            warnings=self._context_freshness_warnings(metadata.stale),
         )
 
     def _context_orientation_items(
@@ -531,16 +543,41 @@ class ContextPlanningMixin:
             used += tokens
         return items, used, seen, item_index
 
+    @staticmethod
+    def _context_dependency_item(
+        dep: dict[str, object],
+        raw_edge: dict[str, object],
+        hit: SearchHit,
+        remaining_tokens: int,
+        seen: set[tuple[str, str | None]],
+    ) -> tuple[tuple[str, str], ContextItem] | None:
+        if (
+            EvidenceVisibility(str(dep["evidence_visibility"]))
+            is EvidenceVisibility.DENY
+        ):
+            return None
+        key = (str(dep["path"]), str(dep["qualname"]))
+        if key in seen:
+            return None
+        content = str(dep["signature"] or dep["qualname"])
+        tokens = estimate_tokens(content)
+        if tokens <= 0 or tokens > remaining_tokens:
+            return None
+        return key, ContextItem(
+            path=str(dep["path"]),
+            representation="signature",
+            content=content,
+            estimated_tokens=tokens,
+            symbol=str(dep["qualname"]),
+            reason=f"{raw_edge.get('kind')} dependency of {hit.qualname}",
+        )
+
     def _context_add_dependency_evidence(
         self,
         hits: tuple[SearchHit, ...],
-        *,
-        items: list[ContextItem],
-        used: int,
-        seen: set[tuple[str, str | None]],
-        item_index: dict[tuple[str, str | None], int],
+        state: _ContextItemState,
         token_budget: int,
-    ) -> int:
+    ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         evidence_hits = [hit for hit in hits[:4] if hit.qualname is not None]
@@ -570,42 +607,28 @@ class ContextPlanningMixin:
                 str(dep.get("qualname") or "").rsplit(".", 1)[-1].lower(),
             }
             for alias in aliases.intersection(wanted):
-                bucket = deps_by_short.setdefault(alias, [])
-                if len(bucket) < 3:
-                    bucket.append(dep)
+                deps_by_short.setdefault(alias, []).append(dep)
         for hit, raw_edge in edge_rows:
-            if used >= token_budget:
+            if state.used >= token_budget:
                 break
             target = str(raw_edge.get("target", ""))
             short = target.rsplit(".", 1)[-1].lower()
-            for dep in deps_by_short.get(short, ()):
-                if (
-                    EvidenceVisibility(str(dep["evidence_visibility"]))
-                    is EvidenceVisibility.DENY
-                ):
-                    continue
-                dep_key = (str(dep["path"]), str(dep["qualname"]))
-                if dep_key in seen:
-                    continue
-                content = str(dep["signature"] or dep["qualname"])
-                tokens = estimate_tokens(content)
-                if tokens <= 0 or used + tokens > token_budget:
-                    continue
-                seen.add(dep_key)
-                item_index[dep_key] = len(items)
-                items.append(
-                    ContextItem(
-                        path=str(dep["path"]),
-                        representation="signature",
-                        content=content,
-                        estimated_tokens=tokens,
-                        symbol=str(dep["qualname"]),
-                        reason=f"{raw_edge.get('kind')} dependency of {hit.qualname}",
-                    )
+            for dep in deps_by_short.get(short, ())[:3]:
+                admitted = self._context_dependency_item(
+                    dep,
+                    raw_edge,
+                    hit,
+                    token_budget - state.used,
+                    state.seen,
                 )
-                used += tokens
+                if admitted is None:
+                    continue
+                dep_key, item = admitted
+                state.seen.add(dep_key)
+                state.item_index[dep_key] = len(state.items)
+                state.items.append(item)
+                state.used += item.estimated_tokens
                 break
-        return used
 
     def _context_upgrade_source_items(
         self,
@@ -674,6 +697,58 @@ class ContextPlanningMixin:
             upgrades += 1
         return used
 
+    def _context_items(
+        self,
+        query: str,
+        hits: tuple[SearchHit, ...],
+        metadata: _ContextPackMetadata,
+    ) -> _ContextItemState:
+        if metadata.level is ContextDisclosure.ORIENT:
+            items, used = self._context_orientation_items(
+                hits, token_budget=metadata.token_budget
+            )
+            return _ContextItemState(items, used, set(), {})
+        items, used, seen, item_index = self._context_outline_items(
+            hits, token_budget=metadata.token_budget
+        )
+        state = _ContextItemState(items, used, seen, item_index)
+        if metadata.level in {ContextDisclosure.EVIDENCE, ContextDisclosure.SOURCE}:
+            self._context_add_dependency_evidence(
+                hits, state, metadata.token_budget
+            )
+        if metadata.level is ContextDisclosure.SOURCE:
+            state.used = self._context_upgrade_source_items(
+                hits,
+                query=query,
+                items=state.items,
+                used=state.used,
+                item_index=state.item_index,
+                token_budget=metadata.token_budget,
+            )
+        return state
+
+    def _context_pack_metadata(
+        self,
+        query: str,
+        token_budget: int,
+        level: ContextDisclosure,
+        hits: tuple[SearchHit, ...],
+    ) -> _ContextPackMetadata:
+        best = hits[0].score if hits else 0.0
+        confidence = (
+            "high" if best >= 70 else "medium" if best >= 30 else "insufficient"
+        )
+        generation, identity_generation, stale = self._generation_status()
+        return _ContextPackMetadata(
+            query=query,
+            token_budget=token_budget,
+            level=level,
+            confidence=confidence,
+            generation=generation,
+            identity_generation=identity_generation,
+            stale=stale,
+        )
+
     def _context_impl(
         self,
         query: str,
@@ -700,22 +775,18 @@ class ContextPlanningMixin:
             ) from exc
 
         hits = self.find(query, limit=limit)
-        best = hits[0].score if hits else 0.0
-        confidence = (
-            "high" if best >= 70 else "medium" if best >= 30 else "insufficient"
-        )
-        generation, identity_generation, stale = self._generation_status()
-        if confidence == "insufficient":
+        metadata = self._context_pack_metadata(query, token_budget, level, hits)
+        if metadata.confidence == "insufficient":
             return ContextPack(
                 query=query,
                 budget=token_budget,
                 disclosure=level,
                 estimated_tokens=0,
-                confidence=confidence,
+                confidence=metadata.confidence,
                 abstained=True,
-                generation=generation,
-                identity_generation=identity_generation,
-                stale=stale,
+                generation=metadata.generation,
+                identity_generation=metadata.identity_generation,
+                stale=metadata.stale,
                 warnings=(
                     "retrieval confidence insufficient; repository context omitted",
                 ),
@@ -726,62 +797,30 @@ class ContextPlanningMixin:
             token_budget=token_budget,
             limit=limit,
             level=level,
-            generation=generation,
+            generation=metadata.generation,
             hits=hits,
         )
-        cache_allowed = stale is False or (
-            stale is None and level is not ContextDisclosure.SOURCE
+        cache_allowed = metadata.stale is False or (
+            metadata.stale is None and level is not ContextDisclosure.SOURCE
         )
         if cache_allowed:
-            cached_pack = self._context_cached_pack(
-                action=action,
-                query=query,
-                token_budget=token_budget,
-                level=level,
-                confidence=confidence,
-                generation=generation,
-                identity_generation=identity_generation,
-                stale=stale,
-            )
+            cached_pack = self._context_cached_pack(action, metadata)
             if cached_pack is not None:
                 return cached_pack
 
-        if level is ContextDisclosure.ORIENT:
-            items, used = self._context_orientation_items(
-                hits, token_budget=token_budget
-            )
-        else:
-            items, used, seen, item_index = self._context_outline_items(
-                hits, token_budget=token_budget
-            )
-            if level in {ContextDisclosure.EVIDENCE, ContextDisclosure.SOURCE}:
-                used = self._context_add_dependency_evidence(
-                    hits,
-                    items=items,
-                    used=used,
-                    seen=seen,
-                    item_index=item_index,
-                    token_budget=token_budget,
-                )
-            if level is ContextDisclosure.SOURCE:
-                used = self._context_upgrade_source_items(
-                    hits,
-                    query=query,
-                    items=items,
-                    used=used,
-                    item_index=item_index,
-                    token_budget=token_budget,
-                )
+        item_state = self._context_items(query, hits, metadata)
 
-        freshness_warnings = self._context_freshness_warnings(stale)
-        context_items = tuple(items)
+        freshness_warnings = self._context_freshness_warnings(metadata.stale)
+        context_items = tuple(item_state.items)
         action_hash = None
         result_digest = None
         if cache_allowed:
             stored = self.context_cache.put(
                 action,
                 self._context_payload(
-                    context_items, estimated_tokens=used, confidence=confidence
+                    context_items,
+                    estimated_tokens=item_state.used,
+                    confidence=metadata.confidence,
                 ),
             )
             action_hash = stored.action_hash
@@ -790,12 +829,12 @@ class ContextPlanningMixin:
             query=query,
             budget=token_budget,
             disclosure=level,
-            estimated_tokens=used,
-            confidence=confidence,
+            estimated_tokens=item_state.used,
+            confidence=metadata.confidence,
             abstained=False,
             generation=self.store.generation(),
-            identity_generation=identity_generation,
-            stale=stale,
+            identity_generation=metadata.identity_generation,
+            stale=metadata.stale,
             cache_hit=False,
             context_action_hash=action_hash,
             context_result_digest=result_digest,
