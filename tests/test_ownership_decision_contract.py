@@ -155,7 +155,8 @@ def test_ranked_canonical_candidate_without_positive_proof_fails_closed() -> Non
     )
     authority = ownership_authority_contract(trace)
 
-    assert trace["status"] == "unresolved"
+    assert trace["status"] == "resolved"
+    assert trace["evidence_state"]["canonical_selection"] is True
     assert trace["evidence_state"]["admissible"] is False
     assert trace["evidence_state"]["proven"] is False
     assert authority["owner_resolved"] is False
@@ -248,7 +249,7 @@ def test_invalid_bounded_presentation_counts_fail_closed() -> None:
         )
 
 
-def test_canonical_selection_without_positive_proof_remains_unresolved() -> None:
+def test_canonical_selection_without_positive_proof_remains_non_authoritative() -> None:
     trace = ownership_decision_trace(
         OwnershipDecisionState(
             edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},
@@ -260,9 +261,9 @@ def test_canonical_selection_without_positive_proof_remains_unresolved() -> None
     )
     authority = ownership_authority_contract(trace)
 
-    assert trace["status"] == "unresolved"
+    assert trace["status"] == "resolved"
     assert trace["evidence_state"]["retrieved"] is True
-    assert trace["evidence_state"]["canonical_selection"] is False
+    assert trace["evidence_state"]["canonical_selection"] is True
     assert trace["evidence_state"]["admissible"] is False
     assert trace["evidence_state"]["proven"] is False
     assert trace["proof_scope_complete"] is False
@@ -353,10 +354,8 @@ def test_unresolved_provisional_candidate_order_does_not_change_authority_proof(
     )
 
 
-def test_no_authority_proof_identity_ignores_unresolved_vs_ambiguous_presentation() -> (
-    None
-):
-    unresolved = ownership_decision_trace(
+def test_no_authority_proof_identity_ignores_candidate_status_and_presentation() -> None:
+    unproven = ownership_decision_trace(
         OwnershipDecisionState(
             edit={"path": "src/a.py", "canonical_rank": 1, "roles": ["edit"]},
             competing=[],
@@ -375,9 +374,11 @@ def test_no_authority_proof_identity_ignores_unresolved_vs_ambiguous_presentatio
         )
     )
 
-    assert unresolved["status"] == "unresolved"
+    assert unproven["status"] == "resolved"
     assert ambiguous["status"] == "ambiguous"
+    assert ownership_authority_contract(unproven)["owner_resolved"] is False
+    assert ownership_authority_contract(ambiguous)["owner_resolved"] is False
     assert (
-        ownership_authority_contract(unresolved)["authority_proof_identity"]
+        ownership_authority_contract(unproven)["authority_proof_identity"]
         == ownership_authority_contract(ambiguous)["authority_proof_identity"]
     )
