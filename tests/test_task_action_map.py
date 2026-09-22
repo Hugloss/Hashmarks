@@ -669,7 +669,9 @@ def test_duplicate_owner_ambiguity_survives_codemap_reopen(tmp_path: Path) -> No
     )
 
 
-def test_unresolved_edit_owner_cannot_rerank_verification(tmp_path: Path, monkeypatch) -> None:
+def test_unresolved_edit_owner_cannot_rerank_verification(
+    tmp_path: Path, monkeypatch
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src/a.py").write_text(
@@ -709,9 +711,7 @@ def test_unresolved_edit_owner_cannot_rerank_verification(tmp_path: Path, monkey
             "_verification_relevance",
             fail_if_provisional_edit_drives_verification,
         )
-        choices = codemap._task_action_projection_choices(
-            task, context, selection, 20
-        )
+        choices = codemap._task_action_projection_choices(task, context, selection, 20)
 
     assert choices.verify is not None
     assert choices.verify["path"] == initial_verify
