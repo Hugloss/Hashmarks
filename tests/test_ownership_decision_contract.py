@@ -122,7 +122,9 @@ def test_structural_owner_resolves_residual_candidate_ambiguity() -> None:
     assert authority["resolved_owner"] == "src/a.py"
 
 
-def test_unique_retrieval_candidate_without_positive_authority_evidence_fails_closed() -> None:
+def test_unique_retrieval_candidate_without_positive_authority_evidence_fails_closed() -> (
+    None
+):
     trace = ownership_decision_trace(
         OwnershipDecisionState(
             edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},

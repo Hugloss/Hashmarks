@@ -428,8 +428,7 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 for row in diagnostic_rows
             ),
             "diagnostic_invalid_cases": sum(
-                row["ground_truth_status"] == "invalid-case"
-                for row in diagnostic_rows
+                row["ground_truth_status"] == "invalid-case" for row in diagnostic_rows
             ),
             "critical_slices": slice_health,
             "proof_modes": proof_health,

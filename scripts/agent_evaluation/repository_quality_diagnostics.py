@@ -154,7 +154,9 @@ def environment_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     if invalid_modes:
         raise ValueError(f"environment mode must be one of {sorted(allowed_modes)}")
     if any(not str(item.get("fingerprint") or "").strip() for item in observed):
-        raise ValueError("environment fingerprint must be non-empty when environment is observed")
+        raise ValueError(
+            "environment fingerprint must be non-empty when environment is observed"
+        )
     identities = sorted(
         {str(item["fingerprint"]) for item in observed if item.get("fingerprint")}
     )

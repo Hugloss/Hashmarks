@@ -594,7 +594,11 @@ def test_partial_retention_observations_remain_unknown_per_metric() -> None:
 def test_invalid_ranking_rank_fails_closed(rank: int) -> None:
     row = evaluate_case(
         _case(case_id=f"rank-{rank}"),
-        {"state": "resolved", "owner": "src/widget.py::widget", "ranking": {"rank": rank}},
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "ranking": {"rank": rank},
+        },
     )
     with pytest.raises(ValueError, match="rank must be >= 1"):
         summarize([row, *_qualification_rows()[1:]])
@@ -649,7 +653,11 @@ def test_pending_active_case_is_not_mislabeled_as_diagnostic() -> None:
 
 
 def test_new_top_level_authority_vetoes_are_non_compensatory() -> None:
-    for metric in ("false_authority", "false_safe_edit", "unjustified_actionable_finding"):
+    for metric in (
+        "false_authority",
+        "false_safe_edit",
+        "unjustified_actionable_finding",
+    ):
         row = evaluate_case(
             _case(case_id=metric),
             {"state": "resolved", "owner": "src/widget.py::widget", metric: True},
