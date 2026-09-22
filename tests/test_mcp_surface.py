@@ -472,7 +472,8 @@ def test_mcp_task_evidence_preserves_canonical_authority_proof_identity(
     finally:
         surface.close()
 
-    assert evidence["ownership"]["authority_proof_identity"] == (
-        direct["ownership_authority"]["authority_proof_identity"]
+    assert (
+        evidence["ownership"]["authority_proof_identity"]
+        == (direct["ownership_authority"]["authority_proof_identity"])
     )
     assert evidence["ownership"]["status"] == direct["ownership_authority"]["status"]
