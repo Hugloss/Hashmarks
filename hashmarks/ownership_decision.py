@@ -70,14 +70,22 @@ def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, boo
     structural = state.structural_owner is not None
     explicit_basis = bool(state.authority_basis)
     owner_eligible = bool(state.owner_eligible)
-    ambiguity_cleared = status == "resolved" and not state.ambiguous
-    admissible = retrieved and owner_eligible and (explicit_basis or structural)
+    structural_selected = str((state.structural_owner or {}).get("selected") or "")
+    edit_path = str((state.edit or {}).get("path") or "")
+    structural_resolution = bool(structural_selected and structural_selected == edit_path)
+    ambiguity_cleared = status == "resolved" and (
+        not state.ambiguous or structural_resolution
+    )
+    canonical_selection = status == "resolved" and retrieved and owner_eligible
+    admissible = canonical_selection or explicit_basis or structural_resolution
     proven = admissible and ambiguity_cleared
     return {
         "retrieved": retrieved,
         "inferred": inferred,
         "structural": structural,
+        "structural_resolution": structural_resolution,
         "explicit_basis": explicit_basis,
+        "canonical_selection": canonical_selection,
         "owner_eligible": owner_eligible,
         "ambiguity_cleared": ambiguity_cleared,
         "admissible": admissible,

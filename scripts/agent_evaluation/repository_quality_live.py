@@ -98,3 +98,54 @@ def convergence_observations(
     payloads: Sequence[tuple[str, Mapping[str, Any]]],
 ) -> list[dict[str, Any]]:
     return [surface_authority_observation(name, payload) for name, payload in payloads]
+
+
+def equivalent_task_convergence(
+    observations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    if not observations:
+        raise ValueError("equivalent task convergence requires observations")
+    proofs = {str(row.get("authority_proof_identity") or "") for row in observations}
+    proofs.discard("")
+    owners = {str(row.get("resolved_owner") or "") for row in observations}
+    owners.discard("")
+    complete = all(bool(row.get("proof_complete")) for row in observations)
+    return {
+        "variants": len(observations),
+        "authority_proof_identities": sorted(proofs),
+        "resolved_owners": sorted(owners),
+        "proof_complete": complete,
+        "converged": len(proofs) == 1 and len(owners) <= 1 and complete,
+    }
+
+
+def projection_receipt(
+    *,
+    full: Mapping[str, Any],
+    compact: Mapping[str, Any],
+    mcp: Mapping[str, Any],
+) -> dict[str, Any]:
+    observations = convergence_observations(
+        [
+            ("task-evidence", full),
+            ("task-action-brief", compact),
+            ("mcp-task-evidence", mcp),
+        ]
+    )
+    proofs = sorted({row["authority_proof_identity"] for row in observations})
+    return {
+        "observations": observations,
+        "authority_proof_identities": proofs,
+        "converged": len(proofs) == 1,
+        "ambiguity_preserved": len(
+            {
+                (
+                    row["owner_resolved"],
+                    row["resolved_owner"],
+                    row["candidate_owner"],
+                )
+                for row in observations
+            }
+        )
+        == 1,
+    }

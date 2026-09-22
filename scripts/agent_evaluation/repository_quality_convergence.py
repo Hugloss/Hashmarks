@@ -4,6 +4,12 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 SURFACES = {
+    "action-map",
+    "task-action-brief",
+    "task-decision-packet",
+    "task-decision-brief",
+    "task-evidence",
+    "mcp-task-evidence",
     "orient",
     "outline",
     "affected",
