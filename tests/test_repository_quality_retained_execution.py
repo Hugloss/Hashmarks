@@ -23,9 +23,9 @@ def test_retained_real_repositories_preserve_expected_top_file() -> None:
     for repo, task in _cases():
         with CodeMap(repo) as codemap:
             codemap.sync()
-            results = codemap.search(task["query"], limit=5)
+            results = codemap.find(task["query"], limit=5)
         checked += 1
-        paths = [str(row["path"]) for row in results]
+        paths = [str(row.path) for row in results]
         if not any(expected in paths for expected in task["expected_files"]):
             misses.append(f"{task['id']}: expected={task['expected_files']} got={paths}")
     assert checked >= 18
@@ -39,7 +39,7 @@ def test_retained_real_repositories_keep_search_deterministic_across_rebuild() -
         codemap.sync()
         first = [
             (row["path"], row.get("name"), row.get("kind"))
-            for row in codemap.search(query, limit=8)
+            for row in codemap.find(query, limit=8)
         ]
         codemap.sync(force=True)
         rebuilt = [
@@ -53,12 +53,12 @@ def test_retained_real_repository_irrelevant_query_terms_do_not_erase_owner_file
     repo = RETAINED / "repos/python-orders"
     with CodeMap(repo) as codemap:
         codemap.sync()
-        baseline = codemap.search("OrderService submit_order implementation", limit=8)
-        mutated = codemap.search(
+        baseline = codemap.find("OrderService submit_order implementation", limit=8)
+        mutated = codemap.find(
             "OrderService submit_order implementation unrelated_observation_marker",
             limit=8,
         )
-    baseline_paths = [str(row["path"]) for row in baseline]
-    mutated_paths = [str(row["path"]) for row in mutated]
+    baseline_paths = [str(row.path) for row in baseline]
+    mutated_paths = [str(row.path) for row in mutated]
     assert "src/orders/service.py" in baseline_paths
     assert "src/orders/service.py" in mutated_paths
