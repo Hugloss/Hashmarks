@@ -28,7 +28,7 @@ def measurement_receipt(
     economics: Mapping[str, Any],
 ) -> dict[str, Any]:
     if not execution_receipt_identity or not environment_fingerprint:
-        raise ValueError("measurement requires execution receipt and environment identity")
+        raise ValueError(\n            "measurement requires execution receipt and environment identity"\n        )
     if mode not in {"cold", "warm", "incremental"}:
         raise ValueError("measurement mode must be cold, warm, or incremental")
     _validate_economics(economics)
@@ -69,7 +69,7 @@ def comparable_economics(receipts: Sequence[Mapping[str, Any]]) -> dict[str, Any
     }
 
 
-def ranking_distribution(receipts: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any]:
+def ranking_distribution(\n    receipts: Sequence[Mapping[str, Any]], field: str\n) -> dict[str, Any]:
     ranks = [
         int(value["rank"])
         for row in receipts
