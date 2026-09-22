@@ -282,6 +282,14 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "schema": "hashmarks.task-action-brief.v1",
             "status": "unsafe" if not safe else "safe-stale" if stale else "safe-fresh",
             "candidate": action.get("candidate_path"),
+            "authority_proof_identity": str(
+                (
+                    action.get("ownership_authority")
+                    if isinstance(action.get("ownership_authority"), Mapping)
+                    else {}
+                ).get("authority_proof_identity")
+                or ""
+            ),
             "evidence_receipt": self._decision_evidence_receipt(
                 task, action, verification
             ),
@@ -762,6 +770,11 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "explicit_target": explicit_target,
             "ownership": {
                 "status": str(authority.get("status") or "unresolved"),
+                "authority_proof_identity": str(
+                    authority.get("authority_proof_identity") or ""
+                ),
+                "proof_scope": authority.get("proof_scope"),
+                "proof_scope_complete": bool(authority.get("proof_scope_complete")),
                 "owner": dict(owner) if owner_resolved else None,
                 "candidate": None if owner is None else dict(owner),
                 "basis": basis if owner_resolved else None,
