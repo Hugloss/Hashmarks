@@ -1416,6 +1416,27 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         )
 
     @staticmethod
+    def _task_action_authority_proof_scope(
+        owner_basis: str | None,
+        structural_owner: Mapping[str, object] | None,
+    ) -> tuple[str | None, bool]:
+        if owner_basis in {
+            "qualified-symbol",
+            "unique-exact-symbol",
+            "exact-symbol",
+            "exact-import-owner",
+        }:
+            return "repository-global-symbol-identity", True
+        if owner_basis == "literal-path":
+            return "repository-global-path-identity", True
+        if owner_basis in {"literal-reference-owner", "structural-owner"}:
+            return (
+                "repository-relationship-proof",
+                structural_owner is not None,
+            )
+        return None, False
+
+    @staticmethod
     def _task_action_ownership_payload_fields(
         edit: Mapping[str, object] | None,
         competing: Sequence[Mapping[str, object]],
@@ -1430,6 +1451,11 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             else ""
         )
         owner_eligible = explicit_target_basis != "explicit-test-edit"
+        proof_scope, proof_scope_complete = (
+            TaskActionMixin._task_action_authority_proof_scope(
+                owner_basis, structural_owner
+            )
+        )
         trace = ownership_decision_trace(
             OwnershipDecisionState(
                 edit=edit,
@@ -1443,6 +1469,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 ),
                 owner_eligible=owner_eligible,
                 authority_basis=owner_basis,
+                proof_scope=proof_scope,
+                proof_scope_complete=proof_scope_complete,
             )
         )
         authority = ownership_authority_contract(trace)
