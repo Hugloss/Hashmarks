@@ -137,7 +137,7 @@ def test_config_projection_provenance_stays_post_selection(tmp_path: Path) -> No
         codemap.sync()
         start = codemap.task_evidence(task["query"], token_budget=512)
 
-    assert _ownership(start)["owner"]["path"].endswith("policy.toml")
+    assert _ownership(start)["candidate"]["path"].endswith("policy.toml")
     assert _ownership(start)["source_evidence"]["representation"] == "config-key-range"
     assert start["provenance"]["why"] == "contract-authority"
     assert len(start["provenance"]["revision"]) == 64
