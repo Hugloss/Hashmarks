@@ -788,14 +788,11 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         if module_name:
             module_parts = module_name.split(".")
             module_aliases.update(
-                ".".join(module_parts[index:])
-                for index in range(len(module_parts))
+                ".".join(module_parts[index:]) for index in range(len(module_parts))
             )
         accepted = set(identities)
         accepted.update(
-            f"{alias}.{identity}"
-            for alias in module_aliases
-            for identity in identities
+            f"{alias}.{identity}" for alias in module_aliases for identity in identities
         )
         return any(term.lower() in accepted for term in qualified_terms)
 

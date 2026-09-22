@@ -74,9 +74,7 @@ class PostChangeMixin(ChangeImpactMixin):
             )
             argv = plan.get("argv")
             value = (
-                tuple(str(item) for item in argv)
-                if isinstance(argv, list)
-                else None
+                tuple(str(item) for item in argv) if isinstance(argv, list) else None
             )
         return value
 

@@ -713,9 +713,7 @@ class ContextPlanningMixin:
         )
         state = _ContextItemState(items, used, seen, item_index)
         if metadata.level in {ContextDisclosure.EVIDENCE, ContextDisclosure.SOURCE}:
-            self._context_add_dependency_evidence(
-                hits, state, metadata.token_budget
-            )
+            self._context_add_dependency_evidence(hits, state, metadata.token_budget)
         if metadata.level is ContextDisclosure.SOURCE:
             state.used = self._context_upgrade_source_items(
                 hits,
