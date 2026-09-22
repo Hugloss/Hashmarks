@@ -496,7 +496,7 @@ def test_duplicate_exact_identifier_stays_ambiguous_across_presentation_limits(
             encoding="utf-8",
         )
 
-    task = "Refactor policy.evaluate without changing behavior"
+    task = "Refactor evaluate without changing behavior"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         results = [
