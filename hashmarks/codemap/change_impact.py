@@ -478,21 +478,59 @@ class ChangeImpactMixin:
         )
 
     @staticmethod
+    def _changed_path_evidence(
+        state: _ImpactState,
+    ) -> list[dict[str, object]]:
+        evidence: list[dict[str, object]] = []
+        for path in state.changed:
+            row = state.owner._session_file_row(path)
+            if row is None:
+                evidence.append(
+                    {
+                        "path": path,
+                        "state": "missing",
+                        "roles": list(state.roles(path)),
+                    }
+                )
+                continue
+            visibility = EvidenceVisibility(str(row["evidence_visibility"]))
+            evidence.append(
+                {
+                    "path": path,
+                    "state": (
+                        "excluded"
+                        if visibility is EvidenceVisibility.DENY
+                        else "indexed"
+                    ),
+                    "roles": list(state.roles(path)),
+                    "evidence_visibility": visibility.value,
+                }
+            )
+        return evidence
+
+    @staticmethod
     def _project_change_impact(
         state: _ImpactState,
         generation: int,
         options: ChangeImpactOptions,
         declared_refresh: dict[str, object] | None,
     ) -> dict[str, object]:
-        changed_roles = [
-            {"path": path, "roles": list(state.roles(path))}
-            for path in state.changed
-            if state.visible(path)
-        ]
+        changed_roles = ChangeImpactMixin._changed_path_evidence(state)
         result: dict[str, object] = {
             "schema": "hashmarks.task-change-impact.v1",
             "generation": generation,
             "changed": changed_roles,
+            "changed_evidence": {
+                "reported": len(state.changed),
+                "accounted_for": len(changed_roles),
+                "complete": len(changed_roles) == len(state.changed),
+                "states": {
+                    state_name: sum(
+                        1 for row in changed_roles if row["state"] == state_name
+                    )
+                    for state_name in ("indexed", "excluded", "missing")
+                },
+            },
             "surfaces": {key: rows for key, rows in state.surfaces.items() if rows},
             "bounds": {
                 "depth": options.max_depth,
