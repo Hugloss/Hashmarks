@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 TRACE_SCHEMA = "hashmarks.ownership-decision-trace.v1"
 AUTHORITY_SCHEMA = "hashmarks.ownership-authority.v1"
