@@ -55,6 +55,10 @@ _SOURCE_EXTENSIONS = {
     ".php": "php",
     ".swift": "swift",
     ".sql": "sql",
+    ".css": "css",
+    ".scss": "scss",
+    ".sass": "sass",
+    ".less": "less",
 }
 _TEXT_EXTENSIONS = {
     ".toml",
