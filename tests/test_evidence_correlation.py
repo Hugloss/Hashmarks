@@ -1262,8 +1262,9 @@ def test_cross_bundle_correspondence_is_identity_bound_and_tamper_detected(
             codemap.evidence_correlation_delta(packet, tampered)
 
 
-
-def test_external_evidence_correlation_cannot_create_edit_ownership(tmp_path: Path) -> None:
+def test_external_evidence_correlation_cannot_create_edit_ownership(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "owner.py").write_text(
         "def publish_result(value):\n    return value\n", encoding="utf-8"
     )
@@ -1295,7 +1296,9 @@ def test_external_evidence_correlation_cannot_create_edit_ownership(tmp_path: Pa
     assert before["ownership_authority"] == after["ownership_authority"]
 
 
-def test_external_evidence_conflict_is_retained_without_mutating_owner(tmp_path: Path) -> None:
+def test_external_evidence_conflict_is_retained_without_mutating_owner(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "owner.py").write_text(
         "def first():\n    return 1\n\ndef second():\n    return 2\n",
         encoding="utf-8",

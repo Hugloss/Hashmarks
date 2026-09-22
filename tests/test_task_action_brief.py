@@ -349,7 +349,6 @@ def test_task_action_brief_receipt_is_assembled_inside_decision_session(
     assert brief["status"] == "safe-fresh"
 
 
-
 @pytest.mark.parametrize("limit,per_role", [(3, 1), (8, 2), (20, 3)])
 def test_ambiguity_is_sticky_across_retrieval_presentation_bounds(
     tmp_path: Path, limit: int, per_role: int

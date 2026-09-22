@@ -64,7 +64,6 @@ def _rejection_reason(
     return "lower-ranked-alternative"
 
 
-
 def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, bool]:
     retrieved = state.edit is not None
     inferred = bool(state.edit and state.edit.get("structural_projection"))
@@ -84,6 +83,7 @@ def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, boo
         "admissible": admissible,
         "proven": proven,
     }
+
 
 def ownership_decision_trace(
     state: OwnershipDecisionState,
