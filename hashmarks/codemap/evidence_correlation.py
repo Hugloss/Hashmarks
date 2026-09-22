@@ -86,6 +86,16 @@ class _PreparedBundle:
     anchor_count: int
 
 
+@dataclass(frozen=True, slots=True)
+class _BundleDeclaration:
+    bundle_id: str
+    producer: dict[str, object]
+    provenance: dict[str, object]
+    completeness: str
+    scope: dict[str, object]
+    truncation: str
+
+
 def _json_size(value: object, *, label: str) -> int:
     try:
         encoded = json.dumps(
@@ -161,8 +171,7 @@ def _external_path(value: object) -> str:
         return normalized
     if ".." in normalized.split("/"):
         raise ValueError("external path must not contain '..'")
-    while "//" in normalized:
-        normalized = normalized.replace("//", "/")
+    normalized = re.sub(r"/{2,}", "/", normalized)
     if normalized != "/":
         normalized = normalized.rstrip("/")
     if not normalized:
@@ -350,27 +359,7 @@ class EvidenceCorrelationMixin:
         mappings: Sequence[Mapping[str, str]],
     ) -> _Resolution:
         if claims.path is None:
-            if claims.module is not None:
-                module_resolution = self._resolve_module_only(claims.module)
-                if module_resolution.state != "resolved-unique":
-                    return module_resolution
-                assert module_resolution.repository_path is not None
-                if claims.symbol is not None:
-                    return self._resolve_symbol_at_path(
-                        module_resolution.repository_path,
-                        claims.symbol,
-                        line=claims.line,
-                        path_origin="module",
-                    )
-                if claims.line is not None:
-                    return self._resolve_line_at_path(
-                        module_resolution.repository_path,
-                        claims.line,
-                        path_origin="module",
-                    )
-                return module_resolution
-            assert claims.symbol is not None
-            return self._resolve_symbol_only(claims.symbol)
+            return self._resolve_pathless_anchor(claims)
         repository_path, path_origin = self._map_external_path(claims.path, mappings)
         if repository_path is None:
             return _Resolution(
@@ -386,6 +375,17 @@ class EvidenceCorrelationMixin:
                 path_origin,
                 repository_path,
             )
+        return self._resolve_present_path_anchor(
+            claims, repository_path, path_origin=path_origin
+        )
+
+    def _resolve_present_path_anchor(
+        self,
+        claims: _AnchorClaims,
+        repository_path: str,
+        *,
+        path_origin: str,
+    ) -> _Resolution:
         if claims.module is not None:
             module_conflict = self._module_path_conflict(
                 repository_path, claims.module, path_origin=path_origin
@@ -411,6 +411,29 @@ class EvidenceCorrelationMixin:
             path_origin,
             repository_path,
         )
+
+    def _resolve_pathless_anchor(self, claims: _AnchorClaims) -> _Resolution:
+        if claims.module is None:
+            assert claims.symbol is not None
+            return self._resolve_symbol_only(claims.symbol)
+        module_resolution = self._resolve_module_only(claims.module)
+        if module_resolution.state != "resolved-unique":
+            return module_resolution
+        assert module_resolution.repository_path is not None
+        if claims.symbol is not None:
+            return self._resolve_symbol_at_path(
+                module_resolution.repository_path,
+                claims.symbol,
+                line=claims.line,
+                path_origin="module",
+            )
+        if claims.line is not None:
+            return self._resolve_line_at_path(
+                module_resolution.repository_path,
+                claims.line,
+                path_origin="module",
+            )
+        return module_resolution
 
     def _resolve_module_only(self, module: str) -> _Resolution:
         if TYPE_CHECKING:
@@ -810,12 +833,14 @@ class EvidenceCorrelationMixin:
         self._validate_raw_anchors(raw_anchors)
         assert isinstance(raw_anchors, Sequence)
         return self._prepare_bundle_anchors(
-            bundle_id,
-            producer,
-            provenance,
-            completeness,
-            scope,
-            truncation,
+            _BundleDeclaration(
+                bundle_id=bundle_id,
+                producer=producer,
+                provenance=provenance,
+                completeness=completeness,
+                scope=scope,
+                truncation=truncation,
+            ),
             raw_anchors,
             mappings=mappings,
             resolution_cache=resolution_cache,
@@ -879,12 +904,7 @@ class EvidenceCorrelationMixin:
 
     def _prepare_bundle_anchors(
         self,
-        bundle_id: str,
-        producer: dict[str, object],
-        provenance: dict[str, object],
-        completeness: str,
-        scope: dict[str, object],
-        truncation: str,
+        declaration: _BundleDeclaration,
         raw_anchors: Sequence[object],
         *,
         mappings: Sequence[Mapping[str, str]],
@@ -907,7 +927,8 @@ class EvidenceCorrelationMixin:
             anchor_id = str(anchor["anchor_id"])
             if anchor_id in seen:
                 raise ValueError(
-                    f"duplicate anchor_id in bundle {bundle_id}: {anchor_id}"
+                    "duplicate anchor_id in bundle "
+                    f"{declaration.bundle_id}: {anchor_id}"
                 )
             seen.add(anchor_id)
             metadata_bytes += anchor_metadata_bytes
@@ -915,15 +936,15 @@ class EvidenceCorrelationMixin:
             bindings.append(binding)
         return _PreparedBundle(
             packet={
-                "bundle_id": bundle_id,
-                "producer": producer,
+                "bundle_id": declaration.bundle_id,
+                "producer": declaration.producer,
                 "producer_authority": "caller-claimed",
-                "provenance": provenance,
+                "provenance": declaration.provenance,
                 "provenance_authority": "caller-claimed",
                 "repository_freshness_authority": "independent",
-                "completeness": completeness,
-                "scope": scope,
-                "truncation": truncation,
+                "completeness": declaration.completeness,
+                "scope": declaration.scope,
+                "truncation": declaration.truncation,
                 "anchors": anchors,
             },
             bindings=tuple(bindings),
@@ -1109,6 +1130,28 @@ class EvidenceCorrelationMixin:
         }
 
     @staticmethod
+    def _correspondence_target(
+        anchor: Mapping[str, object],
+    ) -> tuple[str, str, int, int] | None:
+        resolution = anchor.get("resolution")
+        if not isinstance(resolution, Mapping):
+            return None
+        if resolution.get("state") != "resolved-unique":
+            return None
+        path = resolution.get("repository_path")
+        if not isinstance(path, str):
+            return None
+        symbol = resolution.get("symbol")
+        if not isinstance(symbol, Mapping):
+            return path, "", 0, 0
+        return (
+            path,
+            str(symbol.get("name") or ""),
+            int(symbol.get("start_line") or 0),
+            int(symbol.get("end_line") or 0),
+        )
+
+    @staticmethod
     def _cross_bundle_correspondence(
         bundles: Sequence[Mapping[str, object]],
     ) -> list[dict[str, object]]:
@@ -1121,26 +1164,9 @@ class EvidenceCorrelationMixin:
             for anchor in anchors:
                 if not isinstance(anchor, Mapping):
                     continue
-                resolution = anchor.get("resolution")
-                if not isinstance(resolution, Mapping):
+                key = EvidenceCorrelationMixin._correspondence_target(anchor)
+                if key is None:
                     continue
-                if resolution.get("state") != "resolved-unique":
-                    continue
-                path = resolution.get("repository_path")
-                if not isinstance(path, str):
-                    continue
-                symbol = resolution.get("symbol")
-                if isinstance(symbol, Mapping):
-                    key = (
-                        path,
-                        str(symbol.get("name") or ""),
-                        int(symbol.get("start_line") or 0),
-                        int(symbol.get("end_line") or 0),
-                    )
-                    scope = "symbol"
-                else:
-                    key = (path, "", 0, 0)
-                    scope = "member"
                 groups.setdefault(key, []).append(
                     {
                         "bundle_id": bundle_id,
