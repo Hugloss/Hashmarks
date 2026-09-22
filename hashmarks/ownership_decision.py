@@ -18,6 +18,8 @@ class OwnershipDecisionState:
     ambiguity_reason: str
     owner_eligible: bool = True
     authority_basis: str | None = None
+    proof_scope: str | None = None
+    proof_scope_complete: bool = False
 
 
 def _candidate_identity(row: Mapping[str, object]) -> dict[str, object]:
@@ -79,8 +81,14 @@ def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, boo
         not state.ambiguous or structural_resolution
     )
     canonical_selection = status == "resolved" and retrieved and owner_eligible
-    admissible = canonical_selection or explicit_basis or structural_resolution
-    proven = admissible and ambiguity_cleared
+    scoped_basis = bool(state.proof_scope)
+    admissible = explicit_basis or structural_resolution
+    proven = (
+        admissible
+        and ambiguity_cleared
+        and scoped_basis
+        and state.proof_scope_complete
+    )
     return {
         "retrieved": retrieved,
         "inferred": inferred,
@@ -89,6 +97,7 @@ def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, boo
         "explicit_basis": explicit_basis,
         "canonical_selection": canonical_selection,
         "owner_eligible": owner_eligible,
+        "proof_scope_complete": state.proof_scope_complete,
         "ambiguity_cleared": ambiguity_cleared,
         "admissible": admissible,
         "proven": proven,
@@ -137,6 +146,8 @@ def ownership_decision_trace(
             "reason": state.ambiguity_reason,
         },
         "authority_basis": state.authority_basis,
+        "proof_scope": state.proof_scope,
+        "proof_scope_complete": state.proof_scope_complete,
         "evidence_state": _evidence_state(state, status),
     }
 
@@ -175,6 +186,8 @@ def authority_proof_identity(trace: Mapping[str, object]) -> str:
             "structural_evidence": trace.get("structural_evidence"),
             "ambiguity": trace.get("ambiguity"),
             "authority_basis": trace.get("authority_basis"),
+            "proof_scope": trace.get("proof_scope"),
+            "proof_scope_complete": trace.get("proof_scope_complete"),
             "evidence_state": trace.get("evidence_state"),
         },
     )
@@ -256,6 +269,8 @@ def ownership_authority_contract(
         "authority": "repository-ownership-only",
         "consumer_action": "external",
         "proof_complete": safe,
+        "proof_scope": trace.get("proof_scope"),
+        "proof_scope_complete": bool(trace.get("proof_scope_complete")),
         "authority_proof_identity": proof_identity,
         "evidence_state": trace.get("evidence_state"),
     }
