@@ -100,6 +100,26 @@ class _TaskActionOwnerResolutionState:
     exact_identifier_paths: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class _TaskActionOwnerResolutionRequest:
+    task: str
+    context: _TaskActionMapContext
+    surface: _TaskActionInitialSurfaceState
+    discrimination: _TaskActionDiscriminationState
+    limit: int
+
+
+@dataclass
+class _TaskActionOwnerCandidateState:
+    edit: dict[str, object] | None
+    basis: str | None
+    structural_owner: dict[str, object] | None
+    archive_live_owner_ambiguity: bool
+    exact_identifier_edits: list[dict[str, object]]
+    exact_identifier_paths: tuple[str, ...]
+    literal_task_path: str
+
+
 @dataclass
 class _TaskActionSelectionState:
     edit: dict[str, object] | None

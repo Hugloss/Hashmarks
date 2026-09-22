@@ -715,6 +715,51 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         )
         return {alias for alias in aliases if alias}
 
+    def _task_action_index_projection(
+        self,
+        symbol: Mapping[str, object],
+        failed: set[str],
+        canonical_rank: int,
+        projection_flag: str,
+    ) -> dict[str, object] | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        path = str(symbol.get("path") or "")
+        if not path or path in failed or self._task_action_is_archive_path(path):
+            return None
+        domains = [domain.value for domain in classify_repository_path(path)]
+        if (
+            RepositoryDomain.SOURCE.value not in domains
+            and RepositoryDomain.SCRIPT.value not in domains
+        ):
+            return None
+        file_row = self._session_file_row(path)
+        if (
+            isinstance(file_row, Mapping)
+            and str(file_row.get("evidence_visibility") or "")
+            == EvidenceVisibility.DENY.value
+        ):
+            return None
+        return {
+            "path": path,
+            "canonical_rank": canonical_rank,
+            "canonical_score": 0.0,
+            "domains": domains,
+            "roles": ["edit", "related"],
+            "name": symbol.get("name"),
+            "qualname": symbol.get("qualname"),
+            "signature": symbol.get("signature"),
+            "start_line": symbol.get("start_line"),
+            "end_line": symbol.get("end_line"),
+            "evidence_visibility": (
+                str(file_row["evidence_visibility"])
+                if isinstance(file_row, Mapping)
+                else EvidenceVisibility.SOURCE.value
+            ),
+            "exact_identifier_projection": True,
+            projection_flag: True,
+        }
+
     def _task_action_qualified_identifier_matches_symbol(
         self,
         path: str,
@@ -733,9 +778,6 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 if value
             )
         )
-        if not identities:
-            return False
-
         module_aliases = self._task_action_path_module_aliases(path)
         file_row = self._session_file_row(path)
         module_name = (
@@ -744,22 +786,15 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             else ""
         )
         if module_name:
-            module_aliases.add(module_name)
-
-        for term in qualified_terms:
-            lowered = term.lower()
-            for identity in identities:
-                if lowered == identity:
-                    return True
-                suffix = f".{identity}"
-                if not lowered.endswith(suffix):
-                    continue
-                qualifier = lowered[: -len(suffix)]
-                if qualifier in module_aliases:
-                    return True
-                if module_name and module_name.endswith(f".{qualifier}"):
-                    return True
-        return False
+            module_parts = module_name.split(".")
+            module_aliases.update(
+                ".".join(module_parts[index:]) for index in range(len(module_parts))
+            )
+        accepted = set(identities)
+        accepted.update(
+            f"{alias}.{identity}" for alias in module_aliases for identity in identities
+        )
+        return any(term.lower() in accepted for term in qualified_terms)
 
     def _task_action_qualified_identifier_index_candidates(
         self,
@@ -793,24 +828,17 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         seen: set[tuple[str, str]] = set()
         for symbol in indexed:
             path = str(symbol.get("path") or "")
-            if not path or path in failed or self._task_action_is_archive_path(path):
-                continue
             if not self._task_action_qualified_identifier_matches_symbol(
                 path, symbol, qualified_terms
             ):
                 continue
-            domains = [domain.value for domain in classify_repository_path(path)]
-            if (
-                RepositoryDomain.SOURCE.value not in domains
-                and RepositoryDomain.SCRIPT.value not in domains
-            ):
-                continue
-            file_row = self._session_file_row(path)
-            if (
-                isinstance(file_row, Mapping)
-                and str(file_row.get("evidence_visibility") or "")
-                == EvidenceVisibility.DENY.value
-            ):
+            candidate = self._task_action_index_projection(
+                symbol,
+                failed,
+                canonical_rank,
+                "qualified_identifier_index_projection",
+            )
+            if candidate is None:
                 continue
             key = (
                 path,
@@ -819,27 +847,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             if key in seen:
                 continue
             seen.add(key)
-            candidates.append(
-                {
-                    "path": path,
-                    "canonical_rank": canonical_rank,
-                    "canonical_score": 0.0,
-                    "domains": domains,
-                    "roles": ["edit", "related"],
-                    "name": symbol.get("name"),
-                    "qualname": symbol.get("qualname"),
-                    "signature": symbol.get("signature"),
-                    "start_line": symbol.get("start_line"),
-                    "end_line": symbol.get("end_line"),
-                    "evidence_visibility": (
-                        str(file_row["evidence_visibility"])
-                        if isinstance(file_row, Mapping)
-                        else EvidenceVisibility.SOURCE.value
-                    ),
-                    "exact_identifier_projection": True,
-                    "qualified_identifier_index_projection": True,
-                }
-            )
+            candidates.append(candidate)
         return candidates
 
     def _task_action_plain_identifier_index_candidates(
@@ -859,8 +867,6 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         plain_terms = tuple(sorted(term for term in terms if "." not in term))
-        if not plain_terms:
-            return []
         indexed = self._session_exact_symbol_candidates(plain_terms, limit=1024)
         candidates: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
@@ -868,46 +874,17 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             path = str(symbol.get("path") or "")
             name = str(symbol.get("name") or "").lower()
             qualname = str(symbol.get("qualname") or "").lower()
-            if (
-                not path
-                or path in failed
-                or self._task_action_is_archive_path(path)
-                or (name not in terms and qualname not in terms)
-            ):
+            if terms.isdisjoint((name, qualname)):
                 continue
-            domains = [domain.value for domain in classify_repository_path(path)]
-            if (
-                RepositoryDomain.SOURCE.value not in domains
-                and RepositoryDomain.SCRIPT.value not in domains
-            ):
+            candidate = self._task_action_index_projection(
+                symbol,
+                failed,
+                canonical_rank,
+                "plain_identifier_index_projection",
+            )
+            if candidate is None:
                 continue
-            file_row = self._session_file_row(path)
-            if (
-                isinstance(file_row, Mapping)
-                and str(file_row.get("evidence_visibility") or "")
-                == EvidenceVisibility.DENY.value
-            ):
-                continue
-            candidate: dict[str, object] = {
-                "path": path,
-                "canonical_rank": canonical_rank,
-                "canonical_score": 0.0,
-                "domains": domains,
-                "roles": ["edit", "related"],
-                "name": symbol.get("name"),
-                "qualname": symbol.get("qualname"),
-                "signature": symbol.get("signature"),
-                "start_line": symbol.get("start_line"),
-                "end_line": symbol.get("end_line"),
-                "evidence_visibility": (
-                    str(file_row["evidence_visibility"])
-                    if isinstance(file_row, Mapping)
-                    else EvidenceVisibility.SOURCE.value
-                ),
-                "exact_identifier_projection": True,
-                "plain_identifier_index_projection": True,
-            }
-            if RepositoryDomain.TEST.value in domains:
+            if RepositoryDomain.TEST.value in candidate["domains"]:
                 projected = self._task_action_reference_backed_source_projection(
                     candidate,
                     {str(symbol.get("name") or "")},

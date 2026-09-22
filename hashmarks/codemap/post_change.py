@@ -40,40 +40,75 @@ class PostChangeMixin(ChangeImpactMixin):
             if isinstance(packet.get("verification"), Mapping)
             else {}
         )
+        value = packet.get(key)
         if key == "candidate_path":
             candidate = (
                 ownership.get("candidate")
                 if isinstance(ownership.get("candidate"), Mapping)
                 else {}
             )
-            return str(candidate.get("path") or "") or None
-        if key == "candidate_basis":
-            return str(ownership.get("candidate_basis") or "") or None
-        if key == "owner_path":
+            value = str(candidate.get("path") or "") or None
+        elif key == "candidate_basis":
+            value = str(ownership.get("candidate_basis") or "") or None
+        elif key == "owner_path":
             owner = (
                 ownership.get("owner")
                 if isinstance(ownership.get("owner"), Mapping)
                 else {}
             )
-            return str(owner.get("path") or "") or None
-        if key == "owner_basis":
-            return str(ownership.get("basis") or "") or None
-        if key == "verification_path":
+            value = str(owner.get("path") or "") or None
+        elif key == "owner_basis":
+            value = str(ownership.get("basis") or "") or None
+        elif key == "verification_path":
             selected = (
                 verification.get("selected")
                 if isinstance(verification.get("selected"), Mapping)
                 else {}
             )
-            return str(selected.get("path") or "") or None
-        if key == "verification_argv":
+            value = str(selected.get("path") or "") or None
+        elif key == "verification_argv":
             plan = (
                 verification.get("plan")
                 if isinstance(verification.get("plan"), Mapping)
                 else {}
             )
             argv = plan.get("argv")
-            return tuple(str(item) for item in argv) if isinstance(argv, list) else None
-        return packet.get(key)
+            value = (
+                tuple(str(item) for item in argv) if isinstance(argv, list) else None
+            )
+        return value
+
+    def _post_change_authority_diff(
+        self,
+        previous_evidence: Mapping[str, object],
+        current: Mapping[str, object],
+        *,
+        generation_changed: bool,
+    ) -> tuple[list[str], list[str], bool, bool]:
+        invalidated = ["previous-evidence-generation"] if generation_changed else []
+        reused: list[str] = []
+        ownership_changed = False
+        verification_changed = False
+        for key, label, domain in (
+            ("candidate_path", "task-candidate", "ownership"),
+            ("candidate_basis", "candidate-basis", "ownership"),
+            ("owner_path", "owner", "ownership"),
+            ("owner_basis", "owner-basis", "ownership"),
+            ("verification_path", "verification-surface", "verification"),
+            ("verification_argv", "verification-plan", "verification"),
+        ):
+            previous_value = self._post_change_previous_value(previous_evidence, key)
+            current_value = self._post_change_previous_value(current, key)
+            if previous_value == current_value:
+                if current_value not in (None, "", (), []):
+                    reused.append(label)
+                continue
+            invalidated.append(label)
+            if domain == "ownership":
+                ownership_changed = True
+            else:
+                verification_changed = True
+        return invalidated, reused, ownership_changed, verification_changed
 
     def _post_change_revision_snapshot(
         self, paths: Sequence[str]
@@ -222,32 +257,14 @@ class PostChangeMixin(ChangeImpactMixin):
         generation_changed: bool,
         previous_revision: str | None,
     ) -> tuple[list[str], list[str], dict[str, object]]:
-        invalidated: list[str] = (
-            ["previous-evidence-generation"] if generation_changed else []
+        invalidated, reused, ownership_changed, verification_changed = (
+            self._post_change_authority_diff(
+                previous_evidence,
+                current,
+                generation_changed=generation_changed,
+            )
         )
-        reused: list[str] = []
         replacement: dict[str, object] = {}
-        ownership_changed = False
-        verification_changed = False
-        for key, label, domain in (
-            ("candidate_path", "task-candidate", "ownership"),
-            ("candidate_basis", "candidate-basis", "ownership"),
-            ("owner_path", "owner", "ownership"),
-            ("owner_basis", "owner-basis", "ownership"),
-            ("verification_path", "verification-surface", "verification"),
-            ("verification_argv", "verification-plan", "verification"),
-        ):
-            previous_value = self._post_change_previous_value(previous_evidence, key)
-            current_value = self._post_change_previous_value(current, key)
-            if previous_value == current_value:
-                if current_value not in (None, "", (), []):
-                    reused.append(label)
-                continue
-            invalidated.append(label)
-            if domain == "ownership":
-                ownership_changed = True
-            else:
-                verification_changed = True
 
         if ownership_changed and isinstance(current.get("ownership"), Mapping):
             replacement["ownership"] = dict(current["ownership"])
@@ -268,11 +285,7 @@ class PostChangeMixin(ChangeImpactMixin):
         current_revision = (
             str(provenance.get("revision")) if provenance.get("revision") else None
         )
-        if (
-            previous_revision
-            and current_revision
-            and previous_revision == current_revision
-        ):
+        if previous_revision == current_revision and current_revision not in (None, ""):
             reused.append("candidate-source-revision")
         elif previous_revision != current_revision:
             invalidated.append("candidate-source-revision")
@@ -337,7 +350,6 @@ class PostChangeMixin(ChangeImpactMixin):
             )
         )
         sync_result = self.sync(normalized)
-        path_changes = self._post_change_path_changes(normalized, before_revisions)
         current, provenance, ownership_status = self._post_change_current_evidence(
             task,
             limit=limit,
@@ -352,21 +364,22 @@ class PostChangeMixin(ChangeImpactMixin):
             generation_changed=sync_result.generation != generation_before,
             previous_revision=previous_revision,
         )
-        freshness = (
-            current.get("freshness")
-            if isinstance(current.get("freshness"), Mapping)
-            else {}
-        )
         result: dict[str, object] = {
             "schema": "hashmarks.task-post-change-delta.v2",
             "change": "changed" if invalidated else "unchanged",
             "ownership_status": ownership_status,
-            "path_changes": path_changes,
+            "path_changes": self._post_change_path_changes(
+                normalized, before_revisions
+            ),
             "generation_before": generation_before,
             "generation_after": sync_result.generation,
             "invalidated": invalidated,
             "reused": reused,
-            "freshness": str(freshness.get("state") or "unknown"),
+            "freshness": str(
+                current["freshness"].get("state") or "unknown"
+                if isinstance(current.get("freshness"), Mapping)
+                else "unknown"
+            ),
             "scope": "changed-paths-only",
             "consumer_owner": "external",
         }
@@ -396,8 +409,7 @@ class PostChangeMixin(ChangeImpactMixin):
         options: PostChangeOptions = PostChangeOptions(),
     ) -> dict[str, object]:
         """Refresh changed paths and expose only changed action anchors."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+        self = cast("CodeMap", self)
         normalized = tuple(
             dict.fromkeys(
                 normalize_relative_path(path, allow_root=False)

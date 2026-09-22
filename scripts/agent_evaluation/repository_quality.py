@@ -9,7 +9,10 @@ from typing import Any
 
 from scripts.agent_evaluation.repository_quality_diagnostics import (
     economics_summary,
+    environment_health,
+    evidence_retention,
     group_quality,
+    metamorphic_health,
     proof_mode_health,
     rank_metrics,
     stability_metrics,
@@ -76,6 +79,13 @@ HARD_ZERO_METRICS = (
     "candidate_promoted_during_projection",
     "false_verification_authority",
     "fabricated_verification_command_authority",
+    "producer_identity_mismatch_accepted",
+    "evidence_receipt_mismatch_accepted",
+    "selection_membership_mismatch_accepted",
+    "missing_required_authority_provenance",
+    "synthetic_command_overrides_proven_command",
+    "conflicting_commands_incorrectly_resolved",
+    "false_premise_accepted_as_authority",
 )
 
 
@@ -118,6 +128,8 @@ def validate_case(case: Mapping[str, Any]) -> QualityTruth:
         "qualification_policy",
         "evaluation_profile",
         "proof_mode",
+        "reviewer_identity",
+        "adjudication_state",
     ):
         if not isinstance(case.get(field), str) or not str(case[field]).strip():
             raise ValueError(f"{field} must be a non-empty string")
@@ -126,14 +138,18 @@ def validate_case(case: Mapping[str, Any]) -> QualityTruth:
     _choice(case.get("lifecycle"), CASE_LIFECYCLE, "lifecycle")
     _choice(case.get("evaluation_profile"), EVALUATION_PROFILES, "evaluation_profile")
     _choice(case.get("proof_mode"), PROOF_MODES, "proof_mode")
-    if case["benchmark_registry"] != BENCHMARK_REGISTRY:
-        raise ValueError("case benchmark_registry does not match evaluator")
-    if case["ground_truth_schema"] != GROUND_TRUTH_SCHEMA:
-        raise ValueError("case ground_truth_schema does not match evaluator")
-    if case["metric_policy"] != METRIC_POLICY:
-        raise ValueError("case metric_policy does not match evaluator")
-    if case["qualification_policy"] != QUALIFICATION_POLICY:
-        raise ValueError("case qualification_policy does not match evaluator")
+    _choice(
+        case.get("adjudication_state"), {"reviewed", "pending"}, "adjudication_state"
+    )
+    expected_policies = {
+        "benchmark_registry": BENCHMARK_REGISTRY,
+        "ground_truth_schema": GROUND_TRUTH_SCHEMA,
+        "metric_policy": METRIC_POLICY,
+        "qualification_policy": QUALIFICATION_POLICY,
+    }
+    for field, expected in expected_policies.items():
+        if case[field] != expected:
+            raise ValueError(f"case {field} does not match evaluator")
     semantic = _choice(case.get("semantic_truth"), SEMANTIC_TRUTH, "semantic_truth")
     evidence = _choice(
         case.get("admitted_evidence_truth"),
@@ -225,10 +241,15 @@ def evaluate_case(
         "risk_class": case["risk_class"],
         "evaluation_profile": case["evaluation_profile"],
         "proof_mode": case["proof_mode"],
+        "reviewer_identity": case["reviewer_identity"],
+        "adjudication_state": case["adjudication_state"],
+        "metamorphic_family": case.get("metamorphic_family"),
         "ranking": dict(observed.get("ranking") or {}),
         "verification": dict(observed.get("verification") or {}),
         "stability": dict(observed.get("stability") or {}),
         "economics": dict(observed.get("economics") or {}),
+        "evidence_retention": dict(observed.get("evidence_retention") or {}),
+        "environment": dict(observed.get("environment") or {}),
         "semantic_truth": truth.semantic_truth,
         "admitted_evidence_truth": truth.admitted_evidence_truth,
         "reported_state": state,
@@ -339,16 +360,23 @@ def _score_rows(rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
         if row["ground_truth_status"] == "valid"
         and row["corpus_class"] == "qualification"
         and row["lifecycle"] == "active"
+        and row["adjudication_state"] == "reviewed"
     ]
 
 
 def _benchmark_counts(rows: Sequence[Mapping[str, Any]]) -> tuple[int, int]:
+    blocking = [
+        row
+        for row in rows
+        if row["corpus_class"] == "qualification" and row["lifecycle"] == "active"
+    ]
     adjudication = sum(
         row["ground_truth_status"]
         in {"ambiguous-ground-truth", "insufficient-ground-truth"}
-        for row in rows
+        or row["adjudication_state"] != "reviewed"
+        for row in blocking
     )
-    invalid = sum(row["ground_truth_status"] == "invalid-case" for row in rows)
+    invalid = sum(row["ground_truth_status"] == "invalid-case" for row in blocking)
     return adjudication, invalid
 
 
@@ -384,6 +412,18 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "score_bearing_cases": len(score_rows),
             "needs_adjudication": adjudication,
             "invalid_cases": invalid,
+            "diagnostic_needs_adjudication": sum(
+                row["ground_truth_status"]
+                in {"ambiguous-ground-truth", "insufficient-ground-truth"}
+                or row["adjudication_state"] != "reviewed"
+                for row in rows
+                if row not in score_rows
+            ),
+            "diagnostic_invalid_cases": sum(
+                row["ground_truth_status"] == "invalid-case"
+                for row in rows
+                if row not in score_rows
+            ),
             "critical_slices": slice_health,
             "proof_modes": proof_health,
         },
@@ -395,6 +435,9 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "verification": rank_metrics(score_rows, "verification"),
         },
         "stability_quality": stability_metrics(score_rows),
+        "evidence_retention": evidence_retention(score_rows),
+        "metamorphic_health": metamorphic_health(score_rows),
+        "environment_health": environment_health(score_rows),
         "economics": economics_summary(score_rows),
         "slice_quality": {
             "macro_by_task_family": group_quality(score_rows, "task_family"),

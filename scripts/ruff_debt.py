@@ -176,6 +176,23 @@ def _write_baseline(path: Path | None, summary: dict[str, object]) -> None:
         )
 
 
+def _report_new_debt(summary: dict[str, object], baseline: dict[str, object]) -> None:
+    print("NEW MAINTAINABILITY DEBT — BLOCKED")
+    baseline_files = dict(baseline["files"])
+    summary_files = dict(summary["files"])
+    for finding in summary["findings"]:
+        path = str(finding["path"])
+        current = summary_files[path]
+        before = baseline_files.get(path)
+        if before is not None and current["excess"] <= before["excess"]:
+            continue
+        rules = ", ".join(
+            f"{rule} {value} > {LIMITS[rule]}"
+            for rule, value in dict(finding["violations"]).items()
+        )
+        print(f"  {path}:{finding['line']}  {rules}")
+
+
 def _report_baseline(args, summary: dict[str, object]) -> int | None:
     if args.baseline is None:
         if args.previous_baseline is not None:
@@ -215,19 +232,7 @@ def _report_baseline(args, summary: dict[str, object]) -> int | None:
             f"{MAX_PYTHON_FILE_LINES} (oversized={len(dict(summary['oversized_files']))})"
         )
         if failures:
-            print("NEW MAINTAINABILITY DEBT — BLOCKED")
-            baseline_files = dict(baseline["files"])
-            for finding in summary["findings"]:
-                path = str(finding["path"])
-                current = dict(summary["files"])[path]
-                before = baseline_files.get(path)
-                if before is not None and current["excess"] <= before["excess"]:
-                    continue
-                rules = ", ".join(
-                    f"{rule} {value} > {LIMITS[rule]}"
-                    for rule, value in dict(finding["violations"]).items()
-                )
-                print(f"  {path}:{finding['line']}  {rules}")
+            _report_new_debt(summary, baseline)
             for failure in failures:
                 print(f"FAIL: {failure}")
             print("Baseline increase permitted: no")

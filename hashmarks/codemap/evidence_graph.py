@@ -24,6 +24,44 @@ class EvidenceGraphMixin:
         # never to a CodeMap instance or dynamically reloaded heavy module.
         return is_test_path(path)
 
+    @staticmethod
+    def _python_file_graph_targets(
+        target: str, module_paths: dict[str, list[str]]
+    ) -> set[str]:
+        if target.startswith("."):
+            return set()
+        candidate = target
+        while candidate:
+            resolved = module_paths.get(candidate)
+            if resolved:
+                return set(resolved)
+            candidate = candidate.rsplit(".", 1)[0] if "." in candidate else ""
+        return set()
+
+    @staticmethod
+    def _script_file_graph_targets(
+        source: str,
+        target: str,
+        language: str,
+        known_paths: set[str],
+    ) -> set[str]:
+        if language not in {"javascript", "typescript"} or not target.startswith("."):
+            return set()
+        base = (Path(source).parent / target).as_posix()
+        try:
+            normalized = normalize_relative_path(base, allow_root=False)
+        except ValueError:
+            return set()
+        candidates = [
+            normalized,
+            *(normalized + suffix for suffix in (".ts", ".tsx", ".js", ".jsx")),
+            *(
+                normalized.rstrip("/") + suffix
+                for suffix in ("/index.ts", "/index.tsx", "/index.js", "/index.jsx")
+            ),
+        ]
+        return {candidate for candidate in candidates if candidate in known_paths}
+
     def _file_graph(self) -> dict[str, set[str]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -35,8 +73,7 @@ class EvidenceGraphMixin:
         module_paths: dict[str, list[str]] = {}
         for row in rows:
             module = str(row.get("module_name") or "")
-            if module:
-                module_paths.setdefault(module, []).append(str(row["path"]))
+            module_paths.setdefault(module, []).append(str(row["path"]))
         known_paths = set(graph)
 
         for edge in self.store.all_edges("import"):
@@ -46,30 +83,12 @@ class EvidenceGraphMixin:
                 continue
             language = language_by_path.get(source, "")
             if language == "python":
-                if target.startswith("."):
-                    continue
-                candidate = target
-                while candidate:
-                    resolved = module_paths.get(candidate)
-                    if resolved:
-                        graph.setdefault(source, set()).update(resolved)
-                        break
-                    candidate = candidate.rsplit(".", 1)[0] if "." in candidate else ""
-                continue
-            if language in {"javascript", "typescript"} and target.startswith("."):
-                base = (Path(source).parent / target).as_posix()
-                try:
-                    normalized = normalize_relative_path(base, allow_root=False)
-                except ValueError:
-                    continue
-                candidates = [normalized]
-                for suffix in (".ts", ".tsx", ".js", ".jsx"):
-                    candidates.append(normalized + suffix)
-                for suffix in ("/index.ts", "/index.tsx", "/index.js", "/index.jsx"):
-                    candidates.append(normalized.rstrip("/") + suffix)
-                graph.setdefault(source, set()).update(
-                    candidate for candidate in candidates if candidate in known_paths
+                targets = self._python_file_graph_targets(target, module_paths)
+            else:
+                targets = self._script_file_graph_targets(
+                    source, target, language, known_paths
                 )
+            graph.setdefault(source, set()).update(targets)
 
         for edge in self._fresh_native_file_edges():
             source = str(edge["source"])
@@ -91,6 +110,52 @@ class EvidenceGraphMixin:
             if isinstance(value, list)
             else set()
         )
+
+    @staticmethod
+    def _longest_module_paths(target: str, resolved: dict[str, list[str]]) -> list[str]:
+        parts = target.split(".")
+        for index in range(len(parts), 0, -1):
+            paths = resolved.get(".".join(parts[:index]), [])
+            if paths:
+                return paths
+        return []
+
+    def _python_reverse_frontier(
+        self, frontier: set[str], seen: set[str]
+    ) -> set[str] | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        ordered_frontier = sorted(frontier)
+        rows = [self._session_file_row(path) for path in ordered_frontier]
+        modules_by_path = {
+            path: str(row.get("module_name") or "")
+            for path, row in zip(ordered_frontier, rows, strict=True)
+            if row is not None and str(row.get("module_name") or "")
+        }
+        if len(modules_by_path) != len(frontier):
+            return None
+        candidates = self.store.python_import_candidates_for_modules(
+            modules_by_path.values()
+        )
+        raw_rows = [row for bucket in candidates.values() for row in bucket]
+        prefixes = {
+            prefix
+            for row in raw_rows
+            for prefix in (
+                ".".join(str(row.get("target") or "").split(".")[:index])
+                for index in range(1, len(str(row.get("target") or "").split(".")) + 1)
+            )
+            if prefix
+        }
+        resolved = self.store.module_paths_many(prefixes)
+        nxt: set[str] = set()
+        for row in raw_rows:
+            paths = self._longest_module_paths(str(row.get("target") or ""), resolved)
+            if len(paths) == 1 and frontier.intersection(paths):
+                source = str(row.get("path") or "")
+                if source and source not in seen:
+                    nxt.add(source)
+        return nxt
 
     def _python_reverse_levels(
         self, roots: set[str], *, max_depth: int
@@ -123,45 +188,9 @@ class EvidenceGraphMixin:
         frontier = set(roots)
         levels: list[list[str]] = []
         for _ in range(max_depth):
-            rows = [self._session_file_row(path) for path in sorted(frontier)]
-            modules_by_path = {
-                path: str(row.get("module_name") or "")
-                for path, row in zip(sorted(frontier), rows, strict=True)
-                if row is not None and str(row.get("module_name") or "")
-            }
-            if len(modules_by_path) != len(frontier):
+            nxt = self._python_reverse_frontier(frontier, seen)
+            if nxt is None:
                 return None
-            candidates = self.store.python_import_candidates_for_modules(
-                modules_by_path.values()
-            )
-            raw_rows = [row for bucket in candidates.values() for row in bucket]
-            targets = {str(row.get("target") or "") for row in raw_rows}
-            prefixes = {
-                prefix
-                for target in targets
-                for prefix in (
-                    ".".join(target.split(".")[:i])
-                    for i in range(1, len(target.split(".")) + 1)
-                )
-                if prefix
-            }
-            resolved = self.store.module_paths_many(prefixes)
-            target_paths = set(frontier)
-            nxt: set[str] = set()
-            for row in raw_rows:
-                target = str(row.get("target") or "")
-                parts = target.split(".")
-                resolved_paths: list[str] = []
-                for i in range(len(parts), 0, -1):
-                    resolved_paths = resolved.get(".".join(parts[:i]), [])
-                    if resolved_paths:
-                        break
-                if len(resolved_paths) == 1 and target_paths.intersection(
-                    resolved_paths
-                ):
-                    source = str(row.get("path") or "")
-                    if source and source not in seen:
-                        nxt.add(source)
             if not nxt:
                 break
             level = sorted(nxt)
@@ -274,15 +303,14 @@ class EvidenceGraphMixin:
             "warnings": list(warnings),
         }
 
-    def enrich_projects(
-        self, providers: Iterable[str] | None = None
-    ) -> dict[str, object]:
-        """Collect slower/native package graph evidence explicitly in the enrichment lane."""
+    def _enrich_project_graphs(
+        self,
+        selected: set[str] | None,
+        results: list[dict[str, object]],
+        warnings: list[str],
+    ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        selected = None if providers is None else {str(value) for value in providers}
-        results = []
-        warnings: list[str] = []
         for provider in self.project_graph_providers:
             if selected is not None and provider.name not in selected:
                 continue
@@ -322,6 +350,15 @@ class EvidenceGraphMixin:
                 }
             )
             warnings.extend(evidence.warnings)
+
+    def _enrich_typescript_graph(
+        self,
+        selected: set[str] | None,
+        results: list[dict[str, object]],
+        warnings: list[str],
+    ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if selected is None or self.typescript_resolver.name in selected:
             if self.typescript_resolver.detect(self.workspace):
                 ts = self.typescript_resolver.collect(self.workspace)
@@ -336,6 +373,15 @@ class EvidenceGraphMixin:
                 )
                 results.append({"producer": ts.producer, "file_edges": len(ts.edges)})
                 warnings.extend(ts.warnings)
+
+    def _enrich_pyright_graph(
+        self,
+        selected: set[str] | None,
+        results: list[dict[str, object]],
+        warnings: list[str],
+    ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if selected is None or self.pyright_type_server.name in selected:
             if self.pyright_type_server.detect(self.workspace):
                 python_sources = [
@@ -363,6 +409,15 @@ class EvidenceGraphMixin:
                     }
                 )
                 warnings.extend(pyright.warnings)
+
+    def _enrich_vitest_graph(
+        self,
+        selected: set[str] | None,
+        results: list[dict[str, object]],
+        warnings: list[str],
+    ) -> None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         if selected is None or "vitest-vite" in selected:
             # Preserve the historical monkeypatch seam on codemap.engine while
             # implementation ownership lives in this mixin.
@@ -392,6 +447,20 @@ class EvidenceGraphMixin:
                         {"producer": vite.producer, "file_edges": len(vite.edges)}
                     )
                 warnings.extend(vite.warnings)
+
+    def enrich_projects(
+        self, providers: Iterable[str] | None = None
+    ) -> dict[str, object]:
+        """Collect slower/native package graph evidence explicitly in the enrichment lane."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        selected = None if providers is None else {str(value) for value in providers}
+        results: list[dict[str, object]] = []
+        warnings: list[str] = []
+        self._enrich_project_graphs(selected, results, warnings)
+        self._enrich_typescript_graph(selected, results, warnings)
+        self._enrich_pyright_graph(selected, results, warnings)
+        self._enrich_vitest_graph(selected, results, warnings)
         self.store.set_meta("project_graph_last_sync_unix", str(time.time()))
         self._reverse_file_graph_cache = None
         return {

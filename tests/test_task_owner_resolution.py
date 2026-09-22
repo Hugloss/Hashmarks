@@ -1,8 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.task_action_types import (
+    _TaskActionInitialSurfaceState,
+    _TaskActionMapContext,
+    _TaskActionOwnerResolutionRequest,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -12,6 +18,29 @@ def _write(root: Path, rel: str, text: str) -> None:
     path = root / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def _owner_request(codemap: CodeMap, task: str) -> _TaskActionOwnerResolutionRequest:
+    return _TaskActionOwnerResolutionRequest(
+        task=task,
+        context=cast(
+            "_TaskActionMapContext", SimpleNamespace(hits=[], rows=[], failed=set())
+        ),
+        surface=cast(
+            "_TaskActionInitialSurfaceState",
+            SimpleNamespace(
+                edit=None,
+                verify=None,
+                verification_anchor_tokens=(),
+                literal_reference_owner=None,
+                localized_config_edit=False,
+                explicit_config_surface_request=False,
+                explicit_edit_surface_selected=False,
+            ),
+        ),
+        discrimination=codemap._task_action_discrimination_state(task, []),
+        limit=1,
+    )
 
 
 def test_owner_resolution_recovers_unique_exact_symbol_without_retrieval_rows(
@@ -34,22 +63,7 @@ def test_owner_resolution_recovers_unique_exact_symbol_without_retrieval_rows(
     task = "cancel_queued_admission expected_sequence"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        discrimination = codemap._task_action_discrimination_state(task, [])
-        owner = codemap._task_action_resolve_owner(
-            task=task,
-            hits=[],
-            rows=[],
-            failed=set(),
-            edit=None,
-            verify=None,
-            discrimination=discrimination,
-            verification_anchor_tokens=(),
-            literal_reference_owner=None,
-            localized_config_edit=False,
-            explicit_config_surface_request=False,
-            explicit_edit_surface_selected=False,
-            limit=1,
-        )
+        owner = codemap._task_action_resolve_owner(_owner_request(codemap, task))
 
     assert owner.edit is not None
     assert owner.edit["path"] == "backend/runtime/executor_pool.py"
@@ -66,22 +80,7 @@ def test_owner_resolution_keeps_duplicate_exact_symbols_unresolved(
     task = "fix cancel_queued_admission"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        discrimination = codemap._task_action_discrimination_state(task, [])
-        owner = codemap._task_action_resolve_owner(
-            task=task,
-            hits=[],
-            rows=[],
-            failed=set(),
-            edit=None,
-            verify=None,
-            discrimination=discrimination,
-            verification_anchor_tokens=(),
-            literal_reference_owner=None,
-            localized_config_edit=False,
-            explicit_config_surface_request=False,
-            explicit_edit_surface_selected=False,
-            limit=1,
-        )
+        owner = codemap._task_action_resolve_owner(_owner_request(codemap, task))
 
     assert owner.edit is None
     assert owner.basis is None

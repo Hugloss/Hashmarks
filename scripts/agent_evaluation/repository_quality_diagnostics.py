@@ -40,6 +40,12 @@ def proof_mode_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _dcg(relevances: Sequence[float]) -> float:
+    import math
+
+    return sum(value / math.log2(index + 2) for index, value in enumerate(relevances))
+
+
 def rank_metrics(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any]:
     ranks = [
         int(row[field]["rank"])
@@ -47,12 +53,23 @@ def rank_metrics(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any
         if isinstance(row.get(field), Mapping) and row[field].get("rank") is not None
     ]
     if not ranks:
-        return {"cases": 0, "recall_at_1": None, "recall_at_5": None, "mrr": None}
+        return {
+            "cases": 0,
+            "recall_at_1": None,
+            "recall_at_5": None,
+            "mrr": None,
+            "ndcg": None,
+        }
     return {
         "cases": len(ranks),
         "recall_at_1": sum(rank <= 1 for rank in ranks) / len(ranks),
         "recall_at_5": sum(rank <= 5 for rank in ranks) / len(ranks),
         "mrr": sum(1 / rank for rank in ranks) / len(ranks),
+        "ndcg": sum(
+            1 / (1 if rank == 1 else __import__("math").log2(rank + 1))
+            for rank in ranks
+        )
+        / len(ranks),
     }
 
 
@@ -96,3 +113,47 @@ def economics_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "cases": len(observed),
         "metrics": {key: _economics_metric(observed, key) for key in keys},
     }
+
+
+def evidence_retention(rows: Sequence[Mapping[str, Any]]) -> dict[str, float | None]:
+    keys = (
+        "related_dependency_retained",
+        "impact_evidence_retained",
+        "caller_callee_retained",
+        "import_relation_retained",
+        "verification_surface_retained",
+    )
+    observed = [
+        row["evidence_retention"]
+        for row in rows
+        if isinstance(row.get("evidence_retention"), Mapping)
+        and row["evidence_retention"]
+    ]
+    return {
+        key: _ratio(sum(item.get(key) is True for item in observed), len(observed))
+        for key in keys
+    }
+
+
+def environment_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    observed = [
+        row["environment"]
+        for row in rows
+        if isinstance(row.get("environment"), Mapping) and row["environment"]
+    ]
+    modes = Counter(str(item.get("mode") or "unknown") for item in observed)
+    identities = sorted(
+        {str(item["fingerprint"]) for item in observed if item.get("fingerprint")}
+    )
+    return {
+        "cases": len(observed),
+        "modes": dict(sorted(modes.items())),
+        "fingerprints": identities,
+    }
+
+
+def metamorphic_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    families = Counter(
+        str(row["metamorphic_family"]) for row in rows if row.get("metamorphic_family")
+    )
+    return {"families": dict(sorted(families.items())), "cases": sum(families.values())}

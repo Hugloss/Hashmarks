@@ -10,14 +10,12 @@ class FakeNode:
         self,
         node_type: str,
         *,
-        start: int = 0,
-        end: int = 0,
-        start_line: int = 0,
-        end_line: int = 0,
+        position: tuple[int, int, int, int] = (0, 0, 0, 0),
         children: tuple[FakeNode, ...] = (),
         fields: dict[str, FakeNode] | None = None,
         broken_field: str | None = None,
     ) -> None:
+        start, end, start_line, end_line = position
         self.type = node_type
         self.start_byte = start
         self.end_byte = end
@@ -62,22 +60,17 @@ def test_range_provider_collects_nested_symbols_from_one_parser_tree() -> None:
     work_start = source.index("work")
     method_start = source.index("function")
     method_end = source.index("}", method_start) + 1
-    alpha = FakeNode("identifier", start=alpha_start, end=alpha_start + 5)
-    work = FakeNode("identifier", start=work_start, end=work_start + 4)
+    alpha = FakeNode("identifier", position=(alpha_start, alpha_start + 5, 0, 0))
+    work = FakeNode("identifier", position=(work_start, work_start + 4, 0, 0))
     method = FakeNode(
         "method_definition",
-        start=method_start,
-        end=method_end,
-        start_line=1,
-        end_line=1,
+        position=(method_start, method_end, 1, 1),
         children=(work,),
         fields={"name": work},
     )
     klass = FakeNode(
         "class_definition",
-        start=0,
-        end=len(source) - 1,
-        end_line=2,
+        position=(0, len(source) - 1, 0, 2),
         children=(alpha, method),
         fields={"name": alpha},
     )
@@ -102,17 +95,16 @@ def test_range_provider_ignores_unnamed_nodes_and_bounds_long_headers() -> None:
     source = f"function {long_name}(\n  value\n) {{}}\n"
     name_start = source.index(long_name)
     identifier = FakeNode(
-        "identifier", start=name_start, end=name_start + len(long_name)
+        "identifier", position=(name_start, name_start + len(long_name), 0, 0)
     )
     unnamed = FakeNode("class_definition")
     blank = FakeNode(
-        "function_definition", fields={"name": FakeNode("identifier", start=0, end=0)}
+        "function_definition",
+        fields={"name": FakeNode("identifier", position=(0, 0, 0, 0))},
     )
     function = FakeNode(
         "function_definition",
-        start=0,
-        end=len(source) - 1,
-        end_line=2,
+        position=(0, len(source) - 1, 0, 2),
         fields={"name": identifier},
     )
     root = FakeNode("module", children=(unnamed, blank, function))

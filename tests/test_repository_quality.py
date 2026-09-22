@@ -28,6 +28,8 @@ def _case(**overrides):
         "qualification_policy": "hashmarks.repository-quality-qualification.v1",
         "evaluation_profile": "change-support.v1",
         "proof_mode": "unit",
+        "reviewer_identity": "reviewer:fixture",
+        "adjudication_state": "reviewed",
         "semantic_truth": "unique-owner",
         "admitted_evidence_truth": "sufficient",
         "expected_owner": "src/widget.py::widget",
@@ -203,8 +205,9 @@ def test_uncertain_ground_truth_requires_adjudication_before_qualification() -> 
         {"state": "unresolved", "owner": None},
     )
     report = summarize([valid, *_qualification_rows()[1:], uncertain])
-    assert report["qualification"] == "needs-adjudication"
-    assert report["benchmark_health"]["needs_adjudication"] == 1
+    assert report["qualification"] == "qualified"
+    assert report["benchmark_health"]["needs_adjudication"] == 0
+    assert report["benchmark_health"]["diagnostic_needs_adjudication"] == 1
 
 
 def test_invalid_case_blocks_benchmark_readiness() -> None:
@@ -443,3 +446,117 @@ def test_economics_missing_is_unknown_and_observed_values_are_bounded_diagnostic
         "max": 12,
     }
     assert report["qualification"] == "qualified"
+
+
+def test_pending_active_qualification_case_requires_adjudication() -> None:
+    pending = evaluate_case(
+        _case(case_id="pending", adjudication_state="pending"),
+        {"state": "resolved", "owner": "src/widget.py::widget"},
+    )
+    report = summarize([*_qualification_rows(), pending])
+    assert report["qualification"] == "needs-adjudication"
+    assert report["benchmark_health"]["needs_adjudication"] == 1
+
+
+def test_invalid_shadow_case_is_diagnostic_not_qualification_blocking() -> None:
+    invalid = evaluate_case(
+        _case(
+            case_id="invalid-shadow",
+            corpus_class="shadow",
+            ground_truth_status="invalid-case",
+        ),
+        {"state": "unresolved", "owner": None},
+    )
+    report = summarize([*_qualification_rows(), invalid])
+    assert report["qualification"] == "qualified"
+    assert report["benchmark_health"]["invalid_cases"] == 0
+    assert report["benchmark_health"]["diagnostic_invalid_cases"] == 1
+
+
+def test_new_authority_identity_vetoes_are_non_compensatory() -> None:
+    for metric in (
+        "producer_identity_mismatch_accepted",
+        "evidence_receipt_mismatch_accepted",
+        "selection_membership_mismatch_accepted",
+        "missing_required_authority_provenance",
+        "synthetic_command_overrides_proven_command",
+        "conflicting_commands_incorrectly_resolved",
+        "false_premise_accepted_as_authority",
+    ):
+        observed = {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            metric: True,
+        }
+        row = evaluate_case(_case(case_id=metric), observed)
+        report = summarize([row, *_qualification_rows()[1:]])
+        assert report["qualification"] == "not-qualified"
+        assert report["hard_zero"][metric] == 1
+
+
+def test_ndcg_is_reported_as_ranking_quality_not_authority() -> None:
+    ranked = evaluate_case(
+        _case(case_id="ndcg"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "ranking": {"rank": 2},
+        },
+    )
+    report = summarize([ranked, *_qualification_rows()[1:]])
+    assert report["qualification"] == "qualified"
+    assert report["ranking_quality"]["owner"]["ndcg"] is not None
+
+
+def test_evidence_retention_is_diagnostic() -> None:
+    retained = evaluate_case(
+        _case(case_id="retained"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "evidence_retention": {
+                "related_dependency_retained": True,
+                "impact_evidence_retained": True,
+                "caller_callee_retained": False,
+            },
+        },
+    )
+    report = summarize([retained, *_qualification_rows()[1:]])
+    assert report["qualification"] == "qualified"
+    assert report["evidence_retention"]["related_dependency_retained"] == 1
+    assert report["evidence_retention"]["caller_callee_retained"] == 0
+
+
+def test_environment_fingerprint_and_mode_are_diagnostic() -> None:
+    measured = evaluate_case(
+        _case(case_id="environment"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "environment": {"fingerprint": "sha256:env", "mode": "cold"},
+        },
+    )
+    report = summarize([measured, *_qualification_rows()[1:]])
+    assert report["environment_health"] == {
+        "cases": 1,
+        "modes": {"cold": 1},
+        "fingerprints": ["sha256:env"],
+    }
+
+
+def test_metamorphic_family_membership_is_visible() -> None:
+    mutated = evaluate_case(
+        _case(case_id="metamorphic", metamorphic_family="irrelevant-file-addition"),
+        {"state": "resolved", "owner": "src/widget.py::widget"},
+    )
+    report = summarize([mutated, *_qualification_rows()[1:]])
+    assert report["metamorphic_health"] == {
+        "families": {"irrelevant-file-addition": 1},
+        "cases": 1,
+    }
+
+
+def test_review_provenance_changes_case_identity() -> None:
+    assert case_identity(_case()) != case_identity(
+        _case(reviewer_identity="reviewer:other")
+    )

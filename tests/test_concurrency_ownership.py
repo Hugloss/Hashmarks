@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import threading
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
@@ -28,6 +29,65 @@ class _BarrierWatcher:
 
     def synchronize(self) -> bool:
         return True
+
+
+@dataclass
+class _BlockedSnapshotDaemon:
+    workspace: Path
+    watcher: _BarrierWatcher
+    socket_path: Path
+    daemon: IdentityDaemon
+    entered: threading.Event
+    release: threading.Event
+    server_thread: threading.Thread
+
+    def client(self) -> IdentityClient:
+        return IdentityClient(self.workspace, socket_path=self.socket_path, timeout=5)
+
+    def release_snapshot(self) -> None:
+        self.release.set()
+
+    def stop(self, client: IdentityClient) -> None:
+        self.release_snapshot()
+        client.stop()
+        self.server_thread.join(timeout=5)
+        assert not self.server_thread.is_alive()
+
+
+def _start_blocked_snapshot_daemon(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> _BlockedSnapshotDaemon:
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    (workspace / "a.txt").write_text("a", encoding="utf-8")
+    watcher = _BarrierWatcher()
+    socket_path = tmp_path / "identity.sock"
+    daemon = IdentityDaemon(
+        workspace,
+        state_dir=tmp_path / "state",
+        socket_path=socket_path,
+        watcher_factory=lambda _engine: watcher,
+    )
+    entered = threading.Event()
+    release = threading.Event()
+    original_snapshot = daemon.engine.snapshot
+
+    def blocking_snapshot(*args, **kwargs):
+        entered.set()
+        if not release.wait(timeout=5):
+            raise TimeoutError("test did not release blocked snapshot")
+        return original_snapshot(*args, **kwargs)
+
+    monkeypatch.setattr(daemon.engine, "snapshot", blocking_snapshot)
+    server_thread = threading.Thread(target=daemon.serve_forever, daemon=True)
+    server_thread.start()
+    deadline = time.monotonic() + 3
+    while not socket_path.exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert socket_path.exists()
+    return _BlockedSnapshotDaemon(
+        workspace, watcher, socket_path, daemon, entered, release, server_thread
+    )
 
 
 def test_workspace_generation_bump_is_one_atomic_read_modify_write(
@@ -77,38 +137,9 @@ def test_workspace_generation_bump_is_one_atomic_read_modify_write(
 def test_identity_daemon_status_is_not_serialized_behind_large_snapshot(
     tmp_path: Path, monkeypatch
 ) -> None:
-    workspace = tmp_path / "repo"
-    workspace.mkdir()
-    (workspace / "a.txt").write_text("a", encoding="utf-8")
-    watcher = _BarrierWatcher()
-    socket_path = tmp_path / "identity.sock"
-    daemon = IdentityDaemon(
-        workspace,
-        state_dir=tmp_path / "state",
-        socket_path=socket_path,
-        watcher_factory=lambda _engine: watcher,
-    )
-
-    entered = threading.Event()
-    release = threading.Event()
-    original_snapshot = daemon.engine.snapshot
-
-    def blocking_snapshot(*args, **kwargs):
-        entered.set()
-        if not release.wait(timeout=5):
-            raise TimeoutError("test did not release blocked snapshot")
-        return original_snapshot(*args, **kwargs)
-
-    monkeypatch.setattr(daemon.engine, "snapshot", blocking_snapshot)
-    server_thread = threading.Thread(target=daemon.serve_forever, daemon=True)
-    server_thread.start()
-    deadline = time.monotonic() + 3
-    while not socket_path.exists() and time.monotonic() < deadline:
-        time.sleep(0.01)
-    assert socket_path.exists()
-
-    slow_client = IdentityClient(workspace, socket_path=socket_path, timeout=5)
-    fast_client = IdentityClient(workspace, socket_path=socket_path, timeout=5)
+    server = _start_blocked_snapshot_daemon(tmp_path, monkeypatch)
+    slow_client = server.client()
+    fast_client = server.client()
     slow_error: list[BaseException] = []
 
     def slow_request() -> None:
@@ -119,7 +150,7 @@ def test_identity_daemon_status_is_not_serialized_behind_large_snapshot(
 
     slow_thread = threading.Thread(target=slow_request)
     slow_thread.start()
-    assert entered.wait(timeout=2)
+    assert server.entered.wait(timeout=2)
 
     status_done = threading.Event()
     status_rows: list[dict] = []
@@ -136,10 +167,10 @@ def test_identity_daemon_status_is_not_serialized_behind_large_snapshot(
         assert status_done.wait(timeout=1), (
             "status was serialized behind heavy identity work"
         )
-        assert status_rows[0]["workspace"] == str(workspace.resolve())
+        assert status_rows[0]["workspace"] == str(server.workspace.resolve())
         assert slow_thread.is_alive()
     finally:
-        release.set()
+        server.release_snapshot()
 
     slow_thread.join(timeout=5)
     status_thread.join(timeout=5)
@@ -147,48 +178,18 @@ def test_identity_daemon_status_is_not_serialized_behind_large_snapshot(
     assert not status_thread.is_alive()
     assert slow_error == []
 
-    fast_client.stop()
-    server_thread.join(timeout=5)
-    assert not server_thread.is_alive()
-    assert watcher.started and watcher.stopped
+    server.stop(fast_client)
+    assert server.watcher.started and server.watcher.stopped
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Unix identity daemon transport")
 def test_registered_manifest_can_be_dropped_while_snapshot_uses_immutable_handle(
     tmp_path: Path, monkeypatch
 ) -> None:
-    workspace = tmp_path / "repo"
-    workspace.mkdir()
-    (workspace / "a.txt").write_text("a", encoding="utf-8")
-    watcher = _BarrierWatcher()
-    socket_path = tmp_path / "identity.sock"
-    daemon = IdentityDaemon(
-        workspace,
-        state_dir=tmp_path / "state",
-        socket_path=socket_path,
-        watcher_factory=lambda _engine: watcher,
-    )
-    entered = threading.Event()
-    release = threading.Event()
-    original_snapshot = daemon.engine.snapshot
-
-    def blocking_snapshot(*args, **kwargs):
-        entered.set()
-        if not release.wait(timeout=5):
-            raise TimeoutError("test did not release blocked snapshot")
-        return original_snapshot(*args, **kwargs)
-
-    monkeypatch.setattr(daemon.engine, "snapshot", blocking_snapshot)
-    server_thread = threading.Thread(target=daemon.serve_forever, daemon=True)
-    server_thread.start()
-    deadline = time.monotonic() + 3
-    while not socket_path.exists() and time.monotonic() < deadline:
-        time.sleep(0.01)
-    assert socket_path.exists()
-
-    owner = IdentityClient(workspace, socket_path=socket_path, timeout=5)
-    control = IdentityClient(workspace, socket_path=socket_path, timeout=5)
-    manifest = daemon.engine.manifest(["a.txt"])
+    server = _start_blocked_snapshot_daemon(tmp_path, monkeypatch)
+    owner = server.client()
+    control = server.client()
+    manifest = server.daemon.engine.manifest(["a.txt"])
     handle = owner.register_manifest(manifest)
     result: list[dict] = []
 
@@ -196,22 +197,20 @@ def test_registered_manifest_can_be_dropped_while_snapshot_uses_immutable_handle
         target=lambda: result.append(owner.input_root_manifest(handle, verify=True))
     )
     thread.start()
-    assert entered.wait(timeout=2)
+    assert server.entered.wait(timeout=2)
     try:
         # Dropping the registry reference does not invalidate the immutable
         # InputManifest already owned by the in-flight operation.
         assert control.drop_manifest(handle) is True
         assert thread.is_alive()
     finally:
-        release.set()
+        server.release_snapshot()
 
     thread.join(timeout=5)
     assert not thread.is_alive()
     assert result and result[0]["manifest"] == manifest.fingerprint
 
-    control.stop()
-    server_thread.join(timeout=5)
-    assert not server_thread.is_alive()
+    server.stop(control)
 
 
 def test_workspace_generation_bump_is_atomic_across_store_instances(tmp_path):

@@ -85,6 +85,22 @@ Economics are deliberately last in the lexicographic stack and diagnostic only. 
 initial surface records sample counts and bounded observed latency, inspected rows,
 candidate counts, and peak memory; absent measurements remain unknown.
 
+## Second batched qualification stack
+
+The next ten qualification increments are deliberately carried in one integration batch:
+active-qualification adjudication is separated from diagnostic corpus health; reviewer and
+adjudication provenance are identity-bound; producer, receipt, selection-membership,
+required-provenance, command-conflict, synthetic-command, and false-premise authority
+violations are hard vetoes; ranking adds nDCG; evidence-retention diagnostics cover
+dependency, impact, call, import, and verification surfaces; metamorphic family
+membership is explicit; and economics can be compared only with recorded environment
+fingerprints and cold/warm/incremental modes.
+
+Shadow, canary, fresh-dogfood, historical, and superseded cases remain visible diagnostics
+but do not block qualification until promoted into the active qualification corpus.
+This prevents exploratory evidence from silently becoming release authority while
+preserving it for review and later promotion.
+
 ## Next increments
 
 The same evaluator will be extended with:
