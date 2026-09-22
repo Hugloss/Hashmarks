@@ -196,8 +196,7 @@ def test_splunk_csv_dogfood_counts_final_physical_line_without_newline(
 ) -> None:
     source = tmp_path / "masked.csv"
     source.write_text(
-        HEADER
-        + '"9","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        HEADER + '"9","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
         '"[host]","idx","[host]","INFO name=utils"',
         encoding="utf-8",
     )
