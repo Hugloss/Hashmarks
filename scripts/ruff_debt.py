@@ -176,7 +176,6 @@ def _write_baseline(path: Path | None, summary: dict[str, object]) -> None:
         )
 
 
-
 def _report_new_debt(summary: dict[str, object], baseline: dict[str, object]) -> None:
     print("NEW MAINTAINABILITY DEBT — BLOCKED")
     baseline_files = dict(baseline["files"])
@@ -192,6 +191,7 @@ def _report_new_debt(summary: dict[str, object], baseline: dict[str, object]) ->
             for rule, value in dict(finding["violations"]).items()
         )
         print(f"  {path}:{finding['line']}  {rules}")
+
 
 def _report_baseline(args, summary: dict[str, object]) -> int | None:
     if args.baseline is None:
