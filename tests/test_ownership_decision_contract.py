@@ -290,3 +290,28 @@ def test_structural_evidence_is_admissible_without_new_metadata_basis() -> None:
     assert trace["evidence_state"]["admissible"] is True
     assert trace["evidence_state"]["proven"] is True
     assert authority["owner_resolved"] is True
+
+
+def test_authority_proof_ignores_selected_row_presentation_metadata() -> None:
+    def proof(rank: int, roles: list[str]) -> str:
+        trace = ownership_decision_trace(
+            OwnershipDecisionState(
+                edit={
+                    "path": "src/owner.py",
+                    "name": "owner",
+                    "qualname": "owner",
+                    "canonical_rank": rank,
+                    "roles": roles,
+                },
+                competing=[],
+                structural_owner=None,
+                ambiguous=False,
+                ambiguity_reason="resolved-by-role",
+                authority_basis="literal-path",
+                proof_scope="repository-global-path-identity",
+                proof_scope_complete=True,
+            )
+        )
+        return ownership_authority_contract(trace)["authority_proof_identity"]
+
+    assert proof(1, ["edit"]) == proof(99, ["edit", "related"])
