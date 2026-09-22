@@ -141,14 +141,15 @@ def validate_case(case: Mapping[str, Any]) -> QualityTruth:
     _choice(
         case.get("adjudication_state"), {"reviewed", "pending"}, "adjudication_state"
     )
-    if case["benchmark_registry"] != BENCHMARK_REGISTRY:
-        raise ValueError("case benchmark_registry does not match evaluator")
-    if case["ground_truth_schema"] != GROUND_TRUTH_SCHEMA:
-        raise ValueError("case ground_truth_schema does not match evaluator")
-    if case["metric_policy"] != METRIC_POLICY:
-        raise ValueError("case metric_policy does not match evaluator")
-    if case["qualification_policy"] != QUALIFICATION_POLICY:
-        raise ValueError("case qualification_policy does not match evaluator")
+    expected_policies = {
+        "benchmark_registry": BENCHMARK_REGISTRY,
+        "ground_truth_schema": GROUND_TRUTH_SCHEMA,
+        "metric_policy": METRIC_POLICY,
+        "qualification_policy": QUALIFICATION_POLICY,
+    }
+    for field, expected in expected_policies.items():
+        if case[field] != expected:
+            raise ValueError(f"case {field} does not match evaluator")
     semantic = _choice(case.get("semantic_truth"), SEMANTIC_TRUTH, "semantic_truth")
     evidence = _choice(
         case.get("admitted_evidence_truth"),
