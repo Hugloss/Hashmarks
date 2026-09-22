@@ -148,107 +148,82 @@ def generate(
     )
 
 
-def run(base: Path, public_path: Path, secret_path: Path, output: Path) -> dict:
-    public = json.loads(public_path.read_text(encoding="utf-8"))["tasks"]
-    frozen: list[dict] = []
-    sync_ms = 0.0
-    for task in public:
-        repo = base / task["repo"]
-        changed = str(task["changed"])
-        with CodeMap(repo, artifact_db=repo / "artifacts.sqlite3") as codemap:
-            started = time.perf_counter()
-            codemap.sync()
-            codemap.enrich_projects(
-                ("npm-package-graph", "maven-pom-graph", "declared-project-links")
-            )
-            sync_ms += (time.perf_counter() - started) * 1000.0
-            path = repo / changed
-            if task["kind"] == "shared-input":
-                text = path.read_text(encoding="utf-8").replace(
-                    "openapi: 3.1.0", "openapi: 3.1.1"
-                )
-                path.write_text(text, encoding="utf-8")
-            else:
-                path.write_text(
-                    path.read_text(encoding="utf-8") + "// external edit\n",
-                    encoding="utf-8",
-                )
-            started = time.perf_counter()
-            packet = codemap.task_change_impact(str(task["query"]), [changed])
-            impact_ms = (time.perf_counter() - started) * 1000.0
-        frozen.append(
-            {
-                "id": task["id"],
-                "kind": task["kind"],
-                "packet": packet,
-                "packet_bytes": len(
-                    json.dumps(packet, sort_keys=True, separators=(",", ":")).encode(
-                        "utf-8"
-                    )
-                ),
-                "impact_ms": impact_ms,
-            }
+def _freeze_task(base: Path, task: dict) -> tuple[dict, float]:
+    repo = base / task["repo"]
+    changed = str(task["changed"])
+    with CodeMap(repo, artifact_db=repo / "artifacts.sqlite3") as codemap:
+        started = time.perf_counter()
+        codemap.sync()
+        codemap.enrich_projects(
+            ("npm-package-graph", "maven-pom-graph", "declared-project-links")
         )
+        sync_ms = (time.perf_counter() - started) * 1000.0
+        path = repo / changed
+        if task["kind"] == "shared-input":
+            text = path.read_text(encoding="utf-8").replace(
+                "openapi: 3.1.0", "openapi: 3.1.1"
+            )
+            path.write_text(text, encoding="utf-8")
+        else:
+            path.write_text(
+                path.read_text(encoding="utf-8") + "// external edit\n",
+                encoding="utf-8",
+            )
+        started = time.perf_counter()
+        packet = codemap.task_change_impact(str(task["query"]), [changed])
+        impact_ms = (time.perf_counter() - started) * 1000.0
+    return {
+        "id": task["id"],
+        "kind": task["kind"],
+        "packet": packet,
+        "packet_bytes": len(
+            json.dumps(packet, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ),
+        "impact_ms": impact_ms,
+    }, sync_ms
 
-    # SECRET is opened only after every packet is frozen.
-    secret = {
-        row["id"]: row
-        for row in json.loads(secret_path.read_text(encoding="utf-8"))["tasks"]
+
+def _score_task(row: dict, expected: dict) -> dict:
+    packet = row["packet"]
+    projects = sorted(str(value) for value in packet.get("projects", []))
+    project_fragment = (
+        packet.get("project_impact")
+        if isinstance(packet.get("project_impact"), dict)
+        else {}
+    )
+    provenance_rows = {
+        str(value.get("project")): value
+        for value in project_fragment.get("affected", [])
+        if isinstance(value, dict)
     }
-    scored: list[dict] = []
-    for row in frozen:
-        expected = secret[row["id"]]
-        packet = row["packet"]
-        projects = sorted(str(value) for value in packet.get("projects", []))
-        expected_projects = sorted(expected["projects"])
-        project_fragment = (
-            packet.get("project_impact")
-            if isinstance(packet.get("project_impact"), dict)
-            else {}
-        )
-        provenance_rows = {
-            str(value.get("project")): value
-            for value in project_fragment.get("affected", [])
-            if isinstance(value, dict)
-        }
-        edges = (
-            project_fragment.get("edges", [])
-            if isinstance(project_fragment, dict)
-            else []
-        )
-        provenance_correct = bool(edges) and all(
-            isinstance(edge, dict) and edge.get("producer") == "declared-project-links"
-            for edge in edges
-        )
-        for project, depth in expected["provenance"].items():
-            candidate = provenance_rows.get(project)
-            if candidate is None or int(candidate.get("depth", -1)) != int(depth):
-                provenance_correct = False
-                break
-        project_correct = projects == expected_projects
-        refresh_correct = True
-        if row["kind"] == "shared-input":
-            refresh = packet.get("project_refresh")
-            refresh_correct = (
-                isinstance(refresh, dict)
-                and refresh.get("producer") == "declared-project-links"
-            )
-        scored.append(
-            {
-                **{
-                    key: row[key] for key in ("id", "kind", "packet_bytes", "impact_ms")
-                },
-                "project_correct": project_correct,
-                "provenance_correct": provenance_correct,
-                "refresh_correct": refresh_correct,
-                "fully_correct": project_correct
-                and provenance_correct
-                and refresh_correct,
-            }
-        )
+    edges = project_fragment.get("edges", [])
+    provenance_correct = bool(edges) and all(
+        isinstance(edge, dict) and edge.get("producer") == "declared-project-links"
+        for edge in edges
+    )
+    for project, depth in expected["provenance"].items():
+        candidate = provenance_rows.get(project)
+        if candidate is None or int(candidate.get("depth", -1)) != int(depth):
+            provenance_correct = False
+            break
+    project_correct = projects == sorted(expected["projects"])
+    refresh = packet.get("project_refresh")
+    refresh_correct = row["kind"] != "shared-input" or (
+        isinstance(refresh, dict)
+        and refresh.get("producer") == "declared-project-links"
+    )
+    return {
+        **{key: row[key] for key in ("id", "kind", "packet_bytes", "impact_ms")},
+        "project_correct": project_correct,
+        "provenance_correct": provenance_correct,
+        "refresh_correct": refresh_correct,
+        "fully_correct": project_correct and provenance_correct and refresh_correct,
+    }
 
+
+def _summary(scored: list[dict], sync_ms: float) -> dict:
     tasks = len(scored)
-    summary = {
+    return {
         "tasks": tasks,
         "fully_correct": sum(int(row["fully_correct"]) for row in scored),
         "project_correct": sum(int(row["project_correct"]) for row in scored),
@@ -263,6 +238,23 @@ def run(base: Path, public_path: Path, secret_path: Path, output: Path) -> dict:
         "mean_impact_ms": sum(row["impact_ms"] for row in scored) / max(1, tasks),
         "sync_enrich_ms": sync_ms,
     }
+
+
+def run(base: Path, public_path: Path, secret_path: Path, output: Path) -> dict:
+    public = json.loads(public_path.read_text(encoding="utf-8"))["tasks"]
+    frozen: list[dict] = []
+    sync_ms = 0.0
+    for task in public:
+        frozen_row, task_sync_ms = _freeze_task(base, task)
+        frozen.append(frozen_row)
+        sync_ms += task_sync_ms
+
+    # SECRET is opened only after every packet is frozen.
+    secret = {
+        row["id"]: row
+        for row in json.loads(secret_path.read_text(encoding="utf-8"))["tasks"]
+    }
+    scored = [_score_task(row, secret[row["id"]]) for row in frozen]
     payload = {
         "schema": "hashmarks.cross-repository-impact-qualification.v1",
         "protocol": {
@@ -271,7 +263,7 @@ def run(base: Path, public_path: Path, secret_path: Path, output: Path) -> dict:
             "external_edit_simulated_before_impact": True,
             "execution_owner": "external",
         },
-        "summary": summary,
+        "summary": _summary(scored, sync_ms),
         "rows": scored,
     }
     output.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
