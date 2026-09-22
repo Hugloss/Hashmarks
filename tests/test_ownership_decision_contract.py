@@ -231,9 +231,7 @@ def test_invalid_bounded_presentation_counts_fail_closed() -> None:
         )
 
 
-def test_resolved_status_without_admissible_basis_does_not_claim_proof_complete() -> (
-    None
-):
+def test_resolved_canonical_selection_is_admissible_without_new_metadata_basis() -> None:
     trace = ownership_decision_trace(
         OwnershipDecisionState(
             edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},
@@ -246,10 +244,11 @@ def test_resolved_status_without_admissible_basis_does_not_claim_proof_complete(
     authority = ownership_authority_contract(trace)
 
     assert trace["status"] == "resolved"
-    assert trace["evidence_state"]["admissible"] is False
-    assert trace["evidence_state"]["proven"] is False
-    assert authority["owner_resolved"] is False
-    assert authority["proof_complete"] is False
+    assert trace["evidence_state"]["canonical_selection"] is True
+    assert trace["evidence_state"]["admissible"] is True
+    assert trace["evidence_state"]["proven"] is True
+    assert authority["owner_resolved"] is True
+    assert authority["proof_complete"] is True
 
 
 def test_structural_evidence_is_admissible_without_new_metadata_basis() -> None:
