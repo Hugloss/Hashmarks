@@ -96,6 +96,8 @@ Each anchor has a caller-controlled opaque `anchor_id` and at least one reposito
 
 Optional `metadata` is opaque JSON-compatible correlation material. Hashmarks does not interpret fields such as `commit`, `revision`, `version`, request IDs, timestamps, topic/partition values, or application correlation IDs unless a separate typed Hashmarks contract explicitly assigns semantics to them.
 
+Bundle and anchor container order is presentation-only. Canonical correlation packets sort bundles by `bundle_id` and anchors within each bundle by `anchor_id`; reordering the same evidence set must not change `correlation_identity`. Any producer ordering that is itself evidence must be represented explicitly in bounded metadata or provenance rather than inferred from list position.
+
 Two qualified identity claims are currently recognized:
 
 - `member_revision` — the exact lowercase SHA-256 member revision used by repository evidence;
