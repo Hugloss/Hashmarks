@@ -30,8 +30,12 @@ DEFAULT_CHALLENGES = (
     MutationChallenge("pagination", "invariant", _set("page", 2)),
     MutationChallenge("candidate-order", "invariant", _set("reverse_candidates", True)),
     MutationChallenge("compact-full", "invariant", _set("compact", True)),
-    MutationChallenge("irrelevant-file-addition", "invariant", _set("irrelevant_file", True)),
-    MutationChallenge("generation-mutation", "change", _set("owner_generation_mutation", True)),
+    MutationChallenge(
+        "irrelevant-file-addition", "invariant", _set("irrelevant_file", True)
+    ),
+    MutationChallenge(
+        "generation-mutation", "change", _set("owner_generation_mutation", True)
+    ),
 )
 
 
