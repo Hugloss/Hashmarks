@@ -40,7 +40,7 @@ def _ownership(start: dict[str, object]) -> dict[str, object]:
 def test_toml_key_range_replaces_symbol_less_next_read(tmp_path: Path) -> None:
     _repo(tmp_path, "policy.toml", "mode='active'\nfeature='ember'\n")
     start = _start(tmp_path, "Change ember policy config accepted response mode")
-    assert _ownership(start)["owner"]["path"] == "src/case/policy.toml"
+    assert _ownership(start)["candidate"]["path"] == "src/case/policy.toml"
     assert _ownership(start)["source_evidence"] == {
         "symbol": "mode",
         "lines": [1, 1],
