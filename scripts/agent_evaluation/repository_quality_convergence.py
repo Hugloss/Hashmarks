@@ -46,4 +46,9 @@ def require_surface_convergence(
     if unknown:
         raise ValueError(f"unsupported required convergence surfaces: {unknown}")
     missing = sorted(set(required) - observed)
-    return {**result, "required_surfaces": sorted(set(required)), "missing_surfaces": missing, "complete": result["converged"] and not missing}
+    return {
+        **result,
+        "required_surfaces": sorted(set(required)),
+        "missing_surfaces": missing,
+        "complete": result["converged"] and not missing,
+    }
