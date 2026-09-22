@@ -138,7 +138,9 @@ def validate_case(case: Mapping[str, Any]) -> QualityTruth:
     _choice(case.get("lifecycle"), CASE_LIFECYCLE, "lifecycle")
     _choice(case.get("evaluation_profile"), EVALUATION_PROFILES, "evaluation_profile")
     _choice(case.get("proof_mode"), PROOF_MODES, "proof_mode")
-    _choice(case.get("adjudication_state"), {"reviewed", "pending"}, "adjudication_state")
+    _choice(
+        case.get("adjudication_state"), {"reviewed", "pending"}, "adjudication_state"
+    )
     if case["benchmark_registry"] != BENCHMARK_REGISTRY:
         raise ValueError("case benchmark_registry does not match evaluator")
     if case["ground_truth_schema"] != GROUND_TRUTH_SCHEMA:
