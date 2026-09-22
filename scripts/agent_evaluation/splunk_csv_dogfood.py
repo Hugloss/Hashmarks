@@ -24,7 +24,7 @@ EXPECTED_HEADER = (
 _RECORD_START = re.compile(r'^"[^"]*","\d{4}-\d{2}-\d{2}T')
 _MODULE = re.compile(r"\bname=([A-Za-z_][A-Za-z0-9_.]*)")
 _TRACEBACK = re.compile(
-    r'File "([^"]+)", line (\d+), in ([A-Za-z_][A-Za-z0-9_]*)'
+    r'File\s+"?([^",]+)"?,\s+line\s+(\d+),\s+in\s+([A-Za-z_][A-Za-z0-9_]*)'
 )
 _MAX_SCOPE_VALUES = 32
 _DEFAULT_MAX_ANCHORS = 256
@@ -139,6 +139,10 @@ def _event_id(ordinal: int, text: str) -> str:
     return f"event:{ordinal:06d}:sha256:{digest}"
 
 
+def _physical_line_count(text: str) -> int:
+    return text.count("\n") + int(bool(text) and not text.endswith("\n"))
+
+
 def _stats_metadata(stats: _ModuleStats) -> dict[str, object]:
     return {
         "observed_count": stats.count,
@@ -203,7 +207,7 @@ def collect(
             raise ValueError("Splunk CSV header must be " + ",".join(EXPECTED_HEADER))
         for ordinal, text in _logical_records(handle):
             event_count += 1
-            physical_lines += text.count("\n")
+            physical_lines += _physical_line_count(text)
             parsed = _parse_record(text)
             if parsed is None:
                 malformed_count += 1
