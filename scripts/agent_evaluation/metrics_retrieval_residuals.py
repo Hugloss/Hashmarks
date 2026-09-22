@@ -27,6 +27,43 @@ SCHEMA = "hashmarks.retrieval-residual-classification.v1"
 FAMILY = "hashmarks-v0.10.45-residual-classification-a"
 
 
+def _task_report(cm, task, secret, *, limit: int) -> dict[str, object]:
+    hits = cm.find_task(task["query"], limit=limit)
+    paths = [hit.path for hit in hits]
+    expected = set(secret.get("expected_files") or ())
+    entry = cm.task_entry_points(task["query"], limit=limit)
+    recommended = [row for row in entry.get("recommended", []) if isinstance(row, dict)]
+    first = str(recommended[0].get("path") or "") if recommended else None
+    top1 = first in expected
+    top5 = bool(expected.intersection(paths[:5]))
+    top20 = expected.issubset(set(paths[:20]))
+    ambiguity = entry.get("ambiguity", {})
+    ambiguous = (
+        bool(ambiguity.get("ambiguous")) if isinstance(ambiguity, dict) else False
+    )
+    if not top20:
+        residual = "discovery-miss"
+    elif not top5:
+        residual = "deep-ranking-miss"
+    elif not top1 and ambiguous:
+        residual = "role-authority-ambiguity"
+    elif not top1:
+        residual = "shallow-ranking-miss"
+    else:
+        residual = "none"
+    return {
+        "id": task["id"],
+        "query": task["query"],
+        "expected_files": sorted(expected),
+        "first_edit_target": first,
+        "top1_correct": top1,
+        "expected_any_top5": top5,
+        "all_expected_top20": top20,
+        "ambiguous": ambiguous,
+        "residual_class": residual,
+    }
+
+
 def collect(root: Path, limit: int = 20) -> dict[str, object]:
     reports = []
     for name, ws, corpus, pub in materialize_challenge(root / "challenge"):
@@ -36,42 +73,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
         with CodeMap(ws) as cm:
             cm.sync()
             for task, secret in zip(public, hidden, strict=False):
-                hits = cm.find_task(task["query"], limit=limit)
-                paths = [h.path for h in hits]
-                expected = set(secret.get("expected_files") or ())
-                entry = cm.task_entry_points(task["query"], limit=limit)
-                rec = [r for r in entry.get("recommended", []) if isinstance(r, dict)]
-                first = str(rec[0].get("path") or "") if rec else None
-                top1 = first in expected
-                top5 = bool(expected.intersection(paths[:5]))
-                top20 = expected.issubset(set(paths[:20]))
-                amb = entry.get("ambiguity", {})
-                ambiguous = (
-                    bool(amb.get("ambiguous")) if isinstance(amb, dict) else False
-                )
-                if not top20:
-                    residual = "discovery-miss"
-                elif not top5:
-                    residual = "deep-ranking-miss"
-                elif not top1 and ambiguous:
-                    residual = "role-authority-ambiguity"
-                elif not top1:
-                    residual = "shallow-ranking-miss"
-                else:
-                    residual = "none"
-                rows.append(
-                    {
-                        "id": task["id"],
-                        "query": task["query"],
-                        "expected_files": sorted(expected),
-                        "first_edit_target": first,
-                        "top1_correct": top1,
-                        "expected_any_top5": top5,
-                        "all_expected_top20": top20,
-                        "ambiguous": ambiguous,
-                        "residual_class": residual,
-                    }
-                )
+                rows.append(_task_report(cm, task, secret, limit=limit))
         reports.append(
             {
                 "name": name,
