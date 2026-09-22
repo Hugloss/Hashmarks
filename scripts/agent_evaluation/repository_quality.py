@@ -399,7 +399,9 @@ def _economics_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 "max": max(values) if values else None,
             }
             for key in keys
-            for values in [[item[key] for item in observed if item.get(key) is not None]]
+            for values in [
+                [item[key] for item in observed if item.get(key) is not None]
+            ]
         },
     }
 
@@ -466,7 +468,9 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "slice_quality": {
             "macro_by_task_family": _group_quality(score_rows, "task_family"),
             "macro_by_risk_class": _group_quality(score_rows, "risk_class"),
-            "macro_by_evaluation_profile": _group_quality(score_rows, "evaluation_profile"),
+            "macro_by_evaluation_profile": _group_quality(
+                score_rows, "evaluation_profile"
+            ),
         },
         "selective_quality": {
             "resolved_cases": selective["resolved"],
