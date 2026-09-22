@@ -9,6 +9,9 @@ from typing import Any
 
 from scripts.agent_evaluation.repository_quality_diagnostics import (
     economics_summary,
+    environment_health,
+    evidence_retention,
+    metamorphic_health,
     group_quality,
     proof_mode_health,
     rank_metrics,
@@ -406,6 +409,18 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "score_bearing_cases": len(score_rows),
             "needs_adjudication": adjudication,
             "invalid_cases": invalid,
+            "diagnostic_needs_adjudication": sum(
+                row["ground_truth_status"]
+                in {"ambiguous-ground-truth", "insufficient-ground-truth"}
+                or row["adjudication_state"] != "reviewed"
+                for row in rows
+                if row not in score_rows
+            ),
+            "diagnostic_invalid_cases": sum(
+                row["ground_truth_status"] == "invalid-case"
+                for row in rows
+                if row not in score_rows
+            ),
             "critical_slices": slice_health,
             "proof_modes": proof_health,
         },
@@ -417,6 +432,9 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "verification": rank_metrics(score_rows, "verification"),
         },
         "stability_quality": stability_metrics(score_rows),
+        "evidence_retention": evidence_retention(score_rows),
+        "metamorphic_health": metamorphic_health(score_rows),
+        "environment_health": environment_health(score_rows),
         "economics": economics_summary(score_rows),
         "slice_quality": {
             "macro_by_task_family": group_quality(score_rows, "task_family"),
