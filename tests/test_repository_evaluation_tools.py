@@ -396,6 +396,14 @@ def test_profile_shards_merge_strict_identity_and_complete() -> None:
     bad["repository_identity"] = "sha256:other"
     with pytest.raises(ValueError, match="profile identity mismatch"):
         merge_profiles([shard(0, "a"), bad])
+    with pytest.raises(ValueError, match="no profiles"):
+        merge_profiles([])
+    with pytest.raises(ValueError, match="unsupported profile schema"):
+        merge_profiles([{**shard(0, "a"), "schema": "unknown"}])
+    with pytest.raises(ValueError, match="duplicate profile shard"):
+        merge_profiles([shard(0, "a"), shard(0, "b")])
+    with pytest.raises(ValueError, match="duplicate profile case"):
+        merge_profiles([shard(0, "same"), shard(1, "same")])
 
 
 def test_paired_profile_interleaves_semantics_and_fails_closed_on_noise(

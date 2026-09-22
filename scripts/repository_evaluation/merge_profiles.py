@@ -17,14 +17,8 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 
-def merge_profiles(profiles: list[Mapping[str, object]]) -> dict[str, Any]:
-    if not profiles:
-        raise ValueError("no profiles to merge")
-    first = profiles[0]
-    schema = first.get("schema")
-    if schema not in {PROFILE_SCHEMA, PAIRED_PROFILE_SCHEMA}:
-        raise ValueError("unsupported profile schema")
-    identity_fields = [
+def _identity_fields(schema: object) -> list[str]:
+    common = [
         "schema",
         "suite",
         "cases_sha256",
@@ -32,16 +26,37 @@ def merge_profiles(profiles: list[Mapping[str, object]]) -> dict[str, Any]:
         "warmups",
         "shard_count",
     ]
-    identity_fields += (
-        ["samples", "repository_identity"]
-        if schema == PROFILE_SCHEMA
-        else [
+    if schema == PROFILE_SCHEMA:
+        return [*common, "samples", "repository_identity"]
+    if schema == PAIRED_PROFILE_SCHEMA:
+        return [
+            *common,
             "pairs",
             "max_control_mad_pct",
             "repository_identity_a",
             "repository_identity_b",
         ]
-    )
+    raise ValueError("unsupported profile schema")
+
+
+def _merged_rows(profiles: list[Mapping[str, object]]) -> list[dict[str, object]]:
+    rows = []
+    seen = set()
+    for doc in sorted(profiles, key=lambda item: int(item.get("shard_index") or 0)):
+        for row in doc.get("cases", []):
+            case_id = str(row["id"])
+            if case_id in seen:
+                raise ValueError("duplicate profile case")
+            seen.add(case_id)
+            rows.append(dict(row))
+    return rows
+
+
+def merge_profiles(profiles: list[Mapping[str, object]]) -> dict[str, Any]:
+    if not profiles:
+        raise ValueError("no profiles to merge")
+    first = profiles[0]
+    identity_fields = _identity_fields(first.get("schema"))
     for doc in profiles[1:]:
         if any(doc.get(key) != first.get(key) for key in identity_fields):
             raise ValueError("profile identity mismatch")
@@ -51,15 +66,7 @@ def merge_profiles(profiles: list[Mapping[str, object]]) -> dict[str, Any]:
         raise ValueError("duplicate profile shard")
     if sorted(indices) != list(range(shard_count)):
         raise ValueError("incomplete profile shards")
-    rows = []
-    seen = set()
-    for doc in sorted(profiles, key=lambda d: int(d.get("shard_index") or 0)):
-        for row in doc.get("cases", []):
-            case_id = str(row["id"])
-            if case_id in seen:
-                raise ValueError("duplicate profile case")
-            seen.add(case_id)
-            rows.append(dict(row))
+    rows = _merged_rows(profiles)
     out = {key: first.get(key) for key in identity_fields}
     out.update(
         {
