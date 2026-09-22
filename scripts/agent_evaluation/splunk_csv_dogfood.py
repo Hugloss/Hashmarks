@@ -259,12 +259,8 @@ def collect(
     selected_tracebacks = ranked_tracebacks[:max_anchors]
     module_slots = max_anchors - len(selected_tracebacks)
     selected_modules = ranked_modules[:module_slots]
-    anchors = [
-        _traceback_anchor(key, stats) for key, stats in selected_tracebacks
-    ]
-    anchors.extend(
-        _module_anchor(module, stats) for module, stats in selected_modules
-    )
+    anchors = [_traceback_anchor(key, stats) for key, stats in selected_tracebacks]
+    anchors.extend(_module_anchor(module, stats) for module, stats in selected_modules)
     observed_anchors = len(ranked_tracebacks) + len(ranked_modules)
     anchors_truncated = observed_anchors > len(anchors)
     bundle = {
