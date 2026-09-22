@@ -511,6 +511,7 @@ metrics-context-economics-csv:
 splunk-csv-dogfood:
 	@test -n "$$SPLUNK_CSV" || (echo "SPLUNK_CSV is required: path to masked Splunk CSV export" >&2; exit 2)
 	@$(UV) run --offline --no-sync python -m scripts.agent_evaluation.splunk_csv_dogfood \
-	  --input "$$SPLUNK_CSV" \
-	  --output "$${OUTPUT:-.hashmarks/benchmarks/splunk-csv-dogfood.json}" \
-	  $${WORKSPACE:+--workspace "$$WORKSPACE"}
+	  --input "$SPLUNK_CSV" \
+	  --output "${OUTPUT:-.hashmarks/benchmarks/splunk-csv-dogfood.json}" \
+	  ${WORKSPACE:+--workspace "$WORKSPACE"} \
+	  ${PATH_MAPPING:+--path-mapping "$PATH_MAPPING"}
