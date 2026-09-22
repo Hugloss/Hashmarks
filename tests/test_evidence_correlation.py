@@ -1260,3 +1260,70 @@ def test_cross_bundle_correspondence_is_identity_bound_and_tamper_detected(
             match="correlation_identity does not match packet content",
         ):
             codemap.evidence_correlation_delta(packet, tampered)
+
+
+def test_external_evidence_correlation_cannot_create_edit_ownership(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text(
+        "def publish_result(value):\n    return value\n", encoding="utf-8"
+    )
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_owner.py").write_text(
+        "from owner import publish_result\n"
+        "def test_publish(): assert publish_result('x') == 'x'\n",
+        encoding="utf-8",
+    )
+    task = "Fix publish_result behavior"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.task_action_map(task)
+        correlated = codemap.correlate_evidence(
+            _bundle(
+                {
+                    "anchor_id": "runtime-frame",
+                    "path": "owner.py",
+                    "symbol": "publish_result",
+                    "metadata": {"runtime": "observed"},
+                }
+            ),
+            include_relationships=False,
+        )
+        after = codemap.task_action_map(task)
+
+    assert correlated["authority"] == "repository-intelligence-only"
+    assert correlated["interpretation_authority"] == "consumer-owned"
+    assert before["ownership_authority"] == after["ownership_authority"]
+
+
+def test_external_evidence_conflict_is_retained_without_mutating_owner(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text(
+        "def first():\n    return 1\n\ndef second():\n    return 2\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_owner.py").write_text(
+        "from owner import first\ndef test_first(): assert first() == 1\n",
+        encoding="utf-8",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.task_action_map("Fix first")
+        correlated = codemap.correlate_evidence(
+            _bundle(
+                {
+                    "anchor_id": "conflict",
+                    "path": "owner.py",
+                    "line": 1,
+                    "symbol": "second",
+                }
+            ),
+            include_relationships=False,
+        )
+        after = codemap.task_action_map("Fix first")
+
+    anchor = correlated["bundles"][0]["anchors"][0]
+    assert anchor["resolution"]["state"] == "claim-conflict"
+    assert before["ownership_authority"] == after["ownership_authority"]

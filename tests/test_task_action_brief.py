@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 
 
@@ -347,3 +349,31 @@ def test_task_action_brief_receipt_is_assembled_inside_decision_session(
         brief = codemap.task_action_brief("widget implementation test", token_budget=64)
 
     assert brief["status"] == "safe-fresh"
+
+
+@pytest.mark.parametrize("limit,per_role", [(3, 1), (8, 2), (20, 3)])
+def test_ambiguity_is_sticky_across_retrieval_presentation_bounds(
+    tmp_path: Path, limit: int, per_role: int
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    for name in ("left", "right"):
+        (tmp_path / "src" / f"{name}.py").write_text(
+            "def duplicate_owner(value):\n    return value\n", encoding="utf-8"
+        )
+    (tmp_path / "tests/test_duplicate.py").write_text(
+        "def test_duplicate(): assert True\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(
+            "Fix duplicate_owner", limit=limit, per_role=per_role
+        )
+
+    assert action["ownership_authority"]["owner_resolved"] is False
+    assert action["ownership_authority"]["resolved_owner"] is None
+    assert action["ownership_authority"]["candidate_owner"] in {
+        "src/left.py",
+        "src/right.py",
+    }
+    assert action["ambiguity"]["ambiguous"] is True
