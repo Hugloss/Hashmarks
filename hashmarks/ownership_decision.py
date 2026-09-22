@@ -177,6 +177,8 @@ def _stable_identity(schema: str, payload: Mapping[str, object]) -> str:
 
 
 def _proof_selected_identity(trace: Mapping[str, object]) -> dict[str, object] | None:
+    if str(trace.get("status") or "unresolved") != "resolved":
+        return None
     selected = trace.get("selected")
     if not isinstance(selected, Mapping):
         return None
@@ -187,20 +189,26 @@ def _proof_selected_identity(trace: Mapping[str, object]) -> dict[str, object] |
     }
 
 
+def _authority_proof_payload(trace: Mapping[str, object]) -> dict[str, object]:
+    status = str(trace.get("status") or "unresolved")
+    if status != "resolved":
+        return {"status": status}
+    return {
+        "status": status,
+        "selected": _proof_selected_identity(trace),
+        "structural_evidence": trace.get("structural_evidence"),
+        "authority_basis": trace.get("authority_basis"),
+        "proof_scope": trace.get("proof_scope"),
+        "proof_scope_complete": trace.get("proof_scope_complete"),
+        "evidence_state": trace.get("evidence_state"),
+    }
+
+
 def authority_proof_identity(trace: Mapping[str, object]) -> str:
     """Identify proof-bearing semantics without presentation/retrieval controls."""
     return _stable_identity(
         "hashmarks.ownership-authority-proof.v1",
-        {
-            "status": trace.get("status"),
-            "selected": _proof_selected_identity(trace),
-            "structural_evidence": trace.get("structural_evidence"),
-            "ambiguity": trace.get("ambiguity"),
-            "authority_basis": trace.get("authority_basis"),
-            "proof_scope": trace.get("proof_scope"),
-            "proof_scope_complete": trace.get("proof_scope_complete"),
-            "evidence_state": trace.get("evidence_state"),
-        },
+        _authority_proof_payload(trace),
     )
 
 
