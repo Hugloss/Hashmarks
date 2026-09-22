@@ -216,20 +216,10 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
     def _task_action_verification_edit_is_admitted(
         selection: _TaskActionSelectionState,
     ) -> bool:
-        return bool(
-            selection.structural_owner is not None
-            or selection.localized_config_edit
-            or selection.explicit_edit_surface_selected
-            or selection.owner_basis
-            in {
-                "literal-path",
-                "literal-reference-owner",
-                "qualified-symbol",
-                "unique-exact-symbol",
-                "exact-symbol",
-                "exact-import-owner",
-                "structural-owner",
-            }
+        return not (
+            len(selection.exact_identifier_paths) > 1
+            and selection.owner_basis is None
+            and selection.structural_owner is None
         )
 
     def _task_action_projection_choices(
