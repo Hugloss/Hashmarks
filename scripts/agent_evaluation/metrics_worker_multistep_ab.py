@@ -8,8 +8,9 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _SCRIPTS_DIR.parent.parent
@@ -34,6 +35,13 @@ from .metrics_worker_inspection_ab import (
 SCHEMA = "hashmarks.worker-multistep-ab.v1"
 PROTOCOL_SCHEMA = "hashmarks.worker-multistep-ab-protocol.v1"
 FAMILY = "hashmarks-v0.10.39-worker-multistep-a"
+
+
+class _EditDecision(TypedDict):
+    target: str | None
+    inspection_paths: list[str]
+    recovered: bool
+    reason: str | None
 
 
 def _identity(value: object) -> str:
@@ -98,6 +106,32 @@ def _read_cost(workspace: Path, paths: list[str]) -> dict[str, object]:
     }
 
 
+def _edit_decision(policy: str, state: Mapping[str, Any], query: str) -> _EditDecision:
+    if policy not in {"direct-sequence", "uncertainty-aware-sequence"}:
+        raise ValueError(f"unsupported policy: {policy}")
+    first = state["first_path"]
+    if policy == "direct-sequence" or not state["ambiguous"]:
+        return {
+            "target": first,
+            "inspection_paths": [],
+            "recovered": False,
+            "reason": None,
+        }
+    inspection_paths = [
+        str(row.get("path") or "")
+        for row in state["alternatives"]
+        if isinstance(row, dict)
+    ]
+    resolution = _resolve_after_inspection(query, list(state["alternatives"]))
+    target = str(resolution["target"]) if resolution["resolved"] else None
+    return {
+        "target": target,
+        "inspection_paths": inspection_paths,
+        "recovered": target is not None and target != first,
+        "reason": resolution["reason"],
+    }
+
+
 def run_worker(
     *, policy: str, workspace: Path, tasks_path: Path, output: Path, limit: int
 ) -> None:
@@ -113,36 +147,12 @@ def run_worker(
             task_id, query = str(row.get("id") or ""), str(row.get("query") or "")
             state = _entry_state(codemap, query, limit=limit)
             first = state["first_path"]
-            inspection_paths: list[str] = []
-            recovered = False
-            resolution_reason = None
-            if policy == "direct-sequence":
-                edit_target = first
-            elif policy == "uncertainty-aware-sequence":
-                if state["ambiguous"]:
-                    inspection_paths = [
-                        str(x.get("path") or "")
-                        for x in state["alternatives"]
-                        if isinstance(x, dict)
-                    ]
-                    resolution = _resolve_after_inspection(
-                        query, list(state["alternatives"])
-                    )
-                    resolution_reason = resolution["reason"]
-                    if resolution["resolved"]:
-                        edit_target = str(resolution["target"])
-                        recovered = edit_target != first
-                    else:
-                        edit_target = None
-                else:
-                    edit_target = first
-            else:
-                raise ValueError(f"unsupported policy: {policy}")
+            decision = _edit_decision(policy, state, query)
             verification = _verification_state(codemap, query, limit=limit)
             verification_target = verification["target"]
             read_paths = (
                 ([str(first)] if first else [])
-                + inspection_paths
+                + list(decision["inspection_paths"])
                 + ([str(verification_target)] if verification_target else [])
             )
             cost = _read_cost(workspace, read_paths)
@@ -152,10 +162,10 @@ def run_worker(
                     "query": query,
                     "first_hypothesis": first,
                     "ambiguous": bool(state["ambiguous"]),
-                    "inspection_paths": inspection_paths,
-                    "edit_target": edit_target,
-                    "recovered_from_first_hypothesis": recovered,
-                    "resolution_reason": resolution_reason,
+                    "inspection_paths": decision["inspection_paths"],
+                    "edit_target": decision["target"],
+                    "recovered_from_first_hypothesis": decision["recovered"],
+                    "resolution_reason": decision["reason"],
                     "verification_target": verification_target,
                     "verification_candidates_examined": verification[
                         "candidates_examined"
