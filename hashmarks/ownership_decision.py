@@ -32,14 +32,29 @@ def _candidate_identity(row: Mapping[str, object]) -> dict[str, object]:
     }
 
 
+_STRUCTURALLY_RESOLVABLE_AMBIGUITY_REASONS = frozenset(
+    {"competing-ranked-candidate", "competing-action-roles"}
+)
+
+
 def _decision_status(state: OwnershipDecisionState) -> str:
     if state.edit is None or not state.owner_eligible:
         return "unresolved"
+    positive_proof = bool(
+        state.authority_basis and state.proof_scope and state.proof_scope_complete
+    )
+    if not positive_proof:
+        return "ambiguous" if state.ambiguous else "unresolved"
     structural = state.structural_owner or {}
     selected = str(structural.get("selected") or "")
     edit_path = str(state.edit.get("path") or "")
-    if state.ambiguous and selected != edit_path:
-        return "ambiguous"
+    if state.ambiguous:
+        structurally_resolved = (
+            selected == edit_path
+            and state.ambiguity_reason in _STRUCTURALLY_RESOLVABLE_AMBIGUITY_REASONS
+        )
+        if not structurally_resolved:
+            return "ambiguous"
     return "resolved"
 
 
@@ -87,7 +102,7 @@ def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, boo
         and scoped_basis
         and state.proof_scope_complete
     )
-    admissible = canonical_selection or scoped_proof
+    admissible = scoped_proof
     proven = admissible and ambiguity_cleared
     return {
         "retrieved": retrieved,
@@ -192,7 +207,7 @@ def _proof_selected_identity(trace: Mapping[str, object]) -> dict[str, object] |
 def _authority_proof_payload(trace: Mapping[str, object]) -> dict[str, object]:
     status = str(trace.get("status") or "unresolved")
     if status != "resolved":
-        return {"status": status}
+        return {"status": "unresolved"}
     return {
         "status": status,
         "selected": _proof_selected_identity(trace),
