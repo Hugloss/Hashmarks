@@ -32,6 +32,20 @@ class _TaskFindFusion:
     selected: list[str]
 
 
+@dataclass(frozen=True, slots=True)
+class _ScoreSurface:
+    path: str
+    name: str
+    qualname: str
+    signature: str
+
+
+_FINAL_IDENTITY_WEIGHTS = (120.0, 100.0, 70.0, 55.0, 45.0)
+_FINAL_TOKEN_WEIGHTS = (30.0, 20.0, 12.0, 15.0, 8.0)
+_PRESCORE_IDENTITY_WEIGHTS = (120.0, 100.0, 70.0, 55.0, 45.0)
+_PRESCORE_TOKEN_WEIGHTS = (24.0, 16.0, 10.0, 12.0, 5.0)
+
+
 def _nonempty_str(value: object) -> str | None:
     text = str(value or "")
     return text or None
@@ -264,6 +278,57 @@ class TaskRetrievalMixin:
             enriched.append(value)
         return tuple(enriched)
 
+    @staticmethod
+    def _score_surface(row: dict) -> _ScoreSurface:
+        return _ScoreSurface(
+            path=str(row.get("path", "")).lower(),
+            name=str(row.get("name", "")).lower(),
+            qualname=str(row.get("qualname", "")).lower(),
+            signature=str(row.get("signature", "")).lower(),
+        )
+
+    @staticmethod
+    def _identity_score(
+        raw_query: str,
+        surface: _ScoreSurface,
+        weights: tuple[float, float, float, float, float],
+    ) -> float:
+        if not raw_query:
+            return 0.0
+        exact_qual, exact_name, qual_contains, path_contains, signature_contains = weights
+        return sum(
+            (
+                exact_qual if raw_query == surface.qualname else 0.0,
+                exact_name if raw_query == surface.name else 0.0,
+                qual_contains if raw_query in surface.qualname else 0.0,
+                path_contains if raw_query in surface.path else 0.0,
+                signature_contains if raw_query in surface.signature else 0.0,
+            )
+        )
+
+    @staticmethod
+    def _token_score(
+        tokens: Sequence[str],
+        surface: _ScoreSurface,
+        weights: tuple[float, float, float, float, float],
+    ) -> float:
+        exact_name, name_contains, path_contains, qual_contains, signature_contains = (
+            weights
+        )
+        return sum(
+            (
+                exact_name
+                if token == surface.name
+                else name_contains
+                if token in surface.name
+                else 0.0
+            )
+            + (path_contains if token in surface.path else 0.0)
+            + (qual_contains if token in surface.qualname else 0.0)
+            + (signature_contains if token in surface.signature else 0.0)
+            for token in tokens
+        )
+
     def _score(
         self,
         query: str,
@@ -278,33 +343,9 @@ class TaskRetrievalMixin:
             self = cast("CodeMap", self)
         raw = query.strip().lower() if raw_query is None else raw_query
         tokens = _query_terms(query) if tokens is None else tokens
-        path = str(row.get("path", "")).lower()
-        name = str(row.get("name", "")).lower()
-        qual = str(row.get("qualname", "")).lower()
-        sig = str(row.get("signature", "")).lower()
-        haystacks = (path, name, qual, sig)
-        score = 0.0
-        if raw and raw == qual:
-            score += 120
-        if raw and raw == name:
-            score += 100
-        if raw and raw in qual:
-            score += 70
-        if raw and raw in path:
-            score += 55
-        if raw and raw in sig:
-            score += 45
-        for token in tokens:
-            if token == name:
-                score += 30
-            elif token in name:
-                score += 20
-            if token in path:
-                score += 12
-            if token in qual:
-                score += 15
-            if token in sig:
-                score += 8
+        surface = self._score_surface(row)
+        score = self._identity_score(raw, surface, _FINAL_IDENTITY_WEIGHTS)
+        score += self._token_score(tokens, surface, _FINAL_TOKEN_WEIGHTS)
         if ranks is not None:
             score += 18.0 * float(ranks.get(str(row.get("path", "")), 0.0))
         if recent and str(row.get("path", "")) in recent:
@@ -332,34 +373,24 @@ class TaskRetrievalMixin:
         reranker/provider.  It preserves exact name/path/qualname matches and
         relation boosts so the bounded stage cannot become a random truncation.
         """
-        path = str(row.get("path", "")).lower()
-        name = str(row.get("name", "")).lower()
-        qual = str(row.get("qualname", "")).lower()
-        sig = str(row.get("signature", "")).lower()
-        score = float(row.get("_relation_boost", 0.0) or 0.0)
-        if raw_query:
-            if raw_query == qual:
-                score += 120.0
-            if raw_query == name:
-                score += 100.0
-            if raw_query in qual:
-                score += 70.0
-            if raw_query in path:
-                score += 55.0
-            if raw_query in sig:
-                score += 45.0
-        for token in tokens:
-            if token == name:
-                score += 24.0
-            elif token in name:
-                score += 16.0
-            if token in path:
-                score += 10.0
-            if token in qual:
-                score += 12.0
-            if token in sig:
-                score += 5.0
-        return score
+        surface = self._score_surface(row)
+        return (
+            float(row.get("_relation_boost", 0.0) or 0.0)
+            + self._identity_score(raw_query, surface, _PRESCORE_IDENTITY_WEIGHTS)
+            + self._token_score(tokens, surface, _PRESCORE_TOKEN_WEIGHTS)
+        )
+
+    @staticmethod
+    def _best_rerank_candidate_by_path(
+        scored: Sequence[tuple[tuple[float, str, str, int], dict]],
+    ) -> dict[str, tuple[tuple[float, str, str, int], dict]]:
+        best_by_path: dict[str, tuple[tuple[float, str, str, int], dict]] = {}
+        for item in scored:
+            path = str(item[1].get("path", ""))
+            current = best_by_path.get(path)
+            if current is None or item[0] < current[0]:
+                best_by_path[path] = item
+        return best_by_path
 
     def _bounded_rerank_rows(
         self,
@@ -397,12 +428,7 @@ class TaskRetrievalMixin:
         path_quota = min(64, max(16, rerank_limit // 4))
         selected: list[dict] = []
         selected_ids: set[int] = set()
-        best_by_path: dict[str, tuple[tuple[float, str, str, int], dict]] = {}
-        for item in scored:
-            path = str(item[1].get("path", ""))
-            current = best_by_path.get(path)
-            if current is None or item[0] < current[0]:
-                best_by_path[path] = item
+        best_by_path = self._best_rerank_candidate_by_path(scored)
         for _key, row in heapq.nsmallest(
             path_quota, best_by_path.values(), key=lambda item: item[0]
         ):
@@ -425,31 +451,22 @@ class TaskRetrievalMixin:
                 break
         return tuple(selected)
 
-    def _formulate_task_query_base(self, task: str, *, max_terms: int = 10) -> str:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        raw_tokens = _WORD_RE.findall(task)
-        words: list[str] = []
-        original: dict[str, str] = {}
-        for raw in raw_tokens:
-            low = raw.lower().strip("_-")
-            if len(low) < 2 or low in _TASK_STOPWORDS:
-                continue
-            if low not in words:
-                words.append(low)
-                original[low] = raw
-        total, frequencies = self._session_lexical_document_frequencies(words)
-
-        def score(term: str) -> tuple[float, int, str]:
-            df = frequencies.get(term, total)
-            rarity = math.log((max(1, total) + 1) / (df + 1)) + 1.0
-            raw = original.get(term, term)
-            bonus = 0.0
-            if any(ch.isupper() for ch in raw[1:]) or raw.isupper():
-                bonus += 2.5
-            if any(ch in raw for ch in "_-/"):
-                bonus += 1.5
-            if term in {
+    @staticmethod
+    def _task_query_term_score(
+        term: str,
+        total: int,
+        frequencies: Mapping[str, int],
+        original: Mapping[str, str],
+    ) -> tuple[float, int, str]:
+        df = frequencies.get(term, total)
+        rarity = math.log((max(1, total) + 1) / (df + 1)) + 1.0
+        raw = original.get(term, term)
+        bonus = 0.0
+        if any(ch.isupper() for ch in raw[1:]) or raw.isupper():
+            bonus += 2.5
+        if any(ch in raw for ch in "_-/"):
+            bonus += 1.5
+        if term in {
                 "api",
                 "goon",
                 "plan",
@@ -466,22 +483,52 @@ class TaskRetrievalMixin:
                 "identity",
                 "schedule",
                 "repository",
-            }:
-                bonus += 1.0
-            return rarity + bonus, len(term), term
+        }:
+            bonus += 1.0
+        return rarity + bonus, len(term), term
+
+    def _formulate_task_query_base(self, task: str, *, max_terms: int = 10) -> str:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        raw_tokens = _WORD_RE.findall(task)
+        words: list[str] = []
+        original: dict[str, str] = {}
+        for raw in raw_tokens:
+            low = raw.lower().strip("_-")
+            if len(low) < 2 or low in _TASK_STOPWORDS:
+                continue
+            if low not in words:
+                words.append(low)
+                original[low] = raw
+        total, frequencies = self._session_lexical_document_frequencies(words)
 
         ranked = sorted(
-            (term for term in words if term in frequencies), key=score, reverse=True
+            (term for term in words if term in frequencies),
+            key=lambda term: self._task_query_term_score(
+                term, total, frequencies, original
+            ),
+            reverse=True,
         )
         selected = ranked[:max_terms]
         return " ".join(selected) if selected else " ".join(words[:max_terms])
+
+    @staticmethod
+    def _bounded_query_terms(
+        base: str, additions: Sequence[str], *, limit: int
+    ) -> list[str]:
+        values = base.split()
+        for value in additions:
+            if value not in values:
+                values.append(value)
+            if len(values) >= limit:
+                break
+        return values
 
     def task_query_views(self, task: str) -> dict[str, str]:
         """Return deterministic candidate-visible retrieval views for one task."""
         base = self._formulate_task_query_base(task)
         raw_tokens = _WORD_RE.findall(task)
         visible_words = {value.lower() for value in raw_tokens}
-        expanded = base.split()
         additions: list[str] = []
         if visible_words & _TASK_GOVERNANCE_CUES:
             additions.extend(
@@ -497,21 +544,12 @@ class TaskRetrievalMixin:
         for cues, values in _TASK_SCOPE_EXPANSIONS:
             if visible_words & cues:
                 additions.extend(values)
-        for value in additions:
-            if value not in expanded:
-                expanded.append(value)
-            if len(expanded) >= 16:
-                break
-        evidence = base.split()
+        expanded = self._bounded_query_terms(base, additions, limit=16)
+        evidence_additions: list[str] = []
         for cues, values in _TASK_EVIDENCE_FAMILIES:
             if visible_words & cues:
-                for value in values:
-                    if value not in evidence:
-                        evidence.append(value)
-                    if len(evidence) >= 18:
-                        break
-            if len(evidence) >= 18:
-                break
+                evidence_additions.extend(values)
+        evidence = self._bounded_query_terms(base, evidence_additions, limit=18)
         return {
             "schema": "hashmarks.task-query-views.v2",
             "base": base,
@@ -530,6 +568,55 @@ class TaskRetrievalMixin:
             raise ValueError("max_terms must be >= 1")
         view = self.task_query_views(task)["governance"]
         return " ".join(view.split()[:max_terms])
+
+    @staticmethod
+    def _rare_symbol_by_path(
+        token: str, symbols: Sequence[dict[str, object]]
+    ) -> dict[str, dict[str, object]]:
+        selected: dict[str, dict[str, object]] = {}
+        for row in symbols:
+            text = " ".join(
+                str(row.get(key) or "").lower()
+                for key in ("path", "name", "qualname")
+            )
+            if token in text:
+                selected.setdefault(str(row.get("path") or ""), row)
+        return selected
+
+    @staticmethod
+    def _rare_task_anchor_hit(
+        path: str,
+        row: Mapping[str, object],
+        symbol: Mapping[str, object] | None,
+    ) -> SearchHit:
+        visibility_raw = str(
+            row.get("evidence_visibility") or EvidenceVisibility.SOURCE.value
+        )
+        try:
+            visibility = EvidenceVisibility(visibility_raw)
+        except ValueError:
+            visibility = EvidenceVisibility.SOURCE
+        return SearchHit(
+            path=path,
+            score=1000.0 if symbol is not None else 900.0,
+            kind=str(symbol.get("kind") or "symbol")
+            if symbol is not None
+            else "file",
+            name=_nonempty_str(symbol.get("name")) if symbol is not None else None,
+            qualname=_nonempty_str(symbol.get("qualname"))
+            if symbol is not None
+            else None,
+            signature=_nonempty_str(symbol.get("signature"))
+            if symbol is not None
+            else None,
+            start_line=_positive_int(symbol.get("start_line"))
+            if symbol is not None
+            else None,
+            end_line=_positive_int(symbol.get("end_line"))
+            if symbol is not None
+            else None,
+            evidence_visibility=visibility,
+        )
 
     def _rare_task_anchor_hits(
         self, token: str, *, limit: int
@@ -560,13 +647,7 @@ class TaskRetrievalMixin:
         symbols = self.store.symbols_for_paths(
             list(by_path), limit=max(64, min(512, len(by_path) * 16))
         )
-        symbol_by_path: dict[str, dict[str, object]] = {}
-        for row in symbols:
-            text = " ".join(
-                str(row.get(key) or "").lower() for key in ("path", "name", "qualname")
-            )
-            if normalized in text:
-                symbol_by_path.setdefault(str(row.get("path") or ""), row)
+        symbol_by_path = self._rare_symbol_by_path(normalized, symbols)
 
         def locality_order(path: str) -> tuple[int, int, str]:
             domains = set(classify_repository_path(path))
@@ -584,39 +665,8 @@ class TaskRetrievalMixin:
         output: list[SearchHit] = []
         for path in sorted(by_path, key=locality_order):
             row = by_path[path]
-            visibility_raw = str(
-                row.get("evidence_visibility") or EvidenceVisibility.SOURCE.value
-            )
-            try:
-                visibility = EvidenceVisibility(visibility_raw)
-            except ValueError:
-                visibility = EvidenceVisibility.SOURCE
             symbol = symbol_by_path.get(path)
-            output.append(
-                SearchHit(
-                    path=path,
-                    score=1000.0 if symbol is not None else 900.0,
-                    kind=str(symbol.get("kind") or "symbol")
-                    if symbol is not None
-                    else "file",
-                    name=str(symbol.get("name") or "") or None
-                    if symbol is not None
-                    else None,
-                    qualname=str(symbol.get("qualname") or "") or None
-                    if symbol is not None
-                    else None,
-                    signature=str(symbol.get("signature") or "") or None
-                    if symbol is not None
-                    else None,
-                    start_line=int(symbol.get("start_line") or 0) or None
-                    if symbol is not None
-                    else None,
-                    end_line=int(symbol.get("end_line") or 0) or None
-                    if symbol is not None
-                    else None,
-                    evidence_visibility=visibility,
-                )
-            )
+            output.append(self._rare_task_anchor_hit(path, row, symbol))
             if len(output) >= limit:
                 break
         return tuple(output)
