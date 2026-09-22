@@ -212,6 +212,26 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             return None
         return contract
 
+    @staticmethod
+    def _task_action_verification_edit_is_admitted(
+        selection: _TaskActionSelectionState,
+    ) -> bool:
+        return bool(
+            selection.structural_owner is not None
+            or selection.localized_config_edit
+            or selection.explicit_edit_surface_selected
+            or selection.owner_basis
+            in {
+                "literal-path",
+                "literal-reference-owner",
+                "qualified-symbol",
+                "unique-exact-symbol",
+                "exact-symbol",
+                "exact-import-owner",
+                "structural-owner",
+            }
+        )
+
     def _task_action_projection_choices(
         self,
         task: str,
@@ -223,13 +243,23 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             self = cast("CodeMap", self)
         edit = self._task_action_promoted_edit(context, selection)
         contract = self._task_action_local_contract(selection, edit)
-        verification_relevance = self._verification_relevance(
-            task,
-            edit=edit,
-            current_verify=selection.verify,
-            rows=context.rows,
-            limit=8,
-        )
+        if self._task_action_verification_edit_is_admitted(selection):
+            verification_relevance = self._verification_relevance(
+                task,
+                edit=edit,
+                current_verify=selection.verify,
+                rows=context.rows,
+                limit=8,
+            )
+        else:
+            current_verify_path = (
+                str(selection.verify.get("path") or "")
+                if isinstance(selection.verify, Mapping)
+                else ""
+            )
+            verification_relevance = self._verification_without_edit_owner(
+                current_verify_path
+            )
         verify = self._task_action_finalize_verification_selection(
             verification_relevance.get("selected"), context.rows, limit
         )
