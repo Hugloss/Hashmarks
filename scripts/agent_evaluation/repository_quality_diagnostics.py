@@ -4,9 +4,13 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from scripts.agent_evaluation.repository_quality import PROOF_MODES, _ratio
+PROOF_MODES = {"unit", "boundary", "lifecycle", "adversarial", "mutation"}
 
-def _group_quality(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any]:
+
+def _ratio(numerator: int, denominator: int) -> float | None:
+    return numerator / denominator if denominator else None
+
+def group_quality(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any]:
     grouped: dict[str, list[Mapping[str, Any]]] = {}
     for row in rows:
         grouped.setdefault(str(row[field]), []).append(row)
@@ -26,7 +30,7 @@ def _group_quality(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, A
     }
 
 
-def _proof_mode_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def proof_mode_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     counts = Counter(str(row["proof_mode"]) for row in rows)
     return {
         "counts": {name: counts[name] for name in sorted(PROOF_MODES)},
@@ -35,7 +39,7 @@ def _proof_mode_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _rank_metrics(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any]:
+def rank_metrics(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any]:
     ranks = [
         int(row[field]["rank"])
         for row in rows
@@ -51,7 +55,7 @@ def _rank_metrics(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, An
     }
 
 
-def _stability_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def stability_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     observed = [
         row["stability"]
         for row in rows
@@ -80,7 +84,7 @@ def _economics_metric(
     }
 
 
-def _economics_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def economics_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     observed = [
         row["economics"]
         for row in rows
