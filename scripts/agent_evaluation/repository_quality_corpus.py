@@ -41,10 +41,13 @@ def validate_manifest(manifest: Mapping[str, Any]) -> None:
         for field in ("task", "source_identity", "ground_truth_basis"):
             if not str(case.get(field) or "").strip():
                 raise ValueError(f"{case_id} {field} must be non-empty")
-        if case["layer"] != "L1-synthetic" and not str(
-            case.get("provenance_reference") or ""
-        ).strip():
-            raise ValueError(f"{case_id} real-world evidence requires provenance_reference")
+        if (
+            case["layer"] != "L1-synthetic"
+            and not str(case.get("provenance_reference") or "").strip()
+        ):
+            raise ValueError(
+                f"{case_id} real-world evidence requires provenance_reference"
+            )
 
 
 def corpus_manifest_identity(manifest: Mapping[str, Any]) -> str:
