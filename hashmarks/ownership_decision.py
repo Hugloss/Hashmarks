@@ -40,11 +40,6 @@ _STRUCTURALLY_RESOLVABLE_AMBIGUITY_REASONS = frozenset(
 def _decision_status(state: OwnershipDecisionState) -> str:
     if state.edit is None or not state.owner_eligible:
         return "unresolved"
-    positive_proof = bool(
-        state.authority_basis and state.proof_scope and state.proof_scope_complete
-    )
-    if not positive_proof:
-        return "ambiguous" if state.ambiguous else "unresolved"
     structural = state.structural_owner or {}
     selected = str(structural.get("selected") or "")
     edit_path = str(state.edit.get("path") or "")
@@ -206,7 +201,9 @@ def _proof_selected_identity(trace: Mapping[str, object]) -> dict[str, object] |
 
 def _authority_proof_payload(trace: Mapping[str, object]) -> dict[str, object]:
     status = str(trace.get("status") or "unresolved")
-    if status != "resolved":
+    evidence_state = trace.get("evidence_state")
+    proven = isinstance(evidence_state, Mapping) and bool(evidence_state.get("proven"))
+    if status != "resolved" or not proven:
         return {"status": "unresolved"}
     return {
         "status": status,
