@@ -104,6 +104,8 @@ evaluation-help:
 	  '  make metrics-worker-multistep-ab' \
 	  '  make metrics-worker-failed-verification-ab' \
 	  '  make metrics-agent-economics' \
+	  '  make metrics-context-economics-csv  Project Codex economics evidence to CSV' \
+	  '  make splunk-csv-dogfood  Stream masked Splunk CSV into bounded evidence' \
 	  '  make metrics-bm25-economics' \
 	  '  make metrics-agent-suite' \
 	  '  make metrics-agent-trace' \
@@ -497,3 +499,18 @@ codex-economics-matrix-plan:
 	  --variant cheap-selective:CHEAP_MODEL:low:selective-real \
 	  --variant strong-native:STRONG_MODEL:medium:native \
 	  --output .hashmarks/metrics/codex-economics-matrix-plan.json
+
+.PHONY: metrics-context-economics-csv splunk-csv-dogfood
+metrics-context-economics-csv:
+	@test -n "$$REPORT" || (echo "REPORT is required: path to codex-agent-economics JSON" >&2; exit 2)
+	@$(UV) run --offline --no-sync python -m scripts.agent_evaluation.context_economics_csv \
+	  --input "$$REPORT" \
+	  --raw-csv "$${RAW_CSV:-.hashmarks/benchmarks/context-economics-raw.csv}" \
+	  --summary-csv "$${SUMMARY_CSV:-.hashmarks/benchmarks/context-economics-summary.csv}"
+
+splunk-csv-dogfood:
+	@test -n "$$SPLUNK_CSV" || (echo "SPLUNK_CSV is required: path to masked Splunk CSV export" >&2; exit 2)
+	@$(UV) run --offline --no-sync python -m scripts.agent_evaluation.splunk_csv_dogfood \
+	  --input "$$SPLUNK_CSV" \
+	  --output "$${OUTPUT:-.hashmarks/benchmarks/splunk-csv-dogfood.json}" \
+	  $${WORKSPACE:+--workspace "$$WORKSPACE"}
