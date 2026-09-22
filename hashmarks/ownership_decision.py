@@ -82,10 +82,13 @@ def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, boo
     )
     canonical_selection = status == "resolved" and retrieved and owner_eligible
     scoped_basis = bool(state.proof_scope)
-    admissible = explicit_basis or structural_resolution
-    proven = (
-        admissible and ambiguity_cleared and scoped_basis and state.proof_scope_complete
+    scoped_proof = (
+        (explicit_basis or structural_resolution)
+        and scoped_basis
+        and state.proof_scope_complete
     )
+    admissible = canonical_selection or scoped_proof
+    proven = admissible and ambiguity_cleared
     return {
         "retrieved": retrieved,
         "inferred": inferred,
