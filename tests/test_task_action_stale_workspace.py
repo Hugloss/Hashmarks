@@ -87,16 +87,17 @@ def test_changed_projected_owner_reconciles_before_cached_authority_is_reused(
         after = codemap.task_action_map("fix calculate_total")
     assert before["edit"]["path"] == "src/foo.py"
     assert after["edit"]["path"] == "src/foo.py"
-    assert after["ownership_authority"] == {
-        "schema": "hashmarks.ownership-authority.v1",
-        "status": "resolved",
-        "owner_resolved": True,
-        "resolved_owner": "src/foo.py",
-        "candidate_owner": "src/foo.py",
-        "reason": "unique-owner-established",
-        "authority": "repository-ownership-only",
-        "consumer_action": "external",
-    }
+    authority = after["ownership_authority"]
+    assert authority["schema"] == "hashmarks.ownership-authority.v1"
+    assert authority["status"] == "resolved"
+    assert authority["owner_resolved"] is True
+    assert authority["resolved_owner"] == "src/foo.py"
+    assert authority["candidate_owner"] == "src/foo.py"
+    assert authority["reason"] == "unique-owner-established"
+    assert authority["authority"] == "repository-ownership-only"
+    assert authority["consumer_action"] == "external"
+    assert authority["proof_complete"] is True
+    assert authority["authority_proof_identity"].startswith("sha256:")
 
 
 def test_unsignaled_owner_rename_converges_to_cold_truth(tmp_path: Path) -> None:

@@ -1422,6 +1422,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         structural_owner: Mapping[str, object] | None,
         ambiguous: bool,
         ambiguity_reason: str,
+        owner_basis: str | None,
     ) -> dict[str, object]:
         explicit_target_basis = (
             str(edit.get("explicit_target_basis") or "")
@@ -1441,6 +1442,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                     else "explicit-target-not-ownership"
                 ),
                 owner_eligible=owner_eligible,
+                authority_basis=owner_basis,
             )
         )
         authority = ownership_authority_contract(trace)

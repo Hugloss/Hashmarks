@@ -4,6 +4,7 @@ from hashmarks.ownership_decision import (
     OwnershipDecisionState,
     ownership_authority_contract,
     ownership_decision_trace,
+    presentation_identity,
 )
 
 
@@ -121,7 +122,9 @@ def test_structural_owner_resolves_residual_candidate_ambiguity() -> None:
     assert authority["resolved_owner"] == "src/a.py"
 
 
-def test_unique_edit_candidate_resolves_without_structural_edge() -> None:
+def test_unique_retrieval_candidate_without_positive_authority_evidence_fails_closed() -> (
+    None
+):
     trace = ownership_decision_trace(
         OwnershipDecisionState(
             edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},
@@ -142,3 +145,45 @@ def test_unique_edit_candidate_resolves_without_structural_edge() -> None:
     assert trace["status"] == "resolved"
     assert authority["owner_resolved"] is True
     assert authority["resolved_owner"] == "src/owner.py"
+    assert authority["proof_complete"] is True
+
+
+def test_exact_symbol_basis_is_positive_authority_evidence() -> None:
+    trace = ownership_decision_trace(
+        OwnershipDecisionState(
+            edit={"path": "src/owner.py", "canonical_rank": 7, "roles": ["edit"]},
+            competing=[],
+            structural_owner=None,
+            ambiguous=False,
+            ambiguity_reason="resolved-by-role",
+            authority_basis="unique-exact-symbol",
+        )
+    )
+    authority = ownership_authority_contract(trace)
+
+    assert trace["status"] == "resolved"
+    assert trace["evidence_state"]["retrieved"] is True
+    assert trace["evidence_state"]["admissible"] is True
+    assert authority["owner_resolved"] is True
+    assert authority["proof_complete"] is True
+
+
+def test_presentation_bounds_do_not_change_authority_proof_identity() -> None:
+    trace = ownership_decision_trace(
+        OwnershipDecisionState(
+            edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},
+            competing=[],
+            structural_owner=None,
+            ambiguous=False,
+            ambiguity_reason="resolved-by-role",
+            authority_basis="literal-path",
+        )
+    )
+    authority = ownership_authority_contract(trace)
+    proof = authority["authority_proof_identity"]
+
+    compact = presentation_identity(proof, limit=1, per_role=1, compact=True)
+    full = presentation_identity(proof, limit=20, per_role=3, compact=False)
+
+    assert compact != full
+    assert ownership_authority_contract(trace)["authority_proof_identity"] == proof

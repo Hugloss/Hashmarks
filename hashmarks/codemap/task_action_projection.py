@@ -318,6 +318,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 final.structural_owner,
                 final.ambiguous,
                 final.ambiguity_reason,
+                selection.owner_basis,
             ),
             "verification_relevance": final.verification_relevance,
             "ambiguity": self._task_action_ambiguity_payload(

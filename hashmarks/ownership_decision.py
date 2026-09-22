@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
@@ -15,6 +17,7 @@ class OwnershipDecisionState:
     ambiguous: bool
     ambiguity_reason: str
     owner_eligible: bool = True
+    authority_basis: str | None = None
 
 
 def _candidate_identity(row: Mapping[str, object]) -> dict[str, object]:
@@ -28,7 +31,10 @@ def _candidate_identity(row: Mapping[str, object]) -> dict[str, object]:
 
 
 def _decision_status(state: OwnershipDecisionState) -> str:
-    if state.edit is None or not state.owner_eligible:
+    if (
+        state.edit is None
+        or not state.owner_eligible
+    ):
         return "unresolved"
     structural = state.structural_owner or {}
     selected = str(structural.get("selected") or "")
@@ -102,6 +108,14 @@ def ownership_decision_trace(
             "ambiguous": state.ambiguous,
             "reason": state.ambiguity_reason,
         },
+        "authority_basis": state.authority_basis,
+        "evidence_state": {
+            "retrieved": state.edit is not None,
+            "inferred": bool(state.edit and state.edit.get("structural_projection")),
+            "structural": state.structural_owner is not None,
+            "admissible": status == "resolved",
+            "proven": status == "resolved",
+        },
     }
 
 
@@ -118,6 +132,48 @@ def _trace_unresolved_reason(trace: Mapping[str, object]) -> str:
         return "ownership-unresolved"
     return str(ambiguity.get("reason") or "ownership-unresolved")
 
+def _stable_identity(schema: str, payload: Mapping[str, object]) -> str:
+    encoded = json.dumps(
+        {"schema": schema, "payload": payload},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def authority_proof_identity(trace: Mapping[str, object]) -> str:
+    """Identify proof-bearing semantics without presentation/retrieval controls."""
+    return _stable_identity(
+        "hashmarks.ownership-authority-proof.v1",
+        {
+            "status": trace.get("status"),
+            "selected": trace.get("selected"),
+            "structural_evidence": trace.get("structural_evidence"),
+            "ambiguity": trace.get("ambiguity"),
+            "authority_basis": trace.get("authority_basis"),
+            "evidence_state": trace.get("evidence_state"),
+        },
+    )
+
+
+def presentation_identity(
+    proof_identity: str,
+    *,
+    limit: int,
+    per_role: int,
+    compact: bool,
+) -> str:
+    """Identify bounded rendering separately from repository authority proof."""
+    return _stable_identity(
+        "hashmarks.ownership-presentation.v1",
+        {
+            "authority_proof_identity": proof_identity,
+            "limit": limit,
+            "per_role": per_role,
+            "compact": compact,
+        },
+    )
 
 def ownership_authority_contract(
     trace: Mapping[str, object],
@@ -126,6 +182,7 @@ def ownership_authority_contract(
     selected_path = _trace_selected_path(trace)
     safe = status == "resolved" and bool(selected_path)
     reason = "unique-owner-established" if safe else _trace_unresolved_reason(trace)
+    proof_identity = authority_proof_identity(trace)
     return {
         "schema": AUTHORITY_SCHEMA,
         "status": status,
@@ -135,6 +192,9 @@ def ownership_authority_contract(
         "reason": reason,
         "authority": "repository-ownership-only",
         "consumer_action": "external",
+        "proof_complete": safe,
+        "authority_proof_identity": proof_identity,
+        "evidence_state": trace.get("evidence_state"),
     }
 
 

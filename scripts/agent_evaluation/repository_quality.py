@@ -86,6 +86,9 @@ HARD_ZERO_METRICS = (
     "synthetic_command_overrides_proven_command",
     "conflicting_commands_incorrectly_resolved",
     "false_premise_accepted_as_authority",
+    "false_authority",
+    "false_safe_edit",
+    "unjustified_actionable_finding",
 )
 
 
@@ -353,23 +356,27 @@ def _qualification_identity(rows: Sequence[Mapping[str, Any]]) -> str:
     return _corpus_identity(rows)
 
 
-def _score_rows(rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+def _active_qualification_rows(
+    rows: Sequence[Mapping[str, Any]],
+) -> list[Mapping[str, Any]]:
     return [
         row
         for row in rows
+        if row["corpus_class"] == "qualification" and row["lifecycle"] == "active"
+    ]
+
+
+def _score_rows(rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    return [
+        row
+        for row in _active_qualification_rows(rows)
         if row["ground_truth_status"] == "valid"
-        and row["corpus_class"] == "qualification"
-        and row["lifecycle"] == "active"
         and row["adjudication_state"] == "reviewed"
     ]
 
 
 def _benchmark_counts(rows: Sequence[Mapping[str, Any]]) -> tuple[int, int]:
-    blocking = [
-        row
-        for row in rows
-        if row["corpus_class"] == "qualification" and row["lifecycle"] == "active"
-    ]
+    blocking = _active_qualification_rows(rows)
     adjudication = sum(
         row["ground_truth_status"]
         in {"ambiguous-ground-truth", "insufficient-ground-truth"}
@@ -381,7 +388,9 @@ def _benchmark_counts(rows: Sequence[Mapping[str, Any]]) -> tuple[int, int]:
 
 
 def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    active_rows = _active_qualification_rows(rows)
     score_rows = _score_rows(rows)
+    diagnostic_rows = [row for row in rows if row not in active_rows]
     adjudication, invalid = _benchmark_counts(rows)
     slice_health = _critical_slice_health(score_rows)
     if not rows or not score_rows or invalid or not slice_health["adequate"]:
@@ -416,13 +425,10 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 row["ground_truth_status"]
                 in {"ambiguous-ground-truth", "insufficient-ground-truth"}
                 or row["adjudication_state"] != "reviewed"
-                for row in rows
-                if row not in score_rows
+                for row in diagnostic_rows
             ),
             "diagnostic_invalid_cases": sum(
-                row["ground_truth_status"] == "invalid-case"
-                for row in rows
-                if row not in score_rows
+                row["ground_truth_status"] == "invalid-case" for row in diagnostic_rows
             ),
             "critical_slices": slice_health,
             "proof_modes": proof_health,
