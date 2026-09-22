@@ -796,6 +796,20 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         )
         return any(term.lower() in accepted for term in qualified_terms)
 
+    def _task_action_qualified_identifier_index_limit(
+        self,
+        terminal_names: Sequence[str],
+    ) -> int:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        total = 0
+        for name in terminal_names:
+            total += max(
+                1,
+                int(self.store.symbol_name_count(name) or 0),
+            )
+        return max(1, total)
+
     def _task_action_qualified_identifier_index_candidates(
         self,
         qualified_terms: Sequence[str],
@@ -823,7 +837,10 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         )
         if not terminal_names:
             return []
-        indexed = self._session_exact_symbol_candidates(terminal_names, limit=1024)
+        indexed = self._session_exact_symbol_candidates(
+            terminal_names,
+            limit=self._task_action_qualified_identifier_index_limit(terminal_names),
+        )
         candidates: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
         for symbol in indexed:
