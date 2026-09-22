@@ -1,6 +1,7 @@
 from scripts.agent_evaluation.experimentability import (
     EvidenceEconomics,
     ExperimentCapabilities,
+    ExperimentRepositoryState,
     classify_decision,
     decision_trace,
     experiment_environment,
@@ -48,9 +49,11 @@ def test_capabilities_bounded():
 def test_environment_identity():
     e = experiment_environment(
         hashmarks_version="0.11.3",
-        repository_identity="sha256:repo",
-        codemap_generation=7,
-        identity_generation=11,
+        repository_state=ExperimentRepositoryState(
+            repository_identity="sha256:repo",
+            codemap_generation=7,
+            identity_generation=11,
+        ),
         provider_revisions={"declared-project-links": "r3"},
         capabilities={"provenance_compression": True},
         seed=42,
@@ -93,9 +96,11 @@ def test_record_tamper_evident():
     p = packet()
     e = experiment_environment(
         hashmarks_version="0.11.3",
-        repository_identity="sha256:repo",
-        codemap_generation=7,
-        identity_generation=11,
+        repository_state=ExperimentRepositoryState(
+            repository_identity="sha256:repo",
+            codemap_generation=7,
+            identity_generation=11,
+        ),
         cache_state="warm",
     )
     eco = EvidenceEconomics().finish(evidence=p, elapsed_ns=1)

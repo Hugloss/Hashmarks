@@ -46,6 +46,13 @@ class ExperimentCapabilities:
         }
 
 
+@dataclass(frozen=True)
+class ExperimentRepositoryState:
+    repository_identity: str | None
+    codemap_generation: int | None
+    identity_generation: int | None
+
+
 def normalize_capabilities(
     capabilities: ExperimentCapabilities | Mapping[str, bool] | None,
 ) -> dict[str, Any]:
@@ -72,9 +79,7 @@ def normalize_capabilities(
 def experiment_environment(
     *,
     hashmarks_version: str,
-    repository_identity: str | None,
-    codemap_generation: int | None,
-    identity_generation: int | None,
+    repository_state: ExperimentRepositoryState,
     provider_revisions: Mapping[str, str] | None = None,
     capabilities: ExperimentCapabilities | Mapping[str, bool] | None = None,
     seed: int | None = None,
@@ -86,13 +91,15 @@ def experiment_environment(
         hashmarks_version, field="hashmarks_version"
     )
     repository_identity = require_nonblank_string(
-        repository_identity, field="repository_identity", optional=True
+        repository_state.repository_identity,
+        field="repository_identity",
+        optional=True,
     )
     codemap_generation = require_optional_portable_nonnegative_integer(
-        codemap_generation, field="codemap_generation"
+        repository_state.codemap_generation, field="codemap_generation"
     )
     identity_generation = require_optional_portable_nonnegative_integer(
-        identity_generation, field="identity_generation"
+        repository_state.identity_generation, field="identity_generation"
     )
     seed = require_optional_portable_nonnegative_integer(seed, field="seed")
     revisions = {}
