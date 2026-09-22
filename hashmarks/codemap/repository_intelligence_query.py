@@ -134,9 +134,7 @@ class RepositoryIntelligenceQueryMixin:
             }
             if surface == "delta":
                 if options.previous_snapshot is None:
-                    raise ValueError(
-                        "previous_snapshot is required for surface delta"
-                    )
+                    raise ValueError("previous_snapshot is required for surface delta")
                 result = self.repository_intelligence_delta(
                     task,
                     changed_paths,

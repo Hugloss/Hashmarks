@@ -689,4 +689,3 @@ class QuerySurfaceMixin:
             "evidence": value["evidence"] + "; plus bounded task graph adjacency",
             "authority": "advisory-navigation-only",
         }
-

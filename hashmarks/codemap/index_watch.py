@@ -34,9 +34,7 @@ class _IndexWatchSession:
             result = self.codemap.sync(
                 None if before.state is ObservationState.UNKNOWN else paths
             )
-            clean = self.tracker.mark_reconciled(
-                expected_generation=before.generation
-            )
+            clean = self.tracker.mark_reconciled(expected_generation=before.generation)
             self.publish("clean" if clean else "dirty")
             if self.on_update is not None:
                 self.on_update(result, paths)

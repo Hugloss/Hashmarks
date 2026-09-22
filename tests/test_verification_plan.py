@@ -80,8 +80,7 @@ def test_verification_plan_derives_typescript_project_argv(tmp_path: Path) -> No
 def test_verification_plan_derives_native_node_test_argv(tmp_path: Path) -> None:
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "widget.test.js").write_text(
-        "import test from 'node:test';\n"
-        "test('widget', () => {});\n",
+        "import test from 'node:test';\ntest('widget', () => {});\n",
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:

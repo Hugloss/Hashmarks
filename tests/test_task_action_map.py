@@ -276,6 +276,7 @@ def test_task_action_map_skips_structural_owner_after_exact_resolution(
     assert action["owner_basis"] in {"exact-symbol", "unique-exact-symbol"}
     assert calls == []
 
+
 def test_qualified_module_function_target_wins_over_lexically_stronger_sibling(
     tmp_path: Path,
 ) -> None:
@@ -294,10 +295,7 @@ def test_qualified_module_function_target_wins_over_lexically_stronger_sibling(
         encoding="utf-8",
     )
 
-    task = (
-        "Refactor repository_understanding_policy.evaluate "
-        "without changing behavior"
-    )
+    task = "Refactor repository_understanding_policy.evaluate without changing behavior"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)
@@ -314,15 +312,11 @@ def test_qualified_module_function_target_stays_ambiguous_across_duplicate_modul
     (tmp_path / "src/b").mkdir(parents=True)
     for package in ("a", "b"):
         (tmp_path / f"src/{package}/repository_understanding_policy.py").write_text(
-            "def evaluate(value):\n"
-            "    return value\n",
+            "def evaluate(value):\n    return value\n",
             encoding="utf-8",
         )
 
-    task = (
-        "Refactor repository_understanding_policy.evaluate "
-        "without changing behavior"
-    )
+    task = "Refactor repository_understanding_policy.evaluate without changing behavior"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)
@@ -337,8 +331,7 @@ def test_qualified_module_function_does_not_match_wrong_module(
 ) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src/policy.py").write_text(
-        "def evaluate(value):\n"
-        "    return value\n",
+        "def evaluate(value):\n    return value\n",
         encoding="utf-8",
     )
 
@@ -351,6 +344,7 @@ def test_qualified_module_function_does_not_match_wrong_module(
         )
 
     assert candidates == []
+
 
 def test_qualified_target_recovers_from_index_when_canonical_limit_excludes_source(
     tmp_path: Path,
@@ -365,8 +359,7 @@ def test_qualified_target_recovers_from_index_when_canonical_limit_excludes_sour
         encoding="utf-8",
     )
     (tmp_path / "src/test_batch_receipts.py").write_text(
-        "def receipt_identity() -> int:\n"
-        "    return 0\n",
+        "def receipt_identity() -> int:\n    return 0\n",
         encoding="utf-8",
     )
     (tmp_path / "tests/test_test_batches.py").write_text(
@@ -389,6 +382,7 @@ def test_qualified_target_recovers_from_index_when_canonical_limit_excludes_sour
     assert action["edit"]["exact_identifier_projection"] is True
     assert action["edit"]["qualified_identifier_index_projection"] is True
     assert action["ambiguity"]["ambiguous"] is False
+
 
 def test_structural_owner_projection_preserves_unique_qualified_symbol_evidence(
     tmp_path: Path,
@@ -426,18 +420,17 @@ def test_structural_owner_projection_preserves_unique_qualified_symbol_evidence(
     assert ownership["source_evidence"]["content"].startswith("def target(value):")
     assert "UnrelatedError" not in ownership["source_evidence"]["content"]
 
+
 def test_qualified_identifier_does_not_inherit_plain_same_name_ambiguity(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src/bootstrap.py").write_text(
-        "def _require_regular(path):\n"
-        "    return path\n",
+        "def _require_regular(path):\n    return path\n",
         encoding="utf-8",
     )
     (tmp_path / "src/qualification.py").write_text(
-        "def _require_regular(path):\n"
-        "    return path\n",
+        "def _require_regular(path):\n    return path\n",
         encoding="utf-8",
     )
 
@@ -451,4 +444,3 @@ def test_qualified_identifier_does_not_inherit_plain_same_name_ambiguity(
     assert action["edit"]["exact_identifier_projection"] is True
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
-

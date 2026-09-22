@@ -22,9 +22,7 @@ def _filesystem_python_inputs(root: Path) -> list[_PythonInput]:
     ]
 
 
-def _resource_python_inputs(
-    root: Traversable, prefix: str = ""
-) -> list[_PythonInput]:
+def _resource_python_inputs(root: Traversable, prefix: str = "") -> list[_PythonInput]:
     inputs: list[_PythonInput] = []
     for child in root.iterdir():
         if child.name == "__pycache__":

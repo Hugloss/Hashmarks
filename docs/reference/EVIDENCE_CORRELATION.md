@@ -77,9 +77,7 @@ with CodeMap(".") as codemap:
     codemap.sync()
     packet = codemap.correlate_evidence(
         bundles,
-        path_mappings=[
-            {"external_prefix": "/app", "repository_prefix": ""}
-        ],
+        path_mappings=[{"external_prefix": "/app", "repository_prefix": ""}],
     )
 ~~~
 

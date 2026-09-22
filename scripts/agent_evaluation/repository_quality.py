@@ -7,10 +7,22 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from scripts.agent_evaluation.repository_quality_diagnostics import (
+    economics_summary,
+    group_quality,
+    proof_mode_health,
+    rank_metrics,
+    stability_metrics,
+)
+
 SCHEMA = "hashmarks.repository-quality-case.v1"
 REPORT_SCHEMA = "hashmarks.repository-quality-report.v1"
 METRIC_POLICY = "hashmarks.lexicographic-quality.v1"
 BENCHMARK_REGISTRY = "hashmarks.repository-quality-registry.v1"
+GROUND_TRUTH_SCHEMA = "hashmarks.repository-quality-ground-truth.v1"
+QUALIFICATION_POLICY = "hashmarks.repository-quality-qualification.v1"
+EVALUATION_PROFILES = {"navigation.v1", "change-support.v1", "release-critical.v1"}
+PROOF_MODES = {"unit", "boundary", "lifecycle", "adversarial", "mutation"}
 
 GROUND_TRUTH_STATUS = {
     "valid",
@@ -100,12 +112,28 @@ def validate_case(case: Mapping[str, Any]) -> QualityTruth:
         "task_family",
         "risk_class",
         "label_basis",
+        "benchmark_registry",
+        "ground_truth_schema",
+        "metric_policy",
+        "qualification_policy",
+        "evaluation_profile",
+        "proof_mode",
     ):
         if not isinstance(case.get(field), str) or not str(case[field]).strip():
             raise ValueError(f"{field} must be a non-empty string")
     _choice(case.get("ground_truth_status"), GROUND_TRUTH_STATUS, "ground_truth_status")
     _choice(case.get("corpus_class"), CORPUS_CLASS, "corpus_class")
     _choice(case.get("lifecycle"), CASE_LIFECYCLE, "lifecycle")
+    _choice(case.get("evaluation_profile"), EVALUATION_PROFILES, "evaluation_profile")
+    _choice(case.get("proof_mode"), PROOF_MODES, "proof_mode")
+    if case["benchmark_registry"] != BENCHMARK_REGISTRY:
+        raise ValueError("case benchmark_registry does not match evaluator")
+    if case["ground_truth_schema"] != GROUND_TRUTH_SCHEMA:
+        raise ValueError("case ground_truth_schema does not match evaluator")
+    if case["metric_policy"] != METRIC_POLICY:
+        raise ValueError("case metric_policy does not match evaluator")
+    if case["qualification_policy"] != QUALIFICATION_POLICY:
+        raise ValueError("case qualification_policy does not match evaluator")
     semantic = _choice(case.get("semantic_truth"), SEMANTIC_TRUTH, "semantic_truth")
     evidence = _choice(
         case.get("admitted_evidence_truth"),
@@ -193,6 +221,14 @@ def evaluate_case(
         "ground_truth_status": case["ground_truth_status"],
         "corpus_class": case["corpus_class"],
         "lifecycle": case["lifecycle"],
+        "task_family": case["task_family"],
+        "risk_class": case["risk_class"],
+        "evaluation_profile": case["evaluation_profile"],
+        "proof_mode": case["proof_mode"],
+        "ranking": dict(observed.get("ranking") or {}),
+        "verification": dict(observed.get("verification") or {}),
+        "stability": dict(observed.get("stability") or {}),
+        "economics": dict(observed.get("economics") or {}),
         "semantic_truth": truth.semantic_truth,
         "admitted_evidence_truth": truth.admitted_evidence_truth,
         "reported_state": state,
@@ -292,20 +328,33 @@ def _critical_slice_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
-def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    score_rows = [
+def _qualification_identity(rows: Sequence[Mapping[str, Any]]) -> str:
+    return _corpus_identity(rows)
+
+
+def _score_rows(rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    return [
         row
         for row in rows
         if row["ground_truth_status"] == "valid"
         and row["corpus_class"] == "qualification"
         and row["lifecycle"] == "active"
     ]
+
+
+def _benchmark_counts(rows: Sequence[Mapping[str, Any]]) -> tuple[int, int]:
     adjudication = sum(
         row["ground_truth_status"]
         in {"ambiguous-ground-truth", "insufficient-ground-truth"}
         for row in rows
     )
     invalid = sum(row["ground_truth_status"] == "invalid-case" for row in rows)
+    return adjudication, invalid
+
+
+def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    score_rows = _score_rows(rows)
+    adjudication, invalid = _benchmark_counts(rows)
     slice_health = _critical_slice_health(score_rows)
     if not rows or not score_rows or invalid or not slice_health["adequate"]:
         qualification = "benchmark-not-ready"
@@ -321,9 +370,12 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     selective = _selective_counts(score_rows)
     confusion = _confusion_counts(score_rows)
     abstention = _abstention_quality(score_rows)
+    proof_health = proof_mode_health(score_rows)
     return {
         "schema": REPORT_SCHEMA,
         "metric_policy": METRIC_POLICY,
+        "ground_truth_schema": GROUND_TRUTH_SCHEMA,
+        "qualification_policy": QUALIFICATION_POLICY,
         "qualification": qualification
         or ("qualified" if sum(totals.values()) == 0 else "not-qualified"),
         "benchmark_health": {
@@ -333,10 +385,24 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "needs_adjudication": adjudication,
             "invalid_cases": invalid,
             "critical_slices": slice_health,
+            "proof_modes": proof_health,
         },
         "hard_zero": dict(totals),
         "state_confusion": dict(sorted(confusion.items())),
         "abstention_quality": abstention,
+        "ranking_quality": {
+            "owner": rank_metrics(score_rows, "ranking"),
+            "verification": rank_metrics(score_rows, "verification"),
+        },
+        "stability_quality": stability_metrics(score_rows),
+        "economics": economics_summary(score_rows),
+        "slice_quality": {
+            "macro_by_task_family": group_quality(score_rows, "task_family"),
+            "macro_by_risk_class": group_quality(score_rows, "risk_class"),
+            "macro_by_evaluation_profile": group_quality(
+                score_rows, "evaluation_profile"
+            ),
+        },
         "selective_quality": {
             "resolved_cases": selective["resolved"],
             "incorrect_resolved_cases": selective["incorrect"],
@@ -352,6 +418,7 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "corpus": {
             "cases": len(rows),
             "identity": _corpus_identity(rows),
+            "qualification_identity": _qualification_identity(score_rows),
             "semantic_slices": dict(sorted(semantic_counts.items())),
         },
         "lexicographic_order": [

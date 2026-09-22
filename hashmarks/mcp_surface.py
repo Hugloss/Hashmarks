@@ -67,24 +67,18 @@ def _previous_evidence(value: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
-def _bounded_json(
-    value: Any, *, name: str, maximum: int, expected_type: type
-) -> Any:
+def _bounded_json(value: Any, *, name: str, maximum: int, expected_type: type) -> Any:
     if not isinstance(value, expected_type):
         kind = "an object" if expected_type is dict else "a list"
         raise McpSurfaceError(f"{name} must be {kind}")
     try:
-        encoded = json.dumps(
-            value, separators=(",", ":"), ensure_ascii=False
-        ).encode("utf-8")
-    except (TypeError, ValueError) as exc:
-        raise McpSurfaceError(
-            f"{name} must contain JSON-compatible values"
-        ) from exc
-    if len(encoded) > maximum:
-        raise McpSurfaceError(
-            f"{name} exceeds {maximum} encoded bytes"
+        encoded = json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode(
+            "utf-8"
         )
+    except (TypeError, ValueError) as exc:
+        raise McpSurfaceError(f"{name} must contain JSON-compatible values") from exc
+    if len(encoded) > maximum:
+        raise McpSurfaceError(f"{name} exceeds {maximum} encoded bytes")
     return value
 
 

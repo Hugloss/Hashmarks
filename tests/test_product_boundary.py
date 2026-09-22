@@ -97,7 +97,9 @@ def test_evidence_authority_precedence_is_explicit_and_non_strengthening() -> No
     assert "There is no universal confidence score" in contributing
 
 
-def test_evidence_correlation_preserves_repository_truth_and_consumer_authority() -> None:
+def test_evidence_correlation_preserves_repository_truth_and_consumer_authority() -> (
+    None
+):
     boundary = _text("docs/reference/PRODUCT_BOUNDARY.md")
     invariants = _text("docs/reference/INVARIANTS.md")
     contract = _text("docs/reference/EVIDENCE_CORRELATION.md")

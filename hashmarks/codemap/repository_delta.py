@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
-
 @dataclass(frozen=True, slots=True)
 class RepositoryGenerationBinding:
     repository_identity: str
@@ -138,9 +137,7 @@ class RepositoryDeltaMixin:
             if row is not None
             else decision.evidence_visibility.value
         )
-        indexed_revision = (
-            str(row.get("file_digest") or "") if row is not None else ""
-        )
+        indexed_revision = str(row.get("file_digest") or "") if row is not None else ""
         return _RepositoryMemberSource(
             rel=rel,
             path=path,
@@ -224,9 +221,7 @@ class RepositoryDeltaMixin:
                 None,
             )
 
-        read = self._read_repository_member_source(
-            source, include_bytes=include_bytes
-        )
+        read = self._read_repository_member_source(source, include_bytes=include_bytes)
         if isinstance(read, dict):
             return read, None
         raw, digest = read.raw, read.digest

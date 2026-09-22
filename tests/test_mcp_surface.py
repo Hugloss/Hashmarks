@@ -95,9 +95,7 @@ def test_mcp_surface_correlates_external_evidence_without_interpreting_it(
                     ],
                 }
             ],
-            path_mappings=[
-                {"external_prefix": "/app", "repository_prefix": ""}
-            ],
+            path_mappings=[{"external_prefix": "/app", "repository_prefix": ""}],
             include_relationships=False,
         )
         anchor = packet["bundles"][0]["anchors"][0]
@@ -109,9 +107,7 @@ def test_mcp_surface_correlates_external_evidence_without_interpreting_it(
 
         with pytest.raises(McpSurfaceError, match="bundles must be a list"):
             surface.correlate_evidence({})  # type: ignore[arg-type]
-        with pytest.raises(
-            McpSurfaceError, match="relationship_limit_per_path"
-        ):
+        with pytest.raises(McpSurfaceError, match="relationship_limit_per_path"):
             surface.correlate_evidence([], relationship_limit_per_path=1001)
     finally:
         surface.close()
@@ -162,8 +158,7 @@ def test_mcp_correlation_round_trips_max_repeated_anchor_set(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "worker.py").write_text(
-        "def process_output_data(value: int) -> int:\n"
-        "    return value + 1\n",
+        "def process_output_data(value: int) -> int:\n    return value + 1\n",
         encoding="utf-8",
     )
     anchors = [

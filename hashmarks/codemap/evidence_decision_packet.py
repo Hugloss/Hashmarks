@@ -279,7 +279,11 @@ class DecisionPacketMixin:
                 "requested_tokens": token_budget,
                 "estimated_tokens": work_context["estimated_tokens"],
                 "safe": all(
-                    (bool(work_context["safe"]), bool(build.get("complete")), edit is not None)
+                    (
+                        bool(work_context["safe"]),
+                        bool(build.get("complete")),
+                        edit is not None,
+                    )
                 ),
                 "missing_roles": work_context["missing_roles"],
             },

@@ -109,6 +109,7 @@ def test_dead_verifier_reference_cannot_claim_edit_coverage(tmp_path: Path) -> N
     assert verifier["coverage_evidence"] is None
     assert graph["summary"]["unlinked_edit_candidates"] == 1
 
+
 def test_symbol_scoped_edit_does_not_link_sibling_verifier(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text(
         "[tool.pytest.ini_options]\ntestpaths=['tests']\n", encoding="utf-8"
@@ -157,6 +158,7 @@ def test_symbol_scoped_edit_does_not_link_sibling_verifier(tmp_path: Path) -> No
         assert sibling["covers_edit_candidates"] == []
         assert sibling["coverage_evidence"] is None
 
+
 def test_unique_direct_verifier_outranks_indirect_and_canonical_candidates(
     tmp_path: Path,
 ) -> None:
@@ -166,8 +168,7 @@ def test_unique_direct_verifier_outranks_indirect_and_canonical_candidates(
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "src/launch.py").write_text(
-        "def launch_manifest_foundation():\n"
-        "    return 'foundation'\n",
+        "def launch_manifest_foundation():\n    return 'foundation'\n",
         encoding="utf-8",
     )
     (tmp_path / "src/wrapper.py").write_text(
@@ -189,8 +190,7 @@ def test_unique_direct_verifier_outranks_indirect_and_canonical_candidates(
         encoding="utf-8",
     )
     (tmp_path / "tests/test_structural_contract.py").write_text(
-        "def test_structural_launch_contract():\n"
-        "    assert True\n",
+        "def test_structural_launch_contract():\n    assert True\n",
         encoding="utf-8",
     )
 
@@ -200,9 +200,7 @@ def test_unique_direct_verifier_outranks_indirect_and_canonical_candidates(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        relevance = codemap.verification_relevance(
-            task, limit=20, candidate_limit=16
-        )
+        relevance = codemap.verification_relevance(task, limit=20, candidate_limit=16)
 
     selected = relevance["selected"]
     assert selected["path"] == "tests/test_launch_foundation.py"
@@ -215,6 +213,7 @@ def test_unique_direct_verifier_outranks_indirect_and_canonical_candidates(
     by_path = {row["path"]: row for row in relevance["candidates"]}
     assert by_path["tests/test_wrapper.py"]["indirect_reference"] is True
 
+
 def test_module_alias_call_is_direct_verifier_for_exact_owner(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text(
         "[tool.pytest.ini_options]\ntestpaths=['tests']\n", encoding="utf-8"
@@ -223,13 +222,11 @@ def test_module_alias_call_is_direct_verifier_for_exact_owner(tmp_path: Path) ->
     (tmp_path / "tests").mkdir()
     (tmp_path / "src/__init__.py").write_text("", encoding="utf-8")
     (tmp_path / "src/policy.py").write_text(
-        "def evaluate(value):\n"
-        "    return value\n",
+        "def evaluate(value):\n    return value\n",
         encoding="utf-8",
     )
     (tmp_path / "src/other.py").write_text(
-        "def evaluate(value):\n"
-        "    return value\n",
+        "def evaluate(value):\n    return value\n",
         encoding="utf-8",
     )
     (tmp_path / "tests/test_policy.py").write_text(
@@ -259,7 +256,9 @@ def test_module_alias_call_is_direct_verifier_for_exact_owner(tmp_path: Path) ->
     assert by_path["tests/test_other.py"]["direct_reference"] is False
 
 
-def test_dead_module_alias_call_cannot_claim_direct_verification(tmp_path: Path) -> None:
+def test_dead_module_alias_call_cannot_claim_direct_verification(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "pyproject.toml").write_text(
         "[tool.pytest.ini_options]\ntestpaths=['tests']\n", encoding="utf-8"
     )
@@ -267,8 +266,7 @@ def test_dead_module_alias_call_cannot_claim_direct_verification(tmp_path: Path)
     (tmp_path / "tests").mkdir()
     (tmp_path / "src/__init__.py").write_text("", encoding="utf-8")
     (tmp_path / "src/policy.py").write_text(
-        "def evaluate(value):\n"
-        "    return value\n",
+        "def evaluate(value):\n    return value\n",
         encoding="utf-8",
     )
     (tmp_path / "tests/test_policy.py").write_text(
@@ -293,7 +291,10 @@ def test_dead_module_alias_call_cannot_claim_direct_verification(tmp_path: Path)
     )
     assert row["direct_reference"] is False
 
-def test_indirect_namespace_candidate_cannot_displace_reference_bound_canonical_verifier() -> None:
+
+def test_indirect_namespace_candidate_cannot_displace_reference_bound_canonical_verifier() -> (
+    None
+):
     canonical = {
         "path": "scripts/tests/test_hosted_dependency_capability.py",
         "direct_reference": False,
@@ -320,7 +321,9 @@ def test_indirect_namespace_candidate_cannot_displace_reference_bound_canonical_
     assert reason == "canonical-verification"
 
 
-def test_direct_or_unique_indirect_evidence_can_still_improve_weak_canonical_verifier() -> None:
+def test_direct_or_unique_indirect_evidence_can_still_improve_weak_canonical_verifier() -> (
+    None
+):
     indirect_canonical = {
         "path": "tests/test_canonical.py",
         "direct_reference": False,
@@ -364,6 +367,7 @@ def test_direct_or_unique_indirect_evidence_can_still_improve_weak_canonical_ver
     assert selected == indirect
     assert reason == "unique-bounded-indirect-reference-plus-namespace-locality"
 
+
 def test_module_alias_call_through_exact_reexport_binds_original_owner(
     tmp_path: Path,
 ) -> None:
@@ -374,8 +378,7 @@ def test_module_alias_call_through_exact_reexport_binds_original_owner(
     (tmp_path / "tests").mkdir()
     (tmp_path / "src/__init__.py").write_text("", encoding="utf-8")
     (tmp_path / "src/owner.py").write_text(
-        "def target(value):\n"
-        "    return value\n",
+        "def target(value):\n    return value\n",
         encoding="utf-8",
     )
     (tmp_path / "src/facade.py").write_text(
@@ -420,14 +423,11 @@ def test_module_alias_local_override_cannot_claim_reexported_owner(
     (tmp_path / "tests").mkdir()
     (tmp_path / "src/__init__.py").write_text("", encoding="utf-8")
     (tmp_path / "src/owner.py").write_text(
-        "def target(value):\n"
-        "    return value\n",
+        "def target(value):\n    return value\n",
         encoding="utf-8",
     )
     (tmp_path / "src/facade.py").write_text(
-        "from src.owner import target\n\n"
-        "def target(value):\n"
-        "    return 'facade'\n",
+        "from src.owner import target\n\ndef target(value):\n    return 'facade'\n",
         encoding="utf-8",
     )
     (tmp_path / "tests/test_facade.py").write_text(
@@ -450,6 +450,7 @@ def test_module_alias_local_override_cannot_claim_reexported_owner(
     )
     assert row["direct_reference"] is False
     assert relevance["qualified_identity_ambiguous"] is False
+
 
 def test_bounded_verification_candidates_always_retain_selected_verifier() -> None:
     candidates = [
@@ -491,4 +492,3 @@ def test_bounded_verification_candidates_always_retain_selected_verifier() -> No
         1,
     )
     assert single == [selected]
-

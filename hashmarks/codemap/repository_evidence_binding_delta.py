@@ -55,7 +55,9 @@ class RepositoryEvidenceBindingDeltaMixin:
         return [path] if scope == "member" else [path, start, end]
 
     @staticmethod
-    def _dependency_index(binding: Mapping[str, object]) -> dict[str, Mapping[str, object]]:
+    def _dependency_index(
+        binding: Mapping[str, object],
+    ) -> dict[str, Mapping[str, object]]:
         rows = binding.get("dependencies")
         if not isinstance(rows, list):
             return {}
@@ -79,8 +81,8 @@ class RepositoryEvidenceBindingDeltaMixin:
         for path in sorted(set(old) & set(new)):
             previous = old[path]
             current = new[path]
-            member_changed = (
-                previous.get("member_revision") != current.get("member_revision")
+            member_changed = previous.get("member_revision") != current.get(
+                "member_revision"
             )
             state_changed = previous.get("state") != current.get("state")
             if member_changed or state_changed:
@@ -132,9 +134,7 @@ class RepositoryEvidenceBindingDeltaMixin:
                 )
             ),
             "limit_per_path": (
-                bounds.get("limit_per_path")
-                if isinstance(bounds, Mapping)
-                else None
+                bounds.get("limit_per_path") if isinstance(bounds, Mapping) else None
             ),
             "completeness": str(value.get("completeness") or "unknown"),
         }
@@ -143,9 +143,7 @@ class RepositoryEvidenceBindingDeltaMixin:
     def _observer_identity(packet: Mapping[str, object]) -> str:
         observer = packet.get("observer")
         return (
-            str(observer.get("identity") or "")
-            if isinstance(observer, Mapping)
-            else ""
+            str(observer.get("identity") or "") if isinstance(observer, Mapping) else ""
         )
 
     @staticmethod
@@ -179,11 +177,7 @@ class RepositoryEvidenceBindingDeltaMixin:
                 if scope == "member"
                 else current.get("span_identity")
             )
-            if (
-                previous_direct
-                and current_direct
-                and previous_direct != current_direct
-            ):
+            if previous_direct and current_direct and previous_direct != current_direct:
                 direct_changes.append(
                     {
                         "scope": scope,
@@ -309,16 +303,24 @@ class RepositoryEvidenceBindingDeltaMixin:
             if isinstance(after_relationships, Mapping)
             else []
         )
-        old = {
-            str(row.get("identity")): row
-            for row in before_rows
-            if isinstance(row, Mapping) and row.get("identity")
-        } if isinstance(before_rows, list) else {}
-        new = {
-            str(row.get("identity")): row
-            for row in after_rows
-            if isinstance(row, Mapping) and row.get("identity")
-        } if isinstance(after_rows, list) else {}
+        old = (
+            {
+                str(row.get("identity")): row
+                for row in before_rows
+                if isinstance(row, Mapping) and row.get("identity")
+            }
+            if isinstance(before_rows, list)
+            else {}
+        )
+        new = (
+            {
+                str(row.get("identity")): row
+                for row in after_rows
+                if isinstance(row, Mapping) and row.get("identity")
+            }
+            if isinstance(after_rows, list)
+            else {}
+        )
 
         if (
             not observer_changed
@@ -368,9 +370,7 @@ class RepositoryEvidenceBindingDeltaMixin:
     ) -> dict[str, object]:
         old = cls._evidence_index(before)
         new = cls._evidence_index(after)
-        direct_changes, locator_changes = cls._direct_locator_evidence_changes(
-            old, new
-        )
+        direct_changes, locator_changes = cls._direct_locator_evidence_changes(old, new)
         member_changes = cls._member_evidence_changes(old, new)
         dependency_delta = cls._dependency_delta(before, after)
         dependency_observations = dependency_delta.get("observations")
@@ -384,9 +384,8 @@ class RepositoryEvidenceBindingDeltaMixin:
             after,
             observer_changed=observer_changed,
         )
-        definition_changed = (
-            before.get("binding_definition_identity")
-            != after.get("binding_definition_identity")
+        definition_changed = before.get("binding_definition_identity") != after.get(
+            "binding_definition_identity"
         )
         changed = bool(
             direct_changes
@@ -428,7 +427,9 @@ class RepositoryEvidenceBindingDeltaMixin:
             self = cast("CodeMap", self)
         for name, packet in (("before", before), ("after", after)):
             if packet.get("schema") != "hashmarks.repository-evidence-bindings.v1":
-                raise ValueError(f"{name} must be a repository evidence bindings packet")
+                raise ValueError(
+                    f"{name} must be a repository evidence bindings packet"
+                )
             if not packet.get("bindings_identity"):
                 raise ValueError(f"{name} must contain bindings_identity")
         before_repository = self._repository_identity(before)

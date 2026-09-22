@@ -51,9 +51,7 @@ def _union_line_count(rows: Sequence[Mapping[str, object]]) -> int:
             or len(lines) != 2
         ):
             continue
-        by_path.setdefault(str(row["path"]), []).append(
-            (int(lines[0]), int(lines[1]))
-        )
+        by_path.setdefault(str(row["path"]), []).append((int(lines[0]), int(lines[1])))
     total = 0
     for spans in by_path.values():
         current_start: int | None = None
@@ -73,7 +71,9 @@ def _union_line_count(rows: Sequence[Mapping[str, object]]) -> int:
     return total
 
 
-def _body_without_docstring(node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ast.stmt]:
+def _body_without_docstring(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> list[ast.stmt]:
     body = list(node.body)
     if (
         body
@@ -170,7 +170,9 @@ class StructuralLocalityMixin:
                 "structural locality requires an exact path::qualname target"
             )
         raw_path, qualname = target.split("::", 1)
-        path = normalize_relative_path(raw_path.strip().replace("\\", "/"), allow_root=False)
+        path = normalize_relative_path(
+            raw_path.strip().replace("\\", "/"), allow_root=False
+        )
         qualname = qualname.strip()
         if not qualname:
             raise ValueError("target path and qualname must be non-empty")
@@ -178,8 +180,13 @@ class StructuralLocalityMixin:
         row = self.store.symbol_at(path, qualname)
         if row is None:
             raise KeyError(f"symbol not found: {target}")
-        if EvidenceVisibility(str(row["evidence_visibility"])) is EvidenceVisibility.DENY:
-            raise PermissionError(f"symbol exists but repository evidence is denied: {target}")
+        if (
+            EvidenceVisibility(str(row["evidence_visibility"]))
+            is EvidenceVisibility.DENY
+        ):
+            raise PermissionError(
+                f"symbol exists but repository evidence is denied: {target}"
+            )
         return dict(row)
 
     def _visible_named_symbol_candidates(self, name: str) -> list[dict[str, object]]:
@@ -192,9 +199,7 @@ class StructuralLocalityMixin:
             is not EvidenceVisibility.DENY
         ]
 
-    def _python_function_locally_binds(
-        self, path: str, source: str, name: str
-    ) -> bool:
+    def _python_function_locally_binds(self, path: str, source: str, name: str) -> bool:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if not path.endswith(".py") or not source or not name:
@@ -240,13 +245,9 @@ class StructuralLocalityMixin:
         kind, targets = self._python_export_binding(source_path, short)
         if kind == "local":
             local = [
-                row
-                for row in candidates
-                if str(row.get("path") or "") == source_path
+                row for row in candidates if str(row.get("path") or "") == source_path
             ]
-            return _binding_result(
-                local, candidates, unresolved=len(local) > 1
-            )
+            return _binding_result(local, candidates, unresolved=len(local) > 1)
         if kind == "reexport" and len(targets) == 1:
             owners, unresolved = self._resolve_import_owner_evidence(
                 source_path, targets[0]
@@ -255,13 +256,9 @@ class StructuralLocalityMixin:
                 return None, candidate_ids, True
             owner_paths = set(owners)
             owned = [
-                row
-                for row in candidates
-                if str(row.get("path") or "") in owner_paths
+                row for row in candidates if str(row.get("path") or "") in owner_paths
             ]
-            return _binding_result(
-                owned, candidates, unresolved=bool(owners)
-            )
+            return _binding_result(owned, candidates, unresolved=bool(owners))
         if kind in {"ambiguous", "star"}:
             return None, candidate_ids, True
         return None, candidate_ids, False
@@ -585,9 +582,7 @@ class StructuralLocalityMixin:
         target_id = _symbol_id(row)
         raw_refs = [dict(ref) for ref in self.store.refs(name, limit=ref_limit)]
         reference_bound_complete = len(raw_refs) < ref_limit
-        raw = [
-            ref for ref in raw_refs if str(ref.get("kind") or "") == "call"
-        ]
+        raw = [ref for ref in raw_refs if str(ref.get("kind") or "") == "call"]
         callers: dict[tuple[str, str], dict[str, object]] = {}
         unresolved: list[dict[str, object]] = []
         for ref in raw:
@@ -645,8 +640,8 @@ class StructuralLocalityMixin:
                 start_line=int(row["start_line"]),
                 name=str(row["name"]),
             )
-        callers, caller_reference_bound_complete, unresolved_callers = self._locality_callers(
-            row, ref_limit=ref_limit
+        callers, caller_reference_bound_complete, unresolved_callers = (
+            self._locality_callers(row, ref_limit=ref_limit)
         )
         source_semantic = {
             "path": path,
@@ -713,7 +708,9 @@ class StructuralLocalityMixin:
                 if str(edge.get("kind") or "") == "call"
             ]
             for edge in outgoing[:call_limit_per_symbol]:
-                resolved, candidates, repository_unresolved = self._resolve_call_target(edge)
+                resolved, candidates, repository_unresolved = self._resolve_call_target(
+                    edge
+                )
                 record = _locality_edge_record(symbol_id, edge, resolved, candidates)
                 edges.append(record)
                 if resolved is not None:
@@ -816,7 +813,9 @@ class StructuralLocalityMixin:
             "refresh": refresh,
         }
         freshness_fields = self._query_freshness_fields()
-        freshness_state = "current" if refresh else _freshness(freshness_fields.get("stale"))
+        freshness_state = (
+            "current" if refresh else _freshness(freshness_fields.get("stale"))
+        )
         semantic = {
             "schema": STRUCTURAL_LOCALITY_SCHEMA,
             "provider": "hashmarks",
@@ -889,7 +888,9 @@ def _locality_edge_record(
 
 def _locality_node_sort_key(item: Mapping[str, object]) -> tuple[int, str, int, str]:
     lines = item["lines"]
-    assert isinstance(lines, Sequence) and not isinstance(lines, (str, bytes, bytearray))
+    assert isinstance(lines, Sequence) and not isinstance(
+        lines, (str, bytes, bytearray)
+    )
     return (
         int(item["navigation_depth"]),
         str(item["path"]),
@@ -908,19 +909,35 @@ def _packet_identity_valid(packet: Mapping[str, object]) -> bool:
     return identity == _identity(semantic)
 
 
-def _delta_incomparability_reasons(before: Mapping[str, object], after: Mapping[str, object]) -> list[str]:
+def _delta_incomparability_reasons(
+    before: Mapping[str, object], after: Mapping[str, object]
+) -> list[str]:
     checks = (
         ("before-schema", before.get("schema") == STRUCTURAL_LOCALITY_SCHEMA),
         ("after-schema", after.get("schema") == STRUCTURAL_LOCALITY_SCHEMA),
         ("before-provider", before.get("provider") == "hashmarks"),
         ("after-provider", after.get("provider") == "hashmarks"),
-        ("provider-version", before.get("provider_version") == after.get("provider_version")),
-        ("provider-implementation", before.get("provider_implementation_identity") == after.get("provider_implementation_identity")),
+        (
+            "provider-version",
+            before.get("provider_version") == after.get("provider_version"),
+        ),
+        (
+            "provider-implementation",
+            before.get("provider_implementation_identity")
+            == after.get("provider_implementation_identity"),
+        ),
         ("before-evidence-identity", _packet_identity_valid(before)),
         ("after-evidence-identity", _packet_identity_valid(after)),
         ("target", before.get("target") == after.get("target")),
-        ("measurement-configuration", before.get("measurement_configuration_identity") == after.get("measurement_configuration_identity")),
-        ("repository-state-not-distinct", before.get("repository_identity") != after.get("repository_identity")),
+        (
+            "measurement-configuration",
+            before.get("measurement_configuration_identity")
+            == after.get("measurement_configuration_identity"),
+        ),
+        (
+            "repository-state-not-distinct",
+            before.get("repository_identity") != after.get("repository_identity"),
+        ),
     )
     issues = [label for label, valid in checks if not valid]
     for label, packet in (("before", before), ("after", after)):
@@ -936,16 +953,27 @@ def _delta_nodes(packet: Mapping[str, object]) -> dict[str, Mapping[str, object]
     rows = packet.get("nodes", [])
     if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes, bytearray)):
         return {}
-    return {str(row.get("symbol_id")): row for row in rows if isinstance(row, Mapping) and row.get("symbol_id")}
+    return {
+        str(row.get("symbol_id")): row
+        for row in rows
+        if isinstance(row, Mapping) and row.get("symbol_id")
+    }
 
 
-def _integer_dimension_delta(before: object, after: object) -> tuple[dict[str, int], bool]:
+def _integer_dimension_delta(
+    before: object, after: object
+) -> tuple[dict[str, int], bool]:
     if not isinstance(before, Mapping) or not isinstance(after, Mapping):
         return {}, False
     delta: dict[str, int] = {}
     for key in sorted(set(before) & set(after)):
         left, right = before.get(key), after.get(key)
-        if isinstance(left, int) and not isinstance(left, bool) and isinstance(right, int) and not isinstance(right, bool):
+        if (
+            isinstance(left, int)
+            and not isinstance(left, bool)
+            and isinstance(right, int)
+            and not isinstance(right, bool)
+        ):
             delta[str(key)] = right - left
     return delta, True
 
@@ -957,11 +985,15 @@ def _string_set(packet: Mapping[str, object], key: str) -> set[str]:
     return {str(value) for value in values if value}
 
 
-def structural_locality_delta(before: Mapping[str, object], after: Mapping[str, object]) -> dict[str, object]:
+def structural_locality_delta(
+    before: Mapping[str, object], after: Mapping[str, object]
+) -> dict[str, object]:
     """Compare two structural-locality packets without interpreting the tradeoff."""
     issues = _delta_incomparability_reasons(before, after)
     before_nodes, after_nodes = _delta_nodes(before), _delta_nodes(after)
-    dimension_delta, dimensions_valid = _integer_dimension_delta(before.get("dimensions"), after.get("dimensions"))
+    dimension_delta, dimensions_valid = _integer_dimension_delta(
+        before.get("dimensions"), after.get("dimensions")
+    )
     if not dimensions_valid:
         issues.append("dimensions")
     before_verifiers = _string_set(before, "verification_paths")
@@ -973,7 +1005,9 @@ def structural_locality_delta(before: Mapping[str, object], after: Mapping[str, 
         "after_evidence_identity": after.get("evidence_identity"),
         "before_repository_identity": before.get("repository_identity"),
         "after_repository_identity": after.get("repository_identity"),
-        "measurement_configuration_identity": before.get("measurement_configuration_identity"),
+        "measurement_configuration_identity": before.get(
+            "measurement_configuration_identity"
+        ),
         "comparable": not issues,
         "incomparability_reasons": sorted(set(issues)),
         "introduced_symbol_ids": sorted(set(after_nodes) - set(before_nodes)),
@@ -981,6 +1015,10 @@ def structural_locality_delta(before: Mapping[str, object], after: Mapping[str, 
         "dimension_delta": dimension_delta,
         "verification_paths_added": sorted(after_verifiers - before_verifiers),
         "verification_paths_removed": sorted(before_verifiers - after_verifiers),
-        "claims": {"architectural_improvement": False, "refactor_recommendation": False, "consumer_policy_applied": False},
+        "claims": {
+            "architectural_improvement": False,
+            "refactor_recommendation": False,
+            "consumer_policy_applied": False,
+        },
     }
     return {**semantic, "evidence_identity": _identity(semantic)}

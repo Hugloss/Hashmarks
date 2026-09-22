@@ -207,8 +207,7 @@ def test_leading_dependency_context_does_not_steal_explicit_edit_owner(
         "def publish_result(value):\n    return value\n", encoding="utf-8"
     )
     (tmp_path / "src/authority.py").write_text(
-        "class AuthorityReceipt:\n"
-        "    canonical_identity = 'canonical'\n",
+        "class AuthorityReceipt:\n    canonical_identity = 'canonical'\n",
         encoding="utf-8",
     )
     (tmp_path / "tests/test_publish.py").write_text(

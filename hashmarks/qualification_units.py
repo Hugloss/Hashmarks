@@ -506,10 +506,9 @@ def _plan_count_membership_reasons(
     unit_count = len(units) if isinstance(units, list) else 0
     if type(plan.get("unit_count")) is not int or plan.get("unit_count") != unit_count:
         reasons.append("qualification-unit-count-mismatch")
-    if (
-        type(plan.get("test_node_count")) is not int
-        or plan.get("test_node_count") != len(nodeids)
-    ):
+    if type(plan.get("test_node_count")) is not int or plan.get(
+        "test_node_count"
+    ) != len(nodeids):
         reasons.append("qualification-test-node-count-mismatch")
     if nodeids:
         try:
@@ -869,9 +868,7 @@ def _handoff_unit_reasons(
         )
         if isinstance(unit, Mapping) and isinstance(unit.get("nodeids"), list):
             nodeids.extend(
-                str(nodeid)
-                for nodeid in unit["nodeids"]
-                if isinstance(nodeid, str)
+                str(nodeid) for nodeid in unit["nodeids"] if isinstance(nodeid, str)
             )
     try:
         membership = node_membership_identity(nodeids)

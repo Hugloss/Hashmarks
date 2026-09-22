@@ -69,6 +69,7 @@ def test_task_evidence_supplies_exact_owner_source_and_verification(
     assert "'length': 3" not in json.dumps(start, sort_keys=True)
     assert ownership["next_read"] is None
 
+
 def test_task_evidence_never_emits_partial_source_when_exact_range_exceeds_budget(
     tmp_path: Path,
 ) -> None:
@@ -85,6 +86,7 @@ def test_task_evidence_never_emits_partial_source_when_exact_range_exceeds_budge
         ownership["source_evidence"] is None
         or ownership["source_evidence"]["representation"] != "source-range"
     )
+
 
 def test_task_evidence_respects_outline_only_policy(tmp_path: Path) -> None:
     _semantic_repo(tmp_path)
@@ -218,10 +220,7 @@ def test_task_evidence_qualification_freezes_before_secret_join(tmp_path: Path) 
     assert payload["summary"]["verify_correct"] == 6
     assert payload["summary"]["stable_packets"] == 6
     assert payload["protocol"]["secret_join_after_two_frozen_passes"] is True
-    assert (
-        payload["summary"]["source_complete"]
-        == payload["summary"]["owner_resolved"]
-    )
+    assert payload["summary"]["source_complete"] == payload["summary"]["owner_resolved"]
     assert payload["summary"]["provenance_complete"] == 6
     assert payload["summary"]["revision_current"] == 6
     assert sum(payload["summary"]["freshness_states"].values()) == 6

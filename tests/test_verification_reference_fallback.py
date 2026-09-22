@@ -72,7 +72,9 @@ def test_exact_verification_import_requires_resolved_owner_path(tmp_path: Path) 
     assert available is True
 
 
-def test_verification_locality_replaces_unrelated_canonical_without_reference_proof() -> None:
+def test_verification_locality_replaces_unrelated_canonical_without_reference_proof() -> (
+    None
+):
     selected = {
         "path": "backend/tests/unit/repository_tooling/test_test_batch_receipts.py",
         "direct_reference": False,

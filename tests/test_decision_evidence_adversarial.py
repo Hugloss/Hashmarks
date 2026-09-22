@@ -58,9 +58,9 @@ def test_exact_owner_is_invariant_to_retrieval_saturation(tmp_path: Path) -> Non
             for limit in (1, 2, 5, 20)
         ]
 
-    assert {
-        _owner_path(packet) for packet in packets
-    } == {"backend/runtime/executor_pool.py"}
+    assert {_owner_path(packet) for packet in packets} == {
+        "backend/runtime/executor_pool.py"
+    }
     assert {str(_ownership(packet)["status"]) for packet in packets} == {"resolved"}
 
 
@@ -70,8 +70,7 @@ def test_weaker_docs_comments_and_tests_cannot_displace_exact_owner(
     _write(
         tmp_path,
         "src/publication.py",
-        "class PublicationAuthority:\n"
-        "    pass\n",
+        "class PublicationAuthority:\n    pass\n",
     )
     for index in range(16):
         _write(
@@ -263,9 +262,7 @@ def test_external_correlation_cannot_change_task_ownership_authority(
         before = codemap.task_evidence("change duplicate_owner")
         correlation = codemap.correlate_evidence(
             bundle,
-            path_mappings=[
-                {"external_prefix": "/app", "repository_prefix": ""}
-            ],
+            path_mappings=[{"external_prefix": "/app", "repository_prefix": ""}],
             include_relationships=False,
         )
         after = codemap.task_evidence("change duplicate_owner")

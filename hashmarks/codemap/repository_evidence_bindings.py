@@ -64,7 +64,9 @@ class RepositoryEvidenceBindingsMixin:
             start = int(raw["start_line"])
             end = int(raw["end_line"])
         except (KeyError, TypeError, ValueError) as exc:
-            raise ValueError("evidence span requires integer start_line/end_line") from exc
+            raise ValueError(
+                "evidence span requires integer start_line/end_line"
+            ) from exc
         if start < 1 or end < start:
             raise ValueError("evidence span requires 1 <= start_line <= end_line")
         return EvidenceSpan(path, start, end)
@@ -102,9 +104,7 @@ class RepositoryEvidenceBindingsMixin:
     def _observe_span(self, span: EvidenceSpan) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        member, raw = self._repository_member_observation(
-            span.path, include_bytes=True
-        )
+        member, raw = self._repository_member_observation(span.path, include_bytes=True)
         base: dict[str, object] = {
             "scope": "lines",
             "path": span.path,
@@ -194,9 +194,7 @@ class RepositoryEvidenceBindingsMixin:
                 if row.get("state") == "known-present" and row.get("path")
             }
         )
-        edges = self._session_edges_for_paths_many(
-            paths, limit_per_path=limit_per_path
-        )
+        edges = self._session_edges_for_paths_many(paths, limit_per_path=limit_per_path)
         relationships: list[dict[str, object]] = []
         for path in paths:
             for edge in edges.get(path, ()):
@@ -250,13 +248,10 @@ class RepositoryEvidenceBindingsMixin:
             raise ValueError("binding evidence must be a sequence")
         if len(value) > _MAX_EVIDENCE_PER_BINDING:
             raise ValueError(
-                "binding evidence exceeds "
-                f"{_MAX_EVIDENCE_PER_BINDING} entries"
+                f"binding evidence exceeds {_MAX_EVIDENCE_PER_BINDING} entries"
             )
         references = [
-            cls._binding_reference(raw)
-            for raw in value
-            if isinstance(raw, Mapping)
+            cls._binding_reference(raw) for raw in value if isinstance(raw, Mapping)
         ]
         if len(references) != len(value):
             raise ValueError("each evidence item must be an object")
@@ -284,8 +279,7 @@ class RepositoryEvidenceBindingsMixin:
         )
         if len(declared_dependencies) > _MAX_DEPENDENCIES_PER_BINDING:
             raise ValueError(
-                "binding dependencies exceeds "
-                f"{_MAX_DEPENDENCIES_PER_BINDING} entries"
+                f"binding dependencies exceeds {_MAX_DEPENDENCIES_PER_BINDING} entries"
             )
         request.unique_paths.update(ref.path for ref in references)
         request.unique_paths.update(declared_dependencies)
@@ -373,9 +367,7 @@ class RepositoryEvidenceBindingsMixin:
             for raw in bindings
             if isinstance(raw, Mapping)
         }
-        unknown_dependency_bindings = (
-            set(dependency_paths or {}) - declared_ids
-        )
+        unknown_dependency_bindings = set(dependency_paths or {}) - declared_ids
         if unknown_dependency_bindings:
             raise ValueError(
                 "dependency_paths contains unknown binding ids: "
@@ -401,8 +393,7 @@ class RepositoryEvidenceBindingsMixin:
                 raise ValueError("binding evidence must be a sequence")
             if len(raw_evidence) > _MAX_EVIDENCE_PER_BINDING:
                 raise ValueError(
-                    "binding evidence exceeds "
-                    f"{_MAX_EVIDENCE_PER_BINDING} entries"
+                    f"binding evidence exceeds {_MAX_EVIDENCE_PER_BINDING} entries"
                 )
             references = [
                 self._binding_reference(raw)
@@ -438,9 +429,7 @@ class RepositoryEvidenceBindingsMixin:
 
             definition_payload = {
                 "binding_id": binding_id,
-                "evidence": [
-                    self._reference_definition(ref) for ref in references
-                ],
+                "evidence": [self._reference_definition(ref) for ref in references],
                 "dependencies": declared_dependencies,
                 "include_relationships": include_relationships,
                 "relationship_limit_per_path": (
@@ -460,7 +449,10 @@ class RepositoryEvidenceBindingsMixin:
                         "state": "not-requested",
                         "scope_paths": [],
                         "relationships": [],
-                        "bounds": {"paths": 0, "limit_per_path": relationship_limit_per_path},
+                        "bounds": {
+                            "paths": 0,
+                            "limit_per_path": relationship_limit_per_path,
+                        },
                         "completeness": "not-observed",
                     }
                 ),

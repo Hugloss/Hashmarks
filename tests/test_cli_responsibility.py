@@ -26,7 +26,13 @@ def test_repository_cli_registers_structural_locality_commands() -> None:
     assert locality.ref_limit == 256
 
     delta = parser.parse_args(
-        ["structural-locality-delta", "--before", "before.json", "--after", "after.json"]
+        [
+            "structural-locality-delta",
+            "--before",
+            "before.json",
+            "--after",
+            "after.json",
+        ]
     )
     assert delta.before == "before.json"
     assert delta.after == "after.json"

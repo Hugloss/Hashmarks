@@ -110,10 +110,7 @@ def test_task_post_change_delta_reports_new_owner_without_replaying_unchanged_ve
             task, ["src/route.py"], previous_evidence=previous
         )
 
-    assert (
-        delta["replacement"]["ownership"]["candidate"]["path"]
-        == "src/engine_b.py"
-    )
+    assert delta["replacement"]["ownership"]["candidate"]["path"] == "src/engine_b.py"
     assert "task-candidate" in delta["invalidated"]
     assert "verification-surface" in delta["reused"]
     assert "verification-plan" in delta["reused"]
