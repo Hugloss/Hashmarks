@@ -13,6 +13,7 @@ from .task_action_types import (
     _TaskActionFinalState,
     _TaskActionInitialSurfaceState,
     _TaskActionMapContext,
+    _TaskActionOwnerResolutionRequest,
     _TaskActionProjectionChoices,
     _TaskActionSelectionState,
 )
@@ -113,23 +114,13 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         surface = self._task_action_initial_surface_selection(task, context, limit)
         discrimination = self._task_action_discrimination_state(task, context.rows)
         owner = self._task_action_resolve_owner(
-            task=task,
-            hits=context.hits,
-            rows=context.rows,
-            failed=context.failed,
-            edit=surface.edit,
-            verify=surface.verify,
-            discrimination=discrimination,
-            verification_anchor_tokens=surface.verification_anchor_tokens,
-            literal_reference_owner=cast(
-                "dict[str, object] | None", surface.literal_reference_owner
-            ),
-            localized_config_edit=surface.localized_config_edit,
-            explicit_config_surface_request=bool(
-                surface.explicit_config_surface_request
-            ),
-            explicit_edit_surface_selected=bool(surface.explicit_edit_surface_selected),
-            limit=limit,
+            _TaskActionOwnerResolutionRequest(
+                task=task,
+                context=context,
+                surface=surface,
+                discrimination=discrimination,
+                limit=limit,
+            )
         )
         return _TaskActionSelectionState(
             edit=owner.edit,
