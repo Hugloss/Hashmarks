@@ -59,7 +59,7 @@ def test_sufficient_unique_owner_resolves_without_authority_violation() -> None:
 
 def test_wrong_resolved_owner_is_non_compensatory_failure() -> None:
     row = evaluate_case(_case(), {"state": "resolved", "owner": "src/other.py::widget"})
-    report = summarize([row])
+    report = summarize([row, *_qualification_rows()[1:]])
     assert report["qualification"] == "not-qualified"
     assert report["hard_zero"]["false_owner"] == 1
     assert report["selective_quality"]["selective_owner_risk"] == 1
@@ -71,7 +71,7 @@ def test_insufficient_evidence_abstention_is_not_counted_as_missed_resolution() 
         {"state": "unresolved", "owner": None},
     )
     report = summarize([row])
-    assert report["qualification"] == "qualified"
+    assert report["qualification"] == "benchmark-not-ready"
     assert report["hard_zero"]["sufficient_unique_reported_unresolved"] == 0
     assert report["selective_quality"]["sufficient_unique_cases"] == 0
     assert report["selective_quality"]["resolvable_owner_coverage"] is None
@@ -86,7 +86,7 @@ def test_true_ambiguity_cannot_be_collapsed_to_unique_owner() -> None:
         ),
         {"state": "resolved", "owner": "src/widget.py::widget"},
     )
-    report = summarize([row])
+    report = summarize([*_qualification_rows()[:1], row, *_qualification_rows()[2:]])
     assert report["qualification"] == "not-qualified"
     assert report["hard_zero"]["true_ambiguity_collapsed"] == 1
     assert report["hard_zero"]["false_unique"] == 1
@@ -113,7 +113,7 @@ def test_projection_authority_leak_is_a_hard_veto() -> None:
             "candidate_promoted_during_projection": True,
         },
     )
-    report = summarize([row])
+    report = summarize([row, *_qualification_rows()[1:]])
     assert report["qualification"] == "not-qualified"
     assert report["hard_zero"]["candidate_promoted_during_projection"] == 1
 
@@ -222,10 +222,10 @@ def test_historical_and_canary_cases_are_evidence_but_not_score_bearing() -> Non
         _case(case_id="canary", corpus_class="canary"),
         {"state": "resolved", "owner": "src/other.py::widget"},
     )
-    report = summarize([active, historical, canary])
+    report = summarize([active, *_qualification_rows()[1:], historical, canary])
     assert report["qualification"] == "qualified"
-    assert report["benchmark_health"]["total_cases"] == 3
-    assert report["benchmark_health"]["score_bearing_cases"] == 1
+    assert report["benchmark_health"]["total_cases"] == 6
+    assert report["benchmark_health"]["score_bearing_cases"] == 4
     assert report["hard_zero"]["false_owner"] == 0
 
 
