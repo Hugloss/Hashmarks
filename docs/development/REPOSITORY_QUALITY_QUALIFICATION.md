@@ -41,6 +41,15 @@ the benchmark not ready. Ambiguous or insufficient ground truth requires
 `needs-adjudication` before the harness may report `qualified` or `not-qualified`.
 These are evaluator states, never edit or release permissions. Qualification also requires minimum active coverage of the critical semantic slices: unique owner, true ambiguity, non-edit, and explicit test edit. Missing a critical slice makes the benchmark not ready; zero observed violations in an unrepresentative corpus are not evidence of qualification.
 
+## State confusion and abstention
+
+The evaluator records one canonical semantic-truth × admitted-evidence × reported-state
+confusion table for score-bearing cases. Abstention quality is derived from that table
+and the same evaluated rows rather than from a second authority classifier. Reports
+include true-ambiguity precision/recall, justified and unjustified unresolved rates,
+and non-edit specificity. Hard-zero authority counters remain the non-compensatory
+gates; positive abstention metrics describe usefulness after those gates.
+
 ## Hard-zero authority metrics
 
 The canonical vocabulary is owned by

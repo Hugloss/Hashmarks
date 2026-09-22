@@ -256,3 +256,58 @@ def test_complete_critical_semantic_slices_allow_qualification() -> None:
     report = summarize(_qualification_rows())
     assert report["qualification"] == "qualified"
     assert report["benchmark_health"]["critical_slices"]["adequate"] is True
+
+
+def test_state_confusion_is_canonical_and_abstention_metrics_are_derived() -> None:
+    rows = _qualification_rows()
+    report = summarize(rows)
+    assert report["state_confusion"] == {
+        "explicit-test-edit|sufficient|explicit-test-target": 1,
+        "non-edit|sufficient|no-edit-authority": 1,
+        "true-ambiguity|sufficient|ambiguous": 1,
+        "unique-owner|sufficient|resolved": 1,
+    }
+    assert report["abstention_quality"]["true_ambiguity_precision"] == 1
+    assert report["abstention_quality"]["true_ambiguity_recall"] == 1
+    assert report["abstention_quality"]["non_edit_specificity"] == 1
+
+
+def test_unjustified_unresolved_is_visible_without_parallel_authority_logic() -> None:
+    unresolved = evaluate_case(
+        _case(case_id="unresolved"),
+        {"state": "unresolved", "owner": None},
+    )
+    report = summarize([unresolved, *_qualification_rows()[1:]])
+    assert report["qualification"] == "not-qualified"
+    assert report["hard_zero"]["sufficient_unique_reported_unresolved"] == 1
+    assert report["state_confusion"]["unique-owner|sufficient|unresolved"] == 1
+    assert report["abstention_quality"]["unjustified_unresolved_rate"] == 1
+    assert report["abstention_quality"]["justified_unresolved_rate"] == 0
+
+
+def test_insufficient_evidence_unresolved_is_justified_abstention() -> None:
+    unresolved = evaluate_case(
+        _case(
+            case_id="insufficient",
+            semantic_truth="insufficient-owner-evidence",
+            admitted_evidence_truth="insufficient",
+            expected_owner=None,
+        ),
+        {"state": "unresolved", "owner": None},
+    )
+    report = summarize([*_qualification_rows(), unresolved])
+    assert report["qualification"] == "qualified"
+    assert report["abstention_quality"]["justified_unresolved_rate"] == 1
+    assert report["abstention_quality"]["unjustified_unresolved_rate"] == 0
+
+
+def test_false_ambiguity_reduces_precision_and_remains_hard_failure() -> None:
+    false_ambiguous = evaluate_case(
+        _case(case_id="false-ambiguous"),
+        {"state": "ambiguous", "owner": None},
+    )
+    report = summarize([false_ambiguous, *_qualification_rows()[1:]])
+    assert report["qualification"] == "not-qualified"
+    assert report["hard_zero"]["sufficient_unique_reported_ambiguous"] == 1
+    assert report["abstention_quality"]["true_ambiguity_precision"] == 0.5
+    assert report["abstention_quality"]["true_ambiguity_recall"] == 1

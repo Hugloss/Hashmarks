@@ -198,6 +198,44 @@ def evaluate_case(
         "reported_state": state,
         "hard_zero": dict(counts),
         "correct_resolution": correct_resolution,
+        "confusion_key": f"{truth.semantic_truth}|{truth.admitted_evidence_truth}|{state}",
+    }
+
+
+def _confusion_counts(rows: Sequence[Mapping[str, Any]]) -> Counter[str]:
+    return Counter(str(row["confusion_key"]) for row in rows)
+
+
+def _abstention_quality(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    true_ambiguity = [
+        row for row in rows if row["semantic_truth"] in {"true-ambiguity", "multi-edit"}
+    ]
+    reported_ambiguous = [row for row in rows if row["reported_state"] == "ambiguous"]
+    correct_ambiguous = sum(
+        row["semantic_truth"] in {"true-ambiguity", "multi-edit"}
+        for row in reported_ambiguous
+    )
+    ambiguity_recalled = sum(
+        row["reported_state"] == "ambiguous" for row in true_ambiguity
+    )
+    unresolved = [row for row in rows if row["reported_state"] == "unresolved"]
+    justified_unresolved = sum(
+        row["admitted_evidence_truth"] != "sufficient"
+        or row["semantic_truth"] == "insufficient-owner-evidence"
+        for row in unresolved
+    )
+    non_edit = [row for row in rows if row["semantic_truth"] == "non-edit"]
+    correct_non_edit = sum(
+        row["reported_state"] == "no-edit-authority" for row in non_edit
+    )
+    return {
+        "true_ambiguity_precision": _ratio(correct_ambiguous, len(reported_ambiguous)),
+        "true_ambiguity_recall": _ratio(ambiguity_recalled, len(true_ambiguity)),
+        "justified_unresolved_rate": _ratio(justified_unresolved, len(unresolved)),
+        "unjustified_unresolved_rate": _ratio(
+            len(unresolved) - justified_unresolved, len(unresolved)
+        ),
+        "non_edit_specificity": _ratio(correct_non_edit, len(non_edit)),
     }
 
 
@@ -281,6 +319,8 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         semantic_counts[str(row["semantic_truth"])] += 1
         totals.update({name: int(count) for name, count in row["hard_zero"].items()})
     selective = _selective_counts(score_rows)
+    confusion = _confusion_counts(score_rows)
+    abstention = _abstention_quality(score_rows)
     return {
         "schema": REPORT_SCHEMA,
         "metric_policy": METRIC_POLICY,
@@ -295,6 +335,8 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "critical_slices": slice_health,
         },
         "hard_zero": dict(totals),
+        "state_confusion": dict(sorted(confusion.items())),
+        "abstention_quality": abstention,
         "selective_quality": {
             "resolved_cases": selective["resolved"],
             "incorrect_resolved_cases": selective["incorrect"],
