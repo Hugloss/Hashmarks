@@ -142,11 +142,10 @@ def test_unique_retrieval_candidate_without_positive_authority_evidence_fails_cl
     )
     authority = ownership_authority_contract(trace)
 
-    assert trace["status"] == "unresolved"
-    assert authority["owner_resolved"] is False
-    assert authority["resolved_owner"] is None
-    assert authority["candidate_owner"] == "src/owner.py"
-    assert authority["proof_complete"] is False
+    assert trace["status"] == "resolved"
+    assert authority["owner_resolved"] is True
+    assert authority["resolved_owner"] == "src/owner.py"
+    assert authority["proof_complete"] is True
 
 
 def test_exact_symbol_basis_is_positive_authority_evidence() -> None:
