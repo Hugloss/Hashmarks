@@ -16,6 +16,12 @@ def _case(**overrides):
         "repository_identity": "sha256:repo",
         "source_identity": "sha256:source",
         "ground_truth_basis": "reviewed repository evidence",
+        "ground_truth_status": "valid",
+        "corpus_class": "qualification",
+        "lifecycle": "active",
+        "task_family": "owner-selection",
+        "risk_class": "change-support",
+        "label_basis": "independently reviewed repository evidence",
         "semantic_truth": "unique-owner",
         "admitted_evidence_truth": "sufficient",
         "expected_owner": "src/widget.py::widget",
@@ -137,3 +143,71 @@ def test_corpus_identity_is_order_independent_but_membership_sensitive() -> None
     singleton = summarize([first])["corpus"]["identity"]
     assert forward == reverse
     assert forward != singleton
+
+
+def test_empty_corpus_cannot_qualify() -> None:
+    report = summarize([])
+    assert report["qualification"] == "benchmark-not-ready"
+    assert report["benchmark_health"]["score_bearing_cases"] == 0
+
+
+def test_shadow_only_corpus_cannot_qualify() -> None:
+    row = evaluate_case(
+        _case(corpus_class="shadow"),
+        {"state": "resolved", "owner": "src/widget.py::widget"},
+    )
+    report = summarize([row])
+    assert report["qualification"] == "benchmark-not-ready"
+    assert report["benchmark_health"]["score_bearing_cases"] == 0
+
+
+def test_uncertain_ground_truth_requires_adjudication_before_qualification() -> None:
+    valid = evaluate_case(
+        _case(case_id="valid"),
+        {"state": "resolved", "owner": "src/widget.py::widget"},
+    )
+    uncertain = evaluate_case(
+        _case(
+            case_id="uncertain",
+            ground_truth_status="insufficient-ground-truth",
+            corpus_class="shadow",
+        ),
+        {"state": "unresolved", "owner": None},
+    )
+    report = summarize([valid, uncertain])
+    assert report["qualification"] == "needs-adjudication"
+    assert report["benchmark_health"]["needs_adjudication"] == 1
+
+
+def test_invalid_case_blocks_benchmark_readiness() -> None:
+    valid = evaluate_case(
+        _case(case_id="valid"),
+        {"state": "resolved", "owner": "src/widget.py::widget"},
+    )
+    invalid = evaluate_case(
+        _case(case_id="invalid", ground_truth_status="invalid-case"),
+        {"state": "unresolved", "owner": None},
+    )
+    report = summarize([valid, invalid])
+    assert report["qualification"] == "benchmark-not-ready"
+    assert report["benchmark_health"]["invalid_cases"] == 1
+
+
+def test_historical_and_canary_cases_are_evidence_but_not_score_bearing() -> None:
+    active = evaluate_case(
+        _case(case_id="active"),
+        {"state": "resolved", "owner": "src/widget.py::widget"},
+    )
+    historical = evaluate_case(
+        _case(case_id="historical", lifecycle="historical"),
+        {"state": "resolved", "owner": "src/other.py::widget"},
+    )
+    canary = evaluate_case(
+        _case(case_id="canary", corpus_class="canary"),
+        {"state": "resolved", "owner": "src/other.py::widget"},
+    )
+    report = summarize([active, historical, canary])
+    assert report["qualification"] == "qualified"
+    assert report["benchmark_health"]["total_cases"] == 3
+    assert report["benchmark_health"]["score_bearing_cases"] == 1
+    assert report["hard_zero"]["false_owner"] == 0

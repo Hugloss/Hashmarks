@@ -10,6 +10,16 @@ from typing import Any
 SCHEMA = "hashmarks.repository-quality-case.v1"
 REPORT_SCHEMA = "hashmarks.repository-quality-report.v1"
 METRIC_POLICY = "hashmarks.lexicographic-quality.v1"
+BENCHMARK_REGISTRY = "hashmarks.repository-quality-registry.v1"
+
+GROUND_TRUTH_STATUS = {
+    "valid",
+    "ambiguous-ground-truth",
+    "invalid-case",
+    "insufficient-ground-truth",
+}
+CORPUS_CLASS = {"qualification", "shadow", "canary", "fresh-dogfood"}
+CASE_LIFECYCLE = {"active", "shadow", "historical", "superseded"}
 
 SEMANTIC_TRUTH = {
     "unique-owner",
@@ -81,9 +91,15 @@ def validate_case(case: Mapping[str, Any]) -> QualityTruth:
         "repository_identity",
         "source_identity",
         "ground_truth_basis",
+        "task_family",
+        "risk_class",
+        "label_basis",
     ):
         if not isinstance(case.get(field), str) or not str(case[field]).strip():
             raise ValueError(f"{field} must be a non-empty string")
+    _choice(case.get("ground_truth_status"), GROUND_TRUTH_STATUS, "ground_truth_status")
+    _choice(case.get("corpus_class"), CORPUS_CLASS, "corpus_class")
+    _choice(case.get("lifecycle"), CASE_LIFECYCLE, "lifecycle")
     semantic = _choice(case.get("semantic_truth"), SEMANTIC_TRUTH, "semantic_truth")
     evidence = _choice(
         case.get("admitted_evidence_truth"),
@@ -168,6 +184,9 @@ def evaluate_case(
     return {
         "case_id": case["case_id"],
         "case_identity": case_identity(case),
+        "ground_truth_status": case["ground_truth_status"],
+        "corpus_class": case["corpus_class"],
+        "lifecycle": case["lifecycle"],
         "semantic_truth": truth.semantic_truth,
         "admitted_evidence_truth": truth.admitted_evidence_truth,
         "reported_state": state,
@@ -215,18 +234,43 @@ def _corpus_identity(rows: Sequence[Mapping[str, Any]]) -> str:
 
 
 def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    score_rows = [
+        row
+        for row in rows
+        if row["ground_truth_status"] == "valid"
+        and row["corpus_class"] == "qualification"
+        and row["lifecycle"] == "active"
+    ]
+    adjudication = sum(
+        row["ground_truth_status"]
+        in {"ambiguous-ground-truth", "insufficient-ground-truth"}
+        for row in rows
+    )
+    invalid = sum(row["ground_truth_status"] == "invalid-case" for row in rows)
+    if not rows or not score_rows or invalid:
+        qualification = "benchmark-not-ready"
+    elif adjudication:
+        qualification = "needs-adjudication"
+    else:
+        qualification = None
     totals = _hard_zero_counts()
     semantic_counts: Counter[str] = Counter()
-    for row in rows:
+    for row in score_rows:
         semantic_counts[str(row["semantic_truth"])] += 1
         totals.update({name: int(count) for name, count in row["hard_zero"].items()})
-    selective = _selective_counts(rows)
+    selective = _selective_counts(score_rows)
     return {
         "schema": REPORT_SCHEMA,
         "metric_policy": METRIC_POLICY,
-        "qualification": (
-            "qualified" if sum(totals.values()) == 0 else "not-qualified"
-        ),
+        "qualification": qualification
+        or ("qualified" if sum(totals.values()) == 0 else "not-qualified"),
+        "benchmark_health": {
+            "registry": BENCHMARK_REGISTRY,
+            "total_cases": len(rows),
+            "score_bearing_cases": len(score_rows),
+            "needs_adjudication": adjudication,
+            "invalid_cases": invalid,
+        },
         "hard_zero": dict(totals),
         "selective_quality": {
             "resolved_cases": selective["resolved"],
