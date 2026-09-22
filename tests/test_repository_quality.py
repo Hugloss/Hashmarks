@@ -350,10 +350,16 @@ def test_qualification_identity_ignores_diagnostic_membership() -> None:
 
 def test_slice_quality_reports_task_risk_and_profile_without_global_score() -> None:
     report = summarize(_qualification_rows())
-    assert report["slice_quality"]["macro_by_task_family"]["owner-selection"]["cases"] == 4
-    assert report["slice_quality"]["macro_by_risk_class"]["change-support"]["cases"] == 4
     assert (
-        report["slice_quality"]["macro_by_evaluation_profile"]["change-support.v1"]["cases"]
+        report["slice_quality"]["macro_by_task_family"]["owner-selection"]["cases"] == 4
+    )
+    assert (
+        report["slice_quality"]["macro_by_risk_class"]["change-support"]["cases"] == 4
+    )
+    assert (
+        report["slice_quality"]["macro_by_evaluation_profile"]["change-support.v1"][
+            "cases"
+        ]
         == 4
     )
     assert "score" not in report
@@ -411,7 +417,9 @@ def test_stability_observations_report_rates_without_granting_authority() -> Non
     assert report["stability_quality"]["generation_authority_stable"] == 0
 
 
-def test_economics_missing_is_unknown_and_observed_values_are_bounded_diagnostics() -> None:
+def test_economics_missing_is_unknown_and_observed_values_are_bounded_diagnostics() -> (
+    None
+):
     baseline = summarize(_qualification_rows())
     assert baseline["economics"]["cases"] == 0
     assert baseline["economics"]["metrics"]["latency_ms"]["min"] is None
