@@ -7,6 +7,14 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from scripts.agent_evaluation.repository_quality_diagnostics import (
+    economics_summary,
+    group_quality,
+    proof_mode_health,
+    rank_metrics,
+    stability_metrics,
+)
+
 SCHEMA = "hashmarks.repository-quality-case.v1"
 REPORT_SCHEMA = "hashmarks.repository-quality-report.v1"
 METRIC_POLICY = "hashmarks.lexicographic-quality.v1"
@@ -362,7 +370,7 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     selective = _selective_counts(score_rows)
     confusion = _confusion_counts(score_rows)
     abstention = _abstention_quality(score_rows)
-    proof_health = _proof_mode_health(score_rows)
+    proof_health = proof_mode_health(score_rows)
     return {
         "schema": REPORT_SCHEMA,
         "metric_policy": METRIC_POLICY,
@@ -383,15 +391,15 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "state_confusion": dict(sorted(confusion.items())),
         "abstention_quality": abstention,
         "ranking_quality": {
-            "owner": _rank_metrics(score_rows, "ranking"),
-            "verification": _rank_metrics(score_rows, "verification"),
+            "owner": rank_metrics(score_rows, "ranking"),
+            "verification": rank_metrics(score_rows, "verification"),
         },
-        "stability_quality": _stability_metrics(score_rows),
-        "economics": _economics_summary(score_rows),
+        "stability_quality": stability_metrics(score_rows),
+        "economics": economics_summary(score_rows),
         "slice_quality": {
-            "macro_by_task_family": _group_quality(score_rows, "task_family"),
-            "macro_by_risk_class": _group_quality(score_rows, "risk_class"),
-            "macro_by_evaluation_profile": _group_quality(
+            "macro_by_task_family": group_quality(score_rows, "task_family"),
+            "macro_by_risk_class": group_quality(score_rows, "risk_class"),
+            "macro_by_evaluation_profile": group_quality(
                 score_rows, "evaluation_profile"
             ),
         },
