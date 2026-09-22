@@ -53,11 +53,12 @@ def test_dual_live_task_local_owners_require_discrimination(tmp_path: Path) -> N
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "multiple-task-local-structural-owners"
     assert len(action["ambiguity"]["task_local_structural_owners"]) == 2
+    assert action["ownership_authority"]["owner_resolved"] is False
     assert packet["discrimination"]["needed"] is True
     assert packet["discrimination"]["reason"] == "competing-action-roles"
 
 
-def test_multiple_task_local_tests_for_same_owner_remain_resolved(
+def test_multiple_task_local_tests_for_same_candidate_remain_unproven(
     tmp_path: Path,
 ) -> None:
     _base(tmp_path)
@@ -80,8 +81,11 @@ def test_multiple_task_local_tests_for_same_owner_remain_resolved(
         action = codemap.task_action_map("Fix quartz_single transform behavior")
         packet = codemap.task_decision_packet("Fix quartz_single transform behavior")
 
-    assert action["ambiguity"]["ambiguous"] is False
+    assert action["ambiguity"]["ambiguous"] is True
+    assert action["ambiguity"]["reason"] == "unproven-structural-owner"
     assert action["ambiguity"]["task_local_structural_owners"] == [
         "src/feature/engine.py"
     ]
-    assert packet["discrimination"]["needed"] is False
+    assert action["ownership_authority"]["owner_resolved"] is False
+    assert action["ownership_authority"]["candidate_owner"] == "src/feature/engine.py"
+    assert packet["discrimination"]["needed"] is True
