@@ -176,13 +176,24 @@ def _stable_identity(schema: str, payload: Mapping[str, object]) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
+def _proof_selected_identity(trace: Mapping[str, object]) -> dict[str, object] | None:
+    selected = trace.get("selected")
+    if not isinstance(selected, Mapping):
+        return None
+    return {
+        "path": str(selected.get("path") or ""),
+        "name": selected.get("name"),
+        "qualname": selected.get("qualname"),
+    }
+
+
 def authority_proof_identity(trace: Mapping[str, object]) -> str:
     """Identify proof-bearing semantics without presentation/retrieval controls."""
     return _stable_identity(
         "hashmarks.ownership-authority-proof.v1",
         {
             "status": trace.get("status"),
-            "selected": trace.get("selected"),
+            "selected": _proof_selected_identity(trace),
             "structural_evidence": trace.get("structural_evidence"),
             "ambiguity": trace.get("ambiguity"),
             "authority_basis": trace.get("authority_basis"),
