@@ -31,10 +31,7 @@ def _candidate_identity(row: Mapping[str, object]) -> dict[str, object]:
 
 
 def _decision_status(state: OwnershipDecisionState) -> str:
-    if (
-        state.edit is None
-        or not state.owner_eligible
-    ):
+    if state.edit is None or not state.owner_eligible:
         return "unresolved"
     structural = state.structural_owner or {}
     selected = str(structural.get("selected") or "")
@@ -132,6 +129,7 @@ def _trace_unresolved_reason(trace: Mapping[str, object]) -> str:
         return "ownership-unresolved"
     return str(ambiguity.get("reason") or "ownership-unresolved")
 
+
 def _stable_identity(schema: str, payload: Mapping[str, object]) -> str:
     encoded = json.dumps(
         {"schema": schema, "payload": payload},
@@ -174,6 +172,40 @@ def presentation_identity(
             "compact": compact,
         },
     )
+
+
+def bounded_presentation_contract(
+    proof_identity: str,
+    *,
+    total_candidates: int,
+    returned_candidates: int,
+    limit: int,
+    per_role: int,
+    compact: bool,
+) -> dict[str, object]:
+    """Describe bounded output without changing the underlying authority proof."""
+    if min(total_candidates, returned_candidates, limit, per_role) < 0:
+        raise ValueError(
+            "presentation bounds and candidate counts must be non-negative"
+        )
+    if returned_candidates > total_candidates:
+        raise ValueError("returned candidates cannot exceed total candidates")
+    complete = returned_candidates >= total_candidates
+    return {
+        "schema": "hashmarks.ownership-presentation.v1",
+        "authority_proof_identity": proof_identity,
+        "presentation_identity": presentation_identity(
+            proof_identity,
+            limit=limit,
+            per_role=per_role,
+            compact=compact,
+        ),
+        "total_candidates": total_candidates,
+        "returned_candidates": returned_candidates,
+        "complete": complete,
+        "truncated": not complete,
+    }
+
 
 def ownership_authority_contract(
     trace: Mapping[str, object],

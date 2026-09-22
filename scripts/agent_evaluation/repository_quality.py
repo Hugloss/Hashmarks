@@ -7,6 +7,13 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from scripts.agent_evaluation.repository_quality_authority import (
+    authority_transition,
+    derived_authority_vetoes,
+    derived_finding_vetoes,
+    metamorphic_observation,
+    proof_profile_health,
+)
 from scripts.agent_evaluation.repository_quality_diagnostics import (
     economics_summary,
     environment_health,
@@ -16,6 +23,7 @@ from scripts.agent_evaluation.repository_quality_diagnostics import (
     proof_mode_health,
     rank_metrics,
     stability_metrics,
+    uncertainty_summary,
 )
 
 SCHEMA = "hashmarks.repository-quality-case.v1"
@@ -89,6 +97,7 @@ HARD_ZERO_METRICS = (
     "false_authority",
     "false_safe_edit",
     "unjustified_actionable_finding",
+    "metamorphic_authority_drift",
 )
 
 
@@ -211,8 +220,17 @@ def _grade_observed_flags(
     observed: Mapping[str, Any],
     counts: Counter[str],
 ) -> None:
+    derived = {
+        **derived_authority_vetoes(observed),
+        **derived_finding_vetoes(observed),
+    }
+    metamorphic = metamorphic_observation(observed)
+    if metamorphic.get("violation"):
+        derived["metamorphic_authority_drift"] = True
     for metric in HARD_ZERO_METRICS:
-        if metric not in DERIVED_METRICS and observed.get(metric) is True:
+        if metric in DERIVED_METRICS:
+            continue
+        if observed.get(metric) is True or derived.get(metric) is True:
             counts[metric] += 1
 
 
@@ -228,6 +246,8 @@ def evaluate_case(
         _grade_resolved(truth, owner, counts)
     _grade_abstention(truth, state, counts)
     _grade_observed_flags(observed, counts)
+    metamorphic = metamorphic_observation(observed)
+    transition = authority_transition(observed)
     correct_resolution = (
         truth.semantic_truth == "unique-owner"
         and truth.admitted_evidence_truth == "sufficient"
@@ -247,6 +267,8 @@ def evaluate_case(
         "reviewer_identity": case["reviewer_identity"],
         "adjudication_state": case["adjudication_state"],
         "metamorphic_family": case.get("metamorphic_family"),
+        "metamorphic_observation": metamorphic,
+        "authority_transition": transition,
         "ranking": dict(observed.get("ranking") or {}),
         "verification": dict(observed.get("verification") or {}),
         "stability": dict(observed.get("stability") or {}),
@@ -432,6 +454,7 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             ),
             "critical_slices": slice_health,
             "proof_modes": proof_health,
+            "proof_profiles": proof_profile_health(score_rows),
         },
         "hard_zero": dict(totals),
         "state_confusion": dict(sorted(confusion.items())),
@@ -445,6 +468,7 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "metamorphic_health": metamorphic_health(score_rows),
         "environment_health": environment_health(score_rows),
         "economics": economics_summary(score_rows),
+        "uncertainty": uncertainty_summary(score_rows),
         "slice_quality": {
             "macro_by_task_family": group_quality(score_rows, "task_family"),
             "macro_by_risk_class": group_quality(score_rows, "risk_class"),

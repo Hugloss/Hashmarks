@@ -553,6 +553,9 @@ def test_metamorphic_family_membership_is_visible() -> None:
     assert report["metamorphic_health"] == {
         "families": {"irrelevant-file-addition": 1},
         "cases": 1,
+        "executed": 0,
+        "executed_families": {},
+        "violations": 0,
     }
 
 
@@ -665,3 +668,135 @@ def test_new_top_level_authority_vetoes_are_non_compensatory() -> None:
         report = summarize([row, *_qualification_rows()[1:]])
         assert report["qualification"] == "not-qualified"
         assert report["hard_zero"][metric] == 1
+
+
+def test_structured_authority_observation_derives_false_authority_veto() -> None:
+    row = evaluate_case(
+        _case(case_id="derived-false-authority"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "authority_observation": {
+                "owner_resolved": True,
+                "resolved_owner": "src/widget.py::widget",
+                "candidate_owner": "src/widget.py::widget",
+                "proof_complete": False,
+            },
+        },
+    )
+    report = summarize([row, *_qualification_rows()[1:]])
+    assert report["hard_zero"]["false_authority"] == 1
+    assert report["qualification"] == "not-qualified"
+
+
+def test_external_evidence_cannot_confer_repository_authority() -> None:
+    row = evaluate_case(
+        _case(case_id="external-authority"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "authority_observation": {
+                "owner_resolved": True,
+                "resolved_owner": "src/widget.py::widget",
+                "candidate_owner": "src/widget.py::widget",
+                "proof_complete": True,
+                "external_evidence_only": True,
+            },
+        },
+    )
+    report = summarize([row, *_qualification_rows()[1:]])
+    assert report["hard_zero"]["external_evidence_authority_leak"] == 1
+
+
+def test_contradicted_finding_cannot_remain_actionable() -> None:
+    row = evaluate_case(
+        _case(case_id="contradicted-finding"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "finding_observation": {
+                "actionable": True,
+                "admissible_evidence": True,
+                "contradicted": True,
+            },
+        },
+    )
+    report = summarize([row, *_qualification_rows()[1:]])
+    assert report["hard_zero"]["unjustified_actionable_finding"] == 1
+
+
+def test_presentation_metamorphic_drift_is_hard_failure() -> None:
+    row = evaluate_case(
+        _case(case_id="presentation-drift", metamorphic_family="retrieval-limit"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "metamorphic_observation": {
+                "family": "retrieval-limit",
+                "baseline_authority_proof_identity": "sha256:a",
+                "candidate_authority_proof_identity": "sha256:b",
+                "expected_relation": "invariant",
+            },
+        },
+    )
+    report = summarize([row, *_qualification_rows()[1:]])
+    assert report["metamorphic_health"]["executed"] == 1
+    assert report["metamorphic_health"]["violations"] == 1
+    assert report["hard_zero"]["metamorphic_authority_drift"] == 1
+    assert report["qualification"] == "not-qualified"
+
+
+def test_generation_mutation_must_change_authority_when_expected() -> None:
+    row = evaluate_case(
+        _case(case_id="generation-mutation", metamorphic_family="generation-mutation"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "metamorphic_observation": {
+                "family": "generation-mutation",
+                "baseline_authority_proof_identity": "sha256:same",
+                "candidate_authority_proof_identity": "sha256:same",
+                "expected_relation": "change",
+            },
+        },
+    )
+    report = summarize([row, *_qualification_rows()[1:]])
+    assert report["hard_zero"]["metamorphic_authority_drift"] == 1
+
+
+def test_changed_authority_transition_requires_named_admissible_evidence() -> None:
+    with pytest.raises(ValueError, match="named admissible evidence"):
+        evaluate_case(
+            _case(case_id="unnamed-transition"),
+            {
+                "state": "resolved",
+                "owner": "src/widget.py::widget",
+                "authority_transition": {"before": "sha256:a", "after": "sha256:b"},
+            },
+        )
+
+
+def test_proof_profile_minimums_are_visible_without_silently_granting_readiness() -> (
+    None
+):
+    report = summarize(_qualification_rows())
+    profiles = report["benchmark_health"]["proof_profiles"]
+    assert profiles["change-support.v1"]["adequate"] is False
+    assert profiles["change-support.v1"]["missing"] == {
+        "boundary": 1,
+        "adversarial": 1,
+    }
+    assert profiles["release-critical.v1"]["adequate"] is False
+
+
+def test_uncertainty_is_descriptive_and_never_a_qualification_threshold() -> None:
+    report = summarize(_qualification_rows())
+    interval = report["uncertainty"]["resolvable_owner_coverage_95pct"]
+    assert interval["successes"] == 1
+    assert interval["total"] == 1
+    assert interval["estimate"] == 1
+    assert interval["low"] < interval["high"]
+    assert report["uncertainty"]["interpretation"] == (
+        "descriptive-only-no-qualification-threshold"
+    )
+    assert report["qualification"] == "qualified"
