@@ -7,6 +7,23 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 MEASUREMENT_SCHEMA = "hashmarks.repository-quality-measurement.v1"
+
+
+class MeasurementInputs:
+    def __init__(
+        self,
+        *,
+        ranking: Mapping[str, Any],
+        verification: Mapping[str, Any],
+        retention: Mapping[str, Any],
+        economics: Mapping[str, Any],
+    ) -> None:
+        self.ranking = ranking
+        self.verification = verification
+        self.retention = retention
+        self.economics = economics
+
+
 ECONOMICS_KEYS = (
     "latency_ms",
     "rows_inspected",
@@ -38,7 +55,7 @@ def measurement_receipt(
         )
     if mode not in {"cold", "warm", "incremental"}:
         raise ValueError("measurement mode must be cold, warm, or incremental")
-    _validate_economics(economics)
+    _validate_economics(measurements.economics)
     payload = {
         "schema": MEASUREMENT_SCHEMA,
         "execution_receipt_identity": execution_receipt_identity,
