@@ -16,6 +16,7 @@ from scripts.agent_evaluation.repository_quality_mutation import (
 )
 from scripts.agent_evaluation.repository_quality_receipt import (
     execution_receipt,
+    external_evidence_receipt,
     promotion_evidence_identity,
     receipt_is_fresh,
 )
@@ -130,3 +131,27 @@ def test_fresh_receipt_can_authorize_shadow_to_qualification_promotion() -> None
     )
     assert transition["to"] == "qualification"
     assert transition["evidence_identity"] == receipt["receipt_identity"]
+
+
+
+def test_external_evidence_receipt_keeps_conflict_without_promoting_authority() -> None:
+    receipt = external_evidence_receipt(
+        before_authority_proof_identity="sha256:proof",
+        after_authority_proof_identity="sha256:proof",
+        correlation_identity="sha256:correlation",
+        conflicts=2,
+    )
+    assert receipt["authority_unchanged"] is True
+    assert receipt["repository_authority_promoted"] is False
+    assert receipt["conflicts"] == 2
+
+
+def test_external_evidence_receipt_exposes_authority_interference() -> None:
+    receipt = external_evidence_receipt(
+        before_authority_proof_identity="sha256:before",
+        after_authority_proof_identity="sha256:after",
+        correlation_identity="sha256:correlation",
+        conflicts=0,
+    )
+    assert receipt["authority_unchanged"] is False
+    assert receipt["repository_authority_promoted"] is True
