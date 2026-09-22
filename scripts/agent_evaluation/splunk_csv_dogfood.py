@@ -23,6 +23,9 @@ EXPECTED_HEADER = (
 )
 _RECORD_START = re.compile(r'^"[^"]*","\d{4}-\d{2}-\d{2}T')
 _MODULE = re.compile(r"\bname=([A-Za-z_][A-Za-z0-9_.]*)")
+_TRACEBACK = re.compile(
+    r'File "([^"]+)", line (\d+), in ([A-Za-z_][A-Za-z0-9_]*)'
+)
 _MAX_SCOPE_VALUES = 32
 _DEFAULT_MAX_ANCHORS = 256
 
@@ -136,18 +139,39 @@ def _event_id(ordinal: int, text: str) -> str:
     return f"event:{ordinal:06d}:sha256:{digest}"
 
 
-def _anchor(module: str, stats: _ModuleStats) -> dict[str, object]:
+def _stats_metadata(stats: _ModuleStats) -> dict[str, object]:
+    return {
+        "observed_count": stats.count,
+        "strict_valid_count": stats.strict_valid,
+        "recovered_count": stats.recovered,
+        "widened_count": stats.widened,
+        "first_time": stats.first_time,
+        "last_time": stats.last_time,
+        "sample_event_ids": stats.sample_event_ids,
+    }
+
+
+def _module_anchor(module: str, stats: _ModuleStats) -> dict[str, object]:
     return {
         "anchor_id": f"module:{module}",
         "module": module,
+        "metadata": _stats_metadata(stats),
+    }
+
+
+def _traceback_anchor(
+    key: tuple[str, int, str],
+    stats: _ModuleStats,
+) -> dict[str, object]:
+    path, line, symbol = key
+    return {
+        "anchor_id": f"traceback:{path}:{line}:{symbol}",
+        "path": path,
+        "line": line,
+        "symbol": symbol,
         "metadata": {
-            "observed_count": stats.count,
-            "strict_valid_count": stats.strict_valid,
-            "recovered_count": stats.recovered,
-            "widened_count": stats.widened,
-            "first_time": stats.first_time,
-            "last_time": stats.last_time,
-            "sample_event_ids": stats.sample_event_ids,
+            "kind": "python-traceback-frame",
+            **_stats_metadata(stats),
         },
     }
 
@@ -159,6 +183,7 @@ def collect(
         raise ValueError(f"max_anchors must be between 1 and {_DEFAULT_MAX_ANCHORS}")
     source_sha256 = _sha256_file(path)
     modules: dict[str, _ModuleStats] = {}
+    tracebacks: dict[tuple[str, int, str], _ModuleStats] = {}
     sourcetypes: set[str] = set()
     indexes: set[str] = set()
     sources: set[str] = set()
@@ -193,24 +218,51 @@ def collect(
             scope_values_truncated |= _bounded_value(sources, source)
             scope_values_truncated |= _bounded_value(sourcetypes, sourcetype)
             scope_values_truncated |= _bounded_value(indexes, index)
-            match = _MODULE.search(parsed.raw)
-            if match is None:
-                continue
-            module = match.group(1).strip(".")
-            stats = modules.setdefault(module, _ModuleStats())
-            stats.observe(
-                timestamp=timestamp,
-                parser_state=parsed.parser_state,
-                widened=parsed.widened,
-                event_id=_event_id(ordinal, text),
-            )
+            event_id = _event_id(ordinal, text)
+            module_match = _MODULE.search(parsed.raw)
+            if module_match is not None:
+                module = module_match.group(1).strip(".")
+                stats = modules.setdefault(module, _ModuleStats())
+                stats.observe(
+                    timestamp=timestamp,
+                    parser_state=parsed.parser_state,
+                    widened=parsed.widened,
+                    event_id=event_id,
+                )
+            traceback_match = _TRACEBACK.search(parsed.raw)
+            if traceback_match is not None:
+                key = (
+                    traceback_match.group(1),
+                    int(traceback_match.group(2)),
+                    traceback_match.group(3),
+                )
+                stats = tracebacks.setdefault(key, _ModuleStats())
+                stats.observe(
+                    timestamp=timestamp,
+                    parser_state=parsed.parser_state,
+                    widened=parsed.widened,
+                    event_id=event_id,
+                )
 
-    ranked = sorted(
+    ranked_tracebacks = sorted(
+        tracebacks.items(),
+        key=lambda item: (-item[1].count, item[0]),
+    )
+    ranked_modules = sorted(
         modules.items(),
         key=lambda item: (-item[1].count, item[0]),
     )
-    anchors_truncated = len(ranked) > max_anchors
-    anchors = [_anchor(module, stats) for module, stats in ranked[:max_anchors]]
+    selected_tracebacks = ranked_tracebacks[:max_anchors]
+    module_slots = max_anchors - len(selected_tracebacks)
+    selected_modules = ranked_modules[:module_slots]
+    anchors = [
+        _traceback_anchor(key, stats) for key, stats in selected_tracebacks
+    ]
+    anchors.extend(
+        _module_anchor(module, stats) for module, stats in selected_modules
+    )
+    observed_anchors = len(ranked_tracebacks) + len(ranked_modules)
+    anchors_truncated = observed_anchors > len(anchors)
     bundle = {
         "bundle_id": "splunk-export:" + source_sha256.removeprefix("sha256:")[:32],
         "producer": {
@@ -251,8 +303,12 @@ def collect(
             "recovered": recovered_count,
             "malformed": malformed_count,
             "widened": widened_count,
-            "module_anchors_observed": len(ranked),
-            "module_anchors_emitted": len(anchors),
+            "traceback_anchors_observed": len(ranked_tracebacks),
+            "traceback_anchors_emitted": len(selected_tracebacks),
+            "module_anchors_observed": len(ranked_modules),
+            "module_anchors_emitted": len(selected_modules),
+            "anchors_observed": observed_anchors,
+            "anchors_emitted": len(anchors),
             "anchors_truncated": anchors_truncated,
             "scope_values_truncated": scope_values_truncated,
         },
@@ -260,7 +316,29 @@ def collect(
     }
 
 
-def correlate(workspace: Path, report: dict[str, object]) -> dict[str, object]:
+def _path_mappings(values: list[str]) -> list[dict[str, str]]:
+    mappings = []
+    for value in values:
+        if "=" not in value:
+            raise ValueError("path mapping must use EXTERNAL_PREFIX=REPOSITORY_PREFIX")
+        external_prefix, repository_prefix = value.split("=", 1)
+        if not external_prefix:
+            raise ValueError("path mapping external prefix must not be empty")
+        mappings.append(
+            {
+                "external_prefix": external_prefix,
+                "repository_prefix": repository_prefix,
+            }
+        )
+    return mappings
+
+
+def correlate(
+    workspace: Path,
+    report: dict[str, object],
+    *,
+    path_mappings: list[dict[str, str]] | None = None,
+) -> dict[str, object]:
     from hashmarks.codemap import CodeMap
 
     bundle = report.get("bundle")
@@ -270,6 +348,7 @@ def correlate(workspace: Path, report: dict[str, object]) -> dict[str, object]:
         sync = codemap.sync()
         packet = codemap.correlate_evidence(
             [bundle],
+            path_mappings=path_mappings,
             include_relationships=False,
         )
     states: dict[str, int] = {}
@@ -298,10 +377,20 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--max-anchors", type=int, default=_DEFAULT_MAX_ANCHORS)
+    parser.add_argument(
+        "--path-mapping",
+        action="append",
+        default=[],
+        metavar="EXTERNAL=REPOSITORY",
+    )
     args = parser.parse_args()
     report = collect(args.input, max_anchors=args.max_anchors)
     if args.workspace is not None:
-        report["correlation"] = correlate(args.workspace, report)
+        report["correlation"] = correlate(
+            args.workspace,
+            report,
+            path_mappings=_path_mappings(args.path_mapping),
+        )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
