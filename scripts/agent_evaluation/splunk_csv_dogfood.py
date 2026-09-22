@@ -409,6 +409,7 @@ def collect(
     selection = _select_anchors(state, max_anchors)
     return _report(path, source_sha256, state, selection)
 
+
 def _path_mappings(values: list[str]) -> list[dict[str, str]]:
     mappings = []
     for value in values:
