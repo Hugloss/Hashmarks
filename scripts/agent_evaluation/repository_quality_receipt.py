@@ -147,3 +147,38 @@ def validate_execution_receipt(receipt: Mapping[str, Any]) -> None:
     _validated_receipt_identities(receipt)
     _validated_receipt_evidence(receipt)
 
+
+
+def execution_receipt_health(
+    receipts: Sequence[Mapping[str, Any]],
+    *,
+    repository_identity: str,
+    generation_identity: str,
+) -> dict[str, Any]:
+    valid = 0
+    fresh = 0
+    invalid = 0
+    stale = 0
+    for receipt in receipts:
+        try:
+            validate_execution_receipt(receipt)
+        except ValueError:
+            invalid += 1
+            continue
+        valid += 1
+        if receipt_is_fresh(
+            receipt,
+            repository_identity=repository_identity,
+            generation_identity=generation_identity,
+        ):
+            fresh += 1
+        else:
+            stale += 1
+    return {
+        "receipts": len(receipts),
+        "valid": valid,
+        "invalid": invalid,
+        "fresh": fresh,
+        "stale": stale,
+        "ready": bool(receipts) and invalid == 0 and stale == 0,
+    }
