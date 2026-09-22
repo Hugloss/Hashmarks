@@ -714,10 +714,10 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             ):
                 continue
             domains = classify_repository_path(path)
-            if (
-                RepositoryDomain.TEST in domains
-                or not {RepositoryDomain.SOURCE, RepositoryDomain.SCRIPT}.intersection(domains)
-            ):
+            if RepositoryDomain.TEST in domains or not {
+                RepositoryDomain.SOURCE,
+                RepositoryDomain.SCRIPT,
+            }.intersection(domains):
                 continue
             exact_paths.setdefault(name, set()).add(path)
         return {token for token, paths in exact_paths.items() if len(paths) > 1}
