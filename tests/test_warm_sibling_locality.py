@@ -126,9 +126,7 @@ def test_unique_identifier_anchor_excludes_generic_contract_sibling_owners(
     assert action["edit"]["path"] == target["edit"]
     assert action["verify"]["path"] == target["verify"]
     assert action["ambiguity"]["ambiguous"] is False
-    assert action["ambiguity"]["task_local_structural_owners"] == [
-        target["edit"]
-    ]
+    assert action["ambiguity"]["task_local_structural_owners"] == [target["edit"]]
     assert action["ownership_authority"]["owner_resolved"] is False
     assert brief["status"] == "safe-fresh"
     assert brief["edit"] == target["edit"]
