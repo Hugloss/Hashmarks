@@ -44,18 +44,20 @@ def _measurement(**overrides) -> dict:
         "execution_receipt_identity": _execution()["receipt_identity"],
         "environment_fingerprint": "env:linux-py311",
         "mode": "warm",
-        "ranking": {"rank": 1},
-        "verification": {"rank": 2},
-        "retention": {
-            "related_dependency_retained": True,
-            "impact_evidence_retained": True,
-        },
-        "economics": {
-            "latency_ms": 12,
-            "rows_inspected": 40,
-            "candidate_count": 5,
-            "peak_memory_bytes": 2048,
-        },
+        "measurements": MeasurementInputs(
+            ranking={"rank": 1},
+            verification={"rank": 2},
+            retention={
+                "related_dependency_retained": True,
+                "impact_evidence_retained": True,
+            },
+            economics={
+                "latency_ms": 12,
+                "rows_inspected": 40,
+                "candidate_count": 5,
+                "peak_memory_bytes": 2048,
+            },
+        ),
     }
     values.update(overrides)
     return measurement_receipt(**values)
@@ -138,7 +140,14 @@ def test_measurement_health_reports_ranking_retention_and_comparability() -> Non
 )
 def test_negative_economics_fail_closed(economics) -> None:
     with pytest.raises(ValueError, match="non-negative"):
-        _measurement(\n            measurements=MeasurementInputs(\n                ranking={"rank": 1},\n                verification={"rank": 2},\n                retention={},\n                economics=economics,\n            )\n        )
+        _measurement(
+            measurements=MeasurementInputs(
+                ranking={"rank": 1},
+                verification={"rank": 2},
+                retention={},
+                economics=economics,
+            )
+        )
 
 
 def test_retained_benchmark_artifacts_are_real_repository_evidence() -> None:
