@@ -195,9 +195,7 @@ class OwnershipAnalysisMixin:
         result["observation"] = "retained"
         result["counter_evidence"] = counter_evidence
         result["interpretation"] = {
-            "actionability": (
-                "not-actionable" if counter_evidence else "actionable"
-            ),
+            "actionability": ("not-actionable" if counter_evidence else "actionable"),
             "authority": "repository-evidence-only",
         }
         return result
