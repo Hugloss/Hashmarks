@@ -71,3 +71,40 @@ def run_mutation_challenges(
             }
         )
     return results
+
+
+
+def repository_counterfactual_challenges() -> tuple[MutationChallenge, ...]:
+    return (
+        MutationChallenge(
+            "irrelevant-file-addition",
+            "invariant",
+            _set("repository_mutation", "add-unreferenced-file"),
+        ),
+        MutationChallenge(
+            "generation-mutation",
+            "change",
+            _set("repository_mutation", "replace-owner-definition"),
+        ),
+        MutationChallenge(
+            "generation-mutation",
+            "change",
+            _set("repository_mutation", "duplicate-exact-owner"),
+        ),
+        MutationChallenge(
+            "generation-mutation",
+            "change",
+            _set("repository_mutation", "remove-decisive-evidence"),
+        ),
+    )
+
+
+def mutation_coverage(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    families = sorted({str(row.get("family") or "") for row in results})
+    violations = [row for row in results if row.get("violation") is True]
+    return {
+        "cases": len(results),
+        "families": families,
+        "violations": len(violations),
+        "clean": bool(results) and not violations,
+    }
