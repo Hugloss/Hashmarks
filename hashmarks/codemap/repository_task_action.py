@@ -363,6 +363,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         return {
             **resolved,
             "selected": owner_path,
+            "authority_admissible": False,
+            "authority_reason": "bounded-structural-candidate-only",
             "secret_knowledge_used": False,
             "effect": "repository-owner-projection-only",
             "consumer_action": "external",
@@ -1446,10 +1448,18 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             return "repository-global-symbol-identity", True
         if owner_basis == "literal-path":
             return "repository-global-path-identity", True
-        if owner_basis in {"literal-reference-owner", "structural-owner"}:
+        if owner_basis == "literal-reference-owner":
             return (
                 "repository-relationship-proof",
                 structural_owner is not None,
+            )
+        if owner_basis == "structural-owner":
+            return (
+                "repository-relationship-proof",
+                bool(
+                    structural_owner is not None
+                    and structural_owner.get("authority_admissible") is True
+                ),
             )
         return None, False
 
