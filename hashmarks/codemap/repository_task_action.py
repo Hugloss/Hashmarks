@@ -539,6 +539,23 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         rows: Sequence[dict[str, object]],
         discrimination: _TaskActionDiscriminationState,
     ) -> list[dict[str, object]]:
+        identifier_terms = [
+            term
+            for term in discrimination.task_terms
+            if self._is_task_identifier_anchor(term)
+        ]
+        if identifier_terms:
+            identifier_rows = [
+                row
+                for row in rows
+                if RepositoryDomain.TEST.value in row.get("domains", [])
+                and any(
+                    term in self._task_action_row_text(row, discrimination)
+                    for term in identifier_terms
+                )
+            ]
+            if identifier_rows:
+                return identifier_rows[:8]
         return [
             row
             for row in rows
