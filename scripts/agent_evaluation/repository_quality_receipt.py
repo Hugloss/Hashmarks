@@ -77,3 +77,28 @@ def promotion_evidence_identity(receipt: Mapping[str, Any]) -> str:
     if not identity:
         raise ValueError("execution receipt has no identity")
     return identity
+
+
+
+def external_evidence_receipt(
+    *,
+    before_authority_proof_identity: str,
+    after_authority_proof_identity: str,
+    correlation_identity: str,
+    conflicts: int,
+) -> dict[str, Any]:
+    if not before_authority_proof_identity or not after_authority_proof_identity:
+        raise ValueError("external evidence receipt requires before and after authority proof")
+    if not correlation_identity:
+        raise ValueError("external evidence receipt requires correlation identity")
+    if conflicts < 0:
+        raise ValueError("external evidence conflict count must be non-negative")
+    unchanged = before_authority_proof_identity == after_authority_proof_identity
+    return {
+        "correlation_identity": correlation_identity,
+        "before_authority_proof_identity": before_authority_proof_identity,
+        "after_authority_proof_identity": after_authority_proof_identity,
+        "authority_unchanged": unchanged,
+        "conflicts": conflicts,
+        "repository_authority_promoted": not unchanged,
+    }
