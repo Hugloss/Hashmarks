@@ -29,7 +29,12 @@ def _execution() -> dict:
             "generation_identity": "sha256:generation",
             "authority_proof_identity": "sha256:proof",
         },
-        surfaces=[\n            {\n                "surface": "task-evidence",\n                "authority_proof_identity": "sha256:proof",\n            }\n        ],
+        surfaces=[
+            {
+                "surface": "task-evidence",
+                "authority_proof_identity": "sha256:proof",
+            }
+        ],
         mutations=[],
     )
 
@@ -68,7 +73,10 @@ def test_execution_receipt_identity_is_recomputed_not_trusted() -> None:
 def test_receipt_health_separates_invalid_from_stale() -> None:
     fresh = _execution()
     stale = _execution()
-    stale["identities"] = {\n        **stale["identities"],\n        "generation_identity": "sha256:old",\n    }
+    stale["identities"] = {
+        **stale["identities"],
+        "generation_identity": "sha256:old",
+    }
     stale["receipt_identity"] = execution_receipt(
         case_id="case",
         corpus_identity="sha256:corpus",
@@ -134,7 +142,9 @@ def test_negative_economics_fail_closed(economics) -> None:
 def test_retained_benchmark_artifacts_are_real_repository_evidence() -> None:
     root = Path(__file__).resolve().parents[1] / "benchmarks/agent_evaluation/retained"
     corpora = sorted(root.glob("challenge/base/corpora/*.json"))
-    repos = sorted(\n        path for path in (root / "challenge/base/repos").iterdir() if path.is_dir()\n    )
+    repos = sorted(
+        path for path in (root / "challenge/base/repos").iterdir() if path.is_dir()
+    )
     outputs = sorted(root.glob("outputs/*.json"))
     assert len(corpora) >= 3
     assert len(repos) >= 3
