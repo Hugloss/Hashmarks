@@ -479,8 +479,7 @@ def test_exact_identifier_authority_is_invariant_across_presentation_limits(
         row["ownership_authority"]["authority_proof_identity"] for row in results
     } == {results[0]["ownership_authority"]["authority_proof_identity"]}
     assert all(
-        row["ownership_authority"]["proof_scope"]
-        == "repository-global-symbol-identity"
+        row["ownership_authority"]["proof_scope"] == "repository-global-symbol-identity"
         for row in results
     )
     assert all(row["ownership_authority"]["proof_scope_complete"] for row in results)
@@ -536,7 +535,6 @@ def test_literal_path_authority_is_invariant_across_presentation_limits(
         row["ownership_authority"]["authority_proof_identity"] for row in results
     } == {results[0]["ownership_authority"]["authority_proof_identity"]}
     assert all(
-        row["ownership_authority"]["proof_scope"]
-        == "repository-global-path-identity"
+        row["ownership_authority"]["proof_scope"] == "repository-global-path-identity"
         for row in results
     )
