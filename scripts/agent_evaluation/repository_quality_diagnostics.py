@@ -54,14 +54,22 @@ def rank_metrics(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any
     ]
     if not ranks:
         return {
-            "cases": 0, "recall_at_1": None, "recall_at_5": None, "mrr": None, "ndcg": None
+            "cases": 0,
+            "recall_at_1": None,
+            "recall_at_5": None,
+            "mrr": None,
+            "ndcg": None,
         }
     return {
         "cases": len(ranks),
         "recall_at_1": sum(rank <= 1 for rank in ranks) / len(ranks),
         "recall_at_5": sum(rank <= 5 for rank in ranks) / len(ranks),
         "mrr": sum(1 / rank for rank in ranks) / len(ranks),
-        "ndcg": sum(1 / (1 if rank == 1 else __import__("math").log2(rank + 1)) for rank in ranks) / len(ranks),
+        "ndcg": sum(
+            1 / (1 if rank == 1 else __import__("math").log2(rank + 1))
+            for rank in ranks
+        )
+        / len(ranks),
     }
 
 
@@ -146,8 +154,6 @@ def environment_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 def metamorphic_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     families = Counter(
-        str(row["metamorphic_family"])
-        for row in rows
-        if row.get("metamorphic_family")
+        str(row["metamorphic_family"]) for row in rows if row.get("metamorphic_family")
     )
     return {"families": dict(sorted(families.items())), "cases": sum(families.values())}
