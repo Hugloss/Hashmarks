@@ -24,6 +24,7 @@ from .repository_index_store import (
     git_base_identity,
     git_overlay_paths,
 )
+from .source_languages import SOURCE_LANGUAGES
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -32,30 +33,8 @@ if TYPE_CHECKING:
 
     from .engine import CodeMap
 
-_SOURCE_EXTENSIONS = {
-    ".py": "python",
-    ".pyi": "python",
-    ".js": "javascript",
-    ".jsx": "javascript",
-    ".ts": "typescript",
-    ".tsx": "typescript",
-    ".go": "go",
-    ".rs": "rust",
-    ".java": "java",
-    ".kt": "kotlin",
-    ".kts": "kotlin",
-    ".c": "c",
-    ".h": "c",
-    ".cc": "cpp",
-    ".cpp": "cpp",
-    ".cxx": "cpp",
-    ".hpp": "cpp",
-    ".cs": "csharp",
-    ".rb": "ruby",
-    ".php": "php",
-    ".swift": "swift",
-    ".sql": "sql",
-}
+_SOURCE_EXTENSIONS = SOURCE_LANGUAGES
+
 _TEXT_EXTENSIONS = {
     ".toml",
     ".yaml",

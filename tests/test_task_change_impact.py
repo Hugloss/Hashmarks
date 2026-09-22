@@ -726,3 +726,41 @@ def test_task_change_impact_rejects_invalid_bounds_before_refresh(
             codemap.task_change_impact(
                 task, ["src/case/engine.py"], options=ChangeImpactOptions(**options)
             )
+
+
+def test_task_change_impact_never_erases_reported_missing_path(tmp_path: Path) -> None:
+    task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        impact = codemap.task_change_impact(
+            task,
+            ["src/case/engine.py", "src/case/deleted.py"],
+        )
+
+    changed = {row["path"]: row for row in impact["changed"]}
+    assert set(changed) == {"src/case/engine.py", "src/case/deleted.py"}
+    assert changed["src/case/engine.py"]["state"] == "indexed"
+    assert changed["src/case/deleted.py"]["state"] == "missing"
+    assert impact["changed_evidence"] == {
+        "reported": 2,
+        "accounted_for": 2,
+        "complete": True,
+        "states": {"indexed": 1, "excluded": 0, "missing": 1},
+    }
+
+
+@pytest.mark.parametrize("suffix", [".css", ".scss", ".sass", ".less"])
+def test_stylesheet_changed_evidence_is_accounted_as_source(
+    tmp_path: Path, suffix: str
+) -> None:
+    task = _repo(tmp_path)
+    stylesheet = tmp_path / f"src/case/theme{suffix}"
+    stylesheet.write_text(".widget { display: block; }\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        impact = codemap.task_change_impact(task, [stylesheet.relative_to(tmp_path)])
+
+    assert impact["changed"][0]["path"] == f"src/case/theme{suffix}"
+    assert impact["changed"][0]["state"] == "indexed"
+    assert "implementation" in impact["changed"][0]["roles"]
+    assert impact["changed_evidence"]["complete"] is True
