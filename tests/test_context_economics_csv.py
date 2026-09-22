@@ -110,9 +110,7 @@ def test_context_economics_csv_rejects_wrong_input_schema(tmp_path, monkeypatch)
         _run(tmp_path, monkeypatch, report)
 
 
-def test_context_economics_csv_rejects_duplicate_condition_rows(
-    tmp_path, monkeypatch
-):
+def test_context_economics_csv_rejects_duplicate_condition_rows(tmp_path, monkeypatch):
     report = _report()
     duplicate = dict(report["repositories"][0]["lanes"]["native"]["tasks"][0])
     report["repositories"][0]["lanes"]["native"]["tasks"].append(duplicate)
