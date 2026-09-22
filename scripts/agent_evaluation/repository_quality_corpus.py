@@ -103,7 +103,6 @@ def promotion_transition(
     }
 
 
-
 def corpus_layer_health(manifest: Mapping[str, Any]) -> dict[str, Any]:
     validate_manifest(manifest)
     counts = {layer: 0 for layer in sorted(ALLOWED_LAYERS)}
