@@ -214,13 +214,22 @@ class DecisionPacketMixin:
         )
         timing.record("action_map")
         candidate = action.get("edit")
-        edit = action.get("admitted_edit")
+        edit = candidate if isinstance(candidate, Mapping) else None
+        admitted_edit = (
+            action.get("admitted_edit")
+            if isinstance(action.get("admitted_edit"), Mapping)
+            else None
+        )
         verify = (
             action.get("verify") if isinstance(action.get("verify"), dict) else None
         )
         build = self._codemap_build_state()
         discrimination = self._decision_packet_discrimination(
-            action=action, edit=edit, verify=verify, build=build, limit=limit
+            action=action,
+            edit=admitted_edit,
+            verify=verify,
+            build=build,
+            limit=limit,
         )
 
         timing.begin_phase()
