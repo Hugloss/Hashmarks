@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.digest import hash_file
@@ -18,7 +19,28 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+@dataclass(frozen=True, slots=True)
+class _TaskEvidenceRange:
+    path: str
+    role: str
+    qualname: str | None
+    name: str | None
+    signature: str
+    start: int | None
+    end: int | None
+
+
 class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
+    @staticmethod
+    def _task_decision_anchor(value: object) -> dict[str, object] | None:
+        if not isinstance(value, dict) or not value.get("path"):
+            return None
+        row: dict[str, object] = {"path": str(value["path"])}
+        symbol = value.get("name") or value.get("qualname")
+        if symbol:
+            row["symbol"] = str(symbol)
+        return row
+
     @decision_scoped
     def task_decision_brief(
         self,
@@ -41,19 +63,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             token_budget=token_budget,
         )
 
-        def anchor(value: object) -> dict[str, object] | None:
-            if not isinstance(value, dict) or not value.get("path"):
-                return None
-            row: dict[str, object] = {"path": str(value["path"])}
-            symbol = value.get("name") or value.get("qualname")
-            if symbol:
-                row["symbol"] = str(symbol)
-            return row
-
-        edit = anchor(packet.get("edit"))
-        candidate = anchor(packet.get("candidate"))
-        verify = anchor(packet.get("verify"))
-        contract = anchor(packet.get("contract"))
+        edit = self._task_decision_anchor(packet.get("edit"))
+        candidate = self._task_decision_anchor(packet.get("candidate"))
+        verify = self._task_decision_anchor(packet.get("verify"))
+        contract = self._task_decision_anchor(packet.get("contract"))
         used = {row["path"] for row in (edit, verify) if row is not None}
         if contract is not None and contract["path"] in used:
             contract = None
@@ -224,6 +237,20 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             else None,
         )
 
+    @staticmethod
+    def _task_action_brief_verification(
+        result: dict[str, object],
+        verification: Mapping[str, object],
+        verify: Mapping[str, object] | None,
+    ) -> None:
+        if not verification.get("available"):
+            return
+        argv = verification.get("argv")
+        if isinstance(argv, list) and argv:
+            result["verify"] = list(argv)
+        if verify is not None and verify.get("path"):
+            result["verify_path"] = str(verify["path"])
+
     def _task_action_brief_from_action(
         self,
         action: dict[str, object],
@@ -251,10 +278,13 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             and edit is not None
             and bool(verification.get("available"))
         )
-        status = "unsafe" if not safe else "safe-stale" if stale else "safe-fresh"
         result: dict[str, object] = {
             "schema": "hashmarks.task-action-brief.v1",
-            "status": status,
+            "status": "unsafe"
+            if not safe
+            else "safe-stale"
+            if stale
+            else "safe-fresh",
             "candidate": action.get("candidate_path"),
             "evidence_receipt": self._decision_evidence_receipt(
                 task, action, verification
@@ -262,18 +292,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         }
         if edit and edit.get("path"):
             result["edit"] = str(edit["path"])
-        if bool(verification.get("available")):
-            argv = verification.get("argv")
-            if isinstance(argv, list) and argv:
-                result["verify"] = list(argv)
-            # Keep the selected verification surface visible even when the
-            # executable plan necessarily widens to a project/package scope
-            # (for example TypeScript without a local test runner).  This is
-            # repository evidence, not an instruction to execute it, and lets
-            # the external consumer inspect or invoke the task-local test without
-            # rediscovering that path through a second search.
-            if verify is not None and verify.get("path"):
-                result["verify_path"] = str(verify["path"])
+        self._task_action_brief_verification(result, verification, verify)
 
         owner_path_text = self._owner_path_text(action)
         if owner_path_text is not None:
@@ -402,6 +421,78 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         )
         return qualname, name, signature, start, end
 
+    def _task_evidence_source_range(
+        self,
+        evidence: _TaskEvidenceRange,
+        token_budget: int,
+    ) -> tuple[dict[str, object] | None, dict[str, object]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        assert evidence.start is not None and evidence.end is not None
+        try:
+            body = self._source_slice(
+                evidence.path,
+                evidence.start,
+                evidence.end,
+                qualname=evidence.qualname,
+            )
+        except (OSError, PermissionError, FileNotFoundError):
+            body = ""
+        body_tokens = estimate_tokens(body) if body else 0
+        common: dict[str, object] = {
+            "role": evidence.role,
+            "path": evidence.path,
+            "symbol": evidence.qualname or evidence.name,
+            "lines": [evidence.start, evidence.end],
+        }
+        if body and body_tokens <= token_budget:
+            return {
+                **common,
+                "representation": "source-range",
+                "content": body,
+                "estimated_tokens": body_tokens,
+            }, {}
+        return None, {
+            **common,
+            "reason": "exact-source-range-exceeds-start-budget"
+            if body
+            else "exact-source-range-unavailable",
+            **({"estimated_tokens": body_tokens} if body else {}),
+        }
+
+    def _task_evidence_path_admission(
+        self, path: str, role: str
+    ) -> tuple[EvidenceVisibility | None, dict[str, object] | None]:
+        visibility = self._task_evidence_visibility(path)
+        if visibility is None:
+            return None, {
+                "role": role,
+                "path": path,
+                "reason": "path-no-longer-indexed",
+            }
+        if visibility is EvidenceVisibility.DENY:
+            return None, {
+                "role": role,
+                "path": path,
+                "reason": "source-evidence-denied",
+            }
+        return visibility, None
+
+    def _task_evidence_source_or_outline(
+        self, evidence: _TaskEvidenceRange, token_budget: int
+    ) -> tuple[dict[str, object] | None, dict[str, object] | None]:
+        item, pending = self._task_evidence_source_range(evidence, token_budget)
+        if item is not None:
+            return item, None
+        return self._task_evidence_outline_item(
+            path=evidence.path,
+            role=evidence.role,
+            symbol=evidence.qualname or evidence.name,
+            signature=evidence.signature,
+            token_budget=token_budget,
+            pending=pending,
+        )
+
     def _task_evidence_evidence_item(
         self,
         row: dict[str, object],
@@ -425,61 +516,30 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         path = str(row.get("path") or "")
         if not path:
             return None, None
-        visibility = self._task_evidence_visibility(path)
-        if visibility is None:
-            return None, {
-                "role": role,
-                "path": path,
-                "reason": "path-no-longer-indexed",
-            }
-        if visibility is EvidenceVisibility.DENY:
-            return None, {
-                "role": role,
-                "path": path,
-                "reason": "source-evidence-denied",
-            }
+        visibility, denied = self._task_evidence_path_admission(path, role)
+        if denied is not None:
+            return None, denied
+        assert visibility is not None
 
         qualname, name, signature, start, end = self._task_evidence_current_range(
             path, row
         )
-        symbol = qualname or name
+        evidence = _TaskEvidenceRange(
+            path=path,
+            role=role,
+            qualname=qualname,
+            name=name,
+            signature=signature,
+            start=start,
+            end=end,
+        )
+        symbol = evidence.qualname or evidence.name
         if (
             visibility is EvidenceVisibility.SOURCE
-            and start is not None
-            and end is not None
+            and evidence.start is not None
+            and evidence.end is not None
         ):
-            try:
-                body = self._source_slice(path, start, end, qualname=qualname)
-            except (OSError, PermissionError, FileNotFoundError):
-                body = ""
-            body_tokens = estimate_tokens(body) if body else 0
-            if body and body_tokens <= token_budget:
-                return {
-                    "role": role,
-                    "path": path,
-                    "symbol": symbol,
-                    "lines": [start, end],
-                    "representation": "source-range",
-                    "content": body,
-                    "estimated_tokens": body_tokens,
-                }, None
-            if body:
-                pending = {
-                    "role": role,
-                    "path": path,
-                    "symbol": symbol,
-                    "lines": [start, end],
-                    "reason": "exact-source-range-exceeds-start-budget",
-                    "estimated_tokens": body_tokens,
-                }
-            else:
-                pending = {
-                    "role": role,
-                    "path": path,
-                    "symbol": symbol,
-                    "lines": [start, end],
-                    "reason": "exact-source-range-unavailable",
-                }
+            return self._task_evidence_source_or_outline(evidence, token_budget)
         elif visibility is EvidenceVisibility.SOURCE:
             config_item, config_pending = self._task_evidence_config_evidence(
                 path,
@@ -531,24 +591,53 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         ownership = action.get("ownership_resolution")
         if isinstance(ownership, dict) and str(ownership.get("selected") or "") == path:
             via = str(ownership.get("via") or "").strip()
-            if via == "references":
-                return "literal-reference"
-            if via:
-                return f"structural-{via}"
-            return "structural-owner"
-        if bool(edit.get("locality_projection")):
-            return "config-locality"
-        if bool(edit.get("literal_reference_projection")):
-            return "literal-reference"
-        if bool(edit.get("structural_projection")):
-            return "structural-owner"
+            return (
+                "literal-reference"
+                if via == "references"
+                else f"structural-{via}"
+                if via
+                else "structural-owner"
+            )
+        projection_reason = next(
+            (
+                reason
+                for field, reason in (
+                    ("locality_projection", "config-locality"),
+                    ("literal_reference_projection", "literal-reference"),
+                    ("structural_projection", "structural-owner"),
+                )
+                if edit.get(field)
+            ),
+            None,
+        )
+        if projection_reason is not None:
+            return projection_reason
         domains = {str(value) for value in (edit.get("domains") or [])}
         roles = {str(value) for value in (edit.get("roles") or [])}
+        reason = "canonical-edit-role"
         if "contract" in roles and domains.intersection({"contract", "ownership"}):
-            return "contract-authority"
-        if domains.intersection({"config", "build", "plan"}):
-            return "config-role"
-        return "canonical-edit-role"
+            reason = "contract-authority"
+        elif domains.intersection({"config", "build", "plan"}):
+            reason = "config-role"
+        return reason
+
+    @staticmethod
+    def _task_evidence_freshness(
+        generation: int,
+        selection_generation: int,
+        stale: bool | None,
+        verification_stale: bool,
+    ) -> tuple[str, str | None]:
+        if generation != selection_generation:
+            return "stale", "generation-changed-during-start"
+        if verification_stale:
+            return "stale", "verification-changed-since-selection"
+        freshness = freshness_state(stale)
+        reason = {
+            "stale": "continuity-reported-change",
+            "unknown": "filesystem-continuity-unproven",
+        }.get(freshness)
+        return freshness, reason
 
     def _task_evidence_provenance(
         self,
@@ -562,21 +651,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             self = cast("CodeMap", self)
         edit = action.get("edit") if isinstance(action.get("edit"), dict) else None
         generation, identity_generation, stale = self._generation_status()
-        if generation != selection_generation:
-            freshness = "stale"
-            freshness_reason = "generation-changed-during-start"
-        elif verification_stale:
-            freshness = "stale"
-            freshness_reason = "verification-changed-since-selection"
-        else:
-            freshness = freshness_state(stale)
-            freshness_reason = (
-                "continuity-reported-change"
-                if freshness == "stale"
-                else "filesystem-continuity-unproven"
-                if freshness == "unknown"
-                else None
-            )
+        freshness, freshness_reason = self._task_evidence_freshness(
+            generation, selection_generation, stale, verification_stale
+        )
 
         result: dict[str, object] = {
             "why": self._task_evidence_selection_reason(action, edit),
@@ -797,6 +874,41 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "reason": provenance.get("freshness_reason"),
         }
 
+    def _task_evidence_attach_owner_source(
+        self,
+        result: dict[str, object],
+        action: Mapping[str, object],
+        *,
+        task: str,
+        token_budget: int,
+    ) -> None:
+        ownership = result["ownership"]
+        if not isinstance(ownership, dict):
+            raise AssertionError("task evidence ownership projection must be a mapping")
+        owner_row = action.get("edit")
+        item = pending = None
+        if (
+            ownership.get("status") == "resolved"
+            and isinstance(owner_row, dict)
+            and owner_row.get("path")
+        ):
+            item, pending = self._task_evidence_evidence_item(
+                owner_row,
+                role="owner",
+                token_budget=token_budget,
+                task=task,
+            )
+        compact_item, compact_pending, source_budget = (
+            self._task_evidence_compact_evidence(
+                item,
+                pending,
+                token_budget=token_budget,
+            )
+        )
+        ownership["source_evidence"] = compact_item
+        ownership["next_read"] = compact_pending
+        ownership["source_budget"] = source_budget
+
     def task_evidence(
         self,
         task: str,
@@ -834,32 +946,12 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 verification_plan,
             )
 
-        ownership = result["ownership"]
-        if not isinstance(ownership, dict):
-            raise AssertionError("task evidence ownership projection must be a mapping")
-        owner_row = action.get("edit")
-        item = pending = None
-        if (
-            ownership.get("status") == "resolved"
-            and isinstance(owner_row, dict)
-            and owner_row.get("path")
-        ):
-            item, pending = self._task_evidence_evidence_item(
-                owner_row,
-                role="owner",
-                token_budget=token_budget,
-                task=task,
-            )
-        compact_item, compact_pending, source_budget = (
-            self._task_evidence_compact_evidence(
-                item,
-                pending,
-                token_budget=token_budget,
-            )
+        self._task_evidence_attach_owner_source(
+            result,
+            action,
+            task=task,
+            token_budget=token_budget,
         )
-        ownership["source_evidence"] = compact_item
-        ownership["next_read"] = compact_pending
-        ownership["source_budget"] = source_budget
 
         selected_verify = action.get("verify")
         selected_verify_path = (
