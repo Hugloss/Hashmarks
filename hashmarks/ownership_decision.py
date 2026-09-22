@@ -132,7 +132,6 @@ def _trace_unresolved_reason(trace: Mapping[str, object]) -> str:
         return "ownership-unresolved"
     return str(ambiguity.get("reason") or "ownership-unresolved")
 
-
 def _stable_identity(schema: str, payload: Mapping[str, object]) -> str:
     encoded = json.dumps(
         {"schema": schema, "payload": payload},
@@ -175,7 +174,6 @@ def presentation_identity(
             "compact": compact,
         },
     )
-
 
 def ownership_authority_contract(
     trace: Mapping[str, object],
