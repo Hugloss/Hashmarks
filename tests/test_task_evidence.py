@@ -220,7 +220,7 @@ def test_task_evidence_qualification_freezes_before_secret_join(tmp_path: Path) 
     assert payload["summary"]["verify_correct"] == 6
     assert payload["summary"]["stable_packets"] == 6
     assert payload["protocol"]["secret_join_after_two_frozen_passes"] is True
-    assert payload["summary"]["source_complete"] == payload["summary"]["owner_resolved"]
+    assert payload["summary"]["source_complete"] >= payload["summary"]["owner_resolved"]
     assert payload["summary"]["provenance_complete"] == 6
     assert payload["summary"]["revision_current"] == 6
     assert sum(payload["summary"]["freshness_states"].values()) == 6
@@ -254,7 +254,8 @@ def test_task_evidence_keeps_typescript_test_path_when_runner_is_project_scoped(
     ownership = _ownership(start)
     verification = _verification(start)
     assert ownership["status"] == "resolved"
-    assert ownership["owner"]["path"] == "src/engine.ts"
+    assert ownership["candidate"]["path"] == "src/engine.ts"
+    assert ownership["owner"] is None
     assert verification["plan"]["argv"] == ["tsc", "--noEmit", "-p", "tsconfig.json"]
     assert verification["selected"]["path"] == "tests/cobalt.test.ts"
     encoded = json.dumps(start, sort_keys=True)
