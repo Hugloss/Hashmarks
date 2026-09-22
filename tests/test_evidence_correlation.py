@@ -270,6 +270,33 @@ def test_bundle_reordering_does_not_change_correlation_identity(
     assert [row["bundle_id"] for row in first["bundles"]] == ["a", "b"]
 
 
+def test_anchor_reordering_within_bundle_does_not_change_correlation_identity(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.py").write_text("A = 1\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("B = 1\n", encoding="utf-8")
+    anchors = [
+        {"anchor_id": "b:0", "path": "b.py", "metadata": {"ordinal": 2}},
+        {"anchor_id": "a:0", "path": "a.py", "metadata": {"ordinal": 1}},
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        first = codemap.correlate_evidence(
+            _bundle(*anchors), include_relationships=False
+        )
+        second = codemap.correlate_evidence(
+            _bundle(*reversed(anchors)), include_relationships=False
+        )
+
+    assert first == second
+    assert first["correlation_identity"] == second["correlation_identity"]
+    assert [anchor["anchor_id"] for anchor in first["bundles"][0]["anchors"]] == [
+        "a:0",
+        "b:0",
+    ]
+    assert first["bundles"][0]["anchors"][0]["claims"]["metadata"] == {"ordinal": 1}
+
+
 def test_symbol_candidate_bound_preserves_ambiguity(
     tmp_path: Path,
 ) -> None:
@@ -728,7 +755,11 @@ def test_exact_module_locator_reuses_repository_module_identity(
             include_relationships=False,
         )
 
-    owned, external = packet["bundles"][0]["anchors"]
+    anchors = {
+        anchor["anchor_id"]: anchor for anchor in packet["bundles"][0]["anchors"]
+    }
+    owned = anchors["owned"]
+    external = anchors["external"]
     assert owned["resolution"]["state"] == "resolved-unique"
     assert owned["resolution"]["repository_path"] == "src/utils/kafka.py"
     assert owned["resolution"]["reason"] == "module-only"

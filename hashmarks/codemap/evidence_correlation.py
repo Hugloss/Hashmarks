@@ -934,6 +934,7 @@ class EvidenceCorrelationMixin:
             metadata_bytes += anchor_metadata_bytes
             anchors.append(anchor)
             bindings.append(binding)
+        anchors.sort(key=lambda row: str(row["anchor_id"]))
         return _PreparedBundle(
             packet={
                 "bundle_id": declaration.bundle_id,
