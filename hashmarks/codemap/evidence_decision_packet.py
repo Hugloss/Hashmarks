@@ -92,7 +92,6 @@ class DecisionPacketMixin:
         self,
         *,
         action: Mapping[str, object],
-        edit: Mapping[str, object] | None,
         verify: Mapping[str, object] | None,
         build: Mapping[str, object],
         limit: int,
@@ -109,7 +108,13 @@ class DecisionPacketMixin:
             needed, reason = True, "no-supported-owner-candidate"
         elif bool(ambiguity.get("ambiguous")):
             needed, reason = True, "competing-action-roles"
-        elif edit is None:
+        elif not bool(
+            (
+                action.get("ownership_authority")
+                if isinstance(action.get("ownership_authority"), Mapping)
+                else {}
+            ).get("owner_resolved")
+        ):
             needed, reason = True, "ownership-unresolved"
         elif verify is None:
             needed, reason = True, "missing-verification-evidence"
@@ -125,6 +130,21 @@ class DecisionPacketMixin:
             "interpretation": "evidence-discrimination-only",
             "consumer_action": "external",
         }
+
+    @staticmethod
+    def _decision_packet_edit_projection(
+        action: Mapping[str, object],
+    ) -> Mapping[str, object] | None:
+        ambiguity = (
+            action.get("ambiguity")
+            if isinstance(action.get("ambiguity"), Mapping)
+            else {}
+        )
+        if bool(ambiguity.get("ambiguous")):
+            value = action.get("admitted_edit")
+        else:
+            value = action.get("edit")
+        return value if isinstance(value, Mapping) else None
 
     def _decision_packet_identity(
         self,
@@ -215,20 +235,13 @@ class DecisionPacketMixin:
             per_role=per_role,
         )
         timing.record("action_map")
-        candidate = action.get("edit")
-        edit = candidate if isinstance(candidate, Mapping) else None
-        admitted_edit = (
-            action.get("admitted_edit")
-            if isinstance(action.get("admitted_edit"), Mapping)
-            else None
-        )
+        edit = self._decision_packet_edit_projection(action)
         verify = (
             action.get("verify") if isinstance(action.get("verify"), dict) else None
         )
         build = self._codemap_build_state()
         discrimination = self._decision_packet_discrimination(
             action=action,
-            edit=admitted_edit,
             verify=verify,
             build=build,
             limit=limit,
@@ -259,7 +272,7 @@ class DecisionPacketMixin:
             "schema": "hashmarks.task-decision-packet.v2",
             "task": task,
             "edit": edit,
-            "candidate": candidate,
+            "candidate": action.get("edit"),
             "ownership_authority": action.get("ownership_authority"),
             "verify": verify,
             "verification_relevance": action.get("verification_relevance"),
