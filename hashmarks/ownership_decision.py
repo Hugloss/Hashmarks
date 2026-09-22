@@ -72,7 +72,9 @@ def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, boo
     owner_eligible = bool(state.owner_eligible)
     structural_selected = str((state.structural_owner or {}).get("selected") or "")
     edit_path = str((state.edit or {}).get("path") or "")
-    structural_resolution = bool(structural_selected and structural_selected == edit_path)
+    structural_resolution = bool(
+        structural_selected and structural_selected == edit_path
+    )
     ambiguity_cleared = status == "resolved" and (
         not state.ambiguous or structural_resolution
     )

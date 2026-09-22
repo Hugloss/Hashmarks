@@ -231,7 +231,9 @@ def test_invalid_bounded_presentation_counts_fail_closed() -> None:
         )
 
 
-def test_resolved_canonical_selection_is_admissible_without_new_metadata_basis() -> None:
+def test_resolved_canonical_selection_is_admissible_without_new_metadata_basis() -> (
+    None
+):
     trace = ownership_decision_trace(
         OwnershipDecisionState(
             edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},
