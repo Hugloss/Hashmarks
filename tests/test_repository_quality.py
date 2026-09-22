@@ -22,6 +22,12 @@ def _case(**overrides):
         "task_family": "owner-selection",
         "risk_class": "change-support",
         "label_basis": "independently reviewed repository evidence",
+        "benchmark_registry": "hashmarks.repository-quality-registry.v1",
+        "ground_truth_schema": "hashmarks.repository-quality-ground-truth.v1",
+        "metric_policy": "hashmarks.lexicographic-quality.v1",
+        "qualification_policy": "hashmarks.repository-quality-qualification.v1",
+        "evaluation_profile": "change-support.v1",
+        "proof_mode": "unit",
         "semantic_truth": "unique-owner",
         "admitted_evidence_truth": "sufficient",
         "expected_owner": "src/widget.py::widget",
@@ -311,3 +317,51 @@ def test_false_ambiguity_reduces_precision_and_remains_hard_failure() -> None:
     assert report["hard_zero"]["sufficient_unique_reported_ambiguous"] == 1
     assert report["abstention_quality"]["true_ambiguity_precision"] == 0.5
     assert report["abstention_quality"]["true_ambiguity_recall"] == 1
+
+
+def test_policy_identity_is_bound_into_case_identity() -> None:
+    original = _case()
+    changed = _case(evaluation_profile="release-critical.v1")
+    assert case_identity(original) != case_identity(changed)
+
+
+def test_policy_version_mismatch_fails_closed() -> None:
+    with pytest.raises(ValueError, match="metric_policy"):
+        evaluate_case(
+            _case(metric_policy="hashmarks.lexicographic-quality.v0"),
+            {"state": "resolved", "owner": "src/widget.py::widget"},
+        )
+
+
+def test_qualification_identity_ignores_diagnostic_membership() -> None:
+    active = _qualification_rows()
+    shadow = evaluate_case(
+        _case(case_id="shadow", corpus_class="shadow"),
+        {"state": "resolved", "owner": "src/widget.py::widget"},
+    )
+    baseline = summarize(active)
+    with_shadow = summarize([*active, shadow])
+    assert baseline["corpus"]["identity"] != with_shadow["corpus"]["identity"]
+    assert (
+        baseline["corpus"]["qualification_identity"]
+        == with_shadow["corpus"]["qualification_identity"]
+    )
+
+
+def test_slice_quality_reports_task_risk_and_profile_without_global_score() -> None:
+    report = summarize(_qualification_rows())
+    assert report["slice_quality"]["macro_by_task_family"]["owner-selection"]["cases"] == 4
+    assert report["slice_quality"]["macro_by_risk_class"]["change-support"]["cases"] == 4
+    assert (
+        report["slice_quality"]["macro_by_evaluation_profile"]["change-support.v1"]["cases"]
+        == 4
+    )
+    assert "score" not in report
+
+
+def test_proof_mode_registry_reports_missing_modes_without_inventing_proof() -> None:
+    report = summarize(_qualification_rows())
+    proof = report["benchmark_health"]["proof_modes"]
+    assert proof["counts"]["unit"] == 4
+    assert proof["present"] == ["unit"]
+    assert proof["missing"] == ["adversarial", "boundary", "lifecycle", "mutation"]
