@@ -377,3 +377,21 @@ def test_ambiguity_is_sticky_across_retrieval_presentation_bounds(
         "src/right.py",
     }
     assert action["ambiguity"]["ambiguous"] is True
+
+
+def test_task_action_brief_preserves_authority_proof_identity_across_budgets(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    task = "Refactor engine.widget without changing behavior"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20, per_role=3)
+        briefs = [
+            codemap.task_action_brief(task, limit=20, per_role=3, token_budget=budget)
+            for budget in (32, 64, 256)
+        ]
+
+    proof = action["ownership_authority"]["authority_proof_identity"]
+    assert {brief["authority_proof_identity"] for brief in briefs} == {proof}
+    assert {brief["candidate"] for brief in briefs} == {"src/engine.py"}
