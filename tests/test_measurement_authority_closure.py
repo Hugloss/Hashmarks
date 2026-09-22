@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from scripts.repository_evaluation.merge_runs import merge_runs
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -56,14 +58,18 @@ def test_controller_cutoff_has_no_product_failure_authority() -> None:
 
 
 def test_resume_receipts_suppress_timing_authority() -> None:
-    text = (ROOT / "scripts/repository_evaluation/run_cases.py").read_text(
-        encoding="utf-8"
-    )
-    assert '"timing_comparable": reused == 0' in text
-    merge = (ROOT / "scripts/repository_evaluation/merge_runs.py").read_text(
-        encoding="utf-8"
-    )
-    assert (
-        '"timing_comparable": all(bool(run.get("timing_comparable")) for run in runs)'
-        in merge
-    )
+    first = {
+        "suite": "authority",
+        "protocol_identity": "sha256:protocol",
+        "repository_identity": "sha256:repository",
+        "producer_implementation_identity": "sha256:producer",
+        "producer_artifact_identity": None,
+        "cases_sha256": "sha256:cases",
+        "shard_count": 2,
+        "shard_index": 0,
+        "timing_comparable": True,
+        "cases": [],
+    }
+    resumed = {**first, "shard_index": 1, "timing_comparable": False}
+
+    assert merge_runs([first, resumed])["timing_comparable"] is False

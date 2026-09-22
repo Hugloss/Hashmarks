@@ -1,4 +1,5 @@
 import contextlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -112,6 +113,53 @@ def test_repository_evaluation_receipt_rejects_target_repository_identity_drift(
     _write(repo, "src/live.py", "def active_target():\n    return 2\n")
     with pytest.raises(ValueError, match="receipt identity mismatch"):
         run_cases(workspace=repo, cases_path=cases, receipts_dir=receipts)
+
+
+@pytest.mark.parametrize(
+    ("case_rows", "options", "message"),
+    [
+        ([], {}, "non-empty cases list"),
+        (["not-an-object"], {}, "case must be an object"),
+        ([{"operation": "task_action_map", "task": "target"}], {}, "id is required"),
+        (
+            [{"id": "target", "operation": "unknown", "task": "target"}],
+            {},
+            "unsupported repository evaluation operation",
+        ),
+        (
+            [{"id": "target", "operation": "task_action_map", "task": "target"}],
+            {"shard_count": 0},
+            "invalid repository evaluation shard",
+        ),
+    ],
+)
+def test_repository_evaluation_rejects_invalid_selection_contract(
+    tmp_path: Path,
+    case_rows: list[object],
+    options: dict[str, int],
+    message: str,
+) -> None:
+    repo = tmp_path / "repo"
+    _write(repo, "src/live.py", "def target():\n    return 1\n")
+    cases = tmp_path / "cases.json"
+    cases.write_text(
+        json.dumps(
+            {
+                "schema": "hashmarks.repository-evaluation-cases.v1",
+                "suite": "invalid-selection",
+                "cases": case_rows,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=message):
+        run_cases(
+            workspace=repo,
+            cases_path=cases,
+            receipts_dir=tmp_path / "receipts",
+            **options,
+        )
 
 
 def test_repository_evaluation_grader_classifies_false_safe_edit() -> None:
