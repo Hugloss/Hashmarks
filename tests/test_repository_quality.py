@@ -365,3 +365,73 @@ def test_proof_mode_registry_reports_missing_modes_without_inventing_proof() -> 
     assert proof["counts"]["unit"] == 4
     assert proof["present"] == ["unit"]
     assert proof["missing"] == ["adversarial", "boundary", "lifecycle", "mutation"]
+
+
+def test_ranking_metrics_are_diagnostic_and_do_not_change_authority() -> None:
+    ranked = evaluate_case(
+        _case(case_id="ranked"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "ranking": {"rank": 2},
+            "verification": {"rank": 5},
+        },
+    )
+    report = summarize([ranked, *_qualification_rows()[1:]])
+    assert report["qualification"] == "qualified"
+    assert report["ranking_quality"]["owner"]["recall_at_1"] == 0
+    assert report["ranking_quality"]["owner"]["recall_at_5"] == 1
+    assert report["ranking_quality"]["owner"]["mrr"] == 0.5
+    assert report["ranking_quality"]["verification"]["recall_at_5"] == 1
+
+
+def test_stability_metrics_are_unknown_without_observations() -> None:
+    report = summarize(_qualification_rows())
+    assert report["stability_quality"]["paraphrase_owner_stable"] is None
+    assert report["stability_quality"]["projection_authority_stable"] is None
+
+
+def test_stability_observations_report_rates_without_granting_authority() -> None:
+    stable = evaluate_case(
+        _case(case_id="stable"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "stability": {
+                "paraphrase_owner_stable": True,
+                "retrieval_bound_owner_stable": True,
+                "projection_authority_stable": True,
+                "generation_authority_stable": False,
+            },
+        },
+    )
+    report = summarize([stable, *_qualification_rows()[1:]])
+    assert report["qualification"] == "qualified"
+    assert report["stability_quality"]["paraphrase_owner_stable"] == 1
+    assert report["stability_quality"]["generation_authority_stable"] == 0
+
+
+def test_economics_missing_is_unknown_and_observed_values_are_bounded_diagnostics() -> None:
+    baseline = summarize(_qualification_rows())
+    assert baseline["economics"]["cases"] == 0
+    assert baseline["economics"]["metrics"]["latency_ms"]["min"] is None
+    measured = evaluate_case(
+        _case(case_id="measured"),
+        {
+            "state": "resolved",
+            "owner": "src/widget.py::widget",
+            "economics": {
+                "latency_ms": 12,
+                "rows_inspected": 40,
+                "candidate_count": 5,
+                "peak_memory_bytes": 1024,
+            },
+        },
+    )
+    report = summarize([measured, *_qualification_rows()[1:]])
+    assert report["economics"]["metrics"]["latency_ms"] == {
+        "samples": 1,
+        "min": 12,
+        "max": 12,
+    }
+    assert report["qualification"] == "qualified"
