@@ -295,7 +295,9 @@ class TaskRetrievalMixin:
     ) -> float:
         if not raw_query:
             return 0.0
-        exact_qual, exact_name, qual_contains, path_contains, signature_contains = weights
+        exact_qual, exact_name, qual_contains, path_contains, signature_contains = (
+            weights
+        )
         return sum(
             (
                 exact_qual if raw_query == surface.qualname else 0.0,
@@ -467,22 +469,22 @@ class TaskRetrievalMixin:
         if any(ch in raw for ch in "_-/"):
             bonus += 1.5
         if term in {
-                "api",
-                "goon",
-                "plan",
-                "fleet",
-                "uv",
-                "scout",
-                "codemap",
-                "hashmarks",
-                "executor",
-                "certification",
-                "workspace",
-                "runtime",
-                "contract",
-                "identity",
-                "schedule",
-                "repository",
+            "api",
+            "goon",
+            "plan",
+            "fleet",
+            "uv",
+            "scout",
+            "codemap",
+            "hashmarks",
+            "executor",
+            "certification",
+            "workspace",
+            "runtime",
+            "contract",
+            "identity",
+            "schedule",
+            "repository",
         }:
             bonus += 1.0
         return rarity + bonus, len(term), term
@@ -576,8 +578,7 @@ class TaskRetrievalMixin:
         selected: dict[str, dict[str, object]] = {}
         for row in symbols:
             text = " ".join(
-                str(row.get(key) or "").lower()
-                for key in ("path", "name", "qualname")
+                str(row.get(key) or "").lower() for key in ("path", "name", "qualname")
             )
             if token in text:
                 selected.setdefault(str(row.get("path") or ""), row)
@@ -599,9 +600,7 @@ class TaskRetrievalMixin:
         return SearchHit(
             path=path,
             score=1000.0 if symbol is not None else 900.0,
-            kind=str(symbol.get("kind") or "symbol")
-            if symbol is not None
-            else "file",
+            kind=str(symbol.get("kind") or "symbol") if symbol is not None else "file",
             name=_nonempty_str(symbol.get("name")) if symbol is not None else None,
             qualname=_nonempty_str(symbol.get("qualname"))
             if symbol is not None

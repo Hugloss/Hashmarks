@@ -112,9 +112,7 @@ class EvidenceGraphMixin:
         )
 
     @staticmethod
-    def _longest_module_paths(
-        target: str, resolved: dict[str, list[str]]
-    ) -> list[str]:
+    def _longest_module_paths(target: str, resolved: dict[str, list[str]]) -> list[str]:
         parts = target.split(".")
         for index in range(len(parts), 0, -1):
             paths = resolved.get(".".join(parts[:index]), [])
@@ -145,18 +143,14 @@ class EvidenceGraphMixin:
             for row in raw_rows
             for prefix in (
                 ".".join(str(row.get("target") or "").split(".")[:index])
-                for index in range(
-                    1, len(str(row.get("target") or "").split(".")) + 1
-                )
+                for index in range(1, len(str(row.get("target") or "").split(".")) + 1)
             )
             if prefix
         }
         resolved = self.store.module_paths_many(prefixes)
         nxt: set[str] = set()
         for row in raw_rows:
-            paths = self._longest_module_paths(
-                str(row.get("target") or ""), resolved
-            )
+            paths = self._longest_module_paths(str(row.get("target") or ""), resolved)
             if len(paths) == 1 and frontier.intersection(paths):
                 source = str(row.get("path") or "")
                 if source and source not in seen:

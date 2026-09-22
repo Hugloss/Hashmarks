@@ -280,11 +280,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         )
         result: dict[str, object] = {
             "schema": "hashmarks.task-action-brief.v1",
-            "status": "unsafe"
-            if not safe
-            else "safe-stale"
-            if stale
-            else "safe-fresh",
+            "status": "unsafe" if not safe else "safe-stale" if stale else "safe-fresh",
             "candidate": action.get("candidate_path"),
             "evidence_receipt": self._decision_evidence_receipt(
                 task, action, verification

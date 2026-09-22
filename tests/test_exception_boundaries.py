@@ -168,9 +168,7 @@ def _broad_handler_names(handler: ast.ExceptHandler) -> set[str]:
     return set()
 
 
-def _enclosing_function(
-    node: ast.AST, parents: dict[ast.AST, ast.AST]
-) -> str:
+def _enclosing_function(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> str:
     owner = node
     while owner in parents:
         owner = parents[owner]
