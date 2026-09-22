@@ -35,7 +35,9 @@ def test_retained_real_world_manifest_is_valid_and_identity_bound() -> None:
     assert corpus_manifest_identity(manifest).startswith("sha256:")
     assert qualification_membership_identity(manifest).startswith("sha256:")
     cases = {case["case_id"]: case for case in manifest["cases"]}
-    assert cases["oh-goon-993-publish-strict-attempt-outputs"]["state"] == "qualification"
+    assert (
+        cases["oh-goon-993-publish-strict-attempt-outputs"]["state"] == "qualification"
+    )
     assert cases["oh-goon-physical-attempt-reincarnation"]["state"] == "shadow"
 
 
@@ -92,7 +94,9 @@ def test_historical_case_cannot_be_silently_repromoted() -> None:
         )
 
 
-def test_mutation_harness_enforces_presentation_invariance_and_generation_change() -> None:
+def test_mutation_harness_enforces_presentation_invariance_and_generation_change() -> (
+    None
+):
     def evaluate(payload):
         if payload.get("owner_generation_mutation"):
             return "sha256:new-owner"
@@ -121,7 +125,6 @@ def test_mutation_harness_detects_limit_sensitive_authority_bug() -> None:
     )
     assert results[0]["violation"] is True
     assert results[0]["presentation_only"] is True
-
 
 
 def test_corpus_health_distinguishes_retained_from_fresh_dogfood() -> None:
