@@ -1,0 +1,3 @@
+# Repository text is canonical LF in Git and checked-out worktrees.
+# Binary files remain binary through Git's normal text detection.
+* text=auto eol=lf
