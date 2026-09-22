@@ -183,7 +183,7 @@ def run(
             "id": row["id"],
             "category": str(truth.get("category") or "unknown"),
             "ownership_status": str(ownership.get("status") or "unresolved"),
-            "owner_resolved": str(ownership.get("status") or "") == "resolved",
+            "owner_resolved": isinstance(ownership.get("owner"), dict),
             "candidate_correct": edit_correct,
             "verify_correct": verify_correct,
             "fully_correct": edit_correct and verify_correct,
@@ -210,7 +210,7 @@ def run(
         "fully_correct": sum(bool(row["fully_correct"]) for row in results),
         "owner_resolved": sum(bool(row["owner_resolved"]) for row in results),
         "owner_unresolved_or_ambiguous": sum(
-            row["ownership_status"] != "resolved" for row in results
+            not bool(row["owner_resolved"]) for row in results
         ),
         "source_complete": sum(bool(row["source_complete"]) for row in results),
         "stable_packets": sum(bool(row["stable"]) for row in results),
