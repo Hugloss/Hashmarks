@@ -131,3 +131,61 @@ def test_splunk_csv_dogfood_correlates_through_existing_repository_owner(
     assert result["authority"] == "repository-intelligence-only"
     assert result["interpretation_authority"] == "consumer-owned"
     assert result["causation"] == "not-inferred"
+
+
+def test_splunk_csv_dogfood_prioritizes_traceback_path_line_symbol_anchor(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","  File \"/app/src/utils/__init__.py\", '
+        'line 280, in process_output_data"\n'
+        '"2","2026-09-14T23:59:57.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","INFO name=api.kafka_consumer"\n',
+    )
+
+    report = collect(source, max_anchors=1)
+    assert report["summary"]["traceback_anchors_observed"] == 1
+    assert report["summary"]["traceback_anchors_emitted"] == 1
+    assert report["summary"]["module_anchors_observed"] == 1
+    assert report["summary"]["module_anchors_emitted"] == 0
+    anchor = report["bundle"]["anchors"][0]
+    assert anchor["path"] == "/app/src/utils/__init__.py"
+    assert anchor["line"] == 280
+    assert anchor["symbol"] == "process_output_data"
+    assert anchor["metadata"]["kind"] == "python-traceback-frame"
+
+
+def test_splunk_csv_dogfood_correlates_traceback_with_explicit_path_mapping(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","  File \"/app/src/utils/__init__.py\", '
+        'line 2, in process_output_data"\n',
+    )
+    workspace = tmp_path / "repo"
+    (workspace / "utils").mkdir(parents=True)
+    (workspace / "utils" / "__init__.py").write_text(
+        "def process_output_data():\n    return 1\n",
+        encoding="utf-8",
+    )
+
+    result = correlate(
+        workspace,
+        collect(source),
+        path_mappings=[
+            {
+                "external_prefix": "/app/src",
+                "repository_prefix": "",
+            }
+        ],
+    )
+    assert result["resolution_states"] == {"resolved-unique": 1}
+    anchor = result["packet"]["bundles"][0]["anchors"][0]
+    assert anchor["resolution"]["repository_path"] == "utils/__init__.py"
+    assert anchor["resolution"]["path_origin"] == "explicit-path-mapping"
