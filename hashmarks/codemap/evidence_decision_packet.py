@@ -114,10 +114,13 @@ class DecisionPacketMixin:
             needed, reason = True, "ownership-unresolved"
         elif verify is None:
             needed, reason = True, "missing-verification-evidence"
+        candidate = (
+            action.get("edit") if isinstance(action.get("edit"), Mapping) else None
+        )
         return {
             "needed": needed,
             "reason": reason,
-            "candidates": self._decision_packet_candidates(action, edit, verify),
+            "candidates": self._decision_packet_candidates(action, candidate, verify),
             "ambiguity": ambiguity if bool(ambiguity.get("ambiguous")) else None,
             "candidate_scope": "repository-evidence-only",
             "interpretation": "evidence-discrimination-only",
