@@ -383,6 +383,17 @@ def _stability_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _economics_metric(
+    observed: Sequence[Mapping[str, Any]], key: str
+) -> dict[str, Any]:
+    values = [item[key] for item in observed if item.get(key) is not None]
+    return {
+        "samples": len(values),
+        "min": min(values) if values else None,
+        "max": max(values) if values else None,
+    }
+
+
 def _economics_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     observed = [
         row["economics"]
@@ -392,17 +403,7 @@ def _economics_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     keys = ("latency_ms", "rows_inspected", "candidate_count", "peak_memory_bytes")
     return {
         "cases": len(observed),
-        "metrics": {
-            key: {
-                "samples": len(values),
-                "min": min(values) if values else None,
-                "max": max(values) if values else None,
-            }
-            for key in keys
-            for values in [
-                [item[key] for item in observed if item.get(key) is not None]
-            ]
-        },
+        "metrics": {key: _economics_metric(observed, key) for key in keys},
     }
 
 
@@ -410,20 +411,29 @@ def _qualification_identity(rows: Sequence[Mapping[str, Any]]) -> str:
     return _corpus_identity(rows)
 
 
-def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    score_rows = [
+def _score_rows(rows: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    return [
         row
         for row in rows
         if row["ground_truth_status"] == "valid"
         and row["corpus_class"] == "qualification"
         and row["lifecycle"] == "active"
     ]
+
+
+def _benchmark_counts(rows: Sequence[Mapping[str, Any]]) -> tuple[int, int]:
     adjudication = sum(
         row["ground_truth_status"]
         in {"ambiguous-ground-truth", "insufficient-ground-truth"}
         for row in rows
     )
     invalid = sum(row["ground_truth_status"] == "invalid-case" for row in rows)
+    return adjudication, invalid
+
+
+def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    score_rows = _score_rows(rows)
+    adjudication, invalid = _benchmark_counts(rows)
     slice_health = _critical_slice_health(score_rows)
     if not rows or not score_rows or invalid or not slice_health["adequate"]:
         qualification = "benchmark-not-ready"
