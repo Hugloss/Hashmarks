@@ -50,14 +50,10 @@ class _ModuleStats:
         self.recovered += int(parser_state == "recovered")
         self.widened += int(widened)
         self.first_time = (
-            timestamp
-            if self.first_time is None
-            else min(self.first_time, timestamp)
+            timestamp if self.first_time is None else min(self.first_time, timestamp)
         )
         self.last_time = (
-            timestamp
-            if self.last_time is None
-            else max(self.last_time, timestamp)
+            timestamp if self.last_time is None else max(self.last_time, timestamp)
         )
         if len(self.sample_event_ids) < 3:
             self.sample_event_ids.append(event_id)
@@ -156,7 +152,9 @@ def _anchor(module: str, stats: _ModuleStats) -> dict[str, object]:
     }
 
 
-def collect(path: Path, *, max_anchors: int = _DEFAULT_MAX_ANCHORS) -> dict[str, object]:
+def collect(
+    path: Path, *, max_anchors: int = _DEFAULT_MAX_ANCHORS
+) -> dict[str, object]:
     if max_anchors < 1 or max_anchors > _DEFAULT_MAX_ANCHORS:
         raise ValueError(f"max_anchors must be between 1 and {_DEFAULT_MAX_ANCHORS}")
     source_sha256 = _sha256_file(path)
@@ -177,10 +175,7 @@ def collect(path: Path, *, max_anchors: int = _DEFAULT_MAX_ANCHORS) -> dict[str,
     with path.open("r", encoding="utf-8", newline="") as handle:
         header = tuple(next(csv.reader([handle.readline()])))
         if header != EXPECTED_HEADER:
-            raise ValueError(
-                "Splunk CSV header must be "
-                + ",".join(EXPECTED_HEADER)
-            )
+            raise ValueError("Splunk CSV header must be " + ",".join(EXPECTED_HEADER))
         for ordinal, text in _logical_records(handle):
             event_count += 1
             physical_lines += text.count("\n")
@@ -191,9 +186,7 @@ def collect(path: Path, *, max_anchors: int = _DEFAULT_MAX_ANCHORS) -> dict[str,
             strict_valid_count += int(parsed.parser_state == "strict-valid")
             recovered_count += int(parsed.parser_state == "recovered")
             widened_count += int(parsed.widened)
-            serial, timestamp, source, sourcetype, _host, index, _server = (
-                parsed.fields
-            )
+            serial, timestamp, source, sourcetype, _host, index, _server = parsed.fields
             del serial
             first_time = timestamp if first_time is None else min(first_time, timestamp)
             last_time = timestamp if last_time is None else max(last_time, timestamp)
