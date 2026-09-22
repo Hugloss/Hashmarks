@@ -277,11 +277,9 @@ class PostChangeMixin(ChangeImpactMixin):
         elif previous_revision != current_revision:
             invalidated.append("candidate-source-revision")
 
-        if (
-            previous_why != current_why
-            or self._post_change_previous_value(previous_evidence, "candidate_path")
-            != self._post_change_previous_value(current, "candidate_path")
-        ):
+        if previous_why != current_why or self._post_change_previous_value(
+            previous_evidence, "candidate_path"
+        ) != self._post_change_previous_value(current, "candidate_path"):
             replacement["provenance"] = {
                 key: provenance[key] for key in ("why", "revision") if key in provenance
             }

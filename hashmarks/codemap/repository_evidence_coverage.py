@@ -210,10 +210,9 @@ class RepositoryEvidenceCoverageMixin:
         cls,
         detail: Mapping[str, object],
     ) -> set[str]:
-        return (
-            cls._direct_binding_impact_reasons(detail)
-            | cls._relationship_binding_impact_reasons(detail)
-        )
+        return cls._direct_binding_impact_reasons(
+            detail
+        ) | cls._relationship_binding_impact_reasons(detail)
 
     @classmethod
     def _binding_impacts(
@@ -229,9 +228,7 @@ class RepositoryEvidenceCoverageMixin:
             evidence_paths, dependency_paths = cls._binding_paths(binding)
             detail = changed_bindings.get(binding_id)
             reasons = (
-                cls._binding_impact_reasons(detail)
-                if detail is not None
-                else set()
+                cls._binding_impact_reasons(detail) if detail is not None else set()
             )
             if detail is None and changed_paths & evidence_paths:
                 reasons.add("bound-member-precision-unknown")
@@ -281,7 +278,10 @@ class RepositoryEvidenceCoverageMixin:
                 and repository_observation.dirty_path_count == len(observed)
                 and repository_observation.state is not ObservationState.UNKNOWN
             )
-            if change_set_complete is not None and bool(change_set_complete) != complete:
+            if (
+                change_set_complete is not None
+                and bool(change_set_complete) != complete
+            ):
                 raise ValueError(
                     "change_set_complete conflicts with repository_observation"
                 )
@@ -307,10 +307,7 @@ class RepositoryEvidenceCoverageMixin:
                 "changed_paths is required when repository_observation is not supplied"
             )
         changed = sorted(
-            {
-                normalize_relative_path(path, allow_root=False)
-                for path in changed_paths
-            }
+            {normalize_relative_path(path, allow_root=False) for path in changed_paths}
         )
         complete = bool(change_set_complete)
         return (
@@ -334,7 +331,9 @@ class RepositoryEvidenceCoverageMixin:
             and binding_delta.get("schema")
             != "hashmarks.repository-evidence-binding-delta.v1"
         ):
-            raise ValueError("binding_delta must be a repository evidence binding delta")
+            raise ValueError(
+                "binding_delta must be a repository evidence binding delta"
+            )
         if binding_delta is None:
             return
         identities = binding_delta.get("bindings_identity")
@@ -485,4 +484,3 @@ class RepositoryEvidenceCoverageMixin:
             "hashmarks.repository-evidence-coverage.v1", payload
         )
         return payload
-

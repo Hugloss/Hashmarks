@@ -126,7 +126,11 @@ def test_unique_edit_candidate_resolves_without_structural_edge() -> None:
         OwnershipDecisionState(
             edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},
             competing=[
-                {"path": "tests/test_owner.py", "canonical_rank": 2, "roles": ["verify"]}
+                {
+                    "path": "tests/test_owner.py",
+                    "canonical_rank": 2,
+                    "roles": ["verify"],
+                }
             ],
             structural_owner=None,
             ambiguous=False,

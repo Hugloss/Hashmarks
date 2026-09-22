@@ -128,9 +128,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             explicit_config_surface_request=bool(
                 surface.explicit_config_surface_request
             ),
-            explicit_edit_surface_selected=bool(
-                surface.explicit_edit_surface_selected
-            ),
+            explicit_edit_surface_selected=bool(surface.explicit_edit_surface_selected),
             limit=limit,
         )
         return _TaskActionSelectionState(
@@ -139,9 +137,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             contract=surface.contract,
             discrimination=discrimination,
             explicit_surface_ambiguity=surface.explicit_surface_ambiguity,
-            explicit_edit_surface_selected=bool(
-                surface.explicit_edit_surface_selected
-            ),
+            explicit_edit_surface_selected=bool(surface.explicit_edit_surface_selected),
             verification_anchor_tokens=cast(
                 "Sequence[str]", surface.verification_anchor_tokens
             ),
@@ -438,7 +434,9 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         explicit_build_tuning = bool(
             context.cue_words.intersection({"pytest", "test", "tests"})
             and context.cue_words.intersection({"batch", "batches", "shard", "shards"})
-            and context.cue_words.intersection({"size", "workers", "timeout", "timeouts"})
+            and context.cue_words.intersection(
+                {"size", "workers", "timeout", "timeouts"}
+            )
         )
         if explicit_build_tuning:
             build_surface, build_surface_ambiguous = self._projected_task_surface(

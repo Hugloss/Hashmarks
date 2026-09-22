@@ -11,7 +11,8 @@ def _snapshot(*, scope: dict[str, object] | None = None) -> dict[str, object]:
     return {
         "schema": "hashmarks.dependency-resolution.v1",
         "producer": {"kind": "uv-workspace-metadata", "schema_version": "preview-1"},
-        "scope": scope or {"python": "3.14", "platform": "linux", "groups": ["default"]},
+        "scope": scope
+        or {"python": "3.14", "platform": "linux", "groups": ["default"]},
         "roots": ["root"],
         "nodes": [
             {
@@ -68,7 +69,9 @@ def test_scope_change_is_not_package_delta(tmp_path: Path) -> None:
     assert delta["reason"] == "definition-changed"
 
 
-def test_resolution_delta_reports_node_change_without_recommendation(tmp_path: Path) -> None:
+def test_resolution_delta_reports_node_change_without_recommendation(
+    tmp_path: Path,
+) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         before = codemap.dependency_resolution_evidence(_snapshot())
@@ -108,7 +111,12 @@ def test_distribution_name_is_not_graph_identity(tmp_path: Path) -> None:
 def test_cycles_are_legal_but_dangling_edges_fail_closed(tmp_path: Path) -> None:
     cycle = _snapshot()
     cycle["edges"].append(
-        {"source": "crypto-registry", "target": "root", "kind": "dependency", "marker": ""}
+        {
+            "source": "crypto-registry",
+            "target": "root",
+            "kind": "dependency",
+            "marker": "",
+        }
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -140,7 +148,9 @@ def test_duplicate_node_and_edge_ids_fail_closed(tmp_path: Path) -> None:
 def test_repository_input_binding_requires_independent_member_revision(
     tmp_path: Path,
 ) -> None:
-    (tmp_path / "pyproject.toml").write_text("[project]\nname='demo'\nversion='0.1.0'\n")
+    (tmp_path / "pyproject.toml").write_text(
+        "[project]\nname='demo'\nversion='0.1.0'\n"
+    )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         unproven = _snapshot()
@@ -230,7 +240,9 @@ def test_owner_never_executes_dependency_tooling(tmp_path: Path, monkeypatch) ->
     assert packet["authority"] == "qualified-external-observation"
 
 
-def test_module_distribution_ownership_requires_explicit_observation(tmp_path: Path) -> None:
+def test_module_distribution_ownership_requires_explicit_observation(
+    tmp_path: Path,
+) -> None:
     snapshot = _snapshot()
     snapshot["module_ownership"] = [
         {
@@ -261,7 +273,9 @@ def test_distribution_name_never_implies_module_ownership(tmp_path: Path) -> Non
     assert result["distribution_nodes"] == []
 
 
-def test_import_correspondence_reuses_repository_import_identity(tmp_path: Path) -> None:
+def test_import_correspondence_reuses_repository_import_identity(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "consumer.py").write_text("import yaml\n")
     snapshot = _snapshot()
     snapshot["nodes"].append(
@@ -344,7 +358,12 @@ def test_dependency_delta_reports_edges_and_module_ownership(tmp_path: Path) -> 
         }
     )
     after_raw["edges"].append(
-        {"source": "crypto-registry", "target": "helper", "kind": "dependency", "marker": ""}
+        {
+            "source": "crypto-registry",
+            "target": "helper",
+            "kind": "dependency",
+            "marker": "",
+        }
     )
     after_raw["module_ownership"] = [
         {
@@ -365,7 +384,9 @@ def test_dependency_delta_reports_edges_and_module_ownership(tmp_path: Path) -> 
     assert delta["causation"] == "not-inferred"
 
 
-def test_dependency_correlation_reuses_generic_repository_locator_owner(tmp_path: Path) -> None:
+def test_dependency_correlation_reuses_generic_repository_locator_owner(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "consumer.py").write_text("import cryptography\n")
     snapshot = _snapshot()
     snapshot["module_ownership"] = [
@@ -420,15 +441,25 @@ def test_cryptography_upgrade_dogfood_preserves_correlation_without_causation(
         "[project]\nname='demo'\nversion='0.1.0'\ndependencies=['cryptography>=46.0.4']\n"
     )
     (tmp_path / "tests").mkdir()
-    (tmp_path / "tests" / "test_tls.py").write_text("def test_tls():\n    assert True\n")
+    (tmp_path / "tests" / "test_tls.py").write_text(
+        "def test_tls():\n    assert True\n"
+    )
     before_raw = _snapshot()
     before_raw["module_ownership"] = [
-        {"module": "cryptography", "owners": ["crypto-registry"], "completeness": "complete"}
+        {
+            "module": "cryptography",
+            "owners": ["crypto-registry"],
+            "completeness": "complete",
+        }
     ]
     after_raw = _snapshot()
     after_raw["nodes"][1]["version"] = "46.0.7"
     after_raw["module_ownership"] = [
-        {"module": "cryptography", "owners": ["crypto-registry"], "completeness": "complete"}
+        {
+            "module": "cryptography",
+            "owners": ["crypto-registry"],
+            "completeness": "complete",
+        }
     ]
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -461,17 +492,25 @@ def test_cryptography_upgrade_dogfood_preserves_correlation_without_causation(
 
     assert delta["nodes_changed"] == ["crypto-registry"]
     assert delta["causation"] == "not-inferred"
-    assert correlated["dependency_links"][0]["distribution_nodes"] == ["crypto-registry"]
+    assert correlated["dependency_links"][0]["distribution_nodes"] == [
+        "crypto-registry"
+    ]
     assert correlated["causation"] == "not-inferred"
     assert "recommendation" not in correlated
 
 
 @pytest.mark.parametrize("count", [1, 10, 100, 256])
-def test_dependency_correlation_bounded_anchor_scale(tmp_path: Path, count: int) -> None:
+def test_dependency_correlation_bounded_anchor_scale(
+    tmp_path: Path, count: int
+) -> None:
     (tmp_path / "owner.py").write_text("VALUE = 1\n")
     snapshot = _snapshot()
     snapshot["module_ownership"] = [
-        {"module": "cryptography", "owners": ["crypto-registry"], "completeness": "complete"}
+        {
+            "module": "cryptography",
+            "owners": ["crypto-registry"],
+            "completeness": "complete",
+        }
     ]
     anchors = [
         {"anchor_id": f"a-{index}", "path": "owner.py", "line": 1}
@@ -519,4 +558,6 @@ def test_dependency_correlation_incomplete_external_failure_cannot_prove_absence
         )
 
     assert packet["correlation"]["completeness"]["state"] == "incomplete"
-    assert packet["correlation"]["completeness"]["negative_evidence"] == "not-admissible"
+    assert (
+        packet["correlation"]["completeness"]["negative_evidence"] == "not-admissible"
+    )

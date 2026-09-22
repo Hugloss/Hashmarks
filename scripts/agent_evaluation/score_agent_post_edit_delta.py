@@ -266,9 +266,7 @@ def run(
         "generation_invalidated": sum(
             bool(row["generation_invalidated"]) for row in results
         ),
-        "candidate_reused": sum(
-            bool(row["candidate_reused"]) for row in results
-        ),
+        "candidate_reused": sum(bool(row["candidate_reused"]) for row in results),
         "verification_surface_reused": sum(
             bool(row["verification_surface_reused"]) for row in results
         ),

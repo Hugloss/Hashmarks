@@ -92,9 +92,7 @@ class WorkContextMixin:
             )
             for role in roles
         }
-        required_roles = [
-            role for role in roles if isinstance(action.get(role), dict)
-        ]
+        required_roles = [role for role in roles if isinstance(action.get(role), dict)]
         missing_roles = [role for role in required_roles if not role_coverage[role]]
         return role_coverage, required_roles, missing_roles
 
@@ -569,4 +567,3 @@ class WorkContextMixin:
             "ranking_effect": "none",
             "evidence": "bounded replay of canonical task-query views and path-level weighted RRF",
         }
-

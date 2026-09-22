@@ -191,7 +191,9 @@ def test_structural_locality_requires_exact_symbol_identity(tmp_path: Path) -> N
         except ValueError as exc:
             assert "path::qualname" in str(exc)
         else:
-            raise AssertionError("plain symbol name was accepted as structural-locality authority")
+            raise AssertionError(
+                "plain symbol name was accepted as structural-locality authority"
+            )
 
 
 def test_structural_locality_does_not_short_name_resolve_qualified_call(
@@ -217,9 +219,7 @@ def authority(client, value):
             max_depth=2,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == [
-        "pkg/core.py::authority"
-    ]
+    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
     assert packet["dimensions"]["unresolved_call_count"] == 0
     assert packet["dimensions"]["external_or_unindexed_call_count"] == 1
     row = packet["external_or_unindexed_calls"][0]
@@ -281,9 +281,7 @@ def authority(helper, value):
             max_depth=2,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == [
-        "pkg/core.py::authority"
-    ]
+    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
     assert packet["dimensions"]["unresolved_call_count"] == 0
     assert packet["dimensions"]["external_or_unindexed_call_count"] == 1
     row = packet["external_or_unindexed_calls"][0]
@@ -316,16 +314,12 @@ def test_structural_locality_exact_callers_are_positive_reuse_evidence(
     _write(
         tmp_path,
         "pkg/a.py",
-        "from pkg.shared import helper\n"
-        "def use_a(value):\n"
-        "    return helper(value)\n",
+        "from pkg.shared import helper\ndef use_a(value):\n    return helper(value)\n",
     )
     _write(
         tmp_path,
         "pkg/b.py",
-        "from pkg.shared import helper\n"
-        "def use_b(value):\n"
-        "    return helper(value)\n",
+        "from pkg.shared import helper\ndef use_b(value):\n    return helper(value)\n",
     )
 
     with _codemap(tmp_path) as codemap:
@@ -337,9 +331,7 @@ def test_structural_locality_exact_callers_are_positive_reuse_evidence(
     target = packet["nodes"][0]
     assert target["symbol_id"] == "pkg/shared.py::helper"
     assert target["exact_caller_count"] == 2
-    assert {
-        (row["path"], row["source"]) for row in target["exact_callers"]
-    } == {
+    assert {(row["path"], row["source"]) for row in target["exact_callers"]} == {
         ("pkg/a.py", "use_a"),
         ("pkg/b.py", "use_b"),
     }
@@ -403,9 +395,7 @@ def authority(Worker, value):
             max_depth=2,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == [
-        "pkg/core.py::authority"
-    ]
+    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
     assert packet["dimensions"]["unresolved_call_count"] == 0
     assert packet["dimensions"]["external_or_unindexed_call_count"] == 1
     row = packet["external_or_unindexed_calls"][0]
@@ -453,9 +443,7 @@ def authority(gaps, payload, seen, observations_path):
             max_depth=2,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == [
-        "pkg/core.py::authority"
-    ]
+    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
     assert packet["dimensions"]["unresolved_call_count"] == 0
     assert packet["dimensions"]["external_or_unindexed_call_count"] == 4
     external = packet["external_or_unindexed_calls"]
@@ -476,9 +464,7 @@ def test_structural_locality_imported_data_method_is_external_not_repository_amb
     _write(
         tmp_path,
         "pkg/unrelated.py",
-        "class Unrelated:\n"
-        "    def items(self):\n"
-        "        return []\n",
+        "class Unrelated:\n    def items(self):\n        return []\n",
     )
     _write(
         tmp_path,
@@ -532,6 +518,8 @@ def test_structural_locality_imported_class_alias_resolves_exact_member(
         "pkg/worker.py::Worker.helper",
     }
     assert packet["dimensions"]["unresolved_call_count"] == 0
+
+
 def test_structural_locality_resolves_exact_self_method_and_caller(
     tmp_path: Path,
 ) -> None:
@@ -566,9 +554,9 @@ class Worker:
     assert packet["dimensions"]["unresolved_call_count"] == 0
     target = helper["nodes"][0]
     assert target["exact_caller_count"] == 1
-    assert {
-        (row["path"], row["source"]) for row in target["exact_callers"]
-    } == {("pkg/core.py", "Worker.authority")}
+    assert {(row["path"], row["source"]) for row in target["exact_callers"]} == {
+        ("pkg/core.py", "Worker.authority")
+    }
 
 
 def test_structural_locality_resolves_exact_cls_method(
@@ -646,9 +634,9 @@ class Worker(Base):
     assert packet["dimensions"]["unresolved_call_count"] == 0
     target = helper["nodes"][0]
     assert target["exact_caller_count"] == 1
-    assert {
-        (row["path"], row["source"]) for row in target["exact_callers"]
-    } == {("pkg/core.py", "Worker.authority")}
+    assert {(row["path"], row["source"]) for row in target["exact_callers"]} == {
+        ("pkg/core.py", "Worker.authority")
+    }
 
 
 def test_structural_locality_keeps_ambiguous_inherited_self_method_unresolved(
@@ -691,6 +679,8 @@ class Worker(First, Second):
         "pkg/core.py::First.helper",
         "pkg/core.py::Second.helper",
     ]
+
+
 def test_structural_locality_resolves_subclass_override(tmp_path: Path) -> None:
     _write(tmp_path, "pkg/__init__.py", "")
     _write(

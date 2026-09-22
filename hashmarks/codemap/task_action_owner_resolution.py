@@ -68,7 +68,6 @@ class TaskActionOwnerResolutionMixin:
             return "unique-exact-symbol"
         return "exact-symbol"
 
-
     def _task_action_resolve_owner(
         self,
         *,

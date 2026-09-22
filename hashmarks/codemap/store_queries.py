@@ -149,9 +149,7 @@ class WorkspaceMapQueryMixin:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def visible_symbol_candidates(
-        self, query: str, *, limit: int = 33
-    ) -> list[dict]:
+    def visible_symbol_candidates(self, query: str, *, limit: int = 33) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
         if limit < 1:

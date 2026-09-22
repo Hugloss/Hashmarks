@@ -866,8 +866,7 @@ class VerificationMixin:
                 )
             )
             unique_reference = (
-                len(indirect_reference_candidates) == 1
-                and not selected_has_reference
+                len(indirect_reference_candidates) == 1 and not selected_has_reference
             )
         if cls._verification_best_can_replace(
             best, selected, unique_reference, current_path
@@ -939,9 +938,7 @@ class VerificationMixin:
     ) -> list[dict[str, object]]:
         bounded = [dict(row) for row in candidates[:limit]]
         selected_path = (
-            str(selected.get("path") or "")
-            if isinstance(selected, Mapping)
-            else ""
+            str(selected.get("path") or "") if isinstance(selected, Mapping) else ""
         )
         if not selected_path or any(
             str(row.get("path") or "") == selected_path for row in bounded

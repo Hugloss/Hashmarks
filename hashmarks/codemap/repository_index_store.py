@@ -380,7 +380,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             CREATE INDEX IF NOT EXISTS derived_node_identity_idx ON derived_node(identity);
             COMMIT;
             """
-            )
+        )
         self._db.execute(
             "CREATE INDEX IF NOT EXISTS edge_target_short_idx ON edge(target_short)"
         )
@@ -388,9 +388,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             "CREATE INDEX IF NOT EXISTS edge_target_short_path_line_idx "
             "ON edge(target_short,path,line)"
         )
-        self._db.execute(
-            "CREATE INDEX IF NOT EXISTS lexical_path_idx ON lexical(path)"
-        )
+        self._db.execute("CREATE INDEX IF NOT EXISTS lexical_path_idx ON lexical(path)")
         self._lock = threading.RLock()
         # Process-local diagnostics for repository-read amplification. These
         # counters are observational only and are never persisted as authority.

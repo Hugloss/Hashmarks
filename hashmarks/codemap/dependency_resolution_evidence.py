@@ -34,9 +34,10 @@ def _canonical(value: object) -> bytes:
 
 
 def _identity(domain: str, value: object) -> str:
-    return "sha256:" + hashlib.sha256(
-        domain.encode("utf-8") + b"\0" + _canonical(value)
-    ).hexdigest()
+    return (
+        "sha256:"
+        + hashlib.sha256(domain.encode("utf-8") + b"\0" + _canonical(value)).hexdigest()
+    )
 
 
 def _identifier(value: object, *, label: str) -> str:
@@ -237,7 +238,9 @@ class DependencyResolutionEvidenceMixin:
             source = _identifier(raw.get("source"), label="edge source")
             target = _identifier(raw.get("target"), label="edge target")
             if source not in node_ids or target not in node_ids:
-                raise ValueError(f"dangling dependency resolution edge: {source}->{target}")
+                raise ValueError(
+                    f"dangling dependency resolution edge: {source}->{target}"
+                )
             packet = {
                 "source": source,
                 "target": target,
@@ -246,7 +249,9 @@ class DependencyResolutionEvidenceMixin:
             }
             key = (source, target, str(packet["kind"]), str(packet["marker"]))
             if key in seen:
-                raise ValueError(f"duplicate dependency resolution edge: {source}->{target}")
+                raise ValueError(
+                    f"duplicate dependency resolution edge: {source}->{target}"
+                )
             seen.add(key)
             result.append(packet)
         return result
@@ -307,14 +312,18 @@ class DependencyResolutionEvidenceMixin:
         import_target: str,
     ) -> dict[str, object]:
         if observation.get("schema") != _SCHEMA:
-            raise ValueError("dependency import correspondence requires qualified v1 observation")
+            raise ValueError(
+                "dependency import correspondence requires qualified v1 observation"
+            )
         candidates = self._python_import_module_candidates(source_path, import_target)
         ownership = {
             str(row["module"]): row
             for row in observation.get("module_ownership", ())
             if isinstance(row, Mapping) and row.get("module")
         }
-        matched = next((ownership[module] for module in candidates if module in ownership), None)
+        matched = next(
+            (ownership[module] for module in candidates if module in ownership), None
+        )
         repository_paths = self._resolve_import_paths(source_path, import_target)
         if matched is None:
             return {
@@ -380,7 +389,9 @@ class DependencyResolutionEvidenceMixin:
         only ordinary external anchors and repository locators.
         """
         if observation.get("schema") != _SCHEMA:
-            raise ValueError("dependency evidence correlation requires qualified v1 observation")
+            raise ValueError(
+                "dependency evidence correlation requires qualified v1 observation"
+            )
         raw_correlations = request.get("correlations", ())
         correlations = _objects(raw_correlations, label="correlations", limit=256)
         bundles: list[dict[str, object]] = []
@@ -401,8 +412,12 @@ class DependencyResolutionEvidenceMixin:
             dependency_links.append(
                 {
                     "module": module,
-                    "distribution_state": "unknown" if owner is None else owner["state"],
-                    "distribution_nodes": [] if owner is None else list(owner["owners"]),
+                    "distribution_state": "unknown"
+                    if owner is None
+                    else owner["state"],
+                    "distribution_nodes": []
+                    if owner is None
+                    else list(owner["owners"]),
                     "ownership_completeness": (
                         "unknown" if owner is None else owner["completeness"]
                     ),
@@ -445,7 +460,9 @@ class DependencyResolutionEvidenceMixin:
         after: Mapping[str, object],
     ) -> dict[str, object]:
         if before.get("schema") != _SCHEMA or after.get("schema") != _SCHEMA:
-            raise ValueError("dependency resolution delta requires qualified v1 observations")
+            raise ValueError(
+                "dependency resolution delta requires qualified v1 observations"
+            )
         before_definition = before.get("definition_identity")
         after_definition = after.get("definition_identity")
         if not _SHA256.fullmatch(str(before_definition or "")) or not _SHA256.fullmatch(
@@ -475,6 +492,7 @@ class DependencyResolutionEvidenceMixin:
             for node_id in before_nodes.keys() & after_nodes.keys()
             if before_nodes[node_id] != after_nodes[node_id]
         )
+
         def edge_key(row: Mapping[str, object]) -> tuple[str, str, str, str]:
             return (
                 str(row.get("source") or ""),
@@ -484,14 +502,10 @@ class DependencyResolutionEvidenceMixin:
             )
 
         before_edges = {
-            edge_key(row)
-            for row in before.get("edges", ())
-            if isinstance(row, Mapping)
+            edge_key(row) for row in before.get("edges", ()) if isinstance(row, Mapping)
         }
         after_edges = {
-            edge_key(row)
-            for row in after.get("edges", ())
-            if isinstance(row, Mapping)
+            edge_key(row) for row in after.get("edges", ()) if isinstance(row, Mapping)
         }
         before_ownership = {
             str(row["module"]): row

@@ -204,9 +204,7 @@ def _span_identity(value: object) -> str | None:
         return None
     text = str(value).strip().lower()
     if not _SHA256.fullmatch(text):
-        raise ValueError(
-            "span_identity must use sha256:<64 lowercase hex characters>"
-        )
+        raise ValueError("span_identity must use sha256:<64 lowercase hex characters>")
     return text
 
 
@@ -278,9 +276,7 @@ class EvidenceCorrelationMixin:
                 "repository-relative",
             )
         for mapping in mappings:
-            mapped = EvidenceCorrelationMixin._apply_path_mapping(
-                claimed_path, mapping
-            )
+            mapped = EvidenceCorrelationMixin._apply_path_mapping(claimed_path, mapping)
             if mapped is not None:
                 return mapped
         return None, "external-path-mapping-required"
@@ -375,9 +371,7 @@ class EvidenceCorrelationMixin:
                 return module_resolution
             assert claims.symbol is not None
             return self._resolve_symbol_only(claims.symbol)
-        repository_path, path_origin = self._map_external_path(
-            claims.path, mappings
-        )
+        repository_path, path_origin = self._map_external_path(claims.path, mappings)
         if repository_path is None:
             return _Resolution(
                 "unresolved",
@@ -421,9 +415,7 @@ class EvidenceCorrelationMixin:
     def _resolve_module_only(self, module: str) -> _Resolution:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        rows = self.store.visible_module_paths(
-            module, limit=_MAX_MODULE_CANDIDATES + 1
-        )
+        rows = self.store.visible_module_paths(module, limit=_MAX_MODULE_CANDIDATES + 1)
         admitted: list[str] = []
         for path in rows:
             member, _raw = self._repository_member_observation(path)
@@ -583,9 +575,7 @@ class EvidenceCorrelationMixin:
         containing = tuple(
             row
             for row in rows
-            if int(row.get("start_line") or 0)
-            <= line
-            <= int(row.get("end_line") or 0)
+            if int(row.get("start_line") or 0) <= line <= int(row.get("end_line") or 0)
         )
         if len(containing) == 1:
             return _Resolution(
@@ -644,15 +634,13 @@ class EvidenceCorrelationMixin:
                 path,
             )
         smallest = min(
-            int(row.get("end_line") or 0)
-            - int(row.get("start_line") or 0)
+            int(row.get("end_line") or 0) - int(row.get("start_line") or 0)
             for row in rows
         )
         most_specific = tuple(
             row
             for row in rows
-            if int(row.get("end_line") or 0)
-            - int(row.get("start_line") or 0)
+            if int(row.get("end_line") or 0) - int(row.get("start_line") or 0)
             == smallest
         )
         if len(most_specific) == 1:
@@ -695,7 +683,11 @@ class EvidenceCorrelationMixin:
                 else {}
             ),
             **(
-                {"symbol": EvidenceCorrelationMixin._symbol_projection(resolution.symbol)}
+                {
+                    "symbol": EvidenceCorrelationMixin._symbol_projection(
+                        resolution.symbol
+                    )
+                }
                 if resolution.symbol is not None
                 else {}
             ),
@@ -724,9 +716,7 @@ class EvidenceCorrelationMixin:
                 }
             ]
         if path is not None and resolution.symbol is not None:
-            return [
-                EvidenceCorrelationMixin._symbol_reference(resolution.symbol)
-            ]
+            return [EvidenceCorrelationMixin._symbol_reference(resolution.symbol)]
         if resolution.candidates:
             return [
                 EvidenceCorrelationMixin._symbol_reference(row)
@@ -807,7 +797,9 @@ class EvidenceCorrelationMixin:
         scope = self._bundle_scope(raw_bundle)
         truncation = str(raw_bundle.get("truncation") or "unknown").strip()
         if truncation not in _TRUNCATION:
-            raise ValueError("bundle truncation must be complete, truncated, or unknown")
+            raise ValueError(
+                "bundle truncation must be complete, truncated, or unknown"
+            )
         if completeness == "complete" and truncation != "complete":
             raise ValueError(
                 "bundle completeness=complete requires truncation=complete"
@@ -837,8 +829,7 @@ class EvidenceCorrelationMixin:
         packet = dict(scope)
         if _json_size(packet, label="bundle scope") > _MAX_METADATA_BYTES_PER_ANCHOR:
             raise ValueError(
-                "bundle scope exceeds "
-                f"{_MAX_METADATA_BYTES_PER_ANCHOR} encoded bytes"
+                f"bundle scope exceeds {_MAX_METADATA_BYTES_PER_ANCHOR} encoded bytes"
             )
         return packet
 
@@ -863,7 +854,10 @@ class EvidenceCorrelationMixin:
         if not isinstance(provenance, Mapping):
             raise ValueError("bundle provenance must be an object")
         packet = dict(provenance)
-        if _json_size(packet, label="bundle provenance") > _MAX_METADATA_BYTES_PER_ANCHOR:
+        if (
+            _json_size(packet, label="bundle provenance")
+            > _MAX_METADATA_BYTES_PER_ANCHOR
+        ):
             raise ValueError(
                 "bundle provenance exceeds "
                 f"{_MAX_METADATA_BYTES_PER_ANCHOR} encoded bytes"
@@ -976,8 +970,7 @@ class EvidenceCorrelationMixin:
     def _validate_request_totals(metadata_bytes: int, anchor_count: int) -> None:
         if metadata_bytes > _MAX_TOTAL_METADATA_BYTES:
             raise ValueError(
-                "evidence metadata exceeds "
-                f"{_MAX_TOTAL_METADATA_BYTES} encoded bytes"
+                f"evidence metadata exceeds {_MAX_TOTAL_METADATA_BYTES} encoded bytes"
             )
         if anchor_count > _MAX_TOTAL_ANCHORS:
             raise ValueError(
@@ -1020,11 +1013,7 @@ class EvidenceCorrelationMixin:
             )
         if not basis:
             return {"state": "unknown", "basis": []}
-        state = (
-            "proven"
-            if all(bool(row["matched"]) for row in basis)
-            else "mismatch"
-        )
+        state = "proven" if all(bool(row["matched"]) for row in basis) else "mismatch"
         return {"state": state, "basis": basis}
 
     @staticmethod
@@ -1045,7 +1034,9 @@ class EvidenceCorrelationMixin:
         bundles: Sequence[dict[str, object]],
         repository_evidence: Mapping[str, object],
     ) -> None:
-        binding_rows = EvidenceCorrelationMixin._correlation_binding_rows(repository_evidence)
+        binding_rows = EvidenceCorrelationMixin._correlation_binding_rows(
+            repository_evidence
+        )
         for bundle in bundles:
             anchors = bundle.get("anchors", [])
             if not isinstance(anchors, list):
@@ -1070,12 +1061,8 @@ class EvidenceCorrelationMixin:
         )
         anchor["repository_evidence"] = {
             "binding_id": binding_id,
-            "binding_definition_identity": binding.get(
-                "binding_definition_identity"
-            ),
-            "binding_observation_identity": binding.get(
-                "binding_observation_identity"
-            ),
+            "binding_definition_identity": binding.get("binding_definition_identity"),
+            "binding_observation_identity": binding.get("binding_observation_identity"),
         }
 
     @staticmethod
@@ -1087,8 +1074,7 @@ class EvidenceCorrelationMixin:
         relationship_limit_per_path: int,
     ) -> dict[str, object]:
         declarations = [
-            EvidenceCorrelationMixin._bundle_definition(bundle)
-            for bundle in bundles
+            EvidenceCorrelationMixin._bundle_definition(bundle) for bundle in bundles
         ]
         declarations.sort(key=lambda row: str(row["bundle_id"]))
         return {
@@ -1156,10 +1142,15 @@ class EvidenceCorrelationMixin:
                     key = (path, "", 0, 0)
                     scope = "member"
                 groups.setdefault(key, []).append(
-                    {"bundle_id": bundle_id, "anchor_id": str(anchor.get("anchor_id") or "")}
+                    {
+                        "bundle_id": bundle_id,
+                        "anchor_id": str(anchor.get("anchor_id") or ""),
+                    }
                 )
         rows: list[dict[str, object]] = []
-        for (path, symbol, start_line, end_line), observations in sorted(groups.items()):
+        for (path, symbol, start_line, end_line), observations in sorted(
+            groups.items()
+        ):
             bundle_ids = {row["bundle_id"] for row in observations}
             if len(bundle_ids) < 2:
                 continue
@@ -1168,7 +1159,15 @@ class EvidenceCorrelationMixin:
                     "state": "same-repository-target",
                     "scope": "symbol" if symbol else "member",
                     "repository_path": path,
-                    **({"symbol": symbol, "start_line": start_line, "end_line": end_line} if symbol else {}),
+                    **(
+                        {
+                            "symbol": symbol,
+                            "start_line": start_line,
+                            "end_line": end_line,
+                        }
+                        if symbol
+                        else {}
+                    ),
                     "observations": sorted(
                         observations,
                         key=lambda row: (row["bundle_id"], row["anchor_id"]),
@@ -1246,7 +1245,11 @@ class EvidenceCorrelationMixin:
         packet["correspondence"] = self._cross_bundle_correspondence(prepared)
         packet["correlation_identity"] = "sha256:" + self._packet_digest(
             "hashmarks.evidence-correlation.v1",
-            {key: value for key, value in packet.items() if key != "correlation_identity"},
+            {
+                key: value
+                for key, value in packet.items()
+                if key != "correlation_identity"
+            },
         )
         if previous_correlation is not None:
             packet["delta_from_previous"] = self.evidence_correlation_delta(
@@ -1381,9 +1384,7 @@ class EvidenceCorrelationMixin:
                 f"{label} must be a hashmarks.evidence-correlation.v1 packet"
             )
         if not isinstance(packet.get("repository_evidence"), Mapping):
-            raise ValueError(
-                "correlation packets must contain repository_evidence"
-            )
+            raise ValueError("correlation packets must contain repository_evidence")
         supplied_identity = packet.get("correlation_identity")
         if not isinstance(supplied_identity, str) or not _SHA256.fullmatch(
             supplied_identity
@@ -1399,7 +1400,9 @@ class EvidenceCorrelationMixin:
             identity_payload,
         )
         if supplied_identity != expected_identity:
-            raise ValueError(f"{label} correlation_identity does not match packet content")
+            raise ValueError(
+                f"{label} correlation_identity does not match packet content"
+            )
 
     @staticmethod
     def _correlation_delta_packet(

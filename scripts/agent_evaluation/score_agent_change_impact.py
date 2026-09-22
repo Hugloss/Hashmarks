@@ -114,9 +114,7 @@ def run(
             start = codemap.task_evidence(query)
             edit_path = _task_candidate_path(start)
             if not edit_path:
-                raise ValueError(
-                    f"PUBLIC task {task_id} has no repository candidate"
-                )
+                raise ValueError(f"PUBLIC task {task_id} has no repository candidate")
             _append_probe(repo / edit_path, task_id)
             impact_started = time.perf_counter()
             impact = codemap.task_change_impact(query, [edit_path])

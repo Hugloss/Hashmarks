@@ -203,4 +203,3 @@ class VerificationPlanMixin:
         if target.suffix.lower() == ".py":
             return self._python_verification_plan(rel, symbol, qualname)
         return self._polyglot_verification_plan(rel, target)
-

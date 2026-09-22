@@ -158,13 +158,19 @@ def run(
             str(candidate.get("path") or "") if candidate is not None else ""
         ) == str(truth["expected_edit_path"])
         verification = _task_verification(packet)
-        plan = verification.get("plan") if isinstance(verification.get("plan"), dict) else {}
+        plan = (
+            verification.get("plan")
+            if isinstance(verification.get("plan"), dict)
+            else {}
+        )
         argv = plan.get("argv")
         surface = verification_surface(argv if isinstance(argv, list) else ())
         verify_correct = str(surface.get("surface") or "") == str(
             truth["expected_verify_path"]
         )
-        ownership = packet.get("ownership") if isinstance(packet.get("ownership"), dict) else {}
+        ownership = (
+            packet.get("ownership") if isinstance(packet.get("ownership"), dict) else {}
+        )
         next_read = ownership.get("next_read")
         if isinstance(next_read, dict) and next_read.get("reason"):
             next_read_reasons[str(next_read["reason"])] += 1

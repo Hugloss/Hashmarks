@@ -147,7 +147,10 @@ def test_config_range_over_budget_is_not_clipped(tmp_path: Path) -> None:
         tmp_path, "Change ember policy config accepted response mode", token_budget=1
     )
     assert _ownership(start)["source_evidence"] is None
-    assert _ownership(start)["next_read"]["reason"] == "exact-config-range-exceeds-start-budget"
+    assert (
+        _ownership(start)["next_read"]["reason"]
+        == "exact-config-range-exceeds-start-budget"
+    )
     assert _ownership(start)["next_read"]["lines"] == [1, 1]
     assert _ownership(start)["next_read"]["config"]["name"] == "mode"
 

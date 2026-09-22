@@ -95,8 +95,7 @@ def test_owner_resolution_marks_literal_path_as_stronger_than_retrieval_order(
     _write(
         tmp_path,
         "src/wrapper.py",
-        "from .worker import run_task\n"
-        "# src/worker.py wrapper context\n",
+        "from .worker import run_task\n# src/worker.py wrapper context\n",
     )
 
     task = "optimize src/worker.py"
@@ -188,8 +187,7 @@ def test_exact_owner_cannot_be_displaced_by_contract_projection(
     _write(
         tmp_path,
         "src/authority.py",
-        "class PublicationAuthority:\n"
-        "    pass\n",
+        "class PublicationAuthority:\n    pass\n",
     )
     _write(
         tmp_path,
@@ -210,19 +208,19 @@ def test_exact_owner_cannot_be_displaced_by_contract_projection(
     assert action["ownership_authority"]["owner_resolved"] is True
 
 
-def _write_publish_dependency_fixture(root: Path, *, duplicate_target: bool = False) -> None:
+def _write_publish_dependency_fixture(
+    root: Path, *, duplicate_target: bool = False
+) -> None:
     _write(
         root,
         "src/publish.py",
-        "def publish_result(value):\n"
-        "    return value\n",
+        "def publish_result(value):\n    return value\n",
     )
     if duplicate_target:
         _write(
             root,
             "src/alternate_publish.py",
-            "def publish_result(value):\n"
-            "    return value\n",
+            "def publish_result(value):\n    return value\n",
         )
     _write(
         root,
@@ -233,7 +231,9 @@ def _write_publish_dependency_fixture(root: Path, *, duplicate_target: bool = Fa
     )
 
 
-def test_requested_edit_target_owns_dependency_identifier_evidence(tmp_path: Path) -> None:
+def test_requested_edit_target_owns_dependency_identifier_evidence(
+    tmp_path: Path,
+) -> None:
     _write_publish_dependency_fixture(tmp_path)
 
     with CodeMap(tmp_path) as codemap:
@@ -249,7 +249,9 @@ def test_requested_edit_target_owns_dependency_identifier_evidence(tmp_path: Pat
     assert action["ownership_authority"]["owner_resolved"] is True
 
 
-def test_requested_edit_target_role_survives_dependency_first_wording(tmp_path: Path) -> None:
+def test_requested_edit_target_role_survives_dependency_first_wording(
+    tmp_path: Path,
+) -> None:
     _write_publish_dependency_fixture(tmp_path)
 
     with CodeMap(tmp_path) as codemap:
@@ -282,7 +284,9 @@ def test_requested_edit_role_does_not_hide_true_duplicate_target_ambiguity(
     assert action["ownership_authority"]["owner_resolved"] is False
 
 
-def test_requested_edit_role_is_stable_across_dependency_phrasings(tmp_path: Path) -> None:
+def test_requested_edit_role_is_stable_across_dependency_phrasings(
+    tmp_path: Path,
+) -> None:
     _write_publish_dependency_fixture(tmp_path)
     tasks = (
         "Update publish_result using AuthorityReceipt.canonical_identity",

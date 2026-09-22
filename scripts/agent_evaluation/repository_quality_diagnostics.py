@@ -10,6 +10,7 @@ PROOF_MODES = {"unit", "boundary", "lifecycle", "adversarial", "mutation"}
 def _ratio(numerator: int, denominator: int) -> float | None:
     return numerator / denominator if denominator else None
 
+
 def group_quality(rows: Sequence[Mapping[str, Any]], field: str) -> dict[str, Any]:
     grouped: dict[str, list[Mapping[str, Any]]] = {}
     for row in rows:
@@ -95,5 +96,3 @@ def economics_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "cases": len(observed),
         "metrics": {key: _economics_metric(observed, key) for key in keys},
     }
-
-

@@ -273,9 +273,9 @@ def test_ci_and_dev_check_enforce_ruff_debt_gate() -> None:
     assert "continue-on-error" not in gate_block
 
     makefile = _text("Makefile")
-    dev_check = makefile.split("dev-check: setup", 1)[1].split(
-        "\ndev-check-batch:", 1
-    )[0]
+    dev_check = makefile.split("dev-check: setup", 1)[1].split("\ndev-check-batch:", 1)[
+        0
+    ]
     assert "Ruff debt no-growth gate" in dev_check
     assert "lint-debt-gate" in dev_check
     assert "lint-debt-summary || true" not in dev_check
