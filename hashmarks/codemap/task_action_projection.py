@@ -757,16 +757,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             selection.structural_owner_origin,
         )
 
-    @staticmethod
-    def _task_action_unproven_structural_owner(
-        selection: _TaskActionSelectionState,
-    ) -> bool:
-        return bool(
-            selection.owner_basis == "structural-owner"
-            and selection.structural_owner is not None
-            and selection.structural_owner.get("authority_admissible") is not True
-        )
-
     def _task_action_projection_ambiguity_state(
         self,
         task: str,
@@ -837,7 +827,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 weak_contract_anchor_ambiguity,
                 selection.archive_live_owner_ambiguity,
                 multi_structural_owner_ambiguity,
-                self._task_action_unproven_structural_owner(selection),
                 verification_identity_ambiguity,
             ),
         )
@@ -856,10 +845,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 (
                     "multiple-task-local-structural-owners",
                     multi_structural_owner_ambiguity,
-                ),
-                (
-                    "unproven-structural-owner",
-                    self._task_action_unproven_structural_owner(selection),
                 ),
                 (
                     "unresolved-qualified-import-identity",
