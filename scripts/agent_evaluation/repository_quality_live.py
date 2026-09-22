@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -86,9 +88,6 @@ def canonical_authority_observation(
 
 
 def _scoped_identity(scope: Mapping[str, Any]) -> str:
-    import hashlib
-    import json
-
     encoded = json.dumps(
         scope, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode("utf-8")
