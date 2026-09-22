@@ -34,7 +34,6 @@ def _decision_status(state: OwnershipDecisionState) -> str:
     if (
         state.edit is None
         or not state.owner_eligible
-        or (state.authority_basis is None and state.structural_owner is None)
     ):
         return "unresolved"
     structural = state.structural_owner or {}
