@@ -190,7 +190,12 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             return "no-supported-owner-candidate"
         if bool(ambiguity.get("ambiguous")):
             return "competing-action-roles"
-        if edit is None:
+        authority = (
+            action.get("ownership_authority")
+            if isinstance(action.get("ownership_authority"), Mapping)
+            else {}
+        )
+        if not bool(authority.get("owner_resolved")):
             return "ownership-unresolved"
         if verify is None:
             return "missing-verification-evidence"
@@ -202,9 +207,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
     ) -> tuple[
         dict[str, object] | None, dict[str, object] | None, dict[str, object] | None
     ]:
-        """Return the admitted edit, verification, and contract evidence rows."""
+        """Return selected candidate, verification, and contract evidence rows."""
         selected = []
-        for role in ("admitted_edit", "verify", "contract"):
+        for role in ("edit", "verify", "contract"):
             value = action.get(role)
             selected.append(value if isinstance(value, dict) else None)
         return selected[0], selected[1], selected[2]
