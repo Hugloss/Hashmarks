@@ -67,3 +67,18 @@ The first L2 manifest retains the Oh-Goon 1267.0.993 publish-strict-attempt owne
 A selected mutation harness now executes presentation-invariance challenges for retrieval limit, pagination, candidate ordering, compact/full projection, and irrelevant additions, plus an expected-change generation mutation. The harness reports proof-identity drift rather than granting product authority. A cross-surface convergence contract likewise requires orient/outline/affected/tests/task-evidence/findings/MCP/compact observations to converge on one authority-proof identity when those surfaces are claimed as a proof set.
 
 This still does not close the retained plan: fresh L3 Oh-Goon execution, actual surface-output adapters, counterfactual repository fixtures, external-evidence end-to-end correlation, richer related-evidence ranking, comparable economics, and final convergence remain required.
+
+
+## Live authority and external-evidence convergence batch
+
+This phase moves qualification from synthetic report contracts toward live Hashmarks product surfaces. Surface adapters now extract the canonical ownership contract from direct action-map output and nested task-evidence/MCP projections and compare their proof identities without re-ranking or re-deciding ownership.
+
+Proof completeness is no longer a synonym for a resolved status string. Evidence state records retrieval, structural inference, explicit authority basis, owner eligibility, ambiguity clearance, admissibility, and proof. A resolved presentation without structural evidence or an explicit positive authority basis may remain a canonical selection state, but it cannot claim a complete ownership proof. This preserves existing decision semantics while making overclaim visible.
+
+A scoped qualification proof identity binds the semantic ownership proof to repository identity, normalized task identity, authority-policy identity, and repository generation. Presentation controls remain outside that identity. Generation changes therefore invalidate the scoped proof even when the underlying semantic owner is unchanged.
+
+External evidence remains correlation-only. New end-to-end regressions execute correlation before and after task ownership resolution and require the ownership contract to remain byte-equivalent, including when the external claim conflicts with repository evidence. The conflicting observation remains visible as a claim conflict rather than being erased or promoted into edit authority.
+
+Ambiguous duplicate owners are also exercised across multiple retrieval/per-role bounds. Bounds may change visible candidates, but they cannot convert unresolved ambiguity into ownership authority.
+
+Still retained: run these adapters against the immutable Oh-Goon 993 source and a fresh L3 dogfood authority; wire actual task-decision/task-evidence/MCP outputs into retained convergence evidence; add repository-byte counterfactual generation fixtures; qualify equivalent wording, pagination, cache/rebuild, batching and irrelevant-addition metamorphics end to end; measure ranking/retention/economics on real corpora; and complete final convergence.
