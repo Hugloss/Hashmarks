@@ -180,90 +180,165 @@ def _traceback_anchor(
     }
 
 
-def collect(
-    path: Path, *, max_anchors: int = _DEFAULT_MAX_ANCHORS
-) -> dict[str, object]:
-    if max_anchors < 1 or max_anchors > _DEFAULT_MAX_ANCHORS:
-        raise ValueError(f"max_anchors must be between 1 and {_DEFAULT_MAX_ANCHORS}")
-    source_sha256 = _sha256_file(path)
-    modules: dict[str, _ModuleStats] = {}
-    tracebacks: dict[tuple[str, int, str], _ModuleStats] = {}
-    sourcetypes: set[str] = set()
-    indexes: set[str] = set()
-    sources: set[str] = set()
-    scope_values_truncated = False
-    event_count = 0
-    strict_valid_count = 0
-    recovered_count = 0
-    malformed_count = 0
-    widened_count = 0
-    physical_lines = 1
+@dataclass
+class _CollectionState:
+    modules: dict[str, _ModuleStats] = field(default_factory=dict)
+    tracebacks: dict[tuple[str, int, str], _ModuleStats] = field(default_factory=dict)
+    sourcetypes: set[str] = field(default_factory=set)
+    indexes: set[str] = field(default_factory=set)
+    sources: set[str] = field(default_factory=set)
+    scope_values_truncated: bool = False
+    event_count: int = 0
+    strict_valid_count: int = 0
+    recovered_count: int = 0
+    malformed_count: int = 0
+    widened_count: int = 0
+    physical_lines: int = 1
     first_time: str | None = None
     last_time: str | None = None
 
-    with path.open("r", encoding="utf-8", newline="") as handle:
-        header = tuple(next(csv.reader([handle.readline()])))
-        if header != EXPECTED_HEADER:
-            raise ValueError("Splunk CSV header must be " + ",".join(EXPECTED_HEADER))
-        for ordinal, text in _logical_records(handle):
-            event_count += 1
-            physical_lines += _physical_line_count(text)
-            parsed = _parse_record(text)
-            if parsed is None:
-                malformed_count += 1
-                continue
-            strict_valid_count += int(parsed.parser_state == "strict-valid")
-            recovered_count += int(parsed.parser_state == "recovered")
-            widened_count += int(parsed.widened)
-            serial, timestamp, source, sourcetype, _host, index, _server = parsed.fields
-            del serial
-            first_time = timestamp if first_time is None else min(first_time, timestamp)
-            last_time = timestamp if last_time is None else max(last_time, timestamp)
-            scope_values_truncated |= _bounded_value(sources, source)
-            scope_values_truncated |= _bounded_value(sourcetypes, sourcetype)
-            scope_values_truncated |= _bounded_value(indexes, index)
-            event_id = _event_id(ordinal, text)
-            module_match = _MODULE.search(parsed.raw)
-            if module_match is not None:
-                module = module_match.group(1).strip(".")
-                stats = modules.setdefault(module, _ModuleStats())
-                stats.observe(
-                    timestamp=timestamp,
-                    parser_state=parsed.parser_state,
-                    widened=parsed.widened,
-                    event_id=event_id,
-                )
-            traceback_match = _TRACEBACK.search(parsed.raw)
-            if traceback_match is not None:
-                key = (
-                    traceback_match.group(1),
-                    int(traceback_match.group(2)),
-                    traceback_match.group(3),
-                )
-                stats = tracebacks.setdefault(key, _ModuleStats())
-                stats.observe(
-                    timestamp=timestamp,
-                    parser_state=parsed.parser_state,
-                    widened=parsed.widened,
-                    event_id=event_id,
-                )
+    def observe(
+        self,
+        ordinal: int,
+        text: str,
+        parsed: _ParsedRecord | None,
+    ) -> None:
+        self.event_count += 1
+        self.physical_lines += _physical_line_count(text)
+        if parsed is None:
+            self.malformed_count += 1
+            return
+        self._observe_parsed(ordinal, text, parsed)
 
-    ranked_tracebacks = sorted(
-        tracebacks.items(),
+    def _observe_parsed(
+        self,
+        ordinal: int,
+        text: str,
+        parsed: _ParsedRecord,
+    ) -> None:
+        self.strict_valid_count += int(parsed.parser_state == "strict-valid")
+        self.recovered_count += int(parsed.parser_state == "recovered")
+        self.widened_count += int(parsed.widened)
+        _serial, timestamp, source, sourcetype, _host, index, _server = parsed.fields
+        self._observe_scope(timestamp, source, sourcetype, index)
+        event_id = _event_id(ordinal, text)
+        self._observe_module(parsed, timestamp, event_id)
+        self._observe_traceback(parsed, timestamp, event_id)
+
+    def _observe_scope(
+        self,
+        timestamp: str,
+        source: str,
+        sourcetype: str,
+        index: str,
+    ) -> None:
+        self.first_time = (
+            timestamp if self.first_time is None else min(self.first_time, timestamp)
+        )
+        self.last_time = (
+            timestamp if self.last_time is None else max(self.last_time, timestamp)
+        )
+        self.scope_values_truncated |= _bounded_value(self.sources, source)
+        self.scope_values_truncated |= _bounded_value(self.sourcetypes, sourcetype)
+        self.scope_values_truncated |= _bounded_value(self.indexes, index)
+
+    def _observe_module(
+        self,
+        parsed: _ParsedRecord,
+        timestamp: str,
+        event_id: str,
+    ) -> None:
+        match = _MODULE.search(parsed.raw)
+        if match is None:
+            return
+        module = match.group(1).strip(".")
+        stats = self.modules.setdefault(module, _ModuleStats())
+        stats.observe(
+            timestamp=timestamp,
+            parser_state=parsed.parser_state,
+            widened=parsed.widened,
+            event_id=event_id,
+        )
+
+    def _observe_traceback(
+        self,
+        parsed: _ParsedRecord,
+        timestamp: str,
+        event_id: str,
+    ) -> None:
+        match = _TRACEBACK.search(parsed.raw)
+        if match is None:
+            return
+        key = (match.group(1), int(match.group(2)), match.group(3))
+        stats = self.tracebacks.setdefault(key, _ModuleStats())
+        stats.observe(
+            timestamp=timestamp,
+            parser_state=parsed.parser_state,
+            widened=parsed.widened,
+            event_id=event_id,
+        )
+
+
+@dataclass(frozen=True)
+class _AnchorSelection:
+    anchors: list[dict[str, object]]
+    traceback_observed: int
+    traceback_emitted: int
+    module_observed: int
+    module_emitted: int
+    observed: int
+    truncated: bool
+
+
+def _validate_header(handle: TextIO) -> None:
+    header = tuple(next(csv.reader([handle.readline()])))
+    if header != EXPECTED_HEADER:
+        raise ValueError("Splunk CSV header must be " + ",".join(EXPECTED_HEADER))
+
+
+def _collect_stream(path: Path) -> _CollectionState:
+    state = _CollectionState()
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        _validate_header(handle)
+        for ordinal, text in _logical_records(handle):
+            state.observe(ordinal, text, _parse_record(text))
+    return state
+
+
+def _select_anchors(
+    state: _CollectionState,
+    max_anchors: int,
+) -> _AnchorSelection:
+    tracebacks = sorted(
+        state.tracebacks.items(),
         key=lambda item: (-item[1].count, item[0]),
     )
-    ranked_modules = sorted(
-        modules.items(),
+    modules = sorted(
+        state.modules.items(),
         key=lambda item: (-item[1].count, item[0]),
     )
-    selected_tracebacks = ranked_tracebacks[:max_anchors]
-    module_slots = max_anchors - len(selected_tracebacks)
-    selected_modules = ranked_modules[:module_slots]
+    selected_tracebacks = tracebacks[:max_anchors]
+    selected_modules = modules[: max_anchors - len(selected_tracebacks)]
     anchors = [_traceback_anchor(key, stats) for key, stats in selected_tracebacks]
     anchors.extend(_module_anchor(module, stats) for module, stats in selected_modules)
-    observed_anchors = len(ranked_tracebacks) + len(ranked_modules)
-    anchors_truncated = observed_anchors > len(anchors)
-    bundle = {
+    observed = len(tracebacks) + len(modules)
+    return _AnchorSelection(
+        anchors=anchors,
+        traceback_observed=len(tracebacks),
+        traceback_emitted=len(selected_tracebacks),
+        module_observed=len(modules),
+        module_emitted=len(selected_modules),
+        observed=observed,
+        truncated=observed > len(anchors),
+    )
+
+
+def _bundle(
+    source_sha256: str,
+    state: _CollectionState,
+    selection: _AnchorSelection,
+) -> dict[str, object]:
+    return {
         "bundle_id": "splunk-export:" + source_sha256.removeprefix("sha256:")[:32],
         "producer": {
             "kind": "splunk-style",
@@ -271,25 +346,33 @@ def collect(
         },
         "provenance": {
             "source_sha256": source_sha256,
-            "logical_event_count": event_count,
-            "physical_line_count": physical_lines,
-            "strict_valid_count": strict_valid_count,
-            "recovered_count": recovered_count,
-            "malformed_count": malformed_count,
-            "widened_count": widened_count,
+            "logical_event_count": state.event_count,
+            "physical_line_count": state.physical_lines,
+            "strict_valid_count": state.strict_valid_count,
+            "recovered_count": state.recovered_count,
+            "malformed_count": state.malformed_count,
+            "widened_count": state.widened_count,
         },
         "completeness": "unknown",
-        "truncation": "truncated" if anchors_truncated else "unknown",
+        "truncation": "truncated" if selection.truncated else "unknown",
         "scope": {
-            "time_start": first_time,
-            "time_end": last_time,
-            "sources": sorted(sources),
-            "sourcetypes": sorted(sourcetypes),
-            "indexes": sorted(indexes),
-            "scope_values_truncated": scope_values_truncated,
+            "time_start": state.first_time,
+            "time_end": state.last_time,
+            "sources": sorted(state.sources),
+            "sourcetypes": sorted(state.sourcetypes),
+            "indexes": sorted(state.indexes),
+            "scope_values_truncated": state.scope_values_truncated,
         },
-        "anchors": anchors,
+        "anchors": selection.anchors,
     }
+
+
+def _report(
+    path: Path,
+    source_sha256: str,
+    state: _CollectionState,
+    selection: _AnchorSelection,
+) -> dict[str, object]:
     return {
         "schema": SCHEMA,
         "source": {
@@ -297,24 +380,34 @@ def collect(
             "sha256": source_sha256,
         },
         "summary": {
-            "events": event_count,
-            "physical_lines": physical_lines,
-            "strict_valid": strict_valid_count,
-            "recovered": recovered_count,
-            "malformed": malformed_count,
-            "widened": widened_count,
-            "traceback_anchors_observed": len(ranked_tracebacks),
-            "traceback_anchors_emitted": len(selected_tracebacks),
-            "module_anchors_observed": len(ranked_modules),
-            "module_anchors_emitted": len(selected_modules),
-            "anchors_observed": observed_anchors,
-            "anchors_emitted": len(anchors),
-            "anchors_truncated": anchors_truncated,
-            "scope_values_truncated": scope_values_truncated,
+            "events": state.event_count,
+            "physical_lines": state.physical_lines,
+            "strict_valid": state.strict_valid_count,
+            "recovered": state.recovered_count,
+            "malformed": state.malformed_count,
+            "widened": state.widened_count,
+            "traceback_anchors_observed": selection.traceback_observed,
+            "traceback_anchors_emitted": selection.traceback_emitted,
+            "module_anchors_observed": selection.module_observed,
+            "module_anchors_emitted": selection.module_emitted,
+            "anchors_observed": selection.observed,
+            "anchors_emitted": len(selection.anchors),
+            "anchors_truncated": selection.truncated,
+            "scope_values_truncated": state.scope_values_truncated,
         },
-        "bundle": bundle,
+        "bundle": _bundle(source_sha256, state, selection),
     }
 
+
+def collect(
+    path: Path, *, max_anchors: int = _DEFAULT_MAX_ANCHORS
+) -> dict[str, object]:
+    if max_anchors < 1 or max_anchors > _DEFAULT_MAX_ANCHORS:
+        raise ValueError(f"max_anchors must be between 1 and {_DEFAULT_MAX_ANCHORS}")
+    source_sha256 = _sha256_file(path)
+    state = _collect_stream(path)
+    selection = _select_anchors(state, max_anchors)
+    return _report(path, source_sha256, state, selection)
 
 def _path_mappings(values: list[str]) -> list[dict[str, str]]:
     mappings = []
