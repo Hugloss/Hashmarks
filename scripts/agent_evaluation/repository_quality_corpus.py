@@ -98,3 +98,23 @@ def promotion_transition(
             }
         ),
     }
+
+
+
+def corpus_layer_health(manifest: Mapping[str, Any]) -> dict[str, Any]:
+    validate_manifest(manifest)
+    counts = {layer: 0 for layer in sorted(ALLOWED_LAYERS)}
+    qualification = {layer: 0 for layer in sorted(ALLOWED_LAYERS)}
+    for case in manifest["cases"]:
+        layer = str(case["layer"])
+        counts[layer] += 1
+        if case["state"] == "qualification":
+            qualification[layer] += 1
+    return {
+        "cases": len(manifest["cases"]),
+        "layers": counts,
+        "qualification_layers": qualification,
+        "has_retained_real_world": counts["L2-retained-real-world"] > 0,
+        "has_fresh_dogfood": counts["L3-fresh-dogfood"] > 0,
+        "fresh_dogfood_qualified": qualification["L3-fresh-dogfood"] > 0,
+    }
