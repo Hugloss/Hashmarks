@@ -125,3 +125,23 @@ def test_task_evidence_v2_keeps_dependency_as_related_evidence_not_owner(
     assert "src/authority.py" in canonical_paths
     assert "src/authority.py" in retrieval_paths
     assert packet["related"]["candidates"] == action["related"]
+
+
+def test_task_evidence_projects_same_authority_proof_across_bounds(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "src/owner.py", "def unique_owner(value):\n    return value\n")
+    task = "Refactor owner.unique_owner without changing behavior"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=1, per_role=1)
+        narrow = codemap.task_evidence(task, limit=1, per_role=1, token_budget=64)
+        wide = codemap.task_evidence(task, limit=20, per_role=3, token_budget=256)
+
+    proof = action["ownership_authority"]["authority_proof_identity"]
+    assert narrow["ownership"]["authority_proof_identity"] == proof
+    assert wide["ownership"]["authority_proof_identity"] == proof
+    assert narrow["ownership"]["owner"]["path"] == "src/owner.py"
+    assert wide["ownership"]["owner"]["path"] == "src/owner.py"
+    assert narrow["ownership"]["proof_scope_complete"] is True
+    assert wide["ownership"]["proof_scope_complete"] is True

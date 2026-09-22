@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast
 
+from ..ownership_decision import bounded_presentation_contract
 from .decision_session import decision_scoped, diagnostic_producer
 from .model import EvidenceVisibility
 from .repository_domains import RepositoryDomain
@@ -304,13 +305,22 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         limit, per_role = bounds
         ownership = self._task_action_ownership_payload_fields(
             final.edit,
-            final.competing[:per_role],
+            final.competing,
             final.structural_owner,
             final.ambiguous,
             final.ambiguity_reason,
             selection.owner_basis,
         )
         authority = cast("Mapping[str, object]", ownership["ownership_authority"])
+        proof_identity = str(authority.get("authority_proof_identity") or "")
+        presentation = bounded_presentation_contract(
+            proof_identity,
+            total_candidates=len(final.competing),
+            returned_candidates=min(len(final.competing), per_role),
+            limit=limit,
+            per_role=per_role,
+            compact=False,
+        )
         return {
             "schema": "hashmarks.task-action-map.v1",
             "task": task,
@@ -349,9 +359,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             "bounds": self._task_action_bounds_payload(limit, per_role),
             "authority_non_interference": {
                 "presentation_bounded": True,
-                "authority_proof_identity": str(
-                    authority.get("authority_proof_identity") or ""
-                ),
+                **presentation,
                 "presentation_limit": limit,
                 "per_role": per_role,
             },

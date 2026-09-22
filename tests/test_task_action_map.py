@@ -538,3 +538,82 @@ def test_literal_path_authority_is_invariant_across_presentation_limits(
         row["ownership_authority"]["proof_scope"] == "repository-global-path-identity"
         for row in results
     )
+
+
+def test_authority_proof_identity_ignores_per_role_presentation_bounds(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    for name in ("a", "b", "c", "d"):
+        (tmp_path / "src" / f"{name}.py").write_text(
+            "def duplicate_owner(value):\n    return value\n", encoding="utf-8"
+        )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        results = [
+            codemap.task_action_map("Fix duplicate_owner", limit=20, per_role=per_role)
+            for per_role in (1, 2, 4)
+        ]
+
+    proof_ids = {
+        row["ownership_authority"]["authority_proof_identity"] for row in results
+    }
+    presentation_ids = {
+        row["authority_non_interference"]["presentation_identity"] for row in results
+    }
+    assert len(proof_ids) == 1
+    assert len(presentation_ids) == 3
+    assert all(row["ambiguity"]["ambiguous"] for row in results)
+    assert all(not row["ownership_authority"]["owner_resolved"] for row in results)
+    # The selected edit candidate is reported separately; alternatives contain
+    # only the remaining competing rows. Four duplicate owners therefore produce
+    # three alternatives. Presentation bounds may truncate those alternatives,
+    # but must never change the proof identity or ambiguity decision.
+    assert [len(row["ambiguity"]["alternatives"]) for row in results] == [1, 2, 3]
+    assert {
+        row["authority_non_interference"]["total_candidates"] for row in results
+    } == {3}
+    assert [
+        row["authority_non_interference"]["returned_candidates"] for row in results
+    ] == [1, 2, 3]
+    assert [row["authority_non_interference"]["complete"] for row in results] == [
+        False,
+        False,
+        True,
+    ]
+
+
+def test_resolved_authority_proof_identity_ignores_per_role_bounds(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/owner.py").write_text(
+        "def unique_owner(value):\n    return value\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        results = [
+            codemap.task_action_map(
+                "Refactor owner.unique_owner without changing behavior",
+                limit=20,
+                per_role=per_role,
+            )
+            for per_role in (1, 2, 4)
+        ]
+
+    assert {row["ownership_authority"]["resolved_owner"] for row in results} == {
+        "src/owner.py"
+    }
+    assert (
+        len({row["ownership_authority"]["authority_proof_identity"] for row in results})
+        == 1
+    )
+    assert (
+        len(
+            {
+                row["authority_non_interference"]["presentation_identity"]
+                for row in results
+            }
+        )
+        == 3
+    )
