@@ -140,7 +140,7 @@ def test_splunk_csv_dogfood_prioritizes_traceback_path_line_symbol_anchor(
     _write(
         source,
         '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
-        '"[host]","idx","[host]","  File \"/app/src/utils/__init__.py\", '
+        '"[host]","idx","[host]","  File "/app/src/utils/__init__.py", '
         'line 280, in process_output_data"\n'
         '"2","2026-09-14T23:59:57.000+0200","[path]","kube:container:x",'
         '"[host]","idx","[host]","INFO name=api.kafka_consumer"\n',
@@ -165,7 +165,7 @@ def test_splunk_csv_dogfood_correlates_traceback_with_explicit_path_mapping(
     _write(
         source,
         '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
-        '"[host]","idx","[host]","  File \"/app/src/utils/__init__.py\", '
+        '"[host]","idx","[host]","  File "/app/src/utils/__init__.py", '
         'line 2, in process_output_data"\n',
     )
     workspace = tmp_path / "repo"
@@ -214,7 +214,7 @@ def test_splunk_csv_dogfood_recovers_traceback_after_quote_damage(
     _write(
         source,
         '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
-        '"[host]","idx","[host]","  File \"/app/src/utils/__init__.py\", '
+        '"[host]","idx","[host]","  File "/app/src/utils/__init__.py", '
         'line 280, in process_output_data"\n',
     )
 
