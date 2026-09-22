@@ -19,6 +19,7 @@ from .index_surfaces import index_surface_for_path
 from .model import EvidenceVisibility, SyncResult
 from .parsers import artifact_key_for, parse_source
 from .policy import ContextPolicy
+from .source_languages import SOURCE_LANGUAGES
 from .repository_index_store import (
     default_base_snapshot,
     git_base_identity,
@@ -32,34 +33,8 @@ if TYPE_CHECKING:
 
     from .engine import CodeMap
 
-_SOURCE_EXTENSIONS = {
-    ".py": "python",
-    ".pyi": "python",
-    ".js": "javascript",
-    ".jsx": "javascript",
-    ".ts": "typescript",
-    ".tsx": "typescript",
-    ".go": "go",
-    ".rs": "rust",
-    ".java": "java",
-    ".kt": "kotlin",
-    ".kts": "kotlin",
-    ".c": "c",
-    ".h": "c",
-    ".cc": "cpp",
-    ".cpp": "cpp",
-    ".cxx": "cpp",
-    ".hpp": "cpp",
-    ".cs": "csharp",
-    ".rb": "ruby",
-    ".php": "php",
-    ".swift": "swift",
-    ".sql": "sql",
-    ".css": "css",
-    ".scss": "scss",
-    ".sass": "sass",
-    ".less": "less",
-}
+_SOURCE_EXTENSIONS = SOURCE_LANGUAGES
+
 _TEXT_EXTENSIONS = {
     ".toml",
     ".yaml",
