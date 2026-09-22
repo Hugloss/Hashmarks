@@ -139,6 +139,7 @@ def test_unique_canonical_owner_without_structural_edge_remains_resolved() -> No
             structural_owner=None,
             ambiguous=False,
             ambiguity_reason="resolved-by-role",
+            authority_basis="canonical-role-discrimination",
         )
     )
     authority = ownership_authority_contract(trace)
@@ -228,3 +229,45 @@ def test_invalid_bounded_presentation_counts_fail_closed() -> None:
             per_role=1,
             compact=False,
         )
+
+
+
+def test_resolved_status_without_admissible_basis_does_not_claim_proof_complete() -> None:
+    trace = ownership_decision_trace(
+        OwnershipDecisionState(
+            edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},
+            competing=[],
+            structural_owner=None,
+            ambiguous=False,
+            ambiguity_reason="resolved-by-role",
+        )
+    )
+    authority = ownership_authority_contract(trace)
+
+    assert trace["status"] == "resolved"
+    assert trace["evidence_state"]["admissible"] is False
+    assert trace["evidence_state"]["proven"] is False
+    assert authority["owner_resolved"] is False
+    assert authority["proof_complete"] is False
+
+
+def test_structural_evidence_is_admissible_without_new_metadata_basis() -> None:
+    trace = ownership_decision_trace(
+        OwnershipDecisionState(
+            edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},
+            competing=[],
+            structural_owner={
+                "selected": "src/owner.py",
+                "via": "import",
+                "owner_path": [],
+            },
+            ambiguous=False,
+            ambiguity_reason="resolved-structurally",
+        )
+    )
+    authority = ownership_authority_contract(trace)
+
+    assert trace["evidence_state"]["structural"] is True
+    assert trace["evidence_state"]["admissible"] is True
+    assert trace["evidence_state"]["proven"] is True
+    assert authority["owner_resolved"] is True
