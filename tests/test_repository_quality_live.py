@@ -86,7 +86,6 @@ def test_scoped_proof_identity_changes_with_generation_not_presentation() -> Non
     )
 
 
-
 def test_equivalent_wording_requires_same_complete_authority_proof() -> None:
     rows = [
         {

@@ -73,7 +73,6 @@ def run_mutation_challenges(
     return results
 
 
-
 def repository_counterfactual_challenges() -> tuple[MutationChallenge, ...]:
     return (
         MutationChallenge(

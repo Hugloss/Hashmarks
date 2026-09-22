@@ -100,15 +100,12 @@ def convergence_observations(
     return [surface_authority_observation(name, payload) for name, payload in payloads]
 
 
-
 def equivalent_task_convergence(
     observations: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     if not observations:
         raise ValueError("equivalent task convergence requires observations")
-    proofs = {
-        str(row.get("authority_proof_identity") or "") for row in observations
-    }
+    proofs = {str(row.get("authority_proof_identity") or "") for row in observations}
     proofs.discard("")
     owners = {str(row.get("resolved_owner") or "") for row in observations}
     owners.discard("")

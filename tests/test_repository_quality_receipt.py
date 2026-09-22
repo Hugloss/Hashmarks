@@ -46,7 +46,9 @@ def test_fresh_execution_receipt_binds_all_authority_identities() -> None:
         case_id="fresh-dogfood",
         corpus_identity=corpus_manifest_identity(_corpus()),
         identities=_identities(),
-        surfaces=[{"surface": "task-evidence", "authority_proof_identity": "sha256:proof"}],
+        surfaces=[
+            {"surface": "task-evidence", "authority_proof_identity": "sha256:proof"}
+        ],
         mutations=[{"family": "retrieval-limit", "violation": False}],
         external_evidence={"authority_unchanged": True},
     )
@@ -65,7 +67,9 @@ def test_stale_execution_receipt_cannot_claim_fresh_generation() -> None:
         case_id="fresh-dogfood",
         corpus_identity=corpus_manifest_identity(_corpus()),
         identities=_identities(),
-        surfaces=[{"surface": "task-evidence", "authority_proof_identity": "sha256:proof"}],
+        surfaces=[
+            {"surface": "task-evidence", "authority_proof_identity": "sha256:proof"}
+        ],
         mutations=[],
     )
     assert not receipt_is_fresh(
@@ -81,7 +85,9 @@ def test_execution_receipt_refuses_to_seal_mutation_violation() -> None:
             case_id="broken",
             corpus_identity=corpus_manifest_identity(_corpus()),
             identities=_identities(),
-            surfaces=[{"surface": "task-evidence", "authority_proof_identity": "sha256:proof"}],
+            surfaces=[
+                {"surface": "task-evidence", "authority_proof_identity": "sha256:proof"}
+            ],
             mutations=[{"family": "pagination", "violation": True}],
         )
 
@@ -120,7 +126,9 @@ def test_fresh_receipt_can_authorize_shadow_to_qualification_promotion() -> None
         case_id=case["case_id"],
         corpus_identity=corpus_manifest_identity(corpus),
         identities=_identities(),
-        surfaces=[{"surface": "task-evidence", "authority_proof_identity": "sha256:proof"}],
+        surfaces=[
+            {"surface": "task-evidence", "authority_proof_identity": "sha256:proof"}
+        ],
         mutations=[],
     )
     transition = promotion_transition(
@@ -131,7 +139,6 @@ def test_fresh_receipt_can_authorize_shadow_to_qualification_promotion() -> None
     )
     assert transition["to"] == "qualification"
     assert transition["evidence_identity"] == receipt["receipt_identity"]
-
 
 
 def test_external_evidence_receipt_keeps_conflict_without_promoting_authority() -> None:
