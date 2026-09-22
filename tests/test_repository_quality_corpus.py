@@ -135,7 +135,6 @@ def test_corpus_health_distinguishes_retained_from_fresh_dogfood() -> None:
     assert health["qualification_layers"]["L2-retained-real-world"] == 2
 
 
-
 def test_cross_surface_authority_convergence_requires_one_proof_identity() -> None:
     rows = [
         {"surface": surface, "authority_proof_identity": "sha256:proof"}
