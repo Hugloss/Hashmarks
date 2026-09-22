@@ -6,6 +6,8 @@ from scripts.agent_evaluation.repository_quality_convergence import (
 from scripts.agent_evaluation.repository_quality_live import (
     canonical_authority_observation,
     convergence_observations,
+    equivalent_task_convergence,
+    projection_receipt,
     surface_authority_observation,
 )
 
@@ -82,3 +84,63 @@ def test_scoped_proof_identity_changes_with_generation_not_presentation() -> Non
         first["semantic_authority_proof_identity"]
         == changed["semantic_authority_proof_identity"]
     )
+
+
+
+def test_equivalent_wording_requires_same_complete_authority_proof() -> None:
+    rows = [
+        {
+            "authority_proof_identity": "sha256:proof",
+            "resolved_owner": "src/owner.py",
+            "proof_complete": True,
+        },
+        {
+            "authority_proof_identity": "sha256:proof",
+            "resolved_owner": "src/owner.py",
+            "proof_complete": True,
+        },
+    ]
+    assert equivalent_task_convergence(rows)["converged"] is True
+
+    rows[1]["authority_proof_identity"] = "sha256:drift"
+    assert equivalent_task_convergence(rows)["converged"] is False
+
+
+def test_full_compact_mcp_projection_receipt_preserves_ambiguity_state() -> None:
+    contract = {
+        "owner_resolved": False,
+        "resolved_owner": None,
+        "candidate_owner": "src/candidate.py",
+        "proof_complete": False,
+        "authority_proof_identity": "sha256:ambiguous",
+    }
+    receipt = projection_receipt(
+        full={"retrieval": {"ownership_authority": contract}},
+        compact={"ownership_authority": contract},
+        mcp={"ownership": {"contract": contract}},
+    )
+    assert receipt["converged"] is True
+    assert receipt["ambiguity_preserved"] is True
+
+
+def test_projection_receipt_exposes_candidate_promotion_drift() -> None:
+    unresolved = {
+        "owner_resolved": False,
+        "resolved_owner": None,
+        "candidate_owner": "src/candidate.py",
+        "proof_complete": False,
+        "authority_proof_identity": "sha256:proof",
+    }
+    promoted = {
+        **unresolved,
+        "owner_resolved": True,
+        "resolved_owner": "src/candidate.py",
+        "proof_complete": True,
+    }
+    receipt = projection_receipt(
+        full={"retrieval": {"ownership_authority": unresolved}},
+        compact={"ownership_authority": promoted},
+        mcp={"ownership": {"contract": unresolved}},
+    )
+    assert receipt["converged"] is True
+    assert receipt["ambiguity_preserved"] is False
