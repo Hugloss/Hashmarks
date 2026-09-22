@@ -207,10 +207,17 @@ def _confusion_counts(rows: Sequence[Mapping[str, Any]]) -> Counter[str]:
 
 
 def _abstention_quality(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    true_ambiguity = [row for row in rows if row["semantic_truth"] in {"true-ambiguity", "multi-edit"}]
+    true_ambiguity = [
+        row for row in rows if row["semantic_truth"] in {"true-ambiguity", "multi-edit"}
+    ]
     reported_ambiguous = [row for row in rows if row["reported_state"] == "ambiguous"]
-    correct_ambiguous = sum(row["semantic_truth"] in {"true-ambiguity", "multi-edit"} for row in reported_ambiguous)
-    ambiguity_recalled = sum(row["reported_state"] == "ambiguous" for row in true_ambiguity)
+    correct_ambiguous = sum(
+        row["semantic_truth"] in {"true-ambiguity", "multi-edit"}
+        for row in reported_ambiguous
+    )
+    ambiguity_recalled = sum(
+        row["reported_state"] == "ambiguous" for row in true_ambiguity
+    )
     unresolved = [row for row in rows if row["reported_state"] == "unresolved"]
     justified_unresolved = sum(
         row["admitted_evidence_truth"] != "sufficient"
@@ -218,12 +225,16 @@ def _abstention_quality(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         for row in unresolved
     )
     non_edit = [row for row in rows if row["semantic_truth"] == "non-edit"]
-    correct_non_edit = sum(row["reported_state"] == "no-edit-authority" for row in non_edit)
+    correct_non_edit = sum(
+        row["reported_state"] == "no-edit-authority" for row in non_edit
+    )
     return {
         "true_ambiguity_precision": _ratio(correct_ambiguous, len(reported_ambiguous)),
         "true_ambiguity_recall": _ratio(ambiguity_recalled, len(true_ambiguity)),
         "justified_unresolved_rate": _ratio(justified_unresolved, len(unresolved)),
-        "unjustified_unresolved_rate": _ratio(len(unresolved) - justified_unresolved, len(unresolved)),
+        "unjustified_unresolved_rate": _ratio(
+            len(unresolved) - justified_unresolved, len(unresolved)
+        ),
         "non_edit_specificity": _ratio(correct_non_edit, len(non_edit)),
     }
 
