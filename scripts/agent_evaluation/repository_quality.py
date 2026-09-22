@@ -23,6 +23,7 @@ from scripts.agent_evaluation.repository_quality_diagnostics import (
     proof_mode_health,
     rank_metrics,
     stability_metrics,
+    uncertainty_summary,
 )
 
 SCHEMA = "hashmarks.repository-quality-case.v1"
@@ -467,6 +468,7 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "metamorphic_health": metamorphic_health(score_rows),
         "environment_health": environment_health(score_rows),
         "economics": economics_summary(score_rows),
+        "uncertainty": uncertainty_summary(score_rows),
         "slice_quality": {
             "macro_by_task_family": group_quality(score_rows, "task_family"),
             "macro_by_risk_class": group_quality(score_rows, "risk_class"),
