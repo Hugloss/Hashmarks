@@ -97,3 +97,16 @@ Equivalent task wording has an explicit convergence receipt, while full, compact
 External evidence now has a non-interference receipt that retains conflict counts and before/after repository authority proof identities. A changed authority proof is surfaced as repository-authority interference rather than normalized away.
 
 Still retained after this batch: execute immutable Oh-Goon 993 and fresh L3 dogfood to create real receipts; adapt real CLI/MCP output rather than only mapping-shaped surface fixtures; execute counterfactual mutations against repository bytes; run pagination/cache-rebuild/batching/equivalent-wording/irrelevant-addition metamorphics end to end; populate ranking and evidence-retention measurements from real corpora; bind comparable economics to environment fingerprints; run selected mutation testing; and perform final convergence.
+
+
+## Real execution measurement batch
+
+The qualification stack now separates execution authority from measurement authority. Execution receipts are cryptographically revalidated rather than trusted by their stored identifier, and receipt health distinguishes malformed evidence from valid-but-stale generation evidence. A stale receipt remains evidence but cannot be treated as fresh qualification proof.
+
+Measurement receipts bind ranking, verification ranking, evidence retention, and economics to the exact execution-receipt identity plus environment fingerprint and cold/warm/incremental mode. Economics are comparable only when both environment and mode match. Missing measurements remain unknown; negative economics fail closed; ranking positions remain one-based.
+
+The retained agent-evaluation repositories are now exercised directly as repository evidence. The qualification tests traverse the retained Python, release-contract, and TypeScript corpora, require their expected files to remain retrievable, exercise rebuild determinism, and verify that an irrelevant query addition does not erase the known owner file. These are execution checks over retained repository bytes, not synthetic report rows.
+
+This batch also makes receipt integrity suitable for later L3 promotion: changing repository generation, task/source/policy identity, surfaces, mutations, or external-evidence content without resealing invalidates the receipt. Promotion evidence can therefore point at a checked receipt identity rather than a mutable result document.
+
+Remaining work is additive: run the immutable Oh-Goon 993 archive and a genuinely fresh Oh-Goon generation through the execution-receipt path; execute repository-byte owner replacement/duplicate/removal counterfactuals rather than callback simulations; capture real CLI/MCP convergence; extend retained measurement coverage to related-evidence nDCG and verification relevance; execute selected mutation testing; establish empirical profile floors only after corpus measurement; and complete final convergence.
