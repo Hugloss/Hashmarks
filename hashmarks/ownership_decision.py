@@ -84,10 +84,7 @@ def _evidence_state(state: OwnershipDecisionState, status: str) -> dict[str, boo
     scoped_basis = bool(state.proof_scope)
     admissible = explicit_basis or structural_resolution
     proven = (
-        admissible
-        and ambiguity_cleared
-        and scoped_basis
-        and state.proof_scope_complete
+        admissible and ambiguity_cleared and scoped_basis and state.proof_scope_complete
     )
     return {
         "retrieved": retrieved,
