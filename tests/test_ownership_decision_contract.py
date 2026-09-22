@@ -317,7 +317,9 @@ def test_authority_proof_ignores_selected_row_presentation_metadata() -> None:
     assert proof(1, ["edit"]) == proof(99, ["edit", "related"])
 
 
-def test_unresolved_provisional_candidate_order_does_not_change_authority_proof() -> None:
+def test_unresolved_provisional_candidate_order_does_not_change_authority_proof() -> (
+    None
+):
     first = {"path": "src/a.py", "canonical_rank": 1, "roles": ["edit"]}
     second = {"path": "src/b.py", "canonical_rank": 2, "roles": ["edit"]}
 
