@@ -125,3 +125,22 @@ def test_codemap_service_exposes_repository_findings(tmp_path: Path) -> None:
     finally:
         client.stop()
         thread.join(timeout=5)
+
+
+def test_repository_findings_retain_observation_and_expose_adjudication(
+    tmp_path: Path,
+) -> None:
+    _write_repository(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        result = codemap.repository_findings()
+
+    assert result["findings"]
+    for finding in result["findings"]:
+        assert finding["observation"] == "retained"
+        assert finding["interpretation"]["authority"] == "repository-evidence-only"
+        assert finding["interpretation"]["actionability"] in {
+            "actionable",
+            "not-actionable",
+        }
+        assert isinstance(finding["counter_evidence"], list)
