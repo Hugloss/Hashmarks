@@ -189,3 +189,39 @@ def test_splunk_csv_dogfood_correlates_traceback_with_explicit_path_mapping(
     anchor = result["packet"]["bundles"][0]["anchors"][0]
     assert anchor["resolution"]["repository_path"] == "utils/__init__.py"
     assert anchor["resolution"]["path_origin"] == "explicit-path-mapping"
+
+
+def test_splunk_csv_dogfood_counts_final_physical_line_without_newline(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    source.write_text(
+        HEADER
+        + '"9","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","INFO name=utils"',
+        encoding="utf-8",
+    )
+
+    report = collect(source)
+    assert report["summary"]["events"] == 1
+    assert report["summary"]["physical_lines"] == 2
+
+
+def test_splunk_csv_dogfood_recovers_traceback_after_quote_damage(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","  File \"/app/src/utils/__init__.py\", '
+        'line 280, in process_output_data"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["recovered"] == 1
+    assert report["summary"]["widened"] == 1
+    anchor = report["bundle"]["anchors"][0]
+    assert anchor["path"] == "/app/src/utils/__init__.py"
+    assert anchor["line"] == 280
+    assert anchor["symbol"] == "process_output_data"
