@@ -81,11 +81,12 @@ def test_multiple_task_local_tests_for_same_candidate_remain_unproven(
         action = codemap.task_action_map("Fix quartz_single transform behavior")
         packet = codemap.task_decision_packet("Fix quartz_single transform behavior")
 
-    assert action["ambiguity"]["ambiguous"] is True
-    assert action["ambiguity"]["reason"] == "unproven-structural-owner"
+    assert action["ambiguity"]["ambiguous"] is False
     assert action["ambiguity"]["task_local_structural_owners"] == [
         "src/feature/engine.py"
     ]
     assert action["ownership_authority"]["owner_resolved"] is False
     assert action["ownership_authority"]["candidate_owner"] == "src/feature/engine.py"
+    assert packet["edit"]["path"] == "src/feature/engine.py"
     assert packet["discrimination"]["needed"] is True
+    assert packet["discrimination"]["reason"] == "ownership-unresolved"
