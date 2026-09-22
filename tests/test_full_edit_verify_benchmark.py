@@ -1,50 +1,47 @@
 from pathlib import Path
 
-from scripts.agent_evaluation.generate_full_edit_corpus import generate
+from scripts.agent_evaluation import full_edit_verify_benchmark as benchmark
 
 
-def test_full_edit_corpus_keeps_secret_external_and_is_deterministic(tmp_path: Path):
-    a = tmp_path / "a"
-    p = tmp_path / "public.json"
-    s = tmp_path / "secret.json"
-    m1 = generate(a, p, s, cases_per_category=1)
-    p1 = p.read_bytes()
-    s1 = s.read_bytes()
-    m2 = generate(a, p, s, cases_per_category=1)
-    assert m1 == m2 and p.read_bytes() == p1 and s.read_bytes() == s1
-    assert m1["tasks"] == 6 and m1["secret_outside_worker_roots"] is True
-    assert b"expected_edit_path" not in p1
+def test_run_lane_measures_first_edit_and_controlled_recovery(
+    tmp_path: Path, monkeypatch
+) -> None:
+    base = tmp_path / "base"
+    base.mkdir()
+    (base / "owner.py").write_text("mode = 'old'\n", encoding="utf-8")
+    (base / "wrong.py").write_text("mode = 'old'\n", encoding="utf-8")
+    tasks = [
+        {"id": "recover", "query": "recover owner"},
+        {"id": "direct", "query": "edit owner"},
+    ]
+    packets = {
+        "recover": {"edit": {"path": "wrong.py"}},
+        "direct": {"edit": {"path": "owner.py"}},
+    }
+    secret = {
+        task["id"]: {
+            "expected_edit_path": "owner.py",
+            "expected_verify_path": "tests/test_owner.py",
+            "category": task["id"],
+        }
+        for task in tasks
+    }
+    monkeypatch.setattr(benchmark, "packet_all", lambda *_args: (packets, 4.0))
 
+    def verify(repo: Path, _verify_path: str) -> tuple[bool, float]:
+        return "mode = 'new'" in (repo / "owner.py").read_text(), 2.0
 
-def test_full_edit_cases_start_red(tmp_path: Path):
-    import json
-    import runpy
-    import sys
+    monkeypatch.setattr(benchmark, "verify", verify)
+    work = tmp_path / "work"
 
-    import pytest
+    result = benchmark.run_lane(tmp_path, base, tasks, secret, work)
 
-    root = tmp_path / "repos"
-    p = tmp_path / "p.json"
-    s = tmp_path / "s.json"
-    generate(root, p, s, cases_per_category=1)
-    secret = json.loads(s.read_text())
-    for row in secret["tasks"]:
-        repo = root / row["id"]
-        verify = repo / row["expected_verify_path"]
-        sys.path.insert(0, str(repo))
-        try:
-            namespace = runpy.run_path(str(verify))
-            test_functions = [
-                value
-                for name, value in namespace.items()
-                if name.startswith("test_") and callable(value)
-            ]
-            assert len(test_functions) == 1
-            with pytest.raises(AssertionError):
-                test_functions[0]()
-        finally:
-            sys.path.remove(str(repo))
-            for name in [
-                name for name in sys.modules if name == "src" or name.startswith("src.")
-            ]:
-                sys.modules.pop(name, None)
+    assert result["tasks"] == 2
+    assert result["first_edit_correct"] == 1
+    assert result["first_verification_passed"] == 1
+    assert result["verified_solutions"] == 2
+    assert result["verification_attempts"] == 3
+    assert result["recovery_attempts"] == 1
+    assert result["packet_ms_per_task"] == 2.0
+    assert (work / "owner.py").read_text() == "mode = 'old'\n"
+    assert (work / "wrong.py").read_text() == "mode = 'old'\n"
