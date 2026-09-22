@@ -30,11 +30,33 @@ def _case(**overrides):
     return value
 
 
+def _qualification_rows():
+    cases = [
+        _case(case_id="unique"),
+        _case(
+            case_id="ambiguous", semantic_truth="true-ambiguity", expected_owner=None
+        ),
+        _case(case_id="non-edit", semantic_truth="non-edit", expected_owner=None),
+        _case(
+            case_id="test-edit",
+            semantic_truth="explicit-test-edit",
+            expected_owner=None,
+        ),
+    ]
+    observed = [
+        {"state": "resolved", "owner": "src/widget.py::widget"},
+        {"state": "ambiguous", "owner": None},
+        {"state": "no-edit-authority", "owner": None},
+        {"state": "explicit-test-target", "owner": None},
+    ]
+    return [evaluate_case(case, result) for case, result in zip(cases, observed)]
+
+
 def test_sufficient_unique_owner_resolves_without_authority_violation() -> None:
     row = evaluate_case(
         _case(), {"state": "resolved", "owner": "src/widget.py::widget"}
     )
-    report = summarize([row])
+    report = summarize([row, *_qualification_rows()[1:]])
     assert report["qualification"] == "qualified"
     assert report["hard_zero"]["false_owner"] == 0
     assert report["selective_quality"]["selective_owner_risk"] == 0
@@ -43,7 +65,7 @@ def test_sufficient_unique_owner_resolves_without_authority_violation() -> None:
 
 def test_wrong_resolved_owner_is_non_compensatory_failure() -> None:
     row = evaluate_case(_case(), {"state": "resolved", "owner": "src/other.py::widget"})
-    report = summarize([row])
+    report = summarize([row, *_qualification_rows()[1:]])
     assert report["qualification"] == "not-qualified"
     assert report["hard_zero"]["false_owner"] == 1
     assert report["selective_quality"]["selective_owner_risk"] == 1
@@ -55,7 +77,7 @@ def test_insufficient_evidence_abstention_is_not_counted_as_missed_resolution() 
         {"state": "unresolved", "owner": None},
     )
     report = summarize([row])
-    assert report["qualification"] == "qualified"
+    assert report["qualification"] == "benchmark-not-ready"
     assert report["hard_zero"]["sufficient_unique_reported_unresolved"] == 0
     assert report["selective_quality"]["sufficient_unique_cases"] == 0
     assert report["selective_quality"]["resolvable_owner_coverage"] is None
@@ -70,7 +92,7 @@ def test_true_ambiguity_cannot_be_collapsed_to_unique_owner() -> None:
         ),
         {"state": "resolved", "owner": "src/widget.py::widget"},
     )
-    report = summarize([row])
+    report = summarize([*_qualification_rows()[:1], row, *_qualification_rows()[2:]])
     assert report["qualification"] == "not-qualified"
     assert report["hard_zero"]["true_ambiguity_collapsed"] == 1
     assert report["hard_zero"]["false_unique"] == 1
@@ -97,7 +119,7 @@ def test_projection_authority_leak_is_a_hard_veto() -> None:
             "candidate_promoted_during_projection": True,
         },
     )
-    report = summarize([row])
+    report = summarize([row, *_qualification_rows()[1:]])
     assert report["qualification"] == "not-qualified"
     assert report["hard_zero"]["candidate_promoted_during_projection"] == 1
 
@@ -174,7 +196,7 @@ def test_uncertain_ground_truth_requires_adjudication_before_qualification() -> 
         ),
         {"state": "unresolved", "owner": None},
     )
-    report = summarize([valid, uncertain])
+    report = summarize([valid, *_qualification_rows()[1:], uncertain])
     assert report["qualification"] == "needs-adjudication"
     assert report["benchmark_health"]["needs_adjudication"] == 1
 
@@ -206,8 +228,31 @@ def test_historical_and_canary_cases_are_evidence_but_not_score_bearing() -> Non
         _case(case_id="canary", corpus_class="canary"),
         {"state": "resolved", "owner": "src/other.py::widget"},
     )
-    report = summarize([active, historical, canary])
+    report = summarize([active, *_qualification_rows()[1:], historical, canary])
     assert report["qualification"] == "qualified"
-    assert report["benchmark_health"]["total_cases"] == 3
-    assert report["benchmark_health"]["score_bearing_cases"] == 1
+    assert report["benchmark_health"]["total_cases"] == 6
+    assert report["benchmark_health"]["score_bearing_cases"] == 4
     assert report["hard_zero"]["false_owner"] == 0
+
+
+def test_missing_critical_semantic_slice_prevents_qualification() -> None:
+    report = summarize(
+        [
+            evaluate_case(
+                _case(),
+                {"state": "resolved", "owner": "src/widget.py::widget"},
+            )
+        ]
+    )
+    assert report["qualification"] == "benchmark-not-ready"
+    assert report["benchmark_health"]["critical_slices"]["missing"] == {
+        "true-ambiguity": 1,
+        "non-edit": 1,
+        "explicit-test-edit": 1,
+    }
+
+
+def test_complete_critical_semantic_slices_allow_qualification() -> None:
+    report = summarize(_qualification_rows())
+    assert report["qualification"] == "qualified"
+    assert report["benchmark_health"]["critical_slices"]["adequate"] is True

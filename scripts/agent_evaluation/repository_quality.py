@@ -20,6 +20,12 @@ GROUND_TRUTH_STATUS = {
 }
 CORPUS_CLASS = {"qualification", "shadow", "canary", "fresh-dogfood"}
 CASE_LIFECYCLE = {"active", "shadow", "historical", "superseded"}
+CRITICAL_SLICE_MINIMUMS = {
+    "unique-owner": 1,
+    "true-ambiguity": 1,
+    "non-edit": 1,
+    "explicit-test-edit": 1,
+}
 
 SEMANTIC_TRUTH = {
     "unique-owner",
@@ -233,6 +239,21 @@ def _corpus_identity(rows: Sequence[Mapping[str, Any]]) -> str:
     return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _critical_slice_health(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    counts = Counter(str(row["semantic_truth"]) for row in rows)
+    missing = {
+        name: minimum - counts[name]
+        for name, minimum in CRITICAL_SLICE_MINIMUMS.items()
+        if counts[name] < minimum
+    }
+    return {
+        "minimums": dict(CRITICAL_SLICE_MINIMUMS),
+        "counts": {name: counts[name] for name in CRITICAL_SLICE_MINIMUMS},
+        "missing": missing,
+        "adequate": not missing,
+    }
+
+
 def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     score_rows = [
         row
@@ -247,7 +268,8 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         for row in rows
     )
     invalid = sum(row["ground_truth_status"] == "invalid-case" for row in rows)
-    if not rows or not score_rows or invalid:
+    slice_health = _critical_slice_health(score_rows)
+    if not rows or not score_rows or invalid or not slice_health["adequate"]:
         qualification = "benchmark-not-ready"
     elif adjudication:
         qualification = "needs-adjudication"
@@ -270,6 +292,7 @@ def summarize(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "score_bearing_cases": len(score_rows),
             "needs_adjudication": adjudication,
             "invalid_cases": invalid,
+            "critical_slices": slice_health,
         },
         "hard_zero": dict(totals),
         "selective_quality": {
