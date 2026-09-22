@@ -23,7 +23,8 @@ Coding agents repeatedly spend context and tool calls rediscovering the same cod
 - **Code navigation and ownership.** Trace symbols, references, imports, callers, project boundaries, and likely implementation owners.
 - **Freshness-aware evidence.** Distinguish current, stale, and unknown repository evidence instead of silently serving an old index as truth.
 - **Observer-aware deltas.** Keep repository change separate from observer-capability change, and compare stable evidence identities instead of treating every newly visible fact as a repository edit.
-- **Repository evidence bindings.** Bind opaque consumer IDs to exact line ranges or whole repository members, then compare direct/member/dependency/relationship evidence without transferring consumer policy into Hashmarks.\n- **Evidence correlation.** Map bounded runtime/derived observations such as tracebacks, CI failures, resolver output, or dependency-tree evidence back to canonical repository truth while preserving ambiguity, completeness, and source equivalence.
+- **Repository evidence bindings.** Bind opaque consumer IDs to exact line ranges or whole repository members, then compare direct/member/dependency/relationship evidence without transferring consumer policy into Hashmarks.
+- **Evidence correlation.** Map bounded runtime/derived observations such as tracebacks, CI failures, resolver output, or dependency-tree evidence back to canonical repository truth while preserving ambiguity, completeness, and source equivalence.
 - **Local and read-only for agent consumers.** Hashmarks maintains disposable derived state, while editing, execution, git, planning, and model decisions stay with the caller.
 
 ## Quick start
@@ -375,7 +376,8 @@ See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs
 - [Hashmarks MCP server for coding agents](docs/integration/MCP.md)
 - [Architecture](docs/reference/ARCHITECTURE.md)
 - [Observer and delta model](docs/reference/OBSERVER_DELTA.md)
-- [Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md)\n- [Evidence correlation](docs/reference/EVIDENCE_CORRELATION.md)
+- [Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md)
+- [Evidence correlation](docs/reference/EVIDENCE_CORRELATION.md)
 - [Structural locality evidence](docs/reference/STRUCTURAL_LOCALITY.md)
 - [Product boundary](docs/reference/PRODUCT_BOUNDARY.md)
 - [Normative invariants](docs/reference/INVARIANTS.md)
