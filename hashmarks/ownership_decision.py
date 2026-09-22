@@ -175,6 +175,37 @@ def presentation_identity(
         },
     )
 
+
+def bounded_presentation_contract(
+    proof_identity: str,
+    *,
+    total_candidates: int,
+    returned_candidates: int,
+    limit: int,
+    per_role: int,
+    compact: bool,
+) -> dict[str, object]:
+    """Describe bounded output without changing the underlying authority proof."""
+    if min(total_candidates, returned_candidates, limit, per_role) < 0:
+        raise ValueError("presentation bounds and candidate counts must be non-negative")
+    if returned_candidates > total_candidates:
+        raise ValueError("returned candidates cannot exceed total candidates")
+    complete = returned_candidates >= total_candidates
+    return {
+        "schema": "hashmarks.ownership-presentation.v1",
+        "authority_proof_identity": proof_identity,
+        "presentation_identity": presentation_identity(
+            proof_identity,
+            limit=limit,
+            per_role=per_role,
+            compact=compact,
+        ),
+        "total_candidates": total_candidates,
+        "returned_candidates": returned_candidates,
+        "complete": complete,
+        "truncated": not complete,
+    }
+
 def ownership_authority_contract(
     trace: Mapping[str, object],
 ) -> dict[str, object]:
