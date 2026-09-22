@@ -354,7 +354,9 @@ def test_unresolved_provisional_candidate_order_does_not_change_authority_proof(
     )
 
 
-def test_no_authority_proof_identity_ignores_candidate_status_and_presentation() -> None:
+def test_no_authority_proof_identity_ignores_candidate_status_and_presentation() -> (
+    None
+):
     unproven = ownership_decision_trace(
         OwnershipDecisionState(
             edit={"path": "src/a.py", "canonical_rank": 1, "roles": ["edit"]},
