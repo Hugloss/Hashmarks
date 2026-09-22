@@ -4,6 +4,8 @@ from enum import Enum
 from functools import lru_cache
 from pathlib import PurePosixPath
 
+from .source_languages import SOURCE_SUFFIXES
+
 
 class RepositoryDomain(str, Enum):
     SOURCE = "source"
@@ -18,32 +20,8 @@ class RepositoryDomain(str, Enum):
     DOC = "doc"
 
 
-_SOURCE_SUFFIXES = {
-    ".py",
-    ".pyi",
-    ".js",
-    ".jsx",
-    ".ts",
-    ".tsx",
-    ".go",
-    ".rs",
-    ".java",
-    ".kt",
-    ".c",
-    ".h",
-    ".cc",
-    ".cpp",
-    ".hpp",
-    ".cs",
-    ".rb",
-    ".php",
-    ".swift",
-    ".sql",
-    ".css",
-    ".scss",
-    ".sass",
-    ".less",
-}
+_SOURCE_SUFFIXES = SOURCE_SUFFIXES
+
 _CONFIG_SUFFIXES = {".toml", ".yaml", ".yml", ".json", ".ini", ".cfg", ".conf"}
 _SCRIPT_SUFFIXES = {".sh", ".bash", ".zsh", ".fish", ".ps1", ".cmd", ".bat"}
 
