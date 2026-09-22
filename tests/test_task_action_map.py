@@ -719,3 +719,42 @@ def test_unresolved_edit_owner_cannot_rerank_verification(
         choices.verification_relevance["selected"]["selection_reason"]
         == "canonical-verification-without-edit-owner"
     )
+
+
+def test_ranked_candidate_without_positive_proof_is_not_owner_authority(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "src/policy.py").write_text(
+        "def evaluate(value):\n    return value\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "src/other.py").write_text(
+        "def evaluate(value):\n    return value\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_policy.py").write_text(
+        "from src import policy as subject\n\n"
+        "def test_evaluate_policy():\n"
+        "    assert subject.evaluate('x') == 'x'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests/test_other.py").write_text(
+        "from src import other as subject\n\n"
+        "def test_evaluate_other():\n"
+        "    assert subject.evaluate('x') == 'x'\n",
+        encoding="utf-8",
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map("Change policy.evaluate behavior", limit=20)
+
+    assert action["edit"]["path"] == "src/policy.py"
+    assert action["owner_basis"] is None
+    assert action["ownership_authority"]["owner_resolved"] is False
+    assert action["ownership_authority"]["candidate_owner"] == "src/policy.py"
+    assert action["verification_relevance"]["selected"]["path"] == "tests/test_policy.py"
+    assert action["verification_relevance"]["selected"]["direct_reference"] is True
