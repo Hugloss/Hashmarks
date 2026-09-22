@@ -147,6 +147,7 @@ def validate_execution_receipt(receipt: Mapping[str, Any]) -> None:
     _validated_receipt_identities(receipt)
     _validated_receipt_evidence(receipt)
 
+
 def execution_receipt_health(
     receipts: Sequence[Mapping[str, Any]],
     *,
