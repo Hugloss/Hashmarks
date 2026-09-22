@@ -29,7 +29,7 @@ def _execution() -> dict:
             "generation_identity": "sha256:generation",
             "authority_proof_identity": "sha256:proof",
         },
-        surfaces=[{"surface": "task-evidence", "authority_proof_identity": "sha256:proof"}],
+        surfaces=[\n            {\n                "surface": "task-evidence",\n                "authority_proof_identity": "sha256:proof",\n            }\n        ],
         mutations=[],
     )
 
@@ -68,7 +68,7 @@ def test_execution_receipt_identity_is_recomputed_not_trusted() -> None:
 def test_receipt_health_separates_invalid_from_stale() -> None:
     fresh = _execution()
     stale = _execution()
-    stale["identities"] = {**stale["identities"], "generation_identity": "sha256:old"}
+    stale["identities"] = {\n        **stale["identities"],\n        "generation_identity": "sha256:old",\n    }
     stale["receipt_identity"] = execution_receipt(
         case_id="case",
         corpus_identity="sha256:corpus",
