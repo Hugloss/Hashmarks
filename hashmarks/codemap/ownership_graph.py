@@ -1004,8 +1004,23 @@ class OwnershipGraphMixin:
 
     @staticmethod
     def _baseline_ownership_candidate(ranked) -> dict[str, object] | None:
-        baseline = [row for row in ranked if int(row.get("depth") or 0) <= 2]
-        return next((row for row in baseline if row.get("corroborated")), None)
+        baseline = [
+            row
+            for row in ranked
+            if int(row.get("depth") or 0) <= 2 and row.get("corroborated")
+        ]
+        if not baseline:
+            return None
+        nearest_depth = min(int(row.get("depth") or 0) for row in baseline)
+        nearest = [
+            row for row in baseline if int(row.get("depth") or 0) == nearest_depth
+        ]
+        task_local = [row for row in nearest if row.get("task_locality_terms")]
+        if len(task_local) == 1:
+            return task_local[0]
+        if task_local:
+            return None
+        return nearest[0] if len(nearest) == 1 else None
 
     @classmethod
     def _select_ownership_candidate(
