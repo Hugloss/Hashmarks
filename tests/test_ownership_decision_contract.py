@@ -315,3 +315,34 @@ def test_authority_proof_ignores_selected_row_presentation_metadata() -> None:
         return ownership_authority_contract(trace)["authority_proof_identity"]
 
     assert proof(1, ["edit"]) == proof(99, ["edit", "related"])
+
+
+def test_unresolved_provisional_candidate_order_does_not_change_authority_proof() -> None:
+    first = {"path": "src/a.py", "canonical_rank": 1, "roles": ["edit"]}
+    second = {"path": "src/b.py", "canonical_rank": 2, "roles": ["edit"]}
+
+    left = ownership_decision_trace(
+        OwnershipDecisionState(
+            edit=first,
+            competing=[second],
+            structural_owner=None,
+            ambiguous=True,
+            ambiguity_reason="multiple-exact-identifier-edit-owners",
+        )
+    )
+    right = ownership_decision_trace(
+        OwnershipDecisionState(
+            edit=second,
+            competing=[first],
+            structural_owner=None,
+            ambiguous=True,
+            ambiguity_reason="multiple-exact-identifier-edit-owners",
+        )
+    )
+
+    assert left["status"] == "ambiguous"
+    assert right["status"] == "ambiguous"
+    assert (
+        ownership_authority_contract(left)["authority_proof_identity"]
+        == ownership_authority_contract(right)["authority_proof_identity"]
+    )
