@@ -150,8 +150,6 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
     if shutil.which(args.codex) is None:
         raise HostGateEnvironmentBlocked(f"{args.codex!r} is not installed")
     version = run([args.codex, "--version"], cwd=project_root).stdout.strip()
-    source = source_binding(project_root, project_root / ".codex" / "config.toml")
-
     receipt_path = Path(args.receipt).resolve()
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     event_log = receipt_path.with_name(receipt_path.stem + "-events.jsonl")
@@ -215,7 +213,7 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
             "schema": "hashmarks.codex-mcp-host-gate.v1",
             "status": "PASS",
             "completed_at": completed_at(),
-            **source,
+            **source_binding(project_root, project_root / ".codex" / "config.toml"),
             "host": {"name": "codex", "version": version},
             "model": args.model or "configured-default",
             "dangerous_bypass": bool(args.dangerous_bypass),

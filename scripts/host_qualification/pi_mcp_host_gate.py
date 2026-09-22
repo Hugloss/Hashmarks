@@ -67,35 +67,61 @@ def _schemas_in(value: Any) -> set[str]:
         schema = value.get("schema")
         if isinstance(schema, str):
             found.add(schema)
-        for item in value.values():
-            found.update(_schemas_in(item))
+        nested = value.values()
     elif isinstance(value, list):
-        for item in value:
-            found.update(_schemas_in(item))
-    elif isinstance(value, str):
-        for schema in EXPECTED.values():
-            if schema in value:
-                found.add(schema)
+        nested = value
+    else:
+        return (
+            {schema for schema in EXPECTED.values() if schema in value}
+            if isinstance(value, str)
+            else found
+        )
+    for item in nested:
+        found.update(_schemas_in(item))
     return found
 
 
-def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    starts: dict[str, dict[str, Any]] = {}
-    ends: dict[str, dict[str, Any]] = {}
+def _tool_events(
+    events: list[dict[str, Any]], event_type: str
+) -> dict[str, dict[str, Any]]:
+    found: dict[str, dict[str, Any]] = {}
     for event in events:
-        event_type = event.get("type")
-        if event_type == "tool_execution_start":
-            tool_name = str(event.get("toolName"))
-            if tool_name != "mcp":
-                raise HostGateError(f"Pi used unexpected tool: {tool_name}")
-            call_id = str(event.get("toolCallId"))
-            starts[call_id] = event
-        elif event_type == "tool_execution_end":
-            tool_name = str(event.get("toolName"))
-            if tool_name != "mcp":
-                raise HostGateError(f"Pi used unexpected tool: {tool_name}")
-            call_id = str(event.get("toolCallId"))
-            ends[call_id] = event
+        if event.get("type") != event_type:
+            continue
+        tool_name = str(event.get("toolName"))
+        if tool_name != "mcp":
+            raise HostGateError(f"Pi used unexpected tool: {tool_name}")
+        found[str(event.get("toolCallId"))] = event
+    return found
+
+
+def _validated_call(
+    start: dict[str, Any], end: dict[str, Any], observed: dict[str, dict[str, Any]]
+) -> tuple[str, dict[str, Any]]:
+    args = start.get("args")
+    if not isinstance(args, dict):
+        raise HostGateError("Pi MCP proxy call has no argument object")
+    target = args.get("tool")
+    if target not in EXPECTED:
+        raise HostGateError(f"Pi MCP proxy targeted unexpected tool: {target!r}")
+    if target in observed:
+        raise HostGateError(f"Pi MCP proxy called tool more than once: {target}")
+    if end.get("isError") is True:
+        raise HostGateError(f"Pi MCP proxy reported an error for {target}")
+    result = end.get("result")
+    expected_schema = EXPECTED[str(target)]
+    if expected_schema not in _schemas_in(result):
+        raise HostGateError(
+            f"Pi MCP proxy result for {target} did not expose schema {expected_schema}"
+        )
+    if "BUILDING" in json.dumps(result, sort_keys=True, default=str):
+        raise HostGateError("transient BUILDING state escaped through Pi")
+    return str(target), end
+
+
+def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    starts = _tool_events(events, "tool_execution_start")
+    ends = _tool_events(events, "tool_execution_end")
 
     if len(starts) != 2 or len(ends) != 2 or set(starts) != set(ends):
         raise HostGateError(
@@ -104,27 +130,8 @@ def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
 
     observed: dict[str, dict[str, Any]] = {}
     for call_id, start in starts.items():
-        args = start.get("args")
-        if not isinstance(args, dict):
-            raise HostGateError("Pi MCP proxy call has no argument object")
-        target = args.get("tool")
-        if target not in EXPECTED:
-            raise HostGateError(f"Pi MCP proxy targeted unexpected tool: {target!r}")
-        if target in observed:
-            raise HostGateError(f"Pi MCP proxy called tool more than once: {target}")
-        end = ends[call_id]
-        if end.get("isError") is True:
-            raise HostGateError(f"Pi MCP proxy reported an error for {target}")
-        result = end.get("result")
-        schemas = _schemas_in(result)
-        expected_schema = EXPECTED[str(target)]
-        if expected_schema not in schemas:
-            raise HostGateError(
-                f"Pi MCP proxy result for {target} did not expose schema {expected_schema}"
-            )
-        if "BUILDING" in json.dumps(result, sort_keys=True, default=str):
-            raise HostGateError("transient BUILDING state escaped through Pi")
-        observed[str(target)] = end
+        target, end = _validated_call(start, ends[call_id], observed)
+        observed[target] = end
     return observed
 
 

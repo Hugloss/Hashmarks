@@ -68,15 +68,17 @@ def _schemas_in(value: Any) -> set[str]:
         schema = value.get("schema")
         if isinstance(schema, str):
             found.add(schema)
-        for item in value.values():
-            found.update(_schemas_in(item))
+        nested = value.values()
     elif isinstance(value, list):
-        for item in value:
-            found.update(_schemas_in(item))
-    elif isinstance(value, str):
-        for schema in EXPECTED.values():
-            if schema in value:
-                found.add(schema)
+        nested = value
+    else:
+        return (
+            {schema for schema in EXPECTED.values() if schema in value}
+            if isinstance(value, str)
+            else found
+        )
+    for item in nested:
+        found.update(_schemas_in(item))
     return found
 
 
@@ -140,6 +142,24 @@ def _tool_results(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return results
 
 
+def _validated_tool_result(
+    name: str, tool_id: str, results: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    result = results.get(tool_id)
+    if result is None:
+        raise HostGateError(f"Claude Code emitted no tool_result for {name}")
+    if result.get("is_error") is True:
+        raise HostGateError(f"Claude Code reported an MCP error for {name}")
+    expected_schema = EXPECTED[name]
+    if expected_schema not in _schemas_in(result.get("content")):
+        raise HostGateError(
+            f"Claude Code result for {name} did not expose schema {expected_schema}"
+        )
+    if "BUILDING" in json.dumps(result, sort_keys=True, default=str):
+        raise HostGateError("transient BUILDING state escaped through Claude Code")
+    return result
+
+
 def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     connected, offered = _init_catalog(events)
     if not connected:
@@ -158,22 +178,10 @@ def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
             f"Claude Code did not call required Hashmarks tools: {sorted(set(EXPECTED) - set(uses))}"
         )
     results = _tool_results(events)
-    validated: dict[str, dict[str, Any]] = {}
-    for name, tool_id in uses.items():
-        result = results.get(tool_id)
-        if result is None:
-            raise HostGateError(f"Claude Code emitted no tool_result for {name}")
-        if result.get("is_error") is True:
-            raise HostGateError(f"Claude Code reported an MCP error for {name}")
-        expected_schema = EXPECTED[name]
-        if expected_schema not in _schemas_in(result.get("content")):
-            raise HostGateError(
-                f"Claude Code result for {name} did not expose schema {expected_schema}"
-            )
-        if "BUILDING" in json.dumps(result, sort_keys=True, default=str):
-            raise HostGateError("transient BUILDING state escaped through Claude Code")
-        validated[name] = result
-    return validated
+    return {
+        name: _validated_tool_result(name, tool_id, results)
+        for name, tool_id in uses.items()
+    }
 
 
 def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
