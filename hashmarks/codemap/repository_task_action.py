@@ -678,7 +678,50 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             return source_path
         return None
 
-    def _task_action_ambiguous_plain_identifiers(\n        self, task: str, rows: Sequence[dict[str, object]], failed: set[str]\n    ) -> set[str]:\n        """Return prose identifiers that are repository-globally non-unique.\n\n        Bounded canonical retrieval is presentation evidence only. Duplicate exact\n        symbol identity must therefore be established from the maintained exact\n        index so a small limit cannot manufacture unique ownership.\n        """\n        if TYPE_CHECKING:\n            self = cast("CodeMap", self)\n        masked = task\n        for value in _QUALIFIED_IDENTIFIER_RE.findall(task):\n            masked = masked.replace(value, " ")\n        plain_tokens = {\n            token.lower()\n            for token in _WORD_RE.findall(masked)\n            if len(token) >= 4 and token.lower() not in _TASK_STOPWORDS\n        }\n        if not plain_tokens:\n            return set()\n        indexed = self._session_exact_symbol_candidates(\n            tuple(sorted(plain_tokens)), limit=1024\n        )\n        exact_paths: dict[str, set[str]] = {}\n        for symbol in indexed:\n            path = str(symbol.get("path") or "")\n            name = str(symbol.get("name") or "").lower()\n            if (\n                name not in plain_tokens\n                or not path\n                or path in failed\n                or self._task_action_is_archive_path(path)\n            ):\n                continue\n            domains = classify_repository_path(path)\n            if (\n                RepositoryDomain.TEST in domains\n                or not {RepositoryDomain.SOURCE, RepositoryDomain.SCRIPT}.intersection(domains)\n            ):\n                continue\n            exact_paths.setdefault(name, set()).add(path)\n        return {token for token, paths in exact_paths.items() if len(paths) > 1}\n
+    def _task_action_ambiguous_plain_identifiers(
+        self, task: str, rows: Sequence[dict[str, object]], failed: set[str]
+    ) -> set[str]:
+        """Return prose identifiers that are repository-globally non-unique.
+
+        Bounded canonical retrieval is presentation evidence only. Duplicate exact
+        symbol identity must therefore be established from the maintained exact
+        index so a small limit cannot manufacture unique ownership.
+        """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        masked = task
+        for value in _QUALIFIED_IDENTIFIER_RE.findall(task):
+            masked = masked.replace(value, " ")
+        plain_tokens = {
+            token.lower()
+            for token in _WORD_RE.findall(masked)
+            if len(token) >= 4 and token.lower() not in _TASK_STOPWORDS
+        }
+        if not plain_tokens:
+            return set()
+        indexed = self._session_exact_symbol_candidates(
+            tuple(sorted(plain_tokens)), limit=1024
+        )
+        exact_paths: dict[str, set[str]] = {}
+        for symbol in indexed:
+            path = str(symbol.get("path") or "")
+            name = str(symbol.get("name") or "").lower()
+            if (
+                name not in plain_tokens
+                or not path
+                or path in failed
+                or self._task_action_is_archive_path(path)
+            ):
+                continue
+            domains = classify_repository_path(path)
+            if (
+                RepositoryDomain.TEST in domains
+                or not {RepositoryDomain.SOURCE, RepositoryDomain.SCRIPT}.intersection(domains)
+            ):
+                continue
+            exact_paths.setdefault(name, set()).add(path)
+        return {token for token, paths in exact_paths.items() if len(paths) > 1}
+
     @staticmethod
     def _task_action_path_module_aliases(path: str) -> set[str]:
         module_parts = Path(path).with_suffix("").parts
