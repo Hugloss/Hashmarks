@@ -82,3 +82,18 @@ External evidence remains correlation-only. New end-to-end regressions execute c
 Ambiguous duplicate owners are also exercised across multiple retrieval/per-role bounds. Bounds may change visible candidates, but they cannot convert unresolved ambiguity into ownership authority.
 
 Still retained: run these adapters against the immutable Oh-Goon 993 source and a fresh L3 dogfood authority; wire actual task-decision/task-evidence/MCP outputs into retained convergence evidence; add repository-byte counterfactual generation fixtures; qualify equivalent wording, pagination, cache/rebuild, batching and irrelevant-addition metamorphics end to end; measure ranking/retention/economics on real corpora; and complete final convergence.
+
+
+## Fresh-execution receipt and counterfactual batch
+
+Qualification now has a sealable execution-receipt contract. A fresh receipt binds case and corpus identity to repository, source bytes, normalized task, authority policy, repository generation, and authority-proof identity. It also carries the product surfaces, mutation results, and bounded external-evidence result used for the execution. A receipt with a metamorphic violation cannot be sealed, and freshness is checked against repository plus generation identity before it can support promotion.
+
+Shadow/canary promotion can therefore cite an execution receipt rather than an unstructured claim that dogfood was run. The retained Oh-Goon physical-attempt case remains shadow until an actual fresh receipt is produced from its repository bytes; this code does not manufacture that evidence.
+
+The counterfactual profile now distinguishes irrelevant repository additions, which must preserve authority, from owner replacement, duplicate exact owners, and decisive-evidence removal, which must change the authority proof. Mutation coverage reports the executed families and any violations.
+
+Equivalent task wording has an explicit convergence receipt, while full, compact, and MCP-style projections have a projection receipt that independently checks proof-identity convergence and preservation of resolved/candidate/ambiguity state. This catches the important case where all surfaces repeat the same proof identifier but one projection silently promotes a candidate.
+
+External evidence now has a non-interference receipt that retains conflict counts and before/after repository authority proof identities. A changed authority proof is surfaced as repository-authority interference rather than normalized away.
+
+Still retained after this batch: execute immutable Oh-Goon 993 and fresh L3 dogfood to create real receipts; adapt real CLI/MCP output rather than only mapping-shaped surface fixtures; execute counterfactual mutations against repository bytes; run pagination/cache-rebuild/batching/equivalent-wording/irrelevant-addition metamorphics end to end; populate ranking and evidence-retention measurements from real corpora; bind comparable economics to environment fingerprints; run selected mutation testing; and perform final convergence.
