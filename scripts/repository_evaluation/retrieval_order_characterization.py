@@ -106,27 +106,32 @@ def characterize_retrieval_order(
         root = base / "repo"
         root.mkdir()
         originals = _build_repository(root, files=files)
-        initial_identity = _content_identity(root)
+        identities = {"initial": _content_identity(root)}
 
-        cold_a = _cold_run(
-            root, base / "state-a", broad_limit=broad_limit, find_limit=find_limit
-        )
-        cold_b = _cold_run(
-            root, base / "state-b", broad_limit=broad_limit, find_limit=find_limit
-        )
+        cold_runs = [
+            _cold_run(
+                root,
+                base / f"state-{suffix}",
+                broad_limit=broad_limit,
+                find_limit=find_limit,
+            )
+            for suffix in ("a", "b")
+        ]
 
         state = base / "state-history"
         with CodeMap(
             root, state_dir=state, artifact_db=state / "artifacts.sqlite3"
         ) as codemap:
             codemap.sync()
-            before_broad = _broad_rows(codemap, limit=broad_limit)
-            before_find = _find_rows(codemap, limit=find_limit)
-            if not before_broad:
+            before = {
+                "broad": _broad_rows(codemap, limit=broad_limit),
+                "find": _find_rows(codemap, limit=find_limit),
+            }
+            if not before["broad"]:
                 raise RuntimeError(
                     "characterization query produced no broad candidates"
                 )
-            target = before_broad[0][0]
+            target = before["broad"][0][0]
             target_path = root / target
             target_path.write_text(
                 "def unrelated_name():\n    return -1\n", encoding="utf-8"
@@ -134,17 +139,20 @@ def characterize_retrieval_order(
             codemap.sync([target])
             target_path.write_text(originals[target], encoding="utf-8")
             codemap.sync([target])
-            restored_identity = _content_identity(root)
-            after_broad = _broad_rows(codemap, limit=broad_limit)
-            after_find = _find_rows(codemap, limit=find_limit)
+            identities["restored"] = _content_identity(root)
+            after = {
+                "broad": _broad_rows(codemap, limit=broad_limit),
+                "find": _find_rows(codemap, limit=find_limit),
+            }
             history_planner = _planner(codemap, limit=broad_limit)
 
-        same_content = initial_identity == restored_identity
-        broad_changed = before_broad != after_broad
-        find_changed = before_find != after_find
+        same_content = identities["initial"] == identities["restored"]
+        changed = {
+            surface: before[surface] != after[surface] for surface in ("broad", "find")
+        }
         decision = (
             "STABLE_CONTRACT_SATISFIED"
-            if same_content and not broad_changed and not find_changed
+            if same_content and not any(changed.values())
             else "STABLE_CONTRACT_VIOLATED"
         )
         return {
@@ -154,18 +162,18 @@ def characterize_retrieval_order(
             "files": files,
             "broad_limit": broad_limit,
             "find_limit": find_limit,
-            "cold_run_stable": cold_a["broad_rows"] == cold_b["broad_rows"]
-            and cold_a["find_rows"] == cold_b["find_rows"],
+            "cold_run_stable": cold_runs[0]["broad_rows"] == cold_runs[1]["broad_rows"]
+            and cold_runs[0]["find_rows"] == cold_runs[1]["find_rows"],
             "same_content_after_aba": same_content,
-            "broad_subset_changed_after_aba": broad_changed,
-            "find_result_changed_after_aba": find_changed,
-            "initial_content_identity": initial_identity,
-            "restored_content_identity": restored_identity,
-            "before_broad": before_broad,
-            "after_broad": after_broad,
-            "before_find": before_find,
-            "after_find": after_find,
-            "cold_planner": cold_a["planner"],
+            "broad_subset_changed_after_aba": changed["broad"],
+            "find_result_changed_after_aba": changed["find"],
+            "initial_content_identity": identities["initial"],
+            "restored_content_identity": identities["restored"],
+            "before_broad": before["broad"],
+            "after_broad": after["broad"],
+            "before_find": before["find"],
+            "after_find": after["find"],
+            "cold_planner": cold_runs[0]["planner"],
             "history_planner": history_planner,
             "decision": decision,
             "contract_basis": (

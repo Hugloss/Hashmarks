@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from scripts.repository_evaluation.retrieval_order_characterization import (
     SCHEMA,
     characterize_retrieval_order,
@@ -22,10 +24,16 @@ def test_same_content_aba_satisfies_stable_retrieval_contract() -> None:
     assert result["product_contract_enforced"] is True
 
 
-def test_characterization_rejects_uncapped_fixture() -> None:
-    try:
-        characterize_retrieval_order(files=10, broad_limit=10, find_limit=5)
-    except ValueError as exc:
-        assert "files must exceed broad_limit" in str(exc)
-    else:
-        raise AssertionError("expected invalid characterization protocol")
+@pytest.mark.parametrize(
+    ("files", "broad_limit", "find_limit"),
+    [(10, 10, 5), (10, 0, 5), (10, 5, 0)],
+)
+def test_characterization_rejects_invalid_fixture_limits(
+    files: int, broad_limit: int, find_limit: int
+) -> None:
+    with pytest.raises(ValueError, match="files must exceed broad_limit"):
+        characterize_retrieval_order(
+            files=files,
+            broad_limit=broad_limit,
+            find_limit=find_limit,
+        )
