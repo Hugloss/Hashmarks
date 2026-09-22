@@ -565,13 +565,17 @@ def test_authority_proof_identity_ignores_per_role_presentation_bounds(
     assert len(presentation_ids) == 3
     assert all(row["ambiguity"]["ambiguous"] for row in results)
     assert all(not row["ownership_authority"]["owner_resolved"] for row in results)
-    assert [len(row["ambiguity"]["alternatives"]) for row in results] == [1, 2, 4]
+    # The selected edit candidate is reported separately; alternatives contain
+    # only the remaining competing rows. Four duplicate owners therefore produce
+    # three alternatives. Presentation bounds may truncate those alternatives,
+    # but must never change the proof identity or ambiguity decision.
+    assert [len(row["ambiguity"]["alternatives"]) for row in results] == [1, 2, 3]
     assert {
         row["authority_non_interference"]["total_candidates"] for row in results
-    } == {4}
+    } == {3}
     assert [
         row["authority_non_interference"]["returned_candidates"] for row in results
-    ] == [1, 2, 4]
+    ] == [1, 2, 3]
     assert [row["authority_non_interference"]["complete"] for row in results] == [
         False,
         False,
