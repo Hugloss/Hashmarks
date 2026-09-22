@@ -553,6 +553,9 @@ def test_metamorphic_family_membership_is_visible() -> None:
     assert report["metamorphic_health"] == {
         "families": {"irrelevant-file-addition": 1},
         "cases": 1,
+        "executed": 0,
+        "executed_families": {},
+        "violations": 0,
     }
 
 
