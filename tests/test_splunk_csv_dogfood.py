@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-
 from scripts.agent_evaluation.splunk_csv_dogfood import collect, correlate
 
 
