@@ -617,3 +617,53 @@ def test_resolved_authority_proof_identity_ignores_per_role_bounds(
         )
         == 3
     )
+
+
+def test_exact_owner_authority_survives_codemap_reopen(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/owner.py").write_text(
+        "def reopen_owner(value):\n    return value\n", encoding="utf-8"
+    )
+    task = "Refactor owner.reopen_owner without changing behavior"
+    state_dir = tmp_path / ".state"
+
+    with CodeMap(tmp_path, state_dir=state_dir) as codemap:
+        codemap.sync()
+        cold = codemap.task_action_map(task, limit=1, per_role=1)
+
+    with CodeMap(tmp_path, state_dir=state_dir) as codemap:
+        warm = codemap.task_action_map(task, limit=100, per_role=5)
+
+    assert cold["ownership_authority"]["resolved_owner"] == "src/owner.py"
+    assert warm["ownership_authority"]["resolved_owner"] == "src/owner.py"
+    assert (
+        cold["ownership_authority"]["authority_proof_identity"]
+        == warm["ownership_authority"]["authority_proof_identity"]
+    )
+
+
+def test_duplicate_owner_ambiguity_survives_codemap_reopen(tmp_path: Path) -> None:
+    (tmp_path / "src/a").mkdir(parents=True)
+    (tmp_path / "src/b").mkdir(parents=True)
+    for package in ("a", "b"):
+        (tmp_path / f"src/{package}/policy.py").write_text(
+            "def reopen_duplicate(value):\n    return value\n", encoding="utf-8"
+        )
+    task = "Refactor reopen_duplicate without changing behavior"
+    state_dir = tmp_path / ".state"
+
+    with CodeMap(tmp_path, state_dir=state_dir) as codemap:
+        codemap.sync()
+        cold = codemap.task_action_map(task, limit=1, per_role=1)
+
+    with CodeMap(tmp_path, state_dir=state_dir) as codemap:
+        warm = codemap.task_action_map(task, limit=100, per_role=5)
+
+    assert cold["ambiguity"]["ambiguous"] is True
+    assert warm["ambiguity"]["ambiguous"] is True
+    assert cold["ownership_authority"]["owner_resolved"] is False
+    assert warm["ownership_authority"]["owner_resolved"] is False
+    assert (
+        cold["ownership_authority"]["authority_proof_identity"]
+        == warm["ownership_authority"]["authority_proof_identity"]
+    )
