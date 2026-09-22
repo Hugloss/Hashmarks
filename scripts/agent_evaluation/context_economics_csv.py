@@ -89,18 +89,14 @@ def _rows(report: dict[str, Any]) -> list[dict[str, object]]:
                         "condition": lane,
                         "completed": bool(task.get("completed")),
                         "correct_first_edit": bool(task.get("correct_first_edit")),
-                        "correct_verification": bool(
-                            task.get("correct_verification")
-                        ),
+                        "correct_verification": bool(task.get("correct_verification")),
                         "joint_success": bool(task.get("correct_first_edit"))
                         and bool(task.get("correct_verification")),
                         "elapsed_ms": float(task.get("elapsed_ms") or 0),
                         "input_tokens": usage.get("input_tokens"),
                         "cached_input_tokens": usage.get("cached_input_tokens"),
                         "output_tokens": usage.get("output_tokens"),
-                        "reasoning_output_tokens": usage.get(
-                            "reasoning_output_tokens"
-                        ),
+                        "reasoning_output_tokens": usage.get("reasoning_output_tokens"),
                         "total_tokens": usage.get("total_tokens"),
                         "token_metrics_available": usage.get("total_tokens")
                         is not None,
@@ -140,10 +136,7 @@ def _summary(rows: list[dict[str, object]]) -> list[dict[str, object]]:
         ]
         reductions = [
             100.0
-            * (
-                float(pair["native"][metric])
-                - float(pair["hashmarks"][metric])
-            )
+            * (float(pair["native"][metric]) - float(pair["hashmarks"][metric]))
             / float(pair["native"][metric])
             for pair in usable
         ]
