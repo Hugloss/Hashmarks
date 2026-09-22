@@ -27,6 +27,9 @@ def test_resolved_structural_owner_is_authoritative() -> None:
             },
             ambiguous=False,
             ambiguity_reason="resolved-by-role",
+            authority_basis="structural-owner",
+            proof_scope="repository-relationship-proof",
+            proof_scope_complete=True,
         )
     )
     authority = ownership_authority_contract(trace)
@@ -88,6 +91,9 @@ def test_ownership_contract_never_grants_edit_permission() -> None:
             structural_owner={"selected": "src/owner.py"},
             ambiguous=False,
             ambiguity_reason="",
+            authority_basis="structural-owner",
+            proof_scope="repository-relationship-proof",
+            proof_scope_complete=True,
         )
     )
 
@@ -115,6 +121,9 @@ def test_structural_owner_resolves_residual_candidate_ambiguity() -> None:
             },
             ambiguous=True,
             ambiguity_reason="competing-ranked-candidate",
+            authority_basis="structural-owner",
+            proof_scope="repository-relationship-proof",
+            proof_scope_complete=True,
         )
     )
     authority = ownership_authority_contract(trace)
@@ -140,6 +149,8 @@ def test_unique_canonical_owner_without_structural_edge_remains_resolved() -> No
             ambiguous=False,
             ambiguity_reason="resolved-by-role",
             authority_basis="canonical-role-discrimination",
+            proof_scope="bounded-retrieval",
+            proof_scope_complete=False,
         )
     )
     authority = ownership_authority_contract(trace)
@@ -159,6 +170,8 @@ def test_exact_symbol_basis_is_positive_authority_evidence() -> None:
             ambiguous=False,
             ambiguity_reason="resolved-by-role",
             authority_basis="unique-exact-symbol",
+            proof_scope="repository-global-symbol-identity",
+            proof_scope_complete=True,
         )
     )
     authority = ownership_authority_contract(trace)
@@ -179,6 +192,8 @@ def test_presentation_bounds_do_not_change_authority_proof_identity() -> None:
             ambiguous=False,
             ambiguity_reason="resolved-by-role",
             authority_basis="literal-path",
+            proof_scope="repository-global-path-identity",
+            proof_scope_complete=True,
         )
     )
     authority = ownership_authority_contract(trace)
@@ -231,9 +246,7 @@ def test_invalid_bounded_presentation_counts_fail_closed() -> None:
         )
 
 
-def test_resolved_canonical_selection_is_admissible_without_new_metadata_basis() -> (
-    None
-):
+def test_ranked_candidate_without_positive_proof_remains_unresolved_authority() -> None:
     trace = ownership_decision_trace(
         OwnershipDecisionState(
             edit={"path": "src/owner.py", "canonical_rank": 1, "roles": ["edit"]},
@@ -247,10 +260,11 @@ def test_resolved_canonical_selection_is_admissible_without_new_metadata_basis()
 
     assert trace["status"] == "resolved"
     assert trace["evidence_state"]["canonical_selection"] is True
-    assert trace["evidence_state"]["admissible"] is True
-    assert trace["evidence_state"]["proven"] is True
-    assert authority["owner_resolved"] is True
-    assert authority["proof_complete"] is True
+    assert trace["evidence_state"]["admissible"] is False
+    assert trace["evidence_state"]["proven"] is False
+    assert authority["owner_resolved"] is False
+    assert authority["candidate_owner"] == "src/owner.py"
+    assert authority["proof_complete"] is False
 
 
 def test_structural_evidence_is_admissible_without_new_metadata_basis() -> None:
@@ -265,6 +279,9 @@ def test_structural_evidence_is_admissible_without_new_metadata_basis() -> None:
             },
             ambiguous=False,
             ambiguity_reason="resolved-structurally",
+            authority_basis="structural-owner",
+            proof_scope="repository-relationship-proof",
+            proof_scope_complete=True,
         )
     )
     authority = ownership_authority_contract(trace)
