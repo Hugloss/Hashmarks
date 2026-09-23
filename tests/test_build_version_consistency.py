@@ -132,3 +132,34 @@ def test_build_backend_rejects_missing_declared_license_file(
 
     with pytest.raises(RuntimeError, match="matched no files"):
         hashmarks_build._metadata_bytes()
+
+
+@pytest.mark.parametrize(
+    ("patterns", "message"),
+    [
+        ("LICENSE", "array of strings"),
+        ([""], "non-empty POSIX paths"),
+        ([r"legal\\LICENSE"], "non-empty POSIX paths"),
+        (["/LICENSE"], "below the project root"),
+        (["../LICENSE"], "below the project root"),
+    ],
+)
+def test_build_backend_rejects_invalid_license_file_patterns(
+    patterns: object, message: str
+) -> None:
+    with pytest.raises(RuntimeError, match=message):
+        hashmarks_build._license_file_paths({"license-files": patterns})
+
+
+def test_build_backend_rejects_license_symlink_outside_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    outside = tmp_path / "outside-license"
+    outside.write_text("outside\n", encoding="utf-8")
+    (project / "LICENSE").symlink_to(outside)
+    monkeypatch.setattr(hashmarks_build, "ROOT", project)
+
+    with pytest.raises(RuntimeError, match="outside the project root"):
+        hashmarks_build._license_file_paths({"license-files": ["LICENSE"]})

@@ -66,7 +66,7 @@ def _header_value(value: object, *, field: str) -> str:
     return text
 
 
-def _license_file_paths(project: dict[str, object]) -> tuple[Path, ...]:
+def _license_patterns(project: dict[str, object]) -> tuple[str, ...]:
     patterns = project.get("license-files")
     if patterns is None:
         return ()
@@ -74,34 +74,44 @@ def _license_file_paths(project: dict[str, object]) -> tuple[Path, ...]:
         isinstance(value, str) for value in patterns
     ):
         raise RuntimeError("project.license-files must be an array of strings")
+    return tuple(patterns)
 
+
+def _license_pattern_paths(pattern: str, root: Path) -> tuple[Path, ...]:
+    if not pattern or "\\" in pattern:
+        raise RuntimeError(
+            "project.license-files patterns must use non-empty POSIX paths"
+        )
+    pattern_path = Path(pattern)
+    if pattern_path.is_absolute() or ".." in pattern_path.parts:
+        raise RuntimeError(
+            "project.license-files patterns must remain below the project root"
+        )
+    files = [path for path in ROOT.glob(pattern) if path.is_file()]
+    if not files:
+        raise RuntimeError(
+            f"project.license-files pattern matched no files: {pattern!r}"
+        )
+    relative_paths = []
+    for path in files:
+        try:
+            relative = path.resolve().relative_to(root)
+        except ValueError as exc:
+            raise RuntimeError(
+                "project.license-files resolved outside the project root"
+            ) from exc
+        path.resolve().read_text(encoding="utf-8")
+        relative_paths.append(relative)
+    return tuple(relative_paths)
+
+
+def _license_file_paths(project: dict[str, object]) -> tuple[Path, ...]:
     root = ROOT.resolve()
-    matched: dict[str, Path] = {}
-    for pattern in patterns:
-        if not pattern or "\\" in pattern:
-            raise RuntimeError(
-                "project.license-files patterns must use non-empty POSIX paths"
-            )
-        pattern_path = Path(pattern)
-        if pattern_path.is_absolute() or ".." in pattern_path.parts:
-            raise RuntimeError(
-                "project.license-files patterns must remain below the project root"
-            )
-        files = [path for path in ROOT.glob(pattern) if path.is_file()]
-        if not files:
-            raise RuntimeError(
-                f"project.license-files pattern matched no files: {pattern!r}"
-            )
-        for path in files:
-            resolved = path.resolve()
-            try:
-                relative = resolved.relative_to(root)
-            except ValueError as exc:
-                raise RuntimeError(
-                    "project.license-files resolved outside the project root"
-                ) from exc
-            resolved.read_text(encoding="utf-8")
-            matched[relative.as_posix()] = relative
+    matched = {
+        relative.as_posix(): relative
+        for pattern in _license_patterns(project)
+        for relative in _license_pattern_paths(pattern, root)
+    }
     return tuple(matched[key] for key in sorted(matched))
 
 
@@ -197,13 +207,9 @@ def _wheel_info(member: str) -> zipfile.ZipInfo:
     return info
 
 
-def _write_wheel(wheel_directory: str, *, editable: bool) -> str:
-    name, version, _, _ = _project()
-    wheel_name = f"{name.replace('-', '_')}-{version}-py3-none-any.whl"
-    target = Path(wheel_directory) / wheel_name
-    target.parent.mkdir(parents=True, exist_ok=True)
-    dist_info = _dist_info()
-
+def _wheel_members(
+    name: str, version: str, dist_info: str, *, editable: bool
+) -> dict[str, bytes]:
     members: dict[str, bytes] = {
         f"{dist_info}/METADATA": _metadata_bytes(),
         f"{dist_info}/WHEEL": _wheel_bytes(),
@@ -227,18 +233,32 @@ def _write_wheel(wheel_directory: str, *, editable: bool) -> str:
                 and path.suffix != ".pyc"
             ):
                 members[path.relative_to(ROOT).as_posix()] = path.read_bytes()
+    return members
 
-    rows: list[tuple[str, str, str]] = []
+
+def _record_bytes(members: dict[str, bytes], dist_info: str) -> tuple[str, bytes]:
+    rows = []
     for member, data in sorted(members.items()):
         digest, size = _hash_record(data)
         rows.append((member, digest, size))
-
     record_name = f"{dist_info}/RECORD"
     buffer = io.StringIO(newline="")
     writer = csv.writer(buffer, lineterminator="\n")
     writer.writerows(rows)
     writer.writerow((record_name, "", ""))
-    members[record_name] = buffer.getvalue().encode("utf-8")
+    return record_name, buffer.getvalue().encode("utf-8")
+
+
+def _write_wheel(wheel_directory: str, *, editable: bool) -> str:
+    name, version, _, _ = _project()
+    wheel_name = f"{name.replace('-', '_')}-{version}-py3-none-any.whl"
+    target = Path(wheel_directory) / wheel_name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    dist_info = _dist_info()
+    members = _wheel_members(name, version, dist_info, editable=editable)
+
+    record_name, record = _record_bytes(members, dist_info)
+    members[record_name] = record
 
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for member, data in sorted(members.items()):
@@ -296,6 +316,42 @@ _SDIST_DIRECTORIES = (
 
 _SDIST_EXCLUDED_PREFIXES = (Path("docs/development"),)
 
+_SDIST_EXCLUDED_PARTS = {
+    "__pycache__",
+    ".pytest_cache",
+    ".hashmarks",
+    ".venv",
+    "dist",
+    "build",
+}
+
+
+def _admitted_sdist_path(path: Path) -> Path | None:
+    if not path.is_file():
+        return None
+    relative = path.relative_to(ROOT)
+    if any(
+        relative == prefix or prefix in relative.parents
+        for prefix in _SDIST_EXCLUDED_PREFIXES
+    ):
+        return None
+    if any(part in _SDIST_EXCLUDED_PARTS for part in relative.parts):
+        return None
+    if path.suffix in {".pyc", ".pyo"}:
+        return None
+    return relative
+
+
+def _unique_paths(paths: list[Path]) -> list[Path]:
+    result = []
+    seen = set()
+    for path in paths:
+        key = path.as_posix()
+        if key not in seen:
+            seen.add(key)
+            result.append(path)
+    return result
+
 
 def _sdist_members() -> list[Path]:
     """Return the intentional public source-distribution surface.
@@ -306,52 +362,17 @@ def _sdist_members() -> list[Path]:
     release but are not shipped through PyPI. Current user/reference documentation and
     examples remain available to people inspecting the sdist.
     """
-    result: list[Path] = []
-    seen: set[str] = set()
-
-    def include(relative: Path) -> None:
-        key = relative.as_posix()
-        if key not in seen:
-            seen.add(key)
-            result.append(relative)
-
-    for rel in _SDIST_FILES:
-        if (ROOT / rel).is_file():
-            include(rel)
-
+    candidates = [relative for relative in _SDIST_FILES if (ROOT / relative).is_file()]
     for rel in _SDIST_DIRECTORIES:
         source = ROOT / rel
         if not source.is_dir():
             continue
         for path in sorted(source.rglob("*")):
-            if not path.is_file():
-                continue
-            relative = path.relative_to(ROOT)
-            if any(
-                relative == prefix or prefix in relative.parents
-                for prefix in _SDIST_EXCLUDED_PREFIXES
-            ):
-                continue
-            if any(
-                part
-                in {
-                    "__pycache__",
-                    ".pytest_cache",
-                    ".hashmarks",
-                    ".venv",
-                    "dist",
-                    "build",
-                }
-                for part in relative.parts
-            ):
-                continue
-            if path.suffix in {".pyc", ".pyo"}:
-                continue
-            include(relative)
-
-    for relative in _license_file_paths(_project_metadata()):
-        include(relative)
-    return result
+            relative = _admitted_sdist_path(path)
+            if relative is not None:
+                candidates.append(relative)
+    candidates.extend(_license_file_paths(_project_metadata()))
+    return _unique_paths(candidates)
 
 
 def _deterministic_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
