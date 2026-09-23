@@ -273,8 +273,11 @@ class DependencyResolutionEvidenceMixin:
         repository_inputs = self._dependency_repository_inputs(
             snapshot.get("repository_inputs", ())
         )
-        module_ownership = self._dependency_module_ownership(
-            snapshot.get("module_ownership", ()), node_ids
+        module_ownership = self._dependency_module_ownership_v2(
+            snapshot.get("module_ownership", ()),
+            node_ids,
+            context_set,
+            source_ids,
         )
         coverage = self._dependency_coverage_v2(
             snapshot.get("coverage", ()), context_set, source_ids
@@ -570,6 +573,71 @@ class DependencyResolutionEvidenceMixin:
             seen.add(key)
             result.append({"node_id": node_id, "context": context})
         return sorted(result, key=lambda row: (str(row["context"]), str(row["node_id"])))
+
+    @classmethod
+    def _dependency_module_ownership_v2(
+        cls,
+        value: object,
+        node_ids: set[str],
+        contexts: set[str],
+        source_ids: set[str],
+    ) -> list[dict[str, object]]:
+        rows = _objects(value, label="module_ownership", limit=_MAX_MODULE_OWNERSHIP)
+        result: list[dict[str, object]] = []
+        seen: set[tuple[str, str]] = set()
+        for raw in rows:
+            module = _text(raw.get("module"), label="module", required=True)
+            context = _identifier(raw.get("context"), label="module ownership context")
+            if context not in contexts:
+                raise ValueError(f"unknown module ownership context: {context}")
+            key = (module, context)
+            if key in seen:
+                raise ValueError(
+                    f"duplicate module ownership observation: {module}:{context}"
+                )
+            seen.add(key)
+            raw_owners = raw.get("owners", ())
+            if not isinstance(raw_owners, Sequence) or isinstance(
+                raw_owners, (str, bytes, bytearray)
+            ):
+                raise ValueError("module ownership owners must be a sequence")
+            owners = [_identifier(owner, label="module owner") for owner in raw_owners]
+            if len(set(owners)) != len(owners):
+                raise ValueError(f"duplicate owner for module: {module}")
+            dangling = sorted(set(owners) - node_ids)
+            if dangling:
+                raise ValueError(
+                    f"dangling module ownership node for {module}: {dangling[0]}"
+                )
+            completeness = str(raw.get("completeness") or "unknown").strip()
+            if completeness not in {"complete", "incomplete", "unknown"}:
+                raise ValueError(
+                    "module ownership completeness must be complete, incomplete, or unknown"
+                )
+            result.append(
+                {
+                    "module": module,
+                    "context": context,
+                    "owners": sorted(owners),
+                    "state": (
+                        "resolved-unique"
+                        if len(owners) == 1
+                        else "resolved-ambiguous"
+                        if owners
+                        else "unresolved"
+                    ),
+                    "completeness": completeness,
+                    "evidence_sources": cls._dependency_source_refs_v2(
+                        raw.get("evidence_sources", ()),
+                        label="module ownership evidence source",
+                        allowed=source_ids,
+                    ),
+                    "authority": "qualified-external-observation",
+                }
+            )
+        return sorted(
+            result, key=lambda row: (str(row["module"]), str(row["context"]))
+        )
 
     @classmethod
     def _dependency_coverage_v2(
