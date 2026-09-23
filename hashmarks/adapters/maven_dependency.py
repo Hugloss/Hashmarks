@@ -253,9 +253,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     module_rows += 1
                     ownership[(_module_name(module), context)].add(node)
             module_completeness = (
-                "complete"
-                if module_rows == module_capable_rows
-                else "incomplete"
+                "complete" if module_rows == module_capable_rows else "incomplete"
             )
             ownership_completeness[context] = module_completeness
             coverage.append(
