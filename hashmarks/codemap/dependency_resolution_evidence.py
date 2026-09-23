@@ -1059,7 +1059,9 @@ class DependencyResolutionEvidenceMixin:
             rows = [
                 dict(row)
                 for row in observation.get("module_ownership", ())
-                if isinstance(row, Mapping) and str(row.get("module") or "") == module
+                if isinstance(row, Mapping)
+                and str(row.get("module") or "") == module
+                and (not context or str(row.get("context") or "") == context)
             ]
             result = limited(rows)
         else:
@@ -1305,8 +1307,19 @@ class DependencyResolutionEvidenceMixin:
             for row in after.get("relationships", ())
             if isinstance(row, Mapping)
         }
-        before_ownership = keyed(before.get("module_ownership", ()), "module")
-        after_ownership = keyed(after.get("module_ownership", ()), "module")
+        def ownership_key(row: Mapping[str, object]) -> str:
+            return f"{row.get('module') or ''}|{row.get('context') or ''}"
+
+        before_ownership = {
+            ownership_key(row): row
+            for row in before.get("module_ownership", ())
+            if isinstance(row, Mapping) and row.get("module")
+        }
+        after_ownership = {
+            ownership_key(row): row
+            for row in after.get("module_ownership", ())
+            if isinstance(row, Mapping) and row.get("module")
+        }
         return {
             "schema": "hashmarks.dependency-resolution-delta.v2",
             "comparability": "comparable",
