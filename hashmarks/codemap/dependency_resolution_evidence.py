@@ -298,9 +298,16 @@ class DependencyResolutionEvidenceMixin:
         definition_identity = _identity(
             "hashmarks.dependency-resolution-definition.v2", definition
         )
+        identity_resolution = {
+            key: [
+                {field: value for field, value in row.items() if field != "evidence_sources"}
+                for row in rows
+            ]
+            for key, rows in resolution.items()
+        }
         resolution_identity = _identity(
             "hashmarks.dependency-resolution-graph.v2",
-            {"definition_identity": definition_identity, **resolution},
+            {"definition_identity": definition_identity, **identity_resolution},
         )
 
         repository_binding = {
