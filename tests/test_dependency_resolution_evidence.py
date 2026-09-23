@@ -599,7 +599,11 @@ def _snapshot_v2() -> dict[str, object]:
         "components": [
             {"component_id": "app", "name": "app", "ecosystem": "test"},
             {"component_id": "library", "name": "library", "ecosystem": "test"},
-            {"component_id": "inventory-only", "name": "inventory-only", "ecosystem": "test"},
+            {
+                "component_id": "inventory-only",
+                "name": "inventory-only",
+                "ecosystem": "test",
+            },
         ],
         "selections": [
             {
@@ -782,7 +786,9 @@ def test_v2_delta_reports_selection_inventory_and_relationship_change(
     assert delta["causation"] == "not-inferred"
 
 
-def test_v2_repository_binding_tracks_current_codemap_generation(tmp_path: Path) -> None:
+def test_v2_repository_binding_tracks_current_codemap_generation(
+    tmp_path: Path,
+) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.dependency_resolution_evidence(_snapshot_v2())
