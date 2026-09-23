@@ -246,9 +246,7 @@ class HashmarksMcpSurface:
         if not isinstance(raw_queries, list):
             raise McpSurfaceError("queries must be a list")
         if len(raw_queries) > _MAX_DEPENDENCY_QUERIES:
-            raise McpSurfaceError(
-                f"queries exceeds {_MAX_DEPENDENCY_QUERIES} entries"
-            )
+            raise McpSurfaceError(f"queries exceeds {_MAX_DEPENDENCY_QUERIES} entries")
         bounded_queries = _bounded_json(
             raw_queries,
             name="queries",
