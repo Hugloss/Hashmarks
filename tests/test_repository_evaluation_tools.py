@@ -310,6 +310,75 @@ def test_repository_evaluation_grader_distinguishes_over_and_wrong_ambiguity() -
     assert report["cases"][0]["failure_stage"] == "AMBIGUITY_ERROR"
 
 
+def test_repository_evaluation_grader_covers_classification_and_failure_stages() -> (
+    None
+):
+    cases = [
+        ("pass", "src/live.py", "active_target", False, ["src/live.py"]),
+        ("qualname", "src/live.py", "wrong", False, ["src/live.py"]),
+        ("no-answer", "", "", False, ["src/live.py"]),
+        ("retrieval-miss", "src/wrong.py", "wrong", False, []),
+        ("projection", "src/wrong.py", "wrong", False, ["src/live.py"]),
+        ("expected-ambiguous", "", "", True, []),
+        ("false-unique", "src/live.py", "active_target", False, []),
+    ]
+    run_rows = []
+    grader_rows = {}
+    for case_id, path, qualname, ambiguous, retrieval in cases:
+        run_rows.append(
+            {
+                "id": case_id,
+                "result": {
+                    "retrieval": [{"path": value} for value in retrieval],
+                    "action": {
+                        "edit": {"path": path, "qualname": qualname},
+                        "ambiguity": {"ambiguous": ambiguous},
+                    },
+                },
+            }
+        )
+        grader_rows[case_id] = {
+            "expected_edit_path": "src/live.py",
+            "expected_edit_qualname": "active_target",
+            "must_be_ambiguous": case_id in {"expected-ambiguous", "false-unique"},
+        }
+
+    report = grade_run(run={"cases": run_rows}, grader={"cases": grader_rows})
+    by_id = {row["id"]: row for row in report["cases"]}
+    assert by_id["pass"]["classification"] == "PASS"
+    assert by_id["qualname"]["classification"] == "OTHER_FAILURE"
+    assert by_id["no-answer"]["classification"] == "NO_ANSWER"
+    assert by_id["retrieval-miss"]["failure_stage"] == "RETRIEVAL_MISS"
+    assert by_id["projection"]["failure_stage"] == "ACTION_PROJECTION_DISPLACEMENT"
+    assert by_id["expected-ambiguous"]["classification"] == "AMBIGUOUS_EXPECTED"
+    assert by_id["false-unique"]["classification"] == "FALSE_UNIQUE"
+    assert report["complete"] is False
+
+
+@pytest.mark.parametrize(
+    ("run", "grader", "message"),
+    [
+        ({"cases": []}, {"cases": []}, "grader cases must be an object"),
+        ({"cases": ["bad"]}, {"cases": {}}, "run case must be an object"),
+        (
+            {"cases": [{"id": "unknown"}]},
+            {"cases": {}},
+            "missing repository evaluation grader rule",
+        ),
+        (
+            {"cases": [{"id": "target", "result": {}}]},
+            {"cases": {"target": {}}},
+            "missing task action result",
+        ),
+    ],
+)
+def test_repository_evaluation_grader_rejects_malformed_inputs(
+    run: dict, grader: dict, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        grade_run(run=run, grader=grader)
+
+
 def test_profile_comparison_uses_same_version_noise_floor() -> None:
     from scripts.repository_evaluation.compare_profiles import compare_profiles
 
