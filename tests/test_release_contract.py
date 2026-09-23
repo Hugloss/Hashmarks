@@ -27,7 +27,7 @@ def test_release_manifest_binds_exact_distribution_bytes(tmp_path: Path) -> None
     manifest = release_manifest(
         _root(), _dist(tmp_path), tag=f"v{hashmarks.__version__}"
     )
-    assert manifest["schema"] == "hashmarks.release-artifact-manifest.v1"
+    assert manifest["schema"] == "hashmarks.release-artifact-manifest.v2"
     assert manifest["project"] == "hashmarks"
     assert manifest["version"] == hashmarks.__version__
     assert manifest["tag"] == f"v{hashmarks.__version__}"
