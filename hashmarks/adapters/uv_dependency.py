@@ -47,7 +47,7 @@ def _dependency_target(
     return candidates[0]
 
 
-def uv_lock_dependency_observation(
+def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     *,
     lock: bytes,
     repository_inputs: Sequence[Mapping[str, object]] = (),
@@ -103,9 +103,10 @@ def uv_lock_dependency_observation(
 
     relationships: list[dict[str, object]] = []
     for row in packages:
-        dependencies = row["raw"].get("dependencies", ())
+        raw = row["raw"]
+        dependencies = raw["dependencies"] if "dependencies" in raw else []
         if dependencies is None:
-            dependencies = ()
+            dependencies = []
         if not isinstance(dependencies, list):
             raise ValueError(f"uv lock dependencies must be a list: {row['name']}")
         for dependency in dependencies:
