@@ -261,4 +261,3 @@ def test_repository_root_markdown_is_limited_to_entry_points() -> None:
     assert (ROOT / "docs" / "integration" / "OH_GOON_INTEGRATION.md").is_file()
     assert (ROOT / "docs" / "maintainers" / "RELEASING.md").is_file()
     assert (ROOT / "docs" / "qualification" / "REPOSITORY_QUALITY.md").is_file()
-
