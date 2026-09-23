@@ -106,8 +106,7 @@ def release_manifest(root: Path, dist: Path, *, tag: str) -> dict[str, object]:
         if row["project"] != name or row["version"] != version:
             raise ValueError(f"distribution metadata mismatch: {row['filename']}")
 
-    lock_path = root / "uv.lock"
-    if not lock_path.is_file():
+    if not (root / "uv.lock").is_file():
         raise ValueError("committed uv.lock is required for release qualification")
 
     payload: dict[str, object] = {
@@ -118,7 +117,7 @@ def release_manifest(root: Path, dist: Path, *, tag: str) -> dict[str, object]:
         "distributions": rows,
         "qualification_dependency_resolution": {
             "path": "uv.lock",
-            "sha256": _sha256(lock_path),
+            "sha256": _sha256(root / "uv.lock"),
         },
         "publication_authority": "external",
     }
