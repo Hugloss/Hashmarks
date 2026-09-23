@@ -10,6 +10,7 @@
 - Remove remaining RCR/guardrail chronology, closed refactor receipts, and obsolete pre-public/v0.11 compatibility wording from maintained contributor policy while preserving the current responsibility-first and authority-boundary rules.
 - Remove remaining unpublished/pre-public anecdotes and standalone historical-evidence appendices from current API/integration/invariant/onboarding docs; current semantic contracts stay explicit while Git/release history remains the archaeology source.
 - Replace transitional migration/containment policy with a current boundary-violation rule: out-of-profile surfaces are defects to reject, split, narrow, or remove rather than responsibilities to preserve.
+- Repair the final dangling repository-local documentation link left by the hard docs cleanup and add a regression that requires live Markdown link targets to exist.
 - Keep only current product/reference, integration, maintainer, and qualification documentation in the live tree, and keep the changelog limited to public release history.
 
 ## 0.17.0 — External evidence correlation and real-data qualification
@@ -118,7 +119,7 @@
 ### Release notes
 
 - Python `>=3.11` is supported by the package metadata; CI is intended to qualify Python 3.11–3.14 on Linux.
-- Qualification tooling uses minimum-supported versions rather than narrow patch/minor pins: pytest `>=8.4`, Ruff `>=0.12`, and uv `>=0.10.0`; newer versions are accepted unless qualification proves a concrete incompatibility. See [`docs/qualification/TOOL_COMPATIBILITY.md`](docs/qualification/TOOL_COMPATIBILITY.md).
+- Qualification tooling uses minimum-supported versions rather than narrow patch/minor pins: pytest `>=8.4`, Ruff `>=0.12`, and uv `>=0.10.0`; newer versions are accepted unless qualification proves a concrete incompatibility.
 - The software license and final repository URLs are release-owner decisions and are intentionally not invented by the build metadata.
 
 - Development performance/maintainability: incremental stale-row reconciliation now collapses redundant requested prefixes and uses binary-search entry into sorted discovered paths instead of rescanning every discovered path for every request prefix. Added a CodeMap maintainer guide that maps implementation ownership and common request flows for developers who already understand the product boundary but not the internal mixin/module topology.
