@@ -1005,13 +1005,12 @@ def test_v2_empty_graph_queries_expose_negative_evidence_authority(
             ],
         )
 
-    compile_dependencies, runtime_dependencies, compile_paths, runtime_paths = (
-        packet["results"]
-    )
+    compile_dependencies, runtime_dependencies, compile_paths, runtime_paths = packet[
+        "results"
+    ]
     assert compile_dependencies["result"] == []
     assert (
-        compile_dependencies["negative_evidence"]
-        == "admissible-within-declared-scope"
+        compile_dependencies["negative_evidence"] == "admissible-within-declared-scope"
     )
     assert runtime_dependencies["result"] == []
     assert runtime_dependencies["negative_evidence"] == "not-admissible"
