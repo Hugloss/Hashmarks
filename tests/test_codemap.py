@@ -9,12 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from hashmarks.client import RepositoryObservation
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.model import EvidenceVisibility
 from hashmarks.codemap.parsers import parse_source
 from hashmarks.codemap.repository_index_store import WorkspaceMapStore
-from hashmarks.observation import ObservationState
 
 
 def _write_repo(root: Path) -> None:
@@ -334,7 +332,7 @@ def test_reverse_dependency_graph_finds_transitive_tests(tmp_path: Path):
     assert "tests/test_auth.py" in tests["tests"]
 
 
-def test_codemap_sync_does_not_claim_daemon_generation_if_generation_moves(
+
     tmp_path: Path, monkeypatch
 ):
     _write_repo(tmp_path)
@@ -357,7 +355,7 @@ def test_codemap_sync_does_not_claim_daemon_generation_if_generation_moves(
         assert codemap.store.meta("identity_generation") == ""
 
 
-def test_codemap_never_follows_source_symlinks_outside_workspace(tmp_path: Path):
+
     outside = tmp_path.parent / f"{tmp_path.name}-outside-secret.py"
     outside.write_text(
         "def outside_secret():\n    return 'DO_NOT_LEAK'\n", encoding="utf-8"
@@ -374,7 +372,7 @@ def test_codemap_never_follows_source_symlinks_outside_workspace(tmp_path: Path)
         assert not codemap.find("outside_secret")
 
 
-def test_incremental_file_to_symlink_removes_old_codemap_row(tmp_path: Path):
+
     target = tmp_path / "real.py"
     target.write_text("def original():\n    return 1\n", encoding="utf-8")
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
@@ -392,7 +390,7 @@ def test_incremental_file_to_symlink_removes_old_codemap_row(tmp_path: Path):
         assert codemap.store.file_row("real.py") is None
 
 
-def test_custom_state_dir_inside_workspace_is_never_indexed(tmp_path: Path):
+
     _write_repo(tmp_path)
     custom = tmp_path / "control-state"
     custom.mkdir()
@@ -407,7 +405,7 @@ def test_custom_state_dir_inside_workspace_is_never_indexed(tmp_path: Path):
         assert codemap.store.file_row("control-state/should_not_exist.py") is None
 
 
-def test_index_denial_policy_purges_previous_shared_artifact(tmp_path: Path):
+
     source = tmp_path / "private.py"
     source.write_text("def previously_allowed():\n    return 1\n", encoding="utf-8")
     artifact_db = tmp_path / "shared.sqlite3"
@@ -2225,7 +2223,7 @@ def test_index_preflight_and_economics_report_measured_surfaces_without_executio
     assert status["build"]["complete"] is True
 
 
-def test_interrupted_sync_leaves_durable_incomplete_generation_and_decision_fails_closed(
+
     tmp_path: Path, monkeypatch
 ):
     (tmp_path / "src").mkdir()
