@@ -962,3 +962,60 @@ def test_v2_graph_query_completeness_requires_complete_resolution_coverage(
     assert paths["result"] == [["app@1", "library@1"]]
     assert paths["omissions"] == []
     assert paths["completeness"] == "incomplete"
+
+
+def test_v2_empty_graph_queries_expose_negative_evidence_authority(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    runtime_coverage = next(
+        row
+        for row in changed["coverage"]
+        if row["context"] == "runtime" and row["kind"] == "resolution-graph"
+    )
+    runtime_coverage["completeness"] = "incomplete"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "library@1",
+                    "context": "compile",
+                },
+                {
+                    "operation": "dependencies",
+                    "node_id": "library@1",
+                    "context": "runtime",
+                },
+                {
+                    "operation": "paths",
+                    "node_id": "library@1",
+                    "target_id": "app@1",
+                    "context": "compile",
+                },
+                {
+                    "operation": "paths",
+                    "node_id": "library@1",
+                    "target_id": "app@1",
+                    "context": "runtime",
+                },
+            ],
+        )
+
+    compile_dependencies, runtime_dependencies, compile_paths, runtime_paths = (
+        packet["results"]
+    )
+    assert compile_dependencies["result"] == []
+    assert (
+        compile_dependencies["negative_evidence"]
+        == "admissible-within-declared-scope"
+    )
+    assert runtime_dependencies["result"] == []
+    assert runtime_dependencies["negative_evidence"] == "not-admissible"
+    assert compile_paths["result"] == []
+    assert compile_paths["negative_evidence"] == "admissible-within-declared-scope"
+    assert runtime_paths["result"] == []
+    assert runtime_paths["negative_evidence"] == "not-admissible"
