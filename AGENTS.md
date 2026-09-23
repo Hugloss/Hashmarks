@@ -18,7 +18,7 @@ Defect repairs, refactors, tests, documentation, and semantics-preserving optimi
 
 A finding is not automatically a requirement. Real-world traces and benchmarks may reveal observer defects or missing observer primitives, but agent/execution behavior discovered by those traces stays with the consumer/execution layer.
 
-Existing APIs and historical experiments are not precedent. Prefer extending the existing identity/CodeMap/evidence/freshness/delta owners over creating parallel graphs, generations, caches, policy engines, or workflow state.
+Existing implementation surfaces are not automatic precedent. Prefer extending the existing identity/CodeMap/evidence/freshness/delta owners over creating parallel graphs, generations, caches, policy engines, or workflow state.
 
 ## Evidence authority is non-strengthening
 
@@ -93,7 +93,7 @@ Consumer conformance does not change that boundary. Hashmarks may validate its o
 
 Verification relevance follows the same boundary. Hashmarks may use bounded indexed reverse references, namespace locality, and task-local evidence to identify a more relevant test surface around an already-selected edit owner. It must not run that test, claim the test is sufficient, alter edit authority, or turn verification selection into an autonomous solution step.
 
-Negative evidence follows the same boundary. Hashmarks may persist or transport **repository-derived** negative evidence such as a symbol being absent, an import being unresolved, a path being stale, or an ownership result being ambiguous. A failed/disproven edit supplied by a worker is **agent attempt history, not repository truth**; it must remain owned by the external worker/harness and must not become durable Hashmarks repository authority. Historical failed-target receipts are compatibility/boundary debt and must not be expanded.
+Negative evidence follows the same boundary. Hashmarks may persist or transport **repository-derived** negative evidence such as a symbol being absent, an import being unresolved, a path being stale, or an ownership result being ambiguous. A failed/disproven edit supplied by a worker is **agent attempt history, not repository truth**; it must remain owned by the external worker/harness and must not become durable Hashmarks repository authority. Do not add failed-target receipt stores or compatibility readers for worker attempt history.
 
 ## Hashmarks ↔ Oh-Goon execution boundary
 

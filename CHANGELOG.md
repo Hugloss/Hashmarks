@@ -9,6 +9,7 @@
 - Make evaluation protocol/fixture family identifiers semantic and package-version-neutral instead of embedding obsolete `v0.10.x` release numbers in current benchmark identities.
 - Remove remaining RCR/guardrail chronology, closed refactor receipts, and obsolete pre-public/v0.11 compatibility wording from maintained contributor policy while preserving the current responsibility-first and authority-boundary rules.
 - Remove remaining unpublished/pre-public anecdotes and standalone historical-evidence appendices from current API/integration/invariant/onboarding docs; current semantic contracts stay explicit while Git/release history remains the archaeology source.
+- Replace transitional “existing boundary debt / until migrated” policy with a current boundary-violation rule: out-of-profile surfaces are defects to reject, split, narrow, or remove rather than compatibility debt to carry.
 - Keep only current product/reference, integration, maintainer, and qualification documentation in the live tree, and keep the changelog limited to public release history.
 
 ## 0.17.0 — External evidence correlation and real-data qualification

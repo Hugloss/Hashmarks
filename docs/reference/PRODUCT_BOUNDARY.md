@@ -8,7 +8,7 @@ The shortest governing rule is:
 
 New work is checked directly against that rule and the ownership boundaries below. Defect repairs and refactors that do not change product responsibility do not require ceremonial policy records.
 
-Historical behavior is evidence about the codebase, not authority to expand the product boundary. A feature does not belong in Hashmarks merely because it is useful to an agent, improves an agent benchmark, already has partial implementation, or can technically be added.
+Implementation presence is evidence about the codebase, not authority to expand the product boundary. A feature does not belong in Hashmarks merely because it is useful to an agent, improves an agent benchmark, already has partial implementation, or can technically be added.
 
 ## Product profile
 
@@ -141,9 +141,9 @@ Keep the neutral repository-evidence primitive in Hashmarks. Keep reasoning, exe
 
 ### 9. Existing-surface test
 
-Is the proposal being justified only because a similar API, field, benchmark, or legacy feature already exists?
+Is the proposal being justified only because a similar API, field, benchmark, or implementation surface already exists?
 
-Existing code is not architectural precedent. Existing features that do not fit this profile are boundary debt to contain or remove, not examples to copy.
+Implementation presence is not architectural precedent. A production surface that violates this profile is a defect to narrow or remove, not an example to copy or harden.
 
 ### 10. Measurement test
 
@@ -159,7 +159,7 @@ A result from analysis, testing, benchmarking, profiling, integration work, or a
 2. **In-profile optimization** — existing admitted behavior is too slow, costly, large, or stale. Optimize it while preserving semantics and authority.
 3. **Missing repository primitive** — the finding suggests repository intelligence Hashmarks does not yet expose. Run the full admission gate, then ADMIT or SPLIT.
 4. **Consumer/runtime behavior** — the finding is useful, but its authority belongs to reasoning, workflow, execution, orchestration, or certification. Route it outward; do not implement it in Hashmarks.
-5. **Boundary debt** — existing Hashmarks code already owns responsibility outside the profile. Prefer containment, migration, simplification, or removal rather than further hardening/expansion.
+5. **Boundary violation** — a proposal or production surface assigns responsibility outside the profile. Reject or split new proposals; narrow or remove an existing violating surface rather than harden or expand it.
 6. **Measurement-only idea** — useful for evaluating Hashmarks but not for production semantics. Keep it in tests/benchmarks/experimental harnesses.
 
 The key discipline is:
@@ -264,20 +264,6 @@ Experiments may use real or simulated agents, retries, model calls, execution, o
 
 Production code must not absorb experimental workflow merely because a benchmark uses it. When an experiment discovers a useful capability, re-run the admission gate and extract only the repository-intelligence primitive that belongs in Hashmarks.
 
-## Existing boundary debt
-
-Historical APIs or experiments may predate this contract and may mix repository intelligence with consumer workflow concepts. They are **boundary debt, not precedent**.
-
-Until migrated or removed:
-
-1. contain them;
-2. do not add new product responsibility through them;
-3. do not cite their existence as justification for new features;
-4. identify the repository-intelligence primitive worth preserving;
-5. move the consumer/runtime responsibility to its proper owner.
-
-Compatibility, where intentionally required, means containment. It does not grant architectural ownership.
-
 ## Change record
 
 Only a change that introduces a **new production responsibility** needs a short ownership note. Keep it factual:
@@ -303,6 +289,6 @@ Before proposing implementation work, coding agents must first ask:
 2. **Does it reduce correctness risk, stale authority, ambiguity, cost, or evidence size within that profile?**
 3. **Or does it merely move more of the consumer/execution workflow into Hashmarks?**
 
-Prefer correctness, simplification, removal of boundary debt, better evidence, better economics, and clearer contracts over feature accumulation.
+Prefer correctness, simplification, narrower ownership boundaries, better evidence, better economics, and clearer contracts over feature accumulation.
 
 A useful proposal outside the Hashmarks profile should be explicitly routed to the consumer or execution layer rather than implemented here.

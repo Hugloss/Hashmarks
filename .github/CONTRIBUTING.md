@@ -12,7 +12,7 @@ Every new capability must be classified before coding as one of:
 - an in-profile optimization;
 - a missing repository-intelligence primitive;
 - consumer/runtime behavior that belongs outside Hashmarks;
-- existing boundary debt to contain/remove;
+- a boundary violation to reject, split, narrow, or remove;
 - measurement-only infrastructure.
 
 A useful idea is not automatically a Hashmarks feature. Hashmarks must not become the coding agent's solution loop or an Oh-Goon-style execution/certification engine.
