@@ -60,6 +60,20 @@ def _relative_path(value: str, field: str, path: Path) -> str:
     return normalized
 
 
+def _nonnegative_integer(value: Any, field: str, path: Path) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{field} must be a non-negative integer: {path}")
+    return value
+
+
+def _relative_paths(value: Any, field: str, path: Path) -> list[str]:
+    if not isinstance(value, list) or any(
+        not isinstance(item, str) or not item.strip() for item in value
+    ):
+        raise ValueError(f"{field} must be a list of non-empty strings: {path}")
+    return [_relative_path(item, field, path) for item in value]
+
+
 def _validate_event_value(field: str, value: Any, path: Path) -> Any:
     if field in {
         "bytes",
@@ -68,28 +82,21 @@ def _validate_event_value(field: str, value: Any, path: Path) -> Any:
         "started_at_ns",
         "finished_at_ns",
     }:
-        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
-            raise ValueError(f"{field} must be a non-negative integer: {path}")
-        return value
+        return _nonnegative_integer(value, field, path)
     if field == "fallback":
         if not isinstance(value, bool):
             raise ValueError(f"fallback must be a boolean: {path}")
         return value
-    if field in {"query"}:
+    if field == "query":
         return _nonempty(value, field, path)
     if field == "path":
         return _relative_path(_nonempty(value, field, path), field, path)
     if field in {"paths", "returned_paths", "evidence_paths"}:
-        if not isinstance(value, list) or any(
-            not isinstance(item, str) or not item.strip() for item in value
-        ):
-            raise ValueError(f"{field} must be a list of non-empty strings: {path}")
-        return [_relative_path(item, field, path) for item in value]
+        return _relative_paths(value, field, path)
     return value
 
 
-def load_raw(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text(encoding="utf-8"))
+def _validate_header(value: dict[str, Any], path: Path) -> None:
     if not isinstance(value, dict) or value.get("schema") != RAW_SCHEMA:
         raise ValueError(f"unsupported runner log schema: {path}")
     for field in (
@@ -108,6 +115,9 @@ def load_raw(path: Path) -> dict[str, Any]:
         raise ValueError(f"mode must be baseline or hashmarks: {path}")
     if value.get("normalization_policy_schema") != POLICY_SCHEMA:
         raise ValueError(f"unsupported normalization policy schema: {path}")
+
+
+def _validated_tool_map(value: dict[str, Any], path: Path) -> dict[str, Any]:
     tool_map = value.get("tool_map")
     if not isinstance(tool_map, dict) or not tool_map:
         raise ValueError(f"tool_map must be a non-empty object: {path}")
@@ -120,37 +130,56 @@ def load_raw(path: Path) -> dict[str, Any]:
         raise ValueError(
             f"normalization_policy_identity mismatch: expected {computed_policy}, got {value['normalization_policy_identity']}: {path}"
         )
+    return tool_map
+
+
+def _validate_event(
+    event: Any, tool_map: dict[str, Any], last_sequence: int, path: Path
+) -> int:
+    if not isinstance(event, dict):
+        raise ValueError(f"runner event must be an object: {path}")
+    sequence = event.get("sequence")
+    if (
+        not isinstance(sequence, int)
+        or isinstance(sequence, bool)
+        or sequence < 0
+        or sequence <= last_sequence
+    ):
+        raise ValueError(
+            f"runner event sequence must be strictly increasing non-negative integers: {path}"
+        )
+    tool = _nonempty(event.get("tool"), "event tool", path)
+    if tool not in tool_map:
+        raise ValueError(
+            f"event tool {tool!r} is not explicitly declared in tool_map: {path}"
+        )
+    started = event.get("started_at_ns")
+    finished = event.get("finished_at_ns")
+    if started is not None:
+        _validate_event_value("started_at_ns", started, path)
+    if finished is not None:
+        _validate_event_value("finished_at_ns", finished, path)
+    if started is not None and finished is not None and finished < started:
+        raise ValueError(f"finished_at_ns must be >= started_at_ns: {path}")
+    return sequence
+
+
+def _validate_events(
+    value: dict[str, Any], tool_map: dict[str, Any], path: Path
+) -> None:
     events = value.get("events")
     if not isinstance(events, list):
         raise ValueError(f"events must be a list: {path}")
     last_sequence = -1
     for event in events:
-        if not isinstance(event, dict):
-            raise ValueError(f"runner event must be an object: {path}")
-        sequence = event.get("sequence")
-        if (
-            not isinstance(sequence, int)
-            or isinstance(sequence, bool)
-            or sequence < 0
-            or sequence <= last_sequence
-        ):
-            raise ValueError(
-                f"runner event sequence must be strictly increasing non-negative integers: {path}"
-            )
-        last_sequence = sequence
-        tool = _nonempty(event.get("tool"), "event tool", path)
-        if tool not in tool_map:
-            raise ValueError(
-                f"event tool {tool!r} is not explicitly declared in tool_map: {path}"
-            )
-        started = event.get("started_at_ns")
-        finished = event.get("finished_at_ns")
-        if started is not None:
-            _validate_event_value("started_at_ns", started, path)
-        if finished is not None:
-            _validate_event_value("finished_at_ns", finished, path)
-        if started is not None and finished is not None and finished < started:
-            raise ValueError(f"finished_at_ns must be >= started_at_ns: {path}")
+        last_sequence = _validate_event(event, tool_map, last_sequence, path)
+
+
+def load_raw(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    _validate_header(value, path)
+    tool_map = _validated_tool_map(value, path)
+    _validate_events(value, tool_map, path)
     return value
 
 
