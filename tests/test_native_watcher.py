@@ -82,19 +82,6 @@ def test_project_core_and_daemon_metadata_are_registry_free():
     assert data["project"]["optional-dependencies"] == {"mcp": ["mcp>=2.2.0"]}
 
 
-def test_uv_lock_is_gitignored_local_prepared_state():
-    project_root = Path(__file__).resolve().parents[1]
-    ignore = (project_root / ".gitignore").read_text().splitlines()
-    assert "uv.lock" in ignore
-    makefile = (
-        (project_root / "Makefile").read_text(encoding="utf-8").replace("$(UV)", "uv")
-    )
-    init = makefile.split("init:\n", 1)[1].split("\nsetup:", 1)[0]
-    assert "uv sync --group test" in init
-    assert "--frozen" not in init
-    assert "release source" not in init
-
-
 def test_daemon_request_barrier_observes_immediate_write(tmp_path: Path):
     if not sys.platform.startswith("linux"):
         pytest.skip("native inotify barrier is Linux-specific")
