@@ -951,3 +951,87 @@ def test_v2_contextual_module_ownership_preserves_independent_observations(
         ("library.module", "compile"),
         ("library.module", "runtime"),
     ]
+
+
+def test_v2_producer_neutral_model_accepts_uv_contexts_without_maven_semantics(
+    tmp_path: Path,
+) -> None:
+    snapshot = {
+        "schema": "hashmarks.dependency-resolution.v2",
+        "producer": {"kind": "uv-lock-projection", "schema_version": "1"},
+        "scope": {"python": "3.14", "platform": "linux"},
+        "contexts": ["default", "dev"],
+        "roots": [
+            {"node_id": "demo@workspace", "context": "default"},
+            {"node_id": "demo@workspace", "context": "dev"},
+        ],
+        "evidence_sources": [
+            {
+                "source_id": "uv:lock",
+                "kind": "resolution-graph",
+                "context": "",
+                "completeness": "complete",
+                "truncation": "complete",
+            }
+        ],
+        "components": [
+            {"component_id": "demo", "name": "demo", "ecosystem": "pypi"},
+            {"component_id": "pytest", "name": "pytest", "ecosystem": "pypi"},
+        ],
+        "selections": [
+            {
+                "node_id": "demo@workspace",
+                "component_id": "demo",
+                "version": "0.1.0",
+                "source": "workspace",
+                "contexts": ["default", "dev"],
+                "evidence_sources": ["uv:lock"],
+            },
+            {
+                "node_id": "pytest@9",
+                "component_id": "pytest",
+                "version": "9.0.2",
+                "source": "registry",
+                "contexts": ["dev"],
+                "evidence_sources": ["uv:lock"],
+            },
+        ],
+        "inventory": [
+            {
+                "node_id": "pytest@9",
+                "context": "dev",
+                "evidence_sources": ["uv:lock"],
+            }
+        ],
+        "relationships": [
+            {
+                "source": "demo@workspace",
+                "target": "pytest@9",
+                "kind": "dependency",
+                "context": "dev",
+                "effective_scope": "dev",
+                "marker": "python_version >= '3.11'",
+                "evidence_sources": ["uv:lock"],
+            }
+        ],
+        "coverage": [
+            {
+                "context": "dev",
+                "kind": "resolution-graph",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["uv:lock"],
+            }
+        ],
+        "repository_inputs": [],
+        "module_ownership": [],
+    }
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(snapshot)
+
+    assert packet["producer"]["kind"] == "uv-lock-projection"
+    assert packet["contexts"] == ["default", "dev"]
+    assert packet["relationships"][0]["context"] == "dev"
+    assert "groupId" not in repr(packet)
+    assert "artifactId" not in repr(packet)
