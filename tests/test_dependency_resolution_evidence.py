@@ -1018,3 +1018,102 @@ def test_v2_empty_graph_queries_expose_negative_evidence_authority(
     assert compile_paths["negative_evidence"] == "admissible-within-declared-scope"
     assert runtime_paths["result"] == []
     assert runtime_paths["negative_evidence"] == "not-admissible"
+
+
+def test_v2_path_query_exact_result_bound_does_not_claim_omission(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["components"].extend(
+        [
+            {"component_id": "dead", "ecosystem": "generic"},
+            {"component_id": "target", "ecosystem": "generic"},
+        ]
+    )
+    changed["selections"].extend(
+        [
+            {
+                "node_id": "dead@1",
+                "component_id": "dead",
+                "version": "1",
+                "contexts": ["compile"],
+            },
+            {
+                "node_id": "target@1",
+                "component_id": "target",
+                "version": "1",
+                "contexts": ["compile"],
+            },
+        ]
+    )
+    changed["relationships"].extend(
+        [
+            {
+                "source": "app@1",
+                "target": "dead@1",
+                "kind": "depends-on",
+                "context": "compile",
+                "evidence_source_refs": ["tree:compile"],
+            },
+            {
+                "source": "library@1",
+                "target": "target@1",
+                "kind": "depends-on",
+                "context": "compile",
+                "evidence_source_refs": ["tree:compile"],
+            },
+        ]
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "paths",
+                    "node_id": "app@1",
+                    "target_id": "target@1",
+                    "context": "compile",
+                    "max_results": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert result["result"] == [["app@1", "library@1", "target@1"]]
+    assert result["omissions"] == []
+    assert result["completeness"] == "complete"
+
+
+def test_v2_path_query_reports_result_bound_only_when_a_path_is_omitted(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["relationships"].append(
+        {
+            "source": "app@1",
+            "target": "library@1",
+            "kind": "depends-on",
+            "context": "compile",
+            "evidence_source_refs": ["tree:compile"],
+        }
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "paths",
+                    "node_id": "app@1",
+                    "target_id": "library@1",
+                    "context": "compile",
+                    "max_results": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert len(result["result"]) == 1
+    assert result["omissions"] == [{"reason": "result-limit"}]
+    assert result["completeness"] == "incomplete"
