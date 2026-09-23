@@ -298,7 +298,11 @@ class DependencyResolutionEvidenceMixin:
         )
         identity_resolution = {
             key: [
-                {field: value for field, value in row.items() if field != "evidence_sources"}
+                {
+                    field: value
+                    for field, value in row.items()
+                    if field != "evidence_sources"
+                }
                 for row in rows
             ]
             for key, rows in resolution.items()
@@ -354,7 +358,9 @@ class DependencyResolutionEvidenceMixin:
             result.append(
                 {
                     "component_id": component_id,
-                    "name": _text(raw.get("name"), label="component name", required=True),
+                    "name": _text(
+                        raw.get("name"), label="component name", required=True
+                    ),
                     "ecosystem": _text(raw.get("ecosystem"), label="ecosystem"),
                 }
             )
@@ -412,19 +418,29 @@ class DependencyResolutionEvidenceMixin:
             completeness = str(raw.get("completeness") or "unknown").strip()
             truncation = str(raw.get("truncation") or "unknown").strip()
             if completeness not in {"complete", "incomplete", "unknown"}:
-                raise ValueError("evidence source completeness must be complete, incomplete, or unknown")
+                raise ValueError(
+                    "evidence source completeness must be complete, incomplete, or unknown"
+                )
             if truncation not in {"complete", "truncated", "unknown"}:
-                raise ValueError("evidence source truncation must be complete, truncated, or unknown")
+                raise ValueError(
+                    "evidence source truncation must be complete, truncated, or unknown"
+                )
             if completeness == "complete" and truncation != "complete":
-                raise ValueError("complete evidence source requires truncation=complete")
+                raise ValueError(
+                    "complete evidence source requires truncation=complete"
+                )
             result.append(
                 {
                     "source_id": source_id,
-                    "kind": _text(raw.get("kind"), label="evidence source kind", required=True),
+                    "kind": _text(
+                        raw.get("kind"), label="evidence source kind", required=True
+                    ),
                     "context": context,
                     "completeness": completeness,
                     "truncation": truncation,
-                    "producer_digest": _text(raw.get("producer_digest"), label="producer digest"),
+                    "producer_digest": _text(
+                        raw.get("producer_digest"), label="producer digest"
+                    ),
                 }
             )
         return sorted(result, key=lambda row: str(row["source_id"]))
@@ -456,7 +472,9 @@ class DependencyResolutionEvidenceMixin:
                     "source": _text(raw.get("source"), label="source"),
                     "marker": _text(raw.get("marker"), label="marker"),
                     "contexts": cls._dependency_context_list_v2(
-                        raw.get("contexts", ()), label="selection context", allowed=contexts
+                        raw.get("contexts", ()),
+                        label="selection context",
+                        allowed=contexts,
                     ),
                     "evidence_sources": cls._dependency_source_refs_v2(
                         raw.get("evidence_sources", ()),
@@ -487,7 +505,9 @@ class DependencyResolutionEvidenceMixin:
                 raise ValueError(f"unknown inventory context: {context}")
             key = (node_id, context)
             if key in seen:
-                raise ValueError(f"duplicate dependency inventory membership: {node_id}:{context}")
+                raise ValueError(
+                    f"duplicate dependency inventory membership: {node_id}:{context}"
+                )
             seen.add(key)
             result.append(
                 {
@@ -500,7 +520,9 @@ class DependencyResolutionEvidenceMixin:
                     ),
                 }
             )
-        return sorted(result, key=lambda row: (str(row["node_id"]), str(row["context"])))
+        return sorted(
+            result, key=lambda row: (str(row["node_id"]), str(row["context"]))
+        )
 
     @classmethod
     def _dependency_relationships_v2(
@@ -518,15 +540,21 @@ class DependencyResolutionEvidenceMixin:
             target = _identifier(raw.get("target"), label="relationship target")
             context = _identifier(raw.get("context"), label="relationship context")
             if source not in node_ids or target not in node_ids:
-                raise ValueError(f"dangling dependency relationship: {source}->{target}")
+                raise ValueError(
+                    f"dangling dependency relationship: {source}->{target}"
+                )
             if context not in contexts:
                 raise ValueError(f"unknown relationship context: {context}")
             packet = {
                 "source": source,
                 "target": target,
-                "kind": _text(raw.get("kind"), label="relationship kind", required=True),
+                "kind": _text(
+                    raw.get("kind"), label="relationship kind", required=True
+                ),
                 "context": context,
-                "effective_scope": _text(raw.get("effective_scope"), label="effective scope"),
+                "effective_scope": _text(
+                    raw.get("effective_scope"), label="effective scope"
+                ),
                 "marker": _text(raw.get("marker"), label="relationship marker"),
                 "evidence_sources": cls._dependency_source_refs_v2(
                     raw.get("evidence_sources", ()),
@@ -543,7 +571,9 @@ class DependencyResolutionEvidenceMixin:
                 str(packet["marker"]),
             )
             if key in seen:
-                raise ValueError(f"duplicate dependency relationship: {source}->{target}:{context}")
+                raise ValueError(
+                    f"duplicate dependency relationship: {source}->{target}:{context}"
+                )
             seen.add(key)
             result.append(packet)
         return sorted(
@@ -574,10 +604,14 @@ class DependencyResolutionEvidenceMixin:
                 raise ValueError(f"unknown root context: {context}")
             key = (node_id, context)
             if key in seen:
-                raise ValueError(f"duplicate dependency resolution root: {node_id}:{context}")
+                raise ValueError(
+                    f"duplicate dependency resolution root: {node_id}:{context}"
+                )
             seen.add(key)
             result.append({"node_id": node_id, "context": context})
-        return sorted(result, key=lambda row: (str(row["context"]), str(row["node_id"])))
+        return sorted(
+            result, key=lambda row: (str(row["context"]), str(row["node_id"]))
+        )
 
     @classmethod
     def _dependency_module_ownership_v2(
@@ -640,9 +674,7 @@ class DependencyResolutionEvidenceMixin:
                     "authority": "qualified-external-observation",
                 }
             )
-        return sorted(
-            result, key=lambda row: (str(row["module"]), str(row["context"]))
-        )
+        return sorted(result, key=lambda row: (str(row["module"]), str(row["context"])))
 
     @classmethod
     def _dependency_coverage_v2(
@@ -663,9 +695,13 @@ class DependencyResolutionEvidenceMixin:
             completeness = str(raw.get("completeness") or "unknown").strip()
             truncation = str(raw.get("truncation") or "unknown").strip()
             if completeness not in {"complete", "incomplete", "unknown"}:
-                raise ValueError("coverage completeness must be complete, incomplete, or unknown")
+                raise ValueError(
+                    "coverage completeness must be complete, incomplete, or unknown"
+                )
             if truncation not in {"complete", "truncated", "unknown"}:
-                raise ValueError("coverage truncation must be complete, truncated, or unknown")
+                raise ValueError(
+                    "coverage truncation must be complete, truncated, or unknown"
+                )
             if completeness == "complete" and truncation != "complete":
                 raise ValueError("complete coverage requires truncation=complete")
             result.append(
@@ -842,12 +878,7 @@ class DependencyResolutionEvidenceMixin:
             }
 
         owners = sorted(
-            {
-                str(owner)
-                for row in matches
-                for owner in row.get("owners", ())
-                if owner
-            }
+            {str(owner) for row in matches for owner in row.get("owners", ()) if owner}
         )
         completeness = (
             "complete"
@@ -1023,7 +1054,8 @@ class DependencyResolutionEvidenceMixin:
         def keyed(rows: object, field: str) -> dict[str, Mapping[str, object]]:
             return {
                 str(row[field]): row
-                for row in rows if isinstance(row, Mapping) and row.get(field)
+                for row in rows
+                if isinstance(row, Mapping) and row.get(field)
             }
 
         before_components = keyed(before.get("components", ()), "component_id")
@@ -1103,14 +1135,26 @@ class DependencyResolutionEvidenceMixin:
             "after_resolution_identity": after.get("resolution_identity"),
             "before_observation_identity": before.get("observation_identity"),
             "after_observation_identity": after.get("observation_identity"),
-            "components_added": sorted(after_components.keys() - before_components.keys()),
-            "components_removed": sorted(before_components.keys() - after_components.keys()),
+            "components_added": sorted(
+                after_components.keys() - before_components.keys()
+            ),
+            "components_removed": sorted(
+                before_components.keys() - after_components.keys()
+            ),
             "components_changed": changed(before_components, after_components),
-            "selections_added": sorted(after_selections.keys() - before_selections.keys()),
-            "selections_removed": sorted(before_selections.keys() - after_selections.keys()),
+            "selections_added": sorted(
+                after_selections.keys() - before_selections.keys()
+            ),
+            "selections_removed": sorted(
+                before_selections.keys() - after_selections.keys()
+            ),
             "selections_changed": changed(before_selections, after_selections),
-            "inventory_added": [list(row) for row in sorted(after_inventory - before_inventory)],
-            "inventory_removed": [list(row) for row in sorted(before_inventory - after_inventory)],
+            "inventory_added": [
+                list(row) for row in sorted(after_inventory - before_inventory)
+            ],
+            "inventory_removed": [
+                list(row) for row in sorted(before_inventory - after_inventory)
+            ],
             "relationships_added": [
                 list(row) for row in sorted(after_relationships - before_relationships)
             ],
@@ -1133,9 +1177,13 @@ class DependencyResolutionEvidenceMixin:
         after: Mapping[str, object],
     ) -> dict[str, object]:
         if before.get("schema") == _SCHEMA_V2 and after.get("schema") == _SCHEMA_V2:
-            return DependencyResolutionEvidenceMixin._dependency_resolution_delta_v2(before, after)
+            return DependencyResolutionEvidenceMixin._dependency_resolution_delta_v2(
+                before, after
+            )
         if before.get("schema") != _SCHEMA or after.get("schema") != _SCHEMA:
-            raise ValueError("dependency resolution delta requires matching qualified observations")
+            raise ValueError(
+                "dependency resolution delta requires matching qualified observations"
+            )
         before_definition = before.get("definition_identity")
         after_definition = after.get("definition_identity")
         if not _SHA256.fullmatch(str(before_definition or "")) or not _SHA256.fullmatch(
