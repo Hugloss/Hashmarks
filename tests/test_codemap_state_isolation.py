@@ -49,7 +49,9 @@ def test_codemap_sync_does_not_claim_daemon_generation_if_generation_moves(
         assert codemap.store.meta("identity_generation") == ""
 
 
-def test_codemap_never_follows_source_symlinks_outside_workspace(tmp_path: Path) -> None:
+def test_codemap_never_follows_source_symlinks_outside_workspace(
+    tmp_path: Path,
+) -> None:
     outside = tmp_path.parent / f"{tmp_path.name}-outside-secret.py"
     outside.write_text(
         "def outside_secret():\n    return 'DO_NOT_LEAK'\n",
