@@ -794,7 +794,8 @@ def test_v2_repository_binding_tracks_current_codemap_generation(
         packet = codemap.dependency_resolution_evidence(_snapshot_v2())
 
     binding = packet["repository_binding"]
-    assert binding["repository_identity"].startswith("sha256:")
+    assert binding["repository_identity"] == codemap._repository_packet_identity()
+    assert binding["repository_identity"].startswith(("git-tree:", "workspace:"))
     assert isinstance(binding["codemap_generation"], int)
 
 
