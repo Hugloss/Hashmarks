@@ -22,6 +22,7 @@ AGENT_ECONOMICS = ROOT / ".agent-economics" / "scripts"
 # This is a dogfood/parity harness, not Hashmarks acceptance authority.
 # Materialize agentsCookbook under .agent-economics before running it.
 
+
 def _load_quality_debt():
     if not AGENT_ECONOMICS.exists():
         raise RuntimeError(
