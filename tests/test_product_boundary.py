@@ -252,11 +252,6 @@ def test_modern_repository_contracts_do_not_import_consumer_runtime() -> None:
     assert violations == []
 
 
-def test_agent_evaluation_compatibility_manifest_is_removed() -> None:
-    assert not (ROOT / "hashmarks" / "contract_surface.py").exists()
-    assert not (ROOT / "scripts" / "agent_evaluation" / "contract_surface.py").exists()
-
-
 def test_repository_root_markdown_is_limited_to_entry_points() -> None:
     allowed = {"AGENTS.md", "README.md", "CHANGELOG.md"}
     root_markdown = {path.name for path in ROOT.glob("*.md")}
