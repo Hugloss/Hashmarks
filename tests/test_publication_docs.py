@@ -169,7 +169,10 @@ def test_generated_agent_evaluation_state_is_not_committed() -> None:
         assert not (ROOT / generated_root).exists()
     evaluation_docs = _text("benchmarks/agent_evaluation/README.md")
     assert "not installed Hashmarks product state" in evaluation_docs
-    assert "Generated blind inputs, packets, worker outputs, and result files are not committed" in evaluation_docs
+    assert (
+        "Generated blind inputs, packets, worker outputs, and result files are not committed"
+        in evaluation_docs
+    )
 
 
 def test_public_onboarding_leads_with_installed_package_not_source_checkout() -> None:
