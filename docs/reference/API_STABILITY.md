@@ -1,6 +1,6 @@
 # Public API and stability policy
 
-Hashmarks is pre-1.0, but the first public release still needs an explicit contract so implementation history does not accidentally become API.
+Hashmarks is pre-1.0, but public releases still need an explicit contract so implementation history does not accidentally become API.
 
 ## What is public
 
@@ -25,7 +25,7 @@ Development material under `scripts/agent_evaluation/`, `benchmarks/agent_evalua
 
 For the `0.x` series:
 
-- Hashmarks carries one current documented Python/CLI surface before the first public release; obsolete unpublished names are removed rather than aliased.
+- Hashmarks carries one current documented Python/CLI surface; obsolete unpublished names are removed rather than aliased.
 - generated local databases/caches are disposable and may be rebuilt when their current shape changes; no migration/backward-reader obligation exists unless a future explicit requirement introduces one.
 - serialized repository-evidence contracts use explicit schema identities and validators; obsolete development/evaluation schema readers are removed instead of normalized.
 - implementation details and development evaluation formats are not compatibility commitments.

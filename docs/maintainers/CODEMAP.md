@@ -247,11 +247,11 @@ Do **not** update it for every private helper rename. The goal is stable navigat
 
 ### Decision-session task-action reuse
 
-`task_action_map()` is a derived projection over canonical task evidence. Within one explicit `CodeMap.decision_session()`, HM278 may reuse an exact projection keyed by repository generation, task, `limit`, and `per_role`. This is disposable performance state, not evidence authority: the first computation still performs normal authority-path freshness bookkeeping, callers receive deep copies, and a new session or generation recomputes.
+`task_action_map()` is a derived projection over canonical task evidence. Within one explicit `CodeMap.decision_session()`, the decision-session projection cache may reuse an exact projection keyed by repository generation, task, `limit`, and `per_role`. This is disposable performance state, not evidence authority: the first computation still performs normal authority-path freshness bookkeeping, callers receive deep copies, and a new session or generation recomputes.
 
 ### Decision-session change-impact owner-chain reuse
 
-Repeated repository-intelligence surfaces can call `task_change_impact()` several times with one exact task-action request. HM280 may reuse only `_change_impact_owner_chain()` inside the explicit decision session, keyed by repository generation, task, and task-action `limit`/`per_role`. This is a derived owner-chain optimization, not freshness authority. `task_change_impact()` must still run its caller-reported path sync and declared-project freshness refresh on every call before the owner-chain cache can be consulted.
+Repeated repository-intelligence surfaces can call `task_change_impact()` several times with one exact task-action request. the change-impact owner-chain cache may reuse only `_change_impact_owner_chain()` inside the explicit decision session, keyed by repository generation, task, and task-action `limit`/`per_role`. This is a derived owner-chain optimization, not freshness authority. `task_change_impact()` must still run its caller-reported path sync and declared-project freshness refresh on every call before the owner-chain cache can be consulted.
 
 ### Decision-session composition diagnostics
 
@@ -268,7 +268,7 @@ The projection does **not** make producer identity consumer-computable authority
 
 ### Generation-bound ownership import-path reuse
 
-Structural ownership expansion may revisit the same exact `(source_path, import_target)` request while one task-action decision traverses overlapping paths. Inside an explicit `CodeMap.decision_session()`, HM284 may reuse that exact resolved repository-relative result for the current generation. This is disposable performance state only: the cache is keyed by generation + source + target, cleared at session boundaries, returns fresh lists, and never replaces import-resolution, visibility, freshness, ranking, or ownership authority.
+Structural ownership expansion may revisit the same exact `(source_path, import_target)` request while one task-action decision traverses overlapping paths. Inside an explicit `CodeMap.decision_session()`, the import-resolution session cache may reuse that exact resolved repository-relative result for the current generation. This is disposable performance state only: the cache is keyed by generation + source + target, cleared at session boundaries, returns fresh lists, and never replaces import-resolution, visibility, freshness, ranking, or ownership authority.
 
 ### Build-state existence probe
 
