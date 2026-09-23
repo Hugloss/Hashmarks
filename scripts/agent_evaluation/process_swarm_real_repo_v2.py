@@ -9,6 +9,7 @@ import os
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -62,222 +63,343 @@ def cost(repo: Path, paths: list[str]) -> dict[str, int]:
     return {"files": n, "bytes": b, "approx_tokens": (b + 3) // 4 if b else 0}
 
 
+@dataclass
+class WorkerObservation:
+    candidates: list[str]
+    first: str | None
+    verification_candidates: list[str]
+    ambiguity: bool
+    cold_setup_ms: float
+    repository_scan_files: int
+    repository_scan_bytes: int
+    events: list[dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class SwarmRunConfig:
+    repo: Path
+    public_path: Path
+    secret_path: Path
+    output: Path
+    trace_dir: Path
+    workers: int
+    limit: int
+
+
+def _native_observation(repo: Path, query: str, *, limit: int) -> WorkerObservation:
+    files = _repository_files(repo)
+    scan_bytes = sum(path.stat().st_size for path in files)
+    started = time.perf_counter()
+    hits = _grep_worker(repo, query, limit=limit)
+    search_ms = (time.perf_counter() - started) * 1000
+    candidates = [str(hit.get("path") or "") for hit in hits]
+    started = time.perf_counter()
+    verification_hits = _grep_worker(repo, query + " test verification", limit=limit)
+    verification_ms = (time.perf_counter() - started) * 1000
+    return WorkerObservation(
+        candidates=candidates,
+        first=candidates[0] if candidates else None,
+        verification_candidates=[
+            str(hit.get("path") or "") for hit in verification_hits
+        ],
+        ambiguity=False,
+        cold_setup_ms=0.0,
+        repository_scan_files=len(files) * 2,
+        repository_scan_bytes=scan_bytes * 2,
+        events=[
+            {
+                "op": "grep",
+                "elapsed_ms": search_ms,
+                "scan_files": len(files),
+                "scan_bytes": scan_bytes,
+                "candidates": candidates[:10],
+            },
+            {
+                "op": "verify_search",
+                "elapsed_ms": verification_ms,
+                "selected": next(
+                    (
+                        str(hit.get("path") or "")
+                        for hit in verification_hits
+                        if is_test(str(hit.get("path") or ""))
+                    ),
+                    None,
+                ),
+                "candidates": [
+                    str(hit.get("path") or "") for hit in verification_hits[:10]
+                ],
+            },
+        ],
+    )
+
+
+def _codemap_candidates(
+    codemap: CodeMap, query: str, strategy: str, *, limit: int
+) -> tuple[list[str], str | None, bool, list[dict[str, Any]], dict[str, Any]]:
+    started = time.perf_counter()
+    if strategy == "find-task":
+        hits = codemap.find_task(query, limit=limit)
+        candidates = [hit.path for hit in hits]
+        return (
+            candidates,
+            candidates[0] if candidates else None,
+            False,
+            [],
+            {
+                "op": "find_task",
+                "elapsed_ms": (time.perf_counter() - started) * 1000,
+                "candidates": candidates[:10],
+            },
+        )
+    entry_points = codemap.task_entry_points(query, limit=limit)
+    recommended = [
+        row for row in entry_points.get("recommended", []) if isinstance(row, dict)
+    ]
+    candidates = [str(row.get("path") or "") for row in recommended]
+    ambiguity = entry_points.get("ambiguity")
+    ambiguity = ambiguity if isinstance(ambiguity, dict) else {}
+    is_ambiguous = bool(ambiguity.get("ambiguous"))
+    alternatives = list(ambiguity.get("alternatives", [])) if is_ambiguous else []
+    return (
+        candidates,
+        candidates[0] if candidates else None,
+        is_ambiguous,
+        alternatives,
+        {
+            "op": "task_entry_points",
+            "elapsed_ms": (time.perf_counter() - started) * 1000,
+            "ambiguous": is_ambiguous,
+            "candidates": candidates[:10],
+        },
+    )
+
+
+def _codemap_observation(
+    repo: Path, query: str, strategy: str, *, limit: int
+) -> WorkerObservation:
+    with CodeMap(repo) as codemap:
+        started = time.perf_counter()
+        codemap.sync()
+        cold_ms = (time.perf_counter() - started) * 1000
+        candidates, first, ambiguity, alternatives, search_event = _codemap_candidates(
+            codemap, query, strategy, limit=limit
+        )
+        events = [{"op": "sync", "elapsed_ms": cold_ms}, search_event]
+        if strategy == "task-entry-selective" and ambiguity:
+            resolution = _resolve_after_inspection(query, alternatives)
+            events.append(
+                {
+                    "op": "resolve",
+                    "resolution": resolution,
+                    "alternatives": alternatives,
+                }
+            )
+            if resolution.get("resolved"):
+                first = str(resolution.get("target") or first)
+        started = time.perf_counter()
+        verification_hits = codemap.find_task(query + " test verification", limit=limit)
+        verification_ms = (time.perf_counter() - started) * 1000
+    observation = WorkerObservation(
+        candidates=candidates,
+        first=first,
+        verification_candidates=[hit.path for hit in verification_hits],
+        ambiguity=ambiguity,
+        cold_setup_ms=cold_ms,
+        repository_scan_files=0,
+        repository_scan_bytes=0,
+        events=events,
+    )
+    observation.events.append(
+        {
+            "op": "verify_search",
+            "elapsed_ms": verification_ms,
+            "selected": next(
+                (path for path in observation.verification_candidates if is_test(path)),
+                None,
+            ),
+            "candidates": observation.verification_candidates[:10],
+        }
+    )
+    return observation
+
+
 def worker(
     repo_s: str, task: dict[str, str], strategy: str, limit: int, trace_dir_s: str
 ) -> dict[str, Any]:
     repo = Path(repo_s)
-    td = Path(trace_dir_s)
-    td.mkdir(parents=True, exist_ok=True)
-    start = time.perf_counter()
-    ev = []
-    cold = 0.0
-    scans_f = scans_b = 0
-    q = task["query"]
-    ambiguity = False
-    alternatives = []
-    if strategy == "native":
-        fs = _repository_files(repo)
-        sb = sum(p.stat().st_size for p in fs)
-        t = time.perf_counter()
-        h = _grep_worker(repo, q, limit=limit)
-        search = (time.perf_counter() - t) * 1000
-        cand = [str(x.get("path") or "") for x in h]
-        scans_f += len(fs)
-        scans_b += sb
-        first = cand[0] if cand else None
-        ev.append(
-            {
-                "op": "grep",
-                "elapsed_ms": search,
-                "scan_files": len(fs),
-                "scan_bytes": sb,
-                "candidates": cand[:10],
-            }
-        )
-        t = time.perf_counter()
-        vh = _grep_worker(repo, q + " test verification", limit=limit)
-        vms = (time.perf_counter() - t) * 1000
-        vp = [str(x.get("path") or "") for x in vh]
-        scans_f += len(fs)
-        scans_b += sb
-    else:
-        with CodeMap(repo) as cm:
-            t = time.perf_counter()
-            cm.sync()
-            cold = (time.perf_counter() - t) * 1000
-            ev.append({"op": "sync", "elapsed_ms": cold})
-            if strategy == "find-task":
-                t = time.perf_counter()
-                h = cm.find_task(q, limit=limit)
-                search = (time.perf_counter() - t) * 1000
-                cand = [x.path for x in h]
-                first = cand[0] if cand else None
-                ev.append(
-                    {"op": "find_task", "elapsed_ms": search, "candidates": cand[:10]}
-                )
-            else:
-                t = time.perf_counter()
-                e = cm.task_entry_points(q, limit=limit)
-                search = (time.perf_counter() - t) * 1000
-                rec = [x for x in e.get("recommended", []) if isinstance(x, dict)]
-                cand = [str(x.get("path") or "") for x in rec]
-                first = cand[0] if cand else None
-                amb = (
-                    e.get("ambiguity", {})
-                    if isinstance(e.get("ambiguity"), dict)
-                    else {}
-                )
-                ambiguity = bool(amb.get("ambiguous"))
-                alternatives = list(amb.get("alternatives", [])) if ambiguity else []
-                ev.append(
-                    {
-                        "op": "task_entry_points",
-                        "elapsed_ms": search,
-                        "ambiguous": ambiguity,
-                        "candidates": cand[:10],
-                    }
-                )
-                if strategy == "task-entry-selective" and ambiguity:
-                    r = _resolve_after_inspection(q, alternatives)
-                    ev.append(
-                        {"op": "resolve", "resolution": r, "alternatives": alternatives}
-                    )
-                    if r.get("resolved"):
-                        first = str(r.get("target") or first)
-            t = time.perf_counter()
-            vh = cm.find_task(q + " test verification", limit=limit)
-            vms = (time.perf_counter() - t) * 1000
-            vp = [x.path for x in vh]
-    verify = next((p for p in vp if is_test(p)), None)
-    ev.append(
-        {
-            "op": "verify_search",
-            "elapsed_ms": vms,
-            "selected": verify,
-            "candidates": vp[:10],
-        }
+    trace_dir = Path(trace_dir_s)
+    trace_dir.mkdir(parents=True, exist_ok=True)
+    started = time.perf_counter()
+    observation = (
+        _native_observation(repo, task["query"], limit=limit)
+        if strategy == "native"
+        else _codemap_observation(repo, task["query"], strategy, limit=limit)
+    )
+    verify = next(
+        (path for path in observation.verification_candidates if is_test(path)), None
     )
     evidence = list(
         dict.fromkeys(
-            ([first] if first else []) + cand[:3] + ([verify] if verify else [])
+            ([observation.first] if observation.first else [])
+            + observation.candidates[:3]
+            + ([verify] if verify else [])
         )
     )
-    c = cost(repo, evidence)
-    elapsed = (time.perf_counter() - start) * 1000
-    r = {
+    result = {
         "schema": TRACE,
         "pid": os.getpid(),
         "strategy": strategy,
         "task": task,
-        "first_edit_target": first,
-        "top_candidates": cand[:limit],
+        "first_edit_target": observation.first,
+        "top_candidates": observation.candidates[:limit],
         "verification_target": verify,
-        "ambiguous": ambiguity,
-        "cold_setup_ms": cold,
-        "repository_scan_files": scans_f,
-        "repository_scan_bytes": scans_b,
-        "evidence_read": c,
-        "elapsed_ms": elapsed,
-        "events": ev,
+        "ambiguous": observation.ambiguity,
+        "cold_setup_ms": observation.cold_setup_ms,
+        "repository_scan_files": observation.repository_scan_files,
+        "repository_scan_bytes": observation.repository_scan_bytes,
+        "evidence_read": cost(repo, evidence),
+        "elapsed_ms": (time.perf_counter() - started) * 1000,
+        "events": observation.events,
     }
-    path = td / f"{strategy}__{task['id']}.json"
-    path.write_text(json.dumps(r, indent=2, sort_keys=True) + "\n")
-    r["trace_file"] = str(path)
-    return r
+    path = trace_dir / f"{strategy}__{task['id']}.json"
+    path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    result["trace_file"] = str(path)
+    return result
 
 
-def run(
-    repo: Path,
-    public_path: Path,
-    secret_path: Path,
-    out: Path,
-    trace_dir: Path,
-    workers: int,
-    limit: int,
-) -> dict[str, Any]:
-    pub = json.loads(public_path.read_text())["tasks"]
-    sec = json.loads(secret_path.read_text())["tasks"]
-    allowed = {"id", "query"}
-    if any(set(t) != allowed for t in pub):
-        raise ValueError("public tasks must contain only id/query")
-    jobs = [(t, s) for t in pub for s in STRATEGIES]
+def _collect_worker_traces(
+    config: SwarmRunConfig, public_tasks: list[dict[str, str]]
+) -> tuple[list[dict[str, Any]], int, float]:
+    jobs = [(task, strategy) for task in public_tasks for strategy in STRATEGIES]
     frozen = []
-    t0 = time.perf_counter()
-    with ProcessPoolExecutor(max_workers=workers) as ex:
-        futs = [
-            ex.submit(worker, str(repo), t, s, limit, str(trace_dir)) for t, s in jobs
+    started = time.perf_counter()
+    with ProcessPoolExecutor(max_workers=config.workers) as executor:
+        futures = [
+            executor.submit(
+                worker,
+                str(config.repo),
+                task,
+                strategy,
+                config.limit,
+                str(config.trace_dir),
+            )
+            for task, strategy in jobs
         ]
-        for f in as_completed(futs):
-            frozen.append(f.result())
-    frozen.sort(key=lambda r: (r["task"]["id"], r["strategy"]))
-    exp = {str(t["id"]): set(map(str, t.get("expected_files") or [])) for t in sec}
-    syms = {str(t["id"]): set(map(str, t.get("expected_symbols") or [])) for t in sec}
+        for future in as_completed(futures):
+            frozen.append(future.result())
+    frozen.sort(key=lambda row: (row["task"]["id"], row["strategy"]))
+    return frozen, len(jobs), (time.perf_counter() - started) * 1000
+
+
+def _grade_worker_traces(
+    frozen: list[dict[str, Any]], secret_tasks: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    expected_files = {
+        str(task["id"]): set(map(str, task.get("expected_files") or []))
+        for task in secret_tasks
+    }
+    expected_symbols = {
+        str(task["id"]): set(map(str, task.get("expected_symbols") or []))
+        for task in secret_tasks
+    }
     rows = []
-    for r in frozen:
-        e = exp[r["task"]["id"]]
-        top = r["top_candidates"]
+    for trace in frozen:
+        task_id = trace["task"]["id"]
+        expected = expected_files[task_id]
+        top = trace["top_candidates"]
         rows.append(
             {
-                **r,
-                "expected_files": sorted(e),
-                "expected_symbols": sorted(syms[r["task"]["id"]]),
-                "correct_first_edit": r["first_edit_target"] in e,
-                "top5_any_expected": bool(e.intersection(top[:5])),
-                "top20_all_expected": e.issubset(set(top[:20])),
-                "verification_found": bool(r["verification_target"]),
+                **trace,
+                "expected_files": sorted(expected),
+                "expected_symbols": sorted(expected_symbols[task_id]),
+                "correct_first_edit": trace["first_edit_target"] in expected,
+                "top5_any_expected": bool(expected.intersection(top[:5])),
+                "top20_all_expected": expected.issubset(set(top[:20])),
+                "verification_found": bool(trace["verification_target"]),
             }
         )
-    sm = {
-        "repo": str(repo),
-        "tasks": len(pub),
-        "workers_launched": len(jobs),
-        "max_parallel_workers": workers,
-        "wall_ms": (time.perf_counter() - t0) * 1000,
-        "strategies": {},
+    return rows
+
+
+def _strategy_summary(rows: list[dict[str, Any]]) -> dict[str, object]:
+    count = len(rows)
+    return {
+        "tasks": count,
+        "correct_first_edits": sum(row["correct_first_edit"] for row in rows),
+        "correct_first_edit_rate": sum(row["correct_first_edit"] for row in rows)
+        / count,
+        "top5_any_expected": sum(row["top5_any_expected"] for row in rows),
+        "top20_all_expected": sum(row["top20_all_expected"] for row in rows),
+        "verification_found": sum(row["verification_found"] for row in rows),
+        "ambiguous_tasks": sum(row["ambiguous"] for row in rows),
+        "cold_setup_ms": sum(float(row["cold_setup_ms"]) for row in rows),
+        "worker_elapsed_ms": sum(float(row["elapsed_ms"]) for row in rows),
+        "repository_scan_files": sum(int(row["repository_scan_files"]) for row in rows),
+        "repository_scan_bytes": sum(int(row["repository_scan_bytes"]) for row in rows),
+        "evidence_bytes_read": sum(int(row["evidence_read"]["bytes"]) for row in rows),
+        "evidence_approx_tokens": sum(
+            int(row["evidence_read"]["approx_tokens"]) for row in rows
+        ),
     }
-    for s in STRATEGIES:
-        rs = [r for r in rows if r["strategy"] == s]
-        n = len(rs)
-        sm["strategies"][s] = {
-            "tasks": n,
-            "correct_first_edits": sum(x["correct_first_edit"] for x in rs),
-            "correct_first_edit_rate": sum(x["correct_first_edit"] for x in rs) / n,
-            "top5_any_expected": sum(x["top5_any_expected"] for x in rs),
-            "top20_all_expected": sum(x["top20_all_expected"] for x in rs),
-            "verification_found": sum(x["verification_found"] for x in rs),
-            "ambiguous_tasks": sum(x["ambiguous"] for x in rs),
-            "cold_setup_ms": sum(float(x["cold_setup_ms"]) for x in rs),
-            "worker_elapsed_ms": sum(float(x["elapsed_ms"]) for x in rs),
-            "repository_scan_files": sum(int(x["repository_scan_files"]) for x in rs),
-            "repository_scan_bytes": sum(int(x["repository_scan_bytes"]) for x in rs),
-            "evidence_bytes_read": sum(int(x["evidence_read"]["bytes"]) for x in rs),
-            "evidence_approx_tokens": sum(
-                int(x["evidence_read"]["approx_tokens"]) for x in rs
-            ),
-        }
-    protocol = {
+
+
+def _run_summary(
+    config: SwarmRunConfig,
+    public_tasks: list[dict[str, str]],
+    rows: list[dict[str, Any]],
+    jobs: int,
+    wall_ms: float,
+) -> dict[str, object]:
+    return {
+        "repo": str(config.repo),
+        "tasks": len(public_tasks),
+        "workers_launched": jobs,
+        "max_parallel_workers": config.workers,
+        "wall_ms": wall_ms,
+        "strategies": {
+            strategy: _strategy_summary(
+                [row for row in rows if row["strategy"] == strategy]
+            )
+            for strategy in STRATEGIES
+        },
+    }
+
+
+def _protocol(config: SwarmRunConfig) -> dict[str, object]:
+    return {
         "public_fields": ["id", "query"],
         "hidden_fields": ["expected_files", "expected_symbols"],
         "secret_outside_worker_repo": True,
         "answer_key_removed_from_repo": not (
-            repo / "benchmarks/agent_tasks.json"
+            config.repo / "benchmarks/agent_tasks.json"
         ).exists(),
         "trace_freeze_before_grading": True,
         "strategies": list(STRATEGIES),
-        "limit": limit,
+        "limit": config.limit,
         "public_sha256": "sha256:"
-        + hashlib.sha256(public_path.read_bytes()).hexdigest(),
+        + hashlib.sha256(config.public_path.read_bytes()).hexdigest(),
         "secret_sha256": "sha256:"
-        + hashlib.sha256(secret_path.read_bytes()).hexdigest(),
+        + hashlib.sha256(config.secret_path.read_bytes()).hexdigest(),
     }
+
+
+def run(config: SwarmRunConfig) -> dict[str, Any]:
+    public_tasks = json.loads(config.public_path.read_text())["tasks"]
+    secret_tasks = json.loads(config.secret_path.read_text())["tasks"]
+    allowed = {"id", "query"}
+    if any(set(task) != allowed for task in public_tasks):
+        raise ValueError("public tasks must contain only id/query")
+    frozen, jobs, wall_ms = _collect_worker_traces(config, public_tasks)
+    rows = _grade_worker_traces(frozen, secret_tasks)
+    protocol = _protocol(config)
     result = {
         "schema": SCHEMA,
         "protocol": protocol,
         "protocol_identity": ident(protocol),
-        "summary": sm,
+        "summary": _run_summary(config, public_tasks, rows, jobs, wall_ms),
         "results": rows,
     }
-    out.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    config.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     return result
 
 
@@ -291,7 +413,17 @@ def main():
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--limit", type=int, default=20)
     a = p.parse_args()
-    r = run(a.repo, a.public, a.secret, a.output, a.trace_dir, a.workers, a.limit)
+    r = run(
+        SwarmRunConfig(
+            repo=a.repo,
+            public_path=a.public,
+            secret_path=a.secret,
+            output=a.output,
+            trace_dir=a.trace_dir,
+            workers=a.workers,
+            limit=a.limit,
+        )
+    )
     print(json.dumps(r["summary"], indent=2, sort_keys=True))  # noqa: T201 - intentional command output
 
 
