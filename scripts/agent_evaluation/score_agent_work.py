@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,41 @@ EVENT_KINDS = {
     "verification",
     "scout",
 }
+_NON_NEGATIVE_FIELDS = (
+    "started_at_ns",
+    "finished_at_ns",
+    "bytes",
+    "estimated_tokens",
+    "model_input_tokens",
+    "model_output_tokens",
+    "reasoning_tokens",
+)
+
+
+def _validate_event(event: object, path: Path, last_sequence: int) -> int:
+    if not isinstance(event, dict) or event.get("kind") not in EVENT_KINDS:
+        raise ValueError(f"invalid work event: {path}")
+    sequence = event.get("sequence")
+    if (
+        not isinstance(sequence, int)
+        or isinstance(sequence, bool)
+        or sequence <= last_sequence
+    ):
+        raise ValueError(f"event sequence must be strictly increasing: {path}")
+    for field in _NON_NEGATIVE_FIELDS:
+        if field in event and (
+            not isinstance(event[field], int)
+            or isinstance(event[field], bool)
+            or event[field] < 0
+        ):
+            raise ValueError(f"{field} must be a non-negative integer: {path}")
+    if (
+        "started_at_ns" in event
+        and "finished_at_ns" in event
+        and event["finished_at_ns"] < event["started_at_ns"]
+    ):
+        raise ValueError(f"event time moved backwards: {path}")
+    return sequence
 
 
 def load_trace(path: Path) -> dict[str, Any]:
@@ -27,35 +63,9 @@ def load_trace(path: Path) -> dict[str, Any]:
     events = value.get("events")
     if not isinstance(events, list):
         raise ValueError(f"events must be a list: {path}")
-    last = -1
+    last_sequence = -1
     for event in events:
-        if not isinstance(event, dict) or event.get("kind") not in EVENT_KINDS:
-            raise ValueError(f"invalid work event: {path}")
-        seq = event.get("sequence")
-        if not isinstance(seq, int) or isinstance(seq, bool) or seq <= last:
-            raise ValueError(f"event sequence must be strictly increasing: {path}")
-        last = seq
-        for field in (
-            "started_at_ns",
-            "finished_at_ns",
-            "bytes",
-            "estimated_tokens",
-            "model_input_tokens",
-            "model_output_tokens",
-            "reasoning_tokens",
-        ):
-            if field in event and (
-                not isinstance(event[field], int)
-                or isinstance(event[field], bool)
-                or event[field] < 0
-            ):
-                raise ValueError(f"{field} must be a non-negative integer: {path}")
-        if (
-            "started_at_ns" in event
-            and "finished_at_ns" in event
-            and event["finished_at_ns"] < event["started_at_ns"]
-        ):
-            raise ValueError(f"event time moved backwards: {path}")
+        last_sequence = _validate_event(event, path, last_sequence)
     return value
 
 
@@ -72,57 +82,84 @@ def load_secret(path: Path) -> dict[str, set[str]]:
     return result
 
 
-def score_trace(trace: dict[str, Any], expected_files: set[str]) -> dict[str, Any]:
-    events = trace["events"]
-    edits = [
-        event
-        for event in events
-        if event["kind"] == "edit_attempt" and isinstance(event.get("path"), str)
-    ]
-    reads = [
-        str(event["path"])
-        for event in events
-        if event["kind"] == "read" and isinstance(event.get("path"), str)
-    ]
-    verifications = [event for event in events if event["kind"] == "verification"]
-    scouts = [event for event in events if event["kind"] == "scout"]
-    searches = [event for event in events if event["kind"] == "search"]
+@dataclass(frozen=True)
+class EventGroups:
+    edits: list[dict[str, Any]]
+    reads: list[str]
+    verifications: list[dict[str, Any]]
+    scouts: list[dict[str, Any]]
+    searches: list[dict[str, Any]]
 
-    first_edit = str(edits[0]["path"]) if edits else None
-    final_edit = str(edits[-1]["path"]) if edits else None
-    first_correct = first_edit in expected_files if first_edit else False
-    final_correct = final_edit in expected_files if final_edit else False
-    wrong_edits = sum(str(event["path"]) not in expected_files for event in edits)
 
+@dataclass(frozen=True)
+class VerificationHistory:
+    repeated_disproven: int
+    passed_targets: set[str]
+    failures: int
+    not_run: int
+
+
+@dataclass(frozen=True)
+class ResourceTotals:
+    bytes_read: int
+    evidence_tokens: int
+    model_input: int
+    model_output: int
+    reasoning: int
+
+
+def _event_groups(events: list[dict[str, Any]]) -> EventGroups:
+    return EventGroups(
+        edits=[
+            event
+            for event in events
+            if event["kind"] == "edit_attempt" and isinstance(event.get("path"), str)
+        ],
+        reads=[
+            str(event["path"])
+            for event in events
+            if event["kind"] == "read" and isinstance(event.get("path"), str)
+        ],
+        verifications=[event for event in events if event["kind"] == "verification"],
+        scouts=[event for event in events if event["kind"] == "scout"],
+        searches=[event for event in events if event["kind"] == "search"],
+    )
+
+
+def _verification_history(events: list[dict[str, Any]]) -> VerificationHistory:
     disproven: set[str] = set()
-    repeated_disproven = 0
     passed_targets: set[str] = set()
-    verification_failures = 0
-    verification_not_run = 0
+    repeated_disproven = failures = not_run = 0
     for event in events:
         if event["kind"] == "edit_attempt" and isinstance(event.get("path"), str):
-            if str(event["path"]) in disproven:
-                repeated_disproven += 1
+            repeated_disproven += str(event["path"]) in disproven
         if event["kind"] != "verification":
             continue
         target = event.get("edit_target")
         outcome = event.get("outcome")
         if outcome == "failed" and isinstance(target, str):
             disproven.add(target)
-            verification_failures += 1
+            failures += 1
         elif outcome == "passed" and isinstance(target, str):
             passed_targets.add(target)
         elif outcome in {"not-run", "selected"}:
-            verification_not_run += 1
+            not_run += 1
+    return VerificationHistory(repeated_disproven, passed_targets, failures, not_run)
 
-    verified_solution = bool(final_correct and final_edit in passed_targets)
-    duplicate_reads = len(reads) - len(set(reads))
-    bytes_read = sum(int(event.get("bytes", 0)) for event in events)
-    evidence_tokens = sum(int(event.get("estimated_tokens", 0)) for event in events)
-    model_input = sum(int(event.get("model_input_tokens", 0)) for event in events)
-    model_output = sum(int(event.get("model_output_tokens", 0)) for event in events)
-    reasoning = sum(int(event.get("reasoning_tokens", 0)) for event in events)
 
+def _resource_totals(events: list[dict[str, Any]]) -> ResourceTotals:
+    return ResourceTotals(
+        bytes_read=sum(int(event.get("bytes", 0)) for event in events),
+        evidence_tokens=sum(int(event.get("estimated_tokens", 0)) for event in events),
+        model_input=sum(int(event.get("model_input_tokens", 0)) for event in events),
+        model_output=sum(int(event.get("model_output_tokens", 0)) for event in events),
+        reasoning=sum(int(event.get("reasoning_tokens", 0)) for event in events),
+    )
+
+
+def _timing_metrics(
+    events: list[dict[str, Any]], edits: list[dict[str, Any]], expected_files: set[str]
+) -> tuple[int | None, int | None]:
     starts = [
         int(event["started_at_ns"]) for event in events if "started_at_ns" in event
     ]
@@ -136,12 +173,36 @@ def score_trace(trace: dict[str, Any], expected_files: set[str]) -> dict[str, An
         if trace_start is not None and trace_finish is not None
         else None
     )
-    first_correct_edit_ns = None
-    if trace_start is not None:
-        for event in edits:
-            if str(event["path"]) in expected_files and "started_at_ns" in event:
-                first_correct_edit_ns = int(event["started_at_ns"]) - trace_start
-                break
+    if trace_start is None:
+        return wall_ns, None
+    first_correct = next(
+        (
+            int(event["started_at_ns"]) - trace_start
+            for event in edits
+            if str(event["path"]) in expected_files and "started_at_ns" in event
+        ),
+        None,
+    )
+    return wall_ns, first_correct
+
+
+def score_trace(trace: dict[str, Any], expected_files: set[str]) -> dict[str, Any]:
+    events = trace["events"]
+    groups = _event_groups(events)
+    first_edit = str(groups.edits[0]["path"]) if groups.edits else None
+    final_edit = str(groups.edits[-1]["path"]) if groups.edits else None
+    first_correct = first_edit in expected_files if first_edit else False
+    final_correct = final_edit in expected_files if final_edit else False
+    wrong_edits = sum(
+        str(event["path"]) not in expected_files for event in groups.edits
+    )
+    history = _verification_history(events)
+    verified_solution = bool(final_correct and final_edit in history.passed_targets)
+    duplicate_reads = len(groups.reads) - len(set(groups.reads))
+    resources = _resource_totals(events)
+    wall_ns, first_correct_edit_ns = _timing_metrics(
+        events, groups.edits, expected_files
+    )
 
     # Transparent decision/work rubric. Verification is deliberately worth 20
     # points, so a process worker that only selects a test cannot receive 100.
@@ -149,10 +210,10 @@ def score_trace(trace: dict[str, Any], expected_files: set[str]) -> dict[str, An
     work_score += 35 if final_correct else 0
     work_score += 15 if first_correct else 0
     work_score += 20 if verified_solution else 0
-    work_score += 10 if repeated_disproven == 0 else 0
+    work_score += 10 if history.repeated_disproven == 0 else 0
     work_score += 10 if wrong_edits == 0 else 0
     work_score += 5 if duplicate_reads == 0 else 0
-    work_score += 5 if len(scouts) == 0 else 0
+    work_score += 5 if len(groups.scouts) == 0 else 0
 
     return {
         "task_id": trace["task_id"],
@@ -164,20 +225,20 @@ def score_trace(trace: dict[str, Any], expected_files: set[str]) -> dict[str, An
         "final_edit_correct": final_correct,
         "verified_solution": verified_solution,
         "work_score": work_score,
-        "edit_attempts": len(edits),
+        "edit_attempts": len(groups.edits),
         "wrong_edit_attempts": wrong_edits,
-        "repeated_disproven_targets": repeated_disproven,
-        "verification_events": len(verifications),
-        "verification_failures": verification_failures,
-        "verification_not_run": verification_not_run,
+        "repeated_disproven_targets": history.repeated_disproven,
+        "verification_events": len(groups.verifications),
+        "verification_failures": history.failures,
+        "verification_not_run": history.not_run,
         "duplicate_reads": duplicate_reads,
-        "search_calls": len(searches),
-        "scout_calls": len(scouts),
-        "bytes_read": bytes_read,
-        "estimated_evidence_tokens": evidence_tokens,
-        "model_input_tokens": model_input or None,
-        "model_output_tokens": model_output or None,
-        "reasoning_tokens": reasoning or None,
+        "search_calls": len(groups.searches),
+        "scout_calls": len(groups.scouts),
+        "bytes_read": resources.bytes_read,
+        "estimated_evidence_tokens": resources.evidence_tokens,
+        "model_input_tokens": resources.model_input or None,
+        "model_output_tokens": resources.model_output or None,
+        "reasoning_tokens": resources.reasoning or None,
         "wall_ns": wall_ns,
         "time_to_first_correct_edit_ns": first_correct_edit_ns,
     }
