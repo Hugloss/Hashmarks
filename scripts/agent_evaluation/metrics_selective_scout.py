@@ -69,146 +69,149 @@ def run_scout(packet: Path, output: Path) -> None:
     )
 
 
-def collect(root: Path, limit: int = 20) -> dict[str, object]:
-    reports = []
-    policies = ("no-scout", "always-scout", "selective-scout")
-    for name, ws, corpus, pub in materialize_challenge(root / "challenge"):
-        hidden = _load_corpus(corpus)
-        public = json.load(open(pub))["tasks"]
-        base = []
-        with CodeMap(ws) as cm:
-            cm.sync()
-            for task in public:
-                entry = cm.task_entry_points(task["query"], limit=limit)
-                rec = [r for r in entry.get("recommended", []) if isinstance(r, dict)]
-                first = str(rec[0].get("path") or "") if rec else ""
-                amb = entry.get("ambiguity", {})
-                ambiguous = (
-                    bool(amb.get("ambiguous")) if isinstance(amb, dict) else False
-                )
-                alternatives = (
-                    list(amb.get("alternatives", []))
-                    if ambiguous and isinstance(amb, dict)
-                    else []
-                )
-                base.append(
-                    {
-                        "id": task["id"],
-                        "query": task["query"],
-                        "first_path": first,
-                        "ambiguous": ambiguous,
-                        "alternatives": alternatives,
-                    }
-                )
-        repo = {
-            "name": name,
-            "public_task_sha256": _sha256_bytes(pub.read_bytes()),
-            "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
-            "policies": {},
-        }
-        expected = {str(t["id"]): set(t.get("expected_files") or ()) for t in hidden}
-        for policy in policies:
-            selected = []
-            for row in base:
-                spawn = policy == "always-scout" or (
-                    policy == "selective-scout" and row["ambiguous"]
-                )
-                selected.append({**row, "spawn": spawn})
-            scout_rows = [
-                {
-                    k: r[k]
-                    for k in ("id", "query", "first_path", "ambiguous", "alternatives")
-                }
-                for r in selected
-                if r["spawn"]
+def _base_rows(workspace: Path, public: list[dict], limit: int) -> list[dict]:
+    rows = []
+    with CodeMap(workspace) as codemap:
+        codemap.sync()
+        for task in public:
+            entry = codemap.task_entry_points(task["query"], limit=limit)
+            recommended = [
+                row for row in entry.get("recommended", []) if isinstance(row, dict)
             ]
-            scout_out = {}
-            elapsed = 0.0
-            if scout_rows:
-                packet = root / "packets" / f"{name}-{policy}.json"
-                out = root / "outputs" / f"{name}-{policy}.json"
-                packet.parent.mkdir(parents=True, exist_ok=True)
-                packet.write_text(
-                    json.dumps(
-                        {"schema": PACKET, "tasks": scout_rows},
-                        indent=2,
-                        sort_keys=True,
-                    )
-                    + "\n"
-                )
-                t = time.perf_counter()
-                env = dict(os.environ)
-                env["PYTHONPATH"] = (
-                    str(_R)
-                    + os.pathsep
-                    + str(_S)
-                    + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
-                )
-                subprocess.run(
-                    [
-                        sys.executable,
-                        "-m",
-                        "scripts.agent_evaluation.metrics_selective_scout",
-                        "--worker",
-                        "--packet",
-                        str(packet),
-                        "--output",
-                        str(out),
-                    ],
-                    check=True,
-                    env=env,
-                )
-                elapsed = (time.perf_counter() - t) * 1000
-                scout_out = {str(x["id"]): x for x in json.load(open(out))["tasks"]}
-            rows = []
-            for r in selected:
-                target = str(
-                    scout_out.get(str(r["id"]), {}).get("target") or r["first_path"]
-                )
-                exp = expected[str(r["id"])]
-                paths = (
-                    [str(a.get("path") or "") for a in r["alternatives"]]
-                    if r["spawn"]
-                    else []
-                )
-                cost = _file_cost(ws, paths)
-                rows.append(
-                    {
-                        "id": r["id"],
-                        "spawned": r["spawn"],
-                        "ambiguous": r["ambiguous"],
-                        "initial_target": r["first_path"],
-                        "final_target": target,
-                        "correct_final": target in exp,
-                        "scout_evidence": cost,
-                    }
-                )
-            repo["policies"][policy] = {
-                "summary": {
-                    "tasks": len(rows),
-                    "correct_final": sum(x["correct_final"] for x in rows),
-                    "wrong_final": sum(not x["correct_final"] for x in rows),
-                    "scout_spawns": sum(x["spawned"] for x in rows),
-                    "scout_evidence_files": sum(
-                        int(x["scout_evidence"]["files"]) for x in rows
-                    ),
-                    "scout_evidence_bytes": sum(
-                        int(x["scout_evidence"]["bytes"]) for x in rows
-                    ),
-                    "scout_evidence_approx_tokens": sum(
-                        int(x["scout_evidence"]["approx_tokens"]) for x in rows
-                    ),
-                    "scout_subprocess_ms": elapsed,
-                },
-                "tasks": rows,
+            ambiguity = entry.get("ambiguity", {})
+            ambiguous = (
+                bool(ambiguity.get("ambiguous"))
+                if isinstance(ambiguity, dict)
+                else False
+            )
+            rows.append(
+                {
+                    "id": task["id"],
+                    "query": task["query"],
+                    "first_path": str(recommended[0].get("path") or "")
+                    if recommended
+                    else "",
+                    "ambiguous": ambiguous,
+                    "alternatives": list(ambiguity.get("alternatives", []))
+                    if ambiguous and isinstance(ambiguity, dict)
+                    else [],
+                }
+            )
+    return rows
+
+
+def _run_scout_process(
+    root: Path, name: str, policy: str, rows: list[dict]
+) -> tuple[dict, float]:
+    if not rows:
+        return {}, 0.0
+    packet = root / "packets" / f"{name}-{policy}.json"
+    output = root / "outputs" / f"{name}-{policy}.json"
+    packet.parent.mkdir(parents=True, exist_ok=True)
+    packet.write_text(
+        json.dumps({"schema": PACKET, "tasks": rows}, indent=2, sort_keys=True) + "\n"
+    )
+    env = dict(os.environ)
+    env["PYTHONPATH"] = (
+        str(_R)
+        + os.pathsep
+        + str(_S)
+        + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    )
+    started = time.perf_counter()
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "scripts.agent_evaluation.metrics_selective_scout",
+            "--worker",
+            "--packet",
+            str(packet),
+            "--output",
+            str(output),
+        ],
+        check=True,
+        env=env,
+    )
+    elapsed = (time.perf_counter() - started) * 1000
+    return {str(row["id"]): row for row in json.load(open(output))["tasks"]}, elapsed
+
+
+def _policy_report(
+    root: Path,
+    name: str,
+    workspace: Path,
+    base: list[dict],
+    expected: dict[str, set],
+    policy: str,
+) -> dict:
+    selected = [
+        {
+            **row,
+            "spawn": policy == "always-scout"
+            or (policy == "selective-scout" and row["ambiguous"]),
+        }
+        for row in base
+    ]
+    scout_rows = [
+        {
+            key: row[key]
+            for key in ("id", "query", "first_path", "ambiguous", "alternatives")
+        }
+        for row in selected
+        if row["spawn"]
+    ]
+    scout_output, elapsed = _run_scout_process(root, name, policy, scout_rows)
+    rows = []
+    for row in selected:
+        target = str(
+            scout_output.get(str(row["id"]), {}).get("target") or row["first_path"]
+        )
+        paths = (
+            [str(alternative.get("path") or "") for alternative in row["alternatives"]]
+            if row["spawn"]
+            else []
+        )
+        rows.append(
+            {
+                "id": row["id"],
+                "spawned": row["spawn"],
+                "ambiguous": row["ambiguous"],
+                "initial_target": row["first_path"],
+                "final_target": target,
+                "correct_final": target in expected[str(row["id"])],
+                "scout_evidence": _file_cost(workspace, paths),
             }
-        reports.append(repo)
+        )
+    return {
+        "summary": {
+            "tasks": len(rows),
+            "correct_final": sum(row["correct_final"] for row in rows),
+            "wrong_final": sum(not row["correct_final"] for row in rows),
+            "scout_spawns": sum(row["spawned"] for row in rows),
+            "scout_evidence_files": sum(
+                int(row["scout_evidence"]["files"]) for row in rows
+            ),
+            "scout_evidence_bytes": sum(
+                int(row["scout_evidence"]["bytes"]) for row in rows
+            ),
+            "scout_evidence_approx_tokens": sum(
+                int(row["scout_evidence"]["approx_tokens"]) for row in rows
+            ),
+            "scout_subprocess_ms": elapsed,
+        },
+        "tasks": rows,
+    }
 
+
+def _aggregate_summary(reports: list[dict]) -> dict[str, float]:
     def total(policy, key):
-        return sum(float(r["policies"][policy]["summary"][key]) for r in reports)
+        return sum(
+            float(report["policies"][policy]["summary"][key]) for report in reports
+        )
 
-    summary = {"repositories": len(reports), "tasks": 18}
-    for pol, prefix in [
+    summary: dict[str, float] = {"repositories": len(reports), "tasks": 18}
+    for policy, prefix in [
         ("no-scout", "no_scout"),
         ("always-scout", "always_scout"),
         ("selective-scout", "selective_scout"),
@@ -222,7 +225,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
             "scout_evidence_approx_tokens",
             "scout_subprocess_ms",
         ):
-            summary[f"{prefix}_{key}"] = total(pol, key)
+            summary[f"{prefix}_{key}"] = total(policy, key)
     summary["selective_spawn_rate"] = summary["selective_scout_scout_spawns"] / 18
     summary["selective_correctness_gain"] = (
         summary["selective_scout_correct_final"] - summary["no_scout_correct_final"]
@@ -230,6 +233,29 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
     summary["always_extra_spawns_vs_selective"] = (
         summary["always_scout_scout_spawns"] - summary["selective_scout_scout_spawns"]
     )
+    return summary
+
+
+def collect(root: Path, limit: int = 20) -> dict[str, object]:
+    reports = []
+    policies = ("no-scout", "always-scout", "selective-scout")
+    for name, ws, corpus, pub in materialize_challenge(root / "challenge"):
+        hidden = _load_corpus(corpus)
+        public = json.load(open(pub))["tasks"]
+        base = _base_rows(ws, public, limit)
+        repo = {
+            "name": name,
+            "public_task_sha256": _sha256_bytes(pub.read_bytes()),
+            "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
+            "policies": {},
+        }
+        expected = {str(t["id"]): set(t.get("expected_files") or ()) for t in hidden}
+        for policy in policies:
+            repo["policies"][policy] = _policy_report(
+                root, name, ws, base, expected, policy
+            )
+        reports.append(repo)
+    summary = _aggregate_summary(reports)
     protocol = {
         "family": FAMILY,
         "public_scout_fields": [
