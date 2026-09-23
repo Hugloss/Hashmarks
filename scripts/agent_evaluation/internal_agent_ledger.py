@@ -195,7 +195,9 @@ def _searchable_path(path: Path, repo: Path) -> bool:
     return (
         path.is_file()
         and path.suffix != ".pyc"
-        and not any(part in {".git", ".hashmarks", "__pycache__"} for part in relative.parts)
+        and not any(
+            part in {".git", ".hashmarks", "__pycache__"} for part in relative.parts
+        )
     )
 
 
