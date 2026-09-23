@@ -52,6 +52,7 @@ def test_product_boundary_treats_out_of_profile_surfaces_as_defects() -> None:
     assert "failed-target receipt stores" in agents
     assert "a boundary violation to reject, split, narrow, or remove" in contributing
 
+
 def test_external_library_findings_do_not_expand_repository_analysis_scope() -> None:
     boundary = _text("docs/reference/PRODUCT_BOUNDARY.md")
     agents = _text("AGENTS.md")
