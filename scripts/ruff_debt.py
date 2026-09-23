@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import subprocess
 import tomllib
 from collections import Counter
 from pathlib import Path
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[1]
 ROOTS = (Path("hashmarks"), Path("scripts"), Path("benchmarks"))
@@ -177,7 +182,7 @@ def _write_baseline(path: Path | None, summary: dict[str, object]) -> None:
 
 
 def _report_new_debt(summary: dict[str, object], baseline: dict[str, object]) -> None:
-    print("NEW MAINTAINABILITY DEBT — BLOCKED")
+    log_command_output(logger, "NEW MAINTAINABILITY DEBT — BLOCKED")
     baseline_files = dict(baseline["files"])
     summary_files = dict(summary["files"])
     for finding in summary["findings"]:
@@ -190,7 +195,7 @@ def _report_new_debt(summary: dict[str, object], baseline: dict[str, object]) ->
             f"{rule} {value} > {LIMITS[rule]}"
             for rule, value in dict(finding["violations"]).items()
         )
-        print(f"  {path}:{finding['line']}  {rules}")
+        log_command_output(logger, f"  {path}:{finding['line']}  {rules}")
 
 
 def _report_baseline(args, summary: dict[str, object]) -> int | None:
@@ -209,7 +214,8 @@ def _report_baseline(args, summary: dict[str, object]) -> int | None:
         )
     failures.extend(_baseline_failures(summary, baseline))
     if args.json:
-        print(
+        log_command_output(
+            logger,
             json.dumps(
                 {
                     "summary": summary,
@@ -218,24 +224,29 @@ def _report_baseline(args, summary: dict[str, object]) -> int | None:
                     "failures": failures,
                 },
                 sort_keys=True,
-            )
+            ),
         )
     else:
-        print(f"Ruff debt excess: {summary['excess']} (baseline {baseline['excess']})")
+        log_command_output(
+            logger,
+            f"Ruff debt excess: {summary['excess']} (baseline {baseline['excess']})",
+        )
         if previous is not None:
-            print(
+            log_command_output(
+                logger,
                 "Previous-main baseline excess: "
-                f"{previous['excess']} -> candidate {baseline['excess']}"
+                f"{previous['excess']} -> candidate {baseline['excess']}",
             )
-        print(
+        log_command_output(
+            logger,
             "Production file line ceiling: "
-            f"{MAX_PYTHON_FILE_LINES} (oversized={len(dict(summary['oversized_files']))})"
+            f"{MAX_PYTHON_FILE_LINES} (oversized={len(dict(summary['oversized_files']))})",
         )
         if failures:
             _report_new_debt(summary, baseline)
             for failure in failures:
-                print(f"FAIL: {failure}")
-            print("Baseline increase permitted: no")
+                log_command_output(logger, f"FAIL: {failure}")
+            log_command_output(logger, "Baseline increase permitted: no")
     return 1 if failures else 0
 
 
@@ -244,7 +255,7 @@ def _report_inventory(
 ) -> int:
     oversized = dict(summary["oversized_files"])
     if as_json:
-        print(json.dumps(summary, sort_keys=True))
+        log_command_output(logger, json.dumps(summary, sort_keys=True))
         return 1 if findings or oversized else 0
     keys = (
         "functions",
@@ -254,12 +265,14 @@ def _report_inventory(
         "max_python_file_lines",
         "oversized_files",
     )
-    print(json.dumps({key: summary[key] for key in keys}, sort_keys=True))
+    log_command_output(
+        logger, json.dumps({key: summary[key] for key in keys}, sort_keys=True)
+    )
     for finding in findings:
         rules = ", ".join(
             f"{rule}={value}" for rule, value in finding["violations"].items()
         )
-        print(f"{finding['path']}:{finding['line']}: {rules}")
+        log_command_output(logger, f"{finding['path']}:{finding['line']}: {rules}")
     return 1 if findings or oversized else 0
 
 
@@ -277,7 +290,9 @@ def main() -> int:
             "max_python_file_lines",
             "oversized_files",
         )
-        print(json.dumps({key: summary[key] for key in keys}, sort_keys=True))
+        log_command_output(
+            logger, json.dumps({key: summary[key] for key in keys}, sort_keys=True)
+        )
         return 0
     baseline_result = _report_baseline(args, summary)
     if baseline_result is not None:

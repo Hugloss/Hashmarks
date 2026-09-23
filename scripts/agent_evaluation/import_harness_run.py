@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
 from scripts.agent_evaluation.experiment import ExperimentLane, import_native_run
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> int:
@@ -36,7 +40,7 @@ def main() -> int:
     if a.output:
         a.output.parent.mkdir(parents=True, exist_ok=True)
         a.output.write_text(text)
-    print(text, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, text, end="")
     return 0
 
 

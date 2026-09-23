@@ -5,7 +5,12 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import logging
 from pathlib import Path
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 
 def _definitions(tree: ast.AST) -> list[dict[str, object]]:
@@ -76,7 +81,7 @@ def main() -> int:
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
     else:
-        print(rendered, end="")  # noqa: T201 - intentional command output
+        log_command_output(logger, rendered, end="")
     return 0
 
 

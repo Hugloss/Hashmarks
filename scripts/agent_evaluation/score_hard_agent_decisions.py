@@ -3,16 +3,20 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
 from scripts.agent_evaluation.decision_qa import (
     evaluate_decision_packet,
     summarize_decision_qa,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _sha(path: Path) -> str:
@@ -143,12 +147,13 @@ def main() -> None:
     result = run(
         args.repo, args.public, args.secret, args.output, token_budget=args.token_budget
     )
-    print(  # noqa: T201 - intentional command output
+    log_command_output(
+        logger,
         json.dumps(
             {"summary": result["summary"], "categories": result["categories"]},
             indent=2,
             sort_keys=True,
-        )
+        ),
     )
 
 

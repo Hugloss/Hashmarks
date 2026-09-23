@@ -3,12 +3,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.sanitized-agent-swarm.v1"
 PUBLIC_FIELDS = {"id", "query"}
@@ -164,7 +168,7 @@ def main() -> None:
         args.trace_dir,
         workers=args.workers,
     )
-    print(json.dumps(result["summary"], indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(result["summary"], indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

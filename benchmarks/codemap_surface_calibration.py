@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import shutil
 import sqlite3
 import statistics
@@ -19,12 +20,15 @@ from benchmarks.research_receipts import (
     evaluate_with_receipt,
     work_identity,
 )
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap.decision_contract import (
     DecisionPacketContract,
 )
 from hashmarks.codemap.engine import (
     CodeMap,
 )
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -884,7 +888,7 @@ def main() -> None:
     text = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.json_out:
         _atomic_write_json(Path(args.json_out), result)
-    print(text, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, text, end="")
 
 
 if __name__ == "__main__":

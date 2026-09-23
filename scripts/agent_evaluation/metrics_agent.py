@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import tempfile
 import time
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.python_ast import estimate_tokens
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.agent-metrics.v1"
 
@@ -115,10 +119,11 @@ def main() -> None:
     parser.add_argument("--files", type=int, default=1000)
     parser.add_argument("--budget", type=int, default=1000)
     args = parser.parse_args()
-    print(  # noqa: T201 - intentional command output
+    log_command_output(
+        logger,
         json.dumps(
             collect(files=args.files, budget=args.budget), indent=2, sort_keys=True
-        )
+        ),
     )
 
 

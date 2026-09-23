@@ -4,11 +4,14 @@ import argparse
 import contextlib
 import hashlib
 import json
+import logging
 import os
 import shutil
 import subprocess
 import time
 from pathlib import Path
+
+from hashmarks._command_output import log_command_output
 
 from .codex_agent_economics import (
     CodexRunConfig,
@@ -24,6 +27,8 @@ from .metrics_blind_worker_ab import (
     _sha256_bytes,
     materialize_challenge,
 )
+
+logger = logging.getLogger(__name__)
 
 _S = Path(__file__).resolve().parent
 
@@ -390,7 +395,7 @@ def main() -> int:
     if a.output:
         a.output.parent.mkdir(parents=True, exist_ok=True)
         a.output.write_text(text)
-    print(text, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, text, end="")
     return 0
 
 

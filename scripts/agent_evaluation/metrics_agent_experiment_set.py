@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import logging
 from dataclasses import dataclass, field
+
+from hashmarks._command_output import log_command_output
 
 try:
     from scripts._module_loader import import_sibling
@@ -11,6 +14,8 @@ except ModuleNotFoundError:  # direct script execution
 import json
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 SET_SCHEMA = "hashmarks.agent-experiment-set.v2"
 REPORT_SCHEMA = "hashmarks.agent-experiment-set-report.v2"
@@ -452,7 +457,7 @@ def main() -> None:
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)  # noqa: T201 - intentional command output
+    log_command_output(logger, rendered)
 
 
 if __name__ == "__main__":

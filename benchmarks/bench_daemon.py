@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import shutil
 import tempfile
 import threading
@@ -9,9 +10,12 @@ import time
 from pathlib import Path
 from typing import Callable
 
+from hashmarks._command_output import log_command_output
 from hashmarks.client import IdentityClient
 from hashmarks.daemon import IdentityDaemon
 from hashmarks.inputs import InputManifest
+
+logger = logging.getLogger(__name__)
 
 
 def timed(fn):
@@ -146,7 +150,7 @@ def main() -> None:
         client.stop()
         thread.join(timeout=5.0)
         result = _result(args, root, measurements, registration_s, status)
-        print(json.dumps(result, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+        log_command_output(logger, json.dumps(result, indent=2, sort_keys=True))
     finally:
         if not args.keep:
             shutil.rmtree(root, ignore_errors=True)

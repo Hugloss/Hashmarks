@@ -3,8 +3,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
     CodeMap,
 )
@@ -14,6 +16,8 @@ from .metrics_blind_worker_ab import (
     _sha256_bytes,
     materialize_challenge,
 )
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.retrieval-residual-classification.v1"
 FAMILY = "hashmarks-residual-classification-a"
@@ -136,7 +140,7 @@ def main():
     text = json.dumps(r, indent=2, sort_keys=True) + "\n"
     if a.output:
         a.output.write_text(text)
-    print(text, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, text, end="")
 
 
 if __name__ == "__main__":

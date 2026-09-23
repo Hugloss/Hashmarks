@@ -3,12 +3,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
     CodeMap,
 )
@@ -25,6 +27,8 @@ from .metrics_worker_inspection_ab import (
 from .metrics_worker_multistep_ab import (
     _verification_state,
 )
+
+logger = logging.getLogger(__name__)
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _SCRIPTS_DIR.parent.parent
@@ -430,7 +434,7 @@ def main() -> int:
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(text, encoding="utf-8")
-    print(text, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, text, end="")
     return 0
 
 

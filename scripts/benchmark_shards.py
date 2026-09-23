@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
 from scripts.benchmark_shards_lib import (
     create_manifest,
     load_manifest,
@@ -14,6 +16,8 @@ from scripts.benchmark_shards_lib import (
     warmup_complete,
     write_manifest,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -74,7 +78,7 @@ def _plan(args: argparse.Namespace) -> None:
         warmup_command=warmup,
         run_identity=args.run_identity,
     )
-    print(write_manifest(args.output_dir, manifest))  # noqa: T201 - intentional command output
+    log_command_output(logger, write_manifest(args.output_dir, manifest))
 
 
 def _status(args: argparse.Namespace) -> None:
@@ -90,7 +94,7 @@ def _status(args: argparse.Namespace) -> None:
         "next": pending[0].key if pending else None,
         "warmup_complete": warmup_complete(args.output_dir, manifest),
     }
-    print(json.dumps(result, sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(result, sort_keys=True))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -100,21 +104,21 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command_name == "warm":
         changed = run_warmup(args.output_dir, timeout_seconds=args.timeout_seconds)
-        print("warmed" if changed else "already-warm")  # noqa: T201 - intentional command output
+        log_command_output(logger, "warmed" if changed else "already-warm")
         return 0
     if args.command_name == "next":
         shard = run_next(args.output_dir, timeout_seconds=args.timeout_seconds)
         if shard is None:
-            print("complete")  # noqa: T201 - intentional command output
+            log_command_output(logger, "complete")
         else:
-            print(f"sealed {shard.key} ({shard.count} rows)")  # noqa: T201 - intentional command output
+            log_command_output(logger, f"sealed {shard.key} ({shard.count} rows)")
         return 0
     if args.command_name == "status":
         _status(args)
         return 0
     if args.command_name == "merge":
         path = merge_shards(args.output_dir, aggregate_name=args.aggregate_name)
-        print(path)  # noqa: T201 - intentional command output
+        log_command_output(logger, path)
         return 0
     raise AssertionError(args.command_name)
 

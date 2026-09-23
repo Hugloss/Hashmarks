@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import shutil
 import tempfile
 import time
 from pathlib import Path
 
 from hashmarks import InputManifest
+from hashmarks._command_output import log_command_output
 from hashmarks.engine import IdentityEngine
+
+logger = logging.getLogger(__name__)
 
 
 def timed(fn):
@@ -121,7 +125,7 @@ def main() -> None:
             },
             "workspace": str(root) if args.keep else None,
         }
-        print(json.dumps(result, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+        log_command_output(logger, json.dumps(result, indent=2, sort_keys=True))
     finally:
         if not args.keep:
             shutil.rmtree(root, ignore_errors=True)

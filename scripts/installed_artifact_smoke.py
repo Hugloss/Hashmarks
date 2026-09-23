@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.resources
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -16,6 +17,9 @@ from pathlib import Path
 
 import hashmarks
 from hashmarks import CodeMap, File, RepositoryIdentity
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 REQUIRED_PUBLIC = {
     "CodeMap",
@@ -149,7 +153,7 @@ def main() -> int:
     _check_public_surface()
     _check_repository_intelligence()
     _check_cli()
-    print(f"installed Hashmarks {hashmarks.__version__}: PASS")  # noqa: T201 - intentional command output
+    log_command_output(logger, f"installed Hashmarks {hashmarks.__version__}: PASS")
     return 0
 
 

@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from hashmarks._command_output import log_command_output
 
 from .codex_agent_economics import (
     CollectionConfig,
@@ -14,6 +17,8 @@ from .codex_agent_economics import collect as collect_lanes
 from .codex_selective_scout_economics import (
     collect as collect_selective,
 )
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.codex-economics-matrix.v1"
 
@@ -198,7 +203,7 @@ def main() -> int:
     if a.output:
         a.output.parent.mkdir(parents=True, exist_ok=True)
         a.output.write_text(t)
-    print(t, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, t, end="")
     return 0
 
 

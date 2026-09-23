@@ -3,10 +3,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Any
 
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
     CodeMap,
 )
@@ -18,6 +20,8 @@ from .metrics_blind_worker_ab import (
     _sha256_bytes,
     materialize_challenge,
 )
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.agent-economics.v1"
 PROTOCOL_SCHEMA = "hashmarks.agent-economics-protocol.v1"
@@ -316,7 +320,7 @@ def main() -> int:
     if a.output:
         a.output.parent.mkdir(parents=True, exist_ok=True)
         a.output.write_text(text)
-    print(text, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, text, end="")
     return 0
 
 

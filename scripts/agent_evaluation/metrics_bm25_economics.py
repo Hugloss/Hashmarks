@@ -3,9 +3,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import time
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
     CodeMap,
 )
@@ -22,6 +24,8 @@ from .metrics_blind_worker_ab import (
     _sha256_bytes,
     materialize_challenge,
 )
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.bm25-economics.v1"
 FAMILY = "hashmarks-fielded-bm25-a"
@@ -155,7 +159,7 @@ def main():
     if a.output:
         a.output.parent.mkdir(parents=True, exist_ok=True)
         a.output.write_text(text)
-    print(text, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, text, end="")
 
 
 if __name__ == "__main__":

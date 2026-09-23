@@ -4,11 +4,16 @@ import argparse
 import csv
 import hashlib
 import json
+import logging
 import math
 import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.context-economics-csv.v1"
 INPUT_SCHEMA = "hashmarks.codex-agent-economics.v1"
@@ -246,7 +251,8 @@ def main() -> int:
     summary = _summary(rows)
     raw_sha256 = _write_csv(args.raw_csv, rows)
     summary_sha256 = _write_csv(args.summary_csv, summary)
-    print(  # noqa: T201 - intentional command output
+    log_command_output(
+        logger,
         json.dumps(
             {
                 "schema": SCHEMA,
@@ -259,7 +265,7 @@ def main() -> int:
                 "summary_csv_sha256": summary_sha256,
             },
             sort_keys=True,
-        )
+        ),
     )
     return 0
 

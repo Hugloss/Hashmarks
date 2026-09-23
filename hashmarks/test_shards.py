@@ -4,16 +4,21 @@ import argparse
 import ast
 import hashlib
 import json
+import logging
 import os
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
+
 from ._version import __version__
 from .digest import hash_file
 from .python_ast_cache import read_python_ast
 from .validation_inputs import require_mapping_for_validation
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.test-shards.v3"
 ENVELOPE_SCHEMA = "hashmarks.repository-work-selection.v1"
@@ -943,11 +948,12 @@ def select(root: Path, shard_count: int, shard_index: int) -> tuple[str, ...]:
 def _emit_shard_plan(payload: Mapping[str, object], *, as_json: bool) -> None:
     """Render immutable shard membership for the selection CLI."""
     if as_json:
-        print(json.dumps(payload, sort_keys=True))  # noqa: T201 - intentional command output
+        log_command_output(logger, json.dumps(payload, sort_keys=True))
         return
     for row in payload["shards"]:  # type: ignore[union-attr]
-        print(  # noqa: T201 - intentional command output
-            f"{row['index']}: {len(row['nodeids'])} tests / {row['weight_bytes']} source-weight bytes"
+        log_command_output(
+            logger,
+            f"{row['index']}: {len(row['nodeids'])} tests / {row['weight_bytes']} source-weight bytes",
         )
 
 
@@ -978,10 +984,11 @@ def main() -> int:
             args.shards,
             producer_artifact_identity=args.producer_artifact_identity,
         )
-        print(  # noqa: T201 - intentional command output
+        log_command_output(
+            logger,
             json.dumps(payload, sort_keys=True)
             if args.json
-            else json.dumps(payload, indent=2, sort_keys=True)
+            else json.dumps(payload, indent=2, sort_keys=True),
         )
         return 0
     payload = plan(root, args.shards)
@@ -993,7 +1000,8 @@ def main() -> int:
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
     if args.json:
-        print(  # noqa: T201 - intentional command output
+        log_command_output(
+            logger,
             json.dumps(
                 {
                     "schema": SCHEMA,
@@ -1002,10 +1010,10 @@ def main() -> int:
                     "nodeids": selected,
                 },
                 sort_keys=True,
-            )
+            ),
         )
     else:
-        print(" ".join(selected))  # noqa: T201 - intentional command output
+        log_command_output(logger, " ".join(selected))
     return 0
 
 

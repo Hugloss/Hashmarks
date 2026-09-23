@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import logging
+
+from hashmarks._command_output import log_command_output
 
 try:
     from scripts._module_loader import import_sibling
@@ -13,6 +16,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 JOURNAL_SCHEMA = "hashmarks.agent-runner-journal.v1"
 RAW_SCHEMA = "hashmarks.agent-runner-log.v1"
@@ -294,7 +299,7 @@ def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
 
 def main() -> None:
     payload = _dispatch(_parser().parse_args())
-    print(json.dumps(payload, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(payload, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
 from hashmarks.promotion_receipt import promotion_manifest
+
+logger = logging.getLogger(__name__)
 
 
 def _load_mapping(path: str, *, label: str) -> dict[str, object]:
@@ -40,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         native_qualification_handoff=handoff,
         native_ruff_receipt=receipt,
     )
-    print(json.dumps(manifest, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(manifest, indent=2, sort_keys=True))
     return 0 if manifest["manifest_valid"] else 3
 
 

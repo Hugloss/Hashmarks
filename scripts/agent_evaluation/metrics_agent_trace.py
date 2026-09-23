@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 TRACE_SCHEMA = "hashmarks.agent-trace.v2"
 VERDICT_SCHEMA = "hashmarks.agent-verdict.v1"
@@ -535,7 +540,7 @@ def main() -> None:
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)  # noqa: T201 - intentional command output
+    log_command_output(logger, rendered)
     if args.strict:
         failures = gate(payload, min_pairs=args.min_pairs)
         if failures:

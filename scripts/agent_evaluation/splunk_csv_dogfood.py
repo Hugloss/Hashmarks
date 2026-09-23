@@ -5,10 +5,15 @@ import csv
 import hashlib
 import io
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TextIO
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.splunk-csv-dogfood.v1"
 EXPECTED_HEADER = (
@@ -490,7 +495,8 @@ def main() -> int:
         json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-    print(  # noqa: T201 - intentional command output
+    log_command_output(
+        logger,
         json.dumps(
             {
                 "schema": SCHEMA,
@@ -498,7 +504,7 @@ def main() -> int:
                 "output": str(args.output),
             },
             sort_keys=True,
-        )
+        ),
     )
     return 0
 

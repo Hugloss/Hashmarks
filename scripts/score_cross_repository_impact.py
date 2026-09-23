@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import shutil
 import time
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
+
+logger = logging.getLogger(__name__)
 
 _TOKENS = (
     "amber",
@@ -289,7 +293,7 @@ def main() -> int:
             decoys=args.decoys,
         )
     payload = run(args.base, args.public, args.secret, args.output)
-    print(json.dumps(payload["summary"], sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(payload["summary"], sort_keys=True))
     return 0
 
 

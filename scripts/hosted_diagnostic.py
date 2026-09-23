@@ -3,12 +3,17 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import logging
 import os
 import shutil
 import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "hashmarks.hosted-diagnostic.v1"
@@ -68,7 +73,9 @@ def _selected_nodes(shards: int, shard: int) -> tuple[str, ...]:
 def _run_shard(shards: int, shard: int, *, extra_marker: str) -> int:
     nodes = _selected_nodes(shards, shard)
     if not nodes:
-        print(f"--- HOSTED DIAGNOSTIC SHARD {shard + 1}/{shards}: EMPTY ---")  # noqa: T201 - intentional command output
+        log_command_output(
+            logger, f"--- HOSTED DIAGNOSTIC SHARD {shard + 1}/{shards}: EMPTY ---"
+        )
         return 0
     env = os.environ.copy()
     env["HASHMARKS_CONSTRAINED_HOST"] = "1"
@@ -87,7 +94,8 @@ def _run_shard(shards: int, shard: int, *, extra_marker: str) -> int:
         marker_expression(extra_marker),
         *nodes,
     ]
-    print(  # noqa: T201 - intentional command output
+    log_command_output(
+        logger,
         f"--- HOSTED DIAGNOSTIC SHARD {shard + 1}/{shards}: {len(nodes)} selected nodes ---",
         flush=True,
     )
@@ -95,7 +103,10 @@ def _run_shard(shards: int, shard: int, *, extra_marker: str) -> int:
     if code == 5:
         # Deterministic membership can legitimately contain only tests excluded by
         # the mandatory constrained-host marker policy (for example scale tests).
-        print(f"--- HOSTED DIAGNOSTIC SHARD {shard + 1}/{shards}: POLICY-EXCLUDED ---")  # noqa: T201 - intentional command output
+        log_command_output(
+            logger,
+            f"--- HOSTED DIAGNOSTIC SHARD {shard + 1}/{shards}: POLICY-EXCLUDED ---",
+        )
         return 0
     return code
 
@@ -124,10 +135,11 @@ def main(argv: list[str] | None = None) -> int:
 
     inventory = capabilities()
     if args.capabilities:
-        print(json.dumps(inventory, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+        log_command_output(logger, json.dumps(inventory, indent=2, sort_keys=True))
         return 0
     if inventory["pytest"] is None:
-        print(  # noqa: T201 - intentional command output
+        log_command_output(
+            logger,
             "HASHMARKS HOSTED DIAGNOSTIC: ENVIRONMENT-BLOCKED (pytest unavailable)",
             file=sys.stderr,
         )
@@ -136,19 +148,20 @@ def main(argv: list[str] | None = None) -> int:
     try:
         start, stop = _validate_range(args.shards, args.start, args.limit)
     except ValueError as exc:
-        print(str(exc), file=sys.stderr)  # noqa: T201 - intentional command output
+        log_command_output(logger, str(exc), file=sys.stderr)
         return 2
 
-    print(json.dumps(inventory, sort_keys=True))  # noqa: T201 - intentional command output
-    print(f"mandatory-marker={MANDATORY_MARKER}")  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(inventory, sort_keys=True))
+    log_command_output(logger, f"mandatory-marker={MANDATORY_MARKER}")
     if args.extra_marker.strip():
-        print(f"extra-marker={args.extra_marker.strip()}")  # noqa: T201 - intentional command output
-    print(f"shards={args.shards} range={start}..{stop - 1}")  # noqa: T201 - intentional command output
+        log_command_output(logger, f"extra-marker={args.extra_marker.strip()}")
+    log_command_output(logger, f"shards={args.shards} range={start}..{stop - 1}")
 
     for shard in range(start, stop):
         code = _run_shard(args.shards, shard, extra_marker=args.extra_marker)
         if code != 0:
-            print(  # noqa: T201 - intentional command output
+            log_command_output(
+                logger,
                 f"HASHMARKS HOSTED DIAGNOSTIC: FAIL (shard {shard}; reproduce with "
                 f"HASHMARKS_CONSTRAINED_HOST=1 make test-diagnostic-shard DIAGNOSTIC_SHARD={shard})",
                 file=sys.stderr,
@@ -159,9 +172,12 @@ def main(argv: list[str] | None = None) -> int:
         scope = "complete constrained-host selection"
     else:
         scope = f"bounded shard range {start}..{stop - 1}"
-    print(f"HASHMARKS HOSTED DIAGNOSTIC: HOSTED-DIAGNOSTIC-PASSED ({scope})")  # noqa: T201 - intentional command output
-    print(  # noqa: T201 - intentional command output
-        "This is diagnostic evidence only and is never native release/certification authority."
+    log_command_output(
+        logger, f"HASHMARKS HOSTED DIAGNOSTIC: HOSTED-DIAGNOSTIC-PASSED ({scope})"
+    )
+    log_command_output(
+        logger,
+        "This is diagnostic evidence only and is never native release/certification authority.",
     )
     return 0
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import os
 import shlex
 import shutil
@@ -12,6 +13,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from hashmarks._command_output import log_command_output
 
 _S = Path(__file__).resolve().parent
 _R = _S.parent.parent
@@ -23,6 +26,8 @@ from .metrics_blind_worker_ab import (  # noqa: E402 - import follows standalone
     _sha256_bytes,
     materialize_challenge,
 )
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.codex-agent-economics.v1"
 PROTOCOL = "hashmarks.codex-agent-economics-protocol.v1"
@@ -419,7 +424,7 @@ def main() -> int:
     if a.output:
         a.output.parent.mkdir(parents=True, exist_ok=True)
         a.output.write_text(text)
-    print(text, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, text, end="")
     return 0
 
 

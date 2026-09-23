@@ -96,6 +96,7 @@ select = [
     "E7",
     "E9",
     "I",
+    "T201",  # print statements; command output uses the repository logger adapter
     "C901",  # excessive cyclomatic complexity
     "PLR0911",  # too many returns
     "PLR0912",  # too many branches

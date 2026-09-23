@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import time
 from pathlib import Path
 
 from hashmarks import Identity
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 
 def timed(fn):
@@ -43,7 +47,7 @@ def main() -> None:
             },
             "identity_checks": {"hot_equals_first": last.hash == first.hash},
         }
-    print(json.dumps(result, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(result, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

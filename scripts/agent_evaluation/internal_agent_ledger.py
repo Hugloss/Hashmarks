@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import os
 import re
 import shutil
@@ -10,6 +11,10 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.internal-agent-ledger.v1"
 
@@ -130,7 +135,7 @@ print(json.dumps({'wall_ms':(time.perf_counter()-t)*1000,'packet':p},sort_keys=T
         packet_identity=(packet.get("identity") or {}).get("decision_generation"),
     )
     _save(a.state, state)
-    print(json.dumps(shown, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(shown, indent=2, sort_keys=True))
 
 
 def _metrics(state: dict) -> dict:
@@ -180,7 +185,7 @@ def _finalize(a: argparse.Namespace, state: dict) -> None:
     _save(a.state, state)
     a.output.parent.mkdir(parents=True, exist_ok=True)
     a.output.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
-    print(state["identity"])  # noqa: T201 - intentional command output
+    log_command_output(logger, state["identity"])
 
 
 def _normalize_search_output(output: str) -> str:
@@ -265,7 +270,7 @@ def _search(a: argparse.Namespace, state: dict, repo: Path) -> None:
         matches=sum(1 for line in output.splitlines() if line),
     )
     _save(a.state, state)
-    print(output, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, output, end="")
 
 
 def _read(a: argparse.Namespace, state: dict, repo: Path) -> None:
@@ -275,7 +280,7 @@ def _read(a: argparse.Namespace, state: dict, repo: Path) -> None:
     elapsed_ms = (time.perf_counter() - started) * 1000
     _event(state, "read", path=a.path, wall_ms=elapsed_ms, bytes=len(data.encode()))
     _save(a.state, state)
-    print(data, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, data, end="")
 
 
 def _edit(a: argparse.Namespace, state: dict, repo: Path) -> None:
@@ -286,7 +291,7 @@ def _edit(a: argparse.Namespace, state: dict, repo: Path) -> None:
         path.write_text(text.replace(a.old, a.new, 1))
     _event(state, "edit", path=a.path, changed=changed)
     _save(a.state, state)
-    print("changed" if changed else "unchanged")  # noqa: T201 - intentional command output
+    log_command_output(logger, "changed" if changed else "unchanged")
 
 
 def _verify(a: argparse.Namespace, state: dict, repo: Path) -> None:
@@ -308,8 +313,8 @@ def _verify(a: argparse.Namespace, state: dict, repo: Path) -> None:
         stderr_bytes=len(result.stderr.encode()),
     )
     _save(a.state, state)
-    print(result.stdout, end="")  # noqa: T201 - intentional command output
-    print(result.stderr, end="", file=sys.stderr)  # noqa: T201 - intentional command output
+    log_command_output(logger, result.stdout, end="")
+    log_command_output(logger, result.stderr, end="", file=sys.stderr)
     raise SystemExit(result.returncode)
 
 

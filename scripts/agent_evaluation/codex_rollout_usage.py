@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
 from typing import Any
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 FIELDS = (
     "input_tokens",
@@ -100,7 +105,7 @@ def main() -> int:
     if a.output:
         a.output.parent.mkdir(parents=True, exist_ok=True)
         a.output.write_text(t)
-    print(t, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, t, end="")
     return 0
 
 

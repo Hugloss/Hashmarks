@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 
 def windows_mounted_wsl_path(path: Path) -> bool:
@@ -20,7 +25,8 @@ def windows_mounted_wsl_path(path: Path) -> bool:
 def main() -> int:
     root = Path.cwd()
     if windows_mounted_wsl_path(root):
-        print(  # noqa: T201 - intentional command output
+        log_command_output(
+            logger,
             "qualification-performance-warning: repository is under /mnt/<drive>; "
             "correctness results remain valid, but performance/economics timings are not "
             "comparable to native Linux filesystem baselines. Prefer /home/... for profiling.",

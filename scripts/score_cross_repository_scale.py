@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import shutil
 import statistics
 import time
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from hashmarks import __version__
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import ChangeImpactOptions, CodeMap, expand_project_impact
 from scripts.agent_evaluation.experimentability import (
     EvidenceEconomics,
@@ -17,6 +19,8 @@ from scripts.agent_evaluation.experimentability import (
     experiment_environment,
     experiment_record,
 )
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -481,7 +485,8 @@ def main() -> int:
     sizes = [int(x) for x in args.sizes.split(",") if x]
     shapes = [x for x in args.shapes.split(",") if x]
     if args.generate:
-        print(  # noqa: T201 - intentional command output
+        log_command_output(
+            logger,
             json.dumps(
                 generate(
                     args.base,
@@ -492,7 +497,7 @@ def main() -> int:
                     contracts=args.contracts,
                 ),
                 sort_keys=True,
-            )
+            ),
         )
     result = run(
         args.base,
@@ -502,7 +507,7 @@ def main() -> int:
         provenance_limit=args.provenance_limit,
         provenance_encoding=args.provenance_encoding,
     )
-    print(json.dumps(result["summary"], sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(result["summary"], sort_keys=True))
     return 0
 
 
