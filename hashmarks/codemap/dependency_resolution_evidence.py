@@ -313,7 +313,7 @@ class DependencyResolutionEvidenceMixin:
         )
 
         repository_binding = {
-            "repository_identity": self.observation.repository_id,
+            "repository_identity": self._repository_packet_identity(),
             "codemap_generation": int(self.store.generation()),
         }
         observation_payload = {
@@ -1115,6 +1115,7 @@ class DependencyResolutionEvidenceMixin:
             for row in after.get("relationships", ())
             if isinstance(row, Mapping)
         }
+
         def ownership_key(row: Mapping[str, object]) -> str:
             return f"{row.get('module') or ''}|{row.get('context') or ''}"
 
