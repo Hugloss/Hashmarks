@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -31,6 +32,11 @@ def test_release_manifest_binds_exact_distribution_bytes(tmp_path: Path) -> None
     assert manifest["version"] == hashmarks.__version__
     assert manifest["tag"] == f"v{hashmarks.__version__}"
     assert manifest["publication_authority"] == "external"
+    assert manifest["qualification_dependency_resolution"] == {
+        "path": "uv.lock",
+        "sha256": "sha256:"
+        + hashlib.sha256((_root() / "uv.lock").read_bytes()).hexdigest(),
+    }
     rows = manifest["distributions"]
     assert [row["kind"] for row in rows] == ["wheel", "sdist"]
     assert all(str(row["sha256"]).startswith("sha256:") for row in rows)
