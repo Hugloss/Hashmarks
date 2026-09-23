@@ -11,7 +11,6 @@ from .dependency_resolution_query import dependency_queries
 if TYPE_CHECKING:
     from .engine import CodeMap
 
-_SCHEMA = "hashmarks.dependency-resolution.v1"
 _SCHEMA_V2 = "hashmarks.dependency-resolution.v2"
 _MAX_CONTEXTS = 64
 _MAX_INVENTORY = 16384
@@ -85,65 +84,6 @@ class DependencyResolutionEvidenceMixin:
     package manager, environment synchronizer, or dependency implementation scan.
     """
 
-    @staticmethod
-    def _dependency_resolution_definition(
-        snapshot: Mapping[str, object],
-    ) -> dict[str, object]:
-        producer = snapshot.get("producer")
-        if not isinstance(producer, Mapping):
-            raise ValueError("dependency resolution producer must be an object")
-        producer_packet = dict(producer)
-        _identifier(producer_packet.get("kind"), label="producer kind")
-        _text(
-            producer_packet.get("schema_version"),
-            label="producer schema_version",
-            required=True,
-        )
-
-        scope = snapshot.get("scope")
-        if not isinstance(scope, Mapping):
-            raise ValueError("dependency resolution scope must be an object")
-        scope_packet = dict(scope)
-        if not scope_packet:
-            raise ValueError("dependency resolution scope must not be empty")
-        _canonical(scope_packet)
-
-        raw_roots = snapshot.get("roots", ())
-        if not isinstance(raw_roots, Sequence) or isinstance(
-            raw_roots, (str, bytes, bytearray)
-        ):
-            raise ValueError("roots must be a sequence")
-        roots = [_identifier(value, label="root") for value in raw_roots]
-        if len(roots) > _MAX_ROOTS:
-            raise ValueError(f"roots exceeds {_MAX_ROOTS} entries")
-        if len(set(roots)) != len(roots):
-            raise ValueError("duplicate dependency resolution root")
-        return {
-            "producer": producer_packet,
-            "scope": scope_packet,
-            "roots": sorted(roots),
-        }
-
-    @staticmethod
-    def _dependency_resolution_completion(
-        snapshot: Mapping[str, object],
-    ) -> tuple[str, str]:
-        completeness = str(snapshot.get("completeness") or "unknown").strip()
-        if completeness not in {"complete", "incomplete", "unknown"}:
-            raise ValueError(
-                "dependency resolution completeness must be complete, incomplete, or unknown"
-            )
-        truncation = str(snapshot.get("truncation") or "unknown").strip()
-        if truncation not in {"complete", "truncated", "unknown"}:
-            raise ValueError(
-                "dependency resolution truncation must be complete, truncated, or unknown"
-            )
-        if completeness == "complete" and truncation != "complete":
-            raise ValueError(
-                "dependency resolution completeness=complete requires truncation=complete"
-            )
-        return completeness, truncation
-
     def dependency_resolution_evidence(
         self,
         snapshot: Mapping[str, object],
@@ -154,65 +94,9 @@ class DependencyResolutionEvidenceMixin:
             raise ValueError(
                 f"dependency resolution snapshot exceeds {_MAX_REQUEST_BYTES} encoded bytes"
             )
-        if snapshot.get("schema") == _SCHEMA_V2:
-            return self._dependency_resolution_evidence_v2(snapshot)
-        if snapshot.get("schema") != _SCHEMA:
-            raise ValueError(
-                f"dependency resolution schema must be {_SCHEMA} or {_SCHEMA_V2}"
-            )
-
-        definition = self._dependency_resolution_definition(snapshot)
-        nodes = self._dependency_resolution_nodes(snapshot.get("nodes", ()))
-        node_ids = {str(row["node_id"]) for row in nodes}
-        for root in definition["roots"]:
-            if root not in node_ids:
-                raise ValueError(f"dangling dependency resolution root: {root}")
-        edges = self._dependency_resolution_edges(snapshot.get("edges", ()), node_ids)
-
-        repository_inputs = self._dependency_repository_inputs(
-            snapshot.get("repository_inputs", ())
-        )
-        module_ownership = self._dependency_module_ownership(
-            snapshot.get("module_ownership", ()), node_ids
-        )
-        completeness, truncation = self._dependency_resolution_completion(snapshot)
-        graph = {
-            "nodes": sorted(nodes, key=lambda row: str(row["node_id"])),
-            "edges": sorted(
-                edges,
-                key=lambda row: (
-                    str(row["source"]),
-                    str(row["target"]),
-                    str(row["kind"]),
-                    str(row["marker"]),
-                ),
-            ),
-        }
-        definition_identity = _identity(
-            "hashmarks.dependency-resolution-definition.v1", definition
-        )
-        resolution_identity = _identity(
-            "hashmarks.dependency-resolution-observation.v1",
-            {"definition_identity": definition_identity, "graph": graph},
-        )
-        return {
-            "schema": _SCHEMA,
-            "authority": "qualified-external-observation",
-            "producer_authority": "caller-claimed",
-            "definition_identity": definition_identity,
-            "resolution_identity": resolution_identity,
-            **definition,
-            **graph,
-            "repository_inputs": repository_inputs,
-            "module_ownership": module_ownership,
-            "completeness": completeness,
-            "truncation": truncation,
-            "negative_evidence": (
-                "admissible-within-declared-scope"
-                if completeness == "complete" and truncation == "complete"
-                else "not-admissible"
-            ),
-        }
+        if snapshot.get("schema") != _SCHEMA_V2:
+            raise ValueError(f"dependency resolution schema must be {_SCHEMA_V2}")
+        return self._dependency_resolution_evidence_v2(snapshot)
 
     def _dependency_resolution_evidence_v2(  # noqa: PLR0914, PLR0915
         self,
@@ -737,106 +621,6 @@ class DependencyResolutionEvidenceMixin:
             for row in coverage
         ]
 
-    @staticmethod
-    def _dependency_resolution_nodes(value: object) -> list[dict[str, object]]:
-        rows = _objects(value, label="nodes", limit=_MAX_NODES)
-        result: list[dict[str, object]] = []
-        seen: set[str] = set()
-        for raw in rows:
-            node_id = _identifier(raw.get("node_id"), label="node_id")
-            if node_id in seen:
-                raise ValueError(f"duplicate dependency resolution node_id: {node_id}")
-            seen.add(node_id)
-            name = _text(raw.get("name"), label="distribution name", required=True)
-            result.append(
-                {
-                    "node_id": node_id,
-                    "name": name,
-                    "version": _text(raw.get("version"), label="version"),
-                    "source": _text(raw.get("source"), label="source"),
-                    "marker": _text(raw.get("marker"), label="marker"),
-                }
-            )
-        return result
-
-    @staticmethod
-    def _dependency_resolution_edges(
-        value: object,
-        node_ids: set[str],
-    ) -> list[dict[str, object]]:
-        rows = _objects(value, label="edges", limit=_MAX_EDGES)
-        result: list[dict[str, object]] = []
-        seen: set[tuple[str, str, str, str]] = set()
-        for raw in rows:
-            source = _identifier(raw.get("source"), label="edge source")
-            target = _identifier(raw.get("target"), label="edge target")
-            if source not in node_ids or target not in node_ids:
-                raise ValueError(
-                    f"dangling dependency resolution edge: {source}->{target}"
-                )
-            packet = {
-                "source": source,
-                "target": target,
-                "kind": _text(raw.get("kind"), label="edge kind", required=True),
-                "marker": _text(raw.get("marker"), label="edge marker"),
-            }
-            key = (source, target, str(packet["kind"]), str(packet["marker"]))
-            if key in seen:
-                raise ValueError(
-                    f"duplicate dependency resolution edge: {source}->{target}"
-                )
-            seen.add(key)
-            result.append(packet)
-        return result
-
-    @staticmethod
-    def _dependency_module_ownership(
-        value: object,
-        node_ids: set[str],
-    ) -> list[dict[str, object]]:
-        rows = _objects(value, label="module_ownership", limit=_MAX_MODULE_OWNERSHIP)
-        result: list[dict[str, object]] = []
-        seen: set[str] = set()
-        for raw in rows:
-            module = _text(raw.get("module"), label="module", required=True)
-            if module in seen:
-                raise ValueError(f"duplicate module ownership observation: {module}")
-            seen.add(module)
-            raw_owners = raw.get("owners", ())
-            if not isinstance(raw_owners, Sequence) or isinstance(
-                raw_owners, (str, bytes, bytearray)
-            ):
-                raise ValueError("module ownership owners must be a sequence")
-            owners = [_identifier(owner, label="module owner") for owner in raw_owners]
-            if len(set(owners)) != len(owners):
-                raise ValueError(f"duplicate owner for module: {module}")
-            dangling = [owner for owner in owners if owner not in node_ids]
-            if dangling:
-                raise ValueError(
-                    f"dangling module ownership node for {module}: {dangling[0]}"
-                )
-            completeness = str(raw.get("completeness") or "unknown").strip()
-            if completeness not in {"complete", "incomplete", "unknown"}:
-                raise ValueError(
-                    "module ownership completeness must be complete, incomplete, or unknown"
-                )
-            result.append(
-                {
-                    "module": module,
-                    "owners": sorted(owners),
-                    "state": (
-                        "resolved-unique"
-                        if len(owners) == 1
-                        else "resolved-ambiguous"
-                        if owners
-                        else "unresolved"
-                    ),
-                    "completeness": completeness,
-                    "authority": "qualified-external-observation",
-                }
-            )
-        return sorted(result, key=lambda row: str(row["module"]))
-
     def dependency_import_correspondence(
         self,
         observation: Mapping[str, object],
@@ -846,7 +630,7 @@ class DependencyResolutionEvidenceMixin:
         context: str | None = None,
     ) -> dict[str, object]:
         schema = observation.get("schema")
-        if schema not in {_SCHEMA, _SCHEMA_V2}:
+        if schema != _SCHEMA_V2:
             raise ValueError(
                 "dependency import correspondence requires a qualified observation"
             )
@@ -856,11 +640,7 @@ class DependencyResolutionEvidenceMixin:
             for row in observation.get("module_ownership", ())
             if isinstance(row, Mapping)
             and row.get("module")
-            and (
-                schema == _SCHEMA
-                or context is None
-                or str(row.get("context") or "") == context
-            )
+            and (context is None or str(row.get("context") or "") == context)
         ]
         matches = [
             row for module in candidates for row in rows if row.get("module") == module
@@ -909,7 +689,7 @@ class DependencyResolutionEvidenceMixin:
             ),
             "distribution_nodes": owners,
             "ownership_completeness": completeness,
-            **({"observed_contexts": contexts} if schema == _SCHEMA_V2 else {}),
+            "observed_contexts": contexts,
             "causation": "not-inferred",
         }
 
@@ -957,7 +737,7 @@ class DependencyResolutionEvidenceMixin:
         only ordinary external anchors and repository locators.
         """
         schema = observation.get("schema")
-        if schema not in {_SCHEMA, _SCHEMA_V2}:
+        if schema != _SCHEMA_V2:
             raise ValueError(
                 "dependency evidence correlation requires a qualified observation"
             )
@@ -982,11 +762,7 @@ class DependencyResolutionEvidenceMixin:
                 row
                 for row in ownership
                 if row.get("module") == module
-                and (
-                    schema == _SCHEMA
-                    or not context
-                    or str(row.get("context") or "") == context
-                )
+                and (not context or str(row.get("context") or "") == context)
             ]
             owners = sorted(
                 {
@@ -1024,11 +800,7 @@ class DependencyResolutionEvidenceMixin:
                     ),
                     "distribution_nodes": owners,
                     "ownership_completeness": completeness,
-                    **(
-                        {"observed_contexts": observed_contexts}
-                        if schema == _SCHEMA_V2
-                        else {}
-                    ),
+                    "observed_contexts": observed_contexts,
                     "causation": "not-inferred",
                 }
             )
@@ -1218,89 +990,10 @@ class DependencyResolutionEvidenceMixin:
         before: Mapping[str, object],
         after: Mapping[str, object],
     ) -> dict[str, object]:
-        if before.get("schema") == _SCHEMA_V2 and after.get("schema") == _SCHEMA_V2:
-            return DependencyResolutionEvidenceMixin._dependency_resolution_delta_v2(
-                before, after
-            )
-        if before.get("schema") != _SCHEMA or after.get("schema") != _SCHEMA:
+        if before.get("schema") != _SCHEMA_V2 or after.get("schema") != _SCHEMA_V2:
             raise ValueError(
-                "dependency resolution delta requires matching qualified observations"
+                "dependency resolution delta requires matching qualified v2 observations"
             )
-        before_definition = before.get("definition_identity")
-        after_definition = after.get("definition_identity")
-        if not _SHA256.fullmatch(str(before_definition or "")) or not _SHA256.fullmatch(
-            str(after_definition or "")
-        ):
-            raise ValueError("dependency resolution definition identity is malformed")
-        if before_definition != after_definition:
-            return {
-                "schema": "hashmarks.dependency-resolution-delta.v1",
-                "comparability": "not-comparable",
-                "reason": "definition-changed",
-                "before_definition_identity": before_definition,
-                "after_definition_identity": after_definition,
-            }
-        before_nodes = {
-            str(row["node_id"]): row
-            for row in before.get("nodes", ())
-            if isinstance(row, Mapping) and row.get("node_id")
-        }
-        after_nodes = {
-            str(row["node_id"]): row
-            for row in after.get("nodes", ())
-            if isinstance(row, Mapping) and row.get("node_id")
-        }
-        changed = sorted(
-            node_id
-            for node_id in before_nodes.keys() & after_nodes.keys()
-            if before_nodes[node_id] != after_nodes[node_id]
+        return DependencyResolutionEvidenceMixin._dependency_resolution_delta_v2(
+            before, after
         )
-
-        def edge_key(row: Mapping[str, object]) -> tuple[str, str, str, str]:
-            return (
-                str(row.get("source") or ""),
-                str(row.get("target") or ""),
-                str(row.get("kind") or ""),
-                str(row.get("marker") or ""),
-            )
-
-        before_edges = {
-            edge_key(row) for row in before.get("edges", ()) if isinstance(row, Mapping)
-        }
-        after_edges = {
-            edge_key(row) for row in after.get("edges", ()) if isinstance(row, Mapping)
-        }
-        before_ownership = {
-            str(row["module"]): row
-            for row in before.get("module_ownership", ())
-            if isinstance(row, Mapping) and row.get("module")
-        }
-        after_ownership = {
-            str(row["module"]): row
-            for row in after.get("module_ownership", ())
-            if isinstance(row, Mapping) and row.get("module")
-        }
-        ownership_changed = sorted(
-            module
-            for module in before_ownership.keys() & after_ownership.keys()
-            if before_ownership[module] != after_ownership[module]
-        )
-        return {
-            "schema": "hashmarks.dependency-resolution-delta.v1",
-            "comparability": "comparable",
-            "before_resolution_identity": before.get("resolution_identity"),
-            "after_resolution_identity": after.get("resolution_identity"),
-            "nodes_added": sorted(after_nodes.keys() - before_nodes.keys()),
-            "nodes_removed": sorted(before_nodes.keys() - after_nodes.keys()),
-            "nodes_changed": changed,
-            "edges_added": [list(row) for row in sorted(after_edges - before_edges)],
-            "edges_removed": [list(row) for row in sorted(before_edges - after_edges)],
-            "module_ownership_added": sorted(
-                after_ownership.keys() - before_ownership.keys()
-            ),
-            "module_ownership_removed": sorted(
-                before_ownership.keys() - after_ownership.keys()
-            ),
-            "module_ownership_changed": ownership_changed,
-            "causation": "not-inferred",
-        }
