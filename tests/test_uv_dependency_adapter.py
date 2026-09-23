@@ -106,6 +106,6 @@ source = { registry = "https://example.invalid/simple" }
 name = "shared"
 version = "2"
 source = { directory = "vendor/shared" }
-'''
+"""
     with pytest.raises(ValueError, match="must resolve uniquely"):
         uv_lock_dependency_observation(lock=lock)
