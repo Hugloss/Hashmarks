@@ -161,11 +161,10 @@ def _paths(  # noqa: C901, PLR0912
         path = queue.pop(0)
         current = path[-1]
         if current == target:
-            paths.append(path)
             if len(paths) >= max_results:
-                if queue:
-                    omissions.append({"reason": "result-limit"})
+                omissions.append({"reason": "result-limit"})
                 break
+            paths.append(path)
             continue
         if len(path) - 1 >= max_depth:
             if outgoing.get(current):
