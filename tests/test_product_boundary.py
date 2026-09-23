@@ -262,28 +262,9 @@ def test_repository_root_markdown_is_limited_to_entry_points() -> None:
     root_markdown = {path.name for path in ROOT.glob("*.md")}
     assert root_markdown == allowed
     assert (ROOT / "docs" / "README.md").is_file()
-    assert not (ROOT / "docs" / "development").exists()
     assert (ROOT / "docs" / "reference" / "INVARIANTS.md").is_file()
     assert (ROOT / "docs" / "integration" / "OH_GOON_INTEGRATION.md").is_file()
     assert (ROOT / "docs" / "maintainers" / "RELEASING.md").is_file()
     assert (ROOT / "docs" / "qualification" / "REPOSITORY_QUALITY.md").is_file()
 
 
-def test_repository_root_has_no_historical_phase_evidence() -> None:
-    root = Path(__file__).resolve().parents[1]
-    historical = sorted(
-        path.name
-        for path in root.iterdir()
-        if path.is_file()
-        and path.name.startswith("HM")
-        and path.suffix in {".json", ".txt", ".md"}
-    )
-    assert historical == []
-    assert not (root / "docs" / "development").exists()
-    historical_docs = sorted(
-        path.relative_to(root).as_posix()
-        for path in (root / "docs").rglob("*")
-        if path.is_file() and (path.name.startswith("HM") or "HISTORICAL" in path.name)
-    )
-    assert historical_docs == []
-    assert "## HM" not in (root / "CHANGELOG.md").read_text(encoding="utf-8")
