@@ -362,6 +362,7 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             "task_evidence",
             "change_impact",
             "correlate_evidence",
+            "dependency_codemap",
             "post_change",
         ]
         for row in registered:
@@ -440,6 +441,7 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             "task_evidence",
             "change_impact",
             "correlate_evidence",
+            "dependency_codemap",
             "post_change",
         ]
         # Construction may initialize empty SQLite files, but it must not build a generation.
