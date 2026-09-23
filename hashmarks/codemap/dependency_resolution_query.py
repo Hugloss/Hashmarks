@@ -184,12 +184,13 @@ def _coverage_complete(
     observation: Mapping[str, object],
     *,
     context: str,
+    kind: str = "resolution-graph",
 ) -> bool:
     rows = [
         row
         for row in observation.get("coverage", ())
         if isinstance(row, Mapping)
-        and str(row.get("kind") or "") == "resolution-graph"
+        and str(row.get("kind") or "") == kind
         and (not context or str(row.get("context") or "") == context)
     ]
     return bool(rows) and all(
@@ -284,7 +285,20 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             and str(row.get("module") or "") == module
             and (not context or str(row.get("context") or "") == context)
         ]
-        result = _limited(rows, max_results=max_results, omissions=omissions)
+        limited = _limited(rows, max_results=max_results, omissions=omissions)
+        result = {
+            "owners": limited,
+            "negative_evidence": (
+                "admissible-within-declared-scope"
+                if not rows
+                and _coverage_complete(
+                    observation, context=context, kind="module-ownership"
+                )
+                else "not-admissible"
+                if not rows
+                else "not-applicable"
+            ),
+        }
     else:
         if not node_id:
             raise ValueError(f"{operation} query requires node_id")
