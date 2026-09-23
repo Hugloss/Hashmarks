@@ -76,6 +76,7 @@ def _walk(
     seen = {start}
     rows: list[object] = []
     omissions: list[dict[str, object]] = []
+    negative_evidence = "not-applicable"
     visited = 0
     while queue:
         current, depth = queue.pop(0)
@@ -285,20 +286,15 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             and str(row.get("module") or "") == module
             and (not context or str(row.get("context") or "") == context)
         ]
-        limited = _limited(rows, max_results=max_results, omissions=omissions)
-        result = {
-            "owners": limited,
-            "negative_evidence": (
+        result = _limited(rows, max_results=max_results, omissions=omissions)
+        if not rows:
+            negative_evidence = (
                 "admissible-within-declared-scope"
-                if not rows
-                and _coverage_complete(
+                if _coverage_complete(
                     observation, context=context, kind="module-ownership"
                 )
                 else "not-admissible"
-                if not rows
-                else "not-applicable"
-            ),
-        }
+            )
     else:
         if not node_id:
             raise ValueError(f"{operation} query requires node_id")
@@ -360,6 +356,7 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "visited": visited,
         },
         "completeness": "complete" if not omissions else "incomplete",
+        "negative_evidence": negative_evidence,
         "omissions": omissions,
         "authority": "qualified-external-observation",
         "causation": "not-inferred",
