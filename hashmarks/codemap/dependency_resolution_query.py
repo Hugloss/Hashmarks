@@ -94,6 +94,10 @@ def _walk(
             if candidate in seen:
                 continue
             seen.add(candidate)
+            if len(rows) >= max_results:
+                omissions.append({"reason": "result-limit"})
+                queue.clear()
+                break
             rows.append(
                 {
                     "node_id": candidate,
@@ -101,10 +105,6 @@ def _walk(
                     "selection": selections.get(candidate),
                 }
             )
-            if len(rows) >= max_results:
-                omissions.append({"reason": "result-limit"})
-                queue.clear()
-                break
             queue.append((candidate, depth + 1))
     return rows, visited, omissions
 

@@ -691,3 +691,73 @@ def test_v2_module_owner_absence_requires_complete_ownership_coverage(
     assert runtime_result["result"] == []
     assert runtime_result["completeness"] == "incomplete"
     assert runtime_result["negative_evidence"] == "not-admissible"
+
+
+def test_v2_dependency_query_exact_result_bound_is_complete(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "app@1",
+                    "context": "compile",
+                    "max_results": 1,
+                }
+            ],
+        )
+
+    result = packet["results"][0]
+    assert [row["node_id"] for row in result["result"]] == ["library@1"]
+    assert result["completeness"] == "complete"
+    assert result["omissions"] == []
+
+
+def test_v2_dependency_query_reports_result_bound_when_result_is_omitted(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["components"].append(
+        {"component_id": "second", "name": "second", "ecosystem": "test"}
+    )
+    changed["selections"].append(
+        {
+            "node_id": "second@1",
+            "component_id": "second",
+            "version": "1",
+            "source": "registry",
+            "contexts": ["compile"],
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+    changed["relationships"].append(
+        {
+            "source": "app@1",
+            "target": "second@1",
+            "kind": "dependency",
+            "context": "compile",
+            "effective_scope": "compile",
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "app@1",
+                    "context": "compile",
+                    "max_results": 1,
+                }
+            ],
+        )
+
+    result = packet["results"][0]
+    assert len(result["result"]) == 1
+    assert result["completeness"] == "incomplete"
+    assert result["omissions"] == [{"reason": "result-limit"}]
