@@ -83,7 +83,7 @@ def test_repository_local_markdown_links_resolve() -> None:
 
 
 def test_docs_readme_is_the_single_complete_docs_catalog() -> None:
-    docs_root = ROOT / "docs"
+    docs_root = (ROOT / "docs").resolve()
     index = docs_root / "README.md"
 
     nested_indexes = sorted(
@@ -105,7 +105,7 @@ def test_docs_readme_is_the_single_complete_docs_catalog() -> None:
         target = _link_target(raw)
         if target is None:
             continue
-        resolved = _resolve_local_target(index, target)
+        resolved = _resolve_local_target(index, target).resolve()
         if resolved.suffix != ".md" or not resolved.is_relative_to(docs_root):
             continue
         indexed.append(resolved.relative_to(docs_root).as_posix())

@@ -1,4 +1,4 @@
-# Hashmarks documentation
+# Hashmarks repository intelligence documentation
 
 This is the single catalog for the current maintained documentation in `docs/`.
 
