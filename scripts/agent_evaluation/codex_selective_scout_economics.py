@@ -36,7 +36,7 @@ from .metrics_blind_worker_ab import (
 
 SCHEMA = "hashmarks.codex-selective-scout-economics.v1"
 PROTOCOL = "hashmarks.codex-selective-scout-economics-protocol.v1"
-FAMILY = "hashmarks-v0.10.48-real-selective-scout-a"
+FAMILY = "hashmarks-real-selective-scout-a"
 
 
 def _id(v: object) -> str:
@@ -176,7 +176,7 @@ def _main_with_scout(
     run_dir: Path,
     scout: dict[str, object] | None,
 ) -> dict[str, object]:
-    # Use the v0.10.47 runner but add frozen scout guidance to the public task text; the grader remains unopened.
+    # Use the shared real-Codex runner but add frozen scout guidance to the public task text; the grader remains unopened.
     enriched = dict(task)
     if scout and isinstance(scout.get("final"), dict):
         rec = scout["final"].get("recommended_path")

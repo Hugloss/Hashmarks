@@ -30,7 +30,7 @@ from .metrics_fresh_multi_repo import (
 
 SCHEMA = "hashmarks.blind-worker-ab.v2"
 PROTOCOL_SCHEMA = "hashmarks.blind-worker-ab-protocol.v2"
-CHALLENGE_FAMILY = "hashmarks-v0.10.35-blind-worker-challenge-a"
+CHALLENGE_FAMILY = "hashmarks-blind-worker-challenge-a"
 _WORD_RE = re.compile(r"[A-Za-z0-9_./-]+")
 _SKIP_ROOTS = {".git", ".hashmarks", ".venv", "node_modules"}
 

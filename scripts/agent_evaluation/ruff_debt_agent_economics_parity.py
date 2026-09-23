@@ -21,7 +21,6 @@ AGENT_ECONOMICS = ROOT / ".agent-economics" / "scripts"
 
 # This is a dogfood/parity harness, not Hashmarks acceptance authority.
 # Materialize agentsCookbook under .agent-economics before running it.
-EXCLUDES = ("benchmarks/agent_evaluation/retained",)
 
 
 def _load_quality_debt():
@@ -97,7 +96,7 @@ def main() -> int:
         limits=ruff_debt.LIMITS,
         max_file_lines=ruff_debt.MAX_PYTHON_FILE_LINES,
         file_line_roots=("hashmarks",),
-        excludes=EXCLUDES,
+        excludes=(),
     )
     measured = _legacy_shape(dict(payload["derived"])["summary"])
     legacy = ruff_debt._summary(ruff_debt.inventory())

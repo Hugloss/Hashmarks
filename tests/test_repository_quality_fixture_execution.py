@@ -4,23 +4,20 @@ import json
 from pathlib import Path
 
 from hashmarks.codemap import CodeMap
-
-ROOT = Path(__file__).resolve().parents[1]
-RETAINED = ROOT / "benchmarks/agent_evaluation/retained/challenge/base"
+from scripts.agent_evaluation.metrics_fresh_multi_repo import materialize_fixture
 
 
-def _cases():
-    for corpus in sorted((RETAINED / "corpora").glob("*.json")):
+def _cases(root: Path):
+    for _name, repo, corpus in materialize_fixture(root):
         payload = json.loads(corpus.read_text(encoding="utf-8"))
-        repo = RETAINED / "repos" / corpus.stem
         for task in payload["tasks"]:
             yield repo, task
 
 
-def test_retained_real_repositories_preserve_expected_top_file() -> None:
+def test_canonical_fixture_preserves_expected_top_file(tmp_path: Path) -> None:
     misses: list[str] = []
     checked = 0
-    for repo, task in _cases():
+    for repo, task in _cases(tmp_path / "fixture"):
         with CodeMap(repo) as codemap:
             codemap.sync()
             results = codemap.find(task["query"], limit=5)
@@ -34,8 +31,13 @@ def test_retained_real_repositories_preserve_expected_top_file() -> None:
     assert not misses, "\n".join(misses)
 
 
-def test_retained_real_repositories_keep_search_deterministic_across_rebuild() -> None:
-    repo = RETAINED / "repos/python-orders"
+def test_canonical_fixture_keeps_search_deterministic_across_rebuild(
+    tmp_path: Path,
+) -> None:
+    repos = {
+        name: repo for name, repo, _corpus in materialize_fixture(tmp_path / "fixture")
+    }
+    repo = repos["python-orders"]
     query = "OrderService submit_order implementation"
     with CodeMap(repo) as codemap:
         codemap.sync()
@@ -48,10 +50,13 @@ def test_retained_real_repositories_keep_search_deterministic_across_rebuild() -
     assert first == rebuilt
 
 
-def test_retained_real_repository_irrelevant_query_terms_do_not_erase_owner_file() -> (
-    None
-):
-    repo = RETAINED / "repos/python-orders"
+def test_canonical_fixture_irrelevant_query_terms_do_not_erase_owner_file(
+    tmp_path: Path,
+) -> None:
+    repos = {
+        name: repo for name, repo, _corpus in materialize_fixture(tmp_path / "fixture")
+    }
+    repo = repos["python-orders"]
     with CodeMap(repo) as codemap:
         codemap.sync()
         baseline = codemap.find("OrderService submit_order implementation", limit=8)

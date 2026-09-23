@@ -30,7 +30,7 @@ from .metrics_worker_inspection_ab import (
 )
 
 SCHEMA = "hashmarks.bm25-constrained-economics.v1"
-FAMILY = "hashmarks-v0.10.44-constrained-bm25-a"
+FAMILY = "hashmarks-constrained-bm25-a"
 
 
 def _task_report(cm, idx, task, secret, *, limit: int) -> dict[str, object]:

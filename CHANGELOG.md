@@ -5,7 +5,8 @@
 - Make the committed `uv.lock` the exact repository development/qualification resolution authority while `pyproject.toml` remains dependency-intent authority; normal setup, CI, MCP development registrations, pre-commit, and release qualification consume the lock with frozen uv operations.
 - Bind release qualification provenance directly to the exact `uv.lock` bytes and remove the old gitignored/local-lock compatibility model rather than preserving a parallel dependency representation.
 - Remove internal HM phase chronology, handoffs, historical receipts, superseded plans, and pre-public agent-loop archaeology from the maintained documentation tree; Git and merged pull requests remain the historical record.
-- Collapse the duplicated retained agent-evaluation baseline mirror into one canonical retained fixture tree and remove the phase-era HM285 measurement-authority checklist; current behavior is protected by semantic tests rather than historical inventory counts.
+- Remove committed copies of generated agent-evaluation fixtures/results and the phase-era HM285 measurement-authority checklist; canonical synthetic fixtures now have one owner in evaluation code and are materialized per run, while semantic tests protect behavior and Git/PR history preserves old snapshots.
+- Make evaluation protocol/fixture family identifiers semantic and package-version-neutral instead of embedding obsolete `v0.10.x` release numbers in current benchmark identities.
 - Keep only current product/reference, integration, maintainer, and qualification documentation in the live tree, and keep the changelog limited to public release history.
 
 ## 0.17.0 — External evidence correlation and real-data qualification

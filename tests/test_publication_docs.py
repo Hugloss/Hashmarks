@@ -156,21 +156,23 @@ def test_public_release_contract_documents_stability_and_changelog() -> None:
     assert "agent-loop" in changelog
 
 
-def test_publication_root_moves_agent_evaluation_corpora_out_of_product_surface() -> (
-    None
-):
-    for old_root in (
+def test_generated_agent_evaluation_state_is_not_committed() -> None:
+    for generated_root in (
         "baseline",
         "challenge",
         "failure-packets",
         "outputs",
         "packets",
         "worker-outputs",
+        "benchmarks/agent_evaluation/retained",
     ):
-        assert not (ROOT / old_root).exists()
-    assert (ROOT / "benchmarks/agent_evaluation/retained").is_dir()
-    retained = _text("benchmarks/agent_evaluation/README.md")
-    assert "not installed Hashmarks product state" in retained
+        assert not (ROOT / generated_root).exists()
+    evaluation_docs = _text("benchmarks/agent_evaluation/README.md")
+    assert "not installed Hashmarks product state" in evaluation_docs
+    assert (
+        "Generated blind inputs, packets, worker outputs, and result files are not committed"
+        in evaluation_docs
+    )
 
 
 def test_public_onboarding_leads_with_installed_package_not_source_checkout() -> None:

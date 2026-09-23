@@ -31,7 +31,7 @@ from .metrics_blind_worker_ab import (
 
 SCHEMA = "hashmarks.worker-inspection-ab.v1"
 PROTOCOL_SCHEMA = "hashmarks.worker-inspection-ab-protocol.v1"
-FAMILY = "hashmarks-v0.10.38-worker-inspection-a"
+FAMILY = "hashmarks-worker-inspection-a"
 
 ROLE_CUES: dict[str, tuple[str, ...]] = {
     "authority": ("agents", "agent instructions", "authority", "policy", "rules"),

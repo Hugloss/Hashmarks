@@ -24,7 +24,7 @@ from .metrics_blind_worker_ab import (
 )
 
 SCHEMA = "hashmarks.retrieval-residual-classification.v1"
-FAMILY = "hashmarks-v0.10.45-residual-classification-a"
+FAMILY = "hashmarks-residual-classification-a"
 
 
 def _task_report(cm, task, secret, *, limit: int) -> dict[str, object]:

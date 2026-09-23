@@ -12,5 +12,6 @@ Key rules:
 - Agent workflow, attempt history, recovery, delegation, model routing, edits, and verification execution remain external responsibilities.
 - New production behavior discovered through these experiments must pass `docs/reference/PRODUCT_BOUNDARY.md` before implementation.
 - Invoke executable evaluation modules from the repository root with `python -m scripts.agent_evaluation.<module>` (normally through `make evaluation-help` targets), so package ownership and imports remain explicit.
+- Evaluation schema versions describe serialized contracts; evaluation family identifiers describe semantic protocols/fixtures and must not be coupled to the Hashmarks package version.
 
 Current product contracts live under `docs/reference/`. Superseded benchmark contracts and development experiments remain recoverable from Git and merged pull requests rather than a parallel historical-document tree.

@@ -15,7 +15,7 @@ collect_suite = import_sibling("metrics_agent_suite", __package__).collect_suite
 
 SCHEMA = "hashmarks.fresh-multi-repo-metrics.v1"
 FIXTURE_SCHEMA = "hashmarks.fresh-multi-repo-fixture.v1"
-FIXTURE_FAMILY = "hashmarks-v0.10.34-fresh-corpus-a"
+FIXTURE_FAMILY = "hashmarks-fresh-corpus-a"
 
 _REPOSITORIES: dict[str, dict[str, object]] = {
     "python-orders": {
