@@ -124,6 +124,25 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         )
 
     @server.tool(
+        name="dependency_codemap",
+        description=(
+            "Qualify a producer-neutral dependency-resolution observation and run "
+            "bounded factual dependency queries without executing a package manager."
+        ),
+        annotations=annotations,
+    )
+    def dependency_codemap(
+        snapshot: dict[str, object],
+        queries: list[dict[str, object]] | None = None,
+    ) -> dict[str, object]:
+        return _call_surface(
+            ToolError,
+            surface.dependency_codemap,
+            snapshot,
+            queries,
+        )
+
+    @server.tool(
         name="post_change",
         description="Refresh caller-reported changed paths against a previous task_evidence packet and return only invalidated/reused/replacement evidence.",
         annotations=annotations,
