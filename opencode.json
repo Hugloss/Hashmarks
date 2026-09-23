@@ -6,6 +6,7 @@
       "command": [
         "uv",
         "run",
+        "--frozen",
         "--no-sync",
         "hashmarks",
         "--workspace",
