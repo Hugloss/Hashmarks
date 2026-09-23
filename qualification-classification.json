@@ -4,7 +4,7 @@
   "node_overrides": [
     {
       "kind": "process-sensitive",
-      "nodeid": "tests/test_codemap.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon",
+      "nodeid": "tests/test_codemap_watcher.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon",
       "preferred_granularity": "singleton",
       "reason": "watcher/process lifecycle semantics"
     },
