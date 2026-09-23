@@ -138,6 +138,38 @@ def _resolve_after_inspection(
     return {"resolved": True, "target": best[2], "reason": "public-task-role-cue"}
 
 
+def _worker_action(
+    policy: str, query: str, state: dict[str, object]
+) -> dict[str, object]:
+    if policy not in {"defer-only", "inspect-then-resolve"}:
+        raise ValueError(f"unsupported policy: {policy}")
+    if not state["ambiguous"]:
+        return {
+            "action": "edit" if state["first_path"] else "no-evidence",
+            "target": state["first_path"],
+            "inspected": False,
+            "resolved_after_inspection": False,
+            "resolution_reason": None,
+        }
+    if policy == "defer-only":
+        return {
+            "action": "inspect-competing-evidence",
+            "target": None,
+            "inspected": True,
+            "resolved_after_inspection": False,
+            "resolution_reason": None,
+        }
+    resolution = _resolve_after_inspection(query, list(state["alternatives"]))
+    resolved = bool(resolution["resolved"])
+    return {
+        "action": "edit-after-inspection" if resolved else "defer-after-inspection",
+        "target": resolution["target"] if resolved else None,
+        "inspected": True,
+        "resolved_after_inspection": resolved,
+        "resolution_reason": resolution["reason"],
+    }
+
+
 def run_worker(
     *, policy: str, workspace: Path, tasks_path: Path, output: Path, limit: int
 ) -> None:
@@ -156,46 +188,21 @@ def run_worker(
             task_id = str(row.get("id") or "")
             query = str(row.get("query") or "")
             state = _entry_state(codemap, query, limit=limit)
-            inspected = False
-            resolved_after_inspection = False
-            resolution_reason = None
-            if policy == "defer-only":
-                if state["ambiguous"]:
-                    action, target, inspected = "inspect-competing-evidence", None, True
-                else:
-                    action = "edit" if state["first_path"] else "no-evidence"
-                    target = state["first_path"]
-            elif policy == "inspect-then-resolve":
-                if state["ambiguous"]:
-                    inspected = True
-                    resolution = _resolve_after_inspection(
-                        query, list(state["alternatives"])
-                    )
-                    resolution_reason = resolution["reason"]
-                    resolved_after_inspection = bool(resolution["resolved"])
-                    if resolved_after_inspection:
-                        action, target = "edit-after-inspection", resolution["target"]
-                    else:
-                        action, target = "defer-after-inspection", None
-                else:
-                    action = "edit" if state["first_path"] else "no-evidence"
-                    target = state["first_path"]
-            else:
-                raise ValueError(f"unsupported policy: {policy}")
+            action = _worker_action(policy, query, state)
             rows.append(
                 {
                     "id": task_id,
                     "query": query,
-                    "action": action,
-                    "target": target,
+                    "action": action["action"],
+                    "target": action["target"],
                     "first_role": state["first_role"],
                     "ambiguous": state["ambiguous"],
                     "ambiguity_reason": state["ambiguity_reason"],
                     "ambiguity_roles": state["ambiguity_roles"],
                     "alternatives": state["alternatives"],
-                    "inspected": inspected,
-                    "resolved_after_inspection": resolved_after_inspection,
-                    "resolution_reason": resolution_reason,
+                    "inspected": action["inspected"],
+                    "resolved_after_inspection": action["resolved_after_inspection"],
+                    "resolution_reason": action["resolution_reason"],
                 }
             )
         result = {

@@ -292,6 +292,34 @@ def test_worker_inspection_worker_rejects_hidden_fields(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.parametrize("policy", ["defer-only", "inspect-then-resolve"])
+def test_worker_inspection_public_worker_contract(tmp_path: Path, policy: str) -> None:
+    from scripts.agent_evaluation.metrics_blind_worker_ab import materialize_challenge
+    from scripts.agent_evaluation.metrics_worker_inspection_ab import run_worker
+
+    _name, workspace, _corpus, public = materialize_challenge(tmp_path / "challenge")[0]
+    output = tmp_path / f"{policy}.json"
+
+    run_worker(
+        policy=policy,
+        workspace=workspace,
+        tasks_path=public,
+        output=output,
+        limit=20,
+    )
+
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert result["policy"] == policy
+    assert len(result["tasks"]) == 6
+    assert {row["action"] for row in result["tasks"]} <= {
+        "edit",
+        "no-evidence",
+        "inspect-competing-evidence",
+        "edit-after-inspection",
+        "defer-after-inspection",
+    }
+
+
 @pytest.mark.scale
 def test_worker_multistep_ab_improves_edit_safety_and_preserves_verification(
     tmp_path: Path,
