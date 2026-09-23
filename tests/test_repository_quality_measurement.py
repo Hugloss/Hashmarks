@@ -147,4 +147,3 @@ def test_negative_economics_fail_closed(economics) -> None:
                 economics=economics,
             )
         )
-

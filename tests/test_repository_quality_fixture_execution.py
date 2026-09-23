@@ -35,8 +35,7 @@ def test_canonical_fixture_keeps_search_deterministic_across_rebuild(
     tmp_path: Path,
 ) -> None:
     repos = {
-        name: repo
-        for name, repo, _corpus in materialize_fixture(tmp_path / "fixture")
+        name: repo for name, repo, _corpus in materialize_fixture(tmp_path / "fixture")
     }
     repo = repos["python-orders"]
     query = "OrderService submit_order implementation"
