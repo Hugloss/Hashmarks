@@ -175,3 +175,138 @@ def test_old_unbound_host_receipt_is_stale(tmp_path: Path) -> None:
     )
     assert result.status == "STALE"
     assert "identity" in result.detail
+
+
+def test_host_receipt_is_bound_to_registration_host_and_completion(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "repo"
+    receipt_dir = workspace / "dist"
+    receipt_dir.mkdir(parents=True)
+    registration = workspace / "opencode.json"
+    registration.write_text("{}\n", encoding="utf-8")
+    receipt_path = receipt_dir / "opencode-mcp-host-gate.json"
+    base = {
+        "schema": "hashmarks.opencode-mcp-host-gate.v1",
+        "status": "PASS",
+        "source_repository_identity": "sha256:current:1",
+        "source_project_registration": {
+            "path": "opencode.json",
+            "sha256": status._sha256(registration),
+        },
+        "host": {"name": "opencode", "version": "opencode v2.0.4"},
+        "completed_at": "2026-09-23T12:00:00Z",
+    }
+
+    def check(payload: dict) -> status.Check:
+        receipt_path.write_text(json.dumps(payload), encoding="utf-8")
+        return status._latest_receipt_call(
+            workspace,
+            "opencode",
+            installed=status.Check("PASS", "opencode v2.0.4"),
+            registration_path=registration,
+            candidate_identity="sha256:current:1",
+        )
+
+    assert check(base) == status.Check("PASS", "2026-09-23T12:00:00Z")
+    mutations = [
+        ({**base, "schema": "old"}, "schema"),
+        ({**base, "source_project_registration": None}, "registration binding"),
+        (
+            {
+                **base,
+                "source_project_registration": {
+                    "path": "elsewhere.json",
+                    "sha256": status._sha256(registration),
+                },
+            },
+            "registration changed",
+        ),
+        (
+            {
+                **base,
+                "source_project_registration": {
+                    "path": "opencode.json",
+                    "sha256": "wrong",
+                },
+            },
+            "bytes changed",
+        ),
+        ({**base, "host": None}, "host-version binding"),
+        (
+            {**base, "host": {"name": "opencode", "version": "old"}},
+            "version changed",
+        ),
+        ({**base, "completed_at": ""}, "completion timestamp"),
+    ]
+    for payload, detail in mutations:
+        result = check(payload)
+        assert result.status == "STALE"
+        assert detail in result.detail
+
+
+def test_host_receipt_rejects_registration_outside_workspace(tmp_path: Path) -> None:
+    workspace = tmp_path / "repo"
+    (workspace / "dist").mkdir(parents=True)
+    registration = tmp_path / "outside.json"
+    registration.write_text("{}\n", encoding="utf-8")
+    (workspace / "dist" / "opencode-mcp-host-gate.json").write_text(
+        json.dumps(
+            {
+                "schema": "hashmarks.opencode-mcp-host-gate.v1",
+                "status": "PASS",
+                "source_repository_identity": "sha256:current:1",
+                "source_project_registration": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = status._latest_receipt_call(
+        workspace,
+        "opencode",
+        installed=status.Check("PASS", "opencode v2.0.4"),
+        registration_path=registration,
+        candidate_identity="sha256:current:1",
+    )
+    assert result == status.Check("STALE", "registration path is outside workspace")
+
+
+def test_codex_discovery_reports_direct_success_and_hard_failure(
+    tmp_path: Path, monkeypatch
+) -> None:
+    workspace = tmp_path / "repo"
+    config = workspace / ".codex" / "config.toml"
+    config.parent.mkdir(parents=True)
+    config.write_text(
+        '[mcp_servers.hashmarks]\ncommand = "uv"\n'
+        'args = ["run", "--no-sync", "hashmarks", "--workspace", ".", "mcp"]\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        status,
+        "_version",
+        lambda *args, **kwargs: status.Check("PASS", "codex-cli 0.154.0"),
+    )
+    calls = []
+
+    def direct_success(argv, *, cwd, timeout=20):
+        import subprocess
+
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, '{"name":"hashmarks"}\n', "")
+
+    monkeypatch.setattr(status, "_run", direct_success)
+    assert status._codex(workspace, "sha256:test:1").discovery == status.Check("PASS")
+    assert len(calls) == 1
+
+    def hard_failure(argv, *, cwd, timeout=20):
+        import subprocess
+
+        message = "project disabled" if "-c" not in argv else "still unavailable"
+        return subprocess.CompletedProcess(argv, 1, "", message)
+
+    monkeypatch.setattr(status, "_run", hard_failure)
+    assert status._codex(workspace, "sha256:test:1").discovery == status.Check(
+        "FAIL", "project disabled"
+    )
