@@ -923,3 +923,42 @@ def test_v2_unscoped_module_absence_is_admissible_when_all_contexts_complete(
     assert result["result"] == []
     assert result["completeness"] == "complete"
     assert result["negative_evidence"] == "admissible-within-declared-scope"
+
+
+def test_v2_graph_query_completeness_requires_complete_resolution_coverage(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    runtime_coverage = next(
+        row
+        for row in changed["coverage"]
+        if row["context"] == "runtime" and row["kind"] == "resolution-graph"
+    )
+    runtime_coverage["completeness"] = "incomplete"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "app@1",
+                    "context": "runtime",
+                },
+                {
+                    "operation": "paths",
+                    "node_id": "app@1",
+                    "target_id": "library@1",
+                    "context": "runtime",
+                },
+            ],
+        )
+
+    dependencies, paths = packet["results"]
+    assert [row["node_id"] for row in dependencies["result"]] == ["library@1"]
+    assert dependencies["omissions"] == []
+    assert dependencies["completeness"] == "incomplete"
+    assert paths["result"] == [["app@1", "library@1"]]
+    assert paths["omissions"] == []
+    assert paths["completeness"] == "incomplete"
