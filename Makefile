@@ -137,7 +137,7 @@ setup: init
 	@printf '%s\n' 'Hashmarks setup ready. Run: make test   or   make check'
 
 bootstrap:
-	@test -f uv.lock || (echo "local uv.lock is missing; run: make init" >&2; exit 2)
+	@test -f uv.lock || (echo "committed uv.lock is missing; restore the repository checkout before bootstrap" >&2; exit 2)
 	@$(UV_SYNC) --offline --group test
 	@$(MAKE) --no-print-directory doctor >/dev/null
 	@printf '%s\n' 'Hashmarks bootstrap ready (offline, committed locked supply).'
