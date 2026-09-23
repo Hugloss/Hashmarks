@@ -340,6 +340,12 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 max_results=max_results,
                 max_visits=max_visits,
             )
+            if not result:
+                negative_evidence = (
+                    "admissible-within-declared-scope"
+                    if source_complete and not omissions
+                    else "not-admissible"
+                )
         elif operation == "reachability":
             if not target_id:
                 raise ValueError("reachability query requires target_id")
@@ -373,6 +379,12 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 max_results=max_results,
                 max_visits=max_visits,
             )
+            if not result:
+                negative_evidence = (
+                    "admissible-within-declared-scope"
+                    if source_complete and not omissions
+                    else "not-admissible"
+                )
 
     return {
         "schema": "hashmarks.dependency-query-result.v1",
