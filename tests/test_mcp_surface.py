@@ -362,6 +362,7 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             "task_evidence",
             "change_impact",
             "correlate_evidence",
+            "dependency_codemap",
             "post_change",
         ]
         for row in registered:
@@ -440,6 +441,7 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             "task_evidence",
             "change_impact",
             "correlate_evidence",
+            "dependency_codemap",
             "post_change",
         ]
         # Construction may initialize empty SQLite files, but it must not build a generation.
@@ -471,3 +473,87 @@ def test_mcp_task_evidence_preserves_canonical_authority_proof_identity(
         == (direct["ownership_authority"]["authority_proof_identity"])
     )
     assert evidence["ownership"]["status"] == direct["ownership_authority"]["status"]
+
+
+def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) -> None:
+    surface = HashmarksMcpSurface(
+        str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
+    )
+    snapshot = {
+        "schema": "hashmarks.dependency-resolution.v2",
+        "producer": {"kind": "test-resolver", "schema_version": "1"},
+        "scope": {"environment": "test"},
+        "contexts": ["runtime"],
+        "roots": [{"node_id": "app@1", "context": "runtime"}],
+        "evidence_sources": [
+            {
+                "source_id": "tree:runtime",
+                "kind": "resolution-graph",
+                "context": "runtime",
+                "completeness": "complete",
+                "truncation": "complete",
+            }
+        ],
+        "components": [
+            {"component_id": "app", "name": "app", "ecosystem": "test"},
+            {"component_id": "lib", "name": "lib", "ecosystem": "test"},
+        ],
+        "selections": [
+            {
+                "node_id": "app@1",
+                "component_id": "app",
+                "version": "1",
+                "source": "workspace",
+                "contexts": ["runtime"],
+                "evidence_sources": ["tree:runtime"],
+            },
+            {
+                "node_id": "lib@1",
+                "component_id": "lib",
+                "version": "1",
+                "source": "registry",
+                "contexts": ["runtime"],
+                "evidence_sources": ["tree:runtime"],
+            },
+        ],
+        "inventory": [],
+        "relationships": [
+            {
+                "source": "app@1",
+                "target": "lib@1",
+                "kind": "dependency",
+                "context": "runtime",
+                "effective_scope": "runtime",
+                "evidence_sources": ["tree:runtime"],
+            }
+        ],
+        "coverage": [
+            {
+                "context": "runtime",
+                "kind": "resolution-graph",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["tree:runtime"],
+            }
+        ],
+        "repository_inputs": [],
+        "module_ownership": [],
+    }
+    try:
+        packet = surface.dependency_codemap(
+            snapshot,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "app@1",
+                    "context": "runtime",
+                }
+            ],
+        )
+    finally:
+        surface.close()
+
+    assert packet["schema"] == "hashmarks.mcp-dependency-codemap.v1"
+    assert packet["observation"]["schema"] == "hashmarks.dependency-resolution.v2"
+    assert packet["queries"]["results"][0]["result"][0]["node_id"] == "lib@1"
+    assert packet["causation"] == "not-inferred"

@@ -19,6 +19,8 @@ _EXPECTED_TOOLS = [
     "find",
     "task_evidence",
     "change_impact",
+    "correlate_evidence",
+    "dependency_codemap",
     "post_change",
 ]
 
