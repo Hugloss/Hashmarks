@@ -329,6 +329,7 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             raise ValueError(f"{operation} query requires node_id")
         if node_id not in selections:
             raise ValueError(f"unknown dependency query node_id: {node_id}")
+        source_complete = _coverage_complete(observation, context=context)
         outgoing, incoming = _adjacency(relationships)
         if operation in {"dependencies", "dependents"}:
             result, visited, omissions = _walk(
