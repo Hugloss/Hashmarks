@@ -4,6 +4,7 @@
       "command": "uv",
       "args": [
         "run",
+        "--frozen",
         "--no-sync",
         "hashmarks",
         "--workspace",
