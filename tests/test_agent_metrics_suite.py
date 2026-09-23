@@ -178,6 +178,76 @@ def test_blind_worker_input_never_contains_expected_answers(tmp_path: Path) -> N
         assert any(row.get("expected_files") for row in hidden["tasks"])
 
 
+@pytest.mark.parametrize(
+    ("strategy", "result_field"),
+    [
+        ("grep", "hits"),
+        ("hashmarks", "hits"),
+        ("entry-points", "hits"),
+        ("ambiguity-reviewer", "review"),
+    ],
+)
+def test_blind_worker_runs_each_public_strategy(
+    tmp_path: Path, strategy: str, result_field: str
+) -> None:
+    from scripts.agent_evaluation.metrics_blind_worker_ab import (
+        materialize_challenge,
+        run_worker,
+    )
+
+    _name, workspace, _corpus, public = materialize_challenge(tmp_path / "challenge")[0]
+    output = tmp_path / f"{strategy}.json"
+
+    run_worker(
+        strategy=strategy,
+        workspace=workspace,
+        tasks_path=public,
+        output=output,
+        limit=20,
+    )
+
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert result["schema"] == "hashmarks.blind-worker-output.v1"
+    assert result["strategy"] == strategy
+    assert len(result["tasks"]) == 6
+    assert all(result_field in row for row in result["tasks"])
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ({"schema": "wrong", "tasks": []}, "unsupported blind worker input"),
+        (
+            {"schema": "hashmarks.blind-worker-tasks.v1", "tasks": {}},
+            "blind worker tasks must be a list",
+        ),
+        (
+            {
+                "schema": "hashmarks.blind-worker-tasks.v1",
+                "tasks": [{"id": "x", "query": "find config", "expected": []}],
+            },
+            "only id and query",
+        ),
+    ],
+)
+def test_blind_worker_rejects_invalid_public_input(
+    tmp_path: Path, payload: dict, message: str
+) -> None:
+    from scripts.agent_evaluation.metrics_blind_worker_ab import run_worker
+
+    tasks = tmp_path / "tasks.json"
+    tasks.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        run_worker(
+            strategy="grep",
+            workspace=tmp_path,
+            tasks_path=tasks,
+            output=tmp_path / "output.json",
+            limit=20,
+        )
+
+
 @pytest.mark.scale
 def test_blind_worker_ab_is_reproducible_and_scores_both_workers(
     tmp_path: Path,

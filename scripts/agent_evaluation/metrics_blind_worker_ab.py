@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -199,6 +200,27 @@ def _ambiguity_reviewer(
     }
 
 
+def _worker_task_result(
+    strategy: str,
+    workspace: Path,
+    codemap: CodeMap | None,
+    query: str,
+    *,
+    limit: int,
+) -> tuple[str, object]:
+    if strategy == "grep":
+        return "hits", _grep_worker(workspace, query, limit=limit)
+    if codemap is None:
+        raise ValueError(f"unsupported strategy: {strategy}")
+    if strategy == "hashmarks":
+        return "hits", _hashmarks_worker(codemap, query, limit=limit)
+    if strategy == "entry-points":
+        return "hits", _entry_points_worker(codemap, query, limit=limit)
+    if strategy == "ambiguity-reviewer":
+        return "review", _ambiguity_reviewer(codemap, query, limit=limit)
+    raise ValueError(f"unsupported strategy: {strategy}")
+
+
 def run_worker(
     *, strategy: str, workspace: Path, tasks_path: Path, output: Path, limit: int
 ) -> None:
@@ -208,32 +230,25 @@ def run_worker(
     tasks = payload.get("tasks")
     if not isinstance(tasks, list):
         raise ValueError("blind worker tasks must be a list")
-    rows = []
+    rows: list[dict[str, object]] = []
     codemap = None
     if strategy in {"hashmarks", "entry-points", "ambiguity-reviewer"}:
         codemap = CodeMap(workspace)
         codemap.sync()
-    # Workers are intentionally unable to consume expected_* fields.
-    for row in tasks:
-        if not isinstance(row, dict) or set(row) - {"id", "query"}:
-            raise ValueError("blind worker input may contain only id and query")
-        task_id = str(row.get("id") or "")
-        query = str(row.get("query") or "")
-        if strategy == "grep":
-            hits = _grep_worker(workspace, query, limit=limit)
-        elif strategy == "hashmarks":
-            hits = _hashmarks_worker(codemap, query, limit=limit)
-        elif strategy == "entry-points":
-            hits = _entry_points_worker(codemap, query, limit=limit)
-        elif strategy == "ambiguity-reviewer":
-            review = _ambiguity_reviewer(codemap, query, limit=limit)
-            rows.append({"id": task_id, "query": query, "review": review})
-            continue
-        else:
-            raise ValueError(f"unsupported strategy: {strategy}")
-        rows.append({"id": task_id, "query": query, "hits": hits})
-    if codemap is not None:
-        codemap.close()
+    try:
+        # Workers are intentionally unable to consume expected_* fields.
+        for row in tasks:
+            if not isinstance(row, dict) or set(row) - {"id", "query"}:
+                raise ValueError("blind worker input may contain only id and query")
+            task_id = str(row.get("id") or "")
+            query = str(row.get("query") or "")
+            result_field, result = _worker_task_result(
+                strategy, workspace, codemap, query, limit=limit
+            )
+            rows.append({"id": task_id, "query": query, result_field: result})
+    finally:
+        if codemap is not None:
+            codemap.close()
     rendered = {
         "schema": "hashmarks.blind-worker-output.v1",
         "strategy": strategy,
@@ -347,86 +362,92 @@ def _score_strategy(
     }
 
 
-def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
-    repos = materialize_challenge(root)
-    repo_reports = []
-    for name, workspace, corpus, public_path in repos:
-        outputs: dict[str, Path] = {}
-        for strategy in ("grep", "hashmarks", "entry-points", "ambiguity-reviewer"):
-            output = root / "worker-outputs" / f"{name}-{strategy}.json"
-            env = dict(__import__("os").environ)
-            source_root = str(Path(__file__).resolve().parent.parent.parent)
-            prior = env.get("PYTHONPATH")
-            env["PYTHONPATH"] = (
-                source_root
-                if not prior
-                else source_root + __import__("os").pathsep + prior
-            )
-            subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "scripts.agent_evaluation.metrics_blind_worker_ab",
-                    "--worker",
-                    "--strategy",
-                    strategy,
-                    "--workspace",
-                    str(workspace),
-                    "--tasks",
-                    str(public_path),
-                    "--output",
-                    str(output),
-                    "--limit",
-                    str(limit),
-                ],
-                check=True,
-                env=env,
-            )
-            outputs[strategy] = output
-        # Hidden expectations are opened only after both workers have exited and
-        # their immutable output files exist.
-        tasks = _load_corpus(corpus)
-        grep_output = json.loads(outputs["grep"].read_text(encoding="utf-8"))
-        hashmarks_output = json.loads(outputs["hashmarks"].read_text(encoding="utf-8"))
-        entry_output = json.loads(outputs["entry-points"].read_text(encoding="utf-8"))
-        reviewer_output = json.loads(
-            outputs["ambiguity-reviewer"].read_text(encoding="utf-8")
-        )
-        grep_score = _score_strategy(tasks, grep_output)
-        hashmarks_score = _score_strategy(tasks, hashmarks_output)
-        entry_score = _score_strategy(tasks, entry_output)
-        reviewer_by_id = {
-            str(row.get("id") or ""): row.get("review", {})
-            for row in reviewer_output.get("tasks", [])
-            if isinstance(row, dict)
-        }
-        repo_reports.append(
-            {
-                "name": name,
-                "workspace": str(workspace),
-                "public_task_sha256": _sha256_bytes(public_path.read_bytes()),
-                "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
-                "grep": grep_score,
-                "hashmarks": hashmarks_score,
-                "entry_points": entry_score,
-                "ambiguity_reviewer": reviewer_by_id,
-            }
-        )
+_STRATEGIES = ("grep", "hashmarks", "entry-points", "ambiguity-reviewer")
 
-    def aggregate(strategy: str, key: str) -> float:
-        values = []
-        for repo in repo_reports:
-            score = repo[strategy]
-            assert isinstance(score, dict)
-            summary = score["summary"]
-            assert isinstance(summary, dict)
-            values.extend([float(summary[key])] * int(summary["tasks"]))
-        return sum(values) / len(values) if values else 0.0
 
-    total_tasks = sum(
-        int(repo["hashmarks"]["summary"]["tasks"]) for repo in repo_reports
-    )  # type: ignore[index]
-    protocol = {
+def _run_repository_workers(
+    root: Path,
+    name: str,
+    workspace: Path,
+    public_path: Path,
+    *,
+    limit: int,
+) -> dict[str, Path]:
+    outputs: dict[str, Path] = {}
+    env = dict(os.environ)
+    source_root = str(Path(__file__).resolve().parent.parent.parent)
+    prior = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = source_root if not prior else source_root + os.pathsep + prior
+    for strategy in _STRATEGIES:
+        output = root / "worker-outputs" / f"{name}-{strategy}.json"
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "scripts.agent_evaluation.metrics_blind_worker_ab",
+                "--worker",
+                "--strategy",
+                strategy,
+                "--workspace",
+                str(workspace),
+                "--tasks",
+                str(public_path),
+                "--output",
+                str(output),
+                "--limit",
+                str(limit),
+            ],
+            check=True,
+            env=env,
+        )
+        outputs[strategy] = output
+    return outputs
+
+
+def _repository_report(
+    name: str,
+    workspace: Path,
+    corpus: Path,
+    public_path: Path,
+    outputs: dict[str, Path],
+) -> dict[str, Any]:
+    # Hidden expectations are opened only after every isolated worker exits and
+    # its immutable output file exists.
+    tasks = _load_corpus(corpus)
+    worker_outputs = {
+        strategy: json.loads(path.read_text(encoding="utf-8"))
+        for strategy, path in outputs.items()
+    }
+    reviewer_by_id = {
+        str(row.get("id") or ""): row.get("review", {})
+        for row in worker_outputs["ambiguity-reviewer"].get("tasks", [])
+        if isinstance(row, dict)
+    }
+    return {
+        "name": name,
+        "workspace": str(workspace),
+        "public_task_sha256": _sha256_bytes(public_path.read_bytes()),
+        "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
+        "grep": _score_strategy(tasks, worker_outputs["grep"]),
+        "hashmarks": _score_strategy(tasks, worker_outputs["hashmarks"]),
+        "entry_points": _score_strategy(tasks, worker_outputs["entry-points"]),
+        "ambiguity_reviewer": reviewer_by_id,
+    }
+
+
+def _aggregate(repo_reports: list[dict[str, Any]], strategy: str, key: str) -> float:
+    values = [
+        float(repo[strategy]["summary"][key])
+        for repo in repo_reports
+        for _ in range(int(repo[strategy]["summary"]["tasks"]))
+    ]
+    return sum(values) / len(values) if values else 0.0
+
+
+def _benchmark_protocol(
+    repo_reports: list[dict[str, Any]], *, limit: int
+) -> dict[str, object]:
+    return {
         "schema": PROTOCOL_SCHEMA,
         "family": CHALLENGE_FAMILY,
         "worker_isolation": "subprocess-per-repository-strategy",
@@ -448,15 +469,9 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
             for repo in repo_reports
         ],
     }
-    grep_top1 = aggregate("grep", "top1_rate")
-    hm_top1 = aggregate("hashmarks", "top1_rate")
-    grep_top5 = aggregate("grep", "top5_rate")
-    hm_top5 = aggregate("hashmarks", "top5_rate")
-    grep_top20 = aggregate("grep", "top20_all_expected_rate")
-    hm_top20 = aggregate("hashmarks", "top20_all_expected_rate")
-    ep_top1 = aggregate("entry_points", "top1_rate")
-    ep_top5 = aggregate("entry_points", "top5_rate")
-    ep_top20 = aggregate("entry_points", "top20_all_expected_rate")
+
+
+def _entry_point_summary(repo_reports: list[dict[str, Any]]) -> dict[str, object]:
     entry_rows = [
         row
         for repo in repo_reports
@@ -468,6 +483,26 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
     ep_ambiguous = [row for row in entry_rows if bool(row.get("ambiguous"))]
     ep_ambiguous_failures = [row for row in ep_failures if bool(row.get("ambiguous"))]
     ep_ambiguous_successes = [row for row in ep_successes if bool(row.get("ambiguous"))]
+    return {
+        "entry_points_top1_rate": _aggregate(repo_reports, "entry_points", "top1_rate"),
+        "entry_points_top5_rate": _aggregate(repo_reports, "entry_points", "top5_rate"),
+        "entry_points_top20_all_expected_rate": _aggregate(
+            repo_reports, "entry_points", "top20_all_expected_rate"
+        ),
+        "entry_points_ambiguous_tasks": len(ep_ambiguous),
+        "entry_points_top1_failures": len(ep_failures),
+        "entry_points_top1_failures_flagged_ambiguous": len(ep_ambiguous_failures),
+        "entry_points_top1_failure_ambiguity_recall": (
+            len(ep_ambiguous_failures) / len(ep_failures) if ep_failures else 1.0
+        ),
+        "entry_points_successes_flagged_ambiguous": len(ep_ambiguous_successes),
+        "entry_points_success_ambiguity_rate": (
+            len(ep_ambiguous_successes) / len(ep_successes) if ep_successes else 0.0
+        ),
+    }
+
+
+def _reviewer_summary(repo_reports: list[dict[str, Any]]) -> dict[str, object]:
     reviewer_rows = []
     for repo in repo_reports:
         reviews = repo.get("ambiguity_reviewer", {})
@@ -494,54 +529,72 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
         row for row in reviewer_rows if row["warned"] and row["failed"]
     ]
     return {
+        "reviewer_spawn": "independent-subprocess-per-repository",
+        "reviewer_top1_failure_recall": (
+            len(reviewer_true_warnings) / len(reviewer_failures)
+            if reviewer_failures
+            else 1.0
+        ),
+        "reviewer_success_false_positive_rate": (
+            sum(row["warned"] for row in reviewer_successes) / len(reviewer_successes)
+            if reviewer_successes
+            else 0.0
+        ),
+        "reviewer_warning_precision": (
+            len(reviewer_true_warnings) / len(reviewer_warnings)
+            if reviewer_warnings
+            else 1.0
+        ),
+        "reviewer_warnings": len(reviewer_warnings),
+    }
+
+
+def _benchmark_summary(repo_reports: list[dict[str, Any]]) -> dict[str, object]:
+    grep_top1 = _aggregate(repo_reports, "grep", "top1_rate")
+    hm_top1 = _aggregate(repo_reports, "hashmarks", "top1_rate")
+    grep_top5 = _aggregate(repo_reports, "grep", "top5_rate")
+    hm_top5 = _aggregate(repo_reports, "hashmarks", "top5_rate")
+    grep_top20 = _aggregate(repo_reports, "grep", "top20_all_expected_rate")
+    hm_top20 = _aggregate(repo_reports, "hashmarks", "top20_all_expected_rate")
+    summary: dict[str, object] = {
+        "repositories": len(repo_reports),
+        "tasks": sum(
+            int(repo["hashmarks"]["summary"]["tasks"]) for repo in repo_reports
+        ),
+        "grep_top1_rate": grep_top1,
+        "hashmarks_top1_rate": hm_top1,
+        "top1_delta": hm_top1 - grep_top1,
+        "grep_top5_rate": grep_top5,
+        "hashmarks_top5_rate": hm_top5,
+        "top5_delta": hm_top5 - grep_top5,
+        "grep_top20_all_expected_rate": grep_top20,
+        "hashmarks_top20_all_expected_rate": hm_top20,
+        "top20_delta": hm_top20 - grep_top20,
+    }
+    entry_summary = _entry_point_summary(repo_reports)
+    summary["entry_points_vs_find_task_top1_delta"] = (
+        float(entry_summary["entry_points_top1_rate"]) - hm_top1
+    )
+    summary.update(entry_summary)
+    summary.update(_reviewer_summary(repo_reports))
+    return summary
+
+
+def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
+    repo_reports = []
+    for name, workspace, corpus, public_path in materialize_challenge(root):
+        outputs = _run_repository_workers(
+            root, name, workspace, public_path, limit=limit
+        )
+        repo_reports.append(
+            _repository_report(name, workspace, corpus, public_path, outputs)
+        )
+    protocol = _benchmark_protocol(repo_reports, limit=limit)
+    return {
         "schema": SCHEMA,
         "protocol": protocol,
         "protocol_identity": _identity(protocol),
-        "summary": {
-            "repositories": len(repo_reports),
-            "tasks": total_tasks,
-            "grep_top1_rate": grep_top1,
-            "hashmarks_top1_rate": hm_top1,
-            "top1_delta": hm_top1 - grep_top1,
-            "grep_top5_rate": grep_top5,
-            "hashmarks_top5_rate": hm_top5,
-            "top5_delta": hm_top5 - grep_top5,
-            "grep_top20_all_expected_rate": grep_top20,
-            "hashmarks_top20_all_expected_rate": hm_top20,
-            "top20_delta": hm_top20 - grep_top20,
-            "entry_points_top1_rate": ep_top1,
-            "entry_points_top5_rate": ep_top5,
-            "entry_points_top20_all_expected_rate": ep_top20,
-            "entry_points_vs_find_task_top1_delta": ep_top1 - hm_top1,
-            "entry_points_ambiguous_tasks": len(ep_ambiguous),
-            "entry_points_top1_failures": len(ep_failures),
-            "entry_points_top1_failures_flagged_ambiguous": len(ep_ambiguous_failures),
-            "entry_points_top1_failure_ambiguity_recall": (
-                len(ep_ambiguous_failures) / len(ep_failures) if ep_failures else 1.0
-            ),
-            "entry_points_successes_flagged_ambiguous": len(ep_ambiguous_successes),
-            "entry_points_success_ambiguity_rate": (
-                len(ep_ambiguous_successes) / len(ep_successes) if ep_successes else 0.0
-            ),
-            "reviewer_spawn": "independent-subprocess-per-repository",
-            "reviewer_top1_failure_recall": (
-                len(reviewer_true_warnings) / len(reviewer_failures)
-                if reviewer_failures
-                else 1.0
-            ),
-            "reviewer_success_false_positive_rate": (
-                sum(row["warned"] for row in reviewer_successes)
-                / len(reviewer_successes)
-                if reviewer_successes
-                else 0.0
-            ),
-            "reviewer_warning_precision": (
-                len(reviewer_true_warnings) / len(reviewer_warnings)
-                if reviewer_warnings
-                else 1.0
-            ),
-            "reviewer_warnings": len(reviewer_warnings),
-        },
+        "summary": _benchmark_summary(repo_reports),
         "repositories": repo_reports,
     }
 
