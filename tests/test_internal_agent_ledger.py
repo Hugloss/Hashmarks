@@ -109,7 +109,9 @@ def test_ledger_rg_and_python_search_normalize_to_same_output(
     monkeypatch.setattr(ledger.shutil, "which", lambda _name: None)
     python_output, python_provider = ledger._search_output(repo, "answer")
 
-    monkeypatch.setattr(ledger.shutil, "which", lambda name: "/fake/rg" if name == "rg" else None)
+    monkeypatch.setattr(
+        ledger.shutil, "which", lambda name: "/fake/rg" if name == "rg" else None
+    )
     monkeypatch.setattr(
         ledger.subprocess,
         "run",
