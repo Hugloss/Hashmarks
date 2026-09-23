@@ -66,7 +66,10 @@ def _module_name(text: str) -> str:
     return value
 
 
-def maven_dependency_observation(
+# This is the cohesive translation boundary between Maven's two artifact shapes and
+# the dependency-resolution v2 contract. Splitting its state across wrapper helpers
+# would obscure the inventory/graph/ownership invariants it must preserve.
+def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     *,
     trees: Mapping[str, bytes],
     inventories: Mapping[str, bytes],
