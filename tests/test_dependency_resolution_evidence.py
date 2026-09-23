@@ -836,10 +836,7 @@ def test_v2_inventory_absence_requires_complete_inventory_coverage(
     compile_result, runtime_result = packet["results"]
     assert compile_result["result"] == []
     assert compile_result["completeness"] == "complete"
-    assert (
-        compile_result["negative_evidence"]
-        == "admissible-within-declared-scope"
-    )
+    assert compile_result["negative_evidence"] == "admissible-within-declared-scope"
     assert runtime_result["result"] == []
     assert runtime_result["completeness"] == "incomplete"
     assert runtime_result["negative_evidence"] == "not-admissible"
