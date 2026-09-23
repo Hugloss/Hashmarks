@@ -805,6 +805,15 @@ def test_v2_inventory_absence_requires_complete_inventory_coverage(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v2()
+    changed["evidence_sources"].append(
+        {
+            "source_id": "list:runtime",
+            "kind": "resolved-inventory",
+            "context": "runtime",
+            "completeness": "incomplete",
+            "truncation": "complete",
+        }
+    )
     changed["coverage"].append(
         {
             "context": "runtime",
