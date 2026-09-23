@@ -40,6 +40,19 @@ def test_product_profile_explicitly_rejects_agent_and_execution_motor_drift() ->
     assert "PB7. Interoperability transfers evidence, never authority." in invariants
 
 
+def test_product_boundary_treats_out_of_profile_surfaces_as_defects() -> None:
+    boundary = _text("docs/reference/PRODUCT_BOUNDARY.md")
+    invariants = _text("docs/reference/INVARIANTS.md")
+    agents = _text("AGENTS.md")
+    contributing = _text(".github/CONTRIBUTING.md")
+
+    assert "Boundary violation" in boundary
+    assert "A production surface that violates this profile is a defect" in boundary
+    assert "Implementation presence is not feature precedent." in invariants
+    assert "failed-target receipt stores" in agents
+    assert "a boundary violation to reject, split, narrow, or remove" in contributing
+
+
 def test_external_library_findings_do_not_expand_repository_analysis_scope() -> None:
     boundary = _text("docs/reference/PRODUCT_BOUNDARY.md")
     agents = _text("AGENTS.md")

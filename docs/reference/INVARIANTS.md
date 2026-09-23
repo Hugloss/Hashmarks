@@ -166,7 +166,7 @@ Hashmarks is a repository observer that exposes repository intelligence, not an 
 
 **PB4. Repository relevance and runtime outcome authority are separate.** Execution, retries/resume, environment recovery, runtime outcomes, and certification remain external.
 
-**PB5. Historical boundary debt is not feature precedent.** Existing or historical code cannot justify expanding product responsibility.
+**PB5. Implementation presence is not feature precedent.** Existing code cannot justify expanding product responsibility; any production surface outside the product profile is a defect to narrow or remove.
 
 **PB6. Hashmarks must never become the agent or the execution motor.** Hashmarks may serve coding agents and execution systems, including Oh-Goon, but service does not transfer ownership. Agent reasoning, memory, edits, delegation, workflow, and recovery remain consumer-owned. Admission, sandboxing, process lifecycle, timeout/retry/resume, runtime environment, result authority, certification, release promotion, and execution-history authority remain execution-layer owned. A proposal that moves either responsibility class into Hashmarks is an architecture regression unless it is split down to a neutral repository-derived evidence primitive.
 
