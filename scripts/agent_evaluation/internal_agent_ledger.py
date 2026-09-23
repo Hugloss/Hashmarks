@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -182,28 +183,81 @@ def _finalize(a: argparse.Namespace, state: dict) -> None:
     print(state["identity"])  # noqa: T201 - intentional command output
 
 
-def _search(a: argparse.Namespace, state: dict, repo: Path) -> None:
-    started = time.perf_counter()
+def _normalize_search_output(output: str) -> str:
+    lines = []
+    for line in output.splitlines():
+        lines.append(line[2:] if line.startswith("./") else line)
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+def _searchable_path(path: Path, repo: Path) -> bool:
+    relative = path.relative_to(repo)
+    return (
+        path.is_file()
+        and path.suffix != ".pyc"
+        and not any(part in {".git", ".hashmarks", "__pycache__"} for part in relative.parts)
+    )
+
+
+def _python_search(repo: Path, pattern: str) -> str:
+    expression = re.compile(pattern)
+    matches: list[str] = []
+    for path in sorted(repo.rglob("*"), key=lambda candidate: candidate.as_posix()):
+        if not _searchable_path(path, repo):
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            continue
+        relative = path.relative_to(repo).as_posix()
+        matches.extend(
+            f"{relative}:{line_number}:{line}"
+            for line_number, line in enumerate(lines, start=1)
+            if expression.search(line)
+        )
+    return "\n".join(matches) + ("\n" if matches else "")
+
+
+def _search_output(repo: Path, pattern: str) -> tuple[str, str]:
     rg = shutil.which("rg")
-    if rg is not None:
-        argv = [rg, "-n", "--glob", "!*.pyc", a.pattern, "."]
-    else:
-        grep = shutil.which("grep")
-        if grep is None:
-            raise RuntimeError("search requires rg or grep on PATH")
-        argv = [grep, "-R", "-n", "--exclude", "*.pyc", a.pattern, "."]
+    if rg is None:
+        return _python_search(repo, pattern), "python"
     result = subprocess.run(
-        argv,
+        [
+            rg,
+            "-n",
+            "--hidden",
+            "--no-ignore",
+            "--glob",
+            "!.git/**",
+            "--glob",
+            "!.hashmarks/**",
+            "--glob",
+            "!__pycache__/**",
+            "--glob",
+            "!*.pyc",
+            pattern,
+            ".",
+        ],
         cwd=repo,
         text=True,
         capture_output=True,
     )
+    if result.returncode not in {0, 1}:
+        detail = result.stderr.strip()[-1000:]
+        raise RuntimeError(f"rg search failed with rc={result.returncode}: {detail}")
+    return _normalize_search_output(result.stdout), "rg"
+
+
+def _search(a: argparse.Namespace, state: dict, repo: Path) -> None:
+    started = time.perf_counter()
+    output, provider = _search_output(repo, a.pattern)
     elapsed_ms = (time.perf_counter() - started) * 1000
-    output = result.stdout
     _event(
         state,
         "search",
         pattern=a.pattern,
+        provider=provider,
         wall_ms=elapsed_ms,
         result_bytes=len(output.encode()),
         matches=sum(1 for line in output.splitlines() if line),
