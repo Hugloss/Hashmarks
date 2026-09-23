@@ -214,7 +214,7 @@ class DependencyResolutionEvidenceMixin:
             ),
         }
 
-    def _dependency_resolution_evidence_v2(
+    def _dependency_resolution_evidence_v2(  # noqa: PLR0914, PLR0915
         self,
         snapshot: Mapping[str, object],
     ) -> dict[str, object]:
@@ -1032,7 +1032,7 @@ class DependencyResolutionEvidenceMixin:
         return dependency_queries(observation, requests)
 
     @staticmethod
-    def _dependency_resolution_delta_v2(
+    def _dependency_resolution_delta_v2(  # noqa: C901
         before: Mapping[str, object],
         after: Mapping[str, object],
     ) -> dict[str, object]:
