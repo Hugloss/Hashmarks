@@ -54,8 +54,7 @@ def test_canonical_fixture_irrelevant_query_terms_do_not_erase_owner_file(
     tmp_path: Path,
 ) -> None:
     repos = {
-        name: repo
-        for name, repo, _corpus in materialize_fixture(tmp_path / "fixture")
+        name: repo for name, repo, _corpus in materialize_fixture(tmp_path / "fixture")
     }
     repo = repos["python-orders"]
     with CodeMap(repo) as codemap:
