@@ -264,6 +264,15 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             and (not context or str(row.get("context") or "") == context)
         ]
         result = _limited(rows, max_results=max_results, omissions=omissions)
+        source_complete = _coverage_complete(
+            observation, context=context, kind="resolved-inventory"
+        )
+        if node_id and not rows:
+            negative_evidence = (
+                "admissible-within-declared-scope"
+                if source_complete
+                else "not-admissible"
+            )
     elif operation == "contexts":
         if not node_id:
             raise ValueError("contexts query requires node_id")
