@@ -14,6 +14,10 @@ _SCHEMA_V2 = "hashmarks.dependency-resolution.v2"
 _MAX_CONTEXTS = 64
 _MAX_INVENTORY = 16384
 _MAX_EVIDENCE_SOURCES = 256
+_MAX_QUERIES = 32
+_MAX_QUERY_RESULTS = 256
+_MAX_QUERY_DEPTH = 16
+_MAX_QUERY_VISITS = 4096
 _MAX_NODES = 4096
 _MAX_EDGES = 16384
 _MAX_ROOTS = 256
@@ -871,6 +875,279 @@ class DependencyResolutionEvidenceMixin:
             "dependency_links": dependency_links,
             "authority": "repository-intelligence-only",
             "interpretation_authority": "consumer-owned",
+            "causation": "not-inferred",
+        }
+
+    @staticmethod
+    def _dependency_query_bounds_v2(request: Mapping[str, object]) -> tuple[int, int, int]:
+        def bounded(name: str, default: int, maximum: int) -> int:
+            raw = request.get(name, default)
+            if isinstance(raw, bool):
+                raise ValueError(f"{name} must be a positive integer")
+            try:
+                value = int(raw)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{name} must be a positive integer") from exc
+            if value < 1 or value > maximum:
+                raise ValueError(f"{name} must be between 1 and {maximum}")
+            return value
+
+        return (
+            bounded("max_depth", 8, _MAX_QUERY_DEPTH),
+            bounded("max_results", 100, _MAX_QUERY_RESULTS),
+            bounded("max_visits", 1024, _MAX_QUERY_VISITS),
+        )
+
+    @classmethod
+    def _dependency_query_v2(
+        cls,
+        observation: Mapping[str, object],
+        request: Mapping[str, object],
+    ) -> dict[str, object]:
+        operation = _identifier(request.get("operation"), label="dependency query operation")
+        allowed = {
+            "component",
+            "dependencies",
+            "dependents",
+            "paths",
+            "reachability",
+            "contexts",
+            "inventory",
+            "module-owners",
+        }
+        if operation not in allowed:
+            raise ValueError(f"unsupported dependency query operation: {operation}")
+        max_depth, max_results, max_visits = cls._dependency_query_bounds_v2(request)
+        node_id = _text(request.get("node_id"), label="dependency query node_id")
+        target_id = _text(request.get("target_id"), label="dependency query target_id")
+        component_id = _text(
+            request.get("component_id"), label="dependency query component_id"
+        )
+        context = _text(request.get("context"), label="dependency query context")
+        module = _text(request.get("module"), label="dependency query module")
+
+        selections = {
+            str(row["node_id"]): row
+            for row in observation.get("selections", ())
+            if isinstance(row, Mapping) and row.get("node_id")
+        }
+        components = {
+            str(row["component_id"]): row
+            for row in observation.get("components", ())
+            if isinstance(row, Mapping) and row.get("component_id")
+        }
+        relationships = [
+            row
+            for row in observation.get("relationships", ())
+            if isinstance(row, Mapping)
+            and (not context or str(row.get("context") or "") == context)
+        ]
+        omissions: list[dict[str, object]] = []
+        visited = 0
+
+        def limited(rows: list[object]) -> list[object]:
+            if len(rows) > max_results:
+                omissions.append(
+                    {
+                        "reason": "result-limit",
+                        "omitted": len(rows) - max_results,
+                    }
+                )
+            return rows[:max_results]
+
+        if operation == "component":
+            if not component_id:
+                raise ValueError("component query requires component_id")
+            component = components.get(component_id)
+            rows = [] if component is None else [dict(component)]
+            result: object = limited(rows)
+        elif operation == "inventory":
+            rows = [
+                dict(row)
+                for row in observation.get("inventory", ())
+                if isinstance(row, Mapping)
+                and (not node_id or str(row.get("node_id") or "") == node_id)
+                and (not context or str(row.get("context") or "") == context)
+            ]
+            result = limited(rows)
+        elif operation == "contexts":
+            if not node_id:
+                raise ValueError("contexts query requires node_id")
+            values = {
+                str(row.get("context") or "")
+                for row in observation.get("inventory", ())
+                if isinstance(row, Mapping) and str(row.get("node_id") or "") == node_id
+            }
+            values.update(
+                str(row.get("context") or "")
+                for row in relationships
+                if str(row.get("source") or "") == node_id
+                or str(row.get("target") or "") == node_id
+            )
+            result = sorted(value for value in values if value)
+        elif operation == "module-owners":
+            if not module:
+                raise ValueError("module-owners query requires module")
+            rows = [
+                dict(row)
+                for row in observation.get("module_ownership", ())
+                if isinstance(row, Mapping) and str(row.get("module") or "") == module
+            ]
+            result = limited(rows)
+        else:
+            if not node_id:
+                raise ValueError(f"{operation} query requires node_id")
+            if node_id not in selections:
+                raise ValueError(f"unknown dependency query node_id: {node_id}")
+            outgoing: dict[str, list[str]] = {}
+            incoming: dict[str, list[str]] = {}
+            for row in relationships:
+                source = str(row.get("source") or "")
+                target = str(row.get("target") or "")
+                outgoing.setdefault(source, []).append(target)
+                incoming.setdefault(target, []).append(source)
+            for values in outgoing.values():
+                values.sort()
+            for values in incoming.values():
+                values.sort()
+
+            if operation in {"dependencies", "dependents"}:
+                adjacency = outgoing if operation == "dependencies" else incoming
+                queue: list[tuple[str, int]] = [(node_id, 0)]
+                seen = {node_id}
+                rows: list[object] = []
+                while queue:
+                    current, depth = queue.pop(0)
+                    if depth >= max_depth:
+                        if adjacency.get(current):
+                            omissions.append({"reason": "depth-limit", "node_id": current})
+                        continue
+                    for candidate in adjacency.get(current, ()):
+                        visited += 1
+                        if visited > max_visits:
+                            omissions.append({"reason": "visit-limit"})
+                            queue.clear()
+                            break
+                        if candidate in seen:
+                            continue
+                        seen.add(candidate)
+                        rows.append(
+                            {
+                                "node_id": candidate,
+                                "depth": depth + 1,
+                                "selection": selections.get(candidate),
+                            }
+                        )
+                        if len(rows) >= max_results:
+                            omissions.append({"reason": "result-limit"})
+                            queue.clear()
+                            break
+                        queue.append((candidate, depth + 1))
+                result = rows
+            elif operation == "reachability":
+                if not target_id:
+                    raise ValueError("reachability query requires target_id")
+                queue = [(node_id, 0)]
+                seen = {node_id}
+                found = node_id == target_id
+                while queue and not found:
+                    current, depth = queue.pop(0)
+                    if depth >= max_depth:
+                        if outgoing.get(current):
+                            omissions.append({"reason": "depth-limit", "node_id": current})
+                        continue
+                    for candidate in outgoing.get(current, ()):
+                        visited += 1
+                        if visited > max_visits:
+                            omissions.append({"reason": "visit-limit"})
+                            queue.clear()
+                            break
+                        if candidate == target_id:
+                            found = True
+                            break
+                        if candidate not in seen:
+                            seen.add(candidate)
+                            queue.append((candidate, depth + 1))
+                result = {
+                    "reachable": found,
+                    "negative_evidence": (
+                        "admissible"
+                        if not found and not omissions
+                        else "not-admissible"
+                        if not found
+                        else "not-applicable"
+                    ),
+                }
+            else:
+                if not target_id:
+                    raise ValueError("paths query requires target_id")
+                queue_paths: list[list[str]] = [[node_id]]
+                paths: list[object] = []
+                while queue_paths:
+                    path = queue_paths.pop(0)
+                    current = path[-1]
+                    if current == target_id:
+                        paths.append(path)
+                        if len(paths) >= max_results:
+                            if queue_paths:
+                                omissions.append({"reason": "result-limit"})
+                            break
+                        continue
+                    if len(path) - 1 >= max_depth:
+                        if outgoing.get(current):
+                            omissions.append({"reason": "depth-limit", "node_id": current})
+                        continue
+                    for candidate in outgoing.get(current, ()):
+                        visited += 1
+                        if visited > max_visits:
+                            omissions.append({"reason": "visit-limit"})
+                            queue_paths.clear()
+                            break
+                        if candidate not in path:
+                            queue_paths.append([*path, candidate])
+                result = paths
+
+        return {
+            "schema": "hashmarks.dependency-query-result.v1",
+            "operation": operation,
+            "context": context or None,
+            "result": result,
+            "bounds": {
+                "max_depth": max_depth,
+                "max_results": max_results,
+                "max_visits": max_visits,
+                "visited": visited,
+            },
+            "completeness": "complete" if not omissions else "incomplete",
+            "omissions": omissions,
+            "authority": "qualified-external-observation",
+            "causation": "not-inferred",
+        }
+
+    @classmethod
+    def dependency_resolution_queries(
+        cls,
+        observation: Mapping[str, object],
+        requests: Sequence[Mapping[str, object]],
+    ) -> dict[str, object]:
+        if observation.get("schema") != _SCHEMA_V2:
+            raise ValueError("dependency queries require qualified v2 observation")
+        if not isinstance(requests, Sequence) or isinstance(
+            requests, (str, bytes, bytearray)
+        ):
+            raise ValueError("dependency queries must be a sequence")
+        if len(requests) > _MAX_QUERIES:
+            raise ValueError(f"dependency queries exceeds {_MAX_QUERIES} entries")
+        results = []
+        for request in requests:
+            if not isinstance(request, Mapping):
+                raise ValueError("each dependency query must be an object")
+            results.append(cls._dependency_query_v2(observation, request))
+        return {
+            "schema": "hashmarks.dependency-query-batch.v1",
+            "observation_identity": observation.get("observation_identity"),
+            "results": results,
+            "authority": "qualified-external-observation",
             "causation": "not-inferred",
         }
 
