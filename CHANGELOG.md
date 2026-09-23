@@ -12,6 +12,7 @@
 - Replace transitional migration/containment policy with a current boundary-violation rule: out-of-profile surfaces are defects to reject, split, narrow, or remove rather than responsibilities to preserve.
 - Repair the final dangling repository-local documentation link left by the hard docs cleanup and add a regression that requires live Markdown link targets to exist.
 - Make `docs/README.md` the single complete catalog for the live documentation tree, remove the redundant nested maintainer index, and require every maintained docs page to be indexed exactly once.
+- Replace the internal-agent oracle-separation source-text preservation test with behavioral proof that the worker ledger rejects secret input and the grader refuses unsealed traces before producing oracle-derived results.
 - Keep only current product/reference, integration, maintainer, and qualification documentation in the live tree, and keep the changelog limited to public release history.
 
 ## 0.17.0 — External evidence correlation and real-data qualification
