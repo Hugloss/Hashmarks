@@ -98,6 +98,13 @@ The admitted dependency-evidence work must keep four layers distinct:
 
 Workspace/local projects may simultaneously have repository-project identity and resolution-node identity; appearing in a resolution graph does not make repository-owned code an external dependency.
 
+
+### Maven artifact adapter
+
+`hashmarks.adapters.maven_dependency_observation` is an execution-free qualification adapter for already-produced Maven dependency evidence. It translates caller-supplied dependency-tree JSON and dependency-list text into the typed dependency-resolution v2 observation contract.
+
+The adapter is not a second dependency semantic owner. It must not invoke Maven, resolve packages, inspect dependency implementation source, parse a POM as resolved truth, or infer repair/vulnerability/causal conclusions. Tree evidence owns graph relationships and effective Maven scope; list evidence owns resolved inventory and reported Java-module ownership. A package present only in list evidence remains inventory-only rather than being invented into graph reachability. Maven contexts such as compile/runtime/test remain observation contexts and are not interchangeable with each edge's effective scope.
+
 ## Orthogonal state rule
 
 Do not overload one field with multiple axes.
