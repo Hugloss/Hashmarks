@@ -162,3 +162,30 @@ def test_maven_adapter_relationship_change_is_not_selection_change(
     assert "example.libs:shared:jar:2.0" not in delta["selections_removed"]
     assert delta["relationships_added"]
     assert delta["relationships_removed"]
+
+
+def test_maven_adapter_preserves_inventory_without_module_metadata(
+    tmp_path: Path,
+) -> None:
+    inventory = b"""The following files have been resolved:
+   example.scala:scala-module_2.13:jar:2.0:test
+   example.root:parent:pom:1.0:compile
+   example.libs:owned:jar:3.0:test -- module example.owned
+"""
+    raw = maven_dependency_observation(
+        trees={},
+        inventories={"test": inventory},
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(raw)
+
+    assert [row["node_id"] for row in observation["inventory"]] == [
+        "example.libs:owned:jar:3.0",
+        "example.root:parent:pom:1.0",
+        "example.scala:scala-module_2.13:jar:2.0",
+    ]
+    assert [row["module"] for row in observation["module_ownership"]] == [
+        "example.owned"
+    ]

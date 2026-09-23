@@ -9,8 +9,8 @@ from collections.abc import Mapping, Sequence
 _SCHEMA = "hashmarks.dependency-resolution.v2"
 _LIST_LINE = re.compile(
     r"^[ \t]*(?P<coordinate>[^ \t:]+:[^ \t:]+:[^ \t:]+"
-    r"(?::[^ \t:]+){2,3})[ \t]+(?:--[ \t]+module[ \t]+)?"
-    r"(?P<module>.+?)[ \t]*$"
+    r"(?::[^ \t:]+){2,3})(?:[ \t]+--[ \t]+module[ \t]+"
+    r"(?P<module>.+?))?[ \t]*$"
 )
 
 
@@ -245,7 +245,9 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                         }
                     )
                     seen_inventory.add(node)
-                ownership[(_module_name(match.group("module")), context)].add(node)
+                module = match.group("module")
+                if module is not None:
+                    ownership[(_module_name(module), context)].add(node)
 
     normalized_selections = []
     for row in selections.values():
