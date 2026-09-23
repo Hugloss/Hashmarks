@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.0 — Development
+
+- Begin the 0.19.0 development line.
+
 ## 0.18.0 — Locked qualification authority and documentation cleanup
 
 - Make the committed `uv.lock` the exact repository development/qualification resolution authority while `pyproject.toml` remains dependency-intent authority; normal setup, CI, MCP development registrations, pre-commit, and release qualification consume the lock with frozen uv operations.
