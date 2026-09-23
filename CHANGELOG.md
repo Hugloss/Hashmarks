@@ -14,6 +14,7 @@
 - Make `docs/README.md` the single complete catalog for the live documentation tree, remove the redundant nested maintainer index, and require every maintained docs page to be indexed exactly once.
 - Replace the internal-agent oracle-separation source-text preservation test with behavioral proof that the worker ledger rejects secret input and the grader refuses unsealed traces before producing oracle-derived results.
 - Replace the refactoring-policy archaeology blacklist with positive regression proof for the current measured-product-value, no-parallel-phase-history, single-spelling, and responsibility-decision contract.
+- Mark every documented Make command as a phony command target; four evaluation targets could previously be shadowed by same-named filesystem entries, and a derived regression now keeps documented commands both defined and phony.
 - Keep only current product/reference, integration, maintainer, and qualification documentation in the live tree, and keep the changelog limited to public release history.
 
 ## 0.17.0 — External evidence correlation and real-data qualification
