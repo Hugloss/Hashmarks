@@ -1,6 +1,6 @@
 # Hashmarks ↔ Oh-Goon integration contract
 
-**Status: current normative integration guidance.** Historical version-by-version notes are preserved in the full source repository development archive; they are not shipped in the PyPI source distribution.
+**Status: current normative integration guidance.** Superseded integration notes are recoverable from Git history and are not product authority.
 
 ## Three-plane model
 
@@ -124,7 +124,7 @@ A CodeMap service/watch process may be managed as infrastructure, but its failur
 
 ## Pre-public boundary history
 
-Execution-shaped and agent-loop development surfaces were removed before the first public contract. The full source repository retains that historical cleanup record under `docs/development/`; it is not an integration compatibility surface and must not be treated as architectural precedent.
+Execution-shaped and agent-loop responsibilities are outside the current public contract. Git history preserves earlier experiments; they are not an integration compatibility surface and must not be treated as architectural precedent.
 
 ## Normative references
 

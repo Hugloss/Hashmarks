@@ -43,11 +43,6 @@ def test_sdist_members_are_the_deliberate_public_source_surface() -> None:
     roots = {path.parts[0] for path in members}
     assert roots == EXPECTED_SDIST_ROOTS
     assert not (roots & FORBIDDEN_SDIST_ROOTS)
-    assert all(
-        path != Path("docs/development")
-        and Path("docs/development") not in path.parents
-        for path in members
-    )
     assert Path(".github/CONTRIBUTING.md") in members
     assert Path(".github/SECURITY.md") in members
     assert Path("docs/GETTING_STARTED.md") in members
@@ -69,10 +64,6 @@ def test_sdist_archive_does_not_reintroduce_repository_only_material(
         }
     roots = {path.parts[0] for path in relative}
     assert roots == EXPECTED_SDIST_ROOTS
-    assert not any(
-        path == Path("docs/development") or Path("docs/development") in path.parents
-        for path in relative
-    )
 
 
 def test_extracted_sdist_rebuilds_the_direct_wheel_byte_identically(

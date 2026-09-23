@@ -1,6 +1,6 @@
 # Hashmarks invariants
 
-**Status: normative.** These are the current public correctness, freshness, ownership, and authority guarantees for Hashmarks. Historical version-by-version invariant ledgers are retained in the full source repository development archive and are not product authority.
+**Status: normative.** These are the current public correctness, freshness, ownership, and authority guarantees for Hashmarks. Superseded invariant text is recoverable from Git history and is not product authority.
 
 The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.md) overrides historical implementation precedent.
 
@@ -228,7 +228,7 @@ Hashmarks is a repository observer that exposes repository intelligence, not an 
 
 ## Historical evidence
 
-Benchmark workers, Codex/scout experiments, agent traces, failed-attempt studies, historical action/result caches, PASS-promotion experiments, and phase-specific compatibility invariants are retained only under `docs/development/` and `scripts/agent_evaluation/`. They may measure Hashmarks; they do not define the product.
+Benchmark workers, Codex/scout experiments, agent traces, failed-attempt studies, historical action/result caches, PASS-promotion experiments, and phase-specific compatibility invariants may exist in development evaluation infrastructure or Git history. They may measure Hashmarks; they do not define the product.
 
 ### MCP transport boundary
 

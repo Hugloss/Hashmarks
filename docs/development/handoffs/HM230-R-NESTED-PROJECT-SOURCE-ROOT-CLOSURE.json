@@ -1,9 +1,0 @@
-{
-  "phase": "HM230-R",
-  "parent": "HM228",
-  "parent_sha256": "149f1867fe1dc4b7a1d704d8cacc928d2ee91d48358de22eb62d5f1972a1469f",
-  "status": "development-candidate",
-  "finding": "nested pyproject source-root metadata was ignored because import roots were derived only from workspace-root pyproject.toml",
-  "authority": "source-root configuration is scoped to its declaring project directory; duplicate import identities remain ambiguous",
-  "qualification": {"focused_source_passed": 194, "nested_scale_files": 10100, "nested_scale_cold_seconds": 5.813, "nested_scale_warm_seconds": 1.078}
-}

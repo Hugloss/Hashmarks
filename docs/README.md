@@ -1,37 +1,34 @@
 # Hashmarks repository intelligence documentation
 
-Hashmarks documentation is split into **public/current contracts** and **historical development evidence**. Current product behavior should be understood from the first group; historical phase notes are evidence, not product authority.
+Hashmarks keeps **current, maintained documentation** in the live repository. Superseded plans, handoffs, phase receipts, and old status ledgers belong to Git/PR history rather than the product documentation tree.
 
 ## Start here
 
 - [`GETTING_STARTED.md`](GETTING_STARTED.md) — install, CodeMap workflow, CLI, Python API, cache/state basics.
 - [`reference/ARCHITECTURE.md`](reference/ARCHITECTURE.md) — architecture and authority model.
-- [`reference/STATE_AND_SEMANTIC_OWNERS.md`](reference/STATE_AND_SEMANTIC_OWNERS.md) — canonical repository-intelligence state families, semantic owners, and reuse-before-new-owner rules.
-- [`reference/REPOSITORY_EVIDENCE_BINDINGS.md`](reference/REPOSITORY_EVIDENCE_BINDINGS.md) — opaque repository evidence bindings, exact range/member identities, deltas, and coverage semantics.
-- [`maintainers/CODEMAP.md`](maintainers/CODEMAP.md) — implementation ownership map and request-flow guide for maintainers.
-- [`reference/PRODUCT_BOUNDARY.md`](reference/PRODUCT_BOUNDARY.md) — normative feature-admission contract; read this before proposing a new capability.
-- [`reference/INVARIANTS.md`](reference/INVARIANTS.md) — normative correctness/freshness/authority guarantees.
+- [`reference/STATE_AND_SEMANTIC_OWNERS.md`](reference/STATE_AND_SEMANTIC_OWNERS.md) — canonical state families, semantic owners, and reuse-before-new-owner rules.
+- [`reference/REPOSITORY_EVIDENCE_BINDINGS.md`](reference/REPOSITORY_EVIDENCE_BINDINGS.md) — repository evidence bindings and change semantics.
+- [`reference/PRODUCT_BOUNDARY.md`](reference/PRODUCT_BOUNDARY.md) — normative feature-admission contract.
+- [`reference/INVARIANTS.md`](reference/INVARIANTS.md) — normative correctness, freshness, and authority guarantees.
 - [`reference/API_STABILITY.md`](reference/API_STABILITY.md) — supported Python/CLI surface and pre-1.0 compatibility policy.
-- [`../CHANGELOG.md`](../CHANGELOG.md) — concise user-facing release history.
+- [`../CHANGELOG.md`](../CHANGELOG.md) — public release history only.
 
 ## Maintainers
 
-- [`maintainers/README.md`](maintainers/README.md) — current implementation-navigation docs and their relationship to product contracts/history.
-- [`maintainers/CODEMAP.md`](maintainers/CODEMAP.md) — CodeMap module ownership, common request flows, and debugging entry points.
+- [`maintainers/CODEMAP.md`](maintainers/CODEMAP.md) — module ownership and request-flow guide.
+- [`maintainers/RESPONSIBILITY_REFACTORING.md`](maintainers/RESPONSIBILITY_REFACTORING.md) — responsibility-first refactoring policy.
+- [`maintainers/RELEASING.md`](maintainers/RELEASING.md) — current release procedure.
 
 ## Integration
 
 - [`integration/OH_GOON_INTEGRATION.md`](integration/OH_GOON_INTEGRATION.md) — current Hashmarks ↔ Oh-Goon evidence/authority boundary.
-- [`integration/MCP.md`](integration/MCP.md) — Hashmarks local read-only MCP server for coding agents, codebase search/repository context tools, freshness behavior, and Claude Code/Codex/OpenCode/Pi configuration.
+- [`integration/MCP.md`](integration/MCP.md) — local read-only MCP server, freshness behavior, and host configuration.
 
 ## Qualification
 
+- [`qualification/REPOSITORY_QUALITY.md`](qualification/REPOSITORY_QUALITY.md) — repository-quality qualification semantics.
 - [`qualification/TEST_RUNTIME_ECONOMICS.md`](qualification/TEST_RUNTIME_ECONOMICS.md) — test-proof scope and runtime-economics guidance.
 
-Development-tool dependencies and configuration are owned directly by `pyproject.toml`; contributor commands are documented in [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md).
+Development-tool dependencies and configuration are owned by `pyproject.toml` and the committed `uv.lock`; contributor commands are documented in [`.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md).
 
-## Historical development record
-
-The full GitHub source repository retains non-normative development history under `docs/development/`, including handoffs, benchmark evidence, audits, reviews, and historical invariant ledgers. That material is characterization evidence, not active roadmap work. The archaeology is intentionally excluded from the PyPI source distribution and must not override current files under `reference/`, `integration/`, or the root `README.md`.
-
-Repository-root Markdown is intentionally limited to public release-facing documents such as the landing page, changelog, and contributor-agent guardrail. GitHub-specific community documents live under `.github/`.
+Historical development material is intentionally recovered from Git commits, merged pull requests, and release history when needed. It is not duplicated as a maintained documentation surface.

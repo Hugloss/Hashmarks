@@ -314,8 +314,6 @@ _SDIST_DIRECTORIES = (
     Path("examples"),
 )
 
-_SDIST_EXCLUDED_PREFIXES = (Path("docs/development"),)
-
 _SDIST_EXCLUDED_PARTS = {
     "__pycache__",
     ".pytest_cache",
@@ -330,11 +328,6 @@ def _admitted_sdist_path(path: Path) -> Path | None:
     if not path.is_file():
         return None
     relative = path.relative_to(ROOT)
-    if any(
-        relative == prefix or prefix in relative.parents
-        for prefix in _SDIST_EXCLUDED_PREFIXES
-    ):
-        return None
     if any(part in _SDIST_EXCLUDED_PARTS for part in relative.parts):
         return None
     if path.suffix in {".pyc", ".pyo"}:
@@ -357,9 +350,9 @@ def _sdist_members() -> list[Path]:
     """Return the intentional public source-distribution surface.
 
     The sdist is a buildable public source release, not a mirror of the development
-    checkout. Tests, benchmarks, qualification scripts/receipts, contributor-agent
-    instructions, and historical development archaeology stay in the repository/source
-    release but are not shipped through PyPI. Current user/reference documentation and
+    checkout. Tests, benchmarks, qualification scripts/receipts, and contributor-agent
+    instructions stay in the repository checkout but are not shipped through PyPI.
+    Current user/reference documentation and
     examples remain available to people inspecting the sdist.
     """
     candidates = [relative for relative in _SDIST_FILES if (ROOT / relative).is_file()]

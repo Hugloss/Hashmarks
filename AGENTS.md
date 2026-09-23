@@ -211,7 +211,7 @@ Hashmarks ownership/cache/import/verification/concurrency diagnostics are reposi
 
 ## Responsibility-first refactoring gate
 
-Before file-size, naming, or complexity cleanup, apply `docs/development/reviews/RESPONSIBILITY_COMPLEXITY_REFACTORING.md`. Large LOC and Ruff debt are investigation signals, not extraction requirements. Every candidate must be classified KEEP COHESIVE, REFACTOR INTERNALLY, EXTRACT RESPONSIBILITY, or DECOMPOSE MULTIPLE RESPONSIBILITIES before code movement. Interoperability transfers information, never authority.
+Before file-size, naming, or complexity cleanup, apply `docs/maintainers/RESPONSIBILITY_REFACTORING.md`. Large LOC and Ruff debt are investigation signals, not extraction requirements. Every candidate must be classified KEEP COHESIVE, REFACTOR INTERNALLY, EXTRACT RESPONSIBILITY, or DECOMPOSE MULTIPLE RESPONSIBILITIES before code movement. Interoperability transfers information, never authority.
 
 ## CLI responsibility ownership
 
@@ -236,7 +236,7 @@ Hashmarks consumer conformance and versioned evidence contracts must remain inde
 
 ### G59 — Removed boundary debt must stay removed
 
-`docs/development/PREPUBLIC_BOUNDARY_DEBT.md` records historical execution and agent-loop surfaces removed before the first public release. Modern CodeMap/repository-intelligence code, CLI, service contracts, examples, and top-level exports must not reintroduce those responsibilities. Development-only evaluation harnesses may model external agents, but they must remain outside the installed product contract.
+Pre-public execution and agent-loop surfaces were removed from the product contract. Modern CodeMap/repository-intelligence code, CLI, service contracts, examples, and top-level exports must not reintroduce those responsibilities. Git history preserves the removed experiments; development-only evaluation harnesses may model external agents, but they must remain outside the installed product contract.
 
 ### G60 — Release-correctness proofs must be scope-bounded
 A release-correctness test must not rebuild the full real Hashmarks repository when the asserted invariant is independent of repository scale or exact repository bytes. Use a representative repository that still traverses the real public product surface. Real-repository and scale proofs remain appropriate only when repository scale, repository bytes, integration topology, or measured economics are themselves part of the contract. Do not add production caching merely to hide test-fixture reconstruction cost.

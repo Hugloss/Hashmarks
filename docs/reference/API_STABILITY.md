@@ -1,6 +1,6 @@
 # Public API and stability policy
 
-Hashmarks is pre-1.0, but the first public release still needs an explicit contract so implementation history does not accidentally become API.
+Hashmarks is pre-1.0, but public releases still need an explicit contract so implementation history does not accidentally become API.
 
 ## What is public
 
@@ -19,13 +19,13 @@ The documented `CodeMap.correlate_evidence()` and `evidence_correlation_delta()`
 
 Importable implementation submodules under `hashmarks.*` are **not automatically public** merely because Python allows importing them. Internal helpers, storage classes, parsers, adapters, and mixins may change without compatibility guarantees unless a current public document explicitly promotes them into the contract.
 
-Development material under `scripts/agent_evaluation/`, `benchmarks/agent_evaluation/`, `tests/`, and `docs/development/` is measurement/evidence infrastructure, not installed product API.
+Development material under `scripts/agent_evaluation/`, `benchmarks/agent_evaluation/`, and `tests/` is measurement/evidence infrastructure, not installed product API. Superseded development documents remain available through Git history.
 
 ## Pre-1.0 contract evolution
 
 For the `0.x` series:
 
-- Hashmarks carries one current documented Python/CLI surface before the first public release; obsolete unpublished names are removed rather than aliased.
+- Hashmarks carries one current documented Python/CLI surface; obsolete unpublished names are removed rather than aliased.
 - generated local databases/caches are disposable and may be rebuilt when their current shape changes; no migration/backward-reader obligation exists unless a future explicit requirement introduces one.
 - serialized repository-evidence contracts use explicit schema identities and validators; obsolete development/evaluation schema readers are removed instead of normalized.
 - implementation details and development evaluation formats are not compatibility commitments.

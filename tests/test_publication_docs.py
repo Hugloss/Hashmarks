@@ -110,20 +110,6 @@ def test_public_docs_expose_repository_evidence_binding_contract() -> None:
         assert state in binding
 
 
-def test_public_docs_separate_current_contracts_from_history() -> None:
-    docs = _text("docs/README.md")
-    assert "public/current contracts" in docs
-    assert "historical development evidence" in docs
-    assert (ROOT / "docs/development/HISTORICAL_RELEASE_NOTES.md").is_file()
-    assert (ROOT / "docs/development/HISTORICAL_OH_GOON_INTEGRATION_NOTES.md").is_file()
-    assert "Historical, non-normative record." in _text(
-        "docs/development/HISTORICAL_RELEASE_NOTES.md"
-    )
-    assert "Historical, non-normative record." in _text(
-        "docs/development/HISTORICAL_OH_GOON_INTEGRATION_NOTES.md"
-    )
-
-
 def test_github_entry_points_exist() -> None:
     for path in (
         ".github/CONTRIBUTING.md",
@@ -228,8 +214,6 @@ def test_agent_evaluation_executables_are_isolated_from_product_script_root() ->
 
 def test_normative_invariants_exclude_prepublic_agent_execution_history() -> None:
     current = _text("docs/reference/INVARIANTS.md")
-    historical = _text("docs/development/HISTORICAL_INVARIANTS.md")
-    assert "Status: non-normative development history." in historical
     for historical_term in (
         "Action-cache results are valid",
         "PASS promotion is post-run identity-bound",
@@ -238,7 +222,6 @@ def test_normative_invariants_exclude_prepublic_agent_execution_history() -> Non
         "real Codex economics",
     ):
         assert historical_term not in current
-        assert historical_term in historical
     assert (
         "PB6. Hashmarks must never become the agent or the execution motor." in current
     )
