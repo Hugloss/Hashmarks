@@ -1026,8 +1026,12 @@ def test_v2_path_query_exact_result_bound_does_not_claim_omission(
     changed = _snapshot_v2()
     changed["components"].extend(
         [
-            {"component_id": "dead", "ecosystem": "generic"},
-            {"component_id": "target", "ecosystem": "generic"},
+            {"component_id": "dead", "ecosystem": "generic", "name": "dead"},
+            {
+                "component_id": "target",
+                "ecosystem": "generic",
+                "name": "target",
+            },
         ]
     )
     changed["selections"].extend(
