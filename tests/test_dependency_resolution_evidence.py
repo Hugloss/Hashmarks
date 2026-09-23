@@ -788,3 +788,116 @@ def test_v2_repository_binding_tracks_current_codemap_generation(tmp_path: Path)
     binding = packet["repository_binding"]
     assert binding["repository_identity"].startswith("sha256:")
     assert isinstance(binding["codemap_generation"], int)
+
+
+def test_v2_bounded_queries_report_dependencies_paths_and_contexts(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "app@1",
+                    "context": "compile",
+                },
+                {
+                    "operation": "paths",
+                    "node_id": "app@1",
+                    "target_id": "library@1",
+                    "context": "runtime",
+                },
+                {"operation": "contexts", "node_id": "library@1"},
+            ],
+        )
+
+    dependencies, paths, contexts = packet["results"]
+    assert dependencies["result"][0]["node_id"] == "library@1"
+    assert paths["result"] == [["app@1", "library@1"]]
+    assert contexts["result"] == ["compile", "runtime"]
+    assert all(row["completeness"] == "complete" for row in packet["results"])
+
+
+def test_v2_reachability_absence_requires_complete_context_coverage(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["coverage"][1]["completeness"] = "incomplete"
+    changed["coverage"][1]["truncation"] = "truncated"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "reachability",
+                    "node_id": "inventory-only@1",
+                    "target_id": "library@1",
+                    "context": "compile",
+                },
+                {
+                    "operation": "reachability",
+                    "node_id": "inventory-only@1",
+                    "target_id": "library@1",
+                    "context": "runtime",
+                },
+            ],
+        )
+
+    assert (
+        packet["results"][0]["result"]["negative_evidence"]
+        == "admissible-within-declared-scope"
+    )
+    assert packet["results"][1]["result"]["negative_evidence"] == "not-admissible"
+
+
+def test_v2_query_exposes_depth_omission_instead_of_silent_partial_result(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["components"].append(
+        {"component_id": "leaf", "name": "leaf", "ecosystem": "test"}
+    )
+    changed["selections"].append(
+        {
+            "node_id": "leaf@1",
+            "component_id": "leaf",
+            "version": "1",
+            "source": "registry",
+            "contexts": ["compile"],
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+    changed["relationships"].append(
+        {
+            "source": "library@1",
+            "target": "leaf@1",
+            "kind": "dependency",
+            "context": "compile",
+            "effective_scope": "compile",
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "app@1",
+                    "context": "compile",
+                    "max_depth": 1,
+                }
+            ],
+        )
+
+    result = packet["results"][0]
+    assert [row["node_id"] for row in result["result"]] == ["library@1"]
+    assert result["completeness"] == "incomplete"
+    assert result["omissions"] == [{"reason": "depth-limit", "node_id": "library@1"}]
