@@ -85,9 +85,6 @@ markers = [
 ]
 
 [tool.ruff]
-extend-exclude = [
-    "benchmarks/agent_evaluation/retained",
-]
 force-exclude = true
 
 [tool.ruff.lint]
@@ -125,12 +122,8 @@ max-bool-expr = 5
 # ratchet it downward as large modules are split.
 max-python-file-lines = 1600
 
-[tool.ty.src]
-exclude = ["benchmarks/agent_evaluation/retained"]
-
 [tool.pyright]
 include = ["hashmarks", "scripts", "tests", "examples", "benchmarks", "hashmarks_build.py"]
-exclude = ["benchmarks/agent_evaluation/retained"]
 pythonVersion = "3.11"
 venvPath = "."
 venv = ".venv"
