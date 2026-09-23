@@ -121,6 +121,8 @@ Avoid unrelated refactors in the same change unless they are required to make ow
 
 ## Development-tool policy
 
-`pyproject.toml` is the authority for development-tool dependencies and configuration. We do not maintain separate CI lanes whose only purpose is proving pytest, Ruff, or uv version envelopes. Python-version tests exercise the supported runtime, and MCP interop tests exercise a real product integration boundary.
+`pyproject.toml` owns development-tool dependency intent, allowed ranges, groups, and configuration. The committed `uv.lock` owns the exact resolved repository development/qualification dependency set. Normal setup and qualification consume that lock with frozen uv operations; they do not resolve a parallel dependency graph or rewrite the lock. Use `make lock-check` to detect `pyproject.toml` ↔ `uv.lock` drift and `make lock` only for an intentional dependency update that will be reviewed and committed with its lock diff.
+
+The lock is contributor/CI qualification authority, not installed-package runtime metadata. Hashmarks does not maintain a second normalized dependency manifest, and the wheel/sdist continue to expose consumer dependencies through standard package metadata. We do not maintain separate CI lanes whose only purpose is proving pytest, Ruff, or uv version envelopes. Python-version tests exercise the supported runtime, and MCP interop tests exercise a real product integration boundary.
 
 `make hooks-install` installs the Git pre-commit hook. The hook owns only fast commit-time hygiene; `make ruff`, `make typecheck`, `make lint-debt`, and test/qualification targets remain separate so commit-time editing does not become qualification authority. Retained benchmark fixture repositories remain excluded from live-repository formatting and linting.
