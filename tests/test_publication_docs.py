@@ -224,7 +224,8 @@ def test_public_contract_docs_describe_current_api_and_authority() -> None:
     assert "measurement/evidence infrastructure, not installed product API" in stability
 
     assert (
-        "PB6. Hashmarks must never become the agent or the execution motor." in invariants
+        "PB6. Hashmarks must never become the agent or the execution motor."
+        in invariants
     )
     assert "PB7. Interoperability transfers evidence, never authority." in invariants
     assert "Interoperability transfers evidence, never authority." in integration
