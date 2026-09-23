@@ -42,9 +42,7 @@ def _limited(
     omissions: list[dict[str, object]],
 ) -> list[object]:
     if len(rows) > max_results:
-        omissions.append(
-            {"reason": "result-limit", "omitted": len(rows) - max_results}
-        )
+        omissions.append({"reason": "result-limit", "omitted": len(rows) - max_results})
     return rows[:max_results]
 
 
@@ -193,8 +191,7 @@ def _coverage_complete(
         and (not context or str(row.get("context") or "") == context)
     ]
     return bool(rows) and all(
-        row.get("completeness") == "complete"
-        and row.get("truncation") == "complete"
+        row.get("completeness") == "complete" and row.get("truncation") == "complete"
         for row in rows
     )
 
@@ -250,9 +247,7 @@ def dependency_query(
             if isinstance(row, Mapping)
             and str(row.get("component_id") or "") == component_id
         ]
-        result: object = _limited(
-            rows, max_results=max_results, omissions=omissions
-        )
+        result: object = _limited(rows, max_results=max_results, omissions=omissions)
     elif operation == "inventory":
         rows = [
             dict(row)
