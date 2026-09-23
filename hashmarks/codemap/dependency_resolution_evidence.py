@@ -313,7 +313,7 @@ class DependencyResolutionEvidenceMixin:
         )
 
         repository_binding = {
-            "repository_identity": self._repository_packet_identity(),
+            "repository_identity": self.observation.repository_id,
             "codemap_generation": int(self.store.generation()),
         }
         observation_payload = {
