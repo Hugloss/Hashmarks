@@ -717,8 +717,10 @@ def test_v2_separates_component_selection_and_observation_identity(
         changed["module_ownership"] = [
             {
                 "module": "library.module",
+                "context": "compile",
                 "owners": ["library@1"],
                 "completeness": "complete",
+                "evidence_sources": ["list:compile"],
             }
         ]
         second = codemap.dependency_resolution_evidence(changed)
