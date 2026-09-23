@@ -58,6 +58,73 @@ def load_manifest(path: Path) -> dict[str, Any]:
     return value
 
 
+def _entry_report(
+    regret: Any,
+    base: Path,
+    entry: Any,
+    index: int,
+    manifest_path: Path,
+) -> dict[str, Any]:
+    if not isinstance(entry, dict):
+        raise ValueError(f"entry {index} must be an object: {manifest_path}")
+    trace_path = _resolve_member(
+        base, entry.get("trace"), f"entries[{index}].trace", manifest_path
+    )
+    evidence_path = _resolve_member(
+        base, entry.get("evidence"), f"entries[{index}].evidence", manifest_path
+    )
+    for member_path, field in (
+        (trace_path, "trace_sha256"),
+        (evidence_path, "evidence_sha256"),
+    ):
+        expected = _nonempty(
+            entry.get(field), f"entries[{index}].{field}", manifest_path
+        )
+        actual = _digest_bytes(member_path)
+        if expected != actual:
+            raise ValueError(
+                f"entry {index} {field} mismatch: expected {expected}, got {actual}"
+            )
+    return regret.analyze(trace_path, evidence_path)
+
+
+def _comparisons(
+    regret: Any, reports: list[dict[str, Any]]
+) -> tuple[dict[str, dict[str, dict[str, Any]]], list[dict[str, Any]]]:
+    by_task: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
+    for report in reports:
+        by_task[str(report["task_id"])][str(report["mode"])] = report
+    comparisons = [
+        regret.compare(modes["baseline"], modes["hashmarks"])
+        for _task_id, modes in sorted(by_task.items())
+        if set(modes) == {"baseline", "hashmarks"}
+    ]
+    return by_task, comparisons
+
+
+def _opportunities(
+    reports: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, int], list[dict[str, Any]]]:
+    complete = [
+        report for report in reports if report["summary"]["required_evidence_complete"]
+    ]
+    opportunity_fields = {
+        "late_all_required_evidence": "tokens_before_all_required_evidence",
+        "repeated_queries": "duplicate_query_estimated_tokens",
+        "repeated_reads": "duplicate_read_estimated_tokens",
+        "irrelevant_reads": "irrelevant_read_estimated_tokens",
+    }
+    totals = {
+        name: sum(int(report["summary"].get(field) or 0) for report in complete)
+        for name, field in opportunity_fields.items()
+    }
+    ranked = [
+        {"kind": name, "observed_estimated_tokens": value}
+        for name, value in sorted(totals.items(), key=lambda item: (-item[1], item[0]))
+    ]
+    return complete, totals, ranked
+
+
 def analyze(manifest_path: Path) -> dict[str, Any]:
     regret = _load_regret_module()
     manifest = load_manifest(manifest_path)
@@ -65,55 +132,15 @@ def analyze(manifest_path: Path) -> dict[str, Any]:
     reports: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for index, entry in enumerate(manifest["entries"]):
-        if not isinstance(entry, dict):
-            raise ValueError(f"entry {index} must be an object: {manifest_path}")
-        trace_path = _resolve_member(
-            base, entry.get("trace"), f"entries[{index}].trace", manifest_path
-        )
-        evidence_path = _resolve_member(
-            base, entry.get("evidence"), f"entries[{index}].evidence", manifest_path
-        )
-        for member_path, field in (
-            (trace_path, "trace_sha256"),
-            (evidence_path, "evidence_sha256"),
-        ):
-            expected = _nonempty(
-                entry.get(field), f"entries[{index}].{field}", manifest_path
-            )
-            actual = _digest_bytes(member_path)
-            if expected != actual:
-                raise ValueError(
-                    f"entry {index} {field} mismatch: expected {expected}, got {actual}"
-                )
-        report = regret.analyze(trace_path, evidence_path)
+        report = _entry_report(regret, base, entry, index, manifest_path)
         key = (str(report["task_id"]), str(report["mode"]))
         if key in seen:
             raise ValueError(f"duplicate task/mode in regret suite: {key[0]}:{key[1]}")
         seen.add(key)
         reports.append(report)
 
-    by_task: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
-    for report in reports:
-        by_task[str(report["task_id"])][str(report["mode"])] = report
-    comparisons: list[dict[str, Any]] = []
-    for _task_id, modes in sorted(by_task.items()):
-        if set(modes) == {"baseline", "hashmarks"}:
-            comparisons.append(regret.compare(modes["baseline"], modes["hashmarks"]))
-
-    complete = [r for r in reports if r["summary"]["required_evidence_complete"]]
-    opportunity_fields = {
-        "late_all_required_evidence": "tokens_before_all_required_evidence",
-        "repeated_queries": "duplicate_query_estimated_tokens",
-        "repeated_reads": "duplicate_read_estimated_tokens",
-        "irrelevant_reads": "irrelevant_read_estimated_tokens",
-    }
-    totals: dict[str, int] = {}
-    for name, field in opportunity_fields.items():
-        totals[name] = sum(int(r["summary"].get(field) or 0) for r in complete)
-    ranked = [
-        {"kind": name, "observed_estimated_tokens": value}
-        for name, value in sorted(totals.items(), key=lambda item: (-item[1], item[0]))
-    ]
+    by_task, comparisons = _comparisons(regret, reports)
+    complete, totals, ranked = _opportunities(reports)
     return {
         "schema": REPORT_SCHEMA,
         "manifest_sha256": _digest_bytes(manifest_path),
