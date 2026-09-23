@@ -61,7 +61,7 @@ The heavier stress runs independent reader processes while source bytes change a
 
 ## Project-local host registration
 
-Hashmarks keeps host integration inside the repository. The checked-in development registrations do not require editing a user's global host config. Run `uv sync --extra mcp --group test` first so the local `uv run --no-sync hashmarks ...` command is available.
+Hashmarks keeps host integration inside the repository. The checked-in development registrations do not require editing a user's global host config. Run `uv sync --frozen --extra mcp --group test` first so the local `uv run --frozen --no-sync hashmarks ...` command is available without rewriting dependency authority.
 
 ### OpenCode MCP server configuration
 
