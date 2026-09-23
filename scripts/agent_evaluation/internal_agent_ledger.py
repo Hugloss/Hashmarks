@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -183,8 +184,16 @@ def _finalize(a: argparse.Namespace, state: dict) -> None:
 
 def _search(a: argparse.Namespace, state: dict, repo: Path) -> None:
     started = time.perf_counter()
+    rg = shutil.which("rg")
+    if rg is not None:
+        argv = [rg, "-n", "--glob", "!*.pyc", a.pattern, "."]
+    else:
+        grep = shutil.which("grep")
+        if grep is None:
+            raise RuntimeError("search requires rg or grep on PATH")
+        argv = [grep, "-R", "-n", "--exclude", "*.pyc", a.pattern, "."]
     result = subprocess.run(
-        ["rg", "-n", "--glob", "!*.pyc", a.pattern, "."],
+        argv,
         cwd=repo,
         text=True,
         capture_output=True,
