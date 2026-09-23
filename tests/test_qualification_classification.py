@@ -68,7 +68,7 @@ def test_policy_classifies_process_and_empirical_without_python_constants() -> N
     classes = classification_map(root, nodeids)
     assert (
         classes[
-            "tests/test_codemap.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon"
+            "tests/test_codemap_watcher.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon"
         ]["kind"]
         == "process-sensitive"
     )
