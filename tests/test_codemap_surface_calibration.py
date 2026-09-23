@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import json
 import shutil
 from typing import TYPE_CHECKING
+
+import pytest
 
 from benchmarks.codemap_surface_calibration import (
     _lexical_rows,
     apply_variant,
     evaluate,
+    run,
 )
 from hashmarks.codemap.engine import CodeMap
 
@@ -88,6 +92,45 @@ def test_benchmark_scores_expected_discrimination_for_underspecified_tasks(
     assert result["discrimination_graded"] == 1
     assert result["discrimination_correct"] in {0, 1}
     assert result["false_safe"] == int(result["discrimination_correct"] == 0)
+
+
+def test_benchmark_rejects_invalid_session_batch_size(tmp_path: Path) -> None:
+    workspace = tmp_path / "repo-invalid-batch"
+    workspace.mkdir()
+    with CodeMap(
+        workspace,
+        state_dir=tmp_path / "state-invalid-batch",
+        artifact_db=tmp_path / "artifacts-invalid-batch.sqlite3",
+    ) as codemap:
+        with pytest.raises(ValueError, match="session_batch_size must be >= 1"):
+            evaluate(codemap, [], session_batch_size=0)
+
+
+def test_surface_calibration_run_reports_full_baseline(tmp_path: Path) -> None:
+    workspace = tmp_path / "repo-run"
+    workspace.mkdir()
+    (workspace / "owner.py").write_text(
+        "def measured_owner():\n    return 1\n", encoding="utf-8"
+    )
+    corpus_path = tmp_path / "corpus.json"
+    corpus_path.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "owner",
+                    "task": "Change measured_owner behavior.",
+                    "expected_edit": ["owner.py"],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = run(workspace, corpus_path, tmp_path / "output", ["full"], {"docs"})
+
+    assert result["schema"] == "hashmarks.codemap-realworld-surface-calibration.v1"
+    assert result["variants"]["full"]["decision"]["exact_edit"] == 1
+    assert result["variants"]["full"]["delta_vs_full"]["false_safe"] == 0
 
 
 def test_decision_packet_contract_rejects_wrong_shape(tmp_path: Path) -> None:

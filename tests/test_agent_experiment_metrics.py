@@ -183,3 +183,87 @@ def test_verdict_is_bound_to_exact_subject_bytes(tmp_path: Path) -> None:
     (tmp_path / "hashmarks.patch").write_bytes(b"different patch")
     with pytest.raises(ValueError, match="verdict subject_digest mismatch"):
         module.run_experiment(manifest, strict_raw_evidence=True)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda payload: payload.update(schema="unknown"), "unsupported.*schema"),
+        (lambda payload: payload.update(experiment_id=""), "experiment_id"),
+        (lambda payload: payload.update(runs=[]), "runs must be a non-empty list"),
+        (
+            lambda payload: payload["runs"].__setitem__(0, "bad"),
+            "run 0 must be an object",
+        ),
+        (
+            lambda payload: payload["runs"][0].update(mode="unknown"),
+            "mode must be baseline or hashmarks",
+        ),
+        (
+            lambda payload: payload["runs"][1].update(run_id="run-base"),
+            "duplicate manifest run_id",
+        ),
+        (
+            lambda payload: payload["runs"][1].update(mode="baseline"),
+            "duplicate manifest task/mode",
+        ),
+    ],
+)
+def test_manifest_rejects_invalid_structure(
+    tmp_path: Path, mutation, message: str
+) -> None:
+    module = _load()
+    manifest = _experiment(tmp_path)
+    payload = json.loads(manifest.read_text())
+    mutation(payload)
+    manifest.write_text(json.dumps(payload))
+
+    with pytest.raises(ValueError, match=message):
+        module.load_manifest(manifest)
+
+
+@pytest.mark.parametrize(
+    ("filename", "field", "value", "message"),
+    [
+        ("baseline.verdict.json", "task_id", "wrong", "verdict task_id mismatch"),
+        (
+            "baseline.verdict.json",
+            "grader_identity",
+            "wrong",
+            "verdict grader_identity mismatch",
+        ),
+        (
+            "baseline.usage.json",
+            "provider_identity",
+            "wrong",
+            "usage provider_identity mismatch",
+        ),
+    ],
+)
+def test_experiment_rejects_record_identity_drift(
+    tmp_path: Path, filename: str, field: str, value: str, message: str
+) -> None:
+    module = _load()
+    manifest = _experiment(tmp_path)
+    record_path = tmp_path / filename
+    record = json.loads(record_path.read_text())
+    record[field] = value
+    record_path.write_text(json.dumps(record))
+
+    with pytest.raises(ValueError, match=message):
+        module.run_experiment(manifest)
+
+
+def test_manifest_rejects_absolute_and_missing_evidence_paths(tmp_path: Path) -> None:
+    module = _load()
+    manifest = _experiment(tmp_path)
+    payload = json.loads(manifest.read_text())
+    payload["runs"][0]["trace"] = str((tmp_path / "baseline.trace.json").resolve())
+    manifest.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match="must be relative"):
+        module.run_experiment(manifest)
+
+    payload["runs"][0]["trace"] = "missing.json"
+    manifest.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match="file does not exist"):
+        module.run_experiment(manifest)

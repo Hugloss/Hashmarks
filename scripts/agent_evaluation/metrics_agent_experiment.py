@@ -54,6 +54,42 @@ def _sha256(path: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
+def _validate_manifest_run(
+    run: Any,
+    index: int,
+    path: Path,
+    seen_run_ids: set[str],
+    seen_task_modes: set[tuple[str, str]],
+) -> None:
+    if not isinstance(run, dict):
+        raise ValueError(f"manifest run {index} must be an object: {path}")
+    for field in (
+        "task_id",
+        "task_revision",
+        "repository_identity",
+        "mode",
+        "run_id",
+        "trace",
+        "verdict",
+        "usage",
+        "subject",
+    ):
+        _nonempty(run.get(field), f"manifest run {index} {field}", path)
+    if run["mode"] not in MODES:
+        raise ValueError(
+            f"manifest run {index} mode must be baseline or hashmarks: {path}"
+        )
+    if run["run_id"] in seen_run_ids:
+        raise ValueError(f"duplicate manifest run_id: {run['run_id']}")
+    seen_run_ids.add(run["run_id"])
+    task_mode = (run["task_id"], run["mode"])
+    if task_mode in seen_task_modes:
+        raise ValueError(
+            f"duplicate manifest task/mode: {run['task_id']}:{run['mode']}"
+        )
+    seen_task_modes.add(task_mode)
+
+
 def load_manifest(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != MANIFEST_SCHEMA:
@@ -71,33 +107,7 @@ def load_manifest(path: Path) -> dict[str, Any]:
     seen_run_ids: set[str] = set()
     seen_task_modes: set[tuple[str, str]] = set()
     for index, run in enumerate(runs):
-        if not isinstance(run, dict):
-            raise ValueError(f"manifest run {index} must be an object: {path}")
-        for field in (
-            "task_id",
-            "task_revision",
-            "repository_identity",
-            "mode",
-            "run_id",
-            "trace",
-            "verdict",
-            "usage",
-            "subject",
-        ):
-            _nonempty(run.get(field), f"manifest run {index} {field}", path)
-        if run["mode"] not in MODES:
-            raise ValueError(
-                f"manifest run {index} mode must be baseline or hashmarks: {path}"
-            )
-        if run["run_id"] in seen_run_ids:
-            raise ValueError(f"duplicate manifest run_id: {run['run_id']}")
-        seen_run_ids.add(run["run_id"])
-        task_mode = (run["task_id"], run["mode"])
-        if task_mode in seen_task_modes:
-            raise ValueError(
-                f"duplicate manifest task/mode: {run['task_id']}:{run['mode']}"
-            )
-        seen_task_modes.add(task_mode)
+        _validate_manifest_run(run, index, path, seen_run_ids, seen_task_modes)
     by_task: dict[str, set[str]] = {}
     for run in runs:
         by_task.setdefault(run["task_id"], set()).add(run["mode"])
@@ -118,6 +128,110 @@ def _validate_digest_binding(
         )
 
 
+def _expected_run_identity(manifest: dict[str, Any], run: dict[str, Any]) -> dict:
+    return {
+        "task_id": run["task_id"],
+        "task_revision": run["task_revision"],
+        "repository_identity": run["repository_identity"],
+        "mode": run["mode"],
+        "run_id": run["run_id"],
+        "model_identity": manifest["model_identity"],
+        "model_config_identity": manifest["model_config_identity"],
+        "runner_identity": manifest["runner_identity"],
+    }
+
+
+def _validate_run_records(
+    run: dict[str, Any],
+    expected: dict[str, Any],
+    trace: dict[str, Any],
+    verdict: dict[str, Any],
+    usage: dict[str, Any],
+) -> None:
+    for field, expected_value in expected.items():
+        if trace.get(field) != expected_value:
+            raise ValueError(
+                f"trace {field} mismatch for run {run['run_id']}: "
+                f"expected {expected_value!r}, got {trace.get(field)!r}"
+            )
+    for record_name, record in (("verdict", verdict), ("usage", usage)):
+        for field in ("task_id", "mode", "run_id"):
+            if record.get(field) != expected[field]:
+                raise ValueError(
+                    f"{record_name} {field} mismatch for run {run['run_id']}: "
+                    f"expected {expected[field]!r}, got {record.get(field)!r}"
+                )
+
+
+def _validate_optional_identities(
+    manifest: dict[str, Any], run: dict[str, Any], verdict: dict, usage: dict
+) -> None:
+    grader_identity = manifest.get("grader_identity")
+    if (
+        grader_identity is not None
+        and verdict.get("grader_identity") != grader_identity
+    ):
+        raise ValueError(f"verdict grader_identity mismatch for run {run['run_id']}")
+    provider_identity = manifest.get("provider_identity")
+    if (
+        provider_identity is not None
+        and usage.get("provider_identity") != provider_identity
+    ):
+        raise ValueError(f"usage provider_identity mismatch for run {run['run_id']}")
+
+
+def _validate_raw_evidence(
+    root: Path,
+    manifest_path: Path,
+    run: dict[str, Any],
+    verdict: dict,
+    usage: dict,
+    strict_raw_evidence: bool,
+) -> None:
+    for field, record, kind in (
+        ("grader_evidence", verdict, "grader"),
+        ("provider_evidence", usage, "provider"),
+    ):
+        if field in run:
+            evidence_path = _relative_file(root, run[field], field, manifest_path)
+            _validate_digest_binding(record, evidence_path, kind)
+        elif strict_raw_evidence:
+            raise ValueError(
+                f"manifest run {run['run_id']} requires {field} "
+                "in strict raw-evidence mode"
+            )
+
+
+def _validate_experiment_run(
+    root: Path,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    run: dict[str, Any],
+    trace_module: Any,
+    strict_raw_evidence: bool,
+) -> tuple[Path, Path, Path]:
+    trace_path = _relative_file(root, run["trace"], "trace", manifest_path)
+    verdict_path = _relative_file(root, run["verdict"], "verdict", manifest_path)
+    usage_path = _relative_file(root, run["usage"], "usage", manifest_path)
+    subject_path = _relative_file(root, run["subject"], "subject", manifest_path)
+    trace = trace_module.load_trace(trace_path)
+    verdict = trace_module.load_verdict(verdict_path)
+    usage = trace_module.load_usage(usage_path)
+    expected = _expected_run_identity(manifest, run)
+    _validate_run_records(run, expected, trace, verdict, usage)
+    subject_digest = _sha256(subject_path)
+    if verdict.get("subject_digest") != subject_digest:
+        raise ValueError(
+            f"verdict subject_digest mismatch for run {run['run_id']}: "
+            f"expected {subject_digest}, got {verdict.get('subject_digest')}"
+        )
+    _validate_optional_identities(manifest, run, verdict, usage)
+    _validate_raw_evidence(
+        root, manifest_path, run, verdict, usage, strict_raw_evidence
+    )
+    return trace_path, verdict_path, usage_path
+
+
 def run_experiment(
     manifest_path: Path, *, strict_raw_evidence: bool = False
 ) -> dict[str, Any]:
@@ -130,72 +244,14 @@ def run_experiment(
     repositories: set[str] = set()
 
     for run in manifest["runs"]:
-        trace_path = _relative_file(root, run["trace"], "trace", manifest_path)
-        verdict_path = _relative_file(root, run["verdict"], "verdict", manifest_path)
-        usage_path = _relative_file(root, run["usage"], "usage", manifest_path)
-        subject_path = _relative_file(root, run["subject"], "subject", manifest_path)
-        trace = trace_module.load_trace(trace_path)
-        verdict = trace_module.load_verdict(verdict_path)
-        usage = trace_module.load_usage(usage_path)
-
-        expected = {
-            "task_id": run["task_id"],
-            "task_revision": run["task_revision"],
-            "repository_identity": run["repository_identity"],
-            "mode": run["mode"],
-            "run_id": run["run_id"],
-            "model_identity": manifest["model_identity"],
-            "model_config_identity": manifest["model_config_identity"],
-            "runner_identity": manifest["runner_identity"],
-        }
-        for field, expected_value in expected.items():
-            if trace.get(field) != expected_value:
-                raise ValueError(
-                    f"trace {field} mismatch for run {run['run_id']}: expected {expected_value!r}, got {trace.get(field)!r}"
-                )
-        for record_name, record in (("verdict", verdict), ("usage", usage)):
-            for field in ("task_id", "mode", "run_id"):
-                if record.get(field) != expected[field]:
-                    raise ValueError(
-                        f"{record_name} {field} mismatch for run {run['run_id']}: expected {expected[field]!r}, got {record.get(field)!r}"
-                    )
-
-        subject_digest = _sha256(subject_path)
-        if verdict.get("subject_digest") != subject_digest:
-            raise ValueError(
-                f"verdict subject_digest mismatch for run {run['run_id']}: "
-                f"expected {subject_digest}, got {verdict.get('subject_digest')}"
-            )
-
-        grader_identity = manifest.get("grader_identity")
-        if (
-            grader_identity is not None
-            and verdict.get("grader_identity") != grader_identity
-        ):
-            raise ValueError(
-                f"verdict grader_identity mismatch for run {run['run_id']}"
-            )
-        provider_identity = manifest.get("provider_identity")
-        if (
-            provider_identity is not None
-            and usage.get("provider_identity") != provider_identity
-        ):
-            raise ValueError(
-                f"usage provider_identity mismatch for run {run['run_id']}"
-            )
-
-        for field, record, kind in (
-            ("grader_evidence", verdict, "grader"),
-            ("provider_evidence", usage, "provider"),
-        ):
-            if field in run:
-                evidence_path = _relative_file(root, run[field], field, manifest_path)
-                _validate_digest_binding(record, evidence_path, kind)
-            elif strict_raw_evidence:
-                raise ValueError(
-                    f"manifest run {run['run_id']} requires {field} in strict raw-evidence mode"
-                )
-
+        trace_path, verdict_path, usage_path = _validate_experiment_run(
+            root,
+            manifest_path,
+            manifest,
+            run,
+            trace_module,
+            strict_raw_evidence,
+        )
         trace_paths.append(trace_path)
         verdict_paths.append(verdict_path)
         usage_paths.append(usage_path)
