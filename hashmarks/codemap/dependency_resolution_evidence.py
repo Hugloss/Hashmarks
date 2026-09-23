@@ -10,6 +10,10 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 _SCHEMA = "hashmarks.dependency-resolution.v1"
+_SCHEMA_V2 = "hashmarks.dependency-resolution.v2"
+_MAX_CONTEXTS = 64
+_MAX_INVENTORY = 16384
+_MAX_EVIDENCE_SOURCES = 256
 _MAX_NODES = 4096
 _MAX_EDGES = 16384
 _MAX_ROOTS = 256
@@ -148,8 +152,12 @@ class DependencyResolutionEvidenceMixin:
             raise ValueError(
                 f"dependency resolution snapshot exceeds {_MAX_REQUEST_BYTES} encoded bytes"
             )
+        if snapshot.get("schema") == _SCHEMA_V2:
+            return self._dependency_resolution_evidence_v2(snapshot)
         if snapshot.get("schema") != _SCHEMA:
-            raise ValueError(f"dependency resolution schema must be {_SCHEMA}")
+            raise ValueError(
+                f"dependency resolution schema must be {_SCHEMA} or {_SCHEMA_V2}"
+            )
 
         definition = self._dependency_resolution_definition(snapshot)
         nodes = self._dependency_resolution_nodes(snapshot.get("nodes", ()))
@@ -203,6 +211,418 @@ class DependencyResolutionEvidenceMixin:
                 else "not-admissible"
             ),
         }
+
+    def _dependency_resolution_evidence_v2(
+        self,
+        snapshot: Mapping[str, object],
+    ) -> dict[str, object]:
+        """Qualify a multi-context dependency observation without executing its producer."""
+        producer = snapshot.get("producer")
+        if not isinstance(producer, Mapping):
+            raise ValueError("dependency resolution producer must be an object")
+        producer_packet = dict(producer)
+        _identifier(producer_packet.get("kind"), label="producer kind")
+        _text(
+            producer_packet.get("schema_version"),
+            label="producer schema_version",
+            required=True,
+        )
+        scope = snapshot.get("scope")
+        if not isinstance(scope, Mapping) or not scope:
+            raise ValueError("dependency resolution scope must be a non-empty object")
+        scope_packet = dict(scope)
+        _canonical(scope_packet)
+
+        raw_contexts = snapshot.get("contexts", ())
+        if not isinstance(raw_contexts, Sequence) or isinstance(
+            raw_contexts, (str, bytes, bytearray)
+        ):
+            raise ValueError("contexts must be a sequence")
+        contexts = [_identifier(value, label="context") for value in raw_contexts]
+        if not contexts:
+            raise ValueError("contexts must not be empty")
+        if len(contexts) > _MAX_CONTEXTS:
+            raise ValueError(f"contexts exceeds {_MAX_CONTEXTS} entries")
+        if len(set(contexts)) != len(contexts):
+            raise ValueError("duplicate dependency resolution context")
+        context_set = set(contexts)
+
+        evidence_sources = self._dependency_evidence_sources_v2(
+            snapshot.get("evidence_sources", ()), context_set
+        )
+        source_ids = {str(row["source_id"]) for row in evidence_sources}
+        components = self._dependency_components_v2(snapshot.get("components", ()))
+        component_ids = {str(row["component_id"]) for row in components}
+        selections = self._dependency_selections_v2(
+            snapshot.get("selections", ()), component_ids, context_set, source_ids
+        )
+        node_ids = {str(row["node_id"]) for row in selections}
+        inventory = self._dependency_inventory_v2(
+            snapshot.get("inventory", ()), node_ids, context_set, source_ids
+        )
+        relationships = self._dependency_relationships_v2(
+            snapshot.get("relationships", ()), node_ids, context_set, source_ids
+        )
+
+        raw_roots = snapshot.get("roots", ())
+        roots = self._dependency_roots_v2(raw_roots, node_ids, context_set)
+        repository_inputs = self._dependency_repository_inputs(
+            snapshot.get("repository_inputs", ())
+        )
+        module_ownership = self._dependency_module_ownership(
+            snapshot.get("module_ownership", ()), node_ids
+        )
+        coverage = self._dependency_coverage_v2(
+            snapshot.get("coverage", ()), context_set, source_ids
+        )
+
+        definition = {
+            "producer": producer_packet,
+            "scope": scope_packet,
+            "contexts": sorted(contexts),
+            "roots": roots,
+        }
+        resolution = {
+            "components": components,
+            "selections": selections,
+            "inventory": inventory,
+            "relationships": relationships,
+        }
+        definition_identity = _identity(
+            "hashmarks.dependency-resolution-definition.v2", definition
+        )
+        resolution_identity = _identity(
+            "hashmarks.dependency-resolution-graph.v2",
+            {"definition_identity": definition_identity, **resolution},
+        )
+
+        repository_binding = {
+            "repository_identity": self._repository_packet_identity(),
+            "codemap_generation": int(self.store.generation()),
+        }
+        observation_payload = {
+            "resolution_identity": resolution_identity,
+            "repository_binding": repository_binding,
+            "repository_inputs": repository_inputs,
+            "module_ownership": module_ownership,
+            "evidence_sources": evidence_sources,
+            "coverage": coverage,
+        }
+        observation_identity = _identity(
+            "hashmarks.dependency-resolution-observation.v2", observation_payload
+        )
+        negative = self._dependency_negative_evidence_v2(coverage)
+        return {
+            "schema": _SCHEMA_V2,
+            "authority": "qualified-external-observation",
+            "producer_authority": "caller-claimed",
+            "definition_identity": definition_identity,
+            "resolution_identity": resolution_identity,
+            "observation_identity": observation_identity,
+            **definition,
+            **resolution,
+            "repository_binding": repository_binding,
+            "repository_inputs": repository_inputs,
+            "module_ownership": module_ownership,
+            "evidence_sources": evidence_sources,
+            "coverage": coverage,
+            "negative_evidence": negative,
+        }
+
+    @staticmethod
+    def _dependency_components_v2(value: object) -> list[dict[str, object]]:
+        rows = _objects(value, label="components", limit=_MAX_NODES)
+        result: list[dict[str, object]] = []
+        seen: set[str] = set()
+        for raw in rows:
+            component_id = _identifier(raw.get("component_id"), label="component_id")
+            if component_id in seen:
+                raise ValueError(f"duplicate dependency component_id: {component_id}")
+            seen.add(component_id)
+            result.append(
+                {
+                    "component_id": component_id,
+                    "name": _text(raw.get("name"), label="component name", required=True),
+                    "ecosystem": _text(raw.get("ecosystem"), label="ecosystem"),
+                }
+            )
+        return sorted(result, key=lambda row: str(row["component_id"]))
+
+    @staticmethod
+    def _dependency_context_list_v2(
+        value: object, *, label: str, allowed: set[str]
+    ) -> list[str]:
+        if not isinstance(value, Sequence) or isinstance(
+            value, (str, bytes, bytearray)
+        ):
+            raise ValueError(f"{label} must be a sequence")
+        contexts = [_identifier(row, label=label) for row in value]
+        if not contexts:
+            raise ValueError(f"{label} must not be empty")
+        if len(set(contexts)) != len(contexts):
+            raise ValueError(f"duplicate {label}")
+        unknown = sorted(set(contexts) - allowed)
+        if unknown:
+            raise ValueError(f"unknown {label}: {unknown[0]}")
+        return sorted(contexts)
+
+    @staticmethod
+    def _dependency_source_refs_v2(
+        value: object, *, label: str, allowed: set[str]
+    ) -> list[str]:
+        if not isinstance(value, Sequence) or isinstance(
+            value, (str, bytes, bytearray)
+        ):
+            raise ValueError(f"{label} must be a sequence")
+        refs = [_identifier(row, label=label) for row in value]
+        if len(set(refs)) != len(refs):
+            raise ValueError(f"duplicate {label}")
+        dangling = sorted(set(refs) - allowed)
+        if dangling:
+            raise ValueError(f"dangling {label}: {dangling[0]}")
+        return sorted(refs)
+
+    @classmethod
+    def _dependency_evidence_sources_v2(
+        cls, value: object, contexts: set[str]
+    ) -> list[dict[str, object]]:
+        rows = _objects(value, label="evidence_sources", limit=_MAX_EVIDENCE_SOURCES)
+        result: list[dict[str, object]] = []
+        seen: set[str] = set()
+        for raw in rows:
+            source_id = _identifier(raw.get("source_id"), label="source_id")
+            if source_id in seen:
+                raise ValueError(f"duplicate dependency evidence source: {source_id}")
+            seen.add(source_id)
+            context = _text(raw.get("context"), label="evidence source context")
+            if context and context not in contexts:
+                raise ValueError(f"unknown evidence source context: {context}")
+            completeness = str(raw.get("completeness") or "unknown").strip()
+            truncation = str(raw.get("truncation") or "unknown").strip()
+            if completeness not in {"complete", "incomplete", "unknown"}:
+                raise ValueError("evidence source completeness must be complete, incomplete, or unknown")
+            if truncation not in {"complete", "truncated", "unknown"}:
+                raise ValueError("evidence source truncation must be complete, truncated, or unknown")
+            if completeness == "complete" and truncation != "complete":
+                raise ValueError("complete evidence source requires truncation=complete")
+            result.append(
+                {
+                    "source_id": source_id,
+                    "kind": _text(raw.get("kind"), label="evidence source kind", required=True),
+                    "context": context,
+                    "completeness": completeness,
+                    "truncation": truncation,
+                    "producer_digest": _text(raw.get("producer_digest"), label="producer digest"),
+                }
+            )
+        return sorted(result, key=lambda row: str(row["source_id"]))
+
+    @classmethod
+    def _dependency_selections_v2(
+        cls,
+        value: object,
+        component_ids: set[str],
+        contexts: set[str],
+        source_ids: set[str],
+    ) -> list[dict[str, object]]:
+        rows = _objects(value, label="selections", limit=_MAX_NODES)
+        result: list[dict[str, object]] = []
+        seen: set[str] = set()
+        for raw in rows:
+            node_id = _identifier(raw.get("node_id"), label="node_id")
+            if node_id in seen:
+                raise ValueError(f"duplicate dependency selection node_id: {node_id}")
+            seen.add(node_id)
+            component_id = _identifier(raw.get("component_id"), label="component_id")
+            if component_id not in component_ids:
+                raise ValueError(f"dangling dependency component: {component_id}")
+            result.append(
+                {
+                    "node_id": node_id,
+                    "component_id": component_id,
+                    "version": _text(raw.get("version"), label="version"),
+                    "source": _text(raw.get("source"), label="source"),
+                    "marker": _text(raw.get("marker"), label="marker"),
+                    "contexts": cls._dependency_context_list_v2(
+                        raw.get("contexts", ()), label="selection context", allowed=contexts
+                    ),
+                    "evidence_sources": cls._dependency_source_refs_v2(
+                        raw.get("evidence_sources", ()),
+                        label="selection evidence source",
+                        allowed=source_ids,
+                    ),
+                }
+            )
+        return sorted(result, key=lambda row: str(row["node_id"]))
+
+    @classmethod
+    def _dependency_inventory_v2(
+        cls,
+        value: object,
+        node_ids: set[str],
+        contexts: set[str],
+        source_ids: set[str],
+    ) -> list[dict[str, object]]:
+        rows = _objects(value, label="inventory", limit=_MAX_INVENTORY)
+        result: list[dict[str, object]] = []
+        seen: set[tuple[str, str]] = set()
+        for raw in rows:
+            node_id = _identifier(raw.get("node_id"), label="inventory node_id")
+            context = _identifier(raw.get("context"), label="inventory context")
+            if node_id not in node_ids:
+                raise ValueError(f"dangling dependency inventory node: {node_id}")
+            if context not in contexts:
+                raise ValueError(f"unknown inventory context: {context}")
+            key = (node_id, context)
+            if key in seen:
+                raise ValueError(f"duplicate dependency inventory membership: {node_id}:{context}")
+            seen.add(key)
+            result.append(
+                {
+                    "node_id": node_id,
+                    "context": context,
+                    "evidence_sources": cls._dependency_source_refs_v2(
+                        raw.get("evidence_sources", ()),
+                        label="inventory evidence source",
+                        allowed=source_ids,
+                    ),
+                }
+            )
+        return sorted(result, key=lambda row: (str(row["node_id"]), str(row["context"])))
+
+    @classmethod
+    def _dependency_relationships_v2(
+        cls,
+        value: object,
+        node_ids: set[str],
+        contexts: set[str],
+        source_ids: set[str],
+    ) -> list[dict[str, object]]:
+        rows = _objects(value, label="relationships", limit=_MAX_EDGES)
+        result: list[dict[str, object]] = []
+        seen: set[tuple[str, str, str, str, str, str]] = set()
+        for raw in rows:
+            source = _identifier(raw.get("source"), label="relationship source")
+            target = _identifier(raw.get("target"), label="relationship target")
+            context = _identifier(raw.get("context"), label="relationship context")
+            if source not in node_ids or target not in node_ids:
+                raise ValueError(f"dangling dependency relationship: {source}->{target}")
+            if context not in contexts:
+                raise ValueError(f"unknown relationship context: {context}")
+            packet = {
+                "source": source,
+                "target": target,
+                "kind": _text(raw.get("kind"), label="relationship kind", required=True),
+                "context": context,
+                "effective_scope": _text(raw.get("effective_scope"), label="effective scope"),
+                "marker": _text(raw.get("marker"), label="relationship marker"),
+                "evidence_sources": cls._dependency_source_refs_v2(
+                    raw.get("evidence_sources", ()),
+                    label="relationship evidence source",
+                    allowed=source_ids,
+                ),
+            }
+            key = (
+                source,
+                target,
+                str(packet["kind"]),
+                context,
+                str(packet["effective_scope"]),
+                str(packet["marker"]),
+            )
+            if key in seen:
+                raise ValueError(f"duplicate dependency relationship: {source}->{target}:{context}")
+            seen.add(key)
+            result.append(packet)
+        return sorted(
+            result,
+            key=lambda row: (
+                str(row["source"]),
+                str(row["target"]),
+                str(row["kind"]),
+                str(row["context"]),
+                str(row["effective_scope"]),
+                str(row["marker"]),
+            ),
+        )
+
+    @classmethod
+    def _dependency_roots_v2(
+        cls, value: object, node_ids: set[str], contexts: set[str]
+    ) -> list[dict[str, object]]:
+        rows = _objects(value, label="roots", limit=_MAX_ROOTS)
+        result: list[dict[str, object]] = []
+        seen: set[tuple[str, str]] = set()
+        for raw in rows:
+            node_id = _identifier(raw.get("node_id"), label="root node_id")
+            context = _identifier(raw.get("context"), label="root context")
+            if node_id not in node_ids:
+                raise ValueError(f"dangling dependency resolution root: {node_id}")
+            if context not in contexts:
+                raise ValueError(f"unknown root context: {context}")
+            key = (node_id, context)
+            if key in seen:
+                raise ValueError(f"duplicate dependency resolution root: {node_id}:{context}")
+            seen.add(key)
+            result.append({"node_id": node_id, "context": context})
+        return sorted(result, key=lambda row: (str(row["context"]), str(row["node_id"])))
+
+    @classmethod
+    def _dependency_coverage_v2(
+        cls, value: object, contexts: set[str], source_ids: set[str]
+    ) -> list[dict[str, object]]:
+        rows = _objects(value, label="coverage", limit=_MAX_CONTEXTS * 4)
+        result: list[dict[str, object]] = []
+        seen: set[tuple[str, str]] = set()
+        for raw in rows:
+            context = _identifier(raw.get("context"), label="coverage context")
+            kind = _identifier(raw.get("kind"), label="coverage kind")
+            if context not in contexts:
+                raise ValueError(f"unknown coverage context: {context}")
+            key = (context, kind)
+            if key in seen:
+                raise ValueError(f"duplicate dependency coverage: {context}:{kind}")
+            seen.add(key)
+            completeness = str(raw.get("completeness") or "unknown").strip()
+            truncation = str(raw.get("truncation") or "unknown").strip()
+            if completeness not in {"complete", "incomplete", "unknown"}:
+                raise ValueError("coverage completeness must be complete, incomplete, or unknown")
+            if truncation not in {"complete", "truncated", "unknown"}:
+                raise ValueError("coverage truncation must be complete, truncated, or unknown")
+            if completeness == "complete" and truncation != "complete":
+                raise ValueError("complete coverage requires truncation=complete")
+            result.append(
+                {
+                    "context": context,
+                    "kind": kind,
+                    "completeness": completeness,
+                    "truncation": truncation,
+                    "evidence_sources": cls._dependency_source_refs_v2(
+                        raw.get("evidence_sources", ()),
+                        label="coverage evidence source",
+                        allowed=source_ids,
+                    ),
+                }
+            )
+        return sorted(result, key=lambda row: (str(row["context"]), str(row["kind"])))
+
+    @staticmethod
+    def _dependency_negative_evidence_v2(
+        coverage: Sequence[Mapping[str, object]],
+    ) -> list[dict[str, object]]:
+        return [
+            {
+                "context": str(row["context"]),
+                "kind": str(row["kind"]),
+                "state": (
+                    "admissible-within-declared-scope"
+                    if row.get("completeness") == "complete"
+                    and row.get("truncation") == "complete"
+                    else "not-admissible"
+                ),
+            }
+            for row in coverage
+        ]
 
     @staticmethod
     def _dependency_resolution_nodes(value: object) -> list[dict[str, object]]:
