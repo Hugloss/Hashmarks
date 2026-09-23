@@ -25,6 +25,7 @@ EXPECTED_TOOLS = (
 )
 EXPECTED_UV_ARGS = [
     "run",
+    "--frozen",
     "--no-sync",
     "hashmarks",
     "--workspace",
