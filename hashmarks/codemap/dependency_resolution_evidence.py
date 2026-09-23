@@ -1068,11 +1068,23 @@ class DependencyResolutionEvidenceMixin:
                         if candidate not in seen:
                             seen.add(candidate)
                             queue.append((candidate, depth + 1))
+                coverage_rows = [
+                    row
+                    for row in observation.get("coverage", ())
+                    if isinstance(row, Mapping)
+                    and str(row.get("kind") or "") == "resolution-graph"
+                    and (not context or str(row.get("context") or "") == context)
+                ]
+                coverage_complete = bool(coverage_rows) and all(
+                    row.get("completeness") == "complete"
+                    and row.get("truncation") == "complete"
+                    for row in coverage_rows
+                )
                 result = {
                     "reachable": found,
                     "negative_evidence": (
-                        "admissible"
-                        if not found and not omissions
+                        "admissible-within-declared-scope"
+                        if not found and not omissions and coverage_complete
                         else "not-admissible"
                         if not found
                         else "not-applicable"
