@@ -105,6 +105,14 @@ Workspace/local projects may simultaneously have repository-project identity and
 
 The adapter is not a second dependency semantic owner. It must not invoke Maven, resolve packages, inspect dependency implementation source, parse a POM as resolved truth, or infer repair/vulnerability/causal conclusions. Tree evidence owns graph relationships and effective Maven scope; list evidence owns resolved inventory and reported Java-module ownership. A package present only in list evidence remains inventory-only rather than being invented into graph reachability. Maven contexts such as compile/runtime/test remain observation contexts and are not interchangeable with each edge's effective scope.
 
+### uv lock adapter
+
+`hashmarks.adapters.uv_lock_dependency_observation` is an execution-free qualification adapter for already-produced `uv.lock` bytes. It translates lock selections, sources, inventory membership, and lock-declared dependency relationships into the existing dependency-resolution v2 observation contract.
+
+The adapter does not invoke uv, synchronize an environment, inspect dependency implementation source, or parse `pyproject.toml` as resolved truth. Lock package source identity is preserved as part of concrete selection identity; a directory selection remains distinct from a registry or other source selection even when name and version match. Name-only dependency references are admitted only when they resolve uniquely within the supplied lock. Ambiguous lock references are rejected rather than guessed.
+
+The lock is qualified as resolution/inventory evidence, not installed-import ownership evidence. Absence of module ownership in a lock therefore does not become a negative module-ownership claim. Repository binding remains explicit through `repository_inputs`; the adapter does not infer source equivalence from nearby manifest files.
+
 ## Orthogonal state rule
 
 Do not overload one field with multiple axes.
