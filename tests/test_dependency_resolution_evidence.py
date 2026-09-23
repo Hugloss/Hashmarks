@@ -686,10 +686,7 @@ def test_v2_module_owner_absence_requires_complete_ownership_coverage(
 
     compile_result, runtime_result = packet["results"]
     assert compile_result["result"] == []
-    assert (
-        compile_result["negative_evidence"]
-        == "admissible-within-declared-scope"
-    )
+    assert compile_result["negative_evidence"] == "admissible-within-declared-scope"
     assert compile_result["completeness"] == "complete"
     assert runtime_result["result"] == []
     assert runtime_result["completeness"] == "incomplete"
