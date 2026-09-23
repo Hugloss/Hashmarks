@@ -24,9 +24,11 @@ jobs:
           version: "0.12.15"
           enable-cache: false
       - run: uv python install 3.14
-      - run: uv sync --group test --extra mcp --python 3.14
+      - name: Check committed dependency convergence
+        run: uv lock --check
+      - run: uv sync --frozen --group test --extra mcp --python 3.14
       - name: Validate release tag against package version
-        run: uv run --no-sync python scripts/release_contract.py validate-tag --tag "${{ github.event.release.tag_name }}"
+        run: uv run --frozen --no-sync python scripts/release_contract.py validate-tag --tag "${{ github.event.release.tag_name }}"
       - name: Run canonical Ruff check
         run: make ruff
       - name: Enforce Ruff structural debt gate
@@ -55,7 +57,7 @@ jobs:
           .release-sdist/bin/python -I scripts/installed_artifact_smoke.py
       - name: Bind exact release bytes
         run: |
-          uv run --no-sync python scripts/release_contract.py manifest \
+          uv run --frozen --no-sync python scripts/release_contract.py manifest \
             --dist release/packages \
             --tag "${{ github.event.release.tag_name }}" \
             --output release/release-manifest.json \

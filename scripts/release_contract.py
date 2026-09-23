@@ -9,7 +9,7 @@ import tomllib
 import zipfile
 from pathlib import Path
 
-SCHEMA = "hashmarks.release-artifact-manifest.v1"
+SCHEMA = "hashmarks.release-artifact-manifest.v2"
 
 
 def _project(root: Path) -> dict[str, object]:
@@ -106,12 +106,19 @@ def release_manifest(root: Path, dist: Path, *, tag: str) -> dict[str, object]:
         if row["project"] != name or row["version"] != version:
             raise ValueError(f"distribution metadata mismatch: {row['filename']}")
 
+    if not (root / "uv.lock").is_file():
+        raise ValueError("committed uv.lock is required for release qualification")
+
     payload: dict[str, object] = {
         "schema": SCHEMA,
         "project": name,
         "version": version,
         "tag": tag,
         "distributions": rows,
+        "qualification_dependency_resolution": {
+            "path": "uv.lock",
+            "sha256": _sha256(root / "uv.lock"),
+        },
         "publication_authority": "external",
     }
     canonical = json.dumps(

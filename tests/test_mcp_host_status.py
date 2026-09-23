@@ -80,7 +80,7 @@ def test_codex_discovery_reports_project_trust_required(tmp_path, monkeypatch) -
     workspace.mkdir()
     (workspace / ".codex").mkdir()
     (workspace / ".codex" / "config.toml").write_text(
-        '[mcp_servers.hashmarks]\ncommand = "uv"\nargs = ["run", "--no-sync", "hashmarks", "--workspace", ".", "mcp"]\nenabled = true\n',
+        '[mcp_servers.hashmarks]\ncommand = "uv"\nargs = ["run", "--frozen", "--no-sync", "hashmarks", "--workspace", ".", "mcp"]\nenabled = true\n',
         encoding="utf-8",
     )
     monkeypatch.setattr(
@@ -280,7 +280,7 @@ def test_codex_discovery_reports_direct_success_and_hard_failure(
     config.parent.mkdir(parents=True)
     config.write_text(
         '[mcp_servers.hashmarks]\ncommand = "uv"\n'
-        'args = ["run", "--no-sync", "hashmarks", "--workspace", ".", "mcp"]\n',
+        'args = ["run", "--frozen", "--no-sync", "hashmarks", "--workspace", ".", "mcp"]\n',
         encoding="utf-8",
     )
     monkeypatch.setattr(

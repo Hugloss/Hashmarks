@@ -25,19 +25,21 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
-      - name: Install Ruff only for cheap admission
-        run: uv tool install "ruff>=0.12,<0.17"
+      - run: uv python install 3.11
+      - name: Check committed dependency convergence
+        run: uv lock --check
+      - name: Materialize locked Ruff environment
+        run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --frozen --only-group lint --python 3.11
       - name: Ruff formatting gate for changed Python
         shell: bash
         run: |
           mapfile -t files < <(git diff --name-only --diff-filter=ACMR HEAD^1 HEAD -- '*.py')
           if (( ${#files[@]} )); then
-            ruff format --check -- "${files[@]}"
+            .ruff-venv/bin/ruff format --check -- "${files[@]}"
           fi
       - name: Ruff correctness/import gate
-        run: ruff check .
-      - run: uv python install 3.11
-      - run: uv sync --group test --python 3.11
+        run: .ruff-venv/bin/ruff check .
+      - run: uv sync --frozen --group test --python 3.11
       - name: Resolve previous-main Ruff debt baseline
         run: git show HEAD^1:ruff-debt-baseline.json > "$RUNNER_TEMP/ruff-debt-baseline.previous.json"
       - name: Ruff maintainability debt gate
@@ -60,9 +62,9 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.11
-      - run: uv sync --group test --python 3.11
+      - run: uv sync --frozen --group test --python 3.11
       - name: Prove workspace-state authority
-        run: uv run --no-sync python -m pytest -q tests/test_codemap_state_binding.py
+        run: uv run --frozen --no-sync python -m pytest -q tests/test_codemap_state_binding.py
 
   evidence-binding-diagnostics:
     name: Repository evidence binding diagnostics
@@ -76,10 +78,10 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.11
-      - run: uv sync --group test --python 3.11
+      - run: uv sync --frozen --group test --python 3.11
       - name: Prove repository evidence binding behavior
         run: >-
-          uv run --no-sync python -m pytest -q
+          uv run --frozen --no-sync python -m pytest -q
           tests/test_repository_evidence_bindings.py
           tests/test_semantic_ownership_architecture.py
 
@@ -117,7 +119,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.14
-      - run: uv sync --group test --python 3.14
+      - run: uv sync --frozen --group test --python 3.14
       - run: make test-profile
       - run: make artifact-check ARTIFACT_PYTHON=3.14
 
@@ -139,7 +141,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install ${{ matrix.python }}
-      - run: uv sync --group test --python ${{ matrix.python }}
+      - run: uv sync --frozen --group test --python ${{ matrix.python }}
       - run: make test
       - run: make artifact-check ARTIFACT_PYTHON=${{ matrix.python }}
 

@@ -1,5 +1,5 @@
 [mcp_servers.hashmarks]
 command = "uv"
-args = ["run", "--no-sync", "hashmarks", "--workspace", ".", "mcp"]
+args = ["run", "--frozen", "--no-sync", "hashmarks", "--workspace", ".", "mcp"]
 cwd = "."
 enabled = true
