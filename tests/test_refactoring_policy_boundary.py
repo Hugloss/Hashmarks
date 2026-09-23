@@ -1,7 +1,9 @@
 from pathlib import Path
 
 
-def test_refactoring_policy_requires_measured_product_value_without_phase_history() -> None:
+def test_refactoring_policy_requires_measured_product_value_without_phase_history() -> (
+    None
+):
     agents = Path("AGENTS.md").read_text(encoding="utf-8")
     policy = Path("docs/maintainers/RESPONSIBILITY_REFACTORING.md").read_text(
         encoding="utf-8"
