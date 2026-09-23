@@ -1,6 +1,6 @@
 # Getting started with Hashmarks repository intelligence
 
-Hashmarks provides local repository intelligence, codebase search for coding agents, repository context, change-impact evidence, and an optional read-only MCP server for coding agents. This guide covers the current repository-intelligence workflow from installation through CLI, Python, and MCP usage. Historical benchmark and compatibility surfaces are intentionally omitted.
+Hashmarks provides local repository intelligence, codebase search for coding agents, repository context, change-impact evidence, and an optional read-only MCP server for coding agents. This guide covers the current repository-intelligence workflow from installation through CLI, Python, and MCP usage.
 
 ## Requirements
 

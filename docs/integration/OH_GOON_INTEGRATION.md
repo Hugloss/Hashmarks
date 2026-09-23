@@ -1,6 +1,6 @@
 # Hashmarks ↔ Oh-Goon integration contract
 
-**Status: current normative integration guidance.** Superseded integration notes are recoverable from Git history and are not product authority.
+**Status: current normative integration guidance.**
 
 ## Three-plane model
 
@@ -121,10 +121,6 @@ Oh-Goon                         -> admission/execution/certification
 ```
 
 A CodeMap service/watch process may be managed as infrastructure, but its failure must not silently weaken execution/certification policy. Consumers should reconcile or fall back when freshness is insufficient.
-
-## Pre-public boundary history
-
-Execution-shaped and agent-loop responsibilities are outside the current public contract. Git history preserves earlier experiments; they are not an integration compatibility surface and must not be treated as architectural precedent.
 
 ## Normative references
 

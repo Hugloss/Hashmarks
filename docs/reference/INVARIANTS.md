@@ -1,6 +1,6 @@
 # Hashmarks invariants
 
-**Status: normative.** These are the current public correctness, freshness, ownership, and authority guarantees for Hashmarks. Superseded invariant text is recoverable from Git history and is not product authority.
+**Status: normative.** These are the current public correctness, freshness, ownership, and authority guarantees for Hashmarks.
 
 The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.md) overrides historical implementation precedent.
 
@@ -225,10 +225,6 @@ Hashmarks is a repository observer that exposes repository intelligence, not an 
 **G67. Repository evidence bindings are projections, not a second change authority.** Binding definitions may be consumer-declared and opaque, but observed member/range identities, relationships, freshness, completeness, and change facts remain bound to the canonical Hashmarks owners. Definition/configuration change must remain distinguishable from repository content or relationship change.
 
 **G68. Evidence correlation preserves claims without acquiring interpretation authority.** Bounded external or derived observations may be correlated to canonical repository evidence only through existing repository observation, identity, freshness, completeness, relationship, and delta owners. Path/symbol correspondence and qualified source equivalence may be reported; arbitrary metadata cannot strengthen repository truth. Correlation must not become causation, diagnosis, recommendation, execution, recovery, certification, or persistent consumer/runtime history.
-
-## Historical evidence
-
-Benchmark workers, Codex/scout experiments, agent traces, failed-attempt studies, historical action/result caches, PASS-promotion experiments, and phase-specific compatibility invariants may exist in development evaluation infrastructure or Git history. They may measure Hashmarks; they do not define the product.
 
 ### MCP transport boundary
 
