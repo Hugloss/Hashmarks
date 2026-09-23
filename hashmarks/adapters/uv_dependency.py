@@ -133,9 +133,7 @@ def uv_lock_dependency_observation(
         }
         for row in packages
     ]
-    unique_components = {
-        str(row["component_id"]): row for row in components
-    }
+    unique_components = {str(row["component_id"]): row for row in components}
     selections = [
         {
             "node_id": row["node_id"],
