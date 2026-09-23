@@ -6,10 +6,13 @@ def test_refactoring_policy_requires_measured_product_value_without_phase_histor
     policy = Path("docs/maintainers/RESPONSIBILITY_REFACTORING.md").read_text(
         encoding="utf-8"
     )
+    invariants = Path("docs/reference/INVARIANTS.md").read_text(encoding="utf-8")
 
     assert "Structural cleanup requires measured product value" in agents
     assert "Ruff/LOC alone do not authorize a refactor" in agents
     assert "do not create a parallel phase-history document" in policy
+    assert "A6. APIs have one current supported spelling." in invariants
+    assert "Pre-public APIs" not in invariants
 
     for label in range(55, 66):
         assert f"### G{label} —" not in agents
