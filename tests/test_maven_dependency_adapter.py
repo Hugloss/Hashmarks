@@ -189,3 +189,36 @@ def test_maven_adapter_preserves_inventory_without_module_metadata(
     assert [row["module"] for row in observation["module_ownership"]] == [
         "example.owned"
     ]
+
+
+def test_maven_adapter_does_not_overclaim_module_ownership_completeness(
+    tmp_path: Path,
+) -> None:
+    inventory = b"""The following files have been resolved:
+   example.libs:owned:jar:3.0:test -- module example.owned
+   example.libs:unannotated:jar:4.0:test
+"""
+    raw = maven_dependency_observation(
+        trees={},
+        inventories={"test": inventory},
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(raw)
+
+    coverage = {
+        row["kind"]: row
+        for row in observation["coverage"]
+        if row["context"] == "test"
+    }
+    assert coverage["resolved-inventory"]["completeness"] == "complete"
+    assert coverage["module-ownership"]["completeness"] == "incomplete"
+    negative = {
+        row["kind"]: row
+        for row in observation["negative_evidence"]
+        if row["context"] == "test"
+    }
+    assert negative["resolved-inventory"]["state"] == "admissible-within-declared-scope"
+    assert negative["module-ownership"]["state"] == "not-admissible"
+    assert observation["module_ownership"][0]["completeness"] == "incomplete"
