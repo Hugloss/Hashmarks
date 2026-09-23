@@ -786,6 +786,53 @@ def test_v2_delta_reports_selection_inventory_and_relationship_change(
     assert delta["causation"] == "not-inferred"
 
 
+def test_v2_relationship_parent_change_is_not_selection_change(
+    tmp_path: Path,
+) -> None:
+    before_snapshot = _snapshot_v2()
+    after_snapshot = _snapshot_v2()
+    after_snapshot["relationships"][0]["source"] = "inventory-only@1"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(before_snapshot)
+        after = codemap.dependency_resolution_evidence(after_snapshot)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert delta["selections_added"] == []
+    assert delta["selections_removed"] == []
+    assert delta["selections_changed"] == []
+    assert delta["relationships_removed"] == [
+        ["app@1", "library@1", "dependency", "compile", "compile", ""]
+    ]
+    assert delta["relationships_added"] == [
+        ["inventory-only@1", "library@1", "dependency", "compile", "compile", ""]
+    ]
+
+
+def test_v2_module_ownership_preserves_ambiguous_maven_module(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["module_ownership"] = [
+        {
+            "module": "shared.module",
+            "context": "compile",
+            "owners": ["library@1", "inventory-only@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        }
+    ]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+
+    ownership = observation["module_ownership"][0]
+    assert ownership["state"] == "resolved-ambiguous"
+    assert ownership["owners"] == ["inventory-only@1", "library@1"]
+
+
 def test_v2_repository_binding_tracks_current_codemap_generation(
     tmp_path: Path,
 ) -> None:
