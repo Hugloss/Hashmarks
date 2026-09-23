@@ -172,22 +172,32 @@ The binding implementation must therefore converge on the existing owners above 
 
 ## Dependency/distribution evidence work
 
-`dependency_resolution_evidence.py` owns qualified external dependency-resolution observations. Its admitted fact is correspondence between a caller-supplied producer-neutral resolution graph and existing repository evidence.
+`dependency_resolution_evidence.py` owns qualified external dependency-resolution observations. Its admitted fact is correspondence between caller-supplied, producer-neutral resolution evidence and existing repository evidence. Dependency observations remain request-scoped by default; retaining workflow labels or historical observations is consumer-owned unless a separate persistence contract is admitted.
 
 It owns:
-- the `hashmarks.dependency-resolution.v1` observation contract;
-- opaque producer node identity, graph validation, and graph observation identity;
-- resolution definition identity over producer semantics, selected roots, and explicit scope;
-- comparability and factual node-level delta for equivalent definitions;
-- explicit repository-input correspondence using canonical repository member observation.
+- the typed dependency-resolution observation contract;
+- logical component identity separately from concrete resolved selection identity;
+- resolved inventory membership separately from graph reachability;
+- multi-context dependency relationships, roots, and effective-scope observations;
+- compact producer-evidence references and context/source-kind coverage;
+- resolution definition, resolution graph, and full qualified-observation identities;
+- comparability and factual component/selection/inventory/relationship delta for equivalent definitions;
+- bounded dependency traversal with explicit omission accounting;
+- explicit repository-input correspondence using canonical repository member observation;
+- repository-generation binding by reusing the existing repository identity/generation owner;
+- explicit module/distribution ownership observations without name-based inference.
 
 It does not own:
+- repository-declared dependency intent or lockfile authority;
 - repository project topology (`project_graph.py`);
 - repository import identity (`import_resolution.py`);
-- repository freshness or repository delta;
+- a second repository freshness or repository delta model;
 - package-manager execution, environment synchronization, dependency source indexing, or remote discovery;
 - module/distribution ownership inference;
-- causal diagnosis, upgrade advice, or repair recommendation.
+- vulnerability authority, causal diagnosis, upgrade advice, or repair recommendation;
+- consumer phase labels such as `before`, `after-fix`, or `final`.
+
+Inventory membership does not prove graph reachability, and absence from a graph or inventory is authoritative only when the corresponding context/source-kind coverage is explicitly complete and non-truncated. Producer evidence may support individual selections, inventory memberships, and relationships without becoming repository authority.
 
 A producer claim that a resolution came from a repository input is not source-equivalence proof. Without an independently comparable member revision, source equivalence remains `unknown`; matching and mismatching revisions produce `proven` and `mismatch` respectively.
 
