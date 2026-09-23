@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
+import sys
+from argparse import Namespace
 from pathlib import Path
 
 import pytest
@@ -11,6 +14,7 @@ SCRIPT = ROOT / "scripts" / "host_qualification" / "opencode_mcp_host_gate.py"
 SPEC = importlib.util.spec_from_file_location("opencode_mcp_host_gate", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 host_gate = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = host_gate
 SPEC.loader.exec_module(host_gate)
 
 
@@ -201,3 +205,112 @@ def test_opencode_version_gate_accepts_stable_v1_and_v2() -> None:
     assert host_gate._opencode_version("2.0.4") == (2, 0)
     with pytest.raises(host_gate.HostGateError, match="1.18 or newer"):
         host_gate._opencode_version("opencode 1.17.9")
+
+
+def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "opencode.json").write_text("{}\n", encoding="utf-8")
+    receipt_path = tmp_path / "receipts" / "gate.json"
+    args = Namespace(
+        opencode="opencode",
+        uv="uv",
+        python="3.14",
+        model="provider/model",
+        receipt=str(receipt_path),
+    )
+    monkeypatch.setattr(host_gate.shutil, "which", lambda _name: "/bin/opencode")
+
+    def fake_run(argv, *, cwd, env=None, timeout=600):
+        del cwd, env, timeout
+        if argv == ["opencode", "--version"]:
+            return subprocess.CompletedProcess(argv, 0, "opencode 2.0.4\n", "")
+        if argv[:2] == ["uv", "build"]:
+            build_dir = Path(argv[argv.index("--out-dir") + 1])
+            (build_dir / "hashmarks-1.0.0-py3-none-any.whl").write_bytes(b"wheel")
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(host_gate, "_run", fake_run)
+    monkeypatch.setattr(
+        host_gate,
+        "_package_versions",
+        lambda _python: {"hashmarks": "1.0.0", "mcp": "1.0"},
+    )
+    registration_env = {"QUALIFICATION": "opencode"}
+    monkeypatch.setattr(
+        host_gate,
+        "_configure_opencode_mcp",
+        lambda *args, **kwargs: (
+            subprocess.CompletedProcess([], 0, "hashmarks connected\n", ""),
+            "opencode.json",
+            registration_env,
+        ),
+    )
+    phase1_events = [
+        _tool_event(
+            "hashmarks_repository_context",
+            {"schema": "hashmarks.repository-capsule.v1", "generation": 1},
+        ),
+        _tool_event(
+            "hashmarks_find",
+            {
+                "schema": "hashmarks.mcp-find.v1",
+                "results": [{"path": host_gate.CHANGED_PATH}],
+            },
+        ),
+        _tool_event(
+            "hashmarks_task_evidence",
+            {
+                "schema": "hashmarks.task-evidence.v1",
+                "edit": host_gate.CHANGED_PATH,
+                "evidence_receipt": {
+                    "codemap_generation": 1,
+                    "evidence_identity": "sha256:evidence",
+                },
+            },
+        ),
+        _tool_event(
+            "hashmarks_change_impact",
+            {"schema": "hashmarks.task-change-impact.v1"},
+        ),
+    ]
+    phase2_events = [
+        _tool_event(
+            "hashmarks_post_change",
+            {
+                "schema": "hashmarks.task-post-change-delta.v1",
+                "status": "changed",
+                "generation_before": 1,
+                "generation_after": 2,
+                "invalidated": [host_gate.CHANGED_PATH],
+                "path_changes": [{"path": host_gate.CHANGED_PATH, "state": "changed"}],
+            },
+        ),
+        _tool_event(
+            "hashmarks_repository_context",
+            {"schema": "hashmarks.repository-capsule.v1", "generation": 2},
+        ),
+    ]
+    calls = []
+
+    def fake_opencode_run(opencode, *, repo, model, prompt, env, session_id=None):
+        del opencode, repo, model, prompt
+        calls.append((env, session_id))
+        events = phase1_events if session_id is None else phase2_events
+        return subprocess.CompletedProcess(
+            [], 0, "\n".join(json.dumps(event) for event in events) + "\n", ""
+        )
+
+    monkeypatch.setattr(host_gate, "_opencode_run", fake_opencode_run)
+
+    receipt = host_gate._host_gate(args, project)
+
+    assert receipt["status"] == "PASS"
+    assert receipt["host"] == {"name": "opencode", "version": "opencode 2.0.4"}
+    assert receipt["phase1"]["generation"] == 1
+    assert receipt["phase2"]["generation_after"] == 2
+    assert calls == [(registration_env, None), (registration_env, "ses_123")]
+    assert Path(receipt["logs"]["phase1"]["path"]).is_file()
+    assert Path(receipt["logs"]["phase2"]["path"]).is_file()
