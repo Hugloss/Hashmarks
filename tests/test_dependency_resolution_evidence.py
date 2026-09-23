@@ -799,3 +799,47 @@ def test_v2_context_query_includes_selection_context_without_inventory_or_edge(
         )
 
     assert packet["results"][0]["result"] == ["compile", "optional", "runtime"]
+
+
+def test_v2_inventory_absence_requires_complete_inventory_coverage(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["coverage"].append(
+        {
+            "context": "runtime",
+            "kind": "resolved-inventory",
+            "completeness": "incomplete",
+            "truncation": "complete",
+            "evidence_sources": ["list:runtime"],
+        }
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "inventory",
+                    "node_id": "missing@1",
+                    "context": "compile",
+                },
+                {
+                    "operation": "inventory",
+                    "node_id": "missing@1",
+                    "context": "runtime",
+                },
+            ],
+        )
+
+    compile_result, runtime_result = packet["results"]
+    assert compile_result["result"] == []
+    assert compile_result["completeness"] == "complete"
+    assert (
+        compile_result["negative_evidence"]
+        == "admissible-within-declared-scope"
+    )
+    assert runtime_result["result"] == []
+    assert runtime_result["completeness"] == "incomplete"
+    assert runtime_result["negative_evidence"] == "not-admissible"
