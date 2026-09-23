@@ -244,7 +244,6 @@ def test_agent_evaluation_compatibility_manifest_is_removed() -> None:
     assert not (ROOT / "scripts" / "agent_evaluation" / "contract_surface.py").exists()
 
 
-
 def test_repository_root_markdown_is_limited_to_entry_points() -> None:
     allowed = {"AGENTS.md", "README.md", "CHANGELOG.md"}
     root_markdown = {path.name for path in ROOT.glob("*.md")}
@@ -271,8 +270,7 @@ def test_repository_root_has_no_historical_phase_evidence() -> None:
     historical_docs = sorted(
         path.relative_to(root).as_posix()
         for path in (root / "docs").rglob("*")
-        if path.is_file()
-        and (path.name.startswith("HM") or "HISTORICAL" in path.name)
+        if path.is_file() and (path.name.startswith("HM") or "HISTORICAL" in path.name)
     )
     assert historical_docs == []
     assert "## HM" not in (root / "CHANGELOG.md").read_text(encoding="utf-8")
