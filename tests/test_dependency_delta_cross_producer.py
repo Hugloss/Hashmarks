@@ -57,7 +57,9 @@ def _maven_inventory(version: str) -> bytes:
     ).encode()
 
 
-def _delta(\n    codemap: CodeMap, before_raw: dict[str, object], after_raw: dict[str, object]\n):
+def _delta(
+    codemap: CodeMap, before_raw: dict[str, object], after_raw: dict[str, object]
+):
     before = codemap.dependency_resolution_evidence(before_raw)
     after = codemap.dependency_resolution_evidence(after_raw)
     return before, after, codemap.dependency_resolution_delta(before, after)
