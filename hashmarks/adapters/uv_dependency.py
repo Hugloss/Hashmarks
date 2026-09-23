@@ -126,8 +126,7 @@ def uv_lock_dependency_observation(
 
     root_ids = {str(row["node_id"]) for row in roots}
     components = [
-        {"component_id": str(row["name"]), "name": str(row["name"]), "ecosystem": "pypi"}
-        for row in packages
+        {\n            "component_id": str(row["name"]),\n            "name": str(row["name"]),\n            "ecosystem": "pypi",\n        }\n        for row in packages
     ]
     unique_components = {
         str(row["component_id"]): row for row in components
@@ -193,12 +192,12 @@ def uv_lock_dependency_observation(
             key=lambda row: str(row["node_id"]),
         ),
         "evidence_sources": evidence_sources,
-        "components": sorted(unique_components.values(), key=lambda row: row["component_id"]),
+        "components": sorted(\n            unique_components.values(), key=lambda row: row["component_id"]\n        ),
         "selections": sorted(selections, key=lambda row: str(row["node_id"])),
         "inventory": sorted(inventory, key=lambda row: str(row["node_id"])),
         "relationships": sorted(
             relationships,
-            key=lambda row: (str(row["source"]), str(row["target"]), str(row["marker"])),
+            key=lambda row: (\n                str(row["source"]),\n                str(row["target"]),\n                str(row["marker"]),\n            ),
         ),
         "coverage": [
             {
