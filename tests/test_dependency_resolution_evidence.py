@@ -849,3 +849,77 @@ def test_v2_inventory_absence_requires_complete_inventory_coverage(
     assert runtime_result["result"] == []
     assert runtime_result["completeness"] == "incomplete"
     assert runtime_result["negative_evidence"] == "not-admissible"
+
+
+def test_v2_unscoped_module_absence_requires_coverage_for_every_context(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["evidence_sources"].append(
+        {
+            "source_id": "modules:compile",
+            "kind": "module-ownership",
+            "context": "compile",
+            "completeness": "complete",
+            "truncation": "complete",
+        }
+    )
+    changed["coverage"].append(
+        {
+            "context": "compile",
+            "kind": "module-ownership",
+            "completeness": "complete",
+            "truncation": "complete",
+            "evidence_sources": ["modules:compile"],
+        }
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "module-owners", "module": "missing.module"}],
+        )
+
+    result = packet["results"][0]
+    assert result["result"] == []
+    assert result["completeness"] == "incomplete"
+    assert result["negative_evidence"] == "not-admissible"
+
+
+def test_v2_unscoped_module_absence_is_admissible_when_all_contexts_complete(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    for context in ("compile", "runtime"):
+        source_id = f"modules:{context}"
+        changed["evidence_sources"].append(
+            {
+                "source_id": source_id,
+                "kind": "module-ownership",
+                "context": context,
+                "completeness": "complete",
+                "truncation": "complete",
+            }
+        )
+        changed["coverage"].append(
+            {
+                "context": context,
+                "kind": "module-ownership",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": [source_id],
+            }
+        )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "module-owners", "module": "missing.module"}],
+        )
+
+    result = packet["results"][0]
+    assert result["result"] == []
+    assert result["completeness"] == "complete"
+    assert result["negative_evidence"] == "admissible-within-declared-scope"

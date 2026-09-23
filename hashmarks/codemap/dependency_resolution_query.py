@@ -195,6 +195,13 @@ def _coverage_complete(
         and str(row.get("kind") or "") == kind
         and (not context or str(row.get("context") or "") == context)
     ]
+    if not context:
+        declared_contexts = {
+            str(value) for value in observation.get("contexts", ()) if str(value)
+        }
+        covered_contexts = {str(row.get("context") or "") for row in rows}
+        if declared_contexts - covered_contexts:
+            return False
     return bool(rows) and all(
         row.get("completeness") == "complete" and row.get("truncation") == "complete"
         for row in rows
