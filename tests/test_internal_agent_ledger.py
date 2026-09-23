@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.agent_evaluation import grade_internal_agent_runs as grader
 from scripts.agent_evaluation import internal_agent_ledger as ledger
 
 
@@ -191,3 +192,110 @@ def test_ledger_packet_and_verification_capture_subprocess_evidence(
         "verification",
     ]
     assert saved["events"][-1]["passed"] is True
+
+
+def test_ledger_cli_rejects_oracle_secret_argument(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state = tmp_path / "state.json"
+    secret = tmp_path / "secret.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ledger",
+            "--state",
+            str(state),
+            "--secret",
+            str(secret),
+            "init",
+            "--task-id",
+            "task-1",
+            "--lane",
+            "native",
+            "--repo",
+            str(tmp_path),
+            "--query",
+            "find owner",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        ledger.main()
+
+    assert exc_info.value.code == 2
+    assert not state.exists()
+
+
+def test_grader_rejects_unsealed_trace_then_joins_secret_for_sealed_trace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    trace_path = runs / "task-1.json"
+    secret_path = tmp_path / "secret.json"
+    output = tmp_path / "graded.json"
+
+    trace = {
+        "sealed": False,
+        "task_id": "task-1",
+        "lane": "native",
+        "identity": "sha256:trace",
+        "events": [
+            {
+                "kind": "final_result",
+                "selected_edit": "owner.py",
+                "verified": True,
+            }
+        ],
+        "metrics": {
+            "tool_calls": 1,
+            "search_calls": 0,
+            "read_calls": 0,
+            "repository_read_bytes": 0,
+            "hashmarks_visible_bytes": 0,
+            "verification_attempts": 1,
+            "failed_verifications": 0,
+            "wall_ms": 1.0,
+        },
+    }
+    trace_path.write_text(json.dumps(trace), encoding="utf-8")
+    secret_path.write_text(
+        json.dumps(
+            {
+                "tasks": [
+                    {
+                        "id": "task-1",
+                        "category": "ownership",
+                        "expected_edit_path": "owner.py",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "grade",
+            "--runs",
+            str(runs),
+            "--secret",
+            str(secret_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    with pytest.raises(AssertionError):
+        grader.main()
+    assert not output.exists()
+
+    trace["sealed"] = True
+    trace_path.write_text(json.dumps(trace), encoding="utf-8")
+    grader.main()
+
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert result["protocol"]["secret_join_after_trace_seal"] is True
+    assert result["rows"][0]["edit_correct"] is True
