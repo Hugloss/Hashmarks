@@ -38,7 +38,7 @@ SCHEMA = "hashmarks.worker-failed-verification-ab.v1"
 PROTOCOL_SCHEMA = "hashmarks.worker-failed-verification-ab-protocol.v1"
 FAILURE_PACKET_SCHEMA = "hashmarks.worker-failed-verification-input.v1"
 WORKER_OUTPUT_SCHEMA = "hashmarks.worker-failed-verification-output.v1"
-FAMILY = "hashmarks-v0.10.40-failed-verification-recovery-a"
+FAMILY = "hashmarks-failed-verification-recovery-a"
 POLICIES = ("repeat-failed", "fresh-research", "evidence-guided-recovery")
 
 

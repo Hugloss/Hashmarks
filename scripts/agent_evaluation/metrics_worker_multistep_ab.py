@@ -34,7 +34,7 @@ from .metrics_worker_inspection_ab import (
 
 SCHEMA = "hashmarks.worker-multistep-ab.v1"
 PROTOCOL_SCHEMA = "hashmarks.worker-multistep-ab-protocol.v1"
-FAMILY = "hashmarks-v0.10.39-worker-multistep-a"
+FAMILY = "hashmarks-worker-multistep-a"
 
 
 class _EditDecision(TypedDict):

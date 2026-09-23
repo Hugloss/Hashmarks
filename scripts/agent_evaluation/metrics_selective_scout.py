@@ -33,7 +33,7 @@ from .metrics_worker_inspection_ab import (
 )
 
 SCHEMA = "hashmarks.selective-scout-economics.v1"
-FAMILY = "hashmarks-v0.10.46-selective-scout-a"
+FAMILY = "hashmarks-selective-scout-a"
 PACKET = "hashmarks.selective-scout-input.v1"
 
 

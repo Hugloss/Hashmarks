@@ -26,7 +26,7 @@ from .metrics_blind_worker_ab import (  # noqa: E402 - import follows standalone
 
 SCHEMA = "hashmarks.codex-agent-economics.v1"
 PROTOCOL = "hashmarks.codex-agent-economics-protocol.v1"
-FAMILY = "hashmarks-v0.10.47-real-codex-a"
+FAMILY = "hashmarks-real-codex-a"
 LANES = ("native", "hashmarks", "selective")
 
 

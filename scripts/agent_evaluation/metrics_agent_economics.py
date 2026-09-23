@@ -30,7 +30,7 @@ from .metrics_blind_worker_ab import (
 
 SCHEMA = "hashmarks.agent-economics.v1"
 PROTOCOL_SCHEMA = "hashmarks.agent-economics-protocol.v1"
-FAMILY = "hashmarks-v0.10.41-agent-economics-a"
+FAMILY = "hashmarks-agent-economics-a"
 
 
 def _identity(value: object) -> str:

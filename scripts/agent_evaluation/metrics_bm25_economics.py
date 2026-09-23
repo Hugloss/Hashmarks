@@ -32,7 +32,7 @@ from .metrics_blind_worker_ab import (
 )
 
 SCHEMA = "hashmarks.bm25-economics.v1"
-FAMILY = "hashmarks-v0.10.43-fielded-bm25-a"
+FAMILY = "hashmarks-fielded-bm25-a"
 
 
 def _task_report(
