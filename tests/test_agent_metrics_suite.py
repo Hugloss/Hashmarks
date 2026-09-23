@@ -532,7 +532,7 @@ def test_codex_agent_economics_preflight_reports_missing_binary() -> None:
 
 
 def test_codex_agent_economics_exec_contract_with_fake_codex(tmp_path: Path) -> None:
-    from scripts.agent_evaluation.codex_agent_economics import _run_one
+    from scripts.agent_evaluation.codex_agent_economics import CodexRunConfig, _run_one
 
     fake = tmp_path / "codex"
     fake.write_text(
@@ -548,16 +548,18 @@ def test_codex_agent_economics_exec_contract_with_fake_codex(tmp_path: Path) -> 
     (ws / "tests/test_example.py").write_text("def test_x(): pass\n")
     task = {"id": "t1", "query": "fix example"}
     value = _run_one(
-        str(fake),
+        CodexRunConfig(
+            codex=str(fake),
+            model="fake-model",
+            effort="low",
+            sandbox="read-only",
+            bridge=Path("unused"),
+            timeout_s=30,
+        ),
         "native",
         task,
         ws,
         tmp_path / "run",
-        model="fake-model",
-        effort="low",
-        sandbox="read-only",
-        bridge=Path("unused"),
-        timeout_s=30,
     )
     assert value["returncode"] == 0
     assert value["final"]["task_id"] == "t1"

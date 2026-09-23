@@ -20,6 +20,7 @@ for x in (str(_R), str(_S)):
 import contextlib
 
 from .codex_agent_economics import (
+    CodexRunConfig,
     _run_one,
     _usage_from_jsonl,
 )
@@ -173,18 +174,11 @@ def _run_scout(
 
 
 def _main_with_scout(
-    codex: str,
+    config: CodexRunConfig,
     task: dict[str, str],
     workspace: Path,
     run_dir: Path,
-    pkt: dict[str, object],
     scout: dict[str, object] | None,
-    *,
-    model: str | None,
-    effort: str | None,
-    sandbox: str,
-    bridge: Path,
-    timeout_s: int,
 ) -> dict[str, object]:
     # Use the v0.10.47 runner but add frozen scout guidance to the public task text; the grader remains unopened.
     enriched = dict(task)
@@ -196,16 +190,11 @@ def _main_with_scout(
             + f"\nA separate read-only ambiguity scout recommended candidate path `{rec}` with reason: {reason}. Verify this recommendation against repository evidence before finalizing."
         )
     return _run_one(
-        codex,
+        config,
         "hashmarks",
         enriched,
         workspace,
         run_dir,
-        model=model,
-        effort=effort,
-        sandbox=sandbox,
-        bridge=bridge,
-        timeout_s=timeout_s,
     )
 
 
@@ -227,6 +216,14 @@ def collect(
     if not codex:
         raise FileNotFoundError(f"Codex executable not found: {codex_bin}")
     bridge = (_S / "codex_context_bridge.py").resolve()
+    main_config = CodexRunConfig(
+        codex=str(codex),
+        model=model,
+        effort=effort,
+        sandbox=sandbox,
+        bridge=bridge,
+        timeout_s=timeout_s,
+    )
     reports = []
     for name, workspace, corpus, public_path in materialize_challenge(
         root / "challenge"
@@ -260,17 +257,11 @@ def collect(
                 )
                 scouts.append({"task_id": task["id"], **scout})
             main = _main_with_scout(
-                str(codex),
+                main_config,
                 task,
                 workspace,
                 root / "runs" / name / task["id"] / "main",
-                pkt,
                 scout,
-                model=model,
-                effort=effort,
-                sandbox=sandbox,
-                bridge=bridge,
-                timeout_s=timeout_s,
             )
             runs.append(main)
         expv = {
