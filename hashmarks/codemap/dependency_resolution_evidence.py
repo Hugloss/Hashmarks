@@ -875,14 +875,121 @@ class DependencyResolutionEvidenceMixin:
         }
 
     @staticmethod
+    def _dependency_resolution_delta_v2(
+        before: Mapping[str, object],
+        after: Mapping[str, object],
+    ) -> dict[str, object]:
+        before_definition = before.get("definition_identity")
+        after_definition = after.get("definition_identity")
+        if not _SHA256.fullmatch(str(before_definition or "")) or not _SHA256.fullmatch(
+            str(after_definition or "")
+        ):
+            raise ValueError("dependency resolution definition identity is malformed")
+        if before_definition != after_definition:
+            return {
+                "schema": "hashmarks.dependency-resolution-delta.v2",
+                "comparability": "not-comparable",
+                "reason": "definition-changed",
+                "before_definition_identity": before_definition,
+                "after_definition_identity": after_definition,
+            }
+
+        def keyed(rows: object, field: str) -> dict[str, Mapping[str, object]]:
+            return {
+                str(row[field]): row
+                for row in rows if isinstance(row, Mapping) and row.get(field)
+            }
+
+        before_components = keyed(before.get("components", ()), "component_id")
+        after_components = keyed(after.get("components", ()), "component_id")
+        before_selections = keyed(before.get("selections", ()), "node_id")
+        after_selections = keyed(after.get("selections", ()), "node_id")
+
+        def changed(
+            left: Mapping[str, Mapping[str, object]],
+            right: Mapping[str, Mapping[str, object]],
+        ) -> list[str]:
+            return sorted(
+                key for key in left.keys() & right.keys() if left[key] != right[key]
+            )
+
+        def inventory_key(row: Mapping[str, object]) -> tuple[str, str]:
+            return (str(row.get("node_id") or ""), str(row.get("context") or ""))
+
+        def relationship_key(
+            row: Mapping[str, object],
+        ) -> tuple[str, str, str, str, str, str]:
+            return (
+                str(row.get("source") or ""),
+                str(row.get("target") or ""),
+                str(row.get("kind") or ""),
+                str(row.get("context") or ""),
+                str(row.get("effective_scope") or ""),
+                str(row.get("marker") or ""),
+            )
+
+        before_inventory = {
+            inventory_key(row)
+            for row in before.get("inventory", ())
+            if isinstance(row, Mapping)
+        }
+        after_inventory = {
+            inventory_key(row)
+            for row in after.get("inventory", ())
+            if isinstance(row, Mapping)
+        }
+        before_relationships = {
+            relationship_key(row)
+            for row in before.get("relationships", ())
+            if isinstance(row, Mapping)
+        }
+        after_relationships = {
+            relationship_key(row)
+            for row in after.get("relationships", ())
+            if isinstance(row, Mapping)
+        }
+        before_ownership = keyed(before.get("module_ownership", ()), "module")
+        after_ownership = keyed(after.get("module_ownership", ()), "module")
+        return {
+            "schema": "hashmarks.dependency-resolution-delta.v2",
+            "comparability": "comparable",
+            "before_resolution_identity": before.get("resolution_identity"),
+            "after_resolution_identity": after.get("resolution_identity"),
+            "before_observation_identity": before.get("observation_identity"),
+            "after_observation_identity": after.get("observation_identity"),
+            "components_added": sorted(after_components.keys() - before_components.keys()),
+            "components_removed": sorted(before_components.keys() - after_components.keys()),
+            "components_changed": changed(before_components, after_components),
+            "selections_added": sorted(after_selections.keys() - before_selections.keys()),
+            "selections_removed": sorted(before_selections.keys() - after_selections.keys()),
+            "selections_changed": changed(before_selections, after_selections),
+            "inventory_added": [list(row) for row in sorted(after_inventory - before_inventory)],
+            "inventory_removed": [list(row) for row in sorted(before_inventory - after_inventory)],
+            "relationships_added": [
+                list(row) for row in sorted(after_relationships - before_relationships)
+            ],
+            "relationships_removed": [
+                list(row) for row in sorted(before_relationships - after_relationships)
+            ],
+            "module_ownership_added": sorted(
+                after_ownership.keys() - before_ownership.keys()
+            ),
+            "module_ownership_removed": sorted(
+                before_ownership.keys() - after_ownership.keys()
+            ),
+            "module_ownership_changed": changed(before_ownership, after_ownership),
+            "causation": "not-inferred",
+        }
+
+    @staticmethod
     def dependency_resolution_delta(
         before: Mapping[str, object],
         after: Mapping[str, object],
     ) -> dict[str, object]:
+        if before.get("schema") == _SCHEMA_V2 and after.get("schema") == _SCHEMA_V2:
+            return DependencyResolutionEvidenceMixin._dependency_resolution_delta_v2(before, after)
         if before.get("schema") != _SCHEMA or after.get("schema") != _SCHEMA:
-            raise ValueError(
-                "dependency resolution delta requires qualified v1 observations"
-            )
+            raise ValueError("dependency resolution delta requires matching qualified observations")
         before_definition = before.get("definition_identity")
         after_definition = after.get("definition_identity")
         if not _SHA256.fullmatch(str(before_definition or "")) or not _SHA256.fullmatch(
