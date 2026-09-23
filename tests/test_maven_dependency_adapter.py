@@ -220,3 +220,29 @@ def test_maven_adapter_does_not_overclaim_module_ownership_completeness(
     assert negative["resolved-inventory"]["state"] == "admissible-within-declared-scope"
     assert negative["module-ownership"]["state"] == "not-admissible"
     assert observation["module_ownership"][0]["completeness"] == "incomplete"
+
+
+def test_maven_pom_inventory_does_not_make_module_coverage_incomplete(
+    tmp_path: Path,
+) -> None:
+    inventory = b"""The following files have been resolved:
+   example.root:parent:pom:1.0:compile
+   example.libs:owned:jar:3.0:compile -- module example.owned
+"""
+    raw = maven_dependency_observation(
+        trees={},
+        inventories={"compile": inventory},
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(raw)
+
+    coverage = {
+        row["kind"]: row
+        for row in observation["coverage"]
+        if row["context"] == "compile"
+    }
+    assert coverage["resolved-inventory"]["completeness"] == "complete"
+    assert coverage["module-ownership"]["completeness"] == "complete"
+    assert observation["module_ownership"][0]["completeness"] == "complete"
