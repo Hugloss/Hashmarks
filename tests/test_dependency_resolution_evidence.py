@@ -833,6 +833,112 @@ def test_v2_module_ownership_preserves_ambiguous_maven_module(
     assert ownership["owners"] == ["inventory-only@1", "library@1"]
 
 
+def test_v2_dependency_correlation_preserves_contextual_ownership(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "consumer.py").write_text("import library\n")
+    snapshot = _snapshot_v2()
+    snapshot["module_ownership"] = [
+        {
+            "module": "library",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        },
+        {
+            "module": "library",
+            "context": "runtime",
+            "owners": ["inventory-only@1"],
+            "completeness": "complete",
+            "evidence_sources": ["tree:runtime"],
+        },
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        packet = codemap.dependency_evidence_correlation(
+            observation,
+            {
+                "correlations": [
+                    {
+                        "module": "library",
+                        "context": "compile",
+                        "completeness": "complete",
+                        "truncation": "complete",
+                        "anchors": [
+                            {
+                                "anchor_id": "compile-use",
+                                "path": "consumer.py",
+                                "line": 1,
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+
+    assert packet["dependency_links"] == [
+        {
+            "module": "library",
+            "context": "compile",
+            "distribution_state": "resolved-unique",
+            "distribution_nodes": ["library@1"],
+            "ownership_completeness": "complete",
+            "observed_contexts": ["compile"],
+            "causation": "not-inferred",
+        }
+    ]
+    assert packet["correlation"]["bundles"][0]["scope"] == {
+        "kind": "dependency-module-correlation",
+        "module": "library",
+        "context": "compile",
+    }
+
+
+def test_v2_dependency_correlation_without_context_preserves_cross_context_ambiguity(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["module_ownership"] = [
+        {
+            "module": "library",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        },
+        {
+            "module": "library",
+            "context": "runtime",
+            "owners": ["inventory-only@1"],
+            "completeness": "complete",
+            "evidence_sources": ["tree:runtime"],
+        },
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        packet = codemap.dependency_evidence_correlation(
+            observation,
+            {
+                "correlations": [
+                    {
+                        "module": "library",
+                        "completeness": "complete",
+                        "truncation": "complete",
+                        "anchors": [],
+                    }
+                ]
+            },
+        )
+
+    link = packet["dependency_links"][0]
+    assert link["distribution_state"] == "resolved-ambiguous"
+    assert link["distribution_nodes"] == ["inventory-only@1", "library@1"]
+    assert link["observed_contexts"] == ["compile", "runtime"]
+
+
 def test_v2_repository_binding_tracks_current_codemap_generation(
     tmp_path: Path,
 ) -> None:

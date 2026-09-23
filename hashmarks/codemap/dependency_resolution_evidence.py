@@ -956,38 +956,78 @@ class DependencyResolutionEvidenceMixin:
         Package semantics remain owned here.  The generic correlation owner receives
         only ordinary external anchors and repository locators.
         """
-        if observation.get("schema") != _SCHEMA:
+        schema = observation.get("schema")
+        if schema not in {_SCHEMA, _SCHEMA_V2}:
             raise ValueError(
-                "dependency evidence correlation requires qualified v1 observation"
+                "dependency evidence correlation requires a qualified observation"
             )
         raw_correlations = request.get("correlations", ())
         correlations = _objects(raw_correlations, label="correlations", limit=256)
         bundles: list[dict[str, object]] = []
         dependency_links: list[dict[str, object]] = []
-        ownership = {
-            str(row["module"]): row
+        ownership = [
+            row
             for row in observation.get("module_ownership", ())
             if isinstance(row, Mapping) and row.get("module")
-        }
+        ]
         for index, raw in enumerate(correlations):
             module = _text(raw.get("module"), label="correlation module", required=True)
+            context = _text(raw.get("context"), label="correlation context")
             anchors = raw.get("anchors", ())
             if not isinstance(anchors, Sequence) or isinstance(
                 anchors, (str, bytes, bytearray)
             ):
                 raise ValueError("correlation anchors must be a sequence")
-            owner = ownership.get(module)
+            matches = [
+                row
+                for row in ownership
+                if row.get("module") == module
+                and (
+                    schema == _SCHEMA
+                    or not context
+                    or str(row.get("context") or "") == context
+                )
+            ]
+            owners = sorted(
+                {
+                    str(owner)
+                    for row in matches
+                    for owner in row.get("owners", ())
+                    if owner
+                }
+            )
+            completeness = (
+                "complete"
+                if matches
+                and all(row.get("completeness") == "complete" for row in matches)
+                else "incomplete"
+                if any(row.get("completeness") == "incomplete" for row in matches)
+                else "unknown"
+            )
+            observed_contexts = sorted(
+                {
+                    str(row.get("context"))
+                    for row in matches
+                    if row.get("context") is not None
+                }
+            )
             dependency_links.append(
                 {
                     "module": module,
-                    "distribution_state": "unknown"
-                    if owner is None
-                    else owner["state"],
-                    "distribution_nodes": []
-                    if owner is None
-                    else list(owner["owners"]),
-                    "ownership_completeness": (
-                        "unknown" if owner is None else owner["completeness"]
+                    **({"context": context} if context else {}),
+                    "distribution_state": (
+                        "resolved-unique"
+                        if len(owners) == 1
+                        else "resolved-ambiguous"
+                        if owners
+                        else "unknown"
+                    ),
+                    "distribution_nodes": owners,
+                    "ownership_completeness": completeness,
+                    **(
+                        {"observed_contexts": observed_contexts}
+                        if schema == _SCHEMA_V2
+                        else {}
                     ),
                     "causation": "not-inferred",
                 }
@@ -1003,6 +1043,7 @@ class DependencyResolutionEvidenceMixin:
                     "scope": {
                         "kind": "dependency-module-correlation",
                         "module": module,
+                        **({"context": context} if context else {}),
                     },
                     "truncation": str(raw.get("truncation") or "unknown"),
                     "anchors": list(anchors),
