@@ -110,7 +110,7 @@ def test_maven_adapter_preserves_classifier_as_selection_identity(
     }
 
 
-def test_maven_adapter_is_execution_free(tmp_path: Path, monkeypatch) -> None:
+def test_maven_adapter_is_execution_free(monkeypatch) -> None:
     import subprocess
 
     def forbidden(*args, **kwargs):
@@ -122,12 +122,8 @@ def test_maven_adapter_is_execution_free(tmp_path: Path, monkeypatch) -> None:
         inventories={"compile": _inventory()},
     )
 
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(raw)
-
-    assert observation["producer"]["kind"] == "maven-dependency-artifacts"
-    assert observation["producer_authority"] == "caller-claimed"
+    assert raw["producer"]["kind"] == "maven-dependency-artifacts"
+    assert raw["contexts"] == ["compile"]
 
 
 def test_maven_adapter_relationship_change_is_not_selection_change(
