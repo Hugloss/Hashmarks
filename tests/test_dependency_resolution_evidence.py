@@ -792,11 +792,13 @@ def test_v2_repository_binding_tracks_current_codemap_generation(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.dependency_resolution_evidence(_snapshot_v2())
+        expected_identity = codemap._repository_packet_identity()
+        expected_generation = codemap.store.generation()
 
     binding = packet["repository_binding"]
-    assert binding["repository_identity"] == codemap._repository_packet_identity()
+    assert binding["repository_identity"] == expected_identity
     assert binding["repository_identity"].startswith(("git-tree:", "workspace:"))
-    assert isinstance(binding["codemap_generation"], int)
+    assert binding["codemap_generation"] == expected_generation
 
 
 def test_v2_bounded_queries_report_dependencies_paths_and_contexts(
