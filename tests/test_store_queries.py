@@ -91,4 +91,3 @@ def test_search_candidates_match_repository_fields_in_stable_order(tmp_path):
 
     files = [row for row in first if row["row_type"] == "file"]
     assert [row["path"] for row in files] == ["z_path_needle.py"]
-\n
