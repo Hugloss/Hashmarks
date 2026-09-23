@@ -230,6 +230,8 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
     module = _text(request.get("module"), label="dependency query module")
     omissions: list[dict[str, object]] = []
     visited = 0
+    negative_evidence = "not-applicable"
+    source_complete = True
 
     selections = {
         str(row["node_id"]): row
