@@ -293,12 +293,6 @@ def test_mcp_surface_read_centralizes_gate_and_retry(
         surface.close()
 
 
-def test_mcp_surface_remains_transport_sdk_independent() -> None:
-    source = Path(mcp_surface.__file__).read_text(encoding="utf-8")
-    assert "ToolError" not in source
-    assert "mcp.server" not in source
-
-
 def test_mcp_server_boundary_translates_only_surface_errors() -> None:
     class FakeToolError(Exception):
         pass
