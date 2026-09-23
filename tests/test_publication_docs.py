@@ -110,7 +110,6 @@ def test_public_docs_expose_repository_evidence_binding_contract() -> None:
         assert state in binding
 
 
-
 def test_github_entry_points_exist() -> None:
     for path in (
         ".github/CONTRIBUTING.md",

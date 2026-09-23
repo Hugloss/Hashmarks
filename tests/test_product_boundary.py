@@ -46,11 +46,7 @@ def test_external_library_findings_do_not_expand_repository_analysis_scope() -> 
     contributing = _text(".github/CONTRIBUTING.md")
     architecture = _text("docs/reference/ARCHITECTURE.md")
     invariants = _text("docs/reference/INVARIANTS.md")
-    history = _text(
-        "docs/development/reviews/HM297_EXTERNAL_LIBRARY_CHARACTERIZATION_LESSON.md"
-    )
-
-    for text in (boundary, agents, contributing, history):
+    for text in (boundary, agents, contributing):
         assert "Do not chase remaining findings in external libraries." in text
 
     assert (
@@ -67,9 +63,6 @@ def test_external_library_findings_do_not_expand_repository_analysis_scope() -> 
         in invariants
     )
     assert "Package-name suppression tables" in invariants
-    assert "characterization evidence, not active roadmap work" in _text(
-        "docs/README.md"
-    )
 
 
 def test_evidence_authority_precedence_is_explicit_and_non_strengthening() -> None:
@@ -251,28 +244,17 @@ def test_agent_evaluation_compatibility_manifest_is_removed() -> None:
     assert not (ROOT / "scripts" / "agent_evaluation" / "contract_surface.py").exists()
 
 
-def test_prepublic_boundary_debt_record_supersedes_historical_review_labels() -> None:
-    review = _text("docs/development/reviews/RESPONSIBILITY_NAMING_REVIEW.md")
-    classification = _text("docs/development/PREPUBLIC_BOUNDARY_DEBT.md")
-    assert "historical naming-phase review" in review
-    assert "G53/G59" in review
-    assert "HISTORICAL REVIEW RESOLVED" in review
-    assert "removed from the first public runtime/API surface" in classification
-    assert "no compatibility shim" in classification
-    assert "impact.ExecutionIdentity` | REVIEW LATER" not in review
-    assert (
-        "ActionCache` / `ExecutionCache` / `ActionResult` | REVIEW LATER" not in review
-    )
-
 
 def test_repository_root_markdown_is_limited_to_entry_points() -> None:
     allowed = {"AGENTS.md", "README.md", "CHANGELOG.md"}
     root_markdown = {path.name for path in ROOT.glob("*.md")}
     assert root_markdown == allowed
     assert (ROOT / "docs" / "README.md").is_file()
-    assert (ROOT / "docs" / "development" / "handoffs").is_dir()
+    assert not (ROOT / "docs" / "development").exists()
     assert (ROOT / "docs" / "reference" / "INVARIANTS.md").is_file()
     assert (ROOT / "docs" / "integration" / "OH_GOON_INTEGRATION.md").is_file()
+    assert (ROOT / "docs" / "maintainers" / "RELEASING.md").is_file()
+    assert (ROOT / "docs" / "qualification" / "REPOSITORY_QUALITY.md").is_file()
 
 
 def test_repository_root_has_no_historical_phase_evidence() -> None:
@@ -285,6 +267,12 @@ def test_repository_root_has_no_historical_phase_evidence() -> None:
         and path.suffix in {".json", ".txt", ".md"}
     )
     assert historical == []
-    evidence = root / "docs" / "development" / "evidence"
-    assert evidence.is_dir()
-    assert any(evidence.glob("HM*-EVIDENCE.json"))
+    assert not (root / "docs" / "development").exists()
+    historical_docs = sorted(
+        path.relative_to(root).as_posix()
+        for path in (root / "docs").rglob("*")
+        if path.is_file()
+        and (path.name.startswith("HM") or "HISTORICAL" in path.name)
+    )
+    assert historical_docs == []
+    assert "## HM" not in (root / "CHANGELOG.md").read_text(encoding="utf-8")
