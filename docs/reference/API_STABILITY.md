@@ -19,7 +19,7 @@ The documented `CodeMap.correlate_evidence()` and `evidence_correlation_delta()`
 
 Importable implementation submodules under `hashmarks.*` are **not automatically public** merely because Python allows importing them. Internal helpers, storage classes, parsers, adapters, and mixins may change without compatibility guarantees unless a current public document explicitly promotes them into the contract.
 
-Development material under `scripts/agent_evaluation/`, `benchmarks/agent_evaluation/`, `tests/`, and `docs/development/` is measurement/evidence infrastructure, not installed product API.
+Development material under `scripts/agent_evaluation/`, `benchmarks/agent_evaluation/`, and `tests/` is measurement/evidence infrastructure, not installed product API. Superseded development documents remain available through Git history.
 
 ## Pre-1.0 contract evolution
 

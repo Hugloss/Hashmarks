@@ -124,7 +124,7 @@ A CodeMap service/watch process may be managed as infrastructure, but its failur
 
 ## Pre-public boundary history
 
-Execution-shaped and agent-loop development surfaces were removed before the first public contract. The full source repository retains that historical cleanup record under `docs/development/`; it is not an integration compatibility surface and must not be treated as architectural precedent.
+Execution-shaped and agent-loop development surfaces were removed before the first public contract. Git history preserves that cleanup record; it is not an integration compatibility surface and must not be treated as architectural precedent.
 
 ## Normative references
 

@@ -227,7 +227,7 @@ A junior developer should be able to explain **producer → store/evidence → c
 - `decision_session.py` caches immutable evidence primitives only; it does not own final decisions.
 - `import_resolution.py` and `import_ownership.py` solve different problems.
 - `evidence_graph.py` no longer owns import resolution or freshness; those responsibilities were deliberately extracted.
-- Historical handoffs under `docs/development/` explain prior decisions but do not override current contracts.
+- Git and merged pull requests preserve prior implementation decisions; historical handoffs are not a current documentation authority.
 - Passing tests are necessary but do not justify moving execution, retry, certification, or agent reasoning into Hashmarks.
 
 ## When documentation must change with code

@@ -103,7 +103,7 @@ Hosted diagnostics never mutate the native release contract. They exclude extern
 
 ## Documentation
 
-Current/normative documentation lives under `docs/reference/`, `docs/integration/`, and `docs/qualification/`. Historical phase evidence belongs under `docs/development/` and must not become current product authority.
+Current documentation lives under `docs/reference/`, `docs/integration/`, `docs/qualification/`, and `docs/maintainers/`. Superseded plans, handoffs, phase receipts, and status ledgers belong to Git/PR history rather than a permanent documentation archive.
 
 If a change alters a public contract, update the relevant normative documentation and its invariant tests in the same change.
 

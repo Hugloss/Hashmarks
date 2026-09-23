@@ -101,17 +101,4 @@ but do not block qualification until promoted into the active qualification corp
 This prevents exploratory evidence from silently becoming release authority while
 preserving it for review and later promotion.
 
-## Next increments
-
-The same evaluator will be extended with:
-
-- independent label review/adjudication metadata and corpus-registry manifests;
-- descriptive uncertainty for positive metrics once the baseline corpus is large enough;
-- projection/generation/provenance observations derived directly from frozen public outputs;
-- nDCG and richer evidence-retention metrics after ranking ground truth is available;
-- metamorphic family execution against frozen repository generations;
-- selected mutation challenges for high-risk authority invariants;
-- retained real-world cases including Oh-Goon 1267.0.993 / Hashmarks #67;
-- economics environment fingerprints and cold/warm/incremental comparability.
-
-This infrastructure remains separate from Hashmarks runtime authority.
+Future qualification changes belong in reviewed code/tests and the pull request that introduces them; this document describes the current evaluator semantics rather than a standing roadmap.
