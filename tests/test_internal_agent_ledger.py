@@ -70,7 +70,7 @@ def test_ledger_native_lifecycle_records_metrics(
     assert result["identity"] in capsys.readouterr().out
 
 
-def test_ledger_search_uses_grep_when_rg_is_unavailable(
+def test_ledger_search_uses_python_when_rg_is_unavailable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     repo = tmp_path / "repo"
@@ -90,16 +90,40 @@ def test_ledger_search_uses_grep_when_rg_is_unavailable(
         "--query",
         "answer",
     )
-    real_which = ledger.shutil.which
-    monkeypatch.setattr(
-        ledger.shutil,
-        "which",
-        lambda name: None if name == "rg" else real_which(name),
-    )
+    monkeypatch.setattr(ledger.shutil, "which", lambda _name: None)
 
     _invoke(monkeypatch, state, "search", "--pattern", "answer")
 
-    assert "owner.py:1:answer = 42" in capsys.readouterr().out
+    assert capsys.readouterr().out == "owner.py:1:answer = 42\n"
+    saved = json.loads(state.read_text(encoding="utf-8"))
+    assert saved["events"][-1]["provider"] == "python"
+
+
+def test_ledger_rg_and_python_search_normalize_to_same_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "owner.py").write_text("answer = 42\n", encoding="utf-8")
+
+    monkeypatch.setattr(ledger.shutil, "which", lambda _name: None)
+    python_output, python_provider = ledger._search_output(repo, "answer")
+
+    monkeypatch.setattr(ledger.shutil, "which", lambda name: "/fake/rg" if name == "rg" else None)
+    monkeypatch.setattr(
+        ledger.subprocess,
+        "run",
+        lambda argv, **kwargs: subprocess.CompletedProcess(
+            argv,
+            0,
+            stdout="./owner.py:1:answer = 42\n",
+            stderr="",
+        ),
+    )
+    rg_output, rg_provider = ledger._search_output(repo, "answer")
+
+    assert python_output == rg_output == "owner.py:1:answer = 42\n"
+    assert (python_provider, rg_provider) == ("python", "rg")
 
 
 def test_ledger_packet_and_verification_capture_subprocess_evidence(
