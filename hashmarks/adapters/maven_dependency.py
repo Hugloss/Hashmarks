@@ -90,6 +90,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     relationships: list[dict[str, object]] = []
     inventory: list[dict[str, object]] = []
     ownership: dict[tuple[str, str], set[str]] = defaultdict(set)
+    ownership_completeness: dict[str, str] = {}
     evidence_sources: list[dict[str, object]] = []
     coverage: list[dict[str, object]] = []
 
@@ -207,25 +208,18 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     "producer_digest": _digest(raw_bytes),
                 }
             )
-            coverage.extend(
-                [
-                    {
-                        "context": context,
-                        "kind": "resolved-inventory",
-                        "completeness": "complete",
-                        "truncation": "complete",
-                        "evidence_sources": [list_source],
-                    },
-                    {
-                        "context": context,
-                        "kind": "module-ownership",
-                        "completeness": "complete",
-                        "truncation": "complete",
-                        "evidence_sources": [list_source],
-                    },
-                ]
+            coverage.append(
+                {
+                    "context": context,
+                    "kind": "resolved-inventory",
+                    "completeness": "complete",
+                    "truncation": "complete",
+                    "evidence_sources": [list_source],
+                }
             )
             seen_inventory: set[str] = set()
+            inventory_rows = 0
+            module_rows = 0
             for line in lines:
                 match = _LIST_LINE.match(line)
                 if match is None:
@@ -237,6 +231,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     component, node, artifact, version, context, list_source
                 )
                 if node not in seen_inventory:
+                    inventory_rows += 1
                     inventory.append(
                         {
                             "node_id": node,
@@ -247,7 +242,21 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     seen_inventory.add(node)
                 module = match.group("module")
                 if module is not None:
+                    module_rows += 1
                     ownership[(_module_name(module), context)].add(node)
+            module_completeness = (
+                "complete" if module_rows == inventory_rows else "incomplete"
+            )
+            ownership_completeness[context] = module_completeness
+            coverage.append(
+                {
+                    "context": context,
+                    "kind": "module-ownership",
+                    "completeness": module_completeness,
+                    "truncation": "complete",
+                    "evidence_sources": [list_source],
+                }
+            )
 
     normalized_selections = []
     for row in selections.values():
@@ -264,7 +273,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "module": module,
             "context": context,
             "owners": sorted(owners),
-            "completeness": "complete",
+            "completeness": ownership_completeness[context],
             "evidence_sources": [f"list:{context}"],
         }
         for (module, context), owners in ownership.items()
