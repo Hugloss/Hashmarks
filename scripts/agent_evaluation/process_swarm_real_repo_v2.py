@@ -1,23 +1,15 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
 import os
-import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-_S = Path(__file__).resolve().parent
-_R = _S.parent.parent
-for p in (str(_R), str(_S)):
-    if p not in sys.path:
-        sys.path.insert(0, p)
 from hashmarks.codemap import (
     CodeMap,
 )

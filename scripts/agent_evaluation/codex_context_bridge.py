@@ -1,17 +1,9 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
-_S = Path(__file__).resolve().parent
-_R = _S.parent.parent
-for x in (str(_R), str(_S)):
-    if x not in sys.path:
-        sys.path.insert(0, x)
 from hashmarks.codemap import (
     CodeMap,
 )

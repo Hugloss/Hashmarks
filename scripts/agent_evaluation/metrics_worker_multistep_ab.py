@@ -1,5 +1,3 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -11,12 +9,6 @@ import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, TypedDict
-
-_SCRIPTS_DIR = Path(__file__).resolve().parent
-_REPO_ROOT = _SCRIPTS_DIR.parent.parent
-for value in (str(_REPO_ROOT), str(_SCRIPTS_DIR)):
-    if value not in sys.path:
-        sys.path.insert(0, value)
 
 from hashmarks.codemap import (
     CodeMap,
@@ -31,6 +23,9 @@ from .metrics_worker_inspection_ab import (
     _entry_state,
     _resolve_after_inspection,
 )
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _SCRIPTS_DIR.parent.parent
 
 SCHEMA = "hashmarks.worker-multistep-ab.v1"
 PROTOCOL_SCHEMA = "hashmarks.worker-multistep-ab-protocol.v1"

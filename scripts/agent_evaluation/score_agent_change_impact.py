@@ -1,19 +1,12 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import sys
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
-
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 from hashmarks.codemap import (
     CodeMap,

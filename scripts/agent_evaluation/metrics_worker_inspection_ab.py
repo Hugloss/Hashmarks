@@ -1,5 +1,3 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -12,13 +10,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-_SCRIPTS_DIR = Path(__file__).resolve().parent
-_REPO_ROOT = _SCRIPTS_DIR.parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
-if str(_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_DIR))
-
 from hashmarks.codemap import (
     CodeMap,
 )
@@ -28,6 +19,9 @@ from .metrics_blind_worker_ab import (
     _sha256_bytes,
     materialize_challenge,
 )
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _SCRIPTS_DIR.parent.parent
 
 SCHEMA = "hashmarks.worker-inspection-ab.v1"
 PROTOCOL_SCHEMA = "hashmarks.worker-inspection-ab-protocol.v1"

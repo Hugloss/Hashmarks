@@ -1,5 +1,3 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -8,15 +6,10 @@ import json
 import shutil
 import sqlite3
 import statistics
-import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 from benchmarks.research_receipts import (
     atomic_write_json as _atomic_write_json,

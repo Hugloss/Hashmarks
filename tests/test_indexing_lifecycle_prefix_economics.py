@@ -1,5 +1,6 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
+from pathlib import Path
+
+from hashmarks import CodeMap
 from hashmarks.codemap.indexing_lifecycle import (
     _minimal_path_prefixes,
     _sorted_paths_under,
@@ -60,13 +61,6 @@ def test_prefix_helpers_preserve_union_semantics_for_overlapping_requests() -> N
         new_union.update(_sorted_paths_under(discovered, rel))
 
     assert new_union == old_union
-
-
-from pathlib import Path
-
-from hashmarks import (
-    CodeMap,
-)
 
 
 def test_incremental_sync_overlapping_requested_prefixes_preserves_stale_removal(

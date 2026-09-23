@@ -1,5 +1,3 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -12,17 +10,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-_SCRIPTS_DIR = Path(__file__).resolve().parent
-_REPO_ROOT = _SCRIPTS_DIR.parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
-
 from hashmarks.codemap import (
     CodeMap,
 )
-
-if str(_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from .metrics_fresh_multi_repo import (
     materialize_fixture,

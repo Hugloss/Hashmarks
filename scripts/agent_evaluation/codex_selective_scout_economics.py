@@ -1,23 +1,14 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
 import shutil
 import subprocess
-import sys
 import time
 from pathlib import Path
-
-_S = Path(__file__).resolve().parent
-_R = _S.parent.parent
-for x in (str(_R), str(_S)):
-    if x not in sys.path:
-        sys.path.insert(0, x)
-import contextlib
 
 from .codex_agent_economics import (
     CodexRunConfig,
@@ -33,6 +24,8 @@ from .metrics_blind_worker_ab import (
     _sha256_bytes,
     materialize_challenge,
 )
+
+_S = Path(__file__).resolve().parent
 
 SCHEMA = "hashmarks.codex-selective-scout-economics.v1"
 PROTOCOL = "hashmarks.codex-selective-scout-economics-protocol.v1"
