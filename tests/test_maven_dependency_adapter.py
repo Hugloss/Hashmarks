@@ -208,9 +208,7 @@ def test_maven_adapter_does_not_overclaim_module_ownership_completeness(
         observation = codemap.dependency_resolution_evidence(raw)
 
     coverage = {
-        row["kind"]: row
-        for row in observation["coverage"]
-        if row["context"] == "test"
+        row["kind"]: row for row in observation["coverage"] if row["context"] == "test"
     }
     assert coverage["resolved-inventory"]["completeness"] == "complete"
     assert coverage["module-ownership"]["completeness"] == "incomplete"
