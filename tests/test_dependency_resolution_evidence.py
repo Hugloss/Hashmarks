@@ -903,3 +903,51 @@ def test_v2_query_exposes_depth_omission_instead_of_silent_partial_result(
     assert [row["node_id"] for row in result["result"]] == ["library@1"]
     assert result["completeness"] == "incomplete"
     assert result["omissions"] == [{"reason": "depth-limit", "node_id": "library@1"}]
+
+
+def test_v2_provenance_change_does_not_masquerade_as_resolution_change(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(_snapshot_v2())
+        changed = _snapshot_v2()
+        changed["evidence_sources"][0]["producer_digest"] = "sha256:producer-a"
+        after = codemap.dependency_resolution_evidence(changed)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert before["resolution_identity"] == after["resolution_identity"]
+    assert before["observation_identity"] != after["observation_identity"]
+    assert delta["selections_changed"] == []
+    assert delta["relationships_added"] == []
+    assert delta["relationships_removed"] == []
+
+
+def test_v2_contextual_module_ownership_preserves_independent_observations(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        },
+        {
+            "module": "library.module",
+            "context": "runtime",
+            "owners": [],
+            "completeness": "unknown",
+            "evidence_sources": [],
+        },
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(changed)
+
+    assert [(row["module"], row["context"]) for row in packet["module_ownership"]] == [
+        ("library.module", "compile"),
+        ("library.module", "runtime"),
+    ]
