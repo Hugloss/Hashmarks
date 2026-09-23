@@ -9,7 +9,7 @@ import tomllib
 import zipfile
 from pathlib import Path
 
-SCHEMA = "hashmarks.release-artifact-manifest.v1"
+SCHEMA = "hashmarks.release-artifact-manifest.v2"
 
 
 def _project(root: Path) -> dict[str, object]:
