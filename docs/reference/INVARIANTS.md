@@ -54,7 +54,7 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **A5. Public client/service parity is part of the contract.** A public repository-intelligence client method must have a matching validated service operation.
 
-**A6. Pre-public APIs have one current spelling.** Obsolete unpublished Python/CodeMap names, compatibility aliases, and development-evaluation readers are removed rather than preserved. Current daemon protocol validation may reject an incompatible peer; it must not adapt or normalize that peer.
+**A6. APIs have one current supported spelling.** Obsolete Python/CodeMap names, compatibility aliases, and development-evaluation readers are removed rather than preserved. Changes to supported public contracts must be explicit and release-documented; daemon protocol validation may reject an incompatible peer rather than adapt or normalize it.
 
 ## Manifests, caches, and derived state
 
