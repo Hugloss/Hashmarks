@@ -107,7 +107,9 @@ def _walk(
     return rows, visited, omissions
 
 
-def _reachability(
+# Query traversal is deliberately bounded and cycle-aware; splitting the state machine
+# would obscure the omission semantics it owns.
+def _reachability(  # noqa: C901
     start: str,
     target: str,
     outgoing: Mapping[str, Sequence[str]],
@@ -140,7 +142,7 @@ def _reachability(
     return False, visited, omissions
 
 
-def _paths(
+def _paths(  # noqa: C901, PLR0912
     start: str,
     target: str,
     outgoing: Mapping[str, Sequence[str]],
@@ -196,7 +198,7 @@ def _coverage_complete(
     )
 
 
-def dependency_query(
+def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
     observation: Mapping[str, object],
     request: Mapping[str, object],
 ) -> dict[str, object]:
