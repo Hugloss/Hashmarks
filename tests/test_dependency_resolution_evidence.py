@@ -561,3 +561,230 @@ def test_dependency_correlation_incomplete_external_failure_cannot_prove_absence
     assert (
         packet["correlation"]["completeness"]["negative_evidence"] == "not-admissible"
     )
+
+
+def _snapshot_v2() -> dict[str, object]:
+    return {
+        "schema": "hashmarks.dependency-resolution.v2",
+        "producer": {"kind": "neutral-resolver", "schema_version": "1"},
+        "scope": {"environment": "test"},
+        "contexts": ["compile", "runtime"],
+        "roots": [
+            {"node_id": "app@1", "context": "compile"},
+            {"node_id": "app@1", "context": "runtime"},
+        ],
+        "evidence_sources": [
+            {
+                "source_id": "tree:compile",
+                "kind": "resolution-graph",
+                "context": "compile",
+                "completeness": "complete",
+                "truncation": "complete",
+            },
+            {
+                "source_id": "tree:runtime",
+                "kind": "resolution-graph",
+                "context": "runtime",
+                "completeness": "complete",
+                "truncation": "complete",
+            },
+            {
+                "source_id": "list:compile",
+                "kind": "resolved-inventory",
+                "context": "compile",
+                "completeness": "complete",
+                "truncation": "complete",
+            },
+        ],
+        "components": [
+            {"component_id": "app", "name": "app", "ecosystem": "test"},
+            {"component_id": "library", "name": "library", "ecosystem": "test"},
+            {"component_id": "inventory-only", "name": "inventory-only", "ecosystem": "test"},
+        ],
+        "selections": [
+            {
+                "node_id": "app@1",
+                "component_id": "app",
+                "version": "1",
+                "source": "workspace",
+                "contexts": ["compile", "runtime"],
+                "evidence_sources": ["tree:compile", "tree:runtime"],
+            },
+            {
+                "node_id": "library@1",
+                "component_id": "library",
+                "version": "1",
+                "source": "registry",
+                "contexts": ["compile", "runtime"],
+                "evidence_sources": ["tree:compile", "tree:runtime"],
+            },
+            {
+                "node_id": "inventory-only@1",
+                "component_id": "inventory-only",
+                "version": "1",
+                "source": "registry",
+                "contexts": ["compile"],
+                "evidence_sources": ["list:compile"],
+            },
+        ],
+        "inventory": [
+            {
+                "node_id": "app@1",
+                "context": "compile",
+                "evidence_sources": ["list:compile"],
+            },
+            {
+                "node_id": "library@1",
+                "context": "compile",
+                "evidence_sources": ["list:compile"],
+            },
+            {
+                "node_id": "inventory-only@1",
+                "context": "compile",
+                "evidence_sources": ["list:compile"],
+            },
+        ],
+        "relationships": [
+            {
+                "source": "app@1",
+                "target": "library@1",
+                "kind": "dependency",
+                "context": "compile",
+                "effective_scope": "compile",
+                "evidence_sources": ["tree:compile"],
+            },
+            {
+                "source": "app@1",
+                "target": "library@1",
+                "kind": "dependency",
+                "context": "runtime",
+                "effective_scope": "runtime",
+                "evidence_sources": ["tree:runtime"],
+            },
+        ],
+        "coverage": [
+            {
+                "context": "compile",
+                "kind": "resolution-graph",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["tree:compile"],
+            },
+            {
+                "context": "runtime",
+                "kind": "resolution-graph",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["tree:runtime"],
+            },
+            {
+                "context": "compile",
+                "kind": "resolved-inventory",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["list:compile"],
+            },
+        ],
+        "repository_inputs": [],
+        "module_ownership": [],
+    }
+
+
+def test_v2_distinguishes_inventory_membership_from_graph_reachability(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(_snapshot_v2())
+
+    inventory_nodes = {row["node_id"] for row in packet["inventory"]}
+    graph_nodes = {
+        endpoint
+        for row in packet["relationships"]
+        for endpoint in (row["source"], row["target"])
+    }
+    assert "inventory-only@1" in inventory_nodes
+    assert "inventory-only@1" not in graph_nodes
+
+
+def test_v2_separates_component_selection_and_observation_identity(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        first = codemap.dependency_resolution_evidence(_snapshot_v2())
+        changed = _snapshot_v2()
+        changed["module_ownership"] = [
+            {
+                "module": "library.module",
+                "owners": ["library@1"],
+                "completeness": "complete",
+            }
+        ]
+        second = codemap.dependency_resolution_evidence(changed)
+
+    assert first["resolution_identity"] == second["resolution_identity"]
+    assert first["observation_identity"] != second["observation_identity"]
+
+
+def test_v2_negative_evidence_is_scoped_by_context_and_source_kind(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["coverage"][1]["completeness"] = "incomplete"
+    changed["coverage"][1]["truncation"] = "truncated"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(changed)
+
+    states = {
+        (row["context"], row["kind"]): row["state"]
+        for row in packet["negative_evidence"]
+    }
+    assert states[("compile", "resolution-graph")] == "admissible-within-declared-scope"
+    assert states[("runtime", "resolution-graph")] == "not-admissible"
+
+
+def test_v2_rejects_dangling_evidence_source_reference(tmp_path: Path) -> None:
+    changed = _snapshot_v2()
+    changed["relationships"][0]["evidence_sources"] = ["missing"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="dangling relationship evidence source"):
+            codemap.dependency_resolution_evidence(changed)
+
+
+def test_v2_delta_reports_selection_inventory_and_relationship_change(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(_snapshot_v2())
+        changed = _snapshot_v2()
+        changed["selections"][1]["version"] = "2"
+        changed["inventory"] = [
+            row for row in changed["inventory"] if row["node_id"] != "inventory-only@1"
+        ]
+        changed["relationships"][0]["effective_scope"] = "runtime"
+        after = codemap.dependency_resolution_evidence(changed)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert delta["selections_changed"] == ["library@1"]
+    assert delta["inventory_removed"] == [["inventory-only@1", "compile"]]
+    assert delta["relationships_added"] == [
+        ["app@1", "library@1", "dependency", "compile", "runtime", ""]
+    ]
+    assert delta["relationships_removed"] == [
+        ["app@1", "library@1", "dependency", "compile", "compile", ""]
+    ]
+    assert delta["causation"] == "not-inferred"
+
+
+def test_v2_repository_binding_tracks_current_codemap_generation(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(_snapshot_v2())
+
+    binding = packet["repository_binding"]
+    assert binding["repository_identity"].startswith("sha256:")
+    assert isinstance(binding["codemap_generation"], int)
