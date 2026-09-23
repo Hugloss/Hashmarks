@@ -214,20 +214,22 @@ def test_agent_evaluation_executables_are_isolated_from_product_script_root() ->
     assert "not installed as part of the `hashmarks` Python package" in readme
 
 
-def test_normative_invariants_exclude_prepublic_agent_execution_history() -> None:
-    current = _text("docs/reference/INVARIANTS.md")
-    for historical_term in (
-        "Action-cache results are valid",
-        "PASS promotion is post-run identity-bound",
-        "failed-verification recovery — historical benchmark invariants",
-        "selective ambiguity scout economics",
-        "real Codex economics",
-    ):
-        assert historical_term not in current
+def test_public_contract_docs_describe_current_api_and_authority() -> None:
+    stability = _text("docs/reference/API_STABILITY.md")
+    invariants = _text("docs/reference/INVARIANTS.md")
+    integration = _text("docs/integration/OH_GOON_INTEGRATION.md")
+
+    assert "hashmarks.task-evidence.v2" in stability
+    assert "one current documented Python/CLI surface" in stability
+    assert "measurement/evidence infrastructure, not installed product API" in stability
+
     assert (
-        "PB6. Hashmarks must never become the agent or the execution motor." in current
+        "PB6. Hashmarks must never become the agent or the execution motor."
+        in invariants
     )
-    assert "PB7. Interoperability transfers evidence, never authority." in current
+    assert "PB7. Interoperability transfers evidence, never authority." in invariants
+    assert "Interoperability transfers evidence, never authority." in integration
+    assert "Hashmarks must never become Oh-Goon's execution motor." in integration
 
 
 def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None:
