@@ -80,3 +80,35 @@ def test_repository_local_markdown_links_resolve() -> None:
     assert missing == [], "dangling repository-local Markdown links:\n" + "\n".join(
         missing
     )
+
+
+def test_docs_readme_is_the_single_complete_docs_catalog() -> None:
+    docs_root = ROOT / "docs"
+    index = docs_root / "README.md"
+
+    nested_indexes = sorted(
+        path.relative_to(ROOT).as_posix()
+        for path in docs_root.rglob("README.md")
+        if path != index
+    )
+    assert nested_indexes == []
+
+    expected = sorted(
+        path.relative_to(docs_root).as_posix()
+        for path in docs_root.rglob("*.md")
+        if path != index
+    )
+
+    text = index.read_text(encoding="utf-8")
+    indexed: list[str] = []
+    for raw in _INLINE_LINK_RE.findall(text):
+        target = _link_target(raw)
+        if target is None:
+            continue
+        resolved = _resolve_local_target(index, target)
+        if resolved.suffix != ".md" or not resolved.is_relative_to(docs_root):
+            continue
+        indexed.append(resolved.relative_to(docs_root).as_posix())
+
+    assert sorted(indexed) == expected
+    assert len(indexed) == len(set(indexed))
