@@ -7,7 +7,9 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 
 _SCHEMA = "hashmarks.dependency-resolution.v2"
-_LIST_LINE = re.compile(r"^\\s*(?P<coordinate>\\S+)\\s+--\\s+module\\s+(?P<module>.+?)\\s*$")
+_LIST_LINE = re.compile(
+    r"^\\s*(?P<coordinate>\\S+)\\s+--\\s+module\\s+(?P<module>.+?)\\s*$"
+)
 
 
 def _digest(data: bytes) -> str:
@@ -122,9 +124,13 @@ def maven_dependency_observation(
             try:
                 root_raw = json.loads(raw_bytes)
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                raise ValueError(f"invalid Maven dependency tree JSON for {context}") from exc
+                raise ValueError(
+                    f"invalid Maven dependency tree JSON for {context}"
+                ) from exc
             if not isinstance(root_raw, Mapping):
-                raise ValueError(f"Maven dependency tree root must be an object: {context}")
+                raise ValueError(
+                    f"Maven dependency tree root must be an object: {context}"
+                )
             evidence_sources.append(
                 {
                     "source_id": tree_source,
@@ -147,7 +153,9 @@ def maven_dependency_observation(
 
             def visit(raw: Mapping[str, object], parent: str | None = None) -> str:
                 component, node, _group, artifact, version, scope = _tree_node(raw)
-                admit_selection(component, node, artifact, version, context, tree_source)
+                admit_selection(
+                    component, node, artifact, version, context, tree_source
+                )
                 if parent is not None:
                     relationships.append(
                         {
@@ -181,7 +189,9 @@ def maven_dependency_observation(
             try:
                 lines = raw_bytes.decode("utf-8").splitlines()
             except UnicodeDecodeError as exc:
-                raise ValueError(f"invalid Maven dependency list text for {context}") from exc
+                raise ValueError(
+                    f"invalid Maven dependency list text for {context}"
+                ) from exc
             evidence_sources.append(
                 {
                     "source_id": list_source,
@@ -218,7 +228,9 @@ def maven_dependency_observation(
                 component, node, _group, artifact, version, _scope = _list_coordinate(
                     match.group("coordinate")
                 )
-                admit_selection(component, node, artifact, version, context, list_source)
+                admit_selection(
+                    component, node, artifact, version, context, list_source
+                )
                 if node not in seen_inventory:
                     inventory.append(
                         {
@@ -260,7 +272,9 @@ def maven_dependency_observation(
         "evidence_sources": sorted(evidence_sources, key=lambda row: row["source_id"]),
         "components": sorted(components.values(), key=lambda row: row["component_id"]),
         "selections": sorted(normalized_selections, key=lambda row: row["node_id"]),
-        "inventory": sorted(inventory, key=lambda row: (row["node_id"], row["context"])),
+        "inventory": sorted(
+            inventory, key=lambda row: (row["node_id"], row["context"])
+        ),
         "relationships": sorted(
             relationships,
             key=lambda row: (
