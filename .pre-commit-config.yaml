@@ -22,11 +22,11 @@ repos:
         types_or: [python, pyi]
       - id: ruff-check
         name: ruff check
-        entry: env UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --only-group lint ruff check --fix
+        entry: env UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --frozen --only-group lint ruff check --fix
         language: system
         types_or: [python, pyi]
       - id: ruff-format
         name: ruff format
-        entry: env UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --only-group lint ruff format
+        entry: env UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --frozen --only-group lint ruff format
         language: system
         types_or: [python, pyi]
