@@ -228,6 +228,30 @@ def test_incremental_sync_reindexes_only_changed_path_and_handles_subtree_remova
         assert all(not path.startswith("tests/") for path in codemap.store.paths())
 
 
+def _wait_for_clean_map(workspace: Path, *, symbol: str | None = None) -> bool:
+    deadline = time_monotonic() + 5
+    while time_monotonic() < deadline:
+        with CodeMap(workspace) as reader:
+            status = reader.status()
+            symbol_ready = symbol is None or bool(reader.store.symbol(symbol))
+            files_ready = symbol is not None or status["files"] == 3
+            if status["watcher"]["state"] == "clean" and symbol_ready and files_ready:
+                return True
+        time_sleep(0.03)
+    return False
+
+
+def _stop_watcher(proc: subprocess.Popen) -> None:
+    if proc.poll() is not None:
+        return
+    proc.send_signal(2)
+    try:
+        proc.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=3)
+
+
 def test_codemap_watcher_keeps_map_hot_without_identity_daemon(tmp_path: Path):
     if not sys.platform.startswith("linux"):
         pytest.skip("native watcher regression is Linux-specific")
@@ -251,24 +275,10 @@ def test_codemap_watcher_keeps_map_hot_without_identity_daemon(tmp_path: Path):
         env={**os.environ, "PYTHONPATH": str(source_root)},
     )
     try:
-        deadline = time_monotonic() + 5
-        while time_monotonic() < deadline:
-            with CodeMap(tmp_path) as reader:
-                status = reader.status()
-                if status["watcher"]["state"] == "clean" and status["files"] == 3:
-                    break
-            time_sleep(0.03)
-        else:
+        if not _wait_for_clean_map(tmp_path):
             # Never perform an unbounded pipe read while the watcher is still
             # alive. A failed readiness check must remain a bounded test
             # failure rather than hanging qualification forever.
-            if proc.poll() is None:
-                proc.send_signal(2)
-                try:
-                    proc.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.wait(timeout=3)
             pytest.fail(
                 f"CodeMap watcher did not become ready (returncode={proc.returncode})"
             )
@@ -279,24 +289,10 @@ def test_codemap_watcher_keeps_map_hot_without_identity_daemon(tmp_path: Path):
             + "\ndef watcher_added():\n    return True\n",
             encoding="utf-8",
         )
-        deadline = time_monotonic() + 5
-        while time_monotonic() < deadline:
-            with CodeMap(tmp_path) as reader:
-                matches = reader.store.symbol("watcher_added")
-                status = reader.status()
-                if matches and status["watcher"]["state"] == "clean":
-                    break
-            time_sleep(0.03)
-        else:
+        if not _wait_for_clean_map(tmp_path, symbol="watcher_added"):
             pytest.fail("CodeMap watcher did not incrementally index the changed file")
     finally:
-        if proc.poll() is None:
-            proc.send_signal(2)
-            try:
-                proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait(timeout=3)
+        _stop_watcher(proc)
 
 
 def time_monotonic() -> float:
