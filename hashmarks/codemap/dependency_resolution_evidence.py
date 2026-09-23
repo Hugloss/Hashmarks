@@ -802,38 +802,78 @@ class DependencyResolutionEvidenceMixin:
         *,
         source_path: str,
         import_target: str,
+        context: str | None = None,
     ) -> dict[str, object]:
-        if observation.get("schema") != _SCHEMA:
+        schema = observation.get("schema")
+        if schema not in {_SCHEMA, _SCHEMA_V2}:
             raise ValueError(
-                "dependency import correspondence requires qualified v1 observation"
+                "dependency import correspondence requires a qualified observation"
             )
         candidates = self._python_import_module_candidates(source_path, import_target)
-        ownership = {
-            str(row["module"]): row
+        rows = [
+            row
             for row in observation.get("module_ownership", ())
-            if isinstance(row, Mapping) and row.get("module")
-        }
-        matched = next(
-            (ownership[module] for module in candidates if module in ownership), None
-        )
+            if isinstance(row, Mapping)
+            and row.get("module")
+            and (
+                schema == _SCHEMA
+                or context is None
+                or str(row.get("context") or "") == context
+            )
+        ]
+        matches = [
+            row for module in candidates for row in rows if row.get("module") == module
+        ]
         repository_paths = self._resolve_import_paths(source_path, import_target)
-        if matched is None:
+        if not matches:
             return {
                 "source_path": source_path,
                 "import_target": import_target,
+                **({"context": context} if context is not None else {}),
                 "repository_paths": repository_paths,
                 "distribution_state": "unknown",
                 "distribution_nodes": [],
                 "causation": "not-inferred",
             }
+
+        owners = sorted(
+            {
+                str(owner)
+                for row in matches
+                for owner in row.get("owners", ())
+                if owner
+            }
+        )
+        completeness = (
+            "complete"
+            if all(row.get("completeness") == "complete" for row in matches)
+            else "incomplete"
+            if any(row.get("completeness") == "incomplete" for row in matches)
+            else "unknown"
+        )
+        contexts = sorted(
+            {
+                str(row.get("context"))
+                for row in matches
+                if row.get("context") is not None
+            }
+        )
         return {
             "source_path": source_path,
             "import_target": import_target,
+            **({"context": context} if context is not None else {}),
             "repository_paths": repository_paths,
-            "module": matched["module"],
-            "distribution_state": matched["state"],
-            "distribution_nodes": list(matched["owners"]),
-            "ownership_completeness": matched["completeness"],
+            "module": str(matches[0]["module"]),
+            "distribution_state": (
+                "resolved-unique"
+                if len(owners) == 1
+                else "resolved-ambiguous"
+                if owners
+                else "unresolved"
+            ),
+            "distribution_nodes": owners,
+            "ownership_completeness": completeness,
+            **({"observed_contexts": contexts} if schema == _SCHEMA_V2 else {}),
             "causation": "not-inferred",
         }
 
