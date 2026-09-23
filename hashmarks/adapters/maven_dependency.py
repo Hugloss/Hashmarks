@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 
 _SCHEMA = "hashmarks.dependency-resolution.v2"
 _LIST_LINE = re.compile(
-    r"^\\s*(?P<coordinate>\\S+)\\s+(?:--\\s+module\\s+)?(?P<module>[^-].*?)\\s*$"
+    r"^[ \t]*(?P<coordinate>[^ \t]+)[ \t]+(?:--[ \t]+module[ \t]+)?(?P<module>.+?)[ \t]*$"
 )
 
 
