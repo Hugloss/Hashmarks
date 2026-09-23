@@ -1,23 +1,19 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import json
-import sys
+import logging
 from pathlib import Path
 
-_S = Path(__file__).resolve().parent
-_R = _S.parent.parent
-for x in (str(_R), str(_S)):
-    if x not in sys.path:
-        sys.path.insert(0, x)
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
     CodeMap,
 )
 from scripts.agent_evaluation.metrics_worker_inspection_ab import (
     _resolve_after_inspection,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def packet(
@@ -76,10 +72,11 @@ def main() -> int:
     p.add_argument("--mode", choices=["current", "selective"], default="current")
     p.add_argument("--limit", type=int, default=20)
     a = p.parse_args()
-    print(  # noqa: T201 - intentional command output
+    log_command_output(
+        logger,
         json.dumps(
             packet(a.workspace, a.query, mode=a.mode, limit=a.limit), sort_keys=True
-        )
+        ),
     )
     return 0
 

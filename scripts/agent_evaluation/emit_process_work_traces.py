@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import time
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
+
+logger = logging.getLogger(__name__)
 
 try:
     from scripts._module_loader import import_sibling
@@ -105,10 +109,11 @@ def main() -> None:
     parser.add_argument("--trace-dir", type=Path, required=True)
     args = parser.parse_args()
     paths = emit(args.repo, args.public, args.secret, args.trace_dir)
-    print(  # noqa: T201 - intentional command output
+    log_command_output(
+        logger,
         json.dumps(
             {"traces": len(paths), "trace_dir": str(args.trace_dir)}, sort_keys=True
-        )
+        ),
     )
 
 

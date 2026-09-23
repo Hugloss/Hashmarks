@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
 from statistics import median
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -70,7 +75,9 @@ def main():
         "rows": rows,
     }
     a.output.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n")
-    print(json.dumps({k: v for k, v in out.items() if k != "rows"}, indent=2))  # noqa: T201 - intentional command output
+    log_command_output(
+        logger, json.dumps({k: v for k, v in out.items() if k != "rows"}, indent=2)
+    )
 
 
 if __name__ == "__main__":

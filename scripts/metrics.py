@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import platform
 import subprocess
@@ -10,7 +11,10 @@ import time
 import tomllib
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "fastidentity.metrics.v1"
 
@@ -221,12 +225,13 @@ def main() -> None:
         latest = output.parent / "latest.json"
         latest.write_text(payload, encoding="utf-8")
 
-    print(  # noqa: T201 - intentional command output
+    log_command_output(
+        logger,
         json.dumps(
             {"ok": True, "output": str(output), "metrics": result},
             indent=2,
             sort_keys=True,
-        )
+        ),
     )
 
 

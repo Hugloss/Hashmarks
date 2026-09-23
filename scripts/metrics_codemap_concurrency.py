@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import math
 import statistics
 import threading
@@ -9,7 +10,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMapService, CodeMapServiceClient
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.codemap-concurrency.v1"
 
@@ -134,7 +138,7 @@ def main() -> None:
     text = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.write_text(text)
-    print(text, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, text, end="")
 
 
 if __name__ == "__main__":

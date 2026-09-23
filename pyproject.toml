@@ -5,7 +5,7 @@ backend-path = ["."]
 
 [project]
 name = "hashmarks"
-version = "0.18.0"
+version = "0.19.0"
 description = "Local repository intelligence and a read-only MCP server for coding agents: codebase search, repository context, code navigation, ownership, change impact, freshness, and verification evidence."
 readme = "README.md"
 license = "Apache-2.0"
@@ -86,22 +86,24 @@ markers = [
 
 [tool.ruff]
 force-exclude = true
+required-version = "==0.16.8"
 
 [tool.ruff.lint]
-# Fast, baseline-clean rules run on every Ruff/pre-commit invocation. Legacy
-# structural debt is enforced separately as a no-growth budget in CI.
+preview = true
+explicit-preview-rules = true
 select = [
     "E4",
     "E7",
     "E9",
     "I",
-    #"C901",  # excessive cyclomatic complexity
-    #"PLR0911",  # too many returns
-    #"PLR0912",  # too many branches
-    #"PLR0913",  # too many arguments
+    "T201",  # print statements; command output uses the repository logger adapter
+    "C901",  # excessive cyclomatic complexity
+    "PLR0911",  # too many returns
+    "PLR0912",  # too many branches
+    "PLR0913",  # too many arguments
     "PLR0914",  # too many local variables
-    #"PLR0915",  # too many statements
-    #"PLR0916",  # overly complicated boolean expressions
+    "PLR0915",  # too many statements
+    "PLR0916",  # overly complicated boolean expressions
     # plus the repository's file-size limit
 ]
 

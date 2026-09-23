@@ -1,21 +1,16 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import logging
 import shutil
 import sqlite3
 import statistics
-import sys
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 
 from benchmarks.research_receipts import (
     atomic_write_json as _atomic_write_json,
@@ -25,6 +20,7 @@ from benchmarks.research_receipts import (
     evaluate_with_receipt,
     work_identity,
 )
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap.decision_contract import (
     DecisionPacketContract,
 )
@@ -32,12 +28,88 @@ from hashmarks.codemap.engine import (
     CodeMap,
 )
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 EXPENSIVE_SURFACES = frozenset(
     {"generated", "openapi", "docs", "translation", "snapshot", "fixture", "lockfile"}
 )
+
+
+@dataclass
+class _TaskEvaluation:
+    row: dict[str, Any]
+    phase_seconds: dict[str, Any]
+    elapsed: float
+    edit_graded: int
+    exact_edit: int
+    verify_graded: int
+    exact_verify: int
+    false_safe: int
+    discrimination_needed: int
+    discrimination_graded: int
+    discrimination_correct: int
+
+
+@dataclass
+class _EvaluationState:
+    rows: list[dict[str, Any]] = field(default_factory=list)
+    latencies: list[float] = field(default_factory=list)
+    phase_samples: dict[str, list[float]] = field(default_factory=dict)
+    contribution: dict[str, dict[str, int]] = field(default_factory=dict)
+    edit_graded: int = 0
+    exact_edit: int = 0
+    verify_graded: int = 0
+    exact_verify: int = 0
+    false_safe: int = 0
+    discrimination_needed: int = 0
+    discrimination_graded: int = 0
+    discrimination_correct: int = 0
+
+    def add(self, task: _TaskEvaluation) -> None:
+        self.rows.append(task.row)
+        self.latencies.append(task.elapsed)
+        self.edit_graded += task.edit_graded
+        self.exact_edit += task.exact_edit
+        self.verify_graded += task.verify_graded
+        self.exact_verify += task.exact_verify
+        self.false_safe += task.false_safe
+        self.discrimination_needed += task.discrimination_needed
+        self.discrimination_graded += task.discrimination_graded
+        self.discrimination_correct += task.discrimination_correct
+        surfaces = task.row["evidence_surfaces"]
+        for role in ("edit", "verify"):
+            surface = surfaces.get(role)
+            if surface:
+                bucket = self.contribution.setdefault(
+                    str(surface), {"edit_selected": 0, "verify_selected": 0}
+                )
+                bucket[f"{role}_selected"] += 1
+        for phase, value in task.phase_seconds.items():
+            if isinstance(value, (int, float)):
+                self.phase_samples.setdefault(str(phase), []).append(float(value))
+
+
+@dataclass(frozen=True)
+class ExistingGroupOptions:
+    variant: str = "full"
+    group_size: int = 8
+    group_index: int = 0
+    manifest_path: Path | None = None
+
+
+@dataclass(frozen=True)
+class _BaselineCalibration:
+    state_dir: Path
+    artifact_db: Path
+    preflight: dict[str, Any]
+    sync_economics: dict[str, Any]
+    decision: dict[str, Any]
+    cold_seconds: float
+    lexical_rows: int
+    database_bytes: int
 
 
 def _task_identity(item: dict[str, Any]) -> str:
@@ -277,18 +349,118 @@ def _percentile(values: list[float], fraction: float) -> float:
     return ordered[index]
 
 
+def _decision_phase_seconds(packet: dict[str, Any]) -> dict[str, Any]:
+    metrics = packet.get("decision_metrics")
+    if metrics is None:
+        return {}
+    if not isinstance(metrics, dict):
+        raise ValueError("decision_metrics must be an object")
+    seconds = metrics.get("seconds")
+    if seconds is None:
+        return {}
+    if not isinstance(seconds, dict):
+        raise ValueError("decision_metrics seconds must be an object")
+    return seconds
+
+
+def _evaluate_task(codemap: CodeMap, item: dict[str, Any]) -> _TaskEvaluation:
+    started = time.perf_counter()
+    packet = codemap.task_decision_packet(str(item["task"]))
+    contract = DecisionPacketContract.parse(packet)
+    elapsed = time.perf_counter() - started
+    edit, verify = contract.edit.path, contract.verify.path
+    expected_edit = [str(value) for value in item.get("expected_edit", [])]
+    expected_verify = [str(value) for value in item.get("expected_verify", [])]
+    expected_discrimination = item.get("expected_discrimination")
+    edit_ok = None if not expected_edit else edit in expected_edit
+    verify_ok = None if not expected_verify else verify in expected_verify
+    discrimination_needed = contract.discrimination_needed
+    confident = not discrimination_needed and not contract.ambiguous
+    false_safe = (confident and bool(expected_edit) and not bool(edit_ok)) or (
+        expected_discrimination is True and not discrimination_needed
+    )
+    return _TaskEvaluation(
+        row={
+            "id": item.get("id"),
+            "task": item["task"],
+            "edit": edit,
+            "verify": verify,
+            "edit_ok": edit_ok,
+            "verify_ok": verify_ok,
+            "discrimination_needed": discrimination_needed,
+            "expected_discrimination": expected_discrimination,
+            "ambiguous": contract.ambiguous,
+            "status": "complete" if contract.codemap_complete else "incomplete",
+            "seconds": elapsed,
+            "evidence_surfaces": packet.get("evidence_surfaces") or {},
+        },
+        phase_seconds=_decision_phase_seconds(packet),
+        elapsed=elapsed,
+        edit_graded=int(bool(expected_edit)),
+        exact_edit=int(bool(expected_edit) and bool(edit_ok)),
+        verify_graded=int(bool(expected_verify)),
+        exact_verify=int(bool(expected_verify) and bool(verify_ok)),
+        false_safe=int(false_safe),
+        discrimination_needed=int(discrimination_needed),
+        discrimination_graded=int(expected_discrimination is not None),
+        discrimination_correct=int(
+            expected_discrimination is not None
+            and discrimination_needed is bool(expected_discrimination)
+        ),
+    )
+
+
+def _evaluation_result(
+    state: _EvaluationState,
+    task_count: int,
+    session_batch_size: int,
+    session_totals: dict[str, int],
+) -> dict[str, Any]:
+    return {
+        "tasks": task_count,
+        "edit_graded": state.edit_graded,
+        "exact_edit": state.exact_edit,
+        "verify_graded": state.verify_graded,
+        "exact_verify": state.exact_verify,
+        "false_safe": state.false_safe,
+        "discrimination_needed": state.discrimination_needed,
+        "discrimination_graded": state.discrimination_graded,
+        "discrimination_correct": state.discrimination_correct,
+        "decision_seconds": {
+            "total": sum(state.latencies),
+            "median": statistics.median(state.latencies) if state.latencies else 0.0,
+            "p95": _percentile(state.latencies, 0.95),
+            "max": max(state.latencies) if state.latencies else 0.0,
+        },
+        "phase_seconds": {
+            phase: {
+                "total": sum(values),
+                "median": statistics.median(values),
+                "p95": _percentile(values, 0.95),
+                "max": max(values),
+            }
+            for phase, values in sorted(state.phase_samples.items())
+        },
+        "decision_session": {
+            **session_totals,
+            "batch_size": session_batch_size,
+            "batches": (task_count + session_batch_size - 1) // session_batch_size
+            if task_count
+            else 0,
+        },
+        "selected_surface_contribution": {
+            key: state.contribution[key] for key in sorted(state.contribution)
+        },
+        "rows": state.rows,
+    }
+
+
 def evaluate(
     codemap: CodeMap, corpus: list[dict[str, Any]], *, session_batch_size: int = 8
 ) -> dict[str, Any]:
-    rows: list[dict[str, Any]] = []
-    latencies: list[float] = []
-    phase_samples: dict[str, list[float]] = {}
-    exact_edit = exact_verify = edit_graded = verify_graded = false_safe = (
-        discrimination
-    ) = discrimination_graded = discrimination_correct = 0
-    contribution: dict[str, dict[str, int]] = {}
     if session_batch_size < 1:
         raise ValueError("session_batch_size must be >= 1")
+    state = _EvaluationState()
     session_totals = {
         "symbols_hit": 0,
         "symbols_miss": 0,
@@ -300,108 +472,11 @@ def evaluate(
     for offset in range(0, len(corpus), session_batch_size):
         with codemap.decision_session():
             for item in corpus[offset : offset + session_batch_size]:
-                started = time.perf_counter()
-                packet = codemap.task_decision_packet(str(item["task"]))
-                contract = DecisionPacketContract.parse(packet)
-                elapsed = time.perf_counter() - started
-                latencies.append(elapsed)
-                edit, verify = contract.edit.path, contract.verify.path
-                expected_edit = [str(v) for v in item.get("expected_edit", [])]
-                expected_verify = [str(v) for v in item.get("expected_verify", [])]
-                expected_discrimination = item.get("expected_discrimination")
-                edit_ok = None if not expected_edit else edit in expected_edit
-                verify_ok = None if not expected_verify else verify in expected_verify
-                if expected_edit:
-                    edit_graded += 1
-                    exact_edit += int(bool(edit_ok))
-                if expected_verify:
-                    verify_graded += 1
-                    exact_verify += int(bool(verify_ok))
-                discrimination_needed = contract.discrimination_needed
-                discrimination += int(discrimination_needed)
-                if expected_discrimination is not None:
-                    discrimination_graded += 1
-                    discrimination_correct += int(
-                        discrimination_needed is bool(expected_discrimination)
-                    )
-                confident = not discrimination_needed and not contract.ambiguous
-                wrong_edit = bool(expected_edit) and not bool(edit_ok)
-                underspecified_without_discrimination = (
-                    expected_discrimination is True and not discrimination_needed
-                )
-                false_safe += int(
-                    (confident and wrong_edit) or underspecified_without_discrimination
-                )
-                surfaces = packet.get("evidence_surfaces") or {}
-                for role in ("edit", "verify"):
-                    surface = surfaces.get(role)
-                    if surface:
-                        bucket = contribution.setdefault(
-                            str(surface), {"edit_selected": 0, "verify_selected": 0}
-                        )
-                        bucket[f"{role}_selected"] += 1
-                seconds = (packet.get("decision_metrics") or {}).get("seconds") or {}
-                for phase, value in seconds.items():
-                    if isinstance(value, (int, float)):
-                        phase_samples.setdefault(str(phase), []).append(float(value))
-                rows.append(
-                    {
-                        "id": item.get("id"),
-                        "task": item["task"],
-                        "edit": edit,
-                        "verify": verify,
-                        "edit_ok": edit_ok,
-                        "verify_ok": verify_ok,
-                        "discrimination_needed": discrimination_needed,
-                        "expected_discrimination": expected_discrimination,
-                        "ambiguous": contract.ambiguous,
-                        "status": "complete"
-                        if contract.codemap_complete
-                        else "incomplete",
-                        "seconds": elapsed,
-                        "evidence_surfaces": surfaces,
-                    }
-                )
+                state.add(_evaluate_task(codemap, item))
             session_stats = codemap.decision_session_stats()
             for key, value in session_stats.items():
                 session_totals[key] = session_totals.get(key, 0) + int(value)
-    return {
-        "tasks": len(corpus),
-        "edit_graded": edit_graded,
-        "exact_edit": exact_edit,
-        "verify_graded": verify_graded,
-        "exact_verify": exact_verify,
-        "false_safe": false_safe,
-        "discrimination_needed": discrimination,
-        "discrimination_graded": discrimination_graded,
-        "discrimination_correct": discrimination_correct,
-        "decision_seconds": {
-            "total": sum(latencies),
-            "median": statistics.median(latencies) if latencies else 0.0,
-            "p95": _percentile(latencies, 0.95),
-            "max": max(latencies) if latencies else 0.0,
-        },
-        "phase_seconds": {
-            phase: {
-                "total": sum(values),
-                "median": statistics.median(values),
-                "p95": _percentile(values, 0.95),
-                "max": max(values),
-            }
-            for phase, values in sorted(phase_samples.items())
-        },
-        "decision_session": {
-            **session_totals,
-            "batch_size": session_batch_size,
-            "batches": (len(corpus) + session_batch_size - 1) // session_batch_size
-            if corpus
-            else 0,
-        },
-        "selected_surface_contribution": {
-            key: contribution[key] for key in sorted(contribution)
-        },
-        "rows": rows,
-    }
+    return _evaluation_result(state, len(corpus), session_batch_size, session_totals)
 
 
 def decision_scale_point(
@@ -522,11 +597,7 @@ def evaluate_existing_group(
     corpus_path: Path,
     state_dir: Path,
     artifact_db: Path,
-    *,
-    variant: str = "full",
-    group_size: int = 8,
-    group_index: int = 0,
-    manifest_path: Path | None = None,
+    options: ExistingGroupOptions = ExistingGroupOptions(),
 ) -> dict[str, Any]:
     corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
     if not isinstance(corpus, list):
@@ -538,21 +609,21 @@ def evaluate_existing_group(
             corpus,
             repository_identity=repository_identity,
             generation=generation,
-            variant=variant,
-            group_size=group_size,
+            variant=options.variant,
+            group_size=options.group_size,
         )
-        if manifest_path is not None:
-            if manifest_path.exists():
-                existing = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if options.manifest_path is not None:
+            if options.manifest_path.exists():
+                existing = json.loads(options.manifest_path.read_text(encoding="utf-8"))
                 if existing.get("manifest_sha256") != manifest["manifest_sha256"]:
                     raise ValueError("existing calibration manifest identity mismatch")
                 manifest = existing
             else:
-                _atomic_write_json(manifest_path, manifest)
-        rows = corpus_group(corpus, manifest, group_index)
+                _atomic_write_json(options.manifest_path, manifest)
+        rows = corpus_group(corpus, manifest, options.group_index)
         receipt_dir = (
-            manifest_path.parent / (manifest_path.stem + "-receipts")
-            if manifest_path is not None
+            options.manifest_path.parent / (options.manifest_path.stem + "-receipts")
+            if options.manifest_path is not None
             else None
         )
         decision = (
@@ -561,8 +632,8 @@ def evaluate_existing_group(
                 rows,
                 receipt_dir=receipt_dir,
                 manifest_sha256=manifest["manifest_sha256"],
-                group_index=group_index,
-                expected_task_ids=manifest["groups"][group_index],
+                group_index=options.group_index,
+                expected_task_ids=manifest["groups"][options.group_index],
             )
             if receipt_dir is not None
             else evaluate(codemap, rows)
@@ -570,9 +641,9 @@ def evaluate_existing_group(
     return {
         "schema": "hashmarks.codemap-calibration-group.v1",
         "manifest_sha256": manifest["manifest_sha256"],
-        "group_index": group_index,
+        "group_index": options.group_index,
         "group_count": len(manifest["groups"]),
-        "task_ids": list(manifest["groups"][group_index]),
+        "task_ids": list(manifest["groups"][options.group_index]),
         "complete": True,
         "decision": decision,
     }
@@ -658,6 +729,32 @@ def aggregate_group_results(
     }
 
 
+def _build_baseline(
+    workspace: Path, output_dir: Path, corpus: list[dict[str, Any]]
+) -> _BaselineCalibration:
+    state_dir = output_dir / "state-full"
+    artifact_db = output_dir / "artifacts.sqlite3"
+    shutil.rmtree(state_dir, ignore_errors=True)
+    started = time.perf_counter()
+    with CodeMap(workspace, state_dir=state_dir, artifact_db=artifact_db) as codemap:
+        preflight = codemap.index_preflight()
+        sync = codemap.sync()
+        decision = evaluate(codemap, corpus)
+    cold_seconds = time.perf_counter() - started
+    database = state_dir / "codemap.sqlite3"
+    _checkpoint(database)
+    return _BaselineCalibration(
+        state_dir=state_dir,
+        artifact_db=artifact_db,
+        preflight=preflight,
+        sync_economics=sync.economics,
+        decision=decision,
+        cold_seconds=cold_seconds,
+        lexical_rows=_lexical_rows(database),
+        database_bytes=_db_bytes(database),
+    )
+
+
 def run(
     workspace: Path,
     corpus_path: Path,
@@ -671,22 +768,11 @@ def run(
     ):
         raise ValueError("corpus must be a JSON list of task objects")
     output_dir.mkdir(parents=True, exist_ok=True)
-    base_state = output_dir / "state-full"
-    artifacts = output_dir / "artifacts.sqlite3"
-    shutil.rmtree(base_state, ignore_errors=True)
-    started = time.perf_counter()
-    with CodeMap(workspace, state_dir=base_state, artifact_db=artifacts) as codemap:
-        preflight = codemap.index_preflight()
-        sync = codemap.sync()
-        baseline = evaluate(codemap, corpus)
-    cold_seconds = time.perf_counter() - started
-    _checkpoint(base_state / "codemap.sqlite3")
-    baseline_rows = _lexical_rows(base_state / "codemap.sqlite3")
-    baseline_bytes = _db_bytes(base_state / "codemap.sqlite3")
+    baseline = _build_baseline(workspace, output_dir, corpus)
     results: dict[str, Any] = {}
     for variant in variants:
         if variant == "full":
-            state = base_state
+            state = baseline.state_dir
             transform = {
                 "variant": "full",
                 "selected_surfaces": sorted(surfaces),
@@ -695,21 +781,27 @@ def run(
         else:
             state = output_dir / f"state-{variant}"
             shutil.rmtree(state, ignore_errors=True)
-            shutil.copytree(base_state, state)
+            shutil.copytree(baseline.state_dir, state)
             transform = apply_variant(
                 state / "codemap.sqlite3", variant, surfaces=surfaces
             )
-        with CodeMap(workspace, state_dir=state, artifact_db=artifacts) as codemap:
-            decision = baseline if variant == "full" else evaluate(codemap, corpus)
+        with CodeMap(
+            workspace, state_dir=state, artifact_db=baseline.artifact_db
+        ) as codemap:
+            decision = (
+                baseline.decision if variant == "full" else evaluate(codemap, corpus)
+            )
         rows = _lexical_rows(state / "codemap.sqlite3")
         bytes_ = _db_bytes(state / "codemap.sqlite3")
         results[variant] = {
             "transform": transform,
             "lexical_rows": rows,
-            "lexical_rows_vs_full": rows / baseline_rows if baseline_rows else None,
+            "lexical_rows_vs_full": rows / baseline.lexical_rows
+            if baseline.lexical_rows
+            else None,
             "workspace_map_bytes": bytes_,
-            "workspace_map_bytes_vs_full": bytes_ / baseline_bytes
-            if baseline_bytes
+            "workspace_map_bytes_vs_full": bytes_ / baseline.database_bytes
+            if baseline.database_bytes
             else None,
             "decision": decision,
         }
@@ -728,9 +820,9 @@ def run(
         "workspace": str(workspace),
         "corpus": str(corpus_path),
         "surfaces": sorted(surfaces),
-        "preflight": preflight,
-        "cold_build_seconds": cold_seconds,
-        "sync_economics": sync.economics,
+        "preflight": baseline.preflight,
+        "cold_build_seconds": baseline.cold_seconds,
+        "sync_economics": baseline.sync_economics,
         "variants": results,
         "acceptance_rule": "zero new false-safe decisions; economics changes are evidence only until this holds on frozen real-world corpora",
         "execution_policy": None,
@@ -778,10 +870,12 @@ def main() -> None:
             Path(args.corpus),
             Path(args.existing_state),
             artifact_db,
-            variant=variants[0],
-            group_size=args.group_size,
-            group_index=args.group_index,
-            manifest_path=Path(args.manifest_out) if args.manifest_out else None,
+            ExistingGroupOptions(
+                variant=variants[0],
+                group_size=args.group_size,
+                group_index=args.group_index,
+                manifest_path=Path(args.manifest_out) if args.manifest_out else None,
+            ),
         )
     else:
         result = run(
@@ -794,7 +888,7 @@ def main() -> None:
     text = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.json_out:
         _atomic_write_json(Path(args.json_out), result)
-    print(text, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, text, end="")
 
 
 if __name__ == "__main__":

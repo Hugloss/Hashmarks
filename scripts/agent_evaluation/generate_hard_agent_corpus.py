@@ -3,8 +3,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import shutil
 from pathlib import Path
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.hard-agent-corpus.v1"
 CATEGORIES = (
@@ -197,7 +202,7 @@ def main() -> None:
     if args.manifest:
         args.manifest.parent.mkdir(parents=True, exist_ok=True)
         args.manifest.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)  # noqa: T201 - intentional command output
+    log_command_output(logger, rendered)
 
 
 if __name__ == "__main__":

@@ -1,10 +1,9 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -12,12 +11,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, TypedDict
 
-_SCRIPTS_DIR = Path(__file__).resolve().parent
-_REPO_ROOT = _SCRIPTS_DIR.parent.parent
-for value in (str(_REPO_ROOT), str(_SCRIPTS_DIR)):
-    if value not in sys.path:
-        sys.path.insert(0, value)
-
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
     CodeMap,
 )
@@ -31,6 +25,11 @@ from .metrics_worker_inspection_ab import (
     _entry_state,
     _resolve_after_inspection,
 )
+
+logger = logging.getLogger(__name__)
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _SCRIPTS_DIR.parent.parent
 
 SCHEMA = "hashmarks.worker-multistep-ab.v1"
 PROTOCOL_SCHEMA = "hashmarks.worker-multistep-ab-protocol.v1"
@@ -433,7 +432,7 @@ def main() -> int:
     if a.output:
         a.output.parent.mkdir(parents=True, exist_ok=True)
         a.output.write_text(text)
-    print(text, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, text, end="")
     return 0
 
 

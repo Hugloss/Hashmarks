@@ -1,19 +1,14 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import json
-import sys
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-_S = Path(__file__).resolve().parent
-_R = _S.parent.parent
-for x in (str(_R), str(_S)):
-    if x not in sys.path:
-        sys.path.insert(0, x)
+from hashmarks._command_output import log_command_output
+
 from .codex_agent_economics import (
     CollectionConfig,
     preflight,
@@ -22,6 +17,8 @@ from .codex_agent_economics import collect as collect_lanes
 from .codex_selective_scout_economics import (
     collect as collect_selective,
 )
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.codex-economics-matrix.v1"
 
@@ -206,7 +203,7 @@ def main() -> int:
     if a.output:
         a.output.parent.mkdir(parents=True, exist_ok=True)
         a.output.write_text(t)
-    print(t, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, t, end="")
     return 0
 
 

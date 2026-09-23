@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 TRACE_SCHEMA = "hashmarks.agent-trace.v2"
 VERDICT_SCHEMA = "hashmarks.agent-verdict.v1"
@@ -28,6 +33,49 @@ HASHMARKS_KINDS = {
 }
 
 
+def _validate_trace_event(event: Any, path: Path) -> None:
+    if not isinstance(event, dict) or not isinstance(event.get("kind"), str):
+        raise ValueError(f"invalid trace event: {path}")
+    for field in (
+        "bytes",
+        "estimated_tokens",
+        "model_input_tokens",
+        "started_at_ns",
+        "finished_at_ns",
+    ):
+        if field in event and (
+            not isinstance(event[field], int)
+            or isinstance(event[field], bool)
+            or event[field] < 0
+        ):
+            raise ValueError(f"{field} must be a non-negative integer: {path}")
+    for field in ("paths", "returned_paths", "evidence_paths"):
+        if field in event and (
+            not isinstance(event[field], list)
+            or any(
+                not isinstance(item, str) or not item.strip() for item in event[field]
+            )
+        ):
+            raise ValueError(f"{field} must be a list of non-empty strings: {path}")
+    if "path" in event and (
+        not isinstance(event["path"], str) or not event["path"].strip()
+    ):
+        raise ValueError(f"path must be a non-empty string: {path}")
+    if (
+        "started_at_ns" in event
+        and "finished_at_ns" in event
+        and event["finished_at_ns"] < event["started_at_ns"]
+    ):
+        raise ValueError(f"finished_at_ns must be >= started_at_ns: {path}")
+
+
+def _validate_exact_model_tokens(value: Any, path: Path) -> None:
+    if value is not None and (
+        not isinstance(value, int) or isinstance(value, bool) or value < 0
+    ):
+        raise ValueError(f"model_input_tokens must be a non-negative integer: {path}")
+
+
 def load_trace(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict) or value.get("schema") != TRACE_SCHEMA:
@@ -44,47 +92,8 @@ def load_trace(path: Path) -> dict[str, Any]:
     if not isinstance(events, list):
         raise ValueError(f"trace events must be a list: {path}")
     for event in events:
-        if not isinstance(event, dict) or not isinstance(event.get("kind"), str):
-            raise ValueError(f"invalid trace event: {path}")
-        for field in (
-            "bytes",
-            "estimated_tokens",
-            "model_input_tokens",
-            "started_at_ns",
-            "finished_at_ns",
-        ):
-            if field in event and (
-                not isinstance(event[field], int)
-                or isinstance(event[field], bool)
-                or event[field] < 0
-            ):
-                raise ValueError(f"{field} must be a non-negative integer: {path}")
-        for field in ("paths", "returned_paths", "evidence_paths"):
-            if field in event and (
-                not isinstance(event[field], list)
-                or any(
-                    not isinstance(item, str) or not item.strip()
-                    for item in event[field]
-                )
-            ):
-                raise ValueError(f"{field} must be a list of non-empty strings: {path}")
-        if "path" in event and (
-            not isinstance(event["path"], str) or not event["path"].strip()
-        ):
-            raise ValueError(f"path must be a non-empty string: {path}")
-        if (
-            "started_at_ns" in event
-            and "finished_at_ns" in event
-            and event["finished_at_ns"] < event["started_at_ns"]
-        ):
-            raise ValueError(f"finished_at_ns must be >= started_at_ns: {path}")
-    exact_model_tokens = value.get("model_input_tokens")
-    if exact_model_tokens is not None and (
-        not isinstance(exact_model_tokens, int)
-        or isinstance(exact_model_tokens, bool)
-        or exact_model_tokens < 0
-    ):
-        raise ValueError(f"model_input_tokens must be a non-negative integer: {path}")
+        _validate_trace_event(event, path)
+    _validate_exact_model_tokens(value.get("model_input_tokens"), path)
     return value
 
 
@@ -161,6 +170,56 @@ def summarize(trace: dict[str, Any]) -> dict[str, object]:
     }
 
 
+def _paired_identity_blockers(
+    baseline: dict[str, object], hashmarks: dict[str, object]
+) -> list[str]:
+    reasons: list[str] = []
+    for field in (
+        "repository_identity",
+        "task_revision",
+        "model_identity",
+        "model_config_identity",
+    ):
+        left, right = baseline.get(field), hashmarks.get(field)
+        if (
+            not isinstance(left, str)
+            or not left.strip()
+            or not isinstance(right, str)
+            or not right.strip()
+        ):
+            reasons.append(f"paired_{field}_missing")
+        elif left != right:
+            reasons.append(f"paired_{field}_mismatch")
+    return reasons
+
+
+def _mode_blockers(
+    mode: str,
+    row: dict[str, object],
+    require_external_verdict: bool,
+    require_external_usage: bool,
+) -> list[str]:
+    reasons = []
+    if not isinstance(row.get("run_id"), str) or not str(row.get("run_id")).strip():
+        reasons.append(f"{mode}_run_id_missing")
+    if not isinstance(row.get("model_input_tokens"), int):
+        reasons.append(f"{mode}_exact_model_tokens_missing")
+    if (
+        not isinstance(row.get("model_input_tokens_source"), str)
+        or not str(row.get("model_input_tokens_source")).strip()
+    ):
+        reasons.append(f"{mode}_model_token_provenance_missing")
+    if row.get("success") is not True:
+        reasons.append(f"{mode}_success_not_true")
+    if row.get("patch_correct") is not True:
+        reasons.append(f"{mode}_patch_correct_not_true")
+    if require_external_verdict and row.get("verdict_source") != "external":
+        reasons.append(f"{mode}_external_verdict_missing")
+    if require_external_usage and row.get("model_usage_source") != "external":
+        reasons.append(f"{mode}_external_model_usage_missing")
+    return reasons
+
+
 def _pair_gate(
     baseline: dict[str, object],
     hashmarks: dict[str, object],
@@ -168,45 +227,11 @@ def _pair_gate(
     require_external_verdict: bool,
     require_external_usage: bool,
 ) -> tuple[bool, list[str]]:
-    reasons: list[str] = []
-    hardened = True
-    if hardened:
-        for field in (
-            "repository_identity",
-            "task_revision",
-            "model_identity",
-            "model_config_identity",
-        ):
-            left, right = baseline.get(field), hashmarks.get(field)
-            if (
-                not isinstance(left, str)
-                or not left.strip()
-                or not isinstance(right, str)
-                or not right.strip()
-            ):
-                reasons.append(f"paired_{field}_missing")
-            elif left != right:
-                reasons.append(f"paired_{field}_mismatch")
+    reasons = _paired_identity_blockers(baseline, hashmarks)
     for mode, row in (("baseline", baseline), ("hashmarks", hashmarks)):
-        if hardened and (
-            not isinstance(row.get("run_id"), str) or not str(row.get("run_id")).strip()
-        ):
-            reasons.append(f"{mode}_run_id_missing")
-        if not isinstance(row.get("model_input_tokens"), int):
-            reasons.append(f"{mode}_exact_model_tokens_missing")
-        if hardened and (
-            not isinstance(row.get("model_input_tokens_source"), str)
-            or not str(row.get("model_input_tokens_source")).strip()
-        ):
-            reasons.append(f"{mode}_model_token_provenance_missing")
-        if row.get("success") is not True:
-            reasons.append(f"{mode}_success_not_true")
-        if row.get("patch_correct") is not True:
-            reasons.append(f"{mode}_patch_correct_not_true")
-        if require_external_verdict and row.get("verdict_source") != "external":
-            reasons.append(f"{mode}_external_verdict_missing")
-        if require_external_usage and row.get("model_usage_source") != "external":
-            reasons.append(f"{mode}_external_model_usage_missing")
+        reasons.extend(
+            _mode_blockers(mode, row, require_external_verdict, require_external_usage)
+        )
     if baseline.get("success") is True and hashmarks.get("success") is not True:
         reasons.append("success_regression")
     if (
@@ -215,6 +240,131 @@ def _pair_gate(
     ):
         reasons.append("patch_correctness_regression")
     return not reasons, reasons
+
+
+def _records_by_run(
+    records: list[dict[str, Any]], record_name: str
+) -> dict[tuple[str, str, str], dict[str, Any]]:
+    indexed = {}
+    for record in records:
+        key = (
+            str(record["task_id"]),
+            str(record["mode"]),
+            str(record["run_id"]),
+        )
+        if key in indexed:
+            raise ValueError(f"duplicate {record_name} for run: " + ":".join(key))
+        indexed[key] = record
+    return indexed
+
+
+def _bind_external_records(
+    rows: list[dict[str, object]],
+    verdicts: dict[tuple[str, str, str], dict[str, Any]],
+    usages: dict[tuple[str, str, str], dict[str, Any]],
+) -> None:
+    for row in rows:
+        run_id = row.get("run_id")
+        key = (
+            (str(row["task_id"]), str(row["mode"]), str(run_id))
+            if isinstance(run_id, str)
+            else None
+        )
+        verdict = verdicts.get(key) if key is not None else None
+        if verdict is not None:
+            row.update(
+                success=verdict["success"],
+                patch_correct=verdict["patch_correct"],
+                verdict_source="external",
+                grader_identity=verdict["grader_identity"],
+                grader_evidence_digest=verdict["evidence_digest"],
+            )
+        else:
+            row["verdict_source"] = (
+                "trace"
+                if row.get("success") is not None
+                or row.get("patch_correct") is not None
+                else None
+            )
+        usage = usages.get(key) if key is not None else None
+        if usage is not None:
+            row.update(
+                model_input_tokens=usage["model_input_tokens"],
+                model_usage_source="external",
+                model_input_tokens_source="external-provider-usage",
+                model_usage_provider_identity=usage["provider_identity"],
+                model_usage_evidence_digest=usage["evidence_digest"],
+            )
+            if "model_output_tokens" in usage:
+                row["model_output_tokens"] = usage["model_output_tokens"]
+        else:
+            row["model_usage_source"] = (
+                "trace" if row.get("model_input_tokens") is not None else None
+            )
+
+
+def _rows_by_task(
+    rows: list[dict[str, object]], require_complete_pairs: bool
+) -> tuple[dict[str, dict[str, dict[str, object]]], list[str]]:
+    by_task: dict[str, dict[str, dict[str, object]]] = defaultdict(dict)
+    duplicates = []
+    for row in rows:
+        task_id = str(row["task_id"])
+        mode = str(row["mode"])
+        if mode in by_task[task_id]:
+            duplicates.append(f"{task_id}:{mode}")
+        else:
+            by_task[task_id][mode] = row
+    if duplicates:
+        raise ValueError("duplicate task/mode traces: " + ", ".join(sorted(duplicates)))
+    incomplete = sorted(
+        task_id
+        for task_id, modes in by_task.items()
+        if set(modes) != {"baseline", "hashmarks"}
+    )
+    if require_complete_pairs and incomplete:
+        raise ValueError("unpaired task traces: " + ", ".join(incomplete))
+    return by_task, incomplete
+
+
+def _comparison_pair(
+    task_id: str,
+    baseline: dict[str, object],
+    hashmarks: dict[str, object],
+    require_external_verdict: bool,
+    require_external_usage: bool,
+) -> dict[str, object]:
+    base_tokens = baseline.get("model_input_tokens")
+    hashmarks_tokens = hashmarks.get("model_input_tokens")
+    token_reduction = None
+    if (
+        isinstance(base_tokens, int)
+        and isinstance(hashmarks_tokens, int)
+        and base_tokens > 0
+    ):
+        token_reduction = 1.0 - (hashmarks_tokens / base_tokens)
+    eligible, reasons = _pair_gate(
+        baseline,
+        hashmarks,
+        require_external_verdict=require_external_verdict,
+        require_external_usage=require_external_usage,
+    )
+    return {
+        "task_id": task_id,
+        "baseline": baseline,
+        "hashmarks": hashmarks,
+        "claim_eligible": eligible,
+        "claim_blockers": reasons,
+        "model_input_token_reduction": token_reduction,
+        "search_call_reduction": int(baseline["search_calls"])
+        - int(hashmarks["search_calls"]),
+        "file_read_reduction": int(baseline["file_reads"])
+        - int(hashmarks["file_reads"]),
+        "estimated_exploration_token_reduction": int(
+            baseline["estimated_exploration_tokens"]
+        )
+        - int(hashmarks["estimated_exploration_tokens"]),
+    }
 
 
 def compare(
@@ -229,110 +379,24 @@ def compare(
     rows = [summarize(load_trace(path)) for path in paths]
     verdicts = [load_verdict(path) for path in (verdict_paths or [])]
     usages = [load_usage(path) for path in (usage_paths or [])]
-    verdict_by_run: dict[tuple[str, str, str], dict[str, Any]] = {}
-    for verdict in verdicts:
-        key = (str(verdict["task_id"]), str(verdict["mode"]), str(verdict["run_id"]))
-        if key in verdict_by_run:
-            raise ValueError("duplicate verdict for run: " + ":".join(key))
-        verdict_by_run[key] = verdict
-    usage_by_run: dict[tuple[str, str, str], dict[str, Any]] = {}
-    for usage in usages:
-        key = (str(usage["task_id"]), str(usage["mode"]), str(usage["run_id"]))
-        if key in usage_by_run:
-            raise ValueError("duplicate model usage for run: " + ":".join(key))
-        usage_by_run[key] = usage
-    for row in rows:
-        run_id = row.get("run_id")
-        key = (
-            (str(row["task_id"]), str(row["mode"]), str(run_id))
-            if isinstance(run_id, str)
-            else None
-        )
-        verdict = verdict_by_run.get(key) if key is not None else None
-        if verdict is not None:
-            row["success"] = verdict["success"]
-            row["patch_correct"] = verdict["patch_correct"]
-            row["verdict_source"] = "external"
-            row["grader_identity"] = verdict["grader_identity"]
-            row["grader_evidence_digest"] = verdict["evidence_digest"]
-        else:
-            row["verdict_source"] = (
-                "trace"
-                if row.get("success") is not None
-                or row.get("patch_correct") is not None
-                else None
-            )
-        usage = usage_by_run.get(key) if key is not None else None
-        if usage is not None:
-            row["model_input_tokens"] = usage["model_input_tokens"]
-            row["model_usage_source"] = "external"
-            row["model_input_tokens_source"] = "external-provider-usage"
-            row["model_usage_provider_identity"] = usage["provider_identity"]
-            row["model_usage_evidence_digest"] = usage["evidence_digest"]
-            if "model_output_tokens" in usage:
-                row["model_output_tokens"] = usage["model_output_tokens"]
-        else:
-            row["model_usage_source"] = (
-                "trace" if row.get("model_input_tokens") is not None else None
-            )
-    by_task: dict[str, dict[str, dict[str, object]]] = defaultdict(dict)
-    duplicates: list[str] = []
-    for row in rows:
-        task_id = str(row["task_id"])
-        mode = str(row["mode"])
-        if mode in by_task[task_id]:
-            duplicates.append(f"{task_id}:{mode}")
-            continue
-        by_task[task_id][mode] = row
-    if duplicates:
-        raise ValueError("duplicate task/mode traces: " + ", ".join(sorted(duplicates)))
-
-    incomplete_tasks = sorted(
-        task_id
-        for task_id, modes in by_task.items()
-        if set(modes) != {"baseline", "hashmarks"}
+    _bind_external_records(
+        rows,
+        _records_by_run(verdicts, "verdict"),
+        _records_by_run(usages, "model usage"),
     )
-    if require_complete_pairs and incomplete_tasks:
-        raise ValueError("unpaired task traces: " + ", ".join(incomplete_tasks))
-
-    pairs: list[dict[str, object]] = []
+    by_task, incomplete_tasks = _rows_by_task(rows, require_complete_pairs)
+    pairs = []
     for task_id, modes in sorted(by_task.items()):
         if "baseline" not in modes or "hashmarks" not in modes:
             continue
-        baseline = modes["baseline"]
-        hashmarks = modes["hashmarks"]
-        base_tokens = baseline.get("model_input_tokens")
-        hm_tokens = hashmarks.get("model_input_tokens")
-        token_reduction = None
-        if (
-            isinstance(base_tokens, int)
-            and isinstance(hm_tokens, int)
-            and base_tokens > 0
-        ):
-            token_reduction = 1.0 - (hm_tokens / base_tokens)
-        eligible, reasons = _pair_gate(
-            baseline,
-            hashmarks,
-            require_external_verdict=require_external_verdict,
-            require_external_usage=require_external_usage,
-        )
         pairs.append(
-            {
-                "task_id": task_id,
-                "baseline": baseline,
-                "hashmarks": hashmarks,
-                "claim_eligible": eligible,
-                "claim_blockers": reasons,
-                "model_input_token_reduction": token_reduction,
-                "search_call_reduction": int(baseline["search_calls"])
-                - int(hashmarks["search_calls"]),
-                "file_read_reduction": int(baseline["file_reads"])
-                - int(hashmarks["file_reads"]),
-                "estimated_exploration_token_reduction": int(
-                    baseline["estimated_exploration_tokens"]
-                )
-                - int(hashmarks["estimated_exploration_tokens"]),
-            }
+            _comparison_pair(
+                task_id,
+                modes["baseline"],
+                modes["hashmarks"],
+                require_external_verdict,
+                require_external_usage,
+            )
         )
 
     eligible_pairs = [p for p in pairs if p["claim_eligible"]]
@@ -476,7 +540,7 @@ def main() -> None:
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)  # noqa: T201 - intentional command output
+    log_command_output(logger, rendered)
     if args.strict:
         failures = gate(payload, min_pairs=args.min_pairs)
         if failures:

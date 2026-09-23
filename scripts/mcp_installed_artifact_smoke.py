@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import tempfile
 from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 _EXPECTED_TOOLS = [
     "repository_context",
@@ -87,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     with tempfile.TemporaryDirectory(prefix="hashmarks-mcp-installed-") as raw:
         root = Path(raw)
         asyncio.run(_exercise(executable, _fixture(root), root / "state"))
-    print("Hashmarks installed MCP artifact smoke: PASS")  # noqa: T201 - intentional command output
+    log_command_output(logger, "Hashmarks installed MCP artifact smoke: PASS")
     return 0
 
 

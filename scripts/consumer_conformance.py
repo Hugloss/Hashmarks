@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
 from hashmarks.consumer_conformance import consumer_conformance_vectors
+
+logger = logging.getLogger(__name__)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -21,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
         "result_authority": "external",
         "certification_authority": "external",
     }
-    print(json.dumps(payload, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(payload, indent=2, sort_keys=True))
     return (
         0
         if all(row["result"]["valid"] == row["expected_valid"] for row in vectors)

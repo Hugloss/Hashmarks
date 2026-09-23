@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -11,6 +12,10 @@ import tempfile
 import time
 from pathlib import Path
 from statistics import median
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 
 def _sha_obj(x):
@@ -201,10 +206,10 @@ def main():
     payload["identity"] = _sha_obj(payload)
     a.output.parent.mkdir(parents=True, exist_ok=True)
     a.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-    print("old", {k: v for k, v in old.items() if k != "rows"})  # noqa: T201 - intentional command output
-    print("new", {k: v for k, v in new.items() if k != "rows"})  # noqa: T201 - intentional command output
-    print("delta", payload["delta"])  # noqa: T201 - intentional command output
-    print("identity", payload["identity"])  # noqa: T201 - intentional command output
+    log_command_output(logger, "old", {k: v for k, v in old.items() if k != "rows"})
+    log_command_output(logger, "new", {k: v for k, v in new.items() if k != "rows"})
+    log_command_output(logger, "delta", payload["delta"])
+    log_command_output(logger, "identity", payload["identity"])
 
 
 if __name__ == "__main__":

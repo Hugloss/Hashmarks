@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+from hashmarks._command_output import log_command_output
 
 from ._version import __version__
 from .client import (
@@ -18,6 +21,8 @@ from .daemon import IdentityDaemon
 from .errors import UserFacingError
 from .identity import RepositoryIdentity, RepositoryIdentityMode
 from .paths import canonical_host_path
+
+logger = logging.getLogger(__name__)
 
 
 def _version(args) -> int:
@@ -37,7 +42,7 @@ def _client(args) -> IdentityClient:
 
 
 def _print(value) -> None:
-    print(json.dumps(value, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(value, indent=2, sort_keys=True))
 
 
 def _daemon_start(args) -> int:

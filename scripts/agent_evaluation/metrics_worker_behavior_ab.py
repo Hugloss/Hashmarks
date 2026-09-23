@@ -1,23 +1,16 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import logging
 import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
-_SCRIPTS_DIR = Path(__file__).resolve().parent
-_REPO_ROOT = _SCRIPTS_DIR.parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
-if str(_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_DIR))
-
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
     CodeMap,
 )
@@ -27,6 +20,11 @@ from .metrics_blind_worker_ab import (
     _sha256_bytes,
     materialize_challenge,
 )
+
+logger = logging.getLogger(__name__)
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _SCRIPTS_DIR.parent.parent
 
 SCHEMA = "hashmarks.worker-behavior-ab.v1"
 PROTOCOL_SCHEMA = "hashmarks.worker-behavior-ab-protocol.v1"
@@ -363,7 +361,7 @@ def main() -> None:
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)  # noqa: T201 - intentional command output
+    log_command_output(logger, rendered)
 
 
 if __name__ == "__main__":

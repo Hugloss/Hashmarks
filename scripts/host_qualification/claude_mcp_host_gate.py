@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from typing import Any
+
+from hashmarks._command_output import log_command_output
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(SCRIPTS_DIR) not in sys.path:
@@ -24,6 +27,8 @@ from mcp_host_gate_common import (  # noqa: E402 - import follows standalone scr
     source_binding,
     write_fixture,
 )
+
+logger = logging.getLogger(__name__)
 
 EXPECTED = {
     "mcp__hashmarks__repository_context": "hashmarks.repository-capsule.v1",
@@ -293,11 +298,12 @@ def main(argv: list[str] | None = None) -> int:
     receipt_path.write_text(
         json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    print(  # noqa: T201 - intentional command output
-        f"HASHMARKS CLAUDE MCP HOST GATE: {receipt['status']}\nreceipt: {receipt_path}"
+    log_command_output(
+        logger,
+        f"HASHMARKS CLAUDE MCP HOST GATE: {receipt['status']}\nreceipt: {receipt_path}",
     )
     if receipt["status"] != "PASS" and receipt.get("error"):
-        print(receipt["error"])  # noqa: T201 - intentional command output
+        log_command_output(logger, receipt["error"])
     return code
 
 

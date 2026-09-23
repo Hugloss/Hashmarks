@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import tempfile
 from pathlib import Path
 
+from hashmarks._command_output import log_command_output
+
 from .full_edit_verify_benchmark import build_combined, run_lane
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -35,7 +40,8 @@ def main():
         "new": new,
     }
     a.output.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n")
-    print(  # noqa: T201 - intentional command output
+    log_command_output(
+        logger,
         json.dumps(
             {
                 "category": a.category,
@@ -43,7 +49,7 @@ def main():
                 "new": {k: v for k, v in new.items() if k != "rows"},
             },
             indent=2,
-        )
+        ),
     )
 
 

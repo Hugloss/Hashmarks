@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from pathlib import Path
 from typing import Any
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 
 def _load(path: str) -> dict[str, Any]:
@@ -59,7 +64,8 @@ def main() -> None:
                 "faster": after < before,
             }
         )
-    print(  # noqa: T201 - intentional command output
+    log_command_output(
+        logger,
         json.dumps(
             {
                 "schema": "fastidentity.metrics-comparison.v1",
@@ -69,7 +75,7 @@ def main() -> None:
             },
             indent=2,
             sort_keys=True,
-        )
+        ),
     )
 
 

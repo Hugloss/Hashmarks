@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 TRACE_SCHEMA = "hashmarks.agent-work-trace.v1"
 REPORT_SCHEMA = "hashmarks.agent-work-score.v1"
@@ -303,7 +308,7 @@ def main() -> None:
     rendered = json.dumps(result, indent=2, sort_keys=True)
     if args.output:
         args.output.write_text(rendered + "\n")
-    print(rendered)  # noqa: T201 - intentional command output
+    log_command_output(logger, rendered)
 
 
 if __name__ == "__main__":

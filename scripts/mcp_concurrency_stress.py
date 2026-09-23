@@ -1,25 +1,22 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import json
+import logging
 import multiprocessing as mp
 import os
-import sys
 import tempfile
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
+from hashmarks._command_output import log_command_output
 from hashmarks.mcp_surface import (
     HashmarksMcpSurface,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -289,13 +286,14 @@ def main(argv: list[str] | None = None) -> int:
     path.write_text(
         json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    print(  # noqa: T201 - intentional command output
+    log_command_output(
+        logger,
         "HASHMARKS MCP CONCURRENCY STRESS: " + receipt["status"] + "\n"
         f"calls: {receipt['totals']['successful_calls']}/{receipt['totals']['expected_calls']}\n"
         f"errors: {receipt['totals']['errors']}\n"
         f"BUILDING payload leaks: {receipt['totals']['building_payloads']}\n"
         f"generation regressions: {receipt['totals']['generation_regressions']}\n"
-        f"receipt: {path}"
+        f"receipt: {path}",
     )
     return 0 if receipt["status"] == "PASS" else 1
 

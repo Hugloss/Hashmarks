@@ -179,7 +179,7 @@ ruff: ruff-check ruff-format-check
 lint: ruff
 
 source-hygiene:
-	@git ls-files -z -- '*.py' '*.pyi' | xargs -0 -r python3 scripts/source_hygiene.py
+	@git ls-files -z -- '*.py' '*.pyi' | xargs -0 -r python3 -m scripts.source_hygiene
 	@git diff --check
 
 ty-check:
@@ -199,16 +199,16 @@ hooks-install:
 	@.pre-commit-venv/bin/pre-commit install
 
 lint-debt:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint python scripts/ruff_debt.py
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint python -m scripts.ruff_debt
 
 lint-debt-summary:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint python scripts/ruff_debt.py --summary-only
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint python -m scripts.ruff_debt --summary-only
 
 lint-debt-json:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint python scripts/ruff_debt.py --json; status=$$?; test $$status -eq 0 -o $$status -eq 1
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint python -m scripts.ruff_debt --json; status=$$?; test $$status -eq 0 -o $$status -eq 1
 
 lint-debt-gate:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint python scripts/ruff_debt.py --baseline ruff-debt-baseline.json $(if $(strip $(RUFF_DEBT_PREVIOUS_BASELINE)),--previous-baseline "$(RUFF_DEBT_PREVIOUS_BASELINE)",)
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint python -m scripts.ruff_debt --baseline ruff-debt-baseline.json $(if $(strip $(RUFF_DEBT_PREVIOUS_BASELINE)),--previous-baseline "$(RUFF_DEBT_PREVIOUS_BASELINE)",)
 
 test:
 	@if [ "$${HASHMARKS_CONSTRAINED_HOST:-0}" = "1" ]; then \
@@ -221,23 +221,23 @@ test-native:
 	@$(UV_RUN) --offline --no-sync --group test python -m pytest -q
 
 test-diagnostic-capabilities:
-	@$(DIAGNOSTIC_PYTHON) scripts/hosted_diagnostic.py --capabilities
+	@$(DIAGNOSTIC_PYTHON) -m scripts.hosted_diagnostic --capabilities
 
 test-diagnostic:
-	@$(DIAGNOSTIC_PYTHON) scripts/hosted_diagnostic.py \
+	@$(DIAGNOSTIC_PYTHON) -m scripts.hosted_diagnostic \
 	  --shards $(DIAGNOSTIC_SHARDS) \
 	  --extra-marker '$(DIAGNOSTIC_EXTRA_MARKER)'
 
 test-diagnostic-batch:
 	@start=$$(( $(DIAGNOSTIC_BATCH) * $(DIAGNOSTIC_BATCH_LIMIT) )); \
-	$(DIAGNOSTIC_PYTHON) scripts/hosted_diagnostic.py \
+	$(DIAGNOSTIC_PYTHON) -m scripts.hosted_diagnostic \
 	  --shards $(DIAGNOSTIC_SHARDS) \
 	  --start $$start \
 	  --limit $(DIAGNOSTIC_BATCH_LIMIT) \
 	  --extra-marker '$(DIAGNOSTIC_EXTRA_MARKER)'
 
 test-diagnostic-shard:
-	@$(DIAGNOSTIC_PYTHON) scripts/hosted_diagnostic.py \
+	@$(DIAGNOSTIC_PYTHON) -m scripts.hosted_diagnostic \
 	  --shards $(DIAGNOSTIC_SHARDS) \
 	  --start $(DIAGNOSTIC_SHARD) \
 	  --limit 1 \

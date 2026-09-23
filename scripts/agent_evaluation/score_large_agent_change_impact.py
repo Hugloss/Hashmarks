@@ -1,19 +1,14 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import json
+import logging
 import statistics
-import sys
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
-
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
     CodeMap,
 )
@@ -21,6 +16,8 @@ from scripts.generate_large_impact_corpus import (
     KINDS,
     generate,
 )
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -269,7 +266,7 @@ def main() -> int:
     args.output.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    print(json.dumps(payload["summary"], sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(payload["summary"], sort_keys=True))
     return 0
 
 

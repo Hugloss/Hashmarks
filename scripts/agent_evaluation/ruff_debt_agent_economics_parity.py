@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import logging
 import sys
 from collections import Counter
 from pathlib import Path
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[2]
 _RUFF_DEBT_PATH = ROOT / "scripts" / "ruff_debt.py"
@@ -112,20 +117,22 @@ def main() -> int:
         )
     }
     if measured != expected:
-        print(
+        log_command_output(
+            logger,
             json.dumps(
                 {"legacy": expected, "agent_economics": measured},
                 indent=2,
                 sort_keys=True,
-            )
+            ),
         )
         return 1
     ranked = _ranked_hotspots(payload)
-    print(
+    log_command_output(
+        logger,
         "Agent Economics Ruff debt parity: PASS "
-        f"(excess={measured['excess']}, files={len(measured['files'])})"
+        f"(excess={measured['excess']}, files={len(measured['files'])})",
     )
-    print(json.dumps({"ranked_hotspots": ranked}, sort_keys=True))
+    log_command_output(logger, json.dumps({"ranked_hotspots": ranked}, sort_keys=True))
     return 0
 
 

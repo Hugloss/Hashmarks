@@ -1,23 +1,20 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import logging
 import shutil
-import sys
 import tempfile
 import time
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
-
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
     CodeMap,
 )
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.verification-relevance-scale.v1"
 
@@ -158,7 +155,7 @@ def main() -> int:
     if args.output:
         Path(args.output).write_text(text, encoding="utf-8")
     else:
-        print(text, end="")  # noqa: T201 - intentional command output
+        log_command_output(logger, text, end="")
     return 0
 
 

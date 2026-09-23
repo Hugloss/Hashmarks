@@ -1,23 +1,17 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import logging
 import os
-import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-_S = Path(__file__).resolve().parent
-_R = _S.parent.parent
-for p in (str(_R), str(_S)):
-    if p not in sys.path:
-        sys.path.insert(0, p)
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
     CodeMap,
 )
@@ -29,6 +23,8 @@ from .metrics_blind_worker_ab import (
 from .metrics_worker_inspection_ab import (
     _resolve_after_inspection,
 )
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.process-swarm-real-repo.v2"
 TRACE = "hashmarks.process-swarm-trace.v2"
@@ -424,7 +420,7 @@ def main():
             limit=a.limit,
         )
     )
-    print(json.dumps(r["summary"], indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(r["summary"], indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

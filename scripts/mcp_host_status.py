@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import logging
 import shutil
 import subprocess
 import sys
@@ -11,6 +12,10 @@ import tomllib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -543,7 +548,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     workspace = Path(args.workspace).resolve()
     report = collect(workspace)
-    print(json.dumps(report, indent=2, sort_keys=True) if args.json else render(report))  # noqa: T201 - intentional command output
+    log_command_output(
+        logger,
+        json.dumps(report, indent=2, sort_keys=True) if args.json else render(report),
+    )
     return 0
 
 

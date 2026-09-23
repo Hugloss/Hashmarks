@@ -1,23 +1,17 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
+import logging
 import os
 import shutil
 import subprocess
-import sys
 import time
 from pathlib import Path
 
-_S = Path(__file__).resolve().parent
-_R = _S.parent.parent
-for x in (str(_R), str(_S)):
-    if x not in sys.path:
-        sys.path.insert(0, x)
-import contextlib
+from hashmarks._command_output import log_command_output
 
 from .codex_agent_economics import (
     CodexRunConfig,
@@ -33,6 +27,10 @@ from .metrics_blind_worker_ab import (
     _sha256_bytes,
     materialize_challenge,
 )
+
+logger = logging.getLogger(__name__)
+
+_S = Path(__file__).resolve().parent
 
 SCHEMA = "hashmarks.codex-selective-scout-economics.v1"
 PROTOCOL = "hashmarks.codex-selective-scout-economics-protocol.v1"
@@ -397,7 +395,7 @@ def main() -> int:
     if a.output:
         a.output.parent.mkdir(parents=True, exist_ok=True)
         a.output.write_text(text)
-    print(text, end="")  # noqa: T201 - intentional command output
+    log_command_output(logger, text, end="")
     return 0
 
 

@@ -3,8 +3,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import shutil
 from pathlib import Path
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 CATEGORIES = (
     "vocabulary-mismatch",
@@ -175,7 +180,7 @@ def main():
     m = generate(a.root, a.public, a.secret, cases_per_category=a.cases_per_category)
     if a.manifest:
         a.manifest.write_text(json.dumps(m, indent=2, sort_keys=True) + "\n")
-    print(json.dumps(m, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(m, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

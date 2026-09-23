@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import logging
 import os
 import re
 import shutil
@@ -12,6 +13,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 EXPECTED_HASHMARKS_TOOLS = {
     "hashmarks_repository_context",
@@ -662,7 +667,8 @@ def main(argv: list[str] | None = None) -> int:
             + "\n",
             encoding="utf-8",
         )
-        print(
+        log_command_output(
+            logger,
             f"HASHMARKS OPENCODE MCP HOST GATE: ENVIRONMENT_BLOCKED\n{exc}",
             file=os.sys.stderr,
         )
@@ -682,13 +688,17 @@ def main(argv: list[str] | None = None) -> int:
             + "\n",
             encoding="utf-8",
         )
-        print(f"HASHMARKS OPENCODE MCP HOST GATE: FAIL\n{exc}", file=os.sys.stderr)
+        log_command_output(
+            logger, f"HASHMARKS OPENCODE MCP HOST GATE: FAIL\n{exc}", file=os.sys.stderr
+        )
         return 1
 
     receipt_path.write_text(
         json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    print(f"HASHMARKS OPENCODE MCP HOST GATE: PASS\nreceipt: {receipt_path}")  # noqa: T201 - intentional command output
+    log_command_output(
+        logger, f"HASHMARKS OPENCODE MCP HOST GATE: PASS\nreceipt: {receipt_path}"
+    )
     return 0
 
 

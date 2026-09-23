@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
+
+from hashmarks._command_output import log_command_output
 
 from .codemap.change_impact import ChangeImpactOptions
 from .errors import RepositoryCliError
@@ -12,12 +15,14 @@ from .repository_retry import (
     retry_transient_repository_race,
 )
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 
 def _print(value) -> None:
-    print(json.dumps(value, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(value, indent=2, sort_keys=True))
 
 
 _T = TypeVar("_T")

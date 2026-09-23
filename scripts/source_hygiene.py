@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import ast
+import logging
 import sys
 from pathlib import Path
+
+from hashmarks._command_output import log_command_output
+
+logger = logging.getLogger(__name__)
 
 
 def _check(path: Path) -> list[str]:
@@ -28,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     for path in paths:
         for error in _check(path):
             failed = True
-            print(f"{path}: {error}", file=sys.stderr)
+            log_command_output(logger, f"{path}: {error}", file=sys.stderr)
     return 1 if failed else 0
 
 

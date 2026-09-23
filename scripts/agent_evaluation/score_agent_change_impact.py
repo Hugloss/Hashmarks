@@ -1,23 +1,20 @@
-# Imports below follow the standalone script path bootstrap.
-# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import sys
+import logging
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
-
+from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
     CodeMap,
 )
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = "hashmarks.agent-change-impact-qualification.v1"
 
@@ -299,7 +296,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     payload = run(args.repo, args.public, args.secret, args.output)
-    print(json.dumps(payload["summary"], sort_keys=True))  # noqa: T201 - intentional command output
+    log_command_output(logger, json.dumps(payload["summary"], sort_keys=True))
     return 0
 
 
