@@ -1,27 +1,10 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from scripts.repository_evaluation.merge_runs import merge_runs
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def _manifest() -> dict[str, object]:
-    return json.loads(
-        (
-            ROOT / "scripts/repository_evaluation/retained_measurement_authority.json"
-        ).read_text()
-    )
-
-
-def test_retained_good_work_inventory_is_complete() -> None:
-    doc = _manifest()
-    assert len(doc["required_capabilities"]) == 13
-    assert len(doc["negative_guardrails"]) == 8
-    assert len(set(doc["required_capabilities"])) == 13
-    assert len(set(doc["negative_guardrails"])) == 8
 
 
 def test_measurement_authority_remains_outside_product_runtime() -> None:

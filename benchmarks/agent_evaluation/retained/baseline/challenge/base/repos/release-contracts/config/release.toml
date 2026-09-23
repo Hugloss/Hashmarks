@@ -1,3 +1,0 @@
-[release]
-require_checksum=true
-manifest='contracts/release.schema.json'
