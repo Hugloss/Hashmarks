@@ -7,6 +7,7 @@
 - Remove internal HM phase chronology, handoffs, historical receipts, superseded plans, and pre-public agent-loop archaeology from the maintained documentation tree; Git and merged pull requests remain the historical record.
 - Remove committed copies of generated agent-evaluation fixtures/results and the phase-era HM285 measurement-authority checklist; canonical synthetic fixtures now have one owner in evaluation code and are materialized per run, while semantic tests protect behavior and Git/PR history preserves old snapshots.
 - Make evaluation protocol/fixture family identifiers semantic and package-version-neutral instead of embedding obsolete `v0.10.x` release numbers in current benchmark identities.
+- Remove remaining RCR/guardrail chronology, closed refactor receipts, and obsolete pre-public/v0.11 compatibility wording from maintained contributor policy while preserving the current responsibility-first and authority-boundary rules.
 - Keep only current product/reference, integration, maintainer, and qualification documentation in the live tree, and keep the changelog limited to public release history.
 
 ## 0.17.0 — External evidence correlation and real-data qualification

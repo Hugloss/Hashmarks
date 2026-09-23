@@ -131,7 +131,7 @@ For Hashmarks' own deterministic pytest selection, statically known process-sens
 
 ### Boundary litmus test
 
-Use this rule when implementing future phases:
+Use this rule when implementing or reviewing product changes:
 
 - If the question is **“what does this repository mean, what code/test is relevant, or what immutable membership was selected?”** → Hashmarks.
 - If the question is **“may this run, how is it chunked/launched/retried/resumed, what happened, or can the result be certified?”** → Oh-Goon/execution layer.
@@ -215,47 +215,47 @@ Before file-size, naming, or complexity cleanup, apply `docs/maintainers/RESPONS
 
 ## CLI responsibility ownership
 
-The top-level `hashmarks.cli` module owns process entry, global argument normalization, identity/daemon protocol commands, and current impact/benchmark command registration. Repository-intelligence command families are owned by `hashmarks.repository_cli`. New repository commands belong with repository CLI ownership; do not grow the top-level facade merely because it is the executable entry point. `hashmarks.cli.main` is the single current CLI entry surface; obsolete command aliases are not preserved pre-publication.
+The top-level `hashmarks.cli` module owns process entry, global argument normalization, identity/daemon protocol commands, and current impact/benchmark command registration. Repository-intelligence command families are owned by `hashmarks.repository_cli`. New repository commands belong with repository CLI ownership; do not grow the top-level facade merely because it is the executable entry point. `hashmarks.cli.main` is the single current CLI entry surface; obsolete command aliases are removed rather than preserved.
 
-### G55 — Post-RCR work is product-value driven
+### Structural cleanup requires measured product value
 
-After RCR-08, structural cleanup is not an open-ended queue. New refactoring phases require a fresh measured reason tied to correctness risk, repository-intelligence economics, contract clarity, or demonstrated maintenance cost. Ruff/LOC alone do not authorize a phase. Retrieval refactors must preserve ranking/selection authority and may only remove redundant repository work when output evidence is unchanged.
+Structural cleanup is not an open-ended queue. New refactoring work requires a fresh measured reason tied to correctness risk, repository-intelligence economics, contract clarity, or demonstrated maintenance cost. Ruff/LOC alone do not authorize a refactor. Retrieval refactors must preserve ranking/selection authority and may only remove redundant repository work when output evidence is unchanged.
 
-### G56 — Local developer entrypoints are simple and dependency authority is split by intent and resolution
+### Local developer entrypoints are simple and dependency authority is split by intent and resolution
 A new local developer must not need to know Hashmarks' internal qualification topology to start or test it. `pyproject.toml` owns dependency intent, allowed ranges, dependency groups, and uv source declarations. The committed `uv.lock` owns the exact resolved dependency set for repository development and qualification. Normal `make init`, setup, test/qualification, and CI paths must consume that committed lock through frozen uv operations and must not rewrite it. `make lock-check` is the explicit authoring/convergence check for `pyproject.toml` ↔ `uv.lock` drift; `make lock` is the intentional dependency-authoring operation that refreshes `uv.lock` and then materializes the environment from it. Offline bootstrap may consume the same committed lock when all locked artifacts are cached.
 
 The committed lock is repository development/qualification authority, not installed-package runtime metadata and not a second package manifest. Wheel/sdist consumer dependency semantics remain owned by package metadata. Hashmarks must not maintain a second normalized representation, checksum companion, reconstructed lock, or compatibility layer for the resolved dependency graph. Release/qualification provenance may bind the exact `uv.lock` bytes directly when dependency-environment identity matters.
 
-### G57 — Architecture guards resolve relative imports
+### Architecture guards resolve relative imports
 
 Product-boundary checks must inspect both absolute and package-relative imports. A relative import is not a valid way to reintroduce removed execution/agent-loop responsibilities into modern CodeMap/repository-intelligence code. Architecture tests must resolve imports to fully-qualified module ownership before classifying the dependency; textual spelling alone is not authority.
 
-### G58 — Consumer conformance is runtime-neutral
+### Consumer conformance is runtime-neutral
 
 Hashmarks consumer conformance and versioned evidence contracts must remain independently consumable. Oh-Goon is a consumer, not a required runtime dependency or semantic owner. Modern CodeMap, repository CLI, contract-surface, and consumer-conformance code must not import Oh-Goon/goon runtime packages. Contract metadata may describe external execution/certification authority, but it transfers no execution authority and must remain usable by other consumers.
 
-### G59 — Removed boundary debt must stay removed
+### Agent execution remains outside the product boundary
 
-Pre-public execution and agent-loop surfaces were removed from the product contract. Modern CodeMap/repository-intelligence code, CLI, service contracts, examples, and top-level exports must not reintroduce those responsibilities. Git history preserves the removed experiments; development-only evaluation harnesses may model external agents, but they must remain outside the installed product contract.
+Execution and agent-loop responsibilities remain outside the installed product contract. Modern CodeMap/repository-intelligence code, CLI, service contracts, examples, and top-level exports must not introduce those responsibilities. Development-only evaluation harnesses may model external agents, but they must remain outside the installed product contract.
 
-### G60 — Release-correctness proofs must be scope-bounded
+### Release-correctness proofs must be scope-bounded
 A release-correctness test must not rebuild the full real Hashmarks repository when the asserted invariant is independent of repository scale or exact repository bytes. Use a representative repository that still traverses the real public product surface. Real-repository and scale proofs remain appropriate only when repository scale, repository bytes, integration topology, or measured economics are themselves part of the contract. Do not add production caching merely to hide test-fixture reconstruction cost.
 
-### G61 — Qualification planning reuses one repository snapshot
+### Qualification planning reuses one repository snapshot
 A single qualification-plan construction must enumerate test membership once and derive its units from the same classification artifact. It must not rescan repository identity or reclassify the same membership merely to construct downstream views. Reuse is operation-local and identity-bound; this rule does not authorize persistent caches or execution authority in Hashmarks.
 
-### G62 — Read-only qualification contract tests share one immutable repository proof
+### Read-only qualification contract tests share one immutable repository proof
 Tests that only validate projections, tamper rejection, authority fields, or consumer interpretation of the same qualification state must reuse one session-scoped immutable qualification plan/handoff. Determinism of a projection is proven by deriving it twice from the same bound input, not by rescanning identical repository bytes twice. Keep a bounded number of explicit fresh-construction tests for repository-plan determinism and snapshot correctness. Test reuse must never become production-global caching or weaken repository identity binding.
 
-### G63 — Test runtime visibility is diagnostic, not correctness authority
+### Test runtime visibility is diagnostic, not correctness authority
 
 The full-suite runtime profile is owned by `make test-profile` and reports the slowest 25 pytest phases taking at least one second. Duration alone never changes PASS/FAIL semantics, and slow-test optimization must preserve the proof scope required by the tested contract. Do not duplicate duration flags across qualification entrypoints or introduce production caches solely to improve test timing.
 
-### G64 — Development-tool configuration has one owner
+### Development-tool configuration has one owner
 
 `pyproject.toml` owns the Ruff dependency and rule configuration. Developer hooks, Make targets, and CI must invoke that configured Ruff rather than maintaining parallel min/latest compatibility paths. Do not add tests whose only assertion is that tool configuration, docs, and version strings agree. If a real tool upgrade breaks Hashmarks behavior, reproduce the failure and change the single project declaration or the affected behavior. Ruff remains diagnostic-only and never creates or transfers canonical promotion authority.
 
-### G65 — Exception translation has one owner per boundary
+### Exception translation has one owner per boundary
 
 Expected caller-visible failures are translated exactly once at the public boundary that owns the transport. Repository/domain methods raise their own errors; leaf CLI handlers must not wrap every call in local `try/except`, and MCP repository methods must not import or raise SDK transport exceptions. The repository CLI adapter owns repository-request translation, the top-level CLI dispatcher owns process-exit translation, the MCP server owns `McpSurfaceError -> ToolError`, and local daemon/CodeMap IPC handlers share one JSON request/error serialization boundary.
 

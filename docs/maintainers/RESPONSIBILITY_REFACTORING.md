@@ -4,7 +4,7 @@
 
 Hashmarks does not refactor to minimize lines of code. Large LOC, Ruff debt, branch counts, long functions, wide APIs, repeated edits, and difficult tests are **signals to investigate**. The objective is lower accidental complexity with stronger cohesion, ownership clarity, discoverability, deterministic behavior, and repository-intelligence boundaries.
 
-This policy is the mandatory gate before any "reduce the biggest files", naming cleanup, or complexity-debt phase.
+This policy is the mandatory gate before any "reduce the biggest files", naming cleanup, or complexity-debt effort.
 
 ## Product boundary first
 
@@ -78,7 +78,7 @@ It is acceptable for a file to become longer when explicit stages make ownership
 
 ## Contract preservation
 
-Unless a phase explicitly changes a contract, preserve:
+Unless a refactor explicitly changes a contract, preserve:
 - public imports and call signatures;
 - serialized schema names and fields;
 - deterministic identities and ordering;
@@ -88,7 +88,7 @@ Unless a phase explicitly changes a contract, preserve:
 - qualification behavior;
 - Hashmarks' repository-intelligence-only product boundary.
 
-Compatibility aliases may preserve v0.11 public names, but new internal names should converge on responsibility-owned vocabulary.
+Compatibility is not a reason to preserve obsolete internal spellings. Preserve supported public contracts unless the change explicitly revises them; do not add aliases merely to keep retired internal names alive.
 
 ## Qualification protocol
 
@@ -97,10 +97,10 @@ Two evidence gates are now mandatory before a complexity owner can close:
 - **Exact direct-test ownership:** the selected production owner must have at least one confirmed direct owning test or an explicit unresolved ownership item. Exact first-party static re-exports may establish ownership only when the symbol resolves unambiguously to one defining source; naming similarity or facade adjacency is not authority.
 - **Complete structural-locality evidence:** behavior preservation plus lower Ruff debt is insufficient when new internal structure is introduced. Pre/post locality must be comparable and complete; unresolved repository call targets keep the phase open rather than being waived. Every introduced helper/stage must bind an independent responsibility value, and observed caller count <= 1 remains review evidence only, never proof of global single-use.
   A bounded observer reporting `call-limit-reached`, `reference-limit-reached`, or an equivalent truncation state is incomplete measurement, not semantic ambiguity and not locality success. Raise the explicit bound within the supported limit and rerun the same scope; do not shrink navigation depth merely to make the receipt pass.
-- **Behavior-preservation closure:** BP1 freezes exact pre-edit source identity, direct owning test bytes, behavior boundaries, and the broader repository gate. BP2 must replay unchanged frozen test bytes against the complete changed/new production source set, bind the same post-edit repository identity used by locality evidence, execute the declared broader gate on that state, and combine the preservation receipt with comparable pre/post analyzer measurements. Lower Ruff debt alone never closes a phase.
+- **Behavior-preservation closure:** BP1 freezes exact pre-edit source identity, direct owning test bytes, behavior boundaries, and the broader repository gate. BP2 must replay unchanged frozen test bytes against the complete changed/new production source set, bind the same post-edit repository identity used by locality evidence, execute the declared broader gate on that state, and combine the preservation receipt with comparable pre/post analyzer measurements. Lower Ruff debt alone never closes the work.
   Verification must use the repository-owned test materialization needed by the exercised runtime surface. A dependency-only environment is not equivalent when tests require installed entry points, console scripts, generated artifacts, or other project-owned runtime bytes; mirror the repository CI/setup contract instead of skipping those tests.
 
-For each phase:
+For each bounded refactor:
 1. freeze the exact parent artifact identity;
 2. record pre-change complexity metrics for the selected owner;
 3. make one bounded responsibility change;
@@ -110,7 +110,7 @@ For each phase:
 7. build the candidate deterministically;
 8. test the exact extracted candidate with the same focused ring;
 9. rebuild independently and compare bytes when producing a persistent checkpoint;
-10. persist an audit describing classification, before/after metrics, contracts, tests, and next measured target.
+10. record the classification, before/after metrics, contracts, tests, and any unresolved measured target in the change/PR evidence; do not create a parallel phase-history document.
 
 Host/controller timeout is **INCOMPLETE**, not product failure. Use bounded qualification shards; do not rerun already proven work solely because a later host window expired.
 
@@ -124,65 +124,6 @@ After each refactor ask:
 - Did we create tiny modules that make navigation worse?
 - Could this name be confused with Oh-Goon execution authority?
 
-## Hashmarks refactoring phases from BN
-
-Starting authority: exact DEVELOPMENT BN. These phases are ordered by measured complexity, not file length.
-
-### RCR-01 — Indexing lifecycle orchestration
-Review `hashmarks/codemap/indexing_lifecycle.py::sync` (BN: 212 lines / ~30 AST branch nodes; Ruff `C901=55`, `PLR0912=30`, `PLR0914=61`, `PLR0915=129`). Decision: **REFACTOR INTERNALLY**. Keep indexing lifecycle cohesive; extract responsibility-named stages for persistence/indexing and later preparation/finalization only when each reduces orchestration complexity without transferring state authority.
-
-### RCR-02 — Index discovery and surface classification
-Review `_discover`, `_discover_subtree`, and `_index_surface_for_path` together. Determine whether discovery policy is one cohesive indexing-admission responsibility or whether surface classification is an independently reusable repository-evidence concept. Do not extract based on function count.
-
-### RCR-03 — Change-impact evidence projection
-Review `change_impact.py`, especially `_change_impact_surface_state`, `_change_impact_owner_chain`, and `task_agent_change_impact`. Preserve the rule that Hashmarks reports impact evidence; it does not execute recovery or verification.
-
-### RCR-04 — Evidence decision packet
-Review `evidence_decision_packet.py::task_decision_packet`. Prefer internal responsibility stages before any module split. Preserve packet schemas and deterministic selection semantics.
-
-### RCR-05 — Evidence packet construction
-Review branch-heavy `evidence_packet.py` functions. The module is presumptively cohesive; extract only a genuine separately named evidence responsibility, never `packet_helpers`.
-
-### RCR-06 — Evidence graph resolution
-Review import/re-export resolution and file-graph construction. Keep qualified identity and freshness authority centralized unless a stable resolver owner is demonstrably independent.
-
-### RCR-07 — CLI command-family ownership
-`cli.py` is the known **DECOMPOSE MULTIPLE RESPONSIBILITIES** candidate. Split only by stable command families with discoverable names and preserved CLI behavior, not `cli_partN`.
-
-### RCR-08 — Re-inventory and stop condition
-Re-run the full complexity inventory. Continue only where measured complexity plus responsibility review identifies a real problem. A large cohesive file with bounded functions is not unfinished work.
-
 ## Governing rule
 
 **Large LOC is a signal to investigate, not proof that a file should be split. Split by responsibility and ownership; reduce complexity where complexity actually exists; name modules so a future engineer can find the correct owner; and never trade Hashmarks' repository-intelligence boundary for a cleaner local shape.**
-
-## Execution status after BO
-
-- RCR-01: CLOSED in BO — indexing lifecycle orchestration internally decomposed.
-- RCR-02: REVIEWED / KEEP COHESIVE — no extraction justified.
-- RCR-03: REVIEWED — BN internal decomposition remains sufficient; no churn.
-- RCR-04: CLOSED in BO — evidence decision packet internally decomposed.
-- RCR-05: CLOSED in BP — evidence packet construction remains cohesive; selected-row/verification projection and current source-range rebinding are explicit internal responsibilities.
-- RCR-06: CLOSED in BP — import resolution remains evidence-graph owned; language-specific resolver stages make identity semantics discoverable without creating a second resolver owner.
-- RCR-07: NEXT — CLI command-family ownership review.
-- RCR-08: follows RCR-07 — re-inventory and explicit stop/continue decision.
-
-## Closed phase evidence: repository evidence binding delta
-
-The first continuation phase is closed against exact evidence rather than Ruff reduction alone.
-
-- Pre-edit authority: `50b0e3be83fc0dd445bae9494367ece2f25179fe`
-- Production refactor: `2258affd0a5612b1005c6b4e0ac9dab910424f92`
-- Frozen direct test: `tests/test_repository_evidence_bindings.py`
-- Frozen test identity: `sha256:0ed74a9786d9f8c1c5723f31368afe022f3ddf52e32e7c773b9278e0878b6d4b`
-- BP2 receipt: `sha256:9fe191f4d65530e60481b2062cb938a8c1bad854fd02cd7a641d81788582c84d` — `BEHAVIOR_PRESERVATION_VERIFIED`
-- Locality decision: `sha256:d3664be1f0826be11cb8f575822d899136a50984f5b88e440d936435069e2dae` — `DECOMPOSITION_JUSTIFIED`
-- Post locality snapshot: `sha256:fdf774403751679e47b3f10f22da68835cb5ddcc77f687bd28b92baab967e43c`
-- Comparable debt closure: `sha256:f2b9069e81c7a851dac014d59bc290cbab20de23e560b7cf9ee60cc0ec2ce3d8` — `VERIFIED`
-- Repository excess: 1,571 → 1,500
-- Target excess: 71 → 0
-- Outside-target delta: 0
-- Exact proof runs: Agent Economics dogfood #41 PASS; CI #553 PASS.
-
-The original depth-2 locality observation hit `call-limit-reached` at the default 64-call bound. The proof was rerun at the explicit 256-call bound with the same depth and then closed cleanly; the scope was not narrowed to manufacture a pass.
-
