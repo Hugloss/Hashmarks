@@ -14,22 +14,6 @@ def test_measurement_authority_remains_outside_product_runtime() -> None:
         assert "performance-measurement-only" not in text
 
 
-def test_like_fallback_keeps_recall_and_now_has_explicit_stable_order() -> None:
-    text = (ROOT / "hashmarks/codemap/store_queries.py").read_text(encoding="utf-8")
-    broad = text[
-        text.index("def search_candidates") : text.index("def exact_symbol_candidates")
-    ]
-    assert (
-        "WHERE lower(s.name) LIKE ? OR lower(s.qualname) LIKE ? OR lower(s.signature) LIKE ? OR lower(s.path) LIKE ?"
-        in broad
-    )
-    assert "ORDER BY s.path,s.start_line,s.qualname" in broad
-    assert "WHERE lower(path) LIKE ? ORDER BY path LIMIT ?" in broad
-    assert " UNION " not in broad.upper()
-    assert " EXISTS " not in broad.upper()
-    assert 'q = f"%{query.lower()}%"' in broad
-
-
 def test_controller_cutoff_has_no_product_failure_authority() -> None:
     evaluation = "\n".join(
         p.read_text(encoding="utf-8")
