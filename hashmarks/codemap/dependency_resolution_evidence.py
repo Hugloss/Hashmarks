@@ -1315,8 +1315,17 @@ class DependencyResolutionEvidenceMixin:
             left: Mapping[str, Mapping[str, object]],
             right: Mapping[str, Mapping[str, object]],
         ) -> list[str]:
+            def semantic(row: Mapping[str, object]) -> dict[str, object]:
+                return {
+                    key: value
+                    for key, value in row.items()
+                    if key not in {"evidence_sources", "authority"}
+                }
+
             return sorted(
-                key for key in left.keys() & right.keys() if left[key] != right[key]
+                key
+                for key in left.keys() & right.keys()
+                if semantic(left[key]) != semantic(right[key])
             )
 
         def inventory_key(row: Mapping[str, object]) -> tuple[str, str]:
