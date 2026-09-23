@@ -22,6 +22,12 @@ def _digest(value: object) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
+def _require_sha256_identity(value: object, *, message: str) -> str:
+    if not isinstance(value, str) or not value.startswith("sha256:"):
+        raise ValueError(message)
+    return value
+
+
 @dataclass(frozen=True)
 class ExperimentLane:
     name: str
@@ -243,21 +249,22 @@ def experiment_certificate(
         raise ValueError("only a complete experiment report can be certified")
     if report.get("manifest_identity") != manifest.get("manifest_identity"):
         raise ValueError("report/manifest identity mismatch")
-    if not isinstance(secret_identity, str) or not secret_identity.startswith(
-        "sha256:"
-    ):
-        raise ValueError("secret_identity must be an explicit sha256 identity")
+    secret_identity = _require_sha256_identity(
+        secret_identity,
+        message="secret_identity must be an explicit sha256 identity",
+    )
     trace_ids = []
     native_ids = []
     for bundle in bundles:
         if bundle.get("schema") != BUNDLE_SCHEMA:
             raise ValueError("unsupported experiment bundle schema")
-        trace_id = bundle.get("trace_identity")
-        native_id = bundle.get("native_event_sha256")
-        if not isinstance(trace_id, str) or not trace_id.startswith("sha256:"):
-            raise ValueError("bundle is missing trace identity")
-        if not isinstance(native_id, str) or not native_id.startswith("sha256:"):
-            raise ValueError("bundle is missing native event identity")
+        trace_id = _require_sha256_identity(
+            bundle.get("trace_identity"), message="bundle is missing trace identity"
+        )
+        native_id = _require_sha256_identity(
+            bundle.get("native_event_sha256"),
+            message="bundle is missing native event identity",
+        )
         trace_ids.append(trace_id)
         native_ids.append(native_id)
     payload = {

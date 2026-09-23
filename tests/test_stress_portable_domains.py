@@ -5,6 +5,7 @@ import pytest
 from hashmarks.portable_scalar import MAX_PORTABLE_INTEGER
 from hashmarks.product_acceptance import scale_class_contract
 from scripts.agent_evaluation.experimentability import (
+    ExperimentRepositoryState,
     experiment_environment,
     normalize_capabilities,
 )
@@ -76,15 +77,17 @@ def test_experiment_environment_rejects_nonportable_numeric_identity(
     field: str, value: object
 ) -> None:
     kwargs = {
-        "hashmarks_version": "0.13.0",
         "repository_identity": "repo",
         "codemap_generation": 1,
         "identity_generation": 1,
-        "seed": 1,
     }
     kwargs[field] = value
     with pytest.raises((TypeError, ValueError)):
-        experiment_environment(**kwargs)  # type: ignore[arg-type]
+        experiment_environment(
+            hashmarks_version="0.13.0",
+            repository_state=ExperimentRepositoryState(**kwargs),  # type: ignore[arg-type]
+            seed=1,
+        )
 
 
 @pytest.mark.parametrize("value", ["false", "true", 0, 1, None, [], {}])
@@ -98,9 +101,11 @@ def test_experiment_environment_accepts_portable_boundaries_and_is_deterministic
 ):
     kwargs = {
         "hashmarks_version": "0.13.0",
-        "repository_identity": "repo",
-        "codemap_generation": 0,
-        "identity_generation": None,
+        "repository_state": ExperimentRepositoryState(
+            repository_identity="repo",
+            codemap_generation=0,
+            identity_generation=None,
+        ),
         "seed": MAX_PORTABLE_INTEGER,
         "capabilities": {"semantic_nomination": False},
     }

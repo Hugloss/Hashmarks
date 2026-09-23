@@ -149,6 +149,52 @@ def _go_task(repo: Path, index: int, prefix: str = "Go") -> dict[str, str]:
     }
 
 
+def _validate_destinations(repo: Path, *external_paths: Path) -> None:
+    for external in external_paths:
+        try:
+            external.relative_to(repo)
+        except ValueError:
+            continue
+        raise ValueError(
+            "PUBLIC and SECRET corpus files must live outside the worker repository"
+        )
+
+
+def _write_project_configuration(repo: Path, kind: str) -> None:
+    if kind in {"python", "polyglot"}:
+        _write(
+            repo / "pyproject.toml", '[tool.pytest.ini_options]\ntestpaths=["tests"]\n'
+        )
+    if kind in {"typescript", "polyglot"}:
+        _write(repo / "package.json", '{"type":"module"}\n')
+        _write(
+            repo / "tsconfig.json",
+            '{"compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext","target":"ES2022"},"include":["src/**/*.ts","tests/**/*.ts"]}\n',
+        )
+    if kind in {"go", "polyglot"}:
+        _write(repo / "go.mod", "module example.local/large\n\ngo 1.23\n")
+
+
+def _generate_rows(
+    repo: Path, kind: str, noise_files: int, tasks: int
+) -> list[dict[str, str]]:
+    if kind == "python":
+        _noise_python(repo, noise_files)
+        return [_python_task(repo, index) for index in range(tasks)]
+    if kind == "typescript":
+        _noise_typescript(repo, noise_files)
+        return [_typescript_task(repo, index) for index in range(tasks)]
+    if kind == "go":
+        _noise_go(repo, noise_files)
+        return [_go_task(repo, index) for index in range(tasks)]
+    each = noise_files // 3
+    _noise_python(repo, each)
+    _noise_typescript(repo, each)
+    _noise_go(repo, noise_files - (2 * each))
+    makers = (_python_task, _typescript_task, _go_task)
+    return [makers[index % 3](repo, index, "Mix") for index in range(tasks)]
+
+
 def generate(
     repo: Path,
     public_path: Path,
@@ -165,49 +211,11 @@ def generate(
     repo = repo.resolve()
     public_path = public_path.resolve()
     secret_path = secret_path.resolve()
-    for external in (public_path, secret_path):
-        try:
-            external.relative_to(repo)
-        except ValueError:
-            pass
-        else:
-            raise ValueError(
-                "PUBLIC and SECRET corpus files must live outside the worker repository"
-            )
+    _validate_destinations(repo, public_path, secret_path)
     shutil.rmtree(repo, ignore_errors=True)
     repo.mkdir(parents=True)
-
-    if kind in {"python", "polyglot"}:
-        _write(
-            repo / "pyproject.toml", '[tool.pytest.ini_options]\ntestpaths=["tests"]\n'
-        )
-    if kind in {"typescript", "polyglot"}:
-        _write(repo / "package.json", '{"type":"module"}\n')
-        _write(
-            repo / "tsconfig.json",
-            '{"compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext","target":"ES2022"},"include":["src/**/*.ts","tests/**/*.ts"]}\n',
-        )
-    if kind in {"go", "polyglot"}:
-        _write(repo / "go.mod", "module example.local/large\n\ngo 1.23\n")
-
-    rows: list[dict[str, str]] = []
-    if kind == "python":
-        _noise_python(repo, noise_files)
-        rows = [_python_task(repo, index) for index in range(tasks)]
-    elif kind == "typescript":
-        _noise_typescript(repo, noise_files)
-        rows = [_typescript_task(repo, index) for index in range(tasks)]
-    elif kind == "go":
-        _noise_go(repo, noise_files)
-        rows = [_go_task(repo, index) for index in range(tasks)]
-    else:
-        each = noise_files // 3
-        _noise_python(repo, each)
-        _noise_typescript(repo, each)
-        _noise_go(repo, noise_files - (2 * each))
-        for index in range(tasks):
-            maker = (_python_task, _typescript_task, _go_task)[index % 3]
-            rows.append(maker(repo, index, "Mix"))
+    _write_project_configuration(repo, kind)
+    rows = _generate_rows(repo, kind, noise_files, tasks)
 
     public = {
         "schema": SCHEMA,

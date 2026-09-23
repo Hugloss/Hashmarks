@@ -74,6 +74,16 @@ def _entry_state(
     }
 
 
+def _worker_action(policy: str, state: dict[str, object]) -> tuple[str, object]:
+    if policy == "direct-edit":
+        return ("edit" if state["first_path"] else "no-evidence"), state["first_path"]
+    if policy == "uncertainty-gated":
+        if state["ambiguous"]:
+            return "inspect-competing-evidence", None
+        return ("edit" if state["first_path"] else "no-evidence"), state["first_path"]
+    raise ValueError(f"unsupported policy: {policy}")
+
+
 def run_worker(
     *, policy: str, workspace: Path, tasks_path: Path, output: Path, limit: int
 ) -> None:
@@ -92,18 +102,7 @@ def run_worker(
             task_id = str(row.get("id") or "")
             query = str(row.get("query") or "")
             state = _entry_state(codemap, query, limit=limit)
-            if policy == "direct-edit":
-                action = "edit" if state["first_path"] else "no-evidence"
-                target = state["first_path"]
-            elif policy == "uncertainty-gated":
-                if state["ambiguous"]:
-                    action = "inspect-competing-evidence"
-                    target = None
-                else:
-                    action = "edit" if state["first_path"] else "no-evidence"
-                    target = state["first_path"]
-            else:
-                raise ValueError(f"unsupported policy: {policy}")
+            action, target = _worker_action(policy, state)
             rows.append(
                 {
                     "id": task_id,
@@ -184,40 +183,63 @@ def _score(tasks: list[dict[str, Any]], output: dict[str, Any]) -> dict[str, obj
     }
 
 
+def _run_policy_workers(
+    root: Path,
+    name: str,
+    workspace: Path,
+    public_path: Path,
+    limit: int,
+) -> dict[str, Path]:
+    outputs = {}
+    env = dict(os.environ)
+    source_root = str(_REPO_ROOT)
+    prior = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = source_root if not prior else source_root + os.pathsep + prior
+    for policy in ("direct-edit", "uncertainty-gated"):
+        output = root / "worker-outputs" / f"{name}-{policy}.json"
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "scripts.agent_evaluation.metrics_worker_behavior_ab",
+                "--worker",
+                "--policy",
+                policy,
+                "--workspace",
+                str(workspace),
+                "--tasks",
+                str(public_path),
+                "--output",
+                str(output),
+                "--limit",
+                str(limit),
+            ],
+            check=True,
+            env=env,
+        )
+        outputs[policy] = output
+    return outputs
+
+
+def _summary_totals(reports: list[dict[str, object]]) -> dict[str, int]:
+    def total(policy: str, key: str) -> int:
+        return sum(int(repo[policy]["summary"][key]) for repo in reports)  # type: ignore[index]
+
+    return {
+        "tasks": total("direct_edit", "tasks"),
+        "direct_wrong": total("direct_edit", "unsafe_wrong_first_edits"),
+        "gated_wrong": total("uncertainty_gated", "unsafe_wrong_first_edits"),
+        "direct_correct": total("direct_edit", "correct_immediate_edits"),
+        "gated_correct": total("uncertainty_gated", "correct_immediate_edits"),
+        "inspections": total("uncertainty_gated", "inspections"),
+    }
+
+
 def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
     repos = materialize_challenge(root / "challenge")
     reports = []
     for name, workspace, corpus, public_path in repos:
-        outputs: dict[str, Path] = {}
-        for policy in ("direct-edit", "uncertainty-gated"):
-            output = root / "worker-outputs" / f"{name}-{policy}.json"
-            env = dict(os.environ)
-            source_root = str(_REPO_ROOT)
-            prior = env.get("PYTHONPATH")
-            env["PYTHONPATH"] = (
-                source_root if not prior else source_root + os.pathsep + prior
-            )
-            subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "scripts.agent_evaluation.metrics_worker_behavior_ab",
-                    "--worker",
-                    "--policy",
-                    policy,
-                    "--workspace",
-                    str(workspace),
-                    "--tasks",
-                    str(public_path),
-                    "--output",
-                    str(output),
-                    "--limit",
-                    str(limit),
-                ],
-                check=True,
-                env=env,
-            )
-            outputs[policy] = output
+        outputs = _run_policy_workers(root, name, workspace, public_path, limit)
 
         # Hidden expectations are opened only after both policy workers have exited.
         hidden = _load_corpus(corpus)
@@ -238,16 +260,8 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
             }
         )
 
-    def total(policy: str, key: str) -> int:
-        return sum(int(repo[policy]["summary"][key]) for repo in reports)  # type: ignore[index]
-
-    tasks = sum(int(repo["direct_edit"]["summary"]["tasks"]) for repo in reports)  # type: ignore[index]
-    direct_wrong = total("direct_edit", "unsafe_wrong_first_edits")
-    gated_wrong = total("uncertainty_gated", "unsafe_wrong_first_edits")
-    direct_correct = total("direct_edit", "correct_immediate_edits")
-    gated_correct = total("uncertainty_gated", "correct_immediate_edits")
-    inspections = total("uncertainty_gated", "inspections")
-    prevented = max(0, direct_wrong - gated_wrong)
+    totals = _summary_totals(reports)
+    prevented = max(0, totals["direct_wrong"] - totals["gated_wrong"])
     protocol = {
         "schema": PROTOCOL_SCHEMA,
         "family": FAMILY,
@@ -272,31 +286,43 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
         "protocol_identity": _identity(protocol),
         "summary": {
             "repositories": len(reports),
-            "tasks": tasks,
-            "direct_correct_immediate_edits": direct_correct,
-            "direct_correct_immediate_edit_rate": direct_correct / tasks
-            if tasks
+            "tasks": totals["tasks"],
+            "direct_correct_immediate_edits": totals["direct_correct"],
+            "direct_correct_immediate_edit_rate": totals["direct_correct"]
+            / totals["tasks"]
+            if totals["tasks"]
             else 0.0,
-            "direct_unsafe_wrong_first_edits": direct_wrong,
-            "direct_unsafe_wrong_first_edit_rate": direct_wrong / tasks
-            if tasks
+            "direct_unsafe_wrong_first_edits": totals["direct_wrong"],
+            "direct_unsafe_wrong_first_edit_rate": totals["direct_wrong"]
+            / totals["tasks"]
+            if totals["tasks"]
             else 0.0,
-            "gated_correct_immediate_edits": gated_correct,
-            "gated_correct_immediate_edit_rate": gated_correct / tasks
-            if tasks
+            "gated_correct_immediate_edits": totals["gated_correct"],
+            "gated_correct_immediate_edit_rate": totals["gated_correct"]
+            / totals["tasks"]
+            if totals["tasks"]
             else 0.0,
-            "gated_unsafe_wrong_first_edits": gated_wrong,
-            "gated_unsafe_wrong_first_edit_rate": gated_wrong / tasks if tasks else 0.0,
-            "gated_inspections": inspections,
-            "gated_inspection_rate": inspections / tasks if tasks else 0.0,
+            "gated_unsafe_wrong_first_edits": totals["gated_wrong"],
+            "gated_unsafe_wrong_first_edit_rate": totals["gated_wrong"]
+            / totals["tasks"]
+            if totals["tasks"]
+            else 0.0,
+            "gated_inspections": totals["inspections"],
+            "gated_inspection_rate": totals["inspections"] / totals["tasks"]
+            if totals["tasks"]
+            else 0.0,
             "unsafe_wrong_first_edits_prevented": prevented,
-            "unsafe_wrong_first_edit_reduction": (prevented / direct_wrong)
-            if direct_wrong
+            "unsafe_wrong_first_edit_reduction": (prevented / totals["direct_wrong"])
+            if totals["direct_wrong"]
             else 1.0,
-            "extra_inspections_per_prevented_wrong_edit": (inspections / prevented)
+            "extra_inspections_per_prevented_wrong_edit": (
+                totals["inspections"] / prevented
+            )
             if prevented
             else None,
-            "correct_immediate_edits_deferred": max(0, direct_correct - gated_correct),
+            "correct_immediate_edits_deferred": max(
+                0, totals["direct_correct"] - totals["gated_correct"]
+            ),
         },
         "repositories": reports,
     }

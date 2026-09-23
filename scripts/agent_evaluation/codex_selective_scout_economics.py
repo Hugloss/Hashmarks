@@ -20,6 +20,8 @@ for x in (str(_R), str(_S)):
 import contextlib
 
 from .codex_agent_economics import (
+    CodexRunConfig,
+    CollectionConfig,
     _run_one,
     _usage_from_jsonl,
 )
@@ -84,16 +86,11 @@ def _scout_prompt(task: dict[str, str], workspace: Path, pkt: dict[str, object])
 
 
 def _run_scout(
-    codex: str,
+    config: CodexRunConfig,
     task: dict[str, str],
     workspace: Path,
     pkt: dict[str, object],
     run_dir: Path,
-    *,
-    model: str | None,
-    effort: str | None,
-    sandbox: str,
-    timeout_s: int,
 ) -> dict[str, object]:
     run_dir.mkdir(parents=True, exist_ok=True)
     schema = run_dir / "output.schema.json"
@@ -104,23 +101,23 @@ def _run_scout(
     prompt = _scout_prompt(task, workspace, pkt)
     (run_dir / "prompt.txt").write_text(prompt)
     cmd = [
-        codex,
+        config.codex,
         "exec",
         "-C",
         str(workspace),
         "--skip-git-repo-check",
         "--sandbox",
-        sandbox,
+        config.sandbox,
         "--json",
         "--output-schema",
         str(schema),
         "--output-last-message",
         str(final),
     ]
-    if model:
-        cmd += ["-m", model]
-    if effort:
-        cmd += ["-c", f'model_reasoning_effort="{effort}"']
+    if config.model:
+        cmd += ["-m", config.model]
+    if config.effort:
+        cmd += ["-c", f'model_reasoning_effort="{config.effort}"']
     cmd += ["-"]
     t = time.perf_counter()
     try:
@@ -129,7 +126,7 @@ def _run_scout(
             input=prompt,
             text=True,
             capture_output=True,
-            timeout=timeout_s,
+            timeout=config.timeout_s,
             env=dict(os.environ),
         )
         rc = cp.returncode
@@ -173,18 +170,11 @@ def _run_scout(
 
 
 def _main_with_scout(
-    codex: str,
+    config: CodexRunConfig,
     task: dict[str, str],
     workspace: Path,
     run_dir: Path,
-    pkt: dict[str, object],
     scout: dict[str, object] | None,
-    *,
-    model: str | None,
-    effort: str | None,
-    sandbox: str,
-    bridge: Path,
-    timeout_s: int,
 ) -> dict[str, object]:
     # Use the v0.10.47 runner but add frozen scout guidance to the public task text; the grader remains unopened.
     enriched = dict(task)
@@ -196,142 +186,148 @@ def _main_with_scout(
             + f"\nA separate read-only ambiguity scout recommended candidate path `{rec}` with reason: {reason}. Verify this recommendation against repository evidence before finalizing."
         )
     return _run_one(
-        codex,
+        config,
         "hashmarks",
         enriched,
         workspace,
         run_dir,
-        model=model,
-        effort=effort,
-        sandbox=sandbox,
-        bridge=bridge,
-        timeout_s=timeout_s,
     )
+
+
+def _scored_rows(
+    public: list[dict],
+    hidden: list[dict],
+    runs: list[dict[str, object]],
+    scouts: list[dict[str, object]],
+    expected_verification: str,
+) -> list[dict[str, object]]:
+    hidden_by_id = {str(task["id"]): task for task in hidden}
+    scout_by_id = {str(scout["task_id"]): scout for scout in scouts}
+    rows = []
+    for task, main in zip(public, runs, strict=False):
+        expected = {
+            str(path) for path in hidden_by_id[task["id"]].get("expected_files", [])
+        }
+        final = main.get("final") if isinstance(main.get("final"), dict) else {}
+        edit = str(final.get("first_edit_target") or "")
+        verify = str(final.get("verification_target") or "")
+        scout = scout_by_id.get(str(task["id"]))
+        rows.append(
+            {
+                "id": task["id"],
+                "scout_spawned": scout is not None,
+                "correct_first_edit": edit in expected,
+                "correct_verification": verify == expected_verification,
+                "main_usage": main["usage"],
+                "scout_usage": scout["usage"] if scout else None,
+                "main_elapsed_ms": main["elapsed_ms"],
+                "scout_elapsed_ms": scout["elapsed_ms"] if scout else 0.0,
+            }
+        )
+    return rows
+
+
+def _token_total(rows: list[dict[str, object]], field: str) -> int:
+    return sum(
+        int((row["main_usage"] or {}).get(field) or 0)
+        + int((row["scout_usage"] or {}).get(field) or 0)
+        for row in rows
+    )
+
+
+def _repository_report(
+    root: Path,
+    source: tuple[str, Path, Path, Path],
+    config: CollectionConfig,
+    run_config: CodexRunConfig,
+) -> dict[str, object]:
+    name, workspace, corpus, public_path = source
+    public = json.loads(public_path.read_text())["tasks"]
+    hidden = _load_corpus(corpus)
+    if config.max_tasks is not None:
+        public = public[: config.max_tasks]
+        hidden = hidden[: config.max_tasks]
+    runs = []
+    scouts = []
+    for task in public:
+        packet = context_packet(workspace, task["query"], mode="current")
+        ambiguity = (
+            packet.get("ambiguity", {})
+            if isinstance(packet.get("ambiguity"), dict)
+            else {}
+        )
+        scout = None
+        if ambiguity.get("ambiguous"):
+            scout = _run_scout(
+                run_config,
+                task,
+                workspace,
+                packet,
+                root / "runs" / name / task["id"] / "scout",
+            )
+            scouts.append({"task_id": task["id"], **scout})
+        runs.append(
+            _main_with_scout(
+                run_config,
+                task,
+                workspace,
+                root / "runs" / name / task["id"] / "main",
+                scout,
+            )
+        )
+    expected_verification = {
+        "python-orders": "tests/test_orders.py",
+        "typescript-dashboard": "tests/MetricsPanel.test.tsx",
+        "release-contracts": "tests/test_release_contract.py",
+    }[name]
+    rows = _scored_rows(public, hidden, runs, scouts, expected_verification)
+    return {
+        "name": name,
+        "public_task_sha256": _sha256_bytes(public_path.read_bytes()),
+        "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
+        "summary": {
+            "tasks": len(rows),
+            "correct_first_edits": sum(row["correct_first_edit"] for row in rows),
+            "correct_verifications": sum(row["correct_verification"] for row in rows),
+            "scout_spawns": sum(row["scout_spawned"] for row in rows),
+            "total_tokens": _token_total(rows, "total_tokens"),
+            "input_tokens": _token_total(rows, "input_tokens"),
+            "output_tokens": _token_total(rows, "output_tokens"),
+            "reasoning_output_tokens": _token_total(rows, "reasoning_output_tokens"),
+            "combined_elapsed_ms": sum(
+                float(row["main_elapsed_ms"]) + float(row["scout_elapsed_ms"])
+                for row in rows
+            ),
+        },
+        "tasks": rows,
+        "scout_runs": scouts,
+    }
 
 
 def collect(
     root: Path,
-    *,
-    codex_bin: str = "codex",
-    model: str | None = None,
-    effort: str | None = None,
-    sandbox: str = "read-only",
-    timeout_s: int = 900,
-    max_tasks: int | None = None,
+    config: CollectionConfig,
 ) -> dict[str, object]:
     codex = (
-        shutil.which(codex_bin)
-        if os.sep not in codex_bin
-        else (codex_bin if Path(codex_bin).is_file() else None)
+        shutil.which(config.codex_bin)
+        if os.sep not in config.codex_bin
+        else (config.codex_bin if Path(config.codex_bin).is_file() else None)
     )
     if not codex:
-        raise FileNotFoundError(f"Codex executable not found: {codex_bin}")
+        raise FileNotFoundError(f"Codex executable not found: {config.codex_bin}")
     bridge = (_S / "codex_context_bridge.py").resolve()
-    reports = []
-    for name, workspace, corpus, public_path in materialize_challenge(
-        root / "challenge"
-    ):
-        public = json.loads(public_path.read_text())["tasks"]
-        hidden = _load_corpus(corpus)
-        if max_tasks is not None:
-            public = public[:max_tasks]
-            hidden = hidden[:max_tasks]
-        runs = []
-        scouts = []
-        for task in public:
-            pkt = context_packet(workspace, task["query"], mode="current")
-            ambiguity = (
-                pkt.get("ambiguity", {})
-                if isinstance(pkt.get("ambiguity"), dict)
-                else {}
-            )
-            scout = None
-            if ambiguity.get("ambiguous"):
-                scout = _run_scout(
-                    str(codex),
-                    task,
-                    workspace,
-                    pkt,
-                    root / "runs" / name / task["id"] / "scout",
-                    model=model,
-                    effort=effort,
-                    sandbox=sandbox,
-                    timeout_s=timeout_s,
-                )
-                scouts.append({"task_id": task["id"], **scout})
-            main = _main_with_scout(
-                str(codex),
-                task,
-                workspace,
-                root / "runs" / name / task["id"] / "main",
-                pkt,
-                scout,
-                model=model,
-                effort=effort,
-                sandbox=sandbox,
-                bridge=bridge,
-                timeout_s=timeout_s,
-            )
-            runs.append(main)
-        expv = {
-            "python-orders": "tests/test_orders.py",
-            "typescript-dashboard": "tests/MetricsPanel.test.tsx",
-            "release-contracts": "tests/test_release_contract.py",
-        }[name]
-        byid = {str(t["id"]): t for t in hidden}
-        rows = []
-        for task, main in zip(public, runs, strict=False):
-            h = byid[task["id"]]
-            exp = {str(x) for x in h.get("expected_files", [])}
-            final = main.get("final") if isinstance(main.get("final"), dict) else {}
-            edit = str(final.get("first_edit_target") or "")
-            verify = str(final.get("verification_target") or "")
-            sr = next((s for s in scouts if s["task_id"] == task["id"]), None)
-            rows.append(
-                {
-                    "id": task["id"],
-                    "scout_spawned": sr is not None,
-                    "correct_first_edit": edit in exp,
-                    "correct_verification": verify == expv,
-                    "main_usage": main["usage"],
-                    "scout_usage": sr["usage"] if sr else None,
-                    "main_elapsed_ms": main["elapsed_ms"],
-                    "scout_elapsed_ms": sr["elapsed_ms"] if sr else 0.0,
-                }
-            )
-
-        def tok(field, rows=rows):
-            return sum(
-                int((r["main_usage"] or {}).get(field) or 0)
-                + int((r["scout_usage"] or {}).get(field) or 0)
-                for r in rows
-            )
-
-        reports.append(
-            {
-                "name": name,
-                "public_task_sha256": _sha256_bytes(public_path.read_bytes()),
-                "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
-                "summary": {
-                    "tasks": len(rows),
-                    "correct_first_edits": sum(r["correct_first_edit"] for r in rows),
-                    "correct_verifications": sum(
-                        r["correct_verification"] for r in rows
-                    ),
-                    "scout_spawns": sum(r["scout_spawned"] for r in rows),
-                    "total_tokens": tok("total_tokens"),
-                    "input_tokens": tok("input_tokens"),
-                    "output_tokens": tok("output_tokens"),
-                    "reasoning_output_tokens": tok("reasoning_output_tokens"),
-                    "combined_elapsed_ms": sum(
-                        float(r["main_elapsed_ms"]) + float(r["scout_elapsed_ms"])
-                        for r in rows
-                    ),
-                },
-                "tasks": rows,
-                "scout_runs": scouts,
-            }
-        )
+    main_config = CodexRunConfig(
+        codex=str(codex),
+        model=config.model,
+        effort=config.effort,
+        sandbox=config.sandbox,
+        bridge=bridge,
+        timeout_s=config.timeout_s,
+    )
+    reports = [
+        _repository_report(root, source, config, main_config)
+        for source in materialize_challenge(root / "challenge")
+    ]
     summary = {
         "repositories": len(reports),
         "tasks": sum(r["summary"]["tasks"] for r in reports),
@@ -360,9 +356,9 @@ def collect(
         "scout_candidates": "worker-visible task_entry_points ambiguity alternatives only",
         "scout_spawn_gate": "ambiguity.ambiguous == true",
         "cost_accounting": "main + scout visible token counters and elapsed time; missing counters remain zero/unavailable",
-        "model": model,
-        "reasoning_effort": effort,
-        "sandbox": sandbox,
+        "model": config.model,
+        "reasoning_effort": config.effort,
+        "sandbox": config.sandbox,
     }
     return {
         "schema": SCHEMA,
@@ -388,12 +384,14 @@ def main() -> int:
     a = p.parse_args()
     v = collect(
         a.root,
-        codex_bin=a.codex_bin,
-        model=a.model,
-        effort=a.reasoning_effort,
-        sandbox=a.sandbox,
-        timeout_s=a.timeout,
-        max_tasks=a.max_tasks,
+        CollectionConfig(
+            codex_bin=a.codex_bin,
+            model=a.model,
+            effort=a.reasoning_effort,
+            sandbox=a.sandbox,
+            timeout_s=a.timeout,
+            max_tasks=a.max_tasks,
+        ),
     )
     text = json.dumps(v, indent=2, sort_keys=True) + "\n"
     if a.output:

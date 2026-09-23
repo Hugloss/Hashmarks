@@ -73,26 +73,16 @@ def _surface_paths(packet: dict[str, Any], role: str) -> set[str]:
     )
 
 
-def run_scenario(
-    root: Path, *, kind: str, noise_files: int, tasks: int
-) -> dict[str, Any]:
-    scenario = f"{kind}-{noise_files}"
-    repo = root / "repos" / scenario
-    public_path = root / "public" / f"{scenario}.json"
-    secret_path = root / "secret" / f"{scenario}.json"
-    manifest = generate(
-        repo, public_path, secret_path, kind=kind, noise_files=noise_files, tasks=tasks
-    )
-    public = json.loads(public_path.read_text(encoding="utf-8"))
-
-    frozen: list[dict[str, Any]] = []
+def _freeze_scenario(
+    repo: Path, tasks: list[dict[str, object]]
+) -> tuple[list[dict], float]:
+    frozen = []
     with CodeMap(repo) as codemap:
         started = time.perf_counter()
         codemap.sync()
         sync_ms = (time.perf_counter() - started) * 1000.0
-        for task in public["tasks"]:
+        for task in tasks:
             query = str(task["query"])
-            task_id = str(task["id"])
             start_started = time.perf_counter()
             start = codemap.task_evidence(query)
             start_ms = (time.perf_counter() - start_started) * 1000.0
@@ -107,7 +97,7 @@ def run_scenario(
                 impact_ms = 0.0
             frozen.append(
                 {
-                    "id": task_id,
+                    "id": str(task["id"]),
                     "query": query,
                     "start": start,
                     "edit": edit_path,
@@ -117,12 +107,13 @@ def run_scenario(
                     "impact_ms": impact_ms,
                 }
             )
+    return frozen, sync_ms
 
-    # SECRET is opened only after every task-local start, caller edit probe, and
-    # changed-impact packet for this scenario has been frozen.
-    secret = json.loads(secret_path.read_text(encoding="utf-8"))
-    expected = {str(row["id"]): row for row in secret["tasks"]}
-    graded: list[dict[str, Any]] = []
+
+def _grade_scenario(
+    frozen: list[dict[str, Any]], expected: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    graded = []
     for row in frozen:
         truth = expected[row["id"]]
         impact = row["impact"]
@@ -155,6 +146,28 @@ def run_scenario(
             )
         )
         graded.append(result)
+    return graded
+
+
+def run_scenario(
+    root: Path, *, kind: str, noise_files: int, tasks: int
+) -> dict[str, Any]:
+    scenario = f"{kind}-{noise_files}"
+    repo = root / "repos" / scenario
+    public_path = root / "public" / f"{scenario}.json"
+    secret_path = root / "secret" / f"{scenario}.json"
+    manifest = generate(
+        repo, public_path, secret_path, kind=kind, noise_files=noise_files, tasks=tasks
+    )
+    public = json.loads(public_path.read_text(encoding="utf-8"))
+
+    frozen, sync_ms = _freeze_scenario(repo, public["tasks"])
+
+    # SECRET is opened only after every task-local start, caller edit probe, and
+    # changed-impact packet for this scenario has been frozen.
+    secret = json.loads(secret_path.read_text(encoding="utf-8"))
+    expected = {str(row["id"]): row for row in secret["tasks"]}
+    graded = _grade_scenario(frozen, expected)
 
     return {
         "scenario": scenario,

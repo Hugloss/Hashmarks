@@ -15,11 +15,10 @@ for x in (str(_R), str(_S)):
     if x not in sys.path:
         sys.path.insert(0, x)
 from .codex_agent_economics import (
-    collect as collect_lanes,
-)
-from .codex_agent_economics import (
+    CollectionConfig,
     preflight,
 )
+from .codex_agent_economics import collect as collect_lanes
 from .codex_selective_scout_economics import (
     collect as collect_selective,
 )
@@ -152,21 +151,25 @@ def run(
         if v.strategy == "selective-real":
             r = collect_selective(
                 vr,
-                codex_bin=codex_bin,
-                model=v.model,
-                effort=v.effort,
-                timeout_s=timeout,
-                max_tasks=max_tasks,
+                CollectionConfig(
+                    codex_bin=codex_bin,
+                    model=v.model,
+                    effort=v.effort,
+                    timeout_s=timeout,
+                    max_tasks=max_tasks,
+                ),
             )
         else:
             r = collect_lanes(
                 vr,
-                codex_bin=codex_bin,
-                model=v.model,
-                effort=v.effort,
-                timeout_s=timeout,
-                lanes=(v.strategy,),
-                max_tasks=max_tasks,
+                CollectionConfig(
+                    codex_bin=codex_bin,
+                    model=v.model,
+                    effort=v.effort,
+                    timeout_s=timeout,
+                    lanes=(v.strategy,),
+                    max_tasks=max_tasks,
+                ),
             )
         results[v.name] = r
         metrics.append(_metric(v.name, r, v.strategy, v.model, v.effort))

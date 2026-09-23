@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+import pytest
+
 from scripts.agent_evaluation import score_agent_work as M
 
 if TYPE_CHECKING:
@@ -111,3 +113,95 @@ def test_work_score_penalizes_thrashing_and_duplicate_reads(tmp_path: Path) -> N
     assert row["repeated_disproven_targets"] == 1
     assert row["duplicate_reads"] == 1
     assert row["work_score"] < 100
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ({"schema": "wrong"}, "unsupported work trace"),
+        (
+            {"schema": M.TRACE_SCHEMA, "task_id": "", "worker_kind": "worker"},
+            "task_id must be a non-empty string",
+        ),
+        (
+            {
+                "schema": M.TRACE_SCHEMA,
+                "task_id": "t",
+                "worker_kind": "worker",
+                "events": {},
+            },
+            "events must be a list",
+        ),
+        (
+            {
+                "schema": M.TRACE_SCHEMA,
+                "task_id": "t",
+                "worker_kind": "worker",
+                "events": [{"sequence": 1, "kind": "unknown"}],
+            },
+            "invalid work event",
+        ),
+        (
+            {
+                "schema": M.TRACE_SCHEMA,
+                "task_id": "t",
+                "worker_kind": "worker",
+                "events": [
+                    {"sequence": 1, "kind": "search"},
+                    {"sequence": 1, "kind": "read"},
+                ],
+            },
+            "strictly increasing",
+        ),
+        (
+            {
+                "schema": M.TRACE_SCHEMA,
+                "task_id": "t",
+                "worker_kind": "worker",
+                "events": [
+                    {"sequence": 1, "kind": "read", "bytes": -1},
+                ],
+            },
+            "bytes must be a non-negative integer",
+        ),
+        (
+            {
+                "schema": M.TRACE_SCHEMA,
+                "task_id": "t",
+                "worker_kind": "worker",
+                "events": [
+                    {
+                        "sequence": 1,
+                        "kind": "read",
+                        "started_at_ns": 2,
+                        "finished_at_ns": 1,
+                    },
+                ],
+            },
+            "event time moved backwards",
+        ),
+    ],
+)
+def test_work_trace_rejects_malformed_evidence(
+    tmp_path: Path, payload: dict, message: str
+) -> None:
+    path = tmp_path / "trace.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        M.load_trace(path)
+
+
+def test_work_score_handles_empty_trace_without_inventing_timing() -> None:
+    row = M.score_trace(
+        {
+            "schema": M.TRACE_SCHEMA,
+            "task_id": "t",
+            "worker_kind": "worker",
+            "events": [],
+        },
+        {"src/a.py"},
+    )
+    assert row["first_edit_target"] is None
+    assert row["verified_solution"] is False
+    assert row["wall_ns"] is None
+    assert row["time_to_first_correct_edit_ns"] is None

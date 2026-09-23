@@ -90,8 +90,7 @@ def run_cases(
     producer_identity = native_producer_implementation_identity()
     started = time.perf_counter_ns()
     rows: list[dict[str, object]] = []
-    reused = 0
-    created = 0
+    counters = {"reused": 0, "created": 0}
 
     shard_state = (receipts_dir / f".state-{shard_index}").resolve()
     shard_state.mkdir(parents=True, exist_ok=True)
@@ -102,15 +101,16 @@ def run_cases(
     ) as codemap:
         sync = codemap.sync()
         repository_identity = _repository_identity(codemap)
-        protocol_payload = {
-            "schema": CASES_SCHEMA,
-            "suite": cases_doc.get("suite"),
-            "cases_sha256": canonical_sha256(cases_doc),
-            "repository_identity": repository_identity,
-            "producer_implementation_identity": producer_identity,
-            "producer_artifact_identity": producer_artifact_identity,
-        }
-        protocol_identity = "sha256:" + canonical_sha256(protocol_payload)
+        protocol_identity = "sha256:" + canonical_sha256(
+            {
+                "schema": CASES_SCHEMA,
+                "suite": cases_doc.get("suite"),
+                "cases_sha256": canonical_sha256(cases_doc),
+                "repository_identity": repository_identity,
+                "producer_implementation_identity": producer_identity,
+                "producer_artifact_identity": producer_artifact_identity,
+            }
+        )
 
         for case in selected_cases:
             if not isinstance(case, Mapping):
@@ -118,23 +118,22 @@ def run_cases(
             case_id = str(case.get("id") or "")
             if not case_id:
                 raise ValueError("repository evaluation case id is required")
-            identity = work_identity(
-                protocol_identity=protocol_identity,
-                work_id=case_id,
-                work_payload={
-                    "case": dict(case),
-                    "repository_identity": repository_identity,
-                    "producer_implementation_identity": producer_identity,
-                },
-                lane="repository-evaluation",
-            )
             result, was_reused = evaluate_with_receipt(
                 receipt_path=receipts_dir / f"{case_id}.json",
-                identity=identity,
+                identity=work_identity(
+                    protocol_identity=protocol_identity,
+                    work_id=case_id,
+                    work_payload={
+                        "case": dict(case),
+                        "repository_identity": repository_identity,
+                        "producer_implementation_identity": producer_identity,
+                    },
+                    lane="repository-evaluation",
+                ),
                 evaluate=lambda case=case: _case_result(codemap, case),
             )
-            reused += int(was_reused)
-            created += int(not was_reused)
+            counters["reused"] += int(was_reused)
+            counters["created"] += int(not was_reused)
             rows.append(
                 {
                     "id": case_id,
@@ -155,9 +154,9 @@ def run_cases(
         "shard_count": shard_count,
         "shard_index": shard_index,
         "selected_case_count": len(selected_cases),
-        "reused_cases": reused,
-        "new_cases": created,
-        "timing_comparable": reused == 0,
+        "reused_cases": counters["reused"],
+        "new_cases": counters["created"],
+        "timing_comparable": counters["reused"] == 0,
         "elapsed_ns": time.perf_counter_ns() - started,
         "cases": rows,
         "authority": "repository-intelligence-measurement-only",

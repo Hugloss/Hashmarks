@@ -35,6 +35,45 @@ SCHEMA = "hashmarks.bm25-economics.v1"
 FAMILY = "hashmarks-v0.10.43-fielded-bm25-a"
 
 
+def _task_report(
+    workspace: Path, cm, idx, task, secret, *, limit: int
+) -> dict[str, object]:
+    query = task["query"]
+    canonical = cm.task_entry_points(query, limit=limit)
+    recommended = [
+        row for row in canonical.get("recommended", []) if isinstance(row, dict)
+    ]
+    hashmarks_first = str(recommended[0].get("path") or "") if recommended else None
+    hits = idx.search(query, limit=limit)
+    bm25_first = hits[0].path if hits else None
+    bm25_top = hits[0] if hits else None
+    use_bm25 = bool(
+        bm25_top
+        and set(bm25_top.matched_fields).intersection({"symbol", "signature", "path"})
+        and bm25_first != hashmarks_first
+    )
+    fused_first = bm25_first if use_bm25 else hashmarks_first
+    verification, candidates_examined = _verification_target(
+        workspace, query, limit=limit, codemap=cm
+    )
+    expected = {str(value) for value in secret.get("expected_files") or ()}
+    return {
+        "id": task["id"],
+        "query": query,
+        "hashmarks_first": hashmarks_first,
+        "bm25_first": bm25_first,
+        "fused_first": fused_first,
+        "bm25_matched_fields": list(bm25_top.matched_fields) if bm25_top else [],
+        "bm25_override": use_bm25,
+        "correct_hashmarks": hashmarks_first in expected,
+        "correct_bm25": bm25_first in expected,
+        "correct_fused": fused_first in expected,
+        "verification_target": verification,
+        "evidence_read": _file_cost(workspace, [fused_first or "", verification or ""]),
+        "verification_candidates_examined": candidates_examined,
+    }
+
+
 def collect(root: Path, limit: int = 20) -> dict[str, object]:
     reports = []
     build_ms = 0.0
@@ -50,50 +89,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
             build_ms += (time.perf_counter() - t) * 1000
             rows = []
             for task, secret in zip(public, hidden, strict=False):
-                q = task["query"]
-                canonical = cm.task_entry_points(q, limit=limit)
-                rec = [
-                    r for r in canonical.get("recommended", []) if isinstance(r, dict)
-                ]
-                hm_first = str(rec[0].get("path") or "") if rec else None
-                hits = idx.search(q, limit=limit)
-                bm_first = hits[0].path if hits else None
-                # Cheap additive fusion: preserve canonical first unless BM25 has a
-                # strong role-bearing field match that canonical ranked below it.
-                bm_top = hits[0] if hits else None
-                use_bm = bool(
-                    bm_top
-                    and set(bm_top.matched_fields).intersection(
-                        {"symbol", "signature", "path"}
-                    )
-                    and bm_first != hm_first
-                )
-                fused_first = bm_first if use_bm else hm_first
-                verify, vpos = _verification_target(
-                    workspace, q, limit=limit, codemap=cm
-                )
-                selected = [fused_first or "", verify or ""]
-                read = _file_cost(workspace, selected)
-                exp = {str(x) for x in secret.get("expected_files") or ()}
-                rows.append(
-                    {
-                        "id": task["id"],
-                        "query": q,
-                        "hashmarks_first": hm_first,
-                        "bm25_first": bm_first,
-                        "fused_first": fused_first,
-                        "bm25_matched_fields": list(bm_top.matched_fields)
-                        if bm_top
-                        else [],
-                        "bm25_override": use_bm,
-                        "correct_hashmarks": hm_first in exp,
-                        "correct_bm25": bm_first in exp,
-                        "correct_fused": fused_first in exp,
-                        "verification_target": verify,
-                        "evidence_read": read,
-                        "verification_candidates_examined": vpos,
-                    }
-                )
+                rows.append(_task_report(workspace, cm, idx, task, secret, limit=limit))
         reports.append(
             {
                 "name": name,

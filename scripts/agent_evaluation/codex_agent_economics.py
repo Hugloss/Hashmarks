@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,28 @@ SCHEMA = "hashmarks.codex-agent-economics.v1"
 PROTOCOL = "hashmarks.codex-agent-economics-protocol.v1"
 FAMILY = "hashmarks-v0.10.47-real-codex-a"
 LANES = ("native", "hashmarks", "selective")
+
+
+@dataclass(frozen=True)
+class CodexRunConfig:
+    codex: str
+    model: str | None
+    effort: str | None
+    sandbox: str
+    bridge: Path
+    timeout_s: int
+
+
+@dataclass(frozen=True)
+class CollectionConfig:
+    codex_bin: str
+    model: str | None
+    effort: str | None
+    sandbox: str = "read-only"
+    limit: int = 20
+    timeout_s: int = 900
+    lanes: tuple[str, ...] = LANES
+    max_tasks: int | None = None
 
 
 def _identity(v: object) -> str:
@@ -79,6 +102,16 @@ def _prompt(lane: str, task: dict[str, str], workspace: Path, bridge: Path) -> s
     )
 
 
+def _walk_json(value: Any):
+    if isinstance(value, dict):
+        yield value
+        for child in value.values():
+            yield from _walk_json(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _walk_json(child)
+
+
 def _usage_from_jsonl(text: str) -> dict[str, int | None]:
     totals = {
         "input_tokens": None,
@@ -89,21 +122,12 @@ def _usage_from_jsonl(text: str) -> dict[str, int | None]:
     }
     best = {}
 
-    def walk(v: Any):
-        if isinstance(v, dict):
-            yield v
-            for x in v.values():
-                yield from walk(x)
-        elif isinstance(v, list):
-            for x in v:
-                yield from walk(x)
-
     for line in text.splitlines():
         try:
             obj = json.loads(line)
         except Exception:
             continue
-        for d in walk(obj):
+        for d in _walk_json(obj):
             for key in totals:
                 val = d.get(key)
                 if isinstance(val, int) and val >= 0:
@@ -113,17 +137,11 @@ def _usage_from_jsonl(text: str) -> dict[str, int | None]:
 
 
 def _run_one(
-    codex: str,
+    config: CodexRunConfig,
     lane: str,
     task: dict[str, str],
     workspace: Path,
     run_dir: Path,
-    *,
-    model: str | None,
-    effort: str | None,
-    sandbox: str,
-    bridge: Path,
-    timeout_s: int,
 ) -> dict[str, object]:
     run_dir.mkdir(parents=True, exist_ok=True)
     schema = run_dir / "output.schema.json"
@@ -132,25 +150,25 @@ def _run_one(
     stderr = run_dir / "stderr.txt"
     _schema(schema)
     cmd = [
-        codex,
+        config.codex,
         "exec",
         "-C",
         str(workspace),
         "--skip-git-repo-check",
         "--sandbox",
-        sandbox,
+        config.sandbox,
         "--json",
         "--output-schema",
         str(schema),
         "--output-last-message",
         str(final),
     ]
-    if model:
-        cmd += ["-m", model]
-    if effort:
-        cmd += ["-c", f'model_reasoning_effort="{effort}"']
+    if config.model:
+        cmd += ["-m", config.model]
+    if config.effort:
+        cmd += ["-c", f'model_reasoning_effort="{config.effort}"']
     cmd += ["-"]
-    prompt = _prompt(lane, task, workspace, bridge)
+    prompt = _prompt(lane, task, workspace, config.bridge)
     (run_dir / "prompt.txt").write_text(prompt)
     t = time.perf_counter()
     try:
@@ -159,7 +177,7 @@ def _run_one(
             input=prompt,
             text=True,
             capture_output=True,
-            timeout=timeout_s,
+            timeout=config.timeout_s,
             env=dict(os.environ),
         )
         rc = cp.returncode
@@ -247,54 +265,49 @@ def _score(
 
 def collect(
     root: Path,
-    *,
-    codex_bin: str,
-    model: str | None,
-    effort: str | None,
-    sandbox: str = "read-only",
-    limit: int = 20,
-    timeout_s: int = 900,
-    lanes: tuple[str, ...] = LANES,
-    max_tasks: int | None = None,
+    config: CollectionConfig,
 ) -> dict[str, object]:
     codex_path = (
-        shutil.which(codex_bin)
-        if os.sep not in codex_bin
-        else (codex_bin if Path(codex_bin).is_file() else None)
+        shutil.which(config.codex_bin)
+        if os.sep not in config.codex_bin
+        else (config.codex_bin if Path(config.codex_bin).is_file() else None)
     )
     if not codex_path:
-        raise FileNotFoundError(f"Codex executable not found: {codex_bin}")
+        raise FileNotFoundError(f"Codex executable not found: {config.codex_bin}")
     bridge = (_S / "codex_context_bridge.py").resolve()
+    run_config = CodexRunConfig(
+        codex=str(codex_path),
+        model=config.model,
+        effort=config.effort,
+        sandbox=config.sandbox,
+        bridge=bridge,
+        timeout_s=config.timeout_s,
+    )
     reports = []
     for name, workspace, corpus, public_path in materialize_challenge(
         root / "challenge"
     ):
         public = json.loads(public_path.read_text())["tasks"]
         hidden = _load_corpus(corpus)
-        if max_tasks is not None:
-            public = public[:max_tasks]
-            hidden = hidden[:max_tasks]
+        if config.max_tasks is not None:
+            public = public[: config.max_tasks]
+            hidden = hidden[: config.max_tasks]
         repo = {
             "name": name,
             "public_task_sha256": _sha256_bytes(public_path.read_bytes()),
             "hidden_corpus_sha256": _sha256_bytes(corpus.read_bytes()),
             "lanes": {},
         }
-        for lane in lanes:
+        for lane in config.lanes:
             runs = []
             for task in public:
                 runs.append(
                     _run_one(
-                        str(codex_path),
+                        run_config,
                         lane,
                         task,
                         workspace,
                         root / "runs" / name / lane / task["id"],
-                        model=model,
-                        effort=effort,
-                        sandbox=sandbox,
-                        bridge=bridge,
-                        timeout_s=timeout_s,
                     )
                 )
             repo["lanes"][lane] = _score(name, hidden, runs)
@@ -302,9 +315,11 @@ def collect(
         reports.append(repo)
     summary = {
         "repositories": len(reports),
-        "tasks": sum(int(r["lanes"][lanes[0]]["summary"]["tasks"]) for r in reports),
+        "tasks": sum(
+            int(r["lanes"][config.lanes[0]]["summary"]["tasks"]) for r in reports
+        ),
     }
-    for lane in lanes:
+    for lane in config.lanes:
         for k in (
             "completed",
             "correct_first_edits",
@@ -324,20 +339,20 @@ def collect(
         "schema": PROTOCOL,
         "family": FAMILY,
         "execution": "independent-codex-exec-per-repository-task-lane",
-        "lanes": list(lanes),
+        "lanes": list(config.lanes),
         "public_task_fields": ["id", "query"],
         "hidden_grader_fields": [
             "expected_files",
             "expected_symbols",
             "expected_verification",
         ],
-        "sandbox": sandbox,
-        "model": model,
-        "reasoning_effort": effort,
+        "sandbox": config.sandbox,
+        "model": config.model,
+        "reasoning_effort": config.effort,
         "output_contract": "codex exec --output-schema + --output-last-message",
         "jsonl_usage": "best available token counters from codex --json stream; zero means unavailable, never inferred",
         "history": "fresh independent codex exec process; no parent conversation inheritance",
-        "limit": limit,
+        "limit": config.limit,
     }
     return {
         "schema": SCHEMA,
@@ -390,13 +405,15 @@ def main() -> int:
     else:
         value = collect(
             a.root,
-            codex_bin=a.codex_bin,
-            model=a.model,
-            effort=a.reasoning_effort,
-            sandbox=a.sandbox,
-            timeout_s=a.timeout,
-            lanes=tuple(x.strip() for x in a.lanes.split(",") if x.strip()),
-            max_tasks=a.max_tasks,
+            CollectionConfig(
+                codex_bin=a.codex_bin,
+                model=a.model,
+                effort=a.reasoning_effort,
+                sandbox=a.sandbox,
+                timeout_s=a.timeout,
+                lanes=tuple(x.strip() for x in a.lanes.split(",") if x.strip()),
+                max_tasks=a.max_tasks,
+            ),
         )
     text = json.dumps(value, indent=2, sort_keys=True) + "\n"
     if a.output:

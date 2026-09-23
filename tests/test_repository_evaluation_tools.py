@@ -1,4 +1,5 @@
 import contextlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -7,6 +8,7 @@ import pytest
 
 from scripts.repository_evaluation.compare_runs import compare_runs
 from scripts.repository_evaluation.grade_cases import grade_run
+from scripts.repository_evaluation.merge_runs import merge_runs
 from scripts.repository_evaluation.run_cases import run_cases
 
 
@@ -114,6 +116,53 @@ def test_repository_evaluation_receipt_rejects_target_repository_identity_drift(
         run_cases(workspace=repo, cases_path=cases, receipts_dir=receipts)
 
 
+@pytest.mark.parametrize(
+    ("case_rows", "options", "message"),
+    [
+        ([], {}, "non-empty cases list"),
+        (["not-an-object"], {}, "case must be an object"),
+        ([{"operation": "task_action_map", "task": "target"}], {}, "id is required"),
+        (
+            [{"id": "target", "operation": "unknown", "task": "target"}],
+            {},
+            "unsupported repository evaluation operation",
+        ),
+        (
+            [{"id": "target", "operation": "task_action_map", "task": "target"}],
+            {"shard_count": 0},
+            "invalid repository evaluation shard",
+        ),
+    ],
+)
+def test_repository_evaluation_rejects_invalid_selection_contract(
+    tmp_path: Path,
+    case_rows: list[object],
+    options: dict[str, int],
+    message: str,
+) -> None:
+    repo = tmp_path / "repo"
+    _write(repo, "src/live.py", "def target():\n    return 1\n")
+    cases = tmp_path / "cases.json"
+    cases.write_text(
+        json.dumps(
+            {
+                "schema": "hashmarks.repository-evaluation-cases.v1",
+                "suite": "invalid-selection",
+                "cases": case_rows,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=message):
+        run_cases(
+            workspace=repo,
+            cases_path=cases,
+            receipts_dir=tmp_path / "receipts",
+            **options,
+        )
+
+
 def test_repository_evaluation_grader_classifies_false_safe_edit() -> None:
     run = {
         "schema": "hashmarks.repository-evaluation-run.v1",
@@ -163,8 +212,6 @@ def test_repository_evaluation_comparison_suppresses_resumed_timing() -> None:
 def test_repository_evaluation_shards_merge_without_duplicate_work(
     tmp_path: Path,
 ) -> None:
-    from scripts.repository_evaluation.merge_runs import merge_runs
-
     repo = tmp_path / "repo"
     _write(repo, "src/live.py", "def active_target():\n    return 1\n")
     cases = tmp_path / "cases.json"
@@ -191,6 +238,30 @@ def test_repository_evaluation_shards_merge_without_duplicate_work(
     merged = merge_runs([first, second])
     assert merged["complete"] is True
     assert [row["id"] for row in merged["cases"]] == ["a", "b"]
+
+
+def test_repository_evaluation_merge_rejects_invalid_identity_and_membership() -> None:
+    base = {
+        "suite": "suite",
+        "protocol_identity": "sha256:protocol",
+        "repository_identity": "sha256:repository",
+        "producer_implementation_identity": "sha256:producer",
+        "producer_artifact_identity": None,
+        "cases_sha256": "sha256:cases",
+        "shard_count": 2,
+        "shard_index": 0,
+        "cases": [{"id": "case-a"}],
+    }
+    with pytest.raises(ValueError, match="at least one"):
+        merge_runs([])
+    with pytest.raises(ValueError, match="identity mismatch: protocol_identity"):
+        merge_runs([base, {**base, "protocol_identity": "sha256:other"}])
+    with pytest.raises(ValueError, match="shard-count mismatch"):
+        merge_runs([base, {**base, "shard_count": 3}])
+    with pytest.raises(ValueError, match="case must be an object"):
+        merge_runs([{**base, "cases": ["invalid"]}])
+    with pytest.raises(ValueError, match="duplicate or empty"):
+        merge_runs([base, {**base, "shard_index": 1}])
 
 
 def test_repository_evaluation_grader_distinguishes_over_and_wrong_ambiguity() -> None:
@@ -237,6 +308,75 @@ def test_repository_evaluation_grader_distinguishes_over_and_wrong_ambiguity() -
     report = grade_run(run=wrong, grader=_grader())
     assert report["counters"]["WRONG_AMBIGUOUS"] == 1
     assert report["cases"][0]["failure_stage"] == "AMBIGUITY_ERROR"
+
+
+def test_repository_evaluation_grader_covers_classification_and_failure_stages() -> (
+    None
+):
+    cases = [
+        ("pass", "src/live.py", "active_target", False, ["src/live.py"]),
+        ("qualname", "src/live.py", "wrong", False, ["src/live.py"]),
+        ("no-answer", "", "", False, ["src/live.py"]),
+        ("retrieval-miss", "src/wrong.py", "wrong", False, []),
+        ("projection", "src/wrong.py", "wrong", False, ["src/live.py"]),
+        ("expected-ambiguous", "", "", True, []),
+        ("false-unique", "src/live.py", "active_target", False, []),
+    ]
+    run_rows = []
+    grader_rows = {}
+    for case_id, path, qualname, ambiguous, retrieval in cases:
+        run_rows.append(
+            {
+                "id": case_id,
+                "result": {
+                    "retrieval": [{"path": value} for value in retrieval],
+                    "action": {
+                        "edit": {"path": path, "qualname": qualname},
+                        "ambiguity": {"ambiguous": ambiguous},
+                    },
+                },
+            }
+        )
+        grader_rows[case_id] = {
+            "expected_edit_path": "src/live.py",
+            "expected_edit_qualname": "active_target",
+            "must_be_ambiguous": case_id in {"expected-ambiguous", "false-unique"},
+        }
+
+    report = grade_run(run={"cases": run_rows}, grader={"cases": grader_rows})
+    by_id = {row["id"]: row for row in report["cases"]}
+    assert by_id["pass"]["classification"] == "PASS"
+    assert by_id["qualname"]["classification"] == "OTHER_FAILURE"
+    assert by_id["no-answer"]["classification"] == "NO_ANSWER"
+    assert by_id["retrieval-miss"]["failure_stage"] == "RETRIEVAL_MISS"
+    assert by_id["projection"]["failure_stage"] == "ACTION_PROJECTION_DISPLACEMENT"
+    assert by_id["expected-ambiguous"]["classification"] == "AMBIGUOUS_EXPECTED"
+    assert by_id["false-unique"]["classification"] == "FALSE_UNIQUE"
+    assert report["complete"] is False
+
+
+@pytest.mark.parametrize(
+    ("run", "grader", "message"),
+    [
+        ({"cases": []}, {"cases": []}, "grader cases must be an object"),
+        ({"cases": ["bad"]}, {"cases": {}}, "run case must be an object"),
+        (
+            {"cases": [{"id": "unknown"}]},
+            {"cases": {}},
+            "missing repository evaluation grader rule",
+        ),
+        (
+            {"cases": [{"id": "target", "result": {}}]},
+            {"cases": {"target": {}}},
+            "missing task action result",
+        ),
+    ],
+)
+def test_repository_evaluation_grader_rejects_malformed_inputs(
+    run: dict, grader: dict, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        grade_run(run=run, grader=grader)
 
 
 def test_profile_comparison_uses_same_version_noise_floor() -> None:
@@ -325,6 +465,14 @@ def test_profile_shards_merge_strict_identity_and_complete() -> None:
     bad["repository_identity"] = "sha256:other"
     with pytest.raises(ValueError, match="profile identity mismatch"):
         merge_profiles([shard(0, "a"), bad])
+    with pytest.raises(ValueError, match="no profiles"):
+        merge_profiles([])
+    with pytest.raises(ValueError, match="unsupported profile schema"):
+        merge_profiles([{**shard(0, "a"), "schema": "unknown"}])
+    with pytest.raises(ValueError, match="duplicate profile shard"):
+        merge_profiles([shard(0, "a"), shard(0, "b")])
+    with pytest.raises(ValueError, match="duplicate profile case"):
+        merge_profiles([shard(0, "same"), shard(1, "same")])
 
 
 def test_paired_profile_interleaves_semantics_and_fails_closed_on_noise(
@@ -352,9 +500,11 @@ def test_paired_profile_interleaves_semantics_and_fails_closed_on_noise(
         workspace_a=repo_a,
         workspace_b=repo_b,
         cases_path=cases,
-        warmups=0,
-        pairs=5,
-        max_control_mad_pct=10.0,
+        protocol=profiles.PairedProfileProtocol(
+            warmups=0,
+            pairs=5,
+            max_control_mad_pct=10.0,
+        ),
     )
     row = result["cases"][0]
     assert row["semantic_equal"] is True

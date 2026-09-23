@@ -91,18 +91,9 @@ def _surface_paths(packet: dict[str, Any], role: str) -> set[str]:
     }
 
 
-def run(
-    repo: Path, public_path: Path, secret_path: Path, output: Path
-) -> dict[str, Any]:
-    public = json.loads(public_path.read_text(encoding="utf-8"))
-    tasks = public.get("tasks")
-    if (
-        not isinstance(tasks, list)
-        or not tasks
-        or any(set(row) != {"id", "query"} for row in tasks)
-    ):
-        raise ValueError("PUBLIC tasks must contain exactly id/query")
-
+def _freeze_public_evidence(
+    repo: Path, tasks: list[dict[str, object]]
+) -> tuple[list[dict[str, Any]], float]:
     frozen: list[dict[str, Any]] = []
     with CodeMap(repo) as codemap:
         started = time.perf_counter()
@@ -130,7 +121,112 @@ def run(
                     "impact_ms": impact_ms,
                 }
             )
+    return frozen, sync_ms
 
+
+def _record_reason_counts(impact: dict[str, Any], counts: Counter[str]) -> None:
+    for role in ("verification", "implementation"):
+        surfaces = impact.get("surfaces")
+        rows = surfaces.get(role, []) if isinstance(surfaces, dict) else []
+        if isinstance(rows, list):
+            counts.update(
+                str(item.get("via") or "unknown")
+                for item in rows
+                if isinstance(item, dict)
+            )
+
+
+def _changed_roles(impact: dict[str, Any]) -> set[str]:
+    changed = impact.get("changed")
+    rows = changed if isinstance(changed, list) else []
+    changed_row = rows[0] if len(rows) == 1 and isinstance(rows[0], dict) else {}
+    return {str(value) for value in (changed_row.get("roles") or [])}
+
+
+def _grade_frozen_impact(
+    row: dict[str, Any], truth: dict[str, Any], reason_counts: Counter[str]
+) -> dict[str, Any]:
+    impact = row["impact"]
+    start = row["start"]
+    _record_reason_counts(impact, reason_counts)
+    provenance = (
+        start.get("provenance") if isinstance(start.get("provenance"), dict) else {}
+    )
+    structural = str(provenance.get("why") or "").startswith("structural-")
+    serialized = json.dumps(
+        impact, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    graded = {
+        "id": row["id"],
+        "category": str(truth.get("category") or "unknown"),
+        "edit_correct": row["edit_path"] == str(truth["expected_edit_path"]),
+        "verify_relevant": str(truth["expected_verify_path"])
+        in _surface_paths(impact, "verification"),
+        "structural_dependency_relevant": (not structural)
+        or bool(_surface_paths(impact, "implementation")),
+        "contract_root_typed": ("contract" in _changed_roles(impact))
+        if str(truth.get("category")) == "configuration-ownership"
+        else True,
+        "external_execution_owner": impact.get("owner") == "external",
+        "advisory_authority": impact.get("authority") == "advisory",
+        "no_source_or_argv_replay": '"content"' not in serialized
+        and '"argv"' not in serialized,
+        "impact_bytes": int(row["impact_bytes"]),
+        "impact_ms": float(row["impact_ms"]),
+    }
+    graded["fully_correct"] = all(
+        bool(graded[key])
+        for key in (
+            "edit_correct",
+            "verify_relevant",
+            "structural_dependency_relevant",
+            "contract_root_typed",
+            "external_execution_owner",
+            "advisory_authority",
+            "no_source_or_argv_replay",
+        )
+    )
+    return graded
+
+
+def _summary(
+    results: list[dict[str, Any]], reason_counts: Counter[str], sync_ms: float
+) -> dict[str, object]:
+    count = len(results)
+    return {
+        "tasks": count,
+        "fully_correct": sum(bool(row["fully_correct"]) for row in results),
+        "verify_relevant": sum(bool(row["verify_relevant"]) for row in results),
+        "structural_dependency_relevant": sum(
+            bool(row["structural_dependency_relevant"]) for row in results
+        ),
+        "contract_root_typed": sum(bool(row["contract_root_typed"]) for row in results),
+        "no_source_or_argv_replay": sum(
+            bool(row["no_source_or_argv_replay"]) for row in results
+        ),
+        "visible_bytes": sum(int(row["impact_bytes"]) for row in results),
+        "visible_bytes_per_task": sum(int(row["impact_bytes"]) for row in results)
+        / count,
+        "mean_impact_ms": sum(float(row["impact_ms"]) for row in results) / count,
+        "reason_counts": dict(sorted(reason_counts.items())),
+        "initial_sync_ms": sync_ms,
+    }
+
+
+def run(
+    repo: Path, public_path: Path, secret_path: Path, output: Path
+) -> dict[str, Any]:
+    public = json.loads(public_path.read_text(encoding="utf-8"))
+    tasks = public.get("tasks")
+    if (
+        not isinstance(tasks, list)
+        or not tasks
+        or any(
+            not isinstance(row, dict) or set(row) != {"id", "query"} for row in tasks
+        )
+    ):
+        raise ValueError("PUBLIC tasks must contain exactly id/query")
+    frozen, sync_ms = _freeze_public_evidence(repo, tasks)
     frozen_identity = _identity(
         [
             {
@@ -153,91 +249,10 @@ def run(
     categories: dict[str, list[dict[str, Any]]] = defaultdict(list)
     reason_counts: Counter[str] = Counter()
     for row in frozen:
-        truth = expected[row["id"]]
-        impact = row["impact"]
-        start = row["start"]
-        verification_rows = (
-            ((impact.get("surfaces") or {}).get("verification") or [])
-            if isinstance(impact.get("surfaces"), dict)
-            else []
-        )
-        implementation_rows = (
-            ((impact.get("surfaces") or {}).get("implementation") or [])
-            if isinstance(impact.get("surfaces"), dict)
-            else []
-        )
-        for surface_rows in (verification_rows, implementation_rows):
-            if isinstance(surface_rows, list):
-                for item in surface_rows:
-                    if isinstance(item, dict):
-                        reason_counts[str(item.get("via") or "unknown")] += 1
-        changed = (
-            impact.get("changed") if isinstance(impact.get("changed"), list) else []
-        )
-        changed_row = (
-            changed[0] if len(changed) == 1 and isinstance(changed[0], dict) else {}
-        )
-        changed_roles = {str(value) for value in (changed_row.get("roles") or [])}
-        provenance = (
-            start.get("provenance") if isinstance(start.get("provenance"), dict) else {}
-        )
-        structural = str(provenance.get("why") or "").startswith("structural-")
-        verification_paths = _surface_paths(impact, "verification")
-        implementation_paths = _surface_paths(impact, "implementation")
-        serialized = json.dumps(
-            impact, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-        )
-        graded = {
-            "id": row["id"],
-            "category": str(truth.get("category") or "unknown"),
-            "edit_correct": row["edit_path"] == str(truth["expected_edit_path"]),
-            "verify_relevant": str(truth["expected_verify_path"]) in verification_paths,
-            "structural_dependency_relevant": (not structural)
-            or bool(implementation_paths),
-            "contract_root_typed": ("contract" in changed_roles)
-            if str(truth.get("category")) == "configuration-ownership"
-            else True,
-            "external_execution_owner": impact.get("owner") == "external",
-            "advisory_authority": impact.get("authority") == "advisory",
-            "no_source_or_argv_replay": '"content"' not in serialized
-            and '"argv"' not in serialized,
-            "impact_bytes": int(row["impact_bytes"]),
-            "impact_ms": float(row["impact_ms"]),
-        }
-        graded["fully_correct"] = all(
-            bool(graded[key])
-            for key in (
-                "edit_correct",
-                "verify_relevant",
-                "structural_dependency_relevant",
-                "contract_root_typed",
-                "external_execution_owner",
-                "advisory_authority",
-                "no_source_or_argv_replay",
-            )
-        )
+        graded = _grade_frozen_impact(row, expected[row["id"]], reason_counts)
         results.append(graded)
         categories[graded["category"]].append(graded)
 
-    count = len(results)
-    summary = {
-        "tasks": count,
-        "fully_correct": sum(bool(row["fully_correct"]) for row in results),
-        "verify_relevant": sum(bool(row["verify_relevant"]) for row in results),
-        "structural_dependency_relevant": sum(
-            bool(row["structural_dependency_relevant"]) for row in results
-        ),
-        "contract_root_typed": sum(bool(row["contract_root_typed"]) for row in results),
-        "no_source_or_argv_replay": sum(
-            bool(row["no_source_or_argv_replay"]) for row in results
-        ),
-        "visible_bytes": sum(int(row["impact_bytes"]) for row in results),
-        "visible_bytes_per_task": sum(int(row["impact_bytes"]) for row in results)
-        / count,
-        "mean_impact_ms": sum(float(row["impact_ms"]) for row in results) / count,
-        "reason_counts": dict(sorted(reason_counts.items())),
-        "initial_sync_ms": sync_ms,
-    }
     category_summary = {
         name: {
             "tasks": len(rows),
@@ -265,7 +280,7 @@ def run(
     }
     payload = {
         "schema": SCHEMA,
-        "summary": summary,
+        "summary": _summary(results, reason_counts, sync_ms),
         "categories": category_summary,
         "results": results,
         "protocol": protocol,

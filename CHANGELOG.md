@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.17.0 — External evidence correlation and real-data qualification
+
+- Add a bounded producer-side Splunk CSV dogfood adapter under evaluation tooling, preserving exact source identity, parser health, multiline records, traceback path/line/symbol evidence, repeated-event identity, bounded aggregation, and explicit completeness/truncation without turning Hashmarks into a log-ingestion platform.
+- Harden external-evidence correlation so bundle/anchor container order is presentation-only: anchors are canonically ordered by `anchor_id`, while any semantically meaningful producer ordering must be carried explicitly in metadata or provenance.
+- Preserve and correlate recovered runtime traceback evidence through explicit path mappings, while keeping interpretation and causation external to Hashmarks.
+- Restore the native-vs-Hashmarks context-economics JSON-to-CSV projection on current main with stricter input-schema validation, duplicate identity rejection, explicit UTF-8 handling, and output digests.
+- Qualify the release against the retained masked Splunk export and keep the resulting dogfood evidence and focused regressions in-repository without committing the masked payload itself.
+
 ## 0.16.0 — Authority non-interference and evidence qualification
 
 - Separate repository authority proof from bounded retrieval and presentation so limits, candidate truncation, compact projections, persistent reopen, and MCP projection cannot manufacture or erase ownership authority.

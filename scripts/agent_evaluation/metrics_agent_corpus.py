@@ -22,6 +22,104 @@ def _load(path: Path) -> list[dict[str, Any]]:
     return [row for row in tasks if isinstance(row, dict)]
 
 
+def _timed(fn):
+    started = time.perf_counter()
+    value = fn()
+    return value, time.perf_counter() - started
+
+
+def _percentile(values: list[float], fraction: float) -> float:
+    ordered = sorted(values)
+    if not ordered:
+        return 0.0
+    index = max(0, min(len(ordered) - 1, math.ceil(len(ordered) * fraction) - 1))
+    return ordered[index]
+
+
+def _task_metrics(
+    codemap: CodeMap,
+    task: dict[str, Any],
+    full_tokens: dict[str, int],
+    repository_file_count: int,
+    budget: int,
+    limit: int,
+) -> dict[str, object]:
+    query = str(task.get("query") or "")
+    expected = {
+        "files": {str(value) for value in task.get("expected_files") or ()},
+        "symbols": {str(value) for value in task.get("expected_symbols") or ()},
+    }
+    hits, find_seconds = _timed(lambda: codemap.find(query, limit=limit))
+    pack, context_seconds = _timed(
+        lambda: codemap.context(query, token_budget=budget, limit=limit)
+    )
+    observed_files = {
+        "hits": {hit.path for hit in hits},
+        "context": {item.path for item in pack.items},
+    }
+    observed_symbols = (
+        {hit.qualname for hit in hits if hit.qualname}
+        | {hit.name for hit in hits if hit.name}
+        | {item.symbol for item in pack.items if item.symbol}
+    )
+    relevant_files = observed_files["hits"] | observed_files["context"]
+    token_counts = {
+        "expected": sum(full_tokens.get(path, 0) for path in expected["files"]),
+        "selected": sum(full_tokens.get(path, 0) for path in observed_files["context"]),
+        "source_range": sum(
+            item.estimated_tokens
+            for item in pack.items
+            if item.representation == "source-range"
+        ),
+    }
+    return {
+        "id": str(task.get("id") or query),
+        "query": query,
+        "expected_files": sorted(expected["files"]),
+        "expected_symbols": sorted(expected["symbols"]),
+        "file_recall": 1.0
+        if not expected["files"]
+        else len(expected["files"] & relevant_files) / len(expected["files"]),
+        "symbol_recall": 1.0
+        if not expected["symbols"]
+        else len(expected["symbols"] & observed_symbols) / len(expected["symbols"]),
+        "first_hit_file": None if not hits else hits[0].path,
+        "first_query_hit": bool(hits and hits[0].path in expected["files"]),
+        "fallback_search_required": not expected["files"].issubset(relevant_files),
+        "confidence": pack.confidence,
+        "abstained": pack.abstained,
+        "find_seconds": find_seconds,
+        "context_seconds": context_seconds,
+        "context_tokens": pack.estimated_tokens,
+        "context_files": len(observed_files["context"]),
+        "candidate_files": len(relevant_files),
+        "repository_files": repository_file_count,
+        "candidate_file_reduction": (
+            1.0 - (len(relevant_files) / repository_file_count)
+            if repository_file_count
+            else 0.0
+        ),
+        "source_range_tokens": token_counts["source_range"],
+        "structural_tokens": pack.estimated_tokens - token_counts["source_range"],
+        "source_range_fraction": (
+            token_counts["source_range"] / pack.estimated_tokens
+            if pack.estimated_tokens
+            else 0.0
+        ),
+        "selected_files_full_tokens": token_counts["selected"],
+        "selected_full_to_context_ratio": None
+        if pack.estimated_tokens <= 0
+        else token_counts["selected"] / pack.estimated_tokens,
+        "selected_file_tokens_avoided": max(
+            0, token_counts["selected"] - pack.estimated_tokens
+        ),
+        "expected_full_file_tokens": token_counts["expected"],
+        "expected_full_to_context_ratio": None
+        if pack.estimated_tokens <= 0
+        else token_counts["expected"] / pack.estimated_tokens,
+    }
+
+
 def collect(
     workspace: Path, corpus: Path, *, budget: int = 1200, limit: int = 20
 ) -> dict[str, object]:
@@ -39,102 +137,18 @@ def collect(
         repository_file_count = len(full_tokens)
         repository_source_tokens = sum(full_tokens.values())
         for task in tasks:
-            query = str(task.get("query") or "")
-            expected_files = {str(value) for value in task.get("expected_files") or ()}
-            expected_symbols = {
-                str(value) for value in task.get("expected_symbols") or ()
-            }
-            t0 = time.perf_counter()
-            hits = codemap.find(query, limit=limit)
-            find_seconds = time.perf_counter() - t0
-            t1 = time.perf_counter()
-            pack = codemap.context(query, token_budget=budget, limit=limit)
-            context_seconds = time.perf_counter() - t1
-            hit_files = {hit.path for hit in hits}
-            hit_symbols = {hit.qualname for hit in hits if hit.qualname} | {
-                hit.name for hit in hits if hit.name
-            }
-            context_files = {item.path for item in pack.items}
-            context_symbols = {item.symbol for item in pack.items if item.symbol}
-            relevant_files = hit_files | context_files
-            relevant_symbols = hit_symbols | context_symbols
-            file_hits = expected_files & relevant_files
-            symbol_hits = expected_symbols & relevant_symbols
-            baseline_tokens = sum(full_tokens.get(path, 0) for path in expected_files)
-            context_full_file_tokens = sum(
-                full_tokens.get(path, 0) for path in context_files
-            )
-            ratio = (
-                None
-                if pack.estimated_tokens <= 0
-                else baseline_tokens / pack.estimated_tokens
-            )
-            context_ratio = (
-                None
-                if pack.estimated_tokens <= 0
-                else context_full_file_tokens / pack.estimated_tokens
-            )
-            source_range_tokens = sum(
-                item.estimated_tokens
-                for item in pack.items
-                if item.representation == "source-range"
-            )
-            structural_tokens = pack.estimated_tokens - source_range_tokens
             rows.append(
-                {
-                    "id": str(task.get("id") or query),
-                    "query": query,
-                    "expected_files": sorted(expected_files),
-                    "expected_symbols": sorted(expected_symbols),
-                    "file_recall": 1.0
-                    if not expected_files
-                    else len(file_hits) / len(expected_files),
-                    "symbol_recall": 1.0
-                    if not expected_symbols
-                    else len(symbol_hits) / len(expected_symbols),
-                    "first_hit_file": None if not hits else hits[0].path,
-                    "first_query_hit": bool(hits and hits[0].path in expected_files),
-                    "fallback_search_required": not expected_files.issubset(
-                        relevant_files
-                    ),
-                    "confidence": pack.confidence,
-                    "abstained": pack.abstained,
-                    "find_seconds": find_seconds,
-                    "context_seconds": context_seconds,
-                    "context_tokens": pack.estimated_tokens,
-                    "context_files": len(context_files),
-                    "candidate_files": len(relevant_files),
-                    "repository_files": repository_file_count,
-                    "candidate_file_reduction": (
-                        1.0 - (len(relevant_files) / repository_file_count)
-                        if repository_file_count
-                        else 0.0
-                    ),
-                    "source_range_tokens": source_range_tokens,
-                    "structural_tokens": structural_tokens,
-                    "source_range_fraction": (
-                        source_range_tokens / pack.estimated_tokens
-                        if pack.estimated_tokens
-                        else 0.0
-                    ),
-                    "selected_files_full_tokens": context_full_file_tokens,
-                    "selected_full_to_context_ratio": context_ratio,
-                    "selected_file_tokens_avoided": max(
-                        0, context_full_file_tokens - pack.estimated_tokens
-                    ),
-                    "expected_full_file_tokens": baseline_tokens,
-                    "expected_full_to_context_ratio": ratio,
-                }
+                _task_metrics(
+                    codemap,
+                    task,
+                    full_tokens,
+                    repository_file_count,
+                    budget,
+                    limit,
+                )
             )
         status = codemap.status()
     task_count = len(rows)
-
-    def percentile(values: list[float], fraction: float) -> float:
-        ordered = sorted(values)
-        if not ordered:
-            return 0.0
-        index = max(0, min(len(ordered) - 1, math.ceil(len(ordered) * fraction) - 1))
-        return ordered[index]
 
     find_values = [float(row["find_seconds"]) for row in rows]
     context_values = [float(row["context_seconds"]) for row in rows]
@@ -175,9 +189,9 @@ def collect(
                 int(row["selected_file_tokens_avoided"]) for row in rows
             ),
             "average_find_ms": 1000.0 * sum(find_values) / task_count,
-            "p95_find_ms": 1000.0 * percentile(find_values, 0.95),
+            "p95_find_ms": 1000.0 * _percentile(find_values, 0.95),
             "average_context_ms": 1000.0 * sum(context_values) / task_count,
-            "p95_context_ms": 1000.0 * percentile(context_values, 0.95),
+            "p95_context_ms": 1000.0 * _percentile(context_values, 0.95),
             "selected_full_to_context_ratio": (
                 sum(int(row["selected_files_full_tokens"]) for row in rows)
                 / max(1, sum(int(row["context_tokens"]) for row in rows))

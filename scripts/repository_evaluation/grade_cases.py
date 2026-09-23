@@ -39,6 +39,69 @@ def _classification(
     return wrong_resolved_classification
 
 
+def _failure_stage(
+    classification: str, expected_path: str, retrieval_paths: set[str]
+) -> str:
+    if classification in {"PASS", "AMBIGUOUS_EXPECTED", "OVER_AMBIGUOUS"}:
+        return "CORRECT"
+    if expected_path and expected_path not in retrieval_paths:
+        return "RETRIEVAL_MISS"
+    if classification in {"FALSE_UNIQUE", "WRONG_AMBIGUOUS", "NO_ANSWER"}:
+        return "AMBIGUITY_ERROR"
+    return "ACTION_PROJECTION_DISPLACEMENT"
+
+
+def _grade_case(
+    case_id: str, item: Mapping[str, object], rule: Mapping[str, object]
+) -> dict[str, object]:
+    result = item.get("result")
+    action = result.get("action") if isinstance(result, Mapping) else None
+    if not isinstance(action, Mapping):
+        raise ValueError(f"missing task action result for {case_id}")
+    edit_value = action.get("edit")
+    ambiguity_value = action.get("ambiguity")
+    edit = edit_value if isinstance(edit_value, Mapping) else {}
+    ambiguity = ambiguity_value if isinstance(ambiguity_value, Mapping) else {}
+    actual_path = str(edit.get("path") or "")
+    actual_qualname = str(edit.get("qualname") or "")
+    expected_path = str(rule.get("expected_edit_path") or "")
+    expected_qualname = str(rule.get("expected_edit_qualname") or "")
+    expected_ambiguous = bool(rule.get("must_be_ambiguous", False))
+    ambiguous = bool(ambiguity.get("ambiguous"))
+    classification = _classification(
+        actual_path=actual_path,
+        ambiguous=ambiguous,
+        expected_path=expected_path,
+        expected_ambiguous=expected_ambiguous,
+        wrong_resolved_classification=str(
+            rule.get("classification_on_wrong_resolved_edit") or "FALSE_SAFE_EDIT"
+        ),
+    )
+    if (
+        classification == "PASS"
+        and expected_qualname
+        and actual_qualname != expected_qualname
+    ):
+        classification = "OTHER_FAILURE"
+    retrieval = result.get("retrieval") if isinstance(result, Mapping) else None
+    retrieval_paths = {
+        str(row.get("path") or "")
+        for row in (retrieval or ())
+        if isinstance(row, Mapping)
+    }
+    return {
+        "id": case_id,
+        "classification": classification,
+        "failure_stage": _failure_stage(classification, expected_path, retrieval_paths),
+        "actual_edit_path": actual_path,
+        "actual_edit_qualname": actual_qualname,
+        "actual_ambiguous": ambiguous,
+        "expected_edit_path": expected_path,
+        "expected_edit_qualname": expected_qualname,
+        "expected_ambiguous": expected_ambiguous,
+    }
+
+
 def grade_run(
     *, run: Mapping[str, object], grader: Mapping[str, object]
 ) -> dict[str, Any]:
@@ -65,66 +128,12 @@ def grade_run(
         rule = expected.get(case_id)
         if not isinstance(rule, Mapping):
             raise ValueError(f"missing repository evaluation grader rule for {case_id}")
-        result = item.get("result")
-        action = result.get("action") if isinstance(result, Mapping) else None
-        if not isinstance(action, Mapping):
-            raise ValueError(f"missing task action result for {case_id}")
-        edit = action.get("edit")
-        ambiguity = action.get("ambiguity")
-        edit = edit if isinstance(edit, Mapping) else {}
-        ambiguity = ambiguity if isinstance(ambiguity, Mapping) else {}
-        actual_path = str(edit.get("path") or "")
-        actual_qualname = str(edit.get("qualname") or "")
-        expected_path = str(rule.get("expected_edit_path") or "")
-        expected_qualname = str(rule.get("expected_edit_qualname") or "")
-        expected_ambiguous = bool(rule.get("must_be_ambiguous", False))
-        ambiguous = bool(ambiguity.get("ambiguous"))
-        wrong_classification = str(
-            rule.get("classification_on_wrong_resolved_edit") or "FALSE_SAFE_EDIT"
-        )
-        classification = _classification(
-            actual_path=actual_path,
-            ambiguous=ambiguous,
-            expected_path=expected_path,
-            expected_ambiguous=expected_ambiguous,
-            wrong_resolved_classification=wrong_classification,
-        )
-        if (
-            classification == "PASS"
-            and expected_qualname
-            and actual_qualname != expected_qualname
-        ):
-            classification = "OTHER_FAILURE"
+        row = _grade_case(case_id, item, rule)
+        classification = str(row["classification"])
         counters.setdefault(classification, 0)
         counters[classification] += 1
-        retrieval = result.get("retrieval") if isinstance(result, Mapping) else None
-        retrieval_paths = {
-            str(row.get("path") or "")
-            for row in (retrieval or ())
-            if isinstance(row, Mapping)
-        }
-        if classification in {"PASS", "AMBIGUOUS_EXPECTED", "OVER_AMBIGUOUS"}:
-            failure_stage = "CORRECT"
-        elif expected_path and expected_path not in retrieval_paths:
-            failure_stage = "RETRIEVAL_MISS"
-        elif classification in {"FALSE_UNIQUE", "WRONG_AMBIGUOUS", "NO_ANSWER"}:
-            failure_stage = "AMBIGUITY_ERROR"
-        else:
-            failure_stage = "ACTION_PROJECTION_DISPLACEMENT"
         seen.add(case_id)
-        rows.append(
-            {
-                "id": case_id,
-                "classification": classification,
-                "failure_stage": failure_stage,
-                "actual_edit_path": actual_path,
-                "actual_edit_qualname": actual_qualname,
-                "actual_ambiguous": ambiguous,
-                "expected_edit_path": expected_path,
-                "expected_edit_qualname": expected_qualname,
-                "expected_ambiguous": expected_ambiguous,
-            }
-        )
+        rows.append(row)
 
     missing = sorted(set(map(str, expected)) - seen)
     return {

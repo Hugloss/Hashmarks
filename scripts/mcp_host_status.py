@@ -95,6 +95,34 @@ def _is_uv_registration(command: Any, args: Any = None) -> bool:
     return command == "uv" and args == EXPECTED_UV_ARGS
 
 
+def _receipt_registration_check(
+    data: dict[str, Any], workspace: Path, registration_path: Path
+) -> Check | None:
+    registration = data.get("source_project_registration")
+    if not isinstance(registration, dict):
+        return Check("STALE", "receipt predates project-registration binding")
+    try:
+        relative_path = registration_path.relative_to(workspace).as_posix()
+    except ValueError:
+        return Check("STALE", "registration path is outside workspace")
+    if registration.get("path") != relative_path or not registration_path.is_file():
+        return Check("STALE", "project registration changed")
+    if registration.get("sha256") != _sha256(registration_path):
+        return Check("STALE", "project registration bytes changed")
+    return None
+
+
+def _receipt_host_check(
+    data: dict[str, Any], host: str, installed: Check
+) -> Check | None:
+    host_receipt = data.get("host")
+    if not isinstance(host_receipt, dict) or host_receipt.get("name") != host:
+        return Check("STALE", "receipt predates host-version binding")
+    if installed.status == "PASS" and host_receipt.get("version") != installed.detail:
+        return Check("STALE", "installed host version changed")
+    return None
+
+
 def _latest_receipt_call(
     workspace: Path,
     host: str,
@@ -114,23 +142,12 @@ def _latest_receipt_call(
     if data.get("source_repository_identity") != candidate_identity:
         return Check("STALE", "candidate source identity changed")
 
-    registration = data.get("source_project_registration")
-    if not isinstance(registration, dict):
-        return Check("STALE", "receipt predates project-registration binding")
-    try:
-        relative_path = registration_path.relative_to(workspace).as_posix()
-    except ValueError:
-        return Check("STALE", "registration path is outside workspace")
-    if registration.get("path") != relative_path or not registration_path.is_file():
-        return Check("STALE", "project registration changed")
-    if registration.get("sha256") != _sha256(registration_path):
-        return Check("STALE", "project registration bytes changed")
-
-    host_receipt = data.get("host")
-    if not isinstance(host_receipt, dict) or host_receipt.get("name") != host:
-        return Check("STALE", "receipt predates host-version binding")
-    if installed.status == "PASS" and host_receipt.get("version") != installed.detail:
-        return Check("STALE", "installed host version changed")
+    for check in (
+        _receipt_registration_check(data, workspace, registration_path),
+        _receipt_host_check(data, host, installed),
+    ):
+        if check is not None:
+            return check
 
     completed_at = data.get("completed_at")
     if not isinstance(completed_at, str) or not completed_at.strip():
@@ -284,6 +301,35 @@ def _summarize_failure(result: subprocess.CompletedProcess[str]) -> str:
     return text[:180]
 
 
+def _probe_codex_discovery(
+    workspace: Path, installed: Check, registration: Check
+) -> Check:
+    if installed.status != "PASS" or registration.status != "PASS":
+        return Check("NOT CHECKED")
+    result = _run(["codex", "mcp", "get", "hashmarks", "--json"], cwd=workspace)
+    if _codex_discovery_ok(result):
+        return Check("PASS")
+    trusted = _run(
+        [
+            "codex",
+            "-c",
+            _codex_trust_override(workspace),
+            "mcp",
+            "get",
+            "hashmarks",
+            "--json",
+        ],
+        cwd=workspace,
+    )
+    if _codex_discovery_ok(trusted):
+        return Check(
+            "PROJECT TRUST REQUIRED",
+            "registration is valid; open Codex in this repository and trust the project once",
+        )
+    detail = _summarize_failure(result) or _summarize_failure(trusted)
+    return Check("FAIL", detail)
+
+
 def _codex(workspace: Path, candidate_identity: str) -> HostStatus:
     installed = _version("codex", cwd=workspace)
     path = workspace / ".codex" / "config.toml"
@@ -312,32 +358,7 @@ def _codex(workspace: Path, candidate_identity: str) -> HostStatus:
         if path.exists()
         else Check("NOT REGISTERED")
     )
-    discovery = Check("NOT CHECKED")
-    if installed.status == "PASS" and registration.status == "PASS":
-        result = _run(["codex", "mcp", "get", "hashmarks", "--json"], cwd=workspace)
-        if _codex_discovery_ok(result):
-            discovery = Check("PASS")
-        else:
-            trusted = _run(
-                [
-                    "codex",
-                    "-c",
-                    _codex_trust_override(workspace),
-                    "mcp",
-                    "get",
-                    "hashmarks",
-                    "--json",
-                ],
-                cwd=workspace,
-            )
-            if _codex_discovery_ok(trusted):
-                discovery = Check(
-                    "PROJECT TRUST REQUIRED",
-                    "registration is valid; open Codex in this repository and trust the project once",
-                )
-            else:
-                detail = _summarize_failure(result) or _summarize_failure(trusted)
-                discovery = Check("FAIL", detail)
+    discovery = _probe_codex_discovery(workspace, installed, registration)
     return HostStatus(
         installed,
         registration,

@@ -68,34 +68,33 @@ def collect(*, sizes: tuple[int, ...] = (10, 50, 100, 500)) -> dict[str, object]
             workspace.mkdir()
             task, expected = _materialize(workspace, distractors, feature=40 + offset)
             with CodeMap(workspace) as codemap:
+                timings = {}
                 started = time.perf_counter()
                 codemap.sync()
-                sync_ms = (time.perf_counter() - started) * 1000.0
+                timings["sync_ms"] = (time.perf_counter() - started) * 1000.0
                 started = time.perf_counter()
                 action = codemap.task_action_map(task, limit=20)
-                action_ms = (time.perf_counter() - started) * 1000.0
+                timings["action_ms"] = (time.perf_counter() - started) * 1000.0
                 relevance = action["verification_relevance"]
                 selected = (
                     relevance.get("selected") if isinstance(relevance, dict) else None
                 )
-                selected_path = (
-                    str(selected.get("path") or "")
+                paths = {
+                    "selected": str(selected.get("path") or "")
                     if isinstance(selected, dict)
-                    else ""
-                )
-                canonical_path = (
-                    str(relevance.get("current_canonical_verify") or "")
+                    else "",
+                    "canonical": str(relevance.get("current_canonical_verify") or "")
                     if isinstance(relevance, dict)
-                    else ""
-                )
+                    else "",
+                }
                 plan = (
                     codemap.verification_plan(
-                        selected_path,
+                        paths["selected"],
                         symbol=(str(selected.get("test_symbol") or "") or None)
                         if isinstance(selected, dict)
                         else None,
                     )
-                    if selected_path
+                    if paths["selected"]
                     else {"available": False}
                 )
             rows.append(
@@ -104,18 +103,17 @@ def collect(*, sizes: tuple[int, ...] = (10, 50, 100, 500)) -> dict[str, object]
                     "total_test_surfaces": distractors + 1,
                     "task_sha256": hashlib.sha256(task.encode("utf-8")).hexdigest(),
                     "expected_local_verification": expected,
-                    "baseline_canonical_verify": canonical_path,
-                    "baseline_correct": canonical_path == expected,
-                    "selected_verify": selected_path,
-                    "selected_correct": selected_path == expected,
+                    "baseline_canonical_verify": paths["canonical"],
+                    "baseline_correct": paths["canonical"] == expected,
+                    "selected_verify": paths["selected"],
+                    "selected_correct": paths["selected"] == expected,
                     "selection_changed": bool(relevance.get("selection_changed")),
                     "selection_reason": relevance.get("selection_reason"),
                     "candidate_count": int(relevance.get("candidate_count") or 0),
                     "returned_candidates": len(relevance.get("candidates") or []),
                     "verification_plan_available": bool(plan.get("available")),
                     "verification_scope": plan.get("scope"),
-                    "sync_ms": sync_ms,
-                    "action_ms": action_ms,
+                    **timings,
                 }
             )
     finally:

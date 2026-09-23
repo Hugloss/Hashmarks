@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -325,7 +326,48 @@ def _opencode_version(version_text: str) -> tuple[int, int]:
     return version
 
 
-def _host_gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
+@dataclass(frozen=True)
+class SourceBinding:
+    registration: Path
+    repository_identity: str
+    opencode_version: str
+
+
+@dataclass(frozen=True)
+class HostRuntime:
+    wheel: Path
+    versions: dict[str, str]
+    repo: Path
+    mcp_list: subprocess.CompletedProcess[str]
+    mcp_config_path: str
+    opencode_env: dict[str, str]
+
+
+@dataclass(frozen=True)
+class PhaseOneResult:
+    session_id: str
+    generation: int
+    evidence: dict[str, Any]
+    evidence_receipt: dict[str, Any]
+    impact: dict[str, Any]
+    found_paths: set[str]
+
+
+@dataclass(frozen=True)
+class PhaseTwoResult:
+    generation: int
+    post_change: dict[str, Any]
+    path_changes: list[Any]
+
+
+@dataclass(frozen=True)
+class GateEvidence:
+    phase_one: PhaseOneResult
+    phase_two: PhaseTwoResult
+    logs: tuple[Path, Path]
+
+
+def _source_binding(args: argparse.Namespace, project_root: Path) -> SourceBinding:
     from hashmarks.test_shards import repository_content_identity
 
     if shutil.which(args.opencode) is None:
@@ -339,194 +381,246 @@ def _host_gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
     source_registration = project_root / "opencode.json"
     if not source_registration.is_file():
         raise HostGateError("project opencode.json registration is missing")
-    source_repository_identity = repository_content_identity(
-        project_root,
-        excluded_paths=(project_root / "dist",),
+    return SourceBinding(
+        registration=source_registration,
+        repository_identity=repository_content_identity(
+            project_root,
+            excluded_paths=(project_root / "dist",),
+        ),
+        opencode_version=opencode_version,
     )
 
+
+def _build_host_runtime(
+    args: argparse.Namespace, project_root: Path, tmp: Path
+) -> HostRuntime:
+    build_dir = tmp / "dist"
+    build_dir.mkdir()
+    _run([args.uv, "build", "--out-dir", str(build_dir)], cwd=project_root)
+    wheels = sorted(build_dir.glob("*.whl"))
+    if len(wheels) != 1:
+        raise HostGateError(f"expected exactly one wheel, found {len(wheels)}")
+    wheel = wheels[0]
+    venv = tmp / "venv"
+    _run([args.uv, "venv", "--python", args.python, str(venv)], cwd=project_root)
+    python = _venv_executable(venv, "python")
+    hashmarks = _venv_executable(venv, "hashmarks")
+    _run(
+        [args.uv, "pip", "install", "--python", str(python), f"{wheel}[mcp]"],
+        cwd=project_root,
+    )
+    repo = tmp / "repo"
+    repo.mkdir()
+    _write_fixture(repo)
+    mcp_list, config_path, opencode_env = _configure_opencode_mcp(
+        args.opencode, repo=repo, hashmarks=hashmarks
+    )
+    return HostRuntime(
+        wheel=wheel,
+        versions=_package_versions(python),
+        repo=repo,
+        mcp_list=mcp_list,
+        mcp_config_path=config_path,
+        opencode_env=opencode_env,
+    )
+
+
+def _run_phase_one(
+    args: argparse.Namespace, runtime: HostRuntime, log_path: Path
+) -> PhaseOneResult:
+    completed = _opencode_run(
+        args.opencode,
+        repo=runtime.repo,
+        model=args.model,
+        prompt=_phase1_prompt(),
+        env=runtime.opencode_env,
+    )
+    log_path.write_text(completed.stdout, encoding="utf-8")
+    events = _parse_jsonl(completed.stdout)
+    tools = _assert_completed_tool_set(
+        events,
+        {
+            "hashmarks_repository_context",
+            "hashmarks_find",
+            "hashmarks_task_evidence",
+            "hashmarks_change_impact",
+        },
+    )
+    context = _tool_payload(
+        tools["hashmarks_repository_context"], "hashmarks.repository-capsule.v1"
+    )
+    find = _tool_payload(tools["hashmarks_find"], "hashmarks.mcp-find.v1")
+    evidence = _tool_payload(
+        tools["hashmarks_task_evidence"], "hashmarks.task-evidence.v1"
+    )
+    impact = _tool_payload(
+        tools["hashmarks_change_impact"], "hashmarks.task-change-impact.v1"
+    )
+    found_paths = {
+        str(row.get("path")) for row in find.get("results", []) if isinstance(row, dict)
+    }
+    if CHANGED_PATH not in found_paths:
+        raise HostGateError(
+            f"OpenCode-hosted Hashmarks find did not return {CHANGED_PATH}"
+        )
+    if evidence.get("edit") != CHANGED_PATH:
+        raise HostGateError(
+            f"task_evidence selected unexpected edit path: {evidence.get('edit')!r}"
+        )
+    generation = context.get("generation")
+    evidence_receipt = evidence.get("evidence_receipt")
+    if not isinstance(generation, int) or not isinstance(evidence_receipt, dict):
+        raise HostGateError("phase 1 did not expose generation-bound evidence")
+    if evidence_receipt.get("codemap_generation") != generation:
+        raise HostGateError(
+            "task_evidence generation does not match repository_context"
+        )
+    return PhaseOneResult(
+        session_id=_session_id(events),
+        generation=generation,
+        evidence=evidence,
+        evidence_receipt=evidence_receipt,
+        impact=impact,
+        found_paths=found_paths,
+    )
+
+
+def _run_phase_two(
+    args: argparse.Namespace,
+    runtime: HostRuntime,
+    phase_one: PhaseOneResult,
+    log_path: Path,
+) -> PhaseTwoResult:
+    (runtime.repo / CHANGED_PATH).write_text(
+        "def flare041(value: int) -> int:\n    return value + 2\n",
+        encoding="utf-8",
+    )
+    completed = _opencode_run(
+        args.opencode,
+        repo=runtime.repo,
+        model=args.model,
+        prompt=_phase2_prompt(phase_one.evidence),
+        env=runtime.opencode_env,
+        session_id=phase_one.session_id,
+    )
+    log_path.write_text(completed.stdout, encoding="utf-8")
+    events = _parse_jsonl(completed.stdout)
+    if _session_id(events) != phase_one.session_id:
+        raise HostGateError("OpenCode did not resume the phase 1 session")
+    tools = _assert_completed_tool_set(
+        events, {"hashmarks_post_change", "hashmarks_repository_context"}
+    )
+    post = _tool_payload(
+        tools["hashmarks_post_change"], "hashmarks.task-post-change-delta.v1"
+    )
+    context = _tool_payload(
+        tools["hashmarks_repository_context"], "hashmarks.repository-capsule.v1"
+    )
+    generation = context.get("generation")
+    if post.get("status") != "changed":
+        raise HostGateError(
+            f"post_change status was not changed: {post.get('status')!r}"
+        )
+    if post.get("generation_before") != phase_one.generation:
+        raise HostGateError(
+            "post_change generation_before does not match pre-edit generation"
+        )
+    if not isinstance(generation, int) or generation <= phase_one.generation:
+        raise HostGateError(
+            "repository generation did not advance after external mutation"
+        )
+    if post.get("generation_after") != generation:
+        raise HostGateError(
+            "post_change generation_after does not match final repository_context"
+        )
+    changes = post.get("path_changes")
+    if not isinstance(changes, list) or not any(
+        isinstance(row, dict)
+        and row.get("path") == CHANGED_PATH
+        and row.get("state") == "changed"
+        for row in changes
+    ):
+        raise HostGateError("post_change did not report the externally changed path")
+    return PhaseTwoResult(generation=generation, post_change=post, path_changes=changes)
+
+
+def _gate_receipt(
+    args: argparse.Namespace,
+    project_root: Path,
+    source: SourceBinding,
+    runtime: HostRuntime,
+    evidence: GateEvidence,
+) -> dict[str, Any]:
+    phase_one = evidence.phase_one
+    phase_two = evidence.phase_two
+    return {
+        "schema": "hashmarks.opencode-mcp-host-gate.v1",
+        "status": "PASS",
+        "completed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "source_repository_identity": source.repository_identity,
+        "source_project_registration": {
+            "path": source.registration.relative_to(project_root).as_posix(),
+            "sha256": _sha256(source.registration),
+        },
+        "host": {"name": "opencode", "version": source.opencode_version},
+        "opencode_version": source.opencode_version,
+        "model": args.model,
+        "python_selector": args.python,
+        "installed_versions": runtime.versions,
+        "wheel": {"name": runtime.wheel.name, "sha256": _sha256(runtime.wheel)},
+        "mcp_list": runtime.mcp_list.stdout.strip() or runtime.mcp_list.stderr.strip(),
+        "opencode_mcp_config_path": runtime.mcp_config_path,
+        "session_id": phase_one.session_id,
+        "observed_tools": sorted(EXPECTED_HASHMARKS_TOOLS),
+        "phase1": {
+            "generation": phase_one.generation,
+            "find_paths": sorted(phase_one.found_paths),
+            "task_evidence_identity": phase_one.evidence_receipt.get(
+                "evidence_identity"
+            ),
+            "impact_schema": phase_one.impact.get("schema"),
+        },
+        "phase2": {
+            "generation_before": phase_two.post_change.get("generation_before"),
+            "generation_after": phase_two.post_change.get("generation_after"),
+            "status": phase_two.post_change.get("status"),
+            "invalidated": phase_two.post_change.get("invalidated"),
+            "path_changes": phase_two.path_changes,
+        },
+        "logs": {
+            "phase1": {
+                "path": str(evidence.logs[0]),
+                "sha256": _sha256(evidence.logs[0]),
+            },
+            "phase2": {
+                "path": str(evidence.logs[1]),
+                "sha256": _sha256(evidence.logs[1]),
+            },
+        },
+    }
+
+
+def _host_gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
+    source = _source_binding(args, project_root)
     receipt_path = Path(args.receipt).resolve()
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
-    phase1_log = receipt_path.with_name(receipt_path.stem + "-phase1.jsonl")
-    phase2_log = receipt_path.with_name(receipt_path.stem + "-phase2.jsonl")
-
+    logs = (
+        receipt_path.with_name(receipt_path.stem + "-phase1.jsonl"),
+        receipt_path.with_name(receipt_path.stem + "-phase2.jsonl"),
+    )
     with tempfile.TemporaryDirectory(
         prefix="hashmarks-opencode-host-gate-"
     ) as tmp_text:
-        tmp = Path(tmp_text)
-        build_dir = tmp / "dist"
-        build_dir.mkdir()
-        _run([args.uv, "build", "--out-dir", str(build_dir)], cwd=project_root)
-        wheels = sorted(build_dir.glob("*.whl"))
-        if len(wheels) != 1:
-            raise HostGateError(f"expected exactly one wheel, found {len(wheels)}")
-        wheel = wheels[0]
-
-        venv = tmp / "venv"
-        _run([args.uv, "venv", "--python", args.python, str(venv)], cwd=project_root)
-        python = _venv_executable(venv, "python")
-        hashmarks = _venv_executable(venv, "hashmarks")
-        _run(
-            [args.uv, "pip", "install", "--python", str(python), f"{wheel}[mcp]"],
-            cwd=project_root,
+        runtime = _build_host_runtime(args, project_root, Path(tmp_text))
+        phase_one = _run_phase_one(args, runtime, logs[0])
+        phase_two = _run_phase_two(args, runtime, phase_one, logs[1])
+        return _gate_receipt(
+            args,
+            project_root,
+            source,
+            runtime,
+            GateEvidence(phase_one=phase_one, phase_two=phase_two, logs=logs),
         )
-        versions = _package_versions(python)
-
-        repo = tmp / "repo"
-        repo.mkdir()
-        _write_fixture(repo)
-        mcp_list, mcp_config_path, opencode_env = _configure_opencode_mcp(
-            args.opencode,
-            repo=repo,
-            hashmarks=hashmarks,
-        )
-
-        phase1 = _opencode_run(
-            args.opencode,
-            repo=repo,
-            model=args.model,
-            prompt=_phase1_prompt(),
-            env=opencode_env,
-        )
-        phase1_log.write_text(phase1.stdout, encoding="utf-8")
-        events1 = _parse_jsonl(phase1.stdout)
-        session_id = _session_id(events1)
-        tools1 = _assert_completed_tool_set(
-            events1,
-            {
-                "hashmarks_repository_context",
-                "hashmarks_find",
-                "hashmarks_task_evidence",
-                "hashmarks_change_impact",
-            },
-        )
-        context1 = _tool_payload(
-            tools1["hashmarks_repository_context"], "hashmarks.repository-capsule.v1"
-        )
-        find1 = _tool_payload(tools1["hashmarks_find"], "hashmarks.mcp-find.v1")
-        evidence = _tool_payload(
-            tools1["hashmarks_task_evidence"], "hashmarks.task-evidence.v1"
-        )
-        impact = _tool_payload(
-            tools1["hashmarks_change_impact"], "hashmarks.task-change-impact.v1"
-        )
-        found_paths = {
-            str(row.get("path"))
-            for row in find1.get("results", [])
-            if isinstance(row, dict)
-        }
-        if CHANGED_PATH not in found_paths:
-            raise HostGateError(
-                f"OpenCode-hosted Hashmarks find did not return {CHANGED_PATH}"
-            )
-        if evidence.get("edit") != CHANGED_PATH:
-            raise HostGateError(
-                f"task_evidence selected unexpected edit path: {evidence.get('edit')!r}"
-            )
-
-        generation_before = context1.get("generation")
-        receipt = evidence.get("evidence_receipt")
-        if not isinstance(generation_before, int) or not isinstance(receipt, dict):
-            raise HostGateError("phase 1 did not expose generation-bound evidence")
-        if receipt.get("codemap_generation") != generation_before:
-            raise HostGateError(
-                "task_evidence generation does not match repository_context"
-            )
-
-        source = repo / CHANGED_PATH
-        source.write_text(
-            "def flare041(value: int) -> int:\n    return value + 2\n",
-            encoding="utf-8",
-        )
-
-        phase2 = _opencode_run(
-            args.opencode,
-            repo=repo,
-            model=args.model,
-            prompt=_phase2_prompt(evidence),
-            session_id=session_id,
-        )
-        phase2_log.write_text(phase2.stdout, encoding="utf-8")
-        events2 = _parse_jsonl(phase2.stdout)
-        if _session_id(events2) != session_id:
-            raise HostGateError("OpenCode did not resume the phase 1 session")
-        tools2 = _assert_completed_tool_set(
-            events2,
-            {"hashmarks_post_change", "hashmarks_repository_context"},
-        )
-        post = _tool_payload(
-            tools2["hashmarks_post_change"], "hashmarks.task-post-change-delta.v1"
-        )
-        context2 = _tool_payload(
-            tools2["hashmarks_repository_context"], "hashmarks.repository-capsule.v1"
-        )
-        generation_after = context2.get("generation")
-        if post.get("status") != "changed":
-            raise HostGateError(
-                f"post_change status was not changed: {post.get('status')!r}"
-            )
-        if post.get("generation_before") != generation_before:
-            raise HostGateError(
-                "post_change generation_before does not match pre-edit generation"
-            )
-        if (
-            not isinstance(generation_after, int)
-            or generation_after <= generation_before
-        ):
-            raise HostGateError(
-                "repository generation did not advance after external mutation"
-            )
-        if post.get("generation_after") != generation_after:
-            raise HostGateError(
-                "post_change generation_after does not match final repository_context"
-            )
-        changes = post.get("path_changes")
-        if not isinstance(changes, list) or not any(
-            isinstance(row, dict)
-            and row.get("path") == CHANGED_PATH
-            and row.get("state") == "changed"
-            for row in changes
-        ):
-            raise HostGateError(
-                "post_change did not report the externally changed path"
-            )
-
-        return {
-            "schema": "hashmarks.opencode-mcp-host-gate.v1",
-            "status": "PASS",
-            "completed_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-            "source_repository_identity": source_repository_identity,
-            "source_project_registration": {
-                "path": source_registration.relative_to(project_root).as_posix(),
-                "sha256": _sha256(source_registration),
-            },
-            "host": {"name": "opencode", "version": opencode_version},
-            "opencode_version": opencode_version,
-            "model": args.model,
-            "python_selector": args.python,
-            "installed_versions": versions,
-            "wheel": {"name": wheel.name, "sha256": _sha256(wheel)},
-            "mcp_list": mcp_list.stdout.strip() or mcp_list.stderr.strip(),
-            "opencode_mcp_config_path": mcp_config_path,
-            "session_id": session_id,
-            "observed_tools": sorted(EXPECTED_HASHMARKS_TOOLS),
-            "phase1": {
-                "generation": generation_before,
-                "find_paths": sorted(found_paths),
-                "task_evidence_identity": receipt.get("evidence_identity"),
-                "impact_schema": impact.get("schema"),
-            },
-            "phase2": {
-                "generation_before": post.get("generation_before"),
-                "generation_after": post.get("generation_after"),
-                "status": post.get("status"),
-                "invalidated": post.get("invalidated"),
-                "path_changes": changes,
-            },
-            "logs": {
-                "phase1": {"path": str(phase1_log), "sha256": _sha256(phase1_log)},
-                "phase2": {"path": str(phase2_log), "sha256": _sha256(phase2_log)},
-            },
-        }
 
 
 def _parser() -> argparse.ArgumentParser:

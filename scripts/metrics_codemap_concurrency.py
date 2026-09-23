@@ -82,9 +82,13 @@ def probe(
             wall_ms = (time.perf_counter() - started) * 1000.0
             samples = [item for group in nested for item in group]
             latencies = [float(item["elapsed_ms"]) for item in samples]
-            generations = {int(item["generation"]) for item in samples}
-            decisions = {str(item["decision_generation"]) for item in samples}
-            targets = {(item["edit_path"], item["verify_path"]) for item in samples}
+            observations = {
+                "generations": {int(item["generation"]) for item in samples},
+                "decisions": {str(item["decision_generation"]) for item in samples},
+                "targets": {
+                    (item["edit_path"], item["verify_path"]) for item in samples
+                },
+            }
             rows.append(
                 {
                     "concurrency": concurrency,
@@ -93,11 +97,12 @@ def probe(
                     "p50_ms": statistics.median(latencies),
                     "p95_ms": _percentile(latencies, 0.95),
                     "p99_ms": _percentile(latencies, 0.99),
-                    "generation_count": len(generations),
-                    "decision_generation_count": len(decisions),
-                    "target_pair_count": len(targets),
-                    "generation_consistent": len(generations) == 1,
-                    "deterministic": len(decisions) == 1 and len(targets) == 1,
+                    "generation_count": len(observations["generations"]),
+                    "decision_generation_count": len(observations["decisions"]),
+                    "target_pair_count": len(observations["targets"]),
+                    "generation_consistent": len(observations["generations"]) == 1,
+                    "deterministic": len(observations["decisions"]) == 1
+                    and len(observations["targets"]) == 1,
                 }
             )
         final = control.status()

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from scripts.benchmark_shards import main as benchmark_shards_main
 from scripts.benchmark_shards_lib import (
     create_manifest,
     deterministic_shards,
@@ -149,3 +150,59 @@ def test_manifest_identity_binds_sealed_shards(tmp_path: Path) -> None:
     seal = json.loads((out / "shards" / "00000-00001.seal.json").read_text())
     assert seal["manifest_identity"] == manifest_identity(manifest)
     assert manifest["run_identity"] == "sha256:candidate-a"
+
+
+def test_benchmark_shard_cli_dispatches_complete_lifecycle(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    worker = _worker(tmp_path / "worker.py")
+    out = tmp_path / "run"
+    command = [sys.executable, str(worker), "{start}", "{end}", "{output}"]
+
+    assert (
+        benchmark_shards_main(
+            [
+                "plan",
+                "--total",
+                "2",
+                "--shard-size",
+                "2",
+                "--output-dir",
+                str(out),
+                "--run-identity",
+                "sha256:test",
+                "--",
+                *command,
+            ]
+        )
+        == 0
+    )
+    assert benchmark_shards_main(["status", "--output-dir", str(out)]) == 0
+    assert '"shards_pending": 1' in capsys.readouterr().out
+    assert benchmark_shards_main(["next", "--output-dir", str(out)]) == 0
+    assert benchmark_shards_main(["next", "--output-dir", str(out)]) == 0
+    assert "complete" in capsys.readouterr().out
+    assert benchmark_shards_main(["merge", "--output-dir", str(out)]) == 0
+    assert (out / "aggregate.json").is_file()
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [[], ["--warmup-json", '{"not":"a-list"}', "--", "worker"]],
+)
+def test_benchmark_shard_cli_rejects_invalid_plan(
+    tmp_path: Path, extra: list[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        benchmark_shards_main(
+            [
+                "plan",
+                "--total",
+                "1",
+                "--output-dir",
+                str(tmp_path / "run"),
+                "--run-identity",
+                "sha256:test",
+                *extra,
+            ]
+        )

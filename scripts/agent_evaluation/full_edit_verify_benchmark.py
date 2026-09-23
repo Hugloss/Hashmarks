@@ -81,6 +81,50 @@ def build_combined(corpus_root: Path, public: dict, target: Path) -> None:
             shutil.copytree(d, target / top, dirs_exist_ok=True)
 
 
+def _run_task(work: Path, task: dict, truth: dict, packet: dict) -> dict:
+    selected = (packet.get("edit") or {}).get("path")
+    first_edit_correct = selected == truth["expected_edit_path"]
+    attempt = {"touched": [], "originals": {}, "attempts": 1, "recovery": 0}
+    if selected and (work / selected).exists():
+        attempt["originals"][selected] = (work / selected).read_bytes()
+    edit_start = time.perf_counter()
+    changed = mutate(work / selected) if selected else False
+    edit_ms = (time.perf_counter() - edit_start) * 1000
+    if changed and selected:
+        attempt["touched"].append(selected)
+    passed, initial_verify_ms = verify(work, truth["expected_verify_path"])
+    if not passed:
+        attempt["recovery"] = 1
+        for path, content in attempt["originals"].items():
+            (work / path).write_bytes(content)
+        owner = truth["expected_edit_path"]
+        owner_original = (work / owner).read_bytes()
+        if mutate(work / owner):
+            attempt["touched"].append(owner)
+        passed, recovery_verify_ms = verify(work, truth["expected_verify_path"])
+        attempt["attempts"] += 1
+        verify_ms = initial_verify_ms + recovery_verify_ms
+        (work / owner).write_bytes(owner_original)
+    else:
+        verify_ms = initial_verify_ms
+        for path, content in attempt["originals"].items():
+            (work / path).write_bytes(content)
+    return {
+        "id": task["id"],
+        "category": truth["category"],
+        "selected_edit_path": selected,
+        "first_edit_correct": first_edit_correct,
+        "first_verification_passed": attempt["attempts"] == 1 and passed,
+        "verified_solution": passed,
+        "verification_attempts": attempt["attempts"],
+        "recovery_attempts": attempt["recovery"],
+        "files_touched": len(set(attempt["touched"])),
+        "edit_ms": edit_ms,
+        "verify_ms": verify_ms,
+        "time_to_green_ms": edit_ms + verify_ms,
+    }
+
+
 def run_lane(
     source: Path, base_repo: Path, tasks: list[dict], secret_map: dict, work: Path
 ) -> dict:
@@ -89,56 +133,7 @@ def run_lane(
     rows = []
     for task in tasks:
         tid = task["id"]
-        truth = secret_map[tid]
-        packet = packets[tid]
-        selected = (packet.get("edit") or {}).get("path")
-        first_edit_correct = selected == truth["expected_edit_path"]
-        touched = []
-        originals = {}
-        if selected and (work / selected).exists():
-            originals[selected] = (work / selected).read_bytes()
-        edit_start = time.perf_counter()
-        changed = mutate(work / selected) if selected else False
-        edit_ms = (time.perf_counter() - edit_start) * 1000
-        if changed and selected:
-            touched.append(selected)
-        passed, v1 = verify(work, truth["expected_verify_path"])
-        attempts = 1
-        recovery = 0
-        if not passed:
-            recovery = 1
-            # Restore the wrong first edit, then authority-side controlled recovery applies the actual owner.
-            for p, b in originals.items():
-                (work / p).write_bytes(b)
-            owner = truth["expected_edit_path"]
-            owner_orig = (work / owner).read_bytes()
-            changed2 = mutate(work / owner)
-            if changed2:
-                touched.append(owner)
-            passed, v2 = verify(work, truth["expected_verify_path"])
-            attempts += 1
-            verify_ms = v1 + v2
-            (work / owner).write_bytes(owner_orig)
-        else:
-            verify_ms = v1
-            for p, b in originals.items():
-                (work / p).write_bytes(b)
-        rows.append(
-            {
-                "id": tid,
-                "category": truth["category"],
-                "selected_edit_path": selected,
-                "first_edit_correct": first_edit_correct,
-                "first_verification_passed": attempts == 1 and passed,
-                "verified_solution": passed,
-                "verification_attempts": attempts,
-                "recovery_attempts": recovery,
-                "files_touched": len(set(touched)),
-                "edit_ms": edit_ms,
-                "verify_ms": verify_ms,
-                "time_to_green_ms": edit_ms + verify_ms,
-            }
-        )
+        rows.append(_run_task(work, task, secret_map[tid], packets[tid]))
     n = len(rows)
     verified = sum(r["verified_solution"] for r in rows)
     first = sum(r["first_edit_correct"] for r in rows)

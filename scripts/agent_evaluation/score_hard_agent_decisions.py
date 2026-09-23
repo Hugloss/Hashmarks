@@ -19,6 +19,51 @@ def _sha(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _freeze_packets(
+    repo: Path, tasks: list[dict[str, object]], *, token_budget: int
+) -> tuple[list[dict[str, Any]], float]:
+    frozen: list[dict[str, Any]] = []
+    with CodeMap(repo) as codemap:
+        sync_started = time.perf_counter()
+        codemap.sync()
+        sync_ms = (time.perf_counter() - sync_started) * 1000
+        for task in tasks:
+            packet = codemap.task_decision_packet(
+                str(task["query"]), token_budget=token_budget
+            )
+            frozen.append({"id": str(task["id"]), "packet": packet})
+    return frozen, sync_ms
+
+
+def _grade_packets(
+    frozen: list[dict[str, Any]], expected: dict[str, dict[str, Any]]
+) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, Any]]]]:
+    graded: list[dict[str, Any]] = []
+    categories: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for frozen_row in frozen:
+        truth = expected[frozen_row["id"]]
+        grade = evaluate_decision_packet(
+            frozen_row["packet"],
+            expected_edit_path=str(truth["expected_edit_path"]),
+            expected_verify_path=str(truth["expected_verify_path"]),
+            expected_safe=bool(truth["expected_safe"]),
+        )
+        row = {
+            "id": frozen_row["id"],
+            "category": str(truth["category"]),
+            "edit_correct": grade["edit_correct"],
+            "verify_correct": grade["verify_correct"],
+            "safety_class": grade["safety_class"],
+            "packet_consistent": grade["packet_consistent"],
+            "fully_correct": grade["fully_correct"],
+            "discrimination_needed": grade["discrimination_needed"],
+            "safe": bool(frozen_row["packet"].get("work_context", {}).get("safe")),
+        }
+        graded.append(row)
+        categories[row["category"]].append(row)
+    return graded, categories
+
+
 def run(
     repo: Path,
     public_path: Path,
@@ -36,16 +81,7 @@ def run(
     ):
         raise ValueError("PUBLIC tasks must contain exactly id/query")
     started = time.perf_counter()
-    frozen: list[dict[str, Any]] = []
-    with CodeMap(repo) as codemap:
-        sync_started = time.perf_counter()
-        codemap.sync()
-        sync_ms = (time.perf_counter() - sync_started) * 1000
-        for task in tasks:
-            packet = codemap.task_decision_packet(
-                str(task["query"]), token_budget=token_budget
-            )
-            frozen.append({"id": str(task["id"]), "packet": packet})
+    frozen, sync_ms = _freeze_packets(repo, tasks, token_budget=token_budget)
     frozen_identity = (
         "sha256:"
         + hashlib.sha256(
@@ -58,30 +94,7 @@ def run(
     expected = {str(row["id"]): row for row in secret.get("tasks") or []}
     if set(expected) != {row["id"] for row in frozen}:
         raise ValueError("SECRET task set does not match frozen PUBLIC task set")
-    graded: list[dict[str, Any]] = []
-    categories: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for frozen_row in frozen:
-        truth = expected[frozen_row["id"]]
-        grade = evaluate_decision_packet(
-            frozen_row["packet"],
-            expected_edit_path=str(truth["expected_edit_path"]),
-            expected_verify_path=str(truth["expected_verify_path"]),
-            expected_safe=bool(truth["expected_safe"]),
-        )
-        safe_packet = frozen_row["packet"].get("work_context", {}).get("safe")
-        row = {
-            "id": frozen_row["id"],
-            "category": str(truth["category"]),
-            "edit_correct": grade["edit_correct"],
-            "verify_correct": grade["verify_correct"],
-            "safety_class": grade["safety_class"],
-            "packet_consistent": grade["packet_consistent"],
-            "fully_correct": grade["fully_correct"],
-            "discrimination_needed": grade["discrimination_needed"],
-            "safe": bool(safe_packet),
-        }
-        graded.append(row)
-        categories[row["category"]].append(row)
+    graded, categories = _grade_packets(frozen, expected)
     summary = summarize_decision_qa(graded)
     category_summary = {}
     for name, rows in sorted(categories.items()):

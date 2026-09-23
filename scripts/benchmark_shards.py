@@ -54,29 +54,49 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _plan(args: argparse.Namespace) -> None:
+    command = list(args.command)
+    if command and command[0] == "--":
+        command = command[1:]
+    if not command:
+        raise SystemExit("plan requires a child command after --")
+    warmup = json.loads(args.warmup_json) if args.warmup_json else None
+    if warmup is not None and (
+        not isinstance(warmup, list)
+        or not all(isinstance(item, str) for item in warmup)
+    ):
+        raise SystemExit("--warmup-json must be a JSON array of strings")
+    manifest = create_manifest(
+        total=args.total,
+        shard_size=args.shard_size,
+        command=command,
+        id_field=args.id_field,
+        warmup_command=warmup,
+        run_identity=args.run_identity,
+    )
+    print(write_manifest(args.output_dir, manifest))  # noqa: T201 - intentional command output
+
+
+def _status(args: argparse.Namespace) -> None:
+    manifest = load_manifest(args.output_dir)
+    pending = pending_shards(args.output_dir, manifest)
+    total_shards = len(manifest["shards"])
+    result = {
+        "schema": manifest["schema"],
+        "rows_total": manifest["total"],
+        "shards_total": total_shards,
+        "shards_complete": total_shards - len(pending),
+        "shards_pending": len(pending),
+        "next": pending[0].key if pending else None,
+        "warmup_complete": warmup_complete(args.output_dir, manifest),
+    }
+    print(json.dumps(result, sort_keys=True))  # noqa: T201 - intentional command output
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command_name == "plan":
-        command = list(args.command)
-        if command and command[0] == "--":
-            command = command[1:]
-        if not command:
-            raise SystemExit("plan requires a child command after --")
-        warmup = json.loads(args.warmup_json) if args.warmup_json else None
-        if warmup is not None and (
-            not isinstance(warmup, list) or not all(isinstance(x, str) for x in warmup)
-        ):
-            raise SystemExit("--warmup-json must be a JSON array of strings")
-        manifest = create_manifest(
-            total=args.total,
-            shard_size=args.shard_size,
-            command=command,
-            id_field=args.id_field,
-            warmup_command=warmup,
-            run_identity=args.run_identity,
-        )
-        path = write_manifest(args.output_dir, manifest)
-        print(path)  # noqa: T201 - intentional command output
+        _plan(args)
         return 0
     if args.command_name == "warm":
         changed = run_warmup(args.output_dir, timeout_seconds=args.timeout_seconds)
@@ -90,20 +110,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"sealed {shard.key} ({shard.count} rows)")  # noqa: T201 - intentional command output
         return 0
     if args.command_name == "status":
-        manifest = load_manifest(args.output_dir)
-        pending = pending_shards(args.output_dir, manifest)
-        total_shards = len(manifest["shards"])
-        complete_shards = total_shards - len(pending)
-        result = {
-            "schema": manifest["schema"],
-            "rows_total": manifest["total"],
-            "shards_total": total_shards,
-            "shards_complete": complete_shards,
-            "shards_pending": len(pending),
-            "next": pending[0].key if pending else None,
-            "warmup_complete": warmup_complete(args.output_dir, manifest),
-        }
-        print(json.dumps(result, sort_keys=True))  # noqa: T201 - intentional command output
+        _status(args)
         return 0
     if args.command_name == "merge":
         path = merge_shards(args.output_dir, aggregate_name=args.aggregate_name)

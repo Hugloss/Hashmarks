@@ -13,6 +13,7 @@ from hashmarks import __version__
 from hashmarks.codemap import ChangeImpactOptions, CodeMap, expand_project_impact
 from scripts.agent_evaluation.experimentability import (
     EvidenceEconomics,
+    ExperimentRepositoryState,
     experiment_environment,
     experiment_record,
 )
@@ -282,9 +283,11 @@ def run(
             )
             environment = experiment_environment(
                 hashmarks_version=__version__,
-                repository_identity=_digest({"repo": task["repo"]}),
-                codemap_generation=codemap.store.generation(),
-                identity_generation=None,
+                repository_state=ExperimentRepositoryState(
+                    repository_identity=_digest({"repo": task["repo"]}),
+                    codemap_generation=codemap.store.generation(),
+                    identity_generation=None,
+                ),
                 provider_revisions={"declared-project-links": "current"},
                 cache_state="warm",
             )

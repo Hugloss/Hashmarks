@@ -178,6 +178,76 @@ def test_blind_worker_input_never_contains_expected_answers(tmp_path: Path) -> N
         assert any(row.get("expected_files") for row in hidden["tasks"])
 
 
+@pytest.mark.parametrize(
+    ("strategy", "result_field"),
+    [
+        ("grep", "hits"),
+        ("hashmarks", "hits"),
+        ("entry-points", "hits"),
+        ("ambiguity-reviewer", "review"),
+    ],
+)
+def test_blind_worker_runs_each_public_strategy(
+    tmp_path: Path, strategy: str, result_field: str
+) -> None:
+    from scripts.agent_evaluation.metrics_blind_worker_ab import (
+        materialize_challenge,
+        run_worker,
+    )
+
+    _name, workspace, _corpus, public = materialize_challenge(tmp_path / "challenge")[0]
+    output = tmp_path / f"{strategy}.json"
+
+    run_worker(
+        strategy=strategy,
+        workspace=workspace,
+        tasks_path=public,
+        output=output,
+        limit=20,
+    )
+
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert result["schema"] == "hashmarks.blind-worker-output.v1"
+    assert result["strategy"] == strategy
+    assert len(result["tasks"]) == 6
+    assert all(result_field in row for row in result["tasks"])
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ({"schema": "wrong", "tasks": []}, "unsupported blind worker input"),
+        (
+            {"schema": "hashmarks.blind-worker-tasks.v1", "tasks": {}},
+            "blind worker tasks must be a list",
+        ),
+        (
+            {
+                "schema": "hashmarks.blind-worker-tasks.v1",
+                "tasks": [{"id": "x", "query": "find config", "expected": []}],
+            },
+            "only id and query",
+        ),
+    ],
+)
+def test_blind_worker_rejects_invalid_public_input(
+    tmp_path: Path, payload: dict, message: str
+) -> None:
+    from scripts.agent_evaluation.metrics_blind_worker_ab import run_worker
+
+    tasks = tmp_path / "tasks.json"
+    tasks.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        run_worker(
+            strategy="grep",
+            workspace=tmp_path,
+            tasks_path=tasks,
+            output=tmp_path / "output.json",
+            limit=20,
+        )
+
+
 @pytest.mark.scale
 def test_blind_worker_ab_is_reproducible_and_scores_both_workers(
     tmp_path: Path,
@@ -290,6 +360,34 @@ def test_worker_inspection_worker_rejects_hidden_fields(tmp_path: Path) -> None:
             output=tmp_path / "out.json",
             limit=20,
         )
+
+
+@pytest.mark.parametrize("policy", ["defer-only", "inspect-then-resolve"])
+def test_worker_inspection_public_worker_contract(tmp_path: Path, policy: str) -> None:
+    from scripts.agent_evaluation.metrics_blind_worker_ab import materialize_challenge
+    from scripts.agent_evaluation.metrics_worker_inspection_ab import run_worker
+
+    _name, workspace, _corpus, public = materialize_challenge(tmp_path / "challenge")[0]
+    output = tmp_path / f"{policy}.json"
+
+    run_worker(
+        policy=policy,
+        workspace=workspace,
+        tasks_path=public,
+        output=output,
+        limit=20,
+    )
+
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert result["policy"] == policy
+    assert len(result["tasks"]) == 6
+    assert {row["action"] for row in result["tasks"]} <= {
+        "edit",
+        "no-evidence",
+        "inspect-competing-evidence",
+        "edit-after-inspection",
+        "defer-after-inspection",
+    }
 
 
 @pytest.mark.scale
@@ -504,7 +602,7 @@ def test_codex_agent_economics_preflight_reports_missing_binary() -> None:
 
 
 def test_codex_agent_economics_exec_contract_with_fake_codex(tmp_path: Path) -> None:
-    from scripts.agent_evaluation.codex_agent_economics import _run_one
+    from scripts.agent_evaluation.codex_agent_economics import CodexRunConfig, _run_one
 
     fake = tmp_path / "codex"
     fake.write_text(
@@ -520,16 +618,18 @@ def test_codex_agent_economics_exec_contract_with_fake_codex(tmp_path: Path) -> 
     (ws / "tests/test_example.py").write_text("def test_x(): pass\n")
     task = {"id": "t1", "query": "fix example"}
     value = _run_one(
-        str(fake),
+        CodexRunConfig(
+            codex=str(fake),
+            model="fake-model",
+            effort="low",
+            sandbox="read-only",
+            bridge=Path("unused"),
+            timeout_s=30,
+        ),
         "native",
         task,
         ws,
         tmp_path / "run",
-        model="fake-model",
-        effort="low",
-        sandbox="read-only",
-        bridge=Path("unused"),
-        timeout_s=30,
     )
     assert value["returncode"] == 0
     assert value["final"]["task_id"] == "t1"
@@ -543,6 +643,7 @@ def test_codex_agent_economics_exec_contract_with_fake_codex(tmp_path: Path) -> 
 def test_codex_selective_scout_rejects_path_outside_worker_visible_candidates(
     tmp_path: Path,
 ) -> None:
+    from scripts.agent_evaluation.codex_agent_economics import CodexRunConfig
     from scripts.agent_evaluation.codex_selective_scout_economics import _run_scout
 
     fake = tmp_path / "codex"
@@ -561,15 +662,18 @@ def test_codex_selective_scout_rejects_path_outside_worker_visible_candidates(
         }
     }
     result = _run_scout(
-        str(fake),
+        CodexRunConfig(
+            codex=str(fake),
+            model=None,
+            effort=None,
+            sandbox="read-only",
+            bridge=Path("unused"),
+            timeout_s=30,
+        ),
         {"id": "x", "query": "fix x"},
         ws,
         pkt,
         tmp_path / "run",
-        model=None,
-        effort=None,
-        sandbox="read-only",
-        timeout_s=30,
     )
     assert result["returncode"] == 0
     assert result["final"]["recommended_path"] is None

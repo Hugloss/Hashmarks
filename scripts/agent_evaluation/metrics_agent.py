@@ -53,12 +53,14 @@ def collect(*, files: int = 1000, budget: int = 1000) -> dict[str, object]:
         target, repo_tokens = _fixture(root, files)
         artifact_db = root / "artifact-cache.sqlite3"
         with CodeMap(root, artifact_db=artifact_db) as codemap:
-            cold, cold_s = _timed(codemap.sync)
-            hot, hot_s = _timed(codemap.sync)
-            hits, find_s = _timed(
+            syncs = {}
+            seconds = {}
+            syncs["cold"], seconds["cold_sync"] = _timed(codemap.sync)
+            syncs["hot"], seconds["hot_sync"] = _timed(codemap.sync)
+            hits, seconds["find"] = _timed(
                 lambda: codemap.find("CriticalAuthFlow expired token", limit=10)
             )
-            pack, context_s = _timed(
+            pack, seconds["context"] = _timed(
                 lambda: codemap.context(
                     "CriticalAuthFlow expired token", token_budget=budget, limit=10
                 )
@@ -70,37 +72,28 @@ def collect(*, files: int = 1000, budget: int = 1000) -> dict[str, object]:
                 + "\ndef new_branch():\n    return True\n",
                 encoding="utf-8",
             )
-            refreshed, edit_s = _timed(lambda: codemap.sync([target_path]))
+            syncs["edit"], seconds["one_file_reindex"] = _timed(
+                lambda: codemap.sync([target_path])
+            )
             stats = codemap.status()
 
-        first_hit = hits[0].qualname if hits else None
-        target_present = any(hit.qualname == target for hit in hits)
-        ratio = (
-            None if pack.estimated_tokens == 0 else repo_tokens / pack.estimated_tokens
-        )
         return {
             "schema": SCHEMA,
             "parameters": {"files": files, "budget": budget},
-            "seconds": {
-                "cold_sync": cold_s,
-                "hot_sync": hot_s,
-                "find": find_s,
-                "context": context_s,
-                "one_file_reindex": edit_s,
-            },
+            "seconds": seconds,
             "index": {
-                "cold_parsed": cold.parsed_artifacts,
-                "hot_parsed": hot.parsed_artifacts,
-                "hot_reused": hot.reused_artifacts,
-                "edit_parsed": refreshed.parsed_artifacts,
+                "cold_parsed": syncs["cold"].parsed_artifacts,
+                "hot_parsed": syncs["hot"].parsed_artifacts,
+                "hot_reused": syncs["hot"].reused_artifacts,
+                "edit_parsed": syncs["edit"].parsed_artifacts,
                 "files": stats["files"],
                 "symbols": stats["symbols"],
                 "edges": stats["edges"],
             },
             "retrieval": {
                 "target_symbol": target,
-                "target_present_top10": target_present,
-                "first_hit": first_hit,
+                "target_present_top10": any(hit.qualname == target for hit in hits),
+                "first_hit": hits[0].qualname if hits else None,
                 "confidence": pack.confidence,
                 "abstained": pack.abstained,
             },
@@ -108,7 +101,9 @@ def collect(*, files: int = 1000, budget: int = 1000) -> dict[str, object]:
                 "indexed_source_estimate": repo_tokens,
                 "context_estimate": pack.estimated_tokens,
                 "budget": budget,
-                "source_to_context_ratio": ratio,
+                "source_to_context_ratio": None
+                if pack.estimated_tokens == 0
+                else repo_tokens / pack.estimated_tokens,
             },
         }
 

@@ -7,13 +7,19 @@ import tempfile
 import time
 from pathlib import Path
 
-from hashmarks import IdentityEngine, InputManifest
+from hashmarks import InputManifest
+from hashmarks.engine import IdentityEngine
 
 
 def timed(fn):
     started = time.perf_counter()
     value = fn()
     return value, time.perf_counter() - started
+
+
+def measure(seconds: dict[str, float], name: str, fn):
+    value, seconds[name] = timed(fn)
+    return value
 
 
 def create_repo(root: Path, count: int, files_per_dir: int) -> list[str]:
@@ -50,24 +56,41 @@ def main() -> None:
             else InputManifest(tuple(paths))
         )
 
-        cold, cold_s = timed(lambda: engine.input_root(manifest))
-        hot, hot_s = timed(lambda: engine.input_root(manifest))
+        seconds: dict[str, float] = {}
+        identities = {
+            "cold": measure(seconds, "cold", lambda: engine.input_root(manifest)),
+            "hot": measure(
+                seconds, "hot_unchanged", lambda: engine.input_root(manifest)
+            ),
+        }
 
         engine.merkle.drop_hot_cache()
-        warm_scan, warm_scan_s = timed(lambda: engine.input_root(manifest))
+        identities["warm_scan"] = measure(
+            seconds,
+            "warm_scan_hot_cache_dropped",
+            lambda: engine.input_root(manifest),
+        )
 
         changed = root / paths[len(paths) // 2]
         changed.write_text("changed\n")
         engine.record_changes([changed.relative_to(root)])
-        one_edit, one_edit_s = timed(lambda: engine.input_root(manifest))
+        identities["one_edit"] = measure(
+            seconds, "one_file_edit", lambda: engine.input_root(manifest)
+        )
 
         batch_paths = paths[: min(100, len(paths))]
         for rel in batch_paths:
             (root / rel).write_text("batch-change\n")
         engine.record_changes(batch_paths)
-        batch_edit, batch_edit_s = timed(lambda: engine.input_root(manifest))
+        identities["batch_edit"] = measure(
+            seconds, "up_to_100_file_edit", lambda: engine.input_root(manifest)
+        )
 
-        _verified, verify_s = timed(lambda: engine.input_root(manifest, verify=True))
+        measure(
+            seconds,
+            "strong_verify",
+            lambda: engine.input_root(manifest, verify=True),
+        )
         engine.close()
 
         fresh = IdentityEngine(root)
@@ -76,27 +99,25 @@ def main() -> None:
             if args.manifest == "directory"
             else InputManifest(tuple(paths))
         )
-        _restart, restart_s = timed(lambda: fresh.input_root(fresh_manifest))
+        measure(
+            seconds,
+            "fresh_process_warm_cache",
+            lambda: fresh.input_root(fresh_manifest),
+        )
         fresh.close()
 
         result = {
             "files": args.files,
             "files_per_dir": args.files_per_dir,
             "manifest": args.manifest,
-            "seconds": {
-                "cold": cold_s,
-                "hot_unchanged": hot_s,
-                "warm_scan_hot_cache_dropped": warm_scan_s,
-                "one_file_edit": one_edit_s,
-                "up_to_100_file_edit": batch_edit_s,
-                "strong_verify": verify_s,
-                "fresh_process_warm_cache": restart_s,
-            },
+            "seconds": seconds,
             "identity_checks": {
-                "cold_equals_hot": cold == hot,
-                "cold_equals_warm_scan": cold == warm_scan,
-                "one_edit_changes_identity": one_edit != cold,
-                "batch_edit_changes_identity": batch_edit != one_edit,
+                "cold_equals_hot": identities["cold"] == identities["hot"],
+                "cold_equals_warm_scan": identities["cold"] == identities["warm_scan"],
+                "one_edit_changes_identity": identities["one_edit"]
+                != identities["cold"],
+                "batch_edit_changes_identity": identities["batch_edit"]
+                != identities["one_edit"],
             },
             "workspace": str(root) if args.keep else None,
         }

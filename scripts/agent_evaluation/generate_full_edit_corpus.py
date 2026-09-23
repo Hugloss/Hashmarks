@@ -31,19 +31,111 @@ def _digest(x):
     )
 
 
+def _validate_destinations(root: Path, *paths: Path) -> None:
+    for path in paths:
+        try:
+            path.relative_to(root)
+        except ValueError:
+            continue
+        raise ValueError("PUBLIC and SECRET must live outside worker roots")
+
+
+def _case(root: Path, index: int, category: str) -> tuple[dict, dict]:
+    case = {
+        "task_id": f"edit-{index:03d}",
+        "namespace": f"case_{index:03d}",
+        "behavior": f"flare{index:03d}",
+    }
+    namespace = case["namespace"]
+    behavior = case["behavior"]
+    case.update(
+        {
+            "repo": root / case["task_id"],
+            "owner": f"src/{namespace}/engine.py",
+            "route": f"src/{namespace}/route.py",
+            "legacy": f"src/{namespace}/legacy.py",
+            "config": f"src/{namespace}/policy.toml",
+            "verify": f"tests/{namespace}/test_behavior.py",
+            "engine": f"def apply_{namespace}(value: str) -> str:\n    return value + '-old'\n",
+            "route_text": f"from .engine import apply_{namespace}\n\ndef handle_{behavior}(value: str) -> str:\n    return apply_{namespace}(value)\n",
+            "legacy_text": f"def handle_{behavior}(value: str) -> str:\n    return value + '-old'\n",
+            "query": f"Fix the {behavior} accepted response so the active behavior returns the new contract value '-new'",
+        }
+    )
+    case["expected_edit"] = case["owner"]
+    _w(
+        case["repo"] / "pyproject.toml",
+        "[tool.pytest.ini_options]\ntestpaths=['tests']\n",
+    )
+    _w(case["repo"] / "src/__init__.py", "")
+    _w(case["repo"] / f"src/{namespace}/__init__.py", "")
+    if category == "duplicate-symbol-decoy":
+        case["legacy_text"] += (
+            f"\ndef apply_{namespace}(value: str) -> str:\n    return value + '-old'\n"
+        )
+    elif category == "dead-code-decoy":
+        case["legacy_text"] = (
+            f"# exact issue text: {case['query']}\n"
+            + case["legacy_text"]
+            + "\nENABLED=False\n"
+        )
+    elif category == "cross-layer-ownership":
+        _w(
+            case["repo"] / f"frontend/{namespace}/client.ts",
+            f"export const {behavior}=(v:string)=>fetch('/api/{behavior}?v='+v);\n",
+        )
+        case["query"] = (
+            f"The {behavior} frontend request still returns '-old'; fix the active "
+            "behavior owner so it returns '-new'"
+        )
+    elif category == "configuration-ownership":
+        _w(case["repo"] / case["config"], "mode = 'old'\n")
+        case["engine"] = (
+            "from pathlib import Path\n\n"
+            + f"def apply_{namespace}(value: str) -> str:\n    mode='old' if \"mode = 'old'\" in Path(__file__).with_name('policy.toml').read_text() else 'new'\n    return value + '-' + mode\n"
+        )
+        case["expected_edit"] = case["config"]
+        case["query"] = (
+            f"Change the {behavior} active-path policy from old to new so the accepted response ends '-new'"
+        )
+    elif category == "non-obvious-verification":
+        case["verify"] = f"checks/{namespace}/test_contract.py"
+        case["query"] = (
+            f"Repair {behavior} so its contract outside the default test tree accepts '-new'"
+        )
+    elif category == "vocabulary-mismatch":
+        case["query"] = (
+            f"Accepted responses for request family {behavior} must now use contract value '-new' instead of '-old'"
+        )
+    test_text = f"from src.{namespace}.route import handle_{behavior}\n\ndef test_{behavior}_contract():\n    assert handle_{behavior}('x') == 'x-new'\n"
+    for path_key, text in (
+        ("owner", case["engine"]),
+        ("route", case["route_text"]),
+        ("legacy", case["legacy_text"]),
+        ("verify", test_text),
+    ):
+        _w(case["repo"] / case[path_key], text)
+    return {
+        "id": case["task_id"],
+        "query": case["query"],
+        "repo": case["task_id"],
+    }, {
+        "id": case["task_id"],
+        "category": category,
+        "expected_edit_path": case["expected_edit"],
+        "expected_verify_path": case["verify"],
+        "expected_old": "old",
+        "expected_new": "new",
+    }
+
+
 def generate(
     root: Path, public_path: Path, secret_path: Path, *, cases_per_category: int = 10
 ):
     root = root.resolve()
     public_path = public_path.resolve()
     secret_path = secret_path.resolve()
-    for p in (public_path, secret_path):
-        try:
-            p.relative_to(root)
-        except ValueError:
-            pass
-        else:
-            raise ValueError("PUBLIC and SECRET must live outside worker roots")
+    _validate_destinations(root, public_path, secret_path)
     if root.exists():
         shutil.rmtree(root)
     root.mkdir(parents=True)
@@ -52,71 +144,9 @@ def generate(
     idx = 0
     for cat in CATEGORIES:
         for _variant in range(cases_per_category):
-            tid = f"edit-{idx:03d}"
-            ns = f"case_{idx:03d}"
-            beh = f"flare{idx:03d}"
-            repo = root / tid
-            owner = f"src/{ns}/engine.py"
-            route = f"src/{ns}/route.py"
-            legacy = f"src/{ns}/legacy.py"
-            config = f"src/{ns}/policy.toml"
-            verify = f"tests/{ns}/test_behavior.py"
-            _w(
-                repo / "pyproject.toml",
-                "[tool.pytest.ini_options]\ntestpaths=['tests']\n",
-            )
-            _w(repo / "src/__init__.py", "")
-            _w(repo / f"src/{ns}/__init__.py", "")
-            engine = f"def apply_{ns}(value: str) -> str:\n    return value + '-old'\n"
-            route_text = f"from .engine import apply_{ns}\n\ndef handle_{beh}(value: str) -> str:\n    return apply_{ns}(value)\n"
-            legacy_text = (
-                f"def handle_{beh}(value: str) -> str:\n    return value + '-old'\n"
-            )
-            query = f"Fix the {beh} accepted response so the active behavior returns the new contract value '-new'"
-            expected_edit = owner
-            if cat == "duplicate-symbol-decoy":
-                legacy_text += (
-                    f"\ndef apply_{ns}(value: str) -> str:\n    return value + '-old'\n"
-                )
-            elif cat == "dead-code-decoy":
-                legacy_text = (
-                    f"# exact issue text: {query}\n" + legacy_text + "\nENABLED=False\n"
-                )
-            elif cat == "cross-layer-ownership":
-                _w(
-                    repo / f"frontend/{ns}/client.ts",
-                    f"export const {beh}=(v:string)=>fetch('/api/{beh}?v='+v);\n",
-                )
-                query = f"The {beh} frontend request still returns '-old'; fix the active behavior owner so it returns '-new'"
-            elif cat == "configuration-ownership":
-                _w(repo / config, "mode = 'old'\n")
-                engine = (
-                    "from pathlib import Path\n\n"
-                    + f"def apply_{ns}(value: str) -> str:\n    mode='old' if \"mode = 'old'\" in Path(__file__).with_name('policy.toml').read_text() else 'new'\n    return value + '-' + mode\n"
-                )
-                expected_edit = config
-                query = f"Change the {beh} active-path policy from old to new so the accepted response ends '-new'"
-            elif cat == "non-obvious-verification":
-                verify = f"checks/{ns}/test_contract.py"
-                query = f"Repair {beh} so its contract outside the default test tree accepts '-new'"
-            elif cat == "vocabulary-mismatch":
-                query = f"Accepted responses for request family {beh} must now use contract value '-new' instead of '-old'"
-            test = f"from src.{ns}.route import handle_{beh}\n\ndef test_{beh}_contract():\n    assert handle_{beh}('x') == 'x-new'\n"
-            _w(repo / owner, engine)
-            _w(repo / route, route_text)
-            _w(repo / legacy, legacy_text)
-            _w(repo / verify, test)
-            public.append({"id": tid, "query": query, "repo": tid})
-            secret.append(
-                {
-                    "id": tid,
-                    "category": cat,
-                    "expected_edit_path": expected_edit,
-                    "expected_verify_path": verify,
-                    "expected_old": "old",
-                    "expected_new": "new",
-                }
-            )
+            public_row, secret_row = _case(root, idx, cat)
+            public.append(public_row)
+            secret.append(secret_row)
             idx += 1
     pub = {"schema": SCHEMA, "tasks": public}
     sec = {"schema": SCHEMA, "tasks": secret}

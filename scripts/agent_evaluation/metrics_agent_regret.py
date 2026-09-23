@@ -9,6 +9,7 @@ except ModuleNotFoundError:  # direct script execution
     from _module_loader import import_sibling
 import json
 from collections import Counter
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -105,6 +106,165 @@ def _event_tokens(event: dict[str, Any]) -> int:
     return int(event.get("estimated_tokens", 0))
 
 
+@dataclass
+class RegretObservations:
+    required: set[str]
+    discovered: set[str] = field(default_factory=set)
+    first_index: int | None = None
+    first_tokens: int | None = None
+    all_index: int | None = None
+    all_tokens: int | None = None
+    cumulative_tokens: int = 0
+    navigation_start_ns: int | None = None
+    navigation_finish_ns: int | None = None
+    first_evidence_started_ns: int | None = None
+    all_evidence_started_ns: int | None = None
+    searches_before: int = 0
+    reads_before: int = 0
+    searches_before_all: int = 0
+    reads_before_all: int = 0
+    read_counter: Counter[str] = field(default_factory=Counter)
+    query_counter: Counter[str] = field(default_factory=Counter)
+    irrelevant_read_tokens: int = 0
+    irrelevant_reads: int = 0
+    duplicate_query_tokens: int = 0
+    duplicate_read_tokens: int = 0
+    required_discovery_order: list[dict[str, Any]] = field(default_factory=list)
+    repeated_queries: list[dict[str, Any]] = field(default_factory=list)
+    repeated_reads: list[dict[str, Any]] = field(default_factory=list)
+
+    def _observe_timing(self, event: dict[str, Any]) -> int | None:
+        started = event.get("started_at_ns")
+        finished = event.get("finished_at_ns")
+        if isinstance(started, int) and self.navigation_start_ns is None:
+            self.navigation_start_ns = started
+        if isinstance(finished, int):
+            self.navigation_finish_ns = max(
+                self.navigation_finish_ns or finished, finished
+            )
+        return started if isinstance(started, int) else None
+
+    def _observe_query(self, index: int, event: dict[str, Any], tokens: int) -> None:
+        query = event.get("query")
+        if not isinstance(query, str) or not query.strip():
+            return
+        normalized = " ".join(query.lower().split())
+        if self.query_counter[normalized] > 0:
+            self.duplicate_query_tokens += tokens
+            self.repeated_queries.append(
+                {
+                    "query": normalized,
+                    "event_index": index,
+                    "estimated_tokens": tokens,
+                }
+            )
+        self.query_counter[normalized] += 1
+
+    def _observe_reads(self, index: int, paths: list[str], tokens: int) -> None:
+        for path in paths:
+            if self.read_counter[path] > 0:
+                self.duplicate_read_tokens += tokens
+                self.repeated_reads.append(
+                    {"path": path, "event_index": index, "estimated_tokens": tokens}
+                )
+            self.read_counter[path] += 1
+        if not any(path in self.required for path in paths):
+            self.irrelevant_reads += 1
+            self.irrelevant_read_tokens += tokens
+
+    def _observe_discovery(
+        self, index: int, paths: list[str], started_at_ns: int | None
+    ) -> None:
+        new_required = sorted((set(paths) & self.required) - self.discovered)
+        if not new_required:
+            return
+        if self.first_index is None:
+            self.first_index = index
+            self.first_tokens = self.cumulative_tokens
+            self.first_evidence_started_ns = started_at_ns
+        self.required_discovery_order.extend(
+            {
+                "path": path,
+                "event_index": index,
+                "tokens_before_discovery": self.cumulative_tokens,
+            }
+            for path in new_required
+        )
+        self.discovered.update(new_required)
+        if self.discovered == self.required and self.all_index is None:
+            self.all_index = index
+            self.all_tokens = self.cumulative_tokens
+            self.all_evidence_started_ns = started_at_ns
+
+    def observe(self, index: int, event: dict[str, Any]) -> None:
+        kind = event["kind"]
+        tokens = _event_tokens(event)
+        paths = _event_paths(event)
+        started_at_ns = self._observe_timing(event)
+        if kind in SEARCH_KINDS:
+            self._observe_query(index, event, tokens)
+        if kind in READ_KINDS:
+            self._observe_reads(index, paths, tokens)
+        if kind in DISCOVERY_KINDS:
+            self._observe_discovery(index, paths, started_at_ns)
+        if self.first_index is None:
+            self.searches_before += int(kind in SEARCH_KINDS)
+            self.reads_before += int(kind in READ_KINDS)
+        if self.all_index is None:
+            self.searches_before_all += int(kind in SEARCH_KINDS)
+            self.reads_before_all += int(kind in READ_KINDS)
+        self.cumulative_tokens += tokens
+
+    def summary(self) -> dict[str, Any]:
+        missing = sorted(self.required - self.discovered)
+        return {
+            "required_path_count": len(self.required),
+            "required_paths_discovered": len(self.discovered),
+            "required_evidence_complete": not missing,
+            "missing_required_paths": missing,
+            "tokens_before_first_required_evidence": self.first_tokens,
+            "events_before_first_required_evidence": self.first_index,
+            "searches_before_first_required_evidence": self.searches_before
+            if self.first_index is not None
+            else None,
+            "reads_before_first_required_evidence": self.reads_before
+            if self.first_index is not None
+            else None,
+            "tokens_before_all_required_evidence": self.all_tokens,
+            "events_before_all_required_evidence": self.all_index,
+            "searches_before_all_required_evidence": self.searches_before_all
+            if self.all_index is not None
+            else None,
+            "reads_before_all_required_evidence": self.reads_before_all
+            if self.all_index is not None
+            else None,
+            "duplicate_queries": sum(
+                max(0, count - 1) for count in self.query_counter.values()
+            ),
+            "duplicate_query_estimated_tokens": self.duplicate_query_tokens,
+            "duplicate_reads": sum(
+                max(0, count - 1) for count in self.read_counter.values()
+            ),
+            "duplicate_read_estimated_tokens": self.duplicate_read_tokens,
+            "irrelevant_reads": self.irrelevant_reads,
+            "irrelevant_read_estimated_tokens": self.irrelevant_read_tokens,
+            "total_estimated_exploration_tokens": self.cumulative_tokens,
+            "navigation_ms_before_first_required_evidence": _elapsed_ms(
+                self.navigation_start_ns, self.first_evidence_started_ns
+            ),
+            "navigation_ms_before_all_required_evidence": _elapsed_ms(
+                self.navigation_start_ns, self.all_evidence_started_ns
+            ),
+            "total_navigation_ms": _elapsed_ms(
+                self.navigation_start_ns, self.navigation_finish_ns
+            ),
+        }
+
+
+def _elapsed_ms(start: int | None, finish: int | None) -> float | None:
+    return None if start is None or finish is None else (finish - start) / 1_000_000.0
+
+
 def analyze(trace_path: Path, evidence_path: Path) -> dict[str, Any]:
     trace_module = _load_trace_module()
     trace = trace_module.load_trace(trace_path)
@@ -115,111 +275,9 @@ def analyze(trace_path: Path, evidence_path: Path) -> dict[str, Any]:
                 f"trace/evidence {field} mismatch: expected {evidence[field]!r}, got {trace.get(field)!r}"
             )
 
-    required = set(evidence["required_paths"])
-    discovered: set[str] = set()
-    first_index: int | None = None
-    first_tokens: int | None = None
-    all_index: int | None = None
-    all_tokens: int | None = None
-    cumulative_tokens = 0
-    navigation_start_ns: int | None = None
-    navigation_finish_ns: int | None = None
-    first_evidence_started_ns: int | None = None
-    all_evidence_started_ns: int | None = None
-    searches_before = 0
-    reads_before = 0
-    searches_before_all = 0
-    reads_before_all = 0
-    read_counter: Counter[str] = Counter()
-    query_counter: Counter[str] = Counter()
-    irrelevant_read_tokens = 0
-    irrelevant_reads = 0
-    duplicate_query_tokens = 0
-    duplicate_read_tokens = 0
-    required_discovery_order: list[dict[str, Any]] = []
-    repeated_queries: list[dict[str, Any]] = []
-    repeated_reads: list[dict[str, Any]] = []
-
+    observations = RegretObservations(set(evidence["required_paths"]))
     for index, event in enumerate(trace["events"]):
-        kind = event["kind"]
-        tokens = _event_tokens(event)
-        paths = _event_paths(event)
-        started_at_ns = event.get("started_at_ns")
-        finished_at_ns = event.get("finished_at_ns")
-        if isinstance(started_at_ns, int) and navigation_start_ns is None:
-            navigation_start_ns = started_at_ns
-        if isinstance(finished_at_ns, int):
-            navigation_finish_ns = max(
-                navigation_finish_ns or finished_at_ns, finished_at_ns
-            )
-        if kind in SEARCH_KINDS:
-            query = event.get("query")
-            if isinstance(query, str) and query.strip():
-                normalized_query = " ".join(query.lower().split())
-                if query_counter[normalized_query] > 0:
-                    duplicate_query_tokens += tokens
-                    repeated_queries.append(
-                        {
-                            "query": normalized_query,
-                            "event_index": index,
-                            "estimated_tokens": tokens,
-                        }
-                    )
-                query_counter[normalized_query] += 1
-        if kind in READ_KINDS:
-            for path in paths:
-                if read_counter[path] > 0:
-                    duplicate_read_tokens += tokens
-                    repeated_reads.append(
-                        {"path": path, "event_index": index, "estimated_tokens": tokens}
-                    )
-                read_counter[path] += 1
-            if not any(path in required for path in paths):
-                irrelevant_reads += 1
-                irrelevant_read_tokens += tokens
-
-        new_required = (
-            sorted((set(paths) & required) - discovered)
-            if kind in DISCOVERY_KINDS
-            else []
-        )
-        if new_required:
-            if first_index is None:
-                first_index = index
-                first_tokens = cumulative_tokens
-                if isinstance(started_at_ns, int):
-                    first_evidence_started_ns = started_at_ns
-            for path in new_required:
-                required_discovery_order.append(
-                    {
-                        "path": path,
-                        "event_index": index,
-                        "tokens_before_discovery": cumulative_tokens,
-                    }
-                )
-            discovered.update(new_required)
-            if discovered == required and all_index is None:
-                all_index = index
-                all_tokens = cumulative_tokens
-                if isinstance(started_at_ns, int):
-                    all_evidence_started_ns = started_at_ns
-
-        if first_index is None:
-            if kind in SEARCH_KINDS:
-                searches_before += 1
-            if kind in READ_KINDS:
-                reads_before += 1
-        if all_index is None:
-            if kind in SEARCH_KINDS:
-                searches_before_all += 1
-            if kind in READ_KINDS:
-                reads_before_all += 1
-        cumulative_tokens += tokens
-
-    duplicate_reads = sum(max(0, count - 1) for count in read_counter.values())
-    duplicate_queries = sum(max(0, count - 1) for count in query_counter.values())
-    missing = sorted(required - discovered)
-    complete = not missing
+        observations.observe(index, event)
     return {
         "schema": REPORT_SCHEMA,
         "trace_sha256": _sha256(trace_path),
@@ -230,54 +288,11 @@ def analyze(trace_path: Path, evidence_path: Path) -> dict[str, Any]:
         "mode": trace["mode"],
         "run_id": trace.get("run_id"),
         "evidence_authority_identity": evidence["evidence_authority_identity"],
-        "summary": {
-            "required_path_count": len(required),
-            "required_paths_discovered": len(discovered),
-            "required_evidence_complete": complete,
-            "missing_required_paths": missing,
-            "tokens_before_first_required_evidence": first_tokens,
-            "events_before_first_required_evidence": first_index,
-            "searches_before_first_required_evidence": searches_before
-            if first_index is not None
-            else None,
-            "reads_before_first_required_evidence": reads_before
-            if first_index is not None
-            else None,
-            "tokens_before_all_required_evidence": all_tokens,
-            "events_before_all_required_evidence": all_index,
-            "searches_before_all_required_evidence": searches_before_all
-            if all_index is not None
-            else None,
-            "reads_before_all_required_evidence": reads_before_all
-            if all_index is not None
-            else None,
-            "duplicate_queries": duplicate_queries,
-            "duplicate_query_estimated_tokens": duplicate_query_tokens,
-            "duplicate_reads": duplicate_reads,
-            "duplicate_read_estimated_tokens": duplicate_read_tokens,
-            "irrelevant_reads": irrelevant_reads,
-            "irrelevant_read_estimated_tokens": irrelevant_read_tokens,
-            "total_estimated_exploration_tokens": cumulative_tokens,
-            "navigation_ms_before_first_required_evidence": (
-                None
-                if navigation_start_ns is None or first_evidence_started_ns is None
-                else (first_evidence_started_ns - navigation_start_ns) / 1_000_000.0
-            ),
-            "navigation_ms_before_all_required_evidence": (
-                None
-                if navigation_start_ns is None or all_evidence_started_ns is None
-                else (all_evidence_started_ns - navigation_start_ns) / 1_000_000.0
-            ),
-            "total_navigation_ms": (
-                None
-                if navigation_start_ns is None or navigation_finish_ns is None
-                else (navigation_finish_ns - navigation_start_ns) / 1_000_000.0
-            ),
-        },
-        "required_discovery_order": required_discovery_order,
+        "summary": observations.summary(),
+        "required_discovery_order": observations.required_discovery_order,
         "observed_opportunities": {
-            "repeated_queries": repeated_queries,
-            "repeated_reads": repeated_reads,
+            "repeated_queries": observations.repeated_queries,
+            "repeated_reads": observations.repeated_reads,
             "note": "opportunity categories can overlap and must not be summed into a token-saving claim",
         },
     }

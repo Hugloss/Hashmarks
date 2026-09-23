@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -18,15 +19,17 @@ def _load():
 def _init(module, journal: Path) -> None:
     module.init_journal(
         journal,
-        runner_identity="runner:oh-goon:v1",
-        task_id="t1",
-        task_revision="v1",
-        repository_identity="sha256:repo",
-        mode="baseline",
-        run_id="run-1",
-        model_identity="model-x",
-        model_config_identity="sha256:model",
-        tool_map={"search": "repository_search", "read": "file_read", "edit": None},
+        module.JournalIdentity(
+            runner_identity="runner:oh-goon:v1",
+            task_id="t1",
+            task_revision="v1",
+            repository_identity="sha256:repo",
+            mode="baseline",
+            run_id="run-1",
+            model_identity="model-x",
+            model_config_identity="sha256:model",
+        ),
+        {"search": "repository_search", "read": "file_read", "edit": None},
     )
 
 
@@ -108,3 +111,61 @@ def test_finalize_rejects_sequence_gap(tmp_path: Path) -> None:
     module.record_event(journal, {"sequence": 2, "tool": "read", "path": "src/a.py"})
     with pytest.raises(ValueError, match="sequence gap"):
         module.finalize_journal(journal, tmp_path / "raw.json")
+
+
+def test_journal_cli_runs_complete_lifecycle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    module = _load()
+    journal = tmp_path / "journal"
+    tool_map = tmp_path / "tool-map.json"
+    output = tmp_path / "raw.json"
+    tool_map.write_text(json.dumps({"search": "repository_search"}), encoding="utf-8")
+    commands = [
+        [
+            "journal",
+            "init",
+            str(journal),
+            "--runner-identity",
+            "runner:test:v1",
+            "--task-id",
+            "task-1",
+            "--task-revision",
+            "v1",
+            "--repository-identity",
+            "sha256:repo",
+            "--mode",
+            "baseline",
+            "--run-id",
+            "run-1",
+            "--model-identity",
+            "model-x",
+            "--model-config-identity",
+            "sha256:model",
+            "--tool-map",
+            str(tool_map),
+        ],
+        [
+            "journal",
+            "event",
+            str(journal),
+            "--sequence",
+            "0",
+            "--tool",
+            "search",
+            "--query",
+            "owner",
+            "--fallback",
+        ],
+        ["journal", "finalize", str(journal), "--output", str(output)],
+    ]
+    for command in commands:
+        monkeypatch.setattr(sys, "argv", command)
+        module.main()
+
+    captured = capsys.readouterr().out
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["events"] == [
+        {"fallback": True, "query": "owner", "sequence": 0, "tool": "search"}
+    ]
+    assert '"schema": "hashmarks.agent-runner-log.v1"' in captured

@@ -33,6 +33,65 @@ SCHEMA = "hashmarks.bm25-constrained-economics.v1"
 FAMILY = "hashmarks-v0.10.44-constrained-bm25-a"
 
 
+def _task_report(cm, idx, task, secret, *, limit: int) -> dict[str, object]:
+    query = task["query"]
+    expected = set(secret.get("expected_files") or ())
+    entry = cm.task_entry_points(query, limit=limit)
+    recommended = [row for row in entry.get("recommended", []) if isinstance(row, dict)]
+    hashmarks_first = str(recommended[0].get("path") or "") if recommended else None
+    scores = {hit.path: hit.score for hit in idx.search(query, limit=100)}
+    admitted = [
+        (
+            scores.get(str(row.get("path") or ""), 0.0),
+            int(row.get("canonical_rank") or 999),
+            str(row.get("path") or ""),
+            str(row.get("role") or ""),
+        )
+        for row in recommended
+    ]
+    constrained = (
+        max(admitted, key=lambda item: (item[0], -item[1], item[2]))[2]
+        if admitted
+        else hashmarks_first
+    )
+    ambiguity = entry.get("ambiguity", {})
+    alternatives = (
+        list(ambiguity.get("alternatives", []))
+        if isinstance(ambiguity, dict) and ambiguity.get("ambiguous")
+        else []
+    )
+    resolution = (
+        _resolve_after_inspection(query, alternatives)
+        if alternatives
+        else {"resolved": False, "target": None}
+    )
+    role_resolved = (
+        str(resolution.get("target") or hashmarks_first)
+        if resolution.get("resolved")
+        else hashmarks_first
+    )
+    return {
+        "id": task["id"],
+        "hashmarks_first": hashmarks_first,
+        "constrained_bm25_first": constrained,
+        "role_resolved_first": role_resolved,
+        "correct_hashmarks": hashmarks_first in expected,
+        "correct_constrained_bm25": constrained in expected,
+        "correct_role_resolved": role_resolved in expected,
+        "admitted_candidates": [
+            {
+                "path": path,
+                "role": role,
+                "bm25_score": score,
+                "canonical_rank": rank,
+            }
+            for score, rank, path, role in sorted(
+                admitted, key=lambda item: (-item[0], item[1])
+            )
+        ],
+    }
+
+
 def collect(root: Path, limit: int = 20) -> dict[str, object]:
     reports = []
     for name, ws, corpus, pub in materialize_challenge(root / "challenge"):
@@ -43,66 +102,7 @@ def collect(root: Path, limit: int = 20) -> dict[str, object]:
             cm.sync()
             idx = FieldedBM25Index.build(cm)
             for task, secret in zip(public, hidden, strict=False):
-                q = task["query"]
-                expected = set(secret.get("expected_files") or ())
-                entry = cm.task_entry_points(q, limit=limit)
-                rec = [r for r in entry.get("recommended", []) if isinstance(r, dict)]
-                hm = str(rec[0].get("path") or "") if rec else None
-                scores = {h.path: h.score for h in idx.search(q, limit=100)}
-                admitted = []
-                for r in rec:
-                    path = str(r.get("path") or "")
-                    admitted.append(
-                        (
-                            scores.get(path, 0.0),
-                            int(r.get("canonical_rank") or 999),
-                            path,
-                            str(r.get("role") or ""),
-                        )
-                    )
-                constrained = (
-                    max(admitted, key=lambda x: (x[0], -x[1], x[2]))[2]
-                    if admitted
-                    else hm
-                )
-                ambiguity = entry.get("ambiguity", {})
-                alternatives = (
-                    list(ambiguity.get("alternatives", []))
-                    if isinstance(ambiguity, dict) and ambiguity.get("ambiguous")
-                    else []
-                )
-                resolution = (
-                    _resolve_after_inspection(q, alternatives)
-                    if alternatives
-                    else {"resolved": False, "target": None}
-                )
-                role_resolved = (
-                    str(resolution.get("target") or hm)
-                    if resolution.get("resolved")
-                    else hm
-                )
-                rows.append(
-                    {
-                        "id": task["id"],
-                        "hashmarks_first": hm,
-                        "constrained_bm25_first": constrained,
-                        "role_resolved_first": role_resolved,
-                        "correct_hashmarks": hm in expected,
-                        "correct_constrained_bm25": constrained in expected,
-                        "correct_role_resolved": role_resolved in expected,
-                        "admitted_candidates": [
-                            {
-                                "path": p,
-                                "role": role,
-                                "bm25_score": score,
-                                "canonical_rank": rank,
-                            }
-                            for score, rank, p, role in sorted(
-                                admitted, key=lambda x: (-x[0], x[1])
-                            )
-                        ],
-                    }
-                )
+                rows.append(_task_report(cm, idx, task, secret, limit=limit))
         reports.append(
             {
                 "name": name,

@@ -10,11 +10,24 @@ import contextlib
 import json
 import os
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 JOURNAL_SCHEMA = "hashmarks.agent-runner-journal.v1"
 RAW_SCHEMA = "hashmarks.agent-runner-log.v1"
+
+
+@dataclass(frozen=True)
+class JournalIdentity:
+    runner_identity: str
+    task_id: str
+    task_revision: str
+    repository_identity: str
+    mode: str
+    run_id: str
+    model_identity: str
+    model_config_identity: str
 
 
 def _load_normalizer() -> Any:
@@ -52,21 +65,13 @@ def _atomic_create_json(path: Path, value: dict[str, Any]) -> None:
 
 def init_journal(
     journal: Path,
-    *,
-    runner_identity: str,
-    task_id: str,
-    task_revision: str,
-    repository_identity: str,
-    mode: str,
-    run_id: str,
-    model_identity: str,
-    model_config_identity: str,
+    identity: JournalIdentity,
     tool_map: dict[str, Any],
 ) -> dict[str, Any]:
     normalizer = _load_normalizer()
     if journal.exists() and any(journal.iterdir()):
         raise ValueError(f"journal already exists and is not empty: {journal}")
-    if mode not in {"baseline", "hashmarks"}:
+    if identity.mode not in {"baseline", "hashmarks"}:
         raise ValueError("mode must be baseline or hashmarks")
     if not isinstance(tool_map, dict) or not tool_map:
         raise ValueError("tool_map must be a non-empty object")
@@ -78,15 +83,17 @@ def init_journal(
             )
     header = {
         "schema": JOURNAL_SCHEMA,
-        "runner_identity": _nonempty(runner_identity, "runner_identity"),
-        "task_id": _nonempty(task_id, "task_id"),
-        "task_revision": _nonempty(task_revision, "task_revision"),
-        "repository_identity": _nonempty(repository_identity, "repository_identity"),
-        "mode": mode,
-        "run_id": _nonempty(run_id, "run_id"),
-        "model_identity": _nonempty(model_identity, "model_identity"),
+        "runner_identity": _nonempty(identity.runner_identity, "runner_identity"),
+        "task_id": _nonempty(identity.task_id, "task_id"),
+        "task_revision": _nonempty(identity.task_revision, "task_revision"),
+        "repository_identity": _nonempty(
+            identity.repository_identity, "repository_identity"
+        ),
+        "mode": identity.mode,
+        "run_id": _nonempty(identity.run_id, "run_id"),
+        "model_identity": _nonempty(identity.model_identity, "model_identity"),
         "model_config_identity": _nonempty(
-            model_config_identity, "model_config_identity"
+            identity.model_config_identity, "model_config_identity"
         ),
         "normalization_policy_schema": normalizer.POLICY_SCHEMA,
         "normalization_policy_identity": normalizer.normalization_policy_identity(
@@ -128,19 +135,10 @@ def record_event(journal: Path, event: dict[str, Any]) -> Path:
     return target
 
 
-def finalize_journal(
-    journal: Path, output: Path, *, normalized_output: Path | None = None
-) -> dict[str, Any]:
-    normalizer = _load_normalizer()
-    header_path = journal / "header.json"
-    header = _read_json(header_path)
-    if not isinstance(header, dict) or header.get("schema") != JOURNAL_SCHEMA:
-        raise ValueError(f"unsupported journal header: {header_path}")
-    events_dir = journal / "events"
-    members = sorted(events_dir.glob("*.json"))
+def _journal_events(journal: Path) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     last = -1
-    for member in members:
+    for member in sorted((journal / "events").glob("*.json")):
         event = _read_json(member)
         if not isinstance(event, dict):
             raise ValueError(f"journal event must be an object: {member}")
@@ -160,9 +158,10 @@ def finalize_journal(
             )
         last = sequence
         events.append(event)
-    raw = {key: value for key, value in header.items() if key != "schema"}
-    raw["schema"] = RAW_SCHEMA
-    raw["events"] = events
+    return events
+
+
+def _write_validated_raw(output: Path, raw: dict[str, Any], normalizer: Any) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(
         prefix=".runner-log-", suffix=".tmp", dir=output.parent
@@ -178,6 +177,20 @@ def finalize_journal(
     finally:
         with contextlib.suppress(FileNotFoundError):
             tmp.unlink()
+
+
+def finalize_journal(
+    journal: Path, output: Path, *, normalized_output: Path | None = None
+) -> dict[str, Any]:
+    normalizer = _load_normalizer()
+    header_path = journal / "header.json"
+    header = _read_json(header_path)
+    if not isinstance(header, dict) or header.get("schema") != JOURNAL_SCHEMA:
+        raise ValueError(f"unsupported journal header: {header_path}")
+    raw = {key: value for key, value in header.items() if key != "schema"}
+    raw["schema"] = RAW_SCHEMA
+    raw["events"] = _journal_events(journal)
+    _write_validated_raw(output, raw, normalizer)
     if normalized_output is not None:
         normalized = normalizer.normalize(output)
         normalized_output.parent.mkdir(parents=True, exist_ok=True)
@@ -194,7 +207,7 @@ def _tool_map(path: Path) -> dict[str, Any]:
     return value
 
 
-def main() -> None:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Crash-safe runner-neutral agent navigation journal"
     )
@@ -232,43 +245,55 @@ def main() -> None:
     final.add_argument("--output", type=Path, required=True)
     final.add_argument("--normalized-output", type=Path)
 
-    args = parser.parse_args()
+    return parser
+
+
+def _event_payload(args: argparse.Namespace) -> dict[str, Any]:
+    payload = {
+        "sequence": args.sequence,
+        "tool": args.tool,
+        "query": args.query,
+        "path": args.path,
+        "paths": args.paths,
+        "returned_paths": args.returned_paths,
+        "evidence_paths": args.evidence_paths,
+        "bytes": args.bytes,
+        "estimated_tokens": args.estimated_tokens,
+        "model_input_tokens": args.model_input_tokens,
+        "started_at_ns": args.started_at_ns,
+        "finished_at_ns": args.finished_at_ns,
+    }
+    if args.fallback:
+        payload["fallback"] = True
+    return payload
+
+
+def _dispatch(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "init":
-        payload = init_journal(
+        return init_journal(
             args.journal,
-            runner_identity=args.runner_identity,
-            task_id=args.task_id,
-            task_revision=args.task_revision,
-            repository_identity=args.repository_identity,
-            mode=args.mode,
-            run_id=args.run_id,
-            model_identity=args.model_identity,
-            model_config_identity=args.model_config_identity,
-            tool_map=_tool_map(args.tool_map),
+            JournalIdentity(
+                runner_identity=args.runner_identity,
+                task_id=args.task_id,
+                task_revision=args.task_revision,
+                repository_identity=args.repository_identity,
+                mode=args.mode,
+                run_id=args.run_id,
+                model_identity=args.model_identity,
+                model_config_identity=args.model_config_identity,
+            ),
+            _tool_map(args.tool_map),
         )
-    elif args.command == "event":
-        event_payload = {
-            "sequence": args.sequence,
-            "tool": args.tool,
-            "query": args.query,
-            "path": args.path,
-            "paths": args.paths,
-            "returned_paths": args.returned_paths,
-            "evidence_paths": args.evidence_paths,
-            "bytes": args.bytes,
-            "estimated_tokens": args.estimated_tokens,
-            "model_input_tokens": args.model_input_tokens,
-            "started_at_ns": args.started_at_ns,
-            "finished_at_ns": args.finished_at_ns,
-        }
-        if args.fallback:
-            event_payload["fallback"] = True
-        target = record_event(args.journal, event_payload)
-        payload = {"recorded": str(target)}
-    else:
-        payload = finalize_journal(
-            args.journal, args.output, normalized_output=args.normalized_output
-        )
+    if args.command == "event":
+        target = record_event(args.journal, _event_payload(args))
+        return {"recorded": str(target)}
+    return finalize_journal(
+        args.journal, args.output, normalized_output=args.normalized_output
+    )
+
+
+def main() -> None:
+    payload = _dispatch(_parser().parse_args())
     print(json.dumps(payload, indent=2, sort_keys=True))  # noqa: T201 - intentional command output
 
 

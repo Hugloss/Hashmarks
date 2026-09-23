@@ -11,23 +11,28 @@ if __package__ in {None, ""}:
 
 from scripts.repository_evaluation.common import RUN_SCHEMA, load_json, write_json
 
+_IDENTITY_KEYS = (
+    "suite",
+    "protocol_identity",
+    "repository_identity",
+    "producer_implementation_identity",
+    "producer_artifact_identity",
+    "cases_sha256",
+)
 
-def merge_runs(runs: list[Mapping[str, object]]) -> dict[str, Any]:
-    if not runs:
-        raise ValueError("at least one repository evaluation run is required")
-    first = runs[0]
-    identity_keys = (
-        "suite",
-        "protocol_identity",
-        "repository_identity",
-        "producer_implementation_identity",
-        "producer_artifact_identity",
-        "cases_sha256",
-    )
+
+def _require_matching_identity(
+    runs: list[Mapping[str, object]], first: Mapping[str, object]
+) -> None:
     for run in runs[1:]:
-        for key in identity_keys:
+        for key in _IDENTITY_KEYS:
             if run.get(key) != first.get(key):
                 raise ValueError(f"repository evaluation run identity mismatch: {key}")
+
+
+def _merge_membership(
+    runs: list[Mapping[str, object]],
+) -> tuple[dict[str, object], int, set[int]]:
     rows: dict[str, object] = {}
     shard_count = max(int(run.get("shard_count") or 1) for run in runs)
     seen_shards: set[int] = set()
@@ -44,10 +49,19 @@ def merge_runs(runs: list[Mapping[str, object]]) -> dict[str, Any]:
                     f"duplicate or empty repository evaluation case: {case_id}"
                 )
             rows[case_id] = dict(row)
+    return rows, shard_count, seen_shards
+
+
+def merge_runs(runs: list[Mapping[str, object]]) -> dict[str, Any]:
+    if not runs:
+        raise ValueError("at least one repository evaluation run is required")
+    first = runs[0]
+    _require_matching_identity(runs, first)
+    rows, shard_count, seen_shards = _merge_membership(runs)
     expected_shards = set(range(shard_count))
     return {
         "schema": RUN_SCHEMA,
-        **{key: first.get(key) for key in identity_keys},
+        **{key: first.get(key) for key in _IDENTITY_KEYS},
         "codemap_generation": first.get("codemap_generation"),
         "reused_cases": sum(int(run.get("reused_cases") or 0) for run in runs),
         "new_cases": sum(int(run.get("new_cases") or 0) for run in runs),

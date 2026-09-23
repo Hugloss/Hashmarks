@@ -45,6 +45,35 @@ def _generation(payload: dict[str, Any]) -> int | None:
     return None
 
 
+def _surface_call(surface: HashmarksMcpSurface, lane: int) -> dict[str, Any]:
+    if lane == 0:
+        return surface.repository_context(max_areas=8)
+    if lane == 1:
+        return surface.find("flare041", limit=5)
+    if lane == 2:
+        return surface.task_evidence(
+            "change flare041 behavior and verify it",
+            limit=12,
+            per_role=3,
+            token_budget=384,
+        )
+    return surface.change_impact(
+        "change flare041 behavior and verify it",
+        ["src/feature.py"],
+        max_depth=3,
+    )
+
+
+def _generation_observation(
+    payload: dict[str, Any], last_generation: int | None
+) -> tuple[int | None, int]:
+    generation = _generation(payload)
+    if generation is None:
+        return last_generation, 0
+    regression = int(last_generation is not None and generation < last_generation)
+    return max(last_generation or generation, generation), regression
+
+
 def _worker(
     worker_id: int,
     repo_text: str,
@@ -64,31 +93,13 @@ def _worker(
         start.wait(timeout=30)
         for index in range(calls):
             try:
-                lane = index % 4
-                if lane == 0:
-                    payload = surface.repository_context(max_areas=8)
-                elif lane == 1:
-                    payload = surface.find("flare041", limit=5)
-                elif lane == 2:
-                    payload = surface.task_evidence(
-                        "change flare041 behavior and verify it",
-                        limit=12,
-                        per_role=3,
-                        token_budget=384,
-                    )
-                else:
-                    payload = surface.change_impact(
-                        "change flare041 behavior and verify it",
-                        ["src/feature.py"],
-                        max_depth=3,
-                    )
+                payload = _surface_call(surface, index % 4)
                 if "BUILDING" in json.dumps(payload, sort_keys=True):
                     building_payloads += 1
-                generation = _generation(payload)
-                if generation is not None:
-                    if last_generation is not None and generation < last_generation:
-                        generation_regressions += 1
-                    last_generation = max(last_generation or generation, generation)
+                last_generation, regression = _generation_observation(
+                    payload, last_generation
+                )
+                generation_regressions += regression
                 successes += 1
             except Exception as exc:  # qualification receipt needs exact final failures
                 errors.append(f"{type(exc).__name__}: {exc}")
@@ -149,9 +160,8 @@ def _run_round(
     ) as tmp_text:
         tmp = Path(tmp_text)
         repo = tmp / "repo"
-        state = tmp / "state"
         repo.mkdir()
-        state.mkdir()
+        (tmp / "state").mkdir()
         _fixture(repo, extra_files)
 
         context = mp.get_context("spawn")
@@ -160,7 +170,7 @@ def _run_round(
         readers = [
             context.Process(
                 target=_worker,
-                args=(index, str(repo), str(state), calls, start, queue),
+                args=(index, str(repo), str(tmp / "state"), calls, start, queue),
                 name=f"hashmarks-mcp-reader-{index}",
             )
             for index in range(workers)

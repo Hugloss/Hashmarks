@@ -57,31 +57,14 @@ def _packet_bytes(packet: dict[str, object]) -> int:
     )
 
 
-def run(
-    repo: Path,
-    public_path: Path,
-    secret_path: Path,
-    output: Path,
-    *,
-    token_budget: int = 1536,
-) -> dict[str, Any]:
-    public = json.loads(public_path.read_text(encoding="utf-8"))
-    tasks = public.get("tasks")
-    if (
-        not isinstance(tasks, list)
-        or not tasks
-        or any(set(row) != {"id", "query"} for row in tasks)
-    ):
-        raise ValueError("PUBLIC tasks must contain exactly id/query")
-    if token_budget < 1:
-        raise ValueError("token_budget must be >= 1")
-
+def _freeze_packets(
+    repo: Path, tasks: list[object], token_budget: int
+) -> tuple[list[dict[str, Any]], float]:
     frozen: list[dict[str, Any]] = []
     with CodeMap(repo) as codemap:
         sync_started = time.perf_counter()
         codemap.sync()
         sync_ms = (time.perf_counter() - sync_started) * 1000.0
-
         for task in tasks:
             started = time.perf_counter()
             packet = codemap.task_evidence(
@@ -125,8 +108,8 @@ def run(
                 }
             )
 
-        # A second identical pass measures the long-lived service/cache fast path.
-        # It runs before SECRET is opened and must not alter the frozen decisions.
+        # The second identical pass measures the long-lived service/cache fast path
+        # before SECRET is opened and without altering the frozen decisions.
         for row, task in zip(frozen, tasks, strict=True):
             started = time.perf_counter()
             repeated = codemap.task_evidence(
@@ -136,70 +119,66 @@ def run(
             row["cached_packet_identity"] = _identity(repeated)
             row["packet_identity"] = _identity(row["packet"])
             row["stable"] = row["cached_packet_identity"] == row["packet_identity"]
+    return frozen, sync_ms
 
-    frozen_identity = _identity(
-        [{"id": row["id"], "packet_identity": row["packet_identity"]} for row in frozen]
+
+def _grade_task(
+    row: dict[str, Any], truth: dict[str, Any]
+) -> tuple[dict[str, Any], str | None]:
+    packet = row["packet"]
+    candidate = _task_candidate(packet)
+    edit_correct = (
+        str(candidate.get("path") or "") if candidate is not None else ""
+    ) == str(truth["expected_edit_path"])
+    verification = _task_verification(packet)
+    plan = (
+        verification.get("plan") if isinstance(verification.get("plan"), dict) else {}
     )
+    argv = plan.get("argv")
+    surface = verification_surface(argv if isinstance(argv, list) else ())
+    verify_correct = str(surface.get("surface") or "") == str(
+        truth["expected_verify_path"]
+    )
+    ownership = (
+        packet.get("ownership") if isinstance(packet.get("ownership"), dict) else {}
+    )
+    next_read = ownership.get("next_read")
+    next_read_reason = (
+        str(next_read["reason"])
+        if isinstance(next_read, dict) and next_read.get("reason")
+        else None
+    )
+    source_budget = (
+        ownership.get("source_budget")
+        if isinstance(ownership.get("source_budget"), dict)
+        else {}
+    )
+    return {
+        "id": row["id"],
+        "category": str(truth.get("category") or "unknown"),
+        "ownership_status": str(ownership.get("status") or "unresolved"),
+        "owner_resolved": isinstance(ownership.get("owner"), dict),
+        "candidate_correct": edit_correct,
+        "verify_correct": verify_correct,
+        "fully_correct": edit_correct and verify_correct,
+        "source_complete": bool(source_budget.get("complete")),
+        "packet_bytes": int(row["packet_bytes"]),
+        "first_warm_ms": float(row["first_warm_ms"]),
+        "cached_warm_ms": float(row["cached_warm_ms"]),
+        "stable": bool(row["stable"]),
+        "provenance_complete": bool(row["provenance_complete"]),
+        "revision_current": bool(row["revision_current"]),
+        "freshness_state": str(row["freshness_state"]),
+        "selection_reason": str(row["selection_reason"]),
+    }, next_read_reason
 
-    # SECRET is opened only after every first-pass and cached-pass packet is frozen.
-    secret = json.loads(secret_path.read_text(encoding="utf-8"))
-    expected = {str(row["id"]): row for row in secret.get("tasks") or []}
-    if set(expected) != {row["id"] for row in frozen}:
-        raise ValueError("SECRET task set does not match frozen PUBLIC task set")
 
-    results: list[dict[str, Any]] = []
+def _summaries(
+    results: list[dict[str, Any]], next_read_reasons: Counter[str], sync_ms: float
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     categories: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    next_read_reasons: Counter[str] = Counter()
-    for row in frozen:
-        truth = expected[row["id"]]
-        packet = row["packet"]
-        candidate = _task_candidate(packet)
-        edit_correct = (
-            str(candidate.get("path") or "") if candidate is not None else ""
-        ) == str(truth["expected_edit_path"])
-        verification = _task_verification(packet)
-        plan = (
-            verification.get("plan")
-            if isinstance(verification.get("plan"), dict)
-            else {}
-        )
-        argv = plan.get("argv")
-        surface = verification_surface(argv if isinstance(argv, list) else ())
-        verify_correct = str(surface.get("surface") or "") == str(
-            truth["expected_verify_path"]
-        )
-        ownership = (
-            packet.get("ownership") if isinstance(packet.get("ownership"), dict) else {}
-        )
-        next_read = ownership.get("next_read")
-        if isinstance(next_read, dict) and next_read.get("reason"):
-            next_read_reasons[str(next_read["reason"])] += 1
-        source_budget = (
-            ownership.get("source_budget")
-            if isinstance(ownership.get("source_budget"), dict)
-            else {}
-        )
-        graded = {
-            "id": row["id"],
-            "category": str(truth.get("category") or "unknown"),
-            "ownership_status": str(ownership.get("status") or "unresolved"),
-            "owner_resolved": isinstance(ownership.get("owner"), dict),
-            "candidate_correct": edit_correct,
-            "verify_correct": verify_correct,
-            "fully_correct": edit_correct and verify_correct,
-            "source_complete": bool(source_budget.get("complete")),
-            "packet_bytes": int(row["packet_bytes"]),
-            "first_warm_ms": float(row["first_warm_ms"]),
-            "cached_warm_ms": float(row["cached_warm_ms"]),
-            "stable": bool(row["stable"]),
-            "provenance_complete": bool(row["provenance_complete"]),
-            "revision_current": bool(row["revision_current"]),
-            "freshness_state": str(row["freshness_state"]),
-            "selection_reason": str(row["selection_reason"]),
-        }
-        results.append(graded)
-        categories[graded["category"]].append(graded)
-
+    for row in results:
+        categories[row["category"]].append(row)
     count = len(results)
     freshness_states = Counter(str(row["freshness_state"]) for row in results)
     selection_reasons = Counter(str(row["selection_reason"]) for row in results)
@@ -236,6 +215,44 @@ def run(
         }
         for name, rows in sorted(categories.items())
     }
+    return summary, category_summary
+
+
+def run(
+    repo: Path,
+    public_path: Path,
+    secret_path: Path,
+    output: Path,
+    *,
+    token_budget: int = 1536,
+) -> dict[str, Any]:
+    public = json.loads(public_path.read_text(encoding="utf-8"))
+    tasks = public.get("tasks")
+    if (
+        not isinstance(tasks, list)
+        or not tasks
+        or any(set(row) != {"id", "query"} for row in tasks)
+    ):
+        raise ValueError("PUBLIC tasks must contain exactly id/query")
+    if token_budget < 1:
+        raise ValueError("token_budget must be >= 1")
+
+    frozen, sync_ms = _freeze_packets(repo, tasks, token_budget)
+
+    # SECRET is opened only after every first-pass and cached-pass packet is frozen.
+    secret = json.loads(secret_path.read_text(encoding="utf-8"))
+    expected = {str(row["id"]): row for row in secret.get("tasks") or []}
+    if set(expected) != {row["id"] for row in frozen}:
+        raise ValueError("SECRET task set does not match frozen PUBLIC task set")
+
+    results: list[dict[str, Any]] = []
+    next_read_reasons: Counter[str] = Counter()
+    for row in frozen:
+        graded, next_read_reason = _grade_task(row, expected[row["id"]])
+        results.append(graded)
+        if next_read_reason is not None:
+            next_read_reasons[next_read_reason] += 1
+    summary, category_summary = _summaries(results, next_read_reasons, sync_ms)
     protocol = {
         "public_fields": ["id", "query"],
         "secret_fields": [
@@ -248,7 +265,12 @@ def run(
         "source_budget_tokens": token_budget,
         "public_sha256": _sha(public_path),
         "secret_sha256": _sha(secret_path),
-        "frozen_packet_identity": frozen_identity,
+        "frozen_packet_identity": _identity(
+            [
+                {"id": row["id"], "packet_identity": row["packet_identity"]}
+                for row in frozen
+            ]
+        ),
         "exact_model_token_telemetry": False,
         "visible_measurement": "UTF-8 serialized packet bytes",
     }

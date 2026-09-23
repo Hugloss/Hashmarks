@@ -145,6 +145,30 @@ def _guided_recovery(
     return None, "no-alternative-evidence", len(hits)
 
 
+def _recovery_action(
+    policy: str,
+    workspace: Path,
+    codemap: CodeMap,
+    query: str,
+    failed_target: str,
+    limit: int,
+) -> tuple[str | None, str, int]:
+    if policy == "repeat-failed":
+        return failed_target, "repeat-prior-edit", 0
+    if policy == "fresh-research":
+        with CodeMap(workspace) as fresh:
+            fresh.sync()
+            hits = list(fresh.find_task(query, limit=limit))
+        return (
+            hits[0].path if hits else None,
+            "fresh-canonical-top1",
+            1 if hits else 0,
+        )
+    if policy == "evidence-guided-recovery":
+        return _guided_recovery(codemap, query, failed_target, limit=limit)
+    raise ValueError(f"unsupported policy: {policy}")
+
+
 def run_worker(
     *, policy: str, workspace: Path, tasks_path: Path, output: Path, limit: int
 ) -> None:
@@ -176,20 +200,9 @@ def run_worker(
             task_id = str(row.get("id") or "")
             query = str(row.get("query") or "")
             failed_target = str(row.get("failed_edit_target") or "")
-            if policy == "repeat-failed":
-                target, reason, examined = failed_target, "repeat-prior-edit", 0
-            elif policy == "fresh-research":
-                with CodeMap(workspace) as codemap:
-                    codemap.sync()
-                    hits = list(codemap.find_task(query, limit=limit))
-                target = hits[0].path if hits else None
-                reason, examined = "fresh-canonical-top1", 1 if hits else 0
-            elif policy == "evidence-guided-recovery":
-                target, reason, examined = _guided_recovery(
-                    codemap, query, failed_target, limit=limit
-                )
-            else:
-                raise ValueError(f"unsupported policy: {policy}")
+            target, reason, examined = _recovery_action(
+                policy, workspace, codemap, query, failed_target, limit
+            )
             rows.append(
                 {
                     "id": task_id,

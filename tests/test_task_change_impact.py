@@ -248,6 +248,44 @@ def test_task_change_impact_qualification_freezes_before_secret_join(
     )
 
 
+def test_task_change_impact_qualification_rejects_non_public_task_fields(
+    tmp_path: Path,
+) -> None:
+    from scripts.agent_evaluation.score_agent_change_impact import run
+
+    public = tmp_path / "public.json"
+    public.write_text(
+        json.dumps(
+            {
+                "tasks": [
+                    {"id": "case", "query": "find owner", "expected_path": "secret"}
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="exactly id/query"):
+        run(tmp_path, public, tmp_path / "secret.json", tmp_path / "output.json")
+
+
+def test_task_change_impact_qualification_rejects_secret_task_set_drift(
+    tmp_path: Path,
+) -> None:
+    from scripts.agent_evaluation.generate_hard_agent_corpus import generate
+    from scripts.agent_evaluation.score_agent_change_impact import run
+
+    repo = tmp_path / "repo"
+    public = tmp_path / "public.json"
+    secret = tmp_path / "secret.json"
+    generate(repo, public, secret, cases_per_category=1)
+    secret_payload = json.loads(secret.read_text(encoding="utf-8"))
+    secret_payload["tasks"].pop()
+    secret.write_text(json.dumps(secret_payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="does not match frozen PUBLIC task set"):
+        run(repo, public, secret, tmp_path / "output.json")
+
+
 def test_task_change_impact_reconstructs_same_package_go_owner_chain(
     tmp_path: Path,
 ) -> None:
