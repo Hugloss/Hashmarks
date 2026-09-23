@@ -16,6 +16,7 @@
 - Replace the refactoring-policy archaeology blacklist with positive regression proof for the current measured-product-value, no-parallel-phase-history, single-spelling, and responsibility-decision contract.
 - Mark every documented Make command as a phony command target; four evaluation targets could previously be shadowed by same-named filesystem entries, and a derived regression now keeps documented commands both defined and phony.
 - Replace the broad-search SQL source-text preservation test with direct `search_candidates` behavior proof for name/signature/path recall, deterministic ordering, and repeatability without freezing a specific SQL implementation.
+- Finish the hard test cleanup by replacing CLI delegation source-text assertions with parser/execution behavior proof, relying on the existing MCP server/surface error-boundary regression instead of transport-SDK substring checks, and removing regressions whose only purpose was to preserve the absence of already-deleted compatibility/history artifacts.
 - Keep only current product/reference, integration, maintainer, and qualification documentation in the live tree, and keep the changelog limited to public release history.
 
 ## 0.17.0 — External evidence correlation and real-data qualification
