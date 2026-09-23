@@ -20,6 +20,8 @@ _MAX_CHANGED_PATHS = 256
 _MAX_LIMIT = 50
 _MAX_TOKEN_BUDGET = 8_192
 _MAX_PREVIOUS_EVIDENCE_BYTES = 262_144
+_MAX_DEPENDENCY_CODEMAP_BYTES = 1_048_576
+_MAX_DEPENDENCY_QUERIES = 32
 
 _T = TypeVar("_T")
 
@@ -227,6 +229,49 @@ class HashmarksMcpSurface:
                 raise McpSurfaceError(str(exc)) from exc
 
         return self._read(correlate)
+
+    def dependency_codemap(
+        self,
+        snapshot: dict[str, Any],
+        queries: list[dict[str, Any]] | None = None,
+    ) -> dict[str, object]:
+        """Qualify and query one request-scoped dependency-resolution observation."""
+        raw_snapshot = _bounded_json(
+            snapshot,
+            name="snapshot",
+            maximum=_MAX_DEPENDENCY_CODEMAP_BYTES,
+            expected_type=dict,
+        )
+        raw_queries = [] if queries is None else queries
+        if not isinstance(raw_queries, list):
+            raise McpSurfaceError("queries must be a list")
+        if len(raw_queries) > _MAX_DEPENDENCY_QUERIES:
+            raise McpSurfaceError(
+                f"queries exceeds {_MAX_DEPENDENCY_QUERIES} entries"
+            )
+        bounded_queries = _bounded_json(
+            raw_queries,
+            name="queries",
+            maximum=_MAX_DEPENDENCY_CODEMAP_BYTES,
+            expected_type=list,
+        )
+
+        def project() -> dict[str, object]:
+            observation = self._map.dependency_resolution_evidence(raw_snapshot)
+            result: dict[str, object] = {
+                "schema": "hashmarks.mcp-dependency-codemap.v1",
+                "observation": observation,
+                "authority": "repository-intelligence-only",
+                "interpretation_authority": "consumer-owned",
+                "causation": "not-inferred",
+            }
+            if bounded_queries:
+                result["queries"] = self._map.dependency_resolution_queries(
+                    observation, bounded_queries
+                )
+            return result
+
+        return self._read(project)
 
     def post_change(
         self,
