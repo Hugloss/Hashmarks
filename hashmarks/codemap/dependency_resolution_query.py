@@ -274,9 +274,18 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
         }
         values.update(
             str(row.get("context") or "")
-            for row in relationships
-            if str(row.get("source") or "") == node_id
-            or str(row.get("target") or "") == node_id
+            for row in observation.get("relationships", ())
+            if isinstance(row, Mapping)
+            and (
+                str(row.get("source") or "") == node_id
+                or str(row.get("target") or "") == node_id
+            )
+        )
+        values.update(
+            str(value)
+            for row in observation.get("selections", ())
+            if isinstance(row, Mapping) and str(row.get("node_id") or "") == node_id
+            for value in row.get("contexts", ())
         )
         result = sorted(value for value in values if value)
     elif operation == "module-owners":
