@@ -76,6 +76,8 @@ def _walk(
     seen = {start}
     rows: list[object] = []
     omissions: list[dict[str, object]] = []
+    negative_evidence = "not-applicable"
+    source_complete = True
     visited = 0
     while queue:
         current, depth = queue.pop(0)
@@ -184,12 +186,13 @@ def _coverage_complete(
     observation: Mapping[str, object],
     *,
     context: str,
+    kind: str = "resolution-graph",
 ) -> bool:
     rows = [
         row
         for row in observation.get("coverage", ())
         if isinstance(row, Mapping)
-        and str(row.get("kind") or "") == "resolution-graph"
+        and str(row.get("kind") or "") == kind
         and (not context or str(row.get("context") or "") == context)
     ]
     return bool(rows) and all(
@@ -227,6 +230,8 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
     module = _text(request.get("module"), label="dependency query module")
     omissions: list[dict[str, object]] = []
     visited = 0
+    negative_evidence = "not-applicable"
+    source_complete = True
 
     selections = {
         str(row["node_id"]): row
@@ -285,6 +290,15 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             and (not context or str(row.get("context") or "") == context)
         ]
         result = _limited(rows, max_results=max_results, omissions=omissions)
+        source_complete = _coverage_complete(
+            observation, context=context, kind="module-ownership"
+        )
+        if not rows:
+            negative_evidence = (
+                "admissible-within-declared-scope"
+                if source_complete
+                else "not-admissible"
+            )
     else:
         if not node_id:
             raise ValueError(f"{operation} query requires node_id")
@@ -345,7 +359,10 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "max_visits": max_visits,
             "visited": visited,
         },
-        "completeness": "complete" if not omissions else "incomplete",
+        "completeness": (
+            "complete" if not omissions and source_complete else "incomplete"
+        ),
+        "negative_evidence": negative_evidence,
         "omissions": omissions,
         "authority": "qualified-external-observation",
         "causation": "not-inferred",

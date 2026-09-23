@@ -641,3 +641,53 @@ def test_v2_producer_neutral_model_accepts_uv_contexts_without_maven_semantics(
     assert packet["relationships"][0]["context"] == "dev"
     assert "groupId" not in repr(packet)
     assert "artifactId" not in repr(packet)
+
+
+def test_v2_module_owner_absence_requires_complete_ownership_coverage(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["coverage"].append(
+        {
+            "context": "compile",
+            "kind": "module-ownership",
+            "completeness": "complete",
+            "truncation": "complete",
+            "evidence_sources": ["list:compile"],
+        }
+    )
+    changed["coverage"].append(
+        {
+            "context": "runtime",
+            "kind": "module-ownership",
+            "completeness": "incomplete",
+            "truncation": "complete",
+            "evidence_sources": ["tree:runtime"],
+        }
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "module-owners",
+                    "module": "missing.module",
+                    "context": "compile",
+                },
+                {
+                    "operation": "module-owners",
+                    "module": "missing.module",
+                    "context": "runtime",
+                },
+            ],
+        )
+
+    compile_result, runtime_result = packet["results"]
+    assert compile_result["result"] == []
+    assert compile_result["negative_evidence"] == "admissible-within-declared-scope"
+    assert compile_result["completeness"] == "complete"
+    assert runtime_result["result"] == []
+    assert runtime_result["completeness"] == "incomplete"
+    assert runtime_result["negative_evidence"] == "not-admissible"
