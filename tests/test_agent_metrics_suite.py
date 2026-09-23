@@ -573,6 +573,7 @@ def test_codex_agent_economics_exec_contract_with_fake_codex(tmp_path: Path) -> 
 def test_codex_selective_scout_rejects_path_outside_worker_visible_candidates(
     tmp_path: Path,
 ) -> None:
+    from scripts.agent_evaluation.codex_agent_economics import CodexRunConfig
     from scripts.agent_evaluation.codex_selective_scout_economics import _run_scout
 
     fake = tmp_path / "codex"
@@ -591,15 +592,18 @@ def test_codex_selective_scout_rejects_path_outside_worker_visible_candidates(
         }
     }
     result = _run_scout(
-        str(fake),
+        CodexRunConfig(
+            codex=str(fake),
+            model=None,
+            effort=None,
+            sandbox="read-only",
+            bridge=Path("unused"),
+            timeout_s=30,
+        ),
         {"id": "x", "query": "fix x"},
         ws,
         pkt,
         tmp_path / "run",
-        model=None,
-        effort=None,
-        sandbox="read-only",
-        timeout_s=30,
     )
     assert result["returncode"] == 0
     assert result["final"]["recommended_path"] is None

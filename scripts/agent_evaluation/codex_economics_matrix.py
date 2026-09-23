@@ -151,11 +151,13 @@ def run(
         if v.strategy == "selective-real":
             r = collect_selective(
                 vr,
-                codex_bin=codex_bin,
-                model=v.model,
-                effort=v.effort,
-                timeout_s=timeout,
-                max_tasks=max_tasks,
+                CollectionConfig(
+                    codex_bin=codex_bin,
+                    model=v.model,
+                    effort=v.effort,
+                    timeout_s=timeout,
+                    max_tasks=max_tasks,
+                ),
             )
         else:
             r = collect_lanes(
