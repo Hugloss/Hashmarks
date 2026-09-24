@@ -143,6 +143,12 @@ class DependencyResolutionEvidenceMixin:
             snapshot.get("selections", ()), component_ids, context_set, source_ids
         )
         node_ids = {str(row["node_id"]) for row in selections}
+        selected_component_ids = {str(row["component_id"]) for row in selections}
+        orphan_components = sorted(component_ids - selected_component_ids)
+        if orphan_components:
+            raise ValueError(
+                f"component has no dependency selection: {orphan_components[0]}"
+            )
         inventory = self._dependency_inventory_v2(
             snapshot.get("inventory", ()), node_ids, context_set, source_ids
         )
