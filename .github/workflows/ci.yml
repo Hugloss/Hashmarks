@@ -13,10 +13,32 @@ permissions:
   contents: read
 
 jobs:
+  formatting:
+    name: Formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.11
+      - name: Materialize locked Ruff environment
+        run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --frozen --only-group lint --python 3.11
+      - name: Ruff format
+        run: .ruff-venv/bin/ruff format --check --diff .
+      - name: Ruff lint
+        run: .ruff-venv/bin/ruff check .
+      - name: Git whitespace
+        run: git diff --check
+
   fast-gate:
     name: Fast validation gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    needs: formatting
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -28,17 +50,6 @@ jobs:
       - run: uv python install 3.11
       - name: Check committed dependency convergence
         run: uv lock --check
-      - name: Materialize locked Ruff environment
-        run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --frozen --only-group lint --python 3.11
-      - name: Ruff formatting gate for changed Python
-        shell: bash
-        run: |
-          mapfile -t files < <(git diff --name-only --diff-filter=ACMR HEAD^1 HEAD -- '*.py')
-          if (( ${#files[@]} )); then
-            .ruff-venv/bin/ruff format --check -- "${files[@]}"
-          fi
-      - name: Ruff correctness/import gate
-        run: .ruff-venv/bin/ruff check .
       - run: uv sync --frozen --group test --python 3.11
       - name: Resolve previous-main Ruff debt baseline
         run: git show HEAD^1:ruff-debt-baseline.json > "$RUNNER_TEMP/ruff-debt-baseline.previous.json"
@@ -52,6 +63,7 @@ jobs:
       - run: make compile
   authority-diagnostics:
     name: Workspace authority diagnostics
+    needs: formatting
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -68,6 +80,7 @@ jobs:
 
   evidence-binding-diagnostics:
     name: Repository evidence binding diagnostics
+    needs: formatting
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -87,6 +100,7 @@ jobs:
 
   consumer-wheel-artifact:
     name: Consumer wheel artifact
+    needs: formatting
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -109,6 +123,7 @@ jobs:
 
   release-environment:
     name: Release qualification environment (Python 3.14)
+    needs: formatting
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -125,6 +140,7 @@ jobs:
 
   python-support:
     name: Tests / Python ${{ matrix.python }}
+    needs: formatting
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -147,6 +163,7 @@ jobs:
 
   mcp-interop:
     name: ${{ matrix.label }} / Python ${{ matrix.python }}
+    needs: formatting
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -182,6 +199,7 @@ jobs:
 
   precommit:
     name: Pre-commit checks
+    needs: formatting
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -200,6 +218,7 @@ jobs:
     name: Qualification convergence
     if: always()
     needs:
+      - formatting
       - fast-gate
       - authority-diagnostics
       - evidence-binding-diagnostics
@@ -213,6 +232,7 @@ jobs:
     steps:
       - name: Require every authoritative qualification lane
         env:
+          FORMATTING: ${{ needs.formatting.result }}
           FAST_GATE: ${{ needs.fast-gate.result }}
           WORKSPACE_AUTHORITY: ${{ needs.authority-diagnostics.result }}
           EVIDENCE_BINDINGS: ${{ needs.evidence-binding-diagnostics.result }}
@@ -223,7 +243,7 @@ jobs:
           PRECOMMIT: ${{ needs.precommit.result }}
         run: |
           failed=0
-          for lane in             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             PRECOMMIT
+          for lane in             FORMATTING             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             PRECOMMIT
           do
             result="${!lane}"
             printf '%-24s %s\n' "$lane" "$result"
