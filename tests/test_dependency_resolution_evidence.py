@@ -1667,3 +1667,15 @@ def test_v2_selection_requires_provenance_for_each_observed_context(
             match="selection context lacks evidence source: library@1:runtime",
         ):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_refuses_complete_resolution_graph_without_root(tmp_path: Path) -> None:
+    changed = _snapshot_v2()
+    changed["roots"] = [row for row in changed["roots"] if row["context"] != "runtime"]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match="complete resolution-graph coverage lacks root: runtime"
+        ):
+            codemap.dependency_resolution_evidence(changed)

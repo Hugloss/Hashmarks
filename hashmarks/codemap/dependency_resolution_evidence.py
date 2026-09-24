@@ -144,6 +144,12 @@ class DependencyResolutionEvidenceMixin:
         coverage = self._dependency_coverage_v2(
             snapshot.get("coverage", ()), context_set, evidence_sources
         )
+        self._validate_dependency_coverage_facts_v2(
+            coverage=coverage,
+            roots=roots,
+            inventory=inventory,
+            relationships=relationships,
+        )
         sources_by_id = {
             str(row["source_id"]): row
             for row in evidence_sources
@@ -835,6 +841,26 @@ class DependencyResolutionEvidenceMixin:
                 }
             )
         return sorted(result, key=lambda row: (str(row["context"]), str(row["kind"])))
+
+    @staticmethod
+    def _validate_dependency_coverage_facts_v2(
+        *,
+        coverage: Sequence[Mapping[str, object]],
+        roots: Sequence[Mapping[str, object]],
+        inventory: Sequence[Mapping[str, object]],
+        relationships: Sequence[Mapping[str, object]],
+    ) -> None:
+        for row in coverage:
+            if row.get("completeness") != "complete":
+                continue
+            context = str(row["context"])
+            kind = str(row["kind"])
+            if kind == "resolution-graph":
+                has_root = any(str(item["context"]) == context for item in roots)
+                if not has_root:
+                    raise ValueError(
+                        f"complete resolution-graph coverage lacks root: {context}"
+                    )
 
     @staticmethod
     def _dependency_negative_evidence_v2(
