@@ -1041,12 +1041,14 @@ def test_v2_path_query_exact_result_bound_does_not_claim_omission(
                 "component_id": "dead",
                 "version": "1",
                 "contexts": ["compile"],
+                "evidence_sources": ["tree:compile"],
             },
             {
                 "node_id": "target@1",
                 "component_id": "target",
                 "version": "1",
                 "contexts": ["compile"],
+                "evidence_sources": ["tree:compile"],
             },
         ]
     )
@@ -1505,4 +1507,54 @@ def test_v2_authoritative_dependency_facts_require_provenance(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(ValueError, match="must reference evidence source"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_selection_requires_evidence_provenance(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["selections"][1]["evidence_sources"] = []
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="selection must reference evidence source"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_module_ownership_requires_evidence_provenance(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": [],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match="module ownership must reference evidence source"
+        ):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["evidence_sources"][2]["completeness"] = "incomplete"
+    snapshot["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match="module ownership exceeds evidence source"
+        ):
             codemap.dependency_resolution_evidence(snapshot)
