@@ -83,6 +83,10 @@ Preferred Hashmarks authority sources are repository bytes, repository topology,
 
 If the result is made true primarily by consumer workflow history, model reasoning, runtime outcomes, task execution state, orchestration state, or a previous decision made by an agent, it is not repository authority.
 
+### Dependency-adapter translation boundary
+
+Package-manager and resolver syntax is an edge concern. Maven, uv, Gradle, npm, SBOM, and future producer formats may be parsed by dedicated adapters, but shared dependency qualification must reason only about producer-neutral facts and semantic evidence authorities. A source-format `kind` is provenance, not authority; one physical source may support several semantic authorities, and a complete physical artifact does not by itself establish complete semantic coverage. New adapters must translate into the general dependency evidence contract rather than teach core Hashmarks the producer's native shape.
+
 ### Evidence authority precedence and non-strengthening
 
 Hashmarks has several authority domains rather than one universal truth score. Content identity, freshness, repository relationships, qualified provider evidence, selection, and consumer projections answer different questions. Do not collapse them into one numeric confidence or a single total ordering.
