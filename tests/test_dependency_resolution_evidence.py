@@ -311,12 +311,6 @@ def test_v2_module_ownership_preserves_ambiguous_maven_module(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot_v2()
-    runtime_source = next(
-        row
-        for row in snapshot["evidence_sources"]
-        if row["source_id"] == "tree:runtime"
-    )
-    runtime_source["authorities"].append("module-ownership")
     snapshot["module_ownership"] = [
         {
             "module": "shared.module",
@@ -409,6 +403,12 @@ def test_v2_dependency_correlation_without_context_preserves_cross_context_ambig
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot_v2()
+    runtime_source = next(
+        row
+        for row in snapshot["evidence_sources"]
+        if row["source_id"] == "tree:runtime"
+    )
+    runtime_source["authorities"].append("module-ownership")
     snapshot["module_ownership"] = [
         {
             "module": "library",
