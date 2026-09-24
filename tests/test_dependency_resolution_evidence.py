@@ -262,6 +262,26 @@ def test_v2_relationship_parent_change_is_not_selection_change(
     ]
 
 
+def test_v2_rejects_module_owner_outside_observed_context(tmp_path: Path) -> None:
+    changed = _snapshot_v2()
+    changed["selections"][1]["contexts"] = ["runtime"]
+    changed["selections"][1]["evidence_sources"] = ["tree:runtime"]
+    changed["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        }
+    ]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="module owner context not selected"):
+            codemap.dependency_resolution_evidence(changed)
+
+
 def test_v2_module_ownership_preserves_ambiguous_maven_module(
     tmp_path: Path,
 ) -> None:
