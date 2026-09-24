@@ -261,7 +261,14 @@ class DependencyResolutionEvidenceMixin:
             "producer": producer_packet,
             "scope": scope_packet,
             "contexts": sorted(contexts),
-            "roots": roots,
+            "roots": [
+                {
+                    field: value
+                    for field, value in row.items()
+                    if field != "evidence_sources"
+                }
+                for row in roots
+            ],
         }
         resolution = {
             "components": components,
@@ -296,6 +303,14 @@ class DependencyResolutionEvidenceMixin:
             "resolution_identity": resolution_identity,
             "repository_binding": repository_binding,
             "repository_inputs": repository_inputs,
+            "root_evidence": [
+                {
+                    "node_id": row["node_id"],
+                    "context": row["context"],
+                    "evidence_sources": row["evidence_sources"],
+                }
+                for row in roots
+            ],
             "module_ownership": module_ownership,
             "evidence_sources": evidence_sources,
             "coverage": coverage,
