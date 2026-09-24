@@ -106,7 +106,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         for row in packages
         if isinstance(row["raw"].get("source"), Mapping)
         and any(
-            str(row["raw"]["source"].get(kind) or "") == "."
+            kind in row["raw"]["source"]
             for kind in ("virtual", "editable", "directory")
         )
     ]
