@@ -159,6 +159,8 @@ A single `uv.lock` artifact is one physical source and may support `selection`, 
 
 The lock's base, optional-extra, and development dependency tables all contribute graph edges. The adapter retains the one lock context and distinguishes grouped edges with `effective_scope` values such as `extra:mcp` and `dev:lint`. An unsupported group shape cannot yield complete graph coverage.
 
+The current adapter admits only uv lock schema version 1 shapes it can model faithfully. Locks with top-level resolution forks (`resolution-markers`) or declared conflict sets are rejected rather than flattened into one graph context; those constructs can encode mutually exclusive resolutions and require an explicit semantic representation before Hashmarks may claim complete graph evidence.
+
 uv-specific source mappings, dependency target resolution, markers, and workspace-root interpretation stay inside the adapter.
 
 ## Adding another ecosystem
