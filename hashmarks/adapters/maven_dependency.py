@@ -75,7 +75,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     inventories: Mapping[str, bytes],
     repository_inputs: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
-    """Translate already-produced Maven tree/list evidence into the v2 contract.
+    """Translate already-produced Maven tree/list evidence into the v3 contract.
 
     This adapter is deliberately execution-free: callers provide Maven output bytes.
     Hashmarks does not invoke Maven, resolve packages, or inspect dependency source.
