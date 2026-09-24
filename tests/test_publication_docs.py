@@ -275,6 +275,10 @@ def test_ci_and_dev_check_enforce_ruff_debt_gate() -> None:
     assert "      - ruff-debt" in convergence
     assert "FORMATTING: ${{ needs.formatting.result }}" in convergence
     assert "RUFF_DEBT: ${{ needs.ruff-debt.result }}" in convergence
+    assert '"FORMATTING" "$FORMATTING"' in convergence
+    qualification_loop = convergence.split("for lane in", 1)[1].split("do", 1)[0]
+    assert "FORMATTING" not in qualification_loop
+    assert "RUFF_DEBT" in qualification_loop
     assert 'test "$failed" -eq 0' in convergence
 
     makefile = _text("Makefile")
