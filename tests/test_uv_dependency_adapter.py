@@ -156,4 +156,3 @@ source = { virtual = ".", directory = "." }
 
     with pytest.raises(ValueError, match="ambiguous local source identity"):
         uv_lock_dependency_observation(lock=lock)
-
