@@ -7,9 +7,9 @@ import pytest
 from hashmarks.codemap.engine import CodeMap
 
 
-def _snapshot_v2() -> dict[str, object]:
+def _snapshot_v3() -> dict[str, object]:
     return {
-        "schema": "hashmarks.dependency-resolution.v2",
+        "schema": "hashmarks.dependency-resolution.v3",
         "producer": {"kind": "neutral-resolver", "schema_version": "1"},
         "scope": {"environment": "test"},
         "contexts": ["compile", "runtime"],
@@ -163,12 +163,12 @@ def _snapshot_v2() -> dict[str, object]:
     }
 
 
-def test_v2_distinguishes_inventory_membership_from_graph_reachability(
+def test_v3_distinguishes_inventory_membership_from_graph_reachability(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        packet = codemap.dependency_resolution_evidence(_snapshot_v2())
+        packet = codemap.dependency_resolution_evidence(_snapshot_v3())
 
     inventory_nodes = {row["node_id"] for row in packet["inventory"]}
     graph_nodes = {
@@ -180,13 +180,13 @@ def test_v2_distinguishes_inventory_membership_from_graph_reachability(
     assert "inventory-only@1" not in graph_nodes
 
 
-def test_v2_separates_component_selection_and_observation_identity(
+def test_v3_separates_component_selection_and_observation_identity(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        first = codemap.dependency_resolution_evidence(_snapshot_v2())
-        changed = _snapshot_v2()
+        first = codemap.dependency_resolution_evidence(_snapshot_v3())
+        changed = _snapshot_v3()
         changed["module_ownership"] = [
             {
                 "module": "library.module",
@@ -202,10 +202,10 @@ def test_v2_separates_component_selection_and_observation_identity(
     assert first["observation_identity"] != second["observation_identity"]
 
 
-def test_v2_negative_evidence_is_scoped_by_context_and_coverage_kind(
+def test_v3_negative_evidence_is_scoped_by_context_and_coverage_kind(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["coverage"][1]["completeness"] = "incomplete"
     changed["coverage"][1]["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
@@ -220,8 +220,8 @@ def test_v2_negative_evidence_is_scoped_by_context_and_coverage_kind(
     assert states[("runtime", "resolution-graph")] == "not-admissible"
 
 
-def test_v2_rejects_dangling_evidence_source_reference(tmp_path: Path) -> None:
-    changed = _snapshot_v2()
+def test_v3_rejects_dangling_evidence_source_reference(tmp_path: Path) -> None:
+    changed = _snapshot_v3()
     changed["relationships"][0]["evidence_sources"] = ["missing"]
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -229,13 +229,13 @@ def test_v2_rejects_dangling_evidence_source_reference(tmp_path: Path) -> None:
             codemap.dependency_resolution_evidence(changed)
 
 
-def test_v2_delta_reports_selection_inventory_and_relationship_change(
+def test_v3_delta_reports_selection_inventory_and_relationship_change(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        before = codemap.dependency_resolution_evidence(_snapshot_v2())
-        changed = _snapshot_v2()
+        before = codemap.dependency_resolution_evidence(_snapshot_v3())
+        changed = _snapshot_v3()
         changed["selections"][1]["version"] = "2"
         changed["inventory"] = [
             row for row in changed["inventory"] if row["node_id"] != "inventory-only@1"
@@ -255,11 +255,11 @@ def test_v2_delta_reports_selection_inventory_and_relationship_change(
     assert delta["causation"] == "not-inferred"
 
 
-def test_v2_relationship_parent_change_is_not_selection_change(
+def test_v3_relationship_parent_change_is_not_selection_change(
     tmp_path: Path,
 ) -> None:
-    before_snapshot = _snapshot_v2()
-    after_snapshot = _snapshot_v2()
+    before_snapshot = _snapshot_v3()
+    after_snapshot = _snapshot_v3()
     after_snapshot["relationships"][0]["source"] = "inventory-only@1"
 
     with CodeMap(tmp_path) as codemap:
@@ -279,8 +279,8 @@ def test_v2_relationship_parent_change_is_not_selection_change(
     ]
 
 
-def test_v2_rejects_module_owner_outside_observed_context(tmp_path: Path) -> None:
-    changed = _snapshot_v2()
+def test_v3_rejects_module_owner_outside_observed_context(tmp_path: Path) -> None:
+    changed = _snapshot_v3()
     changed["selections"][1]["contexts"] = ["runtime"]
     changed["selections"][1]["evidence_sources"] = ["tree:runtime"]
     changed["inventory"] = [
@@ -307,10 +307,10 @@ def test_v2_rejects_module_owner_outside_observed_context(tmp_path: Path) -> Non
             codemap.dependency_resolution_evidence(changed)
 
 
-def test_v2_module_ownership_preserves_ambiguous_maven_module(
+def test_v3_module_ownership_preserves_ambiguous_maven_module(
     tmp_path: Path,
 ) -> None:
-    snapshot = _snapshot_v2()
+    snapshot = _snapshot_v3()
     snapshot["module_ownership"] = [
         {
             "module": "shared.module",
@@ -330,11 +330,11 @@ def test_v2_module_ownership_preserves_ambiguous_maven_module(
     assert ownership["owners"] == ["inventory-only@1", "library@1"]
 
 
-def test_v2_dependency_correlation_preserves_contextual_ownership(
+def test_v3_dependency_correlation_preserves_contextual_ownership(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "consumer.py").write_text("import library\n")
-    snapshot = _snapshot_v2()
+    snapshot = _snapshot_v3()
     runtime_source = next(
         row
         for row in snapshot["evidence_sources"]
@@ -399,10 +399,10 @@ def test_v2_dependency_correlation_preserves_contextual_ownership(
     }
 
 
-def test_v2_dependency_correlation_without_context_preserves_cross_context_ambiguity(
+def test_v3_dependency_correlation_without_context_preserves_cross_context_ambiguity(
     tmp_path: Path,
 ) -> None:
-    snapshot = _snapshot_v2()
+    snapshot = _snapshot_v3()
     runtime_source = next(
         row
         for row in snapshot["evidence_sources"]
@@ -448,12 +448,12 @@ def test_v2_dependency_correlation_without_context_preserves_cross_context_ambig
     assert link["observed_contexts"] == ["compile", "runtime"]
 
 
-def test_v2_repository_binding_tracks_current_codemap_generation(
+def test_v3_repository_binding_tracks_current_codemap_generation(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        packet = codemap.dependency_resolution_evidence(_snapshot_v2())
+        packet = codemap.dependency_resolution_evidence(_snapshot_v3())
         expected_identity = codemap._repository_packet_identity()
         expected_generation = codemap.store.generation()
 
@@ -463,12 +463,12 @@ def test_v2_repository_binding_tracks_current_codemap_generation(
     assert binding["codemap_generation"] == expected_generation
 
 
-def test_v2_bounded_queries_report_dependencies_paths_and_contexts(
+def test_v3_bounded_queries_report_dependencies_paths_and_contexts(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
             [
@@ -494,10 +494,10 @@ def test_v2_bounded_queries_report_dependencies_paths_and_contexts(
     assert all(row["completeness"] == "complete" for row in packet["results"])
 
 
-def test_v2_contexts_query_exposes_incomplete_context_evidence(
+def test_v3_contexts_query_exposes_incomplete_context_evidence(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     selection_runtime = next(
         row
         for row in changed["coverage"]
@@ -519,10 +519,10 @@ def test_v2_contexts_query_exposes_incomplete_context_evidence(
     assert result["completeness"] == "incomplete"
 
 
-def test_v2_reachability_absence_requires_complete_context_coverage(
+def test_v3_reachability_absence_requires_complete_context_coverage(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["coverage"][1]["completeness"] = "incomplete"
     changed["coverage"][1]["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
@@ -553,10 +553,10 @@ def test_v2_reachability_absence_requires_complete_context_coverage(
     assert packet["results"][1]["result"]["negative_evidence"] == "not-admissible"
 
 
-def test_v2_query_exposes_depth_omission_instead_of_silent_partial_result(
+def test_v3_query_exposes_depth_omission_instead_of_silent_partial_result(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["components"].append(
         {"component_id": "leaf", "name": "leaf", "ecosystem": "test"}
     )
@@ -601,12 +601,12 @@ def test_v2_query_exposes_depth_omission_instead_of_silent_partial_result(
     assert result["omissions"] == [{"reason": "depth-limit", "node_id": "library@1"}]
 
 
-def test_v2_repository_input_change_is_observation_only(tmp_path: Path) -> None:
+def test_v3_repository_input_change_is_observation_only(tmp_path: Path) -> None:
     dependency_input = tmp_path / "dependency.lock"
     dependency_input.write_text("before\n")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        snapshot = _snapshot_v2()
+        snapshot = _snapshot_v3()
         snapshot["repository_inputs"] = [{"path": "dependency.lock"}]
         before = codemap.dependency_resolution_evidence(snapshot)
 
@@ -622,8 +622,8 @@ def test_v2_repository_input_change_is_observation_only(tmp_path: Path) -> None:
     assert delta["relationships_removed"] == []
 
 
-def test_v2_module_ownership_change_is_observation_only(tmp_path: Path) -> None:
-    before_snapshot = _snapshot_v2()
+def test_v3_module_ownership_change_is_observation_only(tmp_path: Path) -> None:
+    before_snapshot = _snapshot_v3()
     before_snapshot["module_ownership"] = [
         {
             "module": "library.module",
@@ -633,7 +633,7 @@ def test_v2_module_ownership_change_is_observation_only(tmp_path: Path) -> None:
             "evidence_sources": ["list:compile"],
         }
     ]
-    after_snapshot = _snapshot_v2()
+    after_snapshot = _snapshot_v3()
     after_snapshot["module_ownership"] = [
         {
             "module": "library.module",
@@ -657,13 +657,13 @@ def test_v2_module_ownership_change_is_observation_only(tmp_path: Path) -> None:
     assert delta["relationships_removed"] == []
 
 
-def test_v2_provenance_change_does_not_masquerade_as_resolution_change(
+def test_v3_provenance_change_does_not_masquerade_as_resolution_change(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        before = codemap.dependency_resolution_evidence(_snapshot_v2())
-        changed = _snapshot_v2()
+        before = codemap.dependency_resolution_evidence(_snapshot_v3())
+        changed = _snapshot_v3()
         changed["evidence_sources"][0]["producer_digest"] = "sha256:producer-a"
         after = codemap.dependency_resolution_evidence(changed)
         delta = codemap.dependency_resolution_delta(before, after)
@@ -675,10 +675,10 @@ def test_v2_provenance_change_does_not_masquerade_as_resolution_change(
     assert delta["relationships_removed"] == []
 
 
-def test_v2_contextual_module_ownership_preserves_independent_observations(
+def test_v3_contextual_module_ownership_preserves_independent_observations(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     runtime_source = next(
         row for row in changed["evidence_sources"] if row["source_id"] == "tree:runtime"
     )
@@ -709,11 +709,11 @@ def test_v2_contextual_module_ownership_preserves_independent_observations(
     ]
 
 
-def test_v2_source_kind_is_opaque_when_semantic_authorities_are_explicit(
+def test_v3_source_kind_is_opaque_when_semantic_authorities_are_explicit(
     tmp_path: Path,
 ) -> None:
     snapshot = {
-        "schema": "hashmarks.dependency-resolution.v2",
+        "schema": "hashmarks.dependency-resolution.v3",
         "producer": {"kind": "fixture-resolver", "schema_version": "1"},
         "scope": {"python": "3.14", "platform": "linux"},
         "contexts": ["default", "dev"],
@@ -816,10 +816,10 @@ def test_v2_source_kind_is_opaque_when_semantic_authorities_are_explicit(
     assert "artifactId" not in repr(packet)
 
 
-def test_v2_module_owner_absence_requires_complete_ownership_coverage(
+def test_v3_module_owner_absence_requires_complete_ownership_coverage(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["coverage"].append(
         {
             "context": "compile",
@@ -876,10 +876,10 @@ def test_v2_module_owner_absence_requires_complete_ownership_coverage(
     assert runtime_result["negative_evidence"] == "not-admissible"
 
 
-def test_v2_dependency_query_exact_result_bound_is_complete(tmp_path: Path) -> None:
+def test_v3_dependency_query_exact_result_bound_is_complete(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
             [
@@ -898,10 +898,10 @@ def test_v2_dependency_query_exact_result_bound_is_complete(tmp_path: Path) -> N
     assert result["omissions"] == []
 
 
-def test_v2_dependency_query_reports_result_bound_when_result_is_omitted(
+def test_v3_dependency_query_reports_result_bound_when_result_is_omitted(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["components"].append(
         {"component_id": "second", "name": "second", "ecosystem": "test"}
     )
@@ -946,12 +946,12 @@ def test_v2_dependency_query_reports_result_bound_when_result_is_omitted(
     assert result["omissions"] == [{"reason": "result-limit"}]
 
 
-def test_v2_context_query_reports_observed_contexts_despite_context_argument(
+def test_v3_context_query_reports_observed_contexts_despite_context_argument(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
             [
@@ -967,10 +967,10 @@ def test_v2_context_query_reports_observed_contexts_despite_context_argument(
     assert result["result"] == ["compile", "runtime"]
 
 
-def test_v2_context_query_includes_selection_context_without_inventory_or_edge(
+def test_v3_context_query_includes_selection_context_without_inventory_or_edge(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["contexts"].append("optional")
     changed["evidence_sources"].append(
         {
@@ -995,10 +995,10 @@ def test_v2_context_query_includes_selection_context_without_inventory_or_edge(
     assert packet["results"][0]["result"] == ["compile", "optional", "runtime"]
 
 
-def test_v2_inventory_absence_requires_complete_inventory_coverage(
+def test_v3_inventory_absence_requires_complete_inventory_coverage(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["evidence_sources"].append(
         {
             "source_id": "list:runtime",
@@ -1046,10 +1046,10 @@ def test_v2_inventory_absence_requires_complete_inventory_coverage(
     assert runtime_result["negative_evidence"] == "not-admissible"
 
 
-def test_v2_unscoped_module_absence_requires_coverage_for_every_context(
+def test_v3_unscoped_module_absence_requires_coverage_for_every_context(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["evidence_sources"].append(
         {
             "source_id": "modules:compile",
@@ -1083,10 +1083,10 @@ def test_v2_unscoped_module_absence_requires_coverage_for_every_context(
     assert result["negative_evidence"] == "not-admissible"
 
 
-def test_v2_unscoped_module_absence_is_admissible_when_all_contexts_complete(
+def test_v3_unscoped_module_absence_is_admissible_when_all_contexts_complete(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     for context in ("compile", "runtime"):
         source_id = f"modules:{context}"
         changed["evidence_sources"].append(
@@ -1122,10 +1122,10 @@ def test_v2_unscoped_module_absence_is_admissible_when_all_contexts_complete(
     assert result["negative_evidence"] == "admissible-within-declared-scope"
 
 
-def test_v2_graph_query_completeness_requires_complete_resolution_coverage(
+def test_v3_graph_query_completeness_requires_complete_resolution_coverage(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     runtime_coverage = next(
         row
         for row in changed["coverage"]
@@ -1161,10 +1161,10 @@ def test_v2_graph_query_completeness_requires_complete_resolution_coverage(
     assert paths["completeness"] == "incomplete"
 
 
-def test_v2_empty_graph_queries_expose_negative_evidence_authority(
+def test_v3_empty_graph_queries_expose_negative_evidence_authority(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     runtime_coverage = next(
         row
         for row in changed["coverage"]
@@ -1217,10 +1217,10 @@ def test_v2_empty_graph_queries_expose_negative_evidence_authority(
     assert runtime_paths["negative_evidence"] == "not-admissible"
 
 
-def test_v2_path_query_exact_result_bound_does_not_claim_omission(
+def test_v3_path_query_exact_result_bound_does_not_claim_omission(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["components"].extend(
         [
             {"component_id": "dead", "ecosystem": "generic", "name": "dead"},
@@ -1288,10 +1288,10 @@ def test_v2_path_query_exact_result_bound_does_not_claim_omission(
     assert result["completeness"] == "complete"
 
 
-def test_v2_path_query_reports_result_bound_only_when_a_path_is_omitted(
+def test_v3_path_query_reports_result_bound_only_when_a_path_is_omitted(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["relationships"].append(
         {
             "source": "app@1",
@@ -1323,7 +1323,7 @@ def test_v2_path_query_reports_result_bound_only_when_a_path_is_omitted(
 
 
 def _visit_limit_snapshot() -> dict[str, object]:
-    snapshot = _snapshot_v2()
+    snapshot = _snapshot_v3()
     snapshot["components"].extend(
         [
             {"component_id": "left", "name": "left", "ecosystem": "test"},
@@ -1372,7 +1372,7 @@ def _visit_limit_snapshot() -> dict[str, object]:
 
 
 @pytest.mark.parametrize("operation", ["dependencies", "reachability", "paths"])
-def test_v2_query_visit_accounting_never_exceeds_declared_bound(
+def test_v3_query_visit_accounting_never_exceeds_declared_bound(
     tmp_path: Path,
     operation: str,
 ) -> None:
@@ -1397,10 +1397,10 @@ def test_v2_query_visit_accounting_never_exceeds_declared_bound(
     assert result["omissions"] == [{"reason": "visit-limit"}]
 
 
-def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
+def test_v3_complete_module_ownership_cannot_exceed_incomplete_source(
     tmp_path: Path,
 ) -> None:
-    snapshot = _snapshot_v2()
+    snapshot = _snapshot_v3()
     snapshot["evidence_sources"].append(
         {
             "source_id": "ownership:compile",
@@ -1428,10 +1428,10 @@ def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
             codemap.dependency_resolution_evidence(snapshot)
 
 
-def test_v2_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
+def test_v3_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
     tmp_path: Path,
 ) -> None:
-    snapshot = _snapshot_v2()
+    snapshot = _snapshot_v3()
     snapshot["evidence_sources"].append(
         {
             "source_id": "ownership:compile",
@@ -1459,8 +1459,8 @@ def test_v2_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
             codemap.dependency_resolution_evidence(snapshot)
 
 
-def test_v2_complete_coverage_can_combine_complete_sources(tmp_path: Path) -> None:
-    snapshot = _snapshot_v2()
+def test_v3_complete_coverage_can_combine_complete_sources(tmp_path: Path) -> None:
+    snapshot = _snapshot_v3()
     snapshot["evidence_sources"].append(
         {
             "source_id": "tree:compile:second",
@@ -1485,10 +1485,10 @@ def test_v2_complete_coverage_can_combine_complete_sources(tmp_path: Path) -> No
     assert coverage["truncation"] == "complete"
 
 
-def test_v2_unknown_coverage_can_reference_complete_source_without_strengthening(
+def test_v3_unknown_coverage_can_reference_complete_source_without_strengthening(
     tmp_path: Path,
 ) -> None:
-    snapshot = _snapshot_v2()
+    snapshot = _snapshot_v3()
     snapshot["coverage"][0]["completeness"] = "unknown"
     snapshot["coverage"][0]["truncation"] = "unknown"
     with CodeMap(tmp_path) as codemap:
@@ -1504,10 +1504,10 @@ def test_v2_unknown_coverage_can_reference_complete_source_without_strengthening
     assert coverage["truncation"] == "unknown"
 
 
-def test_v2_reachability_rejects_unknown_target_node(tmp_path: Path) -> None:
+def test_v3_reachability_rejects_unknown_target_node(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(ValueError, match="unknown dependency query target_id"):
             codemap.dependency_resolution_queries(
                 observation,
@@ -1521,10 +1521,10 @@ def test_v2_reachability_rejects_unknown_target_node(tmp_path: Path) -> None:
             )
 
 
-def test_v2_paths_rejects_unknown_target_node(tmp_path: Path) -> None:
+def test_v3_paths_rejects_unknown_target_node(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(ValueError, match="unknown dependency query target_id"):
             codemap.dependency_resolution_queries(
                 observation,
@@ -1538,10 +1538,10 @@ def test_v2_paths_rejects_unknown_target_node(tmp_path: Path) -> None:
             )
 
 
-def test_v2_contexts_rejects_unknown_node(tmp_path: Path) -> None:
+def test_v3_contexts_rejects_unknown_node(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(ValueError, match="unknown dependency query node_id"):
             codemap.dependency_resolution_queries(
                 observation,
@@ -1549,10 +1549,10 @@ def test_v2_contexts_rejects_unknown_node(tmp_path: Path) -> None:
             )
 
 
-def test_v2_queries_reject_unknown_context_filter(tmp_path: Path) -> None:
+def test_v3_queries_reject_unknown_context_filter(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         for request in (
             {
                 "operation": "dependencies",
@@ -1566,10 +1566,10 @@ def test_v2_queries_reject_unknown_context_filter(tmp_path: Path) -> None:
                 codemap.dependency_resolution_queries(observation, [request])
 
 
-def test_v2_component_unknown_identity_is_authoritative_absence(tmp_path: Path) -> None:
+def test_v3_component_unknown_identity_is_authoritative_absence(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
             [{"operation": "component", "component_id": "missing"}],
@@ -1580,12 +1580,12 @@ def test_v2_component_unknown_identity_is_authoritative_absence(tmp_path: Path) 
     assert result["negative_evidence"] == "admissible-within-declared-scope"
 
 
-def test_v2_component_present_identity_does_not_claim_negative_evidence(
+def test_v3_component_present_identity_does_not_claim_negative_evidence(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
             [{"operation": "component", "component_id": "library"}],
@@ -1596,10 +1596,10 @@ def test_v2_component_present_identity_does_not_claim_negative_evidence(
     assert result["negative_evidence"] == "not-applicable"
 
 
-def test_v2_component_absence_remains_authoritative_with_incomplete_resolution_coverage(
+def test_v3_component_absence_remains_authoritative_with_incomplete_resolution_coverage(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["coverage"][1]["completeness"] = "incomplete"
     changed["coverage"][1]["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
@@ -1616,12 +1616,12 @@ def test_v2_component_absence_remains_authoritative_with_incomplete_resolution_c
     assert result["negative_evidence"] == "admissible-within-declared-scope"
 
 
-def test_v2_component_result_limit_does_not_weaken_exact_identity_lookup(
+def test_v3_component_result_limit_does_not_weaken_exact_identity_lookup(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
             [
@@ -1639,8 +1639,8 @@ def test_v2_component_result_limit_does_not_weaken_exact_identity_lookup(
     assert result["omissions"] == []
 
 
-def test_v2_component_without_selection_is_rejected(tmp_path: Path) -> None:
-    snapshot = _snapshot_v2()
+def test_v3_component_without_selection_is_rejected(tmp_path: Path) -> None:
+    snapshot = _snapshot_v3()
     snapshot["components"].append(
         {"component_id": "orphan", "name": "orphan", "ecosystem": "test"}
     )
@@ -1650,8 +1650,8 @@ def test_v2_component_without_selection_is_rejected(tmp_path: Path) -> None:
             codemap.dependency_resolution_evidence(snapshot)
 
 
-def test_v2_multiple_selections_for_one_component_remain_valid(tmp_path: Path) -> None:
-    snapshot = _snapshot_v2()
+def test_v3_multiple_selections_for_one_component_remain_valid(tmp_path: Path) -> None:
+    snapshot = _snapshot_v3()
     snapshot["selections"].append(
         {
             "node_id": "library@2",
@@ -1674,8 +1674,8 @@ def test_v2_multiple_selections_for_one_component_remain_valid(tmp_path: Path) -
     assert library_nodes == {"library@1", "library@2"}
 
 
-def test_v2_selection_without_any_context_is_rejected(tmp_path: Path) -> None:
-    snapshot = _snapshot_v2()
+def test_v3_selection_without_any_context_is_rejected(tmp_path: Path) -> None:
+    snapshot = _snapshot_v3()
     selection = next(
         row for row in snapshot["selections"] if row["node_id"] == "library@1"
     )
@@ -1694,8 +1694,8 @@ def test_v2_selection_without_any_context_is_rejected(tmp_path: Path) -> None:
             codemap.dependency_resolution_evidence(snapshot)
 
 
-def test_v2_root_requires_evidence_source_provenance(tmp_path: Path) -> None:
-    snapshot = _snapshot_v2()
+def test_v3_root_requires_evidence_source_provenance(tmp_path: Path) -> None:
+    snapshot = _snapshot_v3()
     snapshot["roots"][0]["evidence_sources"] = []
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -1703,8 +1703,8 @@ def test_v2_root_requires_evidence_source_provenance(tmp_path: Path) -> None:
             codemap.dependency_resolution_evidence(snapshot)
 
 
-def test_v2_root_rejects_incompatible_evidence_source_context(tmp_path: Path) -> None:
-    snapshot = _snapshot_v2()
+def test_v3_root_rejects_incompatible_evidence_source_context(tmp_path: Path) -> None:
+    snapshot = _snapshot_v3()
     snapshot["roots"][0]["evidence_sources"] = ["tree:runtime"]
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -1714,11 +1714,11 @@ def test_v2_root_rejects_incompatible_evidence_source_context(tmp_path: Path) ->
             codemap.dependency_resolution_evidence(snapshot)
 
 
-def test_v2_root_provenance_changes_observation_not_resolution_identity(
+def test_v3_root_provenance_changes_observation_not_resolution_identity(
     tmp_path: Path,
 ) -> None:
-    baseline = _snapshot_v2()
-    changed = _snapshot_v2()
+    baseline = _snapshot_v3()
+    changed = _snapshot_v3()
     changed["evidence_sources"].append(
         {
             "source_id": "tree:compile:copy",
@@ -1741,10 +1741,10 @@ def test_v2_root_provenance_changes_observation_not_resolution_identity(
     assert before["observation_identity"] != after["observation_identity"]
 
 
-def test_v2_selection_requires_provenance_for_each_observed_context(
+def test_v3_selection_requires_provenance_for_each_observed_context(
     tmp_path: Path,
 ) -> None:
-    snapshot = _snapshot_v2()
+    snapshot = _snapshot_v3()
     library = next(
         row for row in snapshot["selections"] if row["node_id"] == "library@1"
     )
@@ -1760,8 +1760,8 @@ def test_v2_selection_requires_provenance_for_each_observed_context(
             codemap.dependency_resolution_evidence(snapshot)
 
 
-def test_v2_refuses_complete_resolution_graph_without_root(tmp_path: Path) -> None:
-    changed = _snapshot_v2()
+def test_v3_refuses_complete_resolution_graph_without_root(tmp_path: Path) -> None:
+    changed = _snapshot_v3()
     changed["roots"] = [row for row in changed["roots"] if row["context"] != "runtime"]
 
     with CodeMap(tmp_path) as codemap:
@@ -1772,12 +1772,12 @@ def test_v2_refuses_complete_resolution_graph_without_root(tmp_path: Path) -> No
             codemap.dependency_resolution_evidence(changed)
 
 
-def test_v2_unscoped_inventory_absence_requires_coverage_for_every_context(
+def test_v3_unscoped_inventory_absence_requires_coverage_for_every_context(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         packet = codemap.dependency_resolution_queries(
             observation,
             [{"operation": "inventory", "node_id": "missing@1"}],
@@ -1789,10 +1789,10 @@ def test_v2_unscoped_inventory_absence_requires_coverage_for_every_context(
     assert result["negative_evidence"] == "not-admissible"
 
 
-def test_v2_complete_graph_coverage_requires_root_in_each_complete_context(
+def test_v3_complete_graph_coverage_requires_root_in_each_complete_context(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["roots"] = [row for row in changed["roots"] if row["context"] != "compile"]
 
     with CodeMap(tmp_path) as codemap:
@@ -1803,10 +1803,10 @@ def test_v2_complete_graph_coverage_requires_root_in_each_complete_context(
             codemap.dependency_resolution_evidence(changed)
 
 
-def test_v2_inventory_requires_resolved_inventory_evidence_authority(
+def test_v3_inventory_requires_resolved_inventory_evidence_authority(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["evidence_sources"].append(
         {
             "source_id": "fact:inventory:compile",
@@ -1828,10 +1828,10 @@ def test_v2_inventory_requires_resolved_inventory_evidence_authority(
             codemap.dependency_resolution_evidence(changed)
 
 
-def test_v2_module_ownership_requires_module_ownership_evidence_authority(
+def test_v3_module_ownership_requires_module_ownership_evidence_authority(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["evidence_sources"][2]["authorities"] = [
         "resolved-inventory",
         "selection",
@@ -1855,10 +1855,10 @@ def test_v2_module_ownership_requires_module_ownership_evidence_authority(
             codemap.dependency_resolution_evidence(changed)
 
 
-def test_v2_selection_requires_selection_evidence_authority(
+def test_v3_selection_requires_selection_evidence_authority(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["evidence_sources"][2]["authorities"] = [
         "module-ownership",
         "resolved-inventory",
@@ -1876,8 +1876,8 @@ def test_v2_selection_requires_selection_evidence_authority(
             codemap.dependency_resolution_evidence(changed)
 
 
-def test_v2_rejects_producer_specific_coverage_kind(tmp_path: Path) -> None:
-    changed = _snapshot_v2()
+def test_v3_rejects_producer_specific_coverage_kind(tmp_path: Path) -> None:
+    changed = _snapshot_v3()
     changed["coverage"][0]["kind"] = "maven-dependency-tree"
 
     with CodeMap(tmp_path) as codemap:
@@ -1889,10 +1889,10 @@ def test_v2_rejects_producer_specific_coverage_kind(tmp_path: Path) -> None:
             codemap.dependency_resolution_evidence(changed)
 
 
-def test_v2_complete_graph_coverage_refuses_inventory_only_source_authority(
+def test_v3_complete_graph_coverage_refuses_inventory_only_source_authority(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["evidence_sources"][0]["authorities"] = ["selection"]
     changed["coverage"][0]["evidence_sources"] = ["tree:compile"]
 
@@ -1905,10 +1905,10 @@ def test_v2_complete_graph_coverage_refuses_inventory_only_source_authority(
             codemap.dependency_resolution_evidence(changed)
 
 
-def test_v2_relationship_refuses_inventory_only_source_authority(
+def test_v3_relationship_refuses_inventory_only_source_authority(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["evidence_sources"].append(
         {
             "source_id": "fact:relationship:compile",
@@ -1930,8 +1930,8 @@ def test_v2_relationship_refuses_inventory_only_source_authority(
             codemap.dependency_resolution_evidence(changed)
 
 
-def test_v2_root_refuses_inventory_only_source_authority(tmp_path: Path) -> None:
-    changed = _snapshot_v2()
+def test_v3_root_refuses_inventory_only_source_authority(tmp_path: Path) -> None:
+    changed = _snapshot_v3()
     changed["evidence_sources"].append(
         {
             "source_id": "fact:root:compile",
@@ -1953,10 +1953,10 @@ def test_v2_root_refuses_inventory_only_source_authority(tmp_path: Path) -> None
             codemap.dependency_resolution_evidence(changed)
 
 
-def test_v2_complete_inventory_coverage_refuses_graph_only_source_authority(
+def test_v3_complete_inventory_coverage_refuses_graph_only_source_authority(
     tmp_path: Path,
 ) -> None:
-    changed = _snapshot_v2()
+    changed = _snapshot_v3()
     changed["evidence_sources"][2]["authorities"] = ["selection"]
     changed["coverage"][2]["evidence_sources"] = ["list:compile"]
 
