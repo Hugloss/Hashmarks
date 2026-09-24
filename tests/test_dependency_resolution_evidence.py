@@ -1199,6 +1199,7 @@ def test_v2_query_visit_accounting_never_exceeds_declared_bound(
     assert result["completeness"] == "incomplete"
     assert result["omissions"] == [{"reason": "visit-limit"}]
 
+
 def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
     tmp_path: Path,
 ) -> None:
