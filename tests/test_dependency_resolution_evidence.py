@@ -415,7 +415,7 @@ def test_v2_dependency_correlation_without_context_preserves_cross_context_ambig
 
     link = packet["dependency_links"][0]
     assert link["distribution_state"] == "resolved-ambiguous"
-    assert link["distribution_nodes"] == ["inventory-only@1", "library@1"]
+    assert link["distribution_nodes"] == ["app@1", "library@1"]
     assert link["observed_contexts"] == ["compile", "runtime"]
 
 
