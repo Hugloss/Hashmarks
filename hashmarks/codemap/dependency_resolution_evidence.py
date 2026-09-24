@@ -449,15 +449,18 @@ class DependencyResolutionEvidenceMixin:
                     f"duplicate dependency inventory membership: {node_id}:{context}"
                 )
             seen.add(key)
+            refs = cls._dependency_source_refs_v2(
+                raw.get("evidence_sources", ()),
+                label="inventory evidence source",
+                allowed=source_ids,
+            )
+            if not refs:
+                raise ValueError("inventory must reference evidence source")
             result.append(
                 {
                     "node_id": node_id,
                     "context": context,
-                    "evidence_sources": cls._dependency_source_refs_v2(
-                        raw.get("evidence_sources", ()),
-                        label="inventory evidence source",
-                        allowed=source_ids,
-                    ),
+                    "evidence_sources": refs,
                 }
             )
         return sorted(
@@ -485,6 +488,13 @@ class DependencyResolutionEvidenceMixin:
                 )
             if context not in contexts:
                 raise ValueError(f"unknown relationship context: {context}")
+            refs = cls._dependency_source_refs_v2(
+                raw.get("evidence_sources", ()),
+                label="relationship evidence source",
+                allowed=source_ids,
+            )
+            if not refs:
+                raise ValueError("relationship must reference evidence source")
             packet = {
                 "source": source,
                 "target": target,
@@ -496,11 +506,7 @@ class DependencyResolutionEvidenceMixin:
                     raw.get("effective_scope"), label="effective scope"
                 ),
                 "marker": _text(raw.get("marker"), label="relationship marker"),
-                "evidence_sources": cls._dependency_source_refs_v2(
-                    raw.get("evidence_sources", ()),
-                    label="relationship evidence source",
-                    allowed=source_ids,
-                ),
+                "evidence_sources": refs,
             }
             key = (
                 source,
@@ -658,6 +664,8 @@ class DependencyResolutionEvidenceMixin:
                 label="coverage evidence source",
                 allowed=source_ids,
             )
+            if not refs:
+                raise ValueError("coverage must reference evidence source")
             expected_source_kind = (
                 "resolution-graph"
                 if kind == "resolution-graph"
