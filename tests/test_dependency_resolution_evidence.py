@@ -1498,3 +1498,46 @@ def test_v2_component_present_identity_does_not_claim_negative_evidence(
     result = packet["results"][0]
     assert result["result"]
     assert result["negative_evidence"] == "not-applicable"
+
+
+def test_v2_component_absence_remains_authoritative_with_incomplete_resolution_coverage(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["coverage"][1]["completeness"] = "incomplete"
+    changed["coverage"][1]["truncation"] = "truncated"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "component", "component_id": "missing"}],
+        )
+
+    result = packet["results"][0]
+    assert result["result"] == []
+    assert result["completeness"] == "complete"
+    assert result["negative_evidence"] == "admissible-within-declared-scope"
+
+
+def test_v2_component_result_limit_does_not_weaken_exact_identity_lookup(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "component",
+                    "component_id": "library",
+                    "max_results": 1,
+                }
+            ],
+        )
+
+    result = packet["results"][0]
+    assert len(result["result"]) == 1
+    assert result["completeness"] == "complete"
+    assert result["omissions"] == []
