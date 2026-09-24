@@ -154,8 +154,6 @@ class DependencyResolutionEvidenceMixin:
         self._validate_dependency_coverage_facts_v3(
             coverage=coverage,
             roots=roots,
-            inventory=inventory,
-            relationships=relationships,
         )
         sources_by_id = {
             str(row["source_id"]): row
@@ -489,7 +487,7 @@ class DependencyResolutionEvidenceMixin:
         return sorted(result, key=lambda row: str(row["component_id"]))
 
     @staticmethod
-    def _dependency_context_list_v3(
+    def _dependency_identifier_list_v3(
         value: object, *, label: str, allowed: set[str]
     ) -> list[str]:
         if not isinstance(value, Sequence) or isinstance(
@@ -551,7 +549,7 @@ class DependencyResolutionEvidenceMixin:
                 raise ValueError(
                     "complete evidence source requires truncation=complete"
                 )
-            authorities = cls._dependency_context_list_v3(
+            authorities = cls._dependency_identifier_list_v3(
                 raw.get("authorities", ()),
                 label="evidence source authority",
                 allowed=_EVIDENCE_AUTHORITIES,
@@ -599,7 +597,7 @@ class DependencyResolutionEvidenceMixin:
             )
             if not refs:
                 raise ValueError("selection must reference evidence source")
-            selection_contexts = cls._dependency_context_list_v3(
+            selection_contexts = cls._dependency_identifier_list_v3(
                 raw.get("contexts", ()),
                 label="selection context",
                 allowed=contexts,
@@ -924,8 +922,6 @@ class DependencyResolutionEvidenceMixin:
         *,
         coverage: Sequence[Mapping[str, object]],
         roots: Sequence[Mapping[str, object]],
-        inventory: Sequence[Mapping[str, object]],
-        relationships: Sequence[Mapping[str, object]],
     ) -> None:
         for row in coverage:
             if row.get("completeness") != "complete":
