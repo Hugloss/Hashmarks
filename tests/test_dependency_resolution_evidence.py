@@ -674,29 +674,29 @@ def test_v2_contextual_module_ownership_preserves_independent_observations(
     ]
 
 
-def test_v2_producer_neutral_model_accepts_uv_contexts_without_maven_semantics(
+def test_v2_source_kind_is_opaque_when_semantic_authorities_are_explicit(
     tmp_path: Path,
 ) -> None:
     snapshot = {
         "schema": "hashmarks.dependency-resolution.v2",
-        "producer": {"kind": "uv-lock-projection", "schema_version": "1"},
+        "producer": {"kind": "fixture-resolver", "schema_version": "1"},
         "scope": {"python": "3.14", "platform": "linux"},
         "contexts": ["default", "dev"],
         "roots": [
             {
                 "node_id": "demo@workspace",
                 "context": "default",
-                "evidence_sources": ["uv:lock"],
+                "evidence_sources": ["resolver:lock"],
             },
             {
                 "node_id": "demo@workspace",
                 "context": "dev",
-                "evidence_sources": ["uv:lock"],
+                "evidence_sources": ["resolver:lock"],
             },
         ],
         "evidence_sources": [
             {
-                "source_id": "uv:lock",
+                "source_id": "resolver:lock",
                 "kind": "opaque-lock-format",
                 "authorities": ["resolution-graph","resolved-inventory","selection"],
                 "context": "",
@@ -715,7 +715,7 @@ def test_v2_producer_neutral_model_accepts_uv_contexts_without_maven_semantics(
                 "version": "0.1.0",
                 "source": "workspace",
                 "contexts": ["default", "dev"],
-                "evidence_sources": ["uv:lock"],
+                "evidence_sources": ["resolver:lock"],
             },
             {
                 "node_id": "pytest@9",
@@ -723,14 +723,14 @@ def test_v2_producer_neutral_model_accepts_uv_contexts_without_maven_semantics(
                 "version": "9.0.2",
                 "source": "registry",
                 "contexts": ["dev"],
-                "evidence_sources": ["uv:lock"],
+                "evidence_sources": ["resolver:lock"],
             },
         ],
         "inventory": [
             {
                 "node_id": "pytest@9",
                 "context": "dev",
-                "evidence_sources": ["uv:lock"],
+                "evidence_sources": ["resolver:lock"],
             }
         ],
         "relationships": [
@@ -741,7 +741,7 @@ def test_v2_producer_neutral_model_accepts_uv_contexts_without_maven_semantics(
                 "context": "dev",
                 "effective_scope": "dev",
                 "marker": "python_version >= '3.11'",
-                "evidence_sources": ["uv:lock"],
+                "evidence_sources": ["resolver:lock"],
             }
         ],
         "coverage": [
@@ -750,7 +750,7 @@ def test_v2_producer_neutral_model_accepts_uv_contexts_without_maven_semantics(
                 "kind": "resolution-graph",
                 "completeness": "complete",
                 "truncation": "complete",
-                "evidence_sources": ["uv:lock"],
+                "evidence_sources": ["resolver:lock"],
             }
         ],
         "repository_inputs": [],
@@ -760,7 +760,7 @@ def test_v2_producer_neutral_model_accepts_uv_contexts_without_maven_semantics(
         codemap.sync()
         packet = codemap.dependency_resolution_evidence(snapshot)
 
-    assert packet["producer"]["kind"] == "uv-lock-projection"
+    assert packet["producer"]["kind"] == "fixture-resolver"
     assert packet["contexts"] == ["default", "dev"]
     assert packet["relationships"][0]["context"] == "dev"
     assert "groupId" not in repr(packet)
@@ -1750,6 +1750,85 @@ def test_v2_complete_graph_coverage_requires_root_in_each_complete_context(
         codemap.sync()
         with pytest.raises(
             ValueError, match="complete resolution-graph coverage lacks root: compile"
+        ):
+            codemap.dependency_resolution_evidence(changed)
+
+
+def test_v2_inventory_requires_resolved_inventory_evidence_authority(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["evidence_sources"][2]["authorities"] = [
+        "module-ownership",
+        "selection",
+    ]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="inventory requires resolved-inventory evidence authority",
+        ):
+            codemap.dependency_resolution_evidence(changed)
+
+
+def test_v2_module_ownership_requires_module_ownership_evidence_authority(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["evidence_sources"][2]["authorities"] = [
+        "resolved-inventory",
+        "selection",
+    ]
+    changed["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        }
+    ]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="module ownership requires module-ownership evidence authority",
+        ):
+            codemap.dependency_resolution_evidence(changed)
+
+
+def test_v2_selection_requires_selection_evidence_authority(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["evidence_sources"][2]["authorities"] = [
+        "module-ownership",
+        "resolved-inventory",
+    ]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match=(
+                "selection context lacks selection evidence authority: "
+                "inventory-only@1:compile"
+            ),
+        ):
+            codemap.dependency_resolution_evidence(changed)
+
+
+def test_v2_rejects_producer_specific_coverage_kind(tmp_path: Path) -> None:
+    changed = _snapshot_v2()
+    changed["coverage"][0]["kind"] = "maven-dependency-tree"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="unsupported dependency coverage kind: maven-dependency-tree",
         ):
             codemap.dependency_resolution_evidence(changed)
 
