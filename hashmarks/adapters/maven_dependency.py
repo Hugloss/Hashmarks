@@ -218,8 +218,8 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 }
             )
             seen_inventory: set[str] = set()
-            module_capable_rows = 0
-            module_rows = 0
+            module_capable_nodes: set[str] = set()
+            module_nodes: set[str] = set()
             for line in lines:
                 match = _LIST_LINE.match(line)
                 if match is None:
@@ -239,7 +239,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 )
                 if node not in seen_inventory:
                     if packaging != "pom":
-                        module_capable_rows += 1
+                        module_capable_nodes.add(node)
                     inventory.append(
                         {
                             "node_id": node,
@@ -250,10 +250,10 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     seen_inventory.add(node)
                 module = match.group("module")
                 if module is not None:
-                    module_rows += 1
+                    module_nodes.add(node)
                     ownership[(_module_name(module), context)].add(node)
             module_completeness = (
-                "complete" if module_rows == module_capable_rows else "incomplete"
+                "complete" if module_nodes >= module_capable_nodes else "incomplete"
             )
             ownership_completeness[context] = module_completeness
             coverage.append(

@@ -246,3 +246,70 @@ def test_maven_pom_inventory_does_not_make_module_coverage_incomplete(
     assert coverage["resolved-inventory"]["completeness"] == "complete"
     assert coverage["module-ownership"]["completeness"] == "complete"
     assert observation["module_ownership"][0]["completeness"] == "complete"
+
+
+def test_maven_duplicate_inventory_rows_do_not_overclaim_module_completeness(
+    tmp_path: Path,
+) -> None:
+    inventory = b"""The following files have been resolved:
+   example.libs:owned:jar:3.0:test -- module example.owned
+   example.libs:owned:jar:3.0:test -- module example.owned
+"""
+    raw = maven_dependency_observation(trees={}, inventories={"test": inventory})
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(raw)
+
+    coverage = {
+        row["kind"]: row for row in observation["coverage"] if row["context"] == "test"
+    }
+    assert len(observation["inventory"]) == 1
+    assert coverage["module-ownership"]["completeness"] == "complete"
+
+
+def test_maven_duplicate_module_annotation_cannot_hide_unannotated_inventory(
+    tmp_path: Path,
+) -> None:
+    inventory = b"""The following files have been resolved:
+   example.libs:owned:jar:3.0:test -- module example.owned
+   example.libs:owned:jar:3.0:test -- module example.owned
+   example.libs:missing:jar:4.0:test
+"""
+    raw = maven_dependency_observation(trees={}, inventories={"test": inventory})
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(raw)
+
+    coverage = {
+        row["kind"]: row for row in observation["coverage"] if row["context"] == "test"
+    }
+    assert len(observation["inventory"]) == 2
+    assert coverage["module-ownership"]["completeness"] == "incomplete"
+
+
+def test_maven_conflicting_duplicate_module_annotations_preserve_ambiguity(
+    tmp_path: Path,
+) -> None:
+    inventory = b"""The following files have been resolved:
+   example.libs:owned:jar:3.0:test -- module example.one
+   example.libs:owned:jar:3.0:test -- module example.two
+"""
+    raw = maven_dependency_observation(trees={}, inventories={"test": inventory})
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(raw)
+
+    ownership = {
+        row["module"]: row["owners"] for row in observation["module_ownership"]
+    }
+    coverage = {
+        row["kind"]: row for row in observation["coverage"] if row["context"] == "test"
+    }
+    assert ownership == {
+        "example.one": ["example.libs:owned:jar:3.0"],
+        "example.two": ["example.libs:owned:jar:3.0"],
+    }
+    assert coverage["module-ownership"]["completeness"] == "complete"
