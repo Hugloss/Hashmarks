@@ -386,7 +386,7 @@ See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs
 
 ## Project status
 
-Current package version: **0.19.0**.
+Current package version: **0.20.0**.
 
 Hashmarks is under active development. Current repository-intelligence contracts are documented explicitly; new integrations should use the supported CLI, Python API, and MCP surfaces rather than historical development experiments.
 
