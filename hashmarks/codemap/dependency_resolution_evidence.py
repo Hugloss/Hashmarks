@@ -412,6 +412,17 @@ class DependencyResolutionEvidenceMixin:
         ):
             raise ValueError("dependency observation content identity mismatch")
 
+    def _require_current_dependency_observation_v3(
+        self, observation: Mapping[str, object]
+    ) -> None:
+        self._require_qualified_dependency_observation_v3(observation)
+        binding = cast("Mapping[str, object]", observation["repository_binding"])
+        if (
+            binding["repository_identity"] != self._repository_packet_identity()
+            or binding["codemap_generation"] != int(self.store.generation())
+        ):
+            raise ValueError("dependency observation repository binding mismatch")
+
     @classmethod
     def _validate_dependency_observation_sources_v3(
         cls,
@@ -1205,7 +1216,7 @@ class DependencyResolutionEvidenceMixin:
         import_target: str,
         context: str | None = None,
     ) -> dict[str, object]:
-        self._require_qualified_dependency_observation_v3(observation)
+        self._require_current_dependency_observation_v3(observation)
         candidates = self._python_import_module_candidates(source_path, import_target)
         rows = [
             row
@@ -1312,7 +1323,7 @@ class DependencyResolutionEvidenceMixin:
         Package semantics remain owned here.  The generic correlation owner receives
         only ordinary external anchors and repository locators.
         """
-        self._require_qualified_dependency_observation_v3(observation)
+        self._require_current_dependency_observation_v3(observation)
         raw_correlations = request.get("correlations", ())
         correlations = _objects(raw_correlations, label="correlations", limit=256)
         bundles: list[dict[str, object]] = []
