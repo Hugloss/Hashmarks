@@ -742,6 +742,54 @@ def test_v3_repository_binding_tracks_current_codemap_generation(
     assert binding["codemap_generation"] == expected_generation
 
 
+def test_v3_graph_query_refuses_node_outside_requested_context(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        with pytest.raises(
+            ValueError,
+            match="dependency query node_id not selected in context: inventory-only@1:runtime",
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "dependencies",
+                        "node_id": "inventory-only@1",
+                        "context": "runtime",
+                    }
+                ],
+            )
+
+
+def test_v3_graph_query_refuses_target_outside_requested_context(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        with pytest.raises(
+            ValueError,
+            match=(
+                "dependency query target_id not selected in context: "
+                "inventory-only@1:runtime"
+            ),
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "reachability",
+                        "node_id": "app@1",
+                        "target_id": "inventory-only@1",
+                        "context": "runtime",
+                    }
+                ],
+            )
+
+
 def test_v3_bounded_queries_report_dependencies_paths_and_contexts(
     tmp_path: Path,
 ) -> None:
