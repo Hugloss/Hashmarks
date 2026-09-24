@@ -1725,3 +1725,31 @@ def test_v2_complete_graph_coverage_refuses_inventory_only_source_authority(
             match="resolution-graph coverage requires resolution-graph evidence source",
         ):
             codemap.dependency_resolution_evidence(changed)
+
+
+def test_v2_relationship_refuses_inventory_only_source_authority(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["relationships"][0]["evidence_sources"] = ["list:compile"]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="relationship requires resolution-graph evidence source",
+        ):
+            codemap.dependency_resolution_evidence(changed)
+
+
+def test_v2_root_refuses_inventory_only_source_authority(tmp_path: Path) -> None:
+    changed = _snapshot_v2()
+    changed["roots"][0]["evidence_sources"] = ["list:compile"]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="root requires resolution-graph evidence source",
+        ):
+            codemap.dependency_resolution_evidence(changed)
