@@ -125,6 +125,7 @@ def test_maven_adapter_is_execution_free(monkeypatch) -> None:
     )
 
     assert raw["producer"]["kind"] == "maven-dependency-artifacts"
+    assert raw["scope"] == {}
     assert raw["contexts"] == ["compile"]
 
 
