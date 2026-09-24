@@ -1121,3 +1121,76 @@ def test_v2_path_query_reports_result_bound_only_when_a_path_is_omitted(
     assert len(result["result"]) == 1
     assert result["omissions"] == [{"reason": "result-limit"}]
     assert result["completeness"] == "incomplete"
+
+
+def _visit_limit_snapshot() -> dict[str, object]:
+    snapshot = _snapshot_v2()
+    snapshot["components"].extend(
+        [
+            {"component_id": "left", "name": "left", "ecosystem": "test"},
+            {"component_id": "right", "name": "right", "ecosystem": "test"},
+        ]
+    )
+    snapshot["selections"].extend(
+        [
+            {
+                "node_id": "left@1",
+                "component_id": "left",
+                "version": "1",
+                "source": "registry",
+                "contexts": ["compile"],
+                "evidence_sources": ["tree:compile"],
+            },
+            {
+                "node_id": "right@1",
+                "component_id": "right",
+                "version": "1",
+                "source": "registry",
+                "contexts": ["compile"],
+                "evidence_sources": ["tree:compile"],
+            },
+        ]
+    )
+    snapshot["relationships"] = [
+        {
+            "source": "app@1",
+            "target": "left@1",
+            "kind": "dependency",
+            "context": "compile",
+            "effective_scope": "compile",
+            "evidence_sources": ["tree:compile"],
+        },
+        {
+            "source": "app@1",
+            "target": "right@1",
+            "kind": "dependency",
+            "context": "compile",
+            "effective_scope": "compile",
+            "evidence_sources": ["tree:compile"],
+        },
+    ]
+    return snapshot
+
+
+@pytest.mark.parametrize("operation", ["dependencies", "reachability", "paths"])
+def test_v2_query_visit_accounting_never_exceeds_declared_bound(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    request = {
+        "operation": operation,
+        "node_id": "app@1",
+        "context": "compile",
+        "max_visits": 1,
+    }
+    if operation in {"reachability", "paths"}:
+        request["target_id"] = "inventory-only@1"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_visit_limit_snapshot())
+        result = codemap.dependency_resolution_queries(observation, [request])["results"][0]
+
+    assert result["bounds"]["visited"] <= result["bounds"]["max_visits"]
+    assert result["completeness"] == "incomplete"
+    assert result["omissions"] == [{"reason": "visit-limit"}]
