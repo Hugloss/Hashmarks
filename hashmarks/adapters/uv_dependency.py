@@ -112,7 +112,10 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         )
     ]
     if not roots:
-        raise ValueError("uv lock does not identify a virtual project root")
+        raise ValueError(
+            "uv.lock alone does not identify a project root; "
+            "workspace membership evidence is required"
+        )
 
     relationships: list[dict[str, object]] = []
     for row in packages:
