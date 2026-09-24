@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from .dependency_resolution_query import dependency_queries
 
@@ -50,6 +50,50 @@ def _identity(domain: str, value: object) -> str:
         "sha256:"
         + hashlib.sha256(domain.encode("utf-8") + b"\0" + _canonical(value)).hexdigest()
     )
+
+
+def _dependency_identities_v3(packet: Mapping[str, object]) -> tuple[str, str, str]:
+    definition = {
+        "scope": packet["scope"],
+        "contexts": packet["contexts"],
+        "roots": packet["roots"],
+    }
+    resolution = {
+        key: packet[key]
+        for key in ("components", "selections", "inventory", "relationships")
+    }
+    definition_identity = _identity(
+        "hashmarks.dependency-resolution-definition.v3", definition
+    )
+    identity_resolution = {
+        key: [
+            {
+                field: value
+                for field, value in row.items()
+                if field != "evidence_sources"
+            }
+            for row in _objects(rows, label=key, limit=_MAX_INVENTORY)
+        ]
+        for key, rows in resolution.items()
+    }
+    resolution_identity = _identity(
+        "hashmarks.dependency-resolution-graph.v3",
+        {"definition_identity": definition_identity, **identity_resolution},
+    )
+    observation_payload = {
+        "resolution_identity": resolution_identity,
+        "producer": packet["producer"],
+        "repository_binding": packet["repository_binding"],
+        "repository_inputs": packet["repository_inputs"],
+        "root_evidence": packet["root_evidence"],
+        "module_ownership": packet["module_ownership"],
+        "evidence_sources": packet["evidence_sources"],
+        "coverage": packet["coverage"],
+    }
+    observation_identity = _identity(
+        "hashmarks.dependency-resolution-observation.v3", observation_payload
+    )
+    return definition_identity, resolution_identity, observation_identity
 
 
 def _identifier(value: object, *, label: str) -> str:
@@ -202,32 +246,18 @@ class DependencyResolutionEvidenceMixin:
             "inventory": inventory,
             "relationships": relationships,
         }
-        definition_identity = _identity(
-            "hashmarks.dependency-resolution-definition.v3", definition
-        )
-        identity_resolution = {
-            key: [
-                {
-                    field: value
-                    for field, value in row.items()
-                    if field != "evidence_sources"
-                }
-                for row in rows
-            ]
-            for key, rows in resolution.items()
-        }
-        resolution_identity = _identity(
-            "hashmarks.dependency-resolution-graph.v3",
-            {"definition_identity": definition_identity, **identity_resolution},
-        )
-
         repository_binding = {
             "repository_identity": self._repository_packet_identity(),
             "codemap_generation": int(self.store.generation()),
         }
-        observation_payload = {
-            "resolution_identity": resolution_identity,
+        negative = self._dependency_negative_evidence_v3(coverage)
+        packet = {
+            "schema": _SCHEMA_V3,
+            "authority": "qualified-external-observation",
+            "producer_authority": "caller-claimed",
             "producer": producer_packet,
+            **definition,
+            **resolution,
             "repository_binding": repository_binding,
             "repository_inputs": repository_inputs,
             "root_evidence": [
@@ -241,28 +271,203 @@ class DependencyResolutionEvidenceMixin:
             "module_ownership": module_ownership,
             "evidence_sources": evidence_sources,
             "coverage": coverage,
+            "negative_evidence": negative,
         }
-        observation_identity = _identity(
-            "hashmarks.dependency-resolution-observation.v3", observation_payload
+        definition_identity, resolution_identity, observation_identity = (
+            _dependency_identities_v3(packet)
         )
-        negative = self._dependency_negative_evidence_v3(coverage)
         return {
-            "schema": _SCHEMA_V3,
-            "authority": "qualified-external-observation",
-            "producer_authority": "caller-claimed",
+            **packet,
             "definition_identity": definition_identity,
             "resolution_identity": resolution_identity,
             "observation_identity": observation_identity,
-            "producer": producer_packet,
-            **definition,
-            **resolution,
-            "repository_binding": repository_binding,
-            "repository_inputs": repository_inputs,
-            "module_ownership": module_ownership,
-            "evidence_sources": evidence_sources,
-            "coverage": coverage,
-            "negative_evidence": negative,
         }
+
+    @classmethod
+    def _require_qualified_dependency_observation_v3(
+        cls, observation: Mapping[str, object]
+    ) -> None:
+        fields = {
+            "schema",
+            "authority",
+            "producer_authority",
+            "definition_identity",
+            "resolution_identity",
+            "observation_identity",
+            "producer",
+            "scope",
+            "contexts",
+            "roots",
+            "components",
+            "selections",
+            "inventory",
+            "relationships",
+            "repository_binding",
+            "repository_inputs",
+            "root_evidence",
+            "module_ownership",
+            "evidence_sources",
+            "coverage",
+            "negative_evidence",
+        }
+        if not isinstance(observation, Mapping) or set(observation) != fields:
+            raise ValueError("dependency observation is not a qualified v3 packet")
+        if observation["schema"] != _SCHEMA_V3 or (
+            observation["authority"] != "qualified-external-observation"
+            or observation["producer_authority"] != "caller-claimed"
+        ):
+            raise ValueError("dependency observation authority is malformed")
+
+        producer, scope, contexts, context_set = cls._dependency_header_v3(observation)
+        sources = cls._dependency_evidence_sources_v3(
+            observation["evidence_sources"], context_set
+        )
+        source_ids = {str(row["source_id"]) for row in sources}
+        components = cls._dependency_components_v3(observation["components"])
+        component_ids = {str(row["component_id"]) for row in components}
+        selections = cls._dependency_selections_v3(
+            observation["selections"], component_ids, context_set, source_ids
+        )
+        node_ids = {str(row["node_id"]) for row in selections}
+        if component_ids - {str(row["component_id"]) for row in selections}:
+            raise ValueError("dependency component has no selection")
+        inventory = cls._dependency_inventory_v3(
+            observation["inventory"], node_ids, context_set, source_ids
+        )
+        relationships = cls._dependency_relationships_v3(
+            observation["relationships"], node_ids, context_set, source_ids
+        )
+        roots = cls._dependency_roots_v3(
+            observation["root_evidence"], node_ids, context_set, source_ids
+        )
+        module_ownership = cls._dependency_module_ownership_v3(
+            observation["module_ownership"], node_ids, context_set, source_ids
+        )
+        coverage = cls._dependency_coverage_v3(
+            observation["coverage"], context_set, sources
+        )
+        sources_by_id = {str(row["source_id"]): row for row in sources}
+        cls._validate_dependency_context_membership_v3(
+            roots=roots,
+            inventory=inventory,
+            relationships=relationships,
+            selections=selections,
+        )
+        cls._validate_dependency_resolution_source_contexts_v3(
+            roots=roots,
+            inventory=inventory,
+            relationships=relationships,
+            sources_by_id=sources_by_id,
+        )
+        cls._validate_dependency_fact_source_authority_v3(
+            roots=roots,
+            inventory=inventory,
+            relationships=relationships,
+            sources_by_id=sources_by_id,
+        )
+        cls._validate_dependency_module_source_authority_v3(
+            module_ownership=module_ownership,
+            selections=selections,
+            sources_by_id=sources_by_id,
+        )
+        cls._validate_dependency_selection_source_contexts_v3(
+            selections=selections, sources_by_id=sources_by_id
+        )
+
+        expected = {
+            "producer": producer,
+            "scope": scope,
+            "contexts": sorted(contexts),
+            "roots": [
+                {
+                    field: value
+                    for field, value in row.items()
+                    if field != "evidence_sources"
+                }
+                for row in roots
+            ],
+            "components": components,
+            "selections": selections,
+            "inventory": inventory,
+            "relationships": relationships,
+            "root_evidence": [
+                {
+                    "node_id": row["node_id"],
+                    "context": row["context"],
+                    "evidence_sources": row["evidence_sources"],
+                }
+                for row in roots
+            ],
+            "module_ownership": module_ownership,
+            "evidence_sources": sources,
+            "coverage": coverage,
+            "negative_evidence": cls._dependency_negative_evidence_v3(coverage),
+        }
+        if any(
+            _canonical(observation[field]) != _canonical(value)
+            for field, value in expected.items()
+        ):
+            raise ValueError("dependency observation is not normalized")
+
+        binding = observation["repository_binding"]
+        if not isinstance(binding, Mapping) or set(binding) != {
+            "repository_identity",
+            "codemap_generation",
+        }:
+            raise ValueError("dependency repository binding is malformed")
+        binding_packet = cast("Mapping[str, object]", binding)
+        repository_identity = binding_packet.get("repository_identity")
+        generation = binding_packet.get("codemap_generation")
+        if (
+            not isinstance(repository_identity, str)
+            or not repository_identity
+            or not isinstance(generation, int)
+            or isinstance(generation, bool)
+            or generation < 0
+        ):
+            raise ValueError("dependency repository binding is malformed")
+        inputs = _objects(
+            observation["repository_inputs"],
+            label="repository_inputs",
+            limit=_MAX_INPUTS,
+        )
+        paths: list[str] = []
+        for row in inputs:
+            if set(row) != {
+                "path",
+                "claimed_member_revision",
+                "observed_member_revision",
+                "source_equivalence",
+                "repository_state",
+            }:
+                raise ValueError("dependency repository input is malformed")
+            paths.append(_identifier(row["path"], label="repository input path"))
+            claimed = row["claimed_member_revision"]
+            observed = row["observed_member_revision"]
+            if any(
+                revision is not None and not _MEMBER_REVISION.fullmatch(str(revision))
+                for revision in (claimed, observed)
+            ):
+                raise ValueError("dependency repository input revision is malformed")
+            equivalence = (
+                "unknown"
+                if claimed is None or observed is None
+                else "proven"
+                if claimed == observed
+                else "mismatch"
+            )
+            if row["source_equivalence"] != equivalence:
+                raise ValueError("dependency repository input equivalence is malformed")
+        if paths != sorted(set(paths)):
+            raise ValueError("dependency repository inputs are not normalized")
+
+        identities = _dependency_identities_v3(observation)
+        if identities != (
+            observation["definition_identity"],
+            observation["resolution_identity"],
+            observation["observation_identity"],
+        ):
+            raise ValueError("dependency observation content identity mismatch")
 
     @staticmethod
     def _dependency_header_v3(
@@ -947,11 +1152,7 @@ class DependencyResolutionEvidenceMixin:
         import_target: str,
         context: str | None = None,
     ) -> dict[str, object]:
-        schema = observation.get("schema")
-        if schema != _SCHEMA_V3:
-            raise ValueError(
-                "dependency import correspondence requires a qualified observation"
-            )
+        self._require_qualified_dependency_observation_v3(observation)
         candidates = self._python_import_module_candidates(source_path, import_target)
         rows = [
             row
@@ -1058,11 +1259,7 @@ class DependencyResolutionEvidenceMixin:
         Package semantics remain owned here.  The generic correlation owner receives
         only ordinary external anchors and repository locators.
         """
-        schema = observation.get("schema")
-        if schema != _SCHEMA_V3:
-            raise ValueError(
-                "dependency evidence correlation requires a qualified observation"
-            )
+        self._require_qualified_dependency_observation_v3(observation)
         raw_correlations = request.get("correlations", ())
         correlations = _objects(raw_correlations, label="correlations", limit=256)
         bundles: list[dict[str, object]] = []
@@ -1167,8 +1364,9 @@ class DependencyResolutionEvidenceMixin:
         observation: Mapping[str, object],
         requests: Sequence[Mapping[str, object]],
     ) -> dict[str, object]:
-        if observation.get("schema") != _SCHEMA_V3:
-            raise ValueError("dependency queries require qualified v3 observation")
+        DependencyResolutionEvidenceMixin._require_qualified_dependency_observation_v3(
+            observation
+        )
         return dependency_queries(observation, requests)
 
     @staticmethod
@@ -1322,9 +1520,9 @@ class DependencyResolutionEvidenceMixin:
         before: Mapping[str, object],
         after: Mapping[str, object],
     ) -> dict[str, object]:
-        if before.get("schema") != _SCHEMA_V3 or after.get("schema") != _SCHEMA_V3:
-            raise ValueError(
-                "dependency resolution delta requires matching qualified v3 observations"
+        for observation in (before, after):
+            DependencyResolutionEvidenceMixin._require_qualified_dependency_observation_v3(
+                observation
             )
         return DependencyResolutionEvidenceMixin._dependency_resolution_delta_v3(
             before, after

@@ -272,8 +272,13 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             and str(row.get("component_id") or "") == component_id
         ]
         result: object = _limited(rows, max_results=max_results, omissions=omissions)
+        source_complete = _coverage_complete(observation, context="", kind="selection")
         if not rows:
-            negative_evidence = "admissible-within-declared-scope"
+            negative_evidence = (
+                "admissible-within-declared-scope"
+                if source_complete
+                else "not-admissible"
+            )
     elif operation == "inventory":
         rows = [
             dict(row)
@@ -317,10 +322,11 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
         source_complete = _coverage_complete(
             observation, context=context, kind="module-ownership"
         )
-        if not rows:
+        if not any(row.get("owners") for row in rows):
             negative_evidence = (
                 "admissible-within-declared-scope"
                 if source_complete
+                and all(row.get("completeness") == "complete" for row in rows)
                 else "not-admissible"
             )
     else:

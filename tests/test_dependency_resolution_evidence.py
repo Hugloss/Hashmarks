@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from pathlib import Path
 
 import pytest
@@ -214,6 +215,74 @@ def test_v3_separates_component_selection_and_observation_identity(
 
     assert first["resolution_identity"] == second["resolution_identity"]
     assert first["observation_identity"] != second["observation_identity"]
+
+
+def test_v3_public_consumers_revalidate_qualified_observation(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        assert observation["root_evidence"]
+        reopened = json.loads(json.dumps(observation))
+        assert (
+            codemap.dependency_resolution_queries(
+                reopened, [{"operation": "inventory", "node_id": "missing"}]
+            )["observation_identity"]
+            == observation["observation_identity"]
+        )
+        tampered = copy.deepcopy(observation)
+        tampered["producer"]["kind"] = "changed-after-qualification"
+
+        consumers = (
+            lambda: codemap.dependency_resolution_queries(
+                tampered, [{"operation": "inventory", "node_id": "missing"}]
+            ),
+            lambda: codemap.dependency_resolution_delta(observation, tampered),
+            lambda: codemap.dependency_import_correspondence(
+                tampered, source_path="app.py", import_target="library"
+            ),
+            lambda: codemap.dependency_evidence_correlation(
+                tampered, {"correlations": []}
+            ),
+        )
+        for consume in consumers:
+            with pytest.raises(ValueError, match="content identity mismatch"):
+                consume()
+
+
+def test_v3_revalidation_rejects_unqualified_coverage_claim(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        tampered = copy.deepcopy(observation)
+        tampered["coverage"].append(
+            {
+                "context": "runtime",
+                "kind": "resolved-inventory",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["invented-source"],
+            }
+        )
+        with pytest.raises(ValueError, match="dangling coverage evidence source"):
+            codemap.dependency_resolution_queries(
+                tampered, [{"operation": "inventory", "node_id": "missing"}]
+            )
+
+
+def test_v3_revalidation_binds_root_evidence_sources(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        tampered = copy.deepcopy(observation)
+        tampered["root_evidence"][0]["evidence_sources"] = ["list:compile"]
+        with pytest.raises(ValueError, match="root requires resolution-graph"):
+            codemap.dependency_resolution_queries(
+                tampered, [{"operation": "inventory", "node_id": "missing"}]
+            )
 
 
 def test_v3_identity_separates_semantics_from_producer_provenance(
@@ -831,6 +900,87 @@ def test_v3_contextual_module_ownership_preserves_independent_observations(
         ("library.module", "compile"),
         ("library.module", "runtime"),
     ]
+
+
+def test_v3_explicit_empty_complete_module_ownership_is_negative_evidence(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v3()
+    snapshot["coverage"].append(
+        {
+            "context": "compile",
+            "kind": "module-ownership",
+            "completeness": "complete",
+            "truncation": "complete",
+            "evidence_sources": ["list:compile"],
+        }
+    )
+    snapshot["module_ownership"] = [
+        {
+            "module": "missing.module",
+            "context": "compile",
+            "owners": [],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "module-owners",
+                    "module": "missing.module",
+                    "context": "compile",
+                }
+            ],
+        )["results"][0]
+
+    assert result["result"][0]["state"] == "unresolved"
+    assert result["result"][0]["owners"] == []
+    assert result["negative_evidence"] == "admissible-within-declared-scope"
+
+
+def test_v3_explicit_empty_unknown_module_ownership_is_not_negative_evidence(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v3()
+    snapshot["coverage"].append(
+        {
+            "context": "compile",
+            "kind": "module-ownership",
+            "completeness": "complete",
+            "truncation": "complete",
+            "evidence_sources": ["list:compile"],
+        }
+    )
+    snapshot["module_ownership"] = [
+        {
+            "module": "missing.module",
+            "context": "compile",
+            "owners": [],
+            "completeness": "unknown",
+            "evidence_sources": ["list:compile"],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "module-owners",
+                    "module": "missing.module",
+                    "context": "compile",
+                }
+            ],
+        )["results"][0]
+
+    assert result["result"][0]["owners"] == []
+    assert result["negative_evidence"] == "not-admissible"
 
 
 def test_v3_source_kind_is_opaque_when_semantic_authorities_are_explicit(
@@ -1791,6 +1941,25 @@ def test_v3_component_unknown_identity_is_authoritative_absence(tmp_path: Path) 
     result = packet["results"][0]
     assert result["result"] == []
     assert result["negative_evidence"] == "admissible-within-declared-scope"
+
+
+def test_v3_component_absence_requires_complete_selection_coverage(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v3()
+    snapshot["coverage"] = [
+        row for row in snapshot["coverage"] if row["kind"] != "selection"
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        result = codemap.dependency_resolution_queries(
+            observation, [{"operation": "component", "component_id": "missing"}]
+        )["results"][0]
+
+    assert result["result"] == []
+    assert result["completeness"] == "incomplete"
+    assert result["negative_evidence"] == "not-admissible"
 
 
 def test_v3_component_present_identity_does_not_claim_negative_evidence(
