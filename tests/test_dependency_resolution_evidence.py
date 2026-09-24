@@ -1527,3 +1527,20 @@ def test_v2_module_ownership_requires_inventory_evidence_source(
         codemap.sync()
         with pytest.raises(ValueError, match="module ownership evidence source kind"):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+@pytest.mark.parametrize(
+    ("section", "index"),
+    [("relationships", 0), ("inventory", 0), ("coverage", 0)],
+)
+def test_v2_authoritative_dependency_facts_require_provenance(
+    tmp_path: Path,
+    section: str,
+    index: int,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot[section][index]["evidence_sources"] = []
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="must reference evidence source"):
+            codemap.dependency_resolution_evidence(snapshot)
