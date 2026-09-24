@@ -1,0 +1,12 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+[*.{py,pyi,toml,yml,yaml,json,js,jsx,ts,tsx,css,html,sh}]
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
