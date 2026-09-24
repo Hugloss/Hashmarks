@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.19.0 — Development
+## 0.20.0 — Development
 
-- Begin the 0.19.0 development line.
+- Begin the 0.20.0 development line.
 - Generalize dependency-resolution evidence as `hashmarks.dependency-resolution.v3`: package-manager/source-format `kind` is opaque provenance, semantic authorities are explicit, one physical artifact may support several authorities, Maven/uv-specific syntax terminates in adapters, and semantic coverage remains separate from source completeness.
 
 ## 0.18.0 — Locked qualification authority and documentation cleanup

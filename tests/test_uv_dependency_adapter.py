@@ -105,7 +105,7 @@ def test_uv_lock_adapter_does_not_promote_declared_metadata_to_resolution() -> N
 
     assert len(raw["relationships"]) == 1
     assert raw["relationships"][0]["kind"] == "dependency"
-    assert raw["scope"]["evidence"] == "uv-lock"
+    assert raw["scope"] == {"requires_python": ">=3.11"}
     assert raw["module_ownership"] == []
 
 

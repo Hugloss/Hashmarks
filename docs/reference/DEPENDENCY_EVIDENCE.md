@@ -67,6 +67,8 @@ Source completeness and semantic coverage are separate axes. Source completeness
 
 Semantic authorities are producer/caller declarations inside an external observation. Core qualification checks that facts and coverage do not exceed those declarations; it does not infer authority from `kind` or independently certify the external producer. Repository truth remains governed by the normal Hashmarks correlation and repository-evidence boundaries.
 
+`producer_digest` is an adapter-computed or caller-supplied byte fingerprint; core does not independently verify arbitrary external bytes. It does not establish physical artifact identity: two distinct artifacts can have identical bytes. Core enforces unique `source_id` values within an observation, while each adapter is responsible for assigning one source identity to each supplied artifact and reusing that identity across all of its semantic authorities.
+
 The invariant is **not**:
 
 > A fact of type X must come from source kind Y.
@@ -90,11 +92,19 @@ The shared model owns these concepts independently of producer syntax:
 
 Producer-native coordinates, lockfile source tables, Maven scopes/classifiers, workspace encodings, command output prefixes, and similar details are adapter concerns. They may be normalized into general fields only when the general field has the same meaning.
 
+`scope` is an opaque JSON map of semantic conditions under which the same resolution question is asked. It may be empty. Adapters must keep producer format, evidence names, and ecosystem labels out of `scope`; those belong in `producer`, source `kind`, or other provenance fields. Core hashes the canonical map without interpreting its keys. A change to a semantic condition, such as an interpreter constraint, changes the definition.
+
+`definition_identity` covers semantic scope, contexts, and roots without evidence references. `resolution_identity` covers that definition and the semantic components, selections, inventory, and relationships. `observation_identity` also binds producer metadata, physical evidence sources, coverage, module ownership, repository inputs, and repository binding. Changing only the producer therefore preserves resolution comparability while changing the observation identity. Delta remains factual and does not certify either producer.
+
+Qualified observations expose `root_evidence` separately from semantic `roots`, so consumers can revalidate the evidence references bound by `observation_identity`. Public dependency queries, deltas, correspondence, and correlation revalidate normalized structure and content identities before using a supplied packet. This detects alteration or inconsistent reuse; because the hashes are not signatures, it does not authenticate the external producer or turn caller-declared authority into repository truth.
+
 ## Coverage and negative evidence
 
 Coverage `kind` is a semantic domain, not a producer/source format. The current coverage domains are `selection`, `resolution-graph`, `resolved-inventory`, and `module-ownership`.
 
 `selection` coverage owns exhaustiveness of selected-node/context membership and therefore bounds `contexts` query completeness. Graph coverage owns graph traversal/absence, inventory coverage owns inventory membership/absence, and module-ownership coverage owns module-owner absence. One domain must not stand in for another merely because a current producer emits them together.
+
+A missing component ID is admissible absence only when selection coverage is complete in every declared context. An explicit module-ownership row with no owners retains `state: unresolved` to describe link cardinality; it supports an absent-owner query result only when both that row and the relevant module-ownership coverage are complete. Incomplete or unknown rows do not become negative evidence because another source declared complete coverage.
 
 A coverage claim must:
 
@@ -103,6 +113,10 @@ A coverage claim must:
 3. remain within the cited source context;
 4. never claim `complete` when any cited source is incomplete or truncated;
 5. preserve empty-but-complete observations when emptiness itself is valid negative evidence.
+
+Every cited source must support the claimed fact or coverage domain; one qualified source cannot lend its authority to another source listed in the same row. Complete graph coverage does not require a root: an empty graph and a graph whose producer identifies no root are both valid observations. Absence is admissible only within the separately complete, untruncated coverage domain and declared context.
+
+Dependency negative evidence, ownership, queries, deltas, and correspondence retain `producer_authority: caller-claimed`. Their `qualified-external-observation` authority describes Hashmarks' structural qualification of a caller claim, not independent proof of the producer's truth. MCP and correlation envelopes that combine repository and external evidence label the dependency subprojection explicitly.
 
 Do not infer negative evidence from the mere existence of a producer artifact. Negative evidence comes from qualified semantic coverage.
 

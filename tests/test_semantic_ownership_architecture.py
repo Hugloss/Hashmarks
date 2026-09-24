@@ -1,14 +1,59 @@
 from __future__ import annotations
 
 import ast
+import importlib.util
 from pathlib import Path
+
+from hashmarks.python_ast_cache import read_python_ast
 
 ROOT = Path(__file__).resolve().parents[1]
 CODEMAP = ROOT / "hashmarks" / "codemap"
 
 
 def _tree(path: Path) -> ast.AST:
-    return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    return read_python_ast(path).tree
+
+
+def test_dependency_core_cannot_branch_on_producer_format_or_import_adapters() -> None:
+    forbidden = (
+        "maven",
+        "uv-lock",
+        "gradle",
+        "npm",
+        "dependency-tree",
+        "dependency-list",
+        "classifier",
+        "groupId",
+        "artifactId",
+    )
+    violations: list[str] = []
+    for name in ("dependency_resolution_evidence.py", "dependency_resolution_query.py"):
+        path = CODEMAP / name
+        for node in ast.walk(_tree(path)):
+            if isinstance(node, ast.Import):
+                modules = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                module = (
+                    importlib.util.resolve_name(
+                        "." * node.level + (node.module or ""), "hashmarks.codemap"
+                    )
+                    if node.level
+                    else node.module or ""
+                )
+                modules = [module, *(f"{module}.{alias.name}" for alias in node.names)]
+            else:
+                modules = []
+            if any(module.startswith("hashmarks.adapters") for module in modules):
+                violations.append(f"{name}:{node.lineno}:adapter import")
+            if isinstance(node, (ast.Compare, ast.Match)):
+                values = (
+                    child.value
+                    for child in ast.walk(node)
+                    if isinstance(child, ast.Constant) and isinstance(child.value, str)
+                )
+                if any(any(term in value for term in forbidden) for value in values):
+                    violations.append(f"{name}:{node.lineno}:producer branch")
+    assert violations == []
 
 
 def test_repository_member_observation_has_one_semantic_owner() -> None:

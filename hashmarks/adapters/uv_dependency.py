@@ -198,11 +198,11 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "schema_version": str(document.get("version") or ""),
             "revision": str(document.get("revision") or ""),
         },
-        "scope": {
-            "ecosystem": "pypi",
-            "evidence": "uv-lock",
-            "requires_python": str(document.get("requires-python") or ""),
-        },
+        "scope": (
+            {"requires_python": str(document["requires-python"])}
+            if document.get("requires-python")
+            else {}
+        ),
         "contexts": [_CONTEXT],
         "roots": sorted(
             (

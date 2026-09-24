@@ -31,7 +31,7 @@ def test_process_sensitive_and_empirical_members_are_not_release_correctness() -
     root = _root()
     selected = set(release_correctness_nodeids(root))
     assert (
-        "tests/test_codemap.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon"
+        "tests/test_codemap_watcher.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon"
         not in selected
     )
     assert (

@@ -40,26 +40,21 @@ jobs:
       - name: Git whitespace in candidate diff
         run: git diff --check HEAD^1 HEAD --
   ruff-debt:
-    name: Ruff debt no-growth
+    name: Current Ruff and size gates
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 2
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
       - run: uv python install 3.11
       - name: Materialize locked Ruff environment
         run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --frozen --only-group lint --python 3.11
-      - name: Resolve previous-main Ruff debt baseline
-        run: git show HEAD^1:ruff-debt-baseline.json > "$RUNNER_TEMP/ruff-debt-baseline.previous.json"
-      - name: Enforce Ruff debt no-growth
-        env:
-          RUFF_DEBT_PREVIOUS_BASELINE: ${{ runner.temp }}/ruff-debt-baseline.previous.json
-        run: make lint-debt-gate
+      - name: Enforce configured Ruff and zero complexity debt
+        run: make lint
       - name: Exact current Ruff debt inventory
         if: always()
         continue-on-error: true
@@ -269,4 +264,3 @@ jobs:
             fi
           done
           test "$failed" -eq 0
-

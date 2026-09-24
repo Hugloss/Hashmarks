@@ -76,10 +76,10 @@ def inventory() -> list[dict[str, object]]:
 
 def _oversized_production_files() -> dict[str, int]:
     oversized: dict[str, int] = {}
-    for path in sorted(Path("hashmarks").rglob("*.py")):
+    for path in sorted((ROOT / "hashmarks").rglob("*.py")):
         line_count = len(path.read_text(encoding="utf-8").splitlines())
         if line_count > MAX_PYTHON_FILE_LINES:
-            oversized[path.as_posix()] = line_count
+            oversized[path.relative_to(ROOT).as_posix()] = line_count
     return oversized
 
 
@@ -115,139 +115,15 @@ def _summary(findings: list[dict[str, object]]) -> dict[str, object]:
     }
 
 
-def _baseline_contract_failure(
-    summary: dict[str, object], baseline: dict[str, object]
-) -> str | None:
-    if baseline.get("schema") != summary["schema"]:
-        return "debt baseline schema mismatch; regenerate from exact Ruff inventory"
-    if baseline.get("limits") != summary["limits"]:
-        return "Ruff limits changed; review the configured thresholds and baseline"
-    if baseline.get("max_python_file_lines") != summary["max_python_file_lines"]:
-        return (
-            "production line ceiling changed: "
-            f"{baseline.get('max_python_file_lines')} -> "
-            f"{summary['max_python_file_lines']}"
-        )
-    return None
-
-
-def _baseline_failures(
-    summary: dict[str, object], baseline: dict[str, object]
-) -> list[str]:
-    contract_failure = _baseline_contract_failure(summary, baseline)
-    if contract_failure is not None:
-        return [contract_failure]
-    current_files = dict(summary["files"])
-    baseline_files = dict(baseline["files"])
-    failures: list[str] = []
-    for path, current in current_files.items():
-        before = baseline_files.get(path)
-        if before is None:
-            failures.append(f"new debt file: {path} excess={current['excess']}")
-            continue
-        if current["excess"] > before["excess"]:
-            failures.append(
-                f"debt increased: {path} {before['excess']} -> {current['excess']}"
-            )
-    if int(summary["excess"]) > int(baseline["excess"]):
-        failures.append(
-            f"total debt increased: {baseline['excess']} -> {summary['excess']}"
-        )
-    for path, lines in dict(summary["oversized_files"]).items():
-        failures.append(
-            f"production file too long: {path} {lines} > {MAX_PYTHON_FILE_LINES} lines"
-        )
-    return failures
-
-
 def _parse_args():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Exact Ruff diagnostic inventory and no-growth budget."
+        description="Exact current Ruff complexity inventory and production size gate."
     )
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--summary-only", action="store_true")
-    parser.add_argument("--write-baseline", type=Path)
-    parser.add_argument("--baseline", type=Path)
-    parser.add_argument("--previous-baseline", type=Path)
     return parser.parse_args()
-
-
-def _write_baseline(path: Path | None, summary: dict[str, object]) -> None:
-    if path is not None:
-        path.write_text(
-            json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-
-
-def _report_new_debt(summary: dict[str, object], baseline: dict[str, object]) -> None:
-    log_command_output(logger, "NEW MAINTAINABILITY DEBT — BLOCKED")
-    baseline_files = dict(baseline["files"])
-    summary_files = dict(summary["files"])
-    for finding in summary["findings"]:
-        path = str(finding["path"])
-        current = summary_files[path]
-        before = baseline_files.get(path)
-        if before is not None and current["excess"] <= before["excess"]:
-            continue
-        rules = ", ".join(
-            f"{rule} {value} > {LIMITS[rule]}"
-            for rule, value in dict(finding["violations"]).items()
-        )
-        log_command_output(logger, f"  {path}:{finding['line']}  {rules}")
-
-
-def _report_baseline(args, summary: dict[str, object]) -> int | None:
-    if args.baseline is None:
-        if args.previous_baseline is not None:
-            raise ValueError("--previous-baseline requires --baseline")
-        return None
-    baseline = json.loads(args.baseline.read_text(encoding="utf-8"))
-    failures: list[str] = []
-    previous = None
-    if args.previous_baseline is not None:
-        previous = json.loads(args.previous_baseline.read_text(encoding="utf-8"))
-        failures.extend(
-            f"baseline mutation: {failure}"
-            for failure in _baseline_failures(baseline, previous)
-        )
-    failures.extend(_baseline_failures(summary, baseline))
-    if args.json:
-        log_command_output(
-            logger,
-            json.dumps(
-                {
-                    "summary": summary,
-                    "baseline": baseline,
-                    "previous_baseline": previous,
-                    "failures": failures,
-                },
-                sort_keys=True,
-            ),
-        )
-    else:
-        log_command_output(
-            logger,
-            f"Ruff debt excess: {summary['excess']} (baseline {baseline['excess']})",
-        )
-        if previous is not None:
-            log_command_output(
-                logger,
-                "Previous-main baseline excess: "
-                f"{previous['excess']} -> candidate {baseline['excess']}",
-            )
-        log_command_output(
-            logger,
-            "Production file line ceiling: "
-            f"{MAX_PYTHON_FILE_LINES} (oversized={len(dict(summary['oversized_files']))})",
-        )
-        if failures:
-            _report_new_debt(summary, baseline)
-            for failure in failures:
-                log_command_output(logger, f"FAIL: {failure}")
-            log_command_output(logger, "Baseline increase permitted: no")
-    return 1 if failures else 0
 
 
 def _report_inventory(
@@ -280,7 +156,6 @@ def main() -> int:
     args = _parse_args()
     findings = inventory()
     summary = _summary(findings)
-    _write_baseline(args.write_baseline, summary)
     if args.summary_only:
         keys = (
             "functions",
@@ -294,9 +169,6 @@ def main() -> int:
             logger, json.dumps({key: summary[key] for key in keys}, sort_keys=True)
         )
         return 0
-    baseline_result = _report_baseline(args, summary)
-    if baseline_result is not None:
-        return baseline_result
     return _report_inventory(findings, summary, args.json)
 
 

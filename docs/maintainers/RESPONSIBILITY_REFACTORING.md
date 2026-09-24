@@ -26,7 +26,7 @@ Measure at least:
 - mutable/shared state touched;
 - number of independent invariants coordinated by one function.
 
-`uv run --offline python scripts/ruff_debt.py` is the repository-wide complexity inventory. Ruff debt is diagnostic and a ratchet; historical Ruff-zero is not itself a promotion objective.
+`make lint-debt` is the repository-wide current complexity and production-size gate. It requires zero findings; it does not compare against historical measurements or grant promotion authority.
 
 ### File/responsibility signals
 
@@ -105,7 +105,7 @@ For each bounded refactor:
 2. record pre-change complexity metrics for the selected owner;
 3. make one bounded responsibility change;
 4. run focused semantic tests for the owner;
-5. run the Ruff debt inventory/ratchet as diagnostic evidence;
+5. run the current Ruff and file-size gates as diagnostic evidence;
 6. run source compileall;
 7. build the candidate deterministically;
 8. test the exact extracted candidate with the same focused ring;

@@ -32,9 +32,9 @@ DIAGNOSTIC_BATCH_LIMIT ?= 8
 DIAGNOSTIC_SHARD ?= 0
 DIAGNOSTIC_EXTRA_MARKER ?=
 RUFF_DEBT_PREVIOUS_BASELINE ?=
-RUFF_BLOCKING_SELECT ?= E4,E7,E9,I,T201
+RUFF_AUTOFIX_SELECT ?= E4,E7,E9,I,T201
 
-.PHONY: help evaluation-help lock lock-check init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json lint-debt-gate test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
+.PHONY: help evaluation-help lock lock-check init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
 
 help:
 	@printf '%s\n' \
@@ -60,18 +60,17 @@ help:
 	  '  make map            Sync the derived repository CodeMap' \
 	  '  make map-status     Show CodeMap generation/staleness' \
 	  '  make map-watch      Maintain CodeMap incrementally in foreground' \
-	  '  make lint           Run Ruff correctness/format plus the no-growth debt gate' \
+	  '  make lint           Run full Ruff/format and current zero-debt size gate' \
 	  '  make ruff           Run blocking Ruff correctness/import + format checks' \
-	  '  make ruff-check     Run blocking Ruff correctness/import checks' \
-	  '  make ruff-format-check  Run non-blocking Ruff formatting diagnostic' \
+	  '  make ruff-check     Run the full configured Ruff rule set' \
+	  '  make ruff-format-check  Verify canonical Ruff formatting' \
 	  '  make source-hygiene Run dependency-free LF + Python syntax checks' \
 	  '  make typecheck      Run ty and Pyright on live repository Python' \
 	  '  make precommit      Run all configured pre-commit hooks on tracked files' \
 	  '  make hooks-install  Install the local Git pre-commit hook' \
-	  '  make lint-debt      Show current Ruff complexity debt inventory' \
+	  '  make lint-debt      Enforce zero current Ruff complexity debt and file-size excess' \
 	  '  make lint-debt-summary  Show concise current Ruff debt diagnostic' \
 	  '  make lint-debt-json  Show exact current Ruff debt JSON (diagnostic)' \
-	  '  make lint-debt-gate Enforce that legacy Ruff debt never increases' \
 	  '  make test-shard-plan  Show deterministic bounded pytest shards (TEST_SHARDS=64)' \
 	  '  make test-shard TEST_SHARD=0  Run exactly one deterministic shard' \
 	  '  make dev-check-batch DEV_BATCH=0  Run one resumable group of deterministic shards' \
@@ -217,23 +216,23 @@ agent-finish:
 	@echo "=== AGENT FINISH ==="
 	@$(MAKE) --no-print-directory hygiene
 	@if command -v ruff >/dev/null 2>&1; then \
-		echo "Ruff available: applying blocking correctness fixes and canonical formatting."; \
-		ruff check --fix --select $(RUFF_BLOCKING_SELECT) .; \
+		echo "Ruff available: applying safe autofixes and canonical formatting."; \
+		ruff check --fix --select $(RUFF_AUTOFIX_SELECT) .; \
 		ruff format .; \
 		git diff --check; \
 		ruff format --check --diff .; \
-		ruff check --select $(RUFF_BLOCKING_SELECT) .; \
+		ruff check .; \
 		echo "AGENT FORMAT STATUS: VERIFIED"; \
-		echo "AGENT RUFF CORRECTNESS STATUS: VERIFIED"; \
+		echo "AGENT FULL RUFF STATUS: VERIFIED"; \
 	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
-		echo "Cached Ruff available: applying blocking correctness fixes and canonical formatting."; \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check --fix --select $(RUFF_BLOCKING_SELECT) .; \
+		echo "Cached Ruff available: applying safe autofixes and canonical formatting."; \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check --fix --select $(RUFF_AUTOFIX_SELECT) .; \
 		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format .; \
 		git diff --check; \
 		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format --check --diff .; \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check --select $(RUFF_BLOCKING_SELECT) .; \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check .; \
 		echo "AGENT FORMAT STATUS: VERIFIED"; \
-		echo "AGENT RUFF CORRECTNESS STATUS: VERIFIED"; \
+		echo "AGENT FULL RUFF STATUS: VERIFIED"; \
 	else \
 		echo ""; \
 		echo "AGENT FORMAT STATUS: UNVERIFIED"; \
@@ -241,17 +240,17 @@ agent-finish:
 	fi
 
 agent-preflight: agent-finish
-	@$(MAKE) --no-print-directory lint-debt-gate
+	@$(MAKE) --no-print-directory lint-debt
 
 ruff-check:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint ruff check --select $(RUFF_BLOCKING_SELECT) .
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint ruff check .
 
 ruff-format-check:
 	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint ruff format --check --diff .
 
 ruff: ruff-check ruff-format-check
 
-lint: ruff lint-debt-gate
+lint: ruff lint-debt
 
 source-hygiene:
 	@git ls-files -z -- '*.py' '*.pyi' | xargs -0 -r python3 -m scripts.source_hygiene
@@ -281,9 +280,6 @@ lint-debt-summary:
 
 lint-debt-json:
 	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint python -m scripts.ruff_debt --json; status=$$?; test $$status -eq 0 -o $$status -eq 1
-
-lint-debt-gate:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint python -m scripts.ruff_debt --baseline ruff-debt-baseline.json $(if $(strip $(RUFF_DEBT_PREVIOUS_BASELINE)),--previous-baseline "$(RUFF_DEBT_PREVIOUS_BASELINE)",)
 
 test:
 	@if [ "$${HASHMARKS_CONSTRAINED_HOST:-0}" = "1" ]; then \
@@ -344,14 +340,14 @@ dev-check: setup
 	@printf '%s\n' '=== HASHMARKS DEV CHECK ==='
 	@printf '%s\n' '[1/4] Compile'
 	@$(MAKE) --no-print-directory compile
-	@printf '%s\n' '[2/4] Ruff debt no-growth gate'
-	@$(MAKE) --no-print-directory lint-debt-gate
+	@printf '%s\n' '[2/4] Current Ruff and size gates'
+	@$(MAKE) --no-print-directory lint
 	@printf '%s\n' '[3/4] CodeMap sync'
 	@$(MAKE) --no-print-directory map >/dev/null
 	@printf '%s\n' '[4/4] Deterministic resumable pytest batches ($(TEST_SHARDS) shards, $(DEV_BATCH_SIZE) shards/batch)'
 	@$(MAKE) --no-print-directory dev-check-tests
 	@VERSION=`$(UV_RUN) --offline hashmarks version`; \
-	printf '\n%s\n' '========================================' " HASHMARKS DEV CHECK: PASS ($$VERSION)" ' Setup:       PASS' ' Compile:     PASS' ' Ruff debt:   PASS (no growth)' ' CodeMap:     PASS' ' Tests:       PASS' '========================================'
+	printf '\n%s\n' '========================================' " HASHMARKS DEV CHECK: PASS ($$VERSION)" ' Setup:       PASS' ' Compile:     PASS' ' Ruff:        PASS (zero debt)' ' CodeMap:     PASS' ' Tests:       PASS' '========================================'
 
 dev-check-batch:
 	@test -n "$(DEV_BATCH)" || (echo "DEV_BATCH is required (0-based)" >&2; exit 2)

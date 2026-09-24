@@ -5,6 +5,8 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 
+from .test_shards import EXPENSIVE_BENCHMARK_NODEIDS, PROCESS_SENSITIVE_NODEIDS
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -28,73 +30,42 @@ def _identity(domain: str, value: object) -> str:
     )
 
 
-def _validate_kind(value: object, *, context: str) -> None:
-    if value not in ALLOWED_KINDS:
-        raise ValueError(
-            f"invalid qualification classification kind in {context}: {value}"
-        )
-
-
-def _validate_override(row: object, seen: set[str]) -> None:
-    if not isinstance(row, Mapping):
-        raise ValueError("qualification classification override must be an object")
-    nodeid = row.get("nodeid")
-    if not isinstance(nodeid, str) or not nodeid:
-        raise ValueError("qualification classification override requires nodeid")
-    if nodeid in seen:
-        raise ValueError(f"duplicate qualification classification override: {nodeid}")
-    _validate_kind(row.get("kind"), context=f"override {nodeid}")
-    seen.add(nodeid)
-
-
-def _validate_path_rule(row: object, seen: set[str]) -> None:
-    if not isinstance(row, Mapping):
-        raise ValueError("qualification classification path rule must be an object")
-    prefix = row.get("path_prefix")
-    if not isinstance(prefix, str) or not prefix:
-        raise ValueError("qualification classification path rule requires path_prefix")
-    if prefix in seen:
-        raise ValueError(f"duplicate qualification classification path rule: {prefix}")
-    _validate_kind(row.get("kind"), context=f"path rule {prefix}")
-    seen.add(prefix)
-
-
-def _policy_lists(value: dict[str, object]) -> tuple[list[object], list[object]]:
-    overrides = value.get("node_overrides")
-    rules = value.get("path_rules")
-    if not isinstance(overrides, list) or not isinstance(rules, list) or not rules:
-        raise ValueError(
-            "qualification classification requires overrides and path rules"
-        )
-    return overrides, rules
-
-
-def _validate_policy(value: object) -> dict[str, object]:
-    if not isinstance(value, dict) or value.get("schema") != POLICY_SCHEMA:
-        raise ValueError("invalid qualification classification policy")
-    if value.get("unmatched_node_policy") != "fail-closed":
-        raise ValueError(
-            "qualification classification unmatched_node_policy must be fail-closed"
-        )
-    overrides, rules = _policy_lists(value)
-    seen_overrides: set[str] = set()
-    for row in overrides:
-        _validate_override(row, seen_overrides)
-    seen_rules: set[str] = set()
-    for row in rules:
-        _validate_path_rule(row, seen_rules)
-    try:
-        _canonical_bytes(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(
-            "qualification classification policy must be strict JSON-portable"
-        ) from exc
-    return value
-
-
 def load_classification_policy(root: Path) -> dict[str, object]:
-    path = root.resolve() / "qualification-classification.json"
-    return _validate_policy(json.loads(path.read_text(encoding="utf-8")))
+    """Build the repository-owned policy from the same node lists used by sharding."""
+    return {
+        "authority": "repository-owned",
+        "measurement_mutation": "forbidden",
+        "node_overrides": [
+            *(
+                {
+                    "kind": "process-sensitive",
+                    "nodeid": nodeid,
+                    "preferred_granularity": "singleton",
+                    "reason": "watcher/process lifecycle semantics",
+                }
+                for nodeid in PROCESS_SENSITIVE_NODEIDS
+            ),
+            *(
+                {
+                    "kind": "empirical-benchmark",
+                    "nodeid": nodeid,
+                    "preferred_granularity": "singleton",
+                    "reason": "repository-intelligence empirical measurement",
+                }
+                for nodeid in EXPENSIVE_BENCHMARK_NODEIDS
+            ),
+        ],
+        "path_rules": [
+            {
+                "kind": "release-correctness",
+                "path_prefix": "tests/",
+                "preferred_granularity": "file",
+                "reason": "repository-owned test-suite correctness rule",
+            }
+        ],
+        "schema": POLICY_SCHEMA,
+        "unmatched_node_policy": "fail-closed",
+    }
 
 
 def classification_policy_identity(root: Path) -> str:
