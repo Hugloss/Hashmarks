@@ -465,6 +465,26 @@ def test_v2_bounded_queries_report_dependencies_paths_and_contexts(
     assert all(row["completeness"] == "complete" for row in packet["results"])
 
 
+def test_v2_contexts_query_exposes_incomplete_context_evidence(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["coverage"][1]["completeness"] = "incomplete"
+    changed["coverage"][1]["truncation"] = "truncated"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "contexts", "node_id": "library@1"}],
+        )
+
+    result = packet["results"][0]
+    assert result["result"] == ["compile", "runtime"]
+    assert result["completeness"] == "incomplete"
+
+
 def test_v2_reachability_absence_requires_complete_context_coverage(
     tmp_path: Path,
 ) -> None:
