@@ -13,6 +13,11 @@ _LIST_LINE = re.compile(
     r"(?P<module>.+?))?[ \t]*$"
 )
 _ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+_INCOMPLETE_RESOLUTION_WARNINGS = (
+    "no dependency information available",
+    "could not be resolved",
+    "failed to read artifact descriptor",
+)
 
 
 def _digest(data: bytes) -> str:
@@ -254,6 +259,14 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     continue
                 if stripped.startswith("[ERROR]") or stripped == "[INFO] BUILD FAILURE":
                     raise ValueError(f"Maven dependency list contains error: {context}")
+                if stripped.startswith("[WARNING]") and any(
+                    marker in stripped.lower()
+                    for marker in _INCOMPLETE_RESOLUTION_WARNINGS
+                ):
+                    raise ValueError(
+                        "Maven dependency list contains incomplete resolution warning: "
+                        f"{context}"
+                    )
                 if not stripped or stripped.startswith(
                     ("[INFO]", "[WARNING]", "[DEBUG]")
                 ):
