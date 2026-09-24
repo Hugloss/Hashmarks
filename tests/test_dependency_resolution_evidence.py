@@ -1541,3 +1541,14 @@ def test_v2_component_result_limit_does_not_weaken_exact_identity_lookup(
     assert len(result["result"]) == 1
     assert result["completeness"] == "complete"
     assert result["omissions"] == []
+
+
+def test_v2_component_without_selection_is_rejected(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["components"].append(
+        {"component_id": "orphan", "name": "orphan", "ecosystem": "test"}
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="component has no dependency selection"):
+            codemap.dependency_resolution_evidence(snapshot)
