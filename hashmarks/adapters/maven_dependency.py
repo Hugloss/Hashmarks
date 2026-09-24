@@ -124,6 +124,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         row["evidence_sources"].add(source_id)
 
     for context in contexts:
+        selection_sources: list[str] = []
         tree_source = f"tree:{context}"
         if context in trees:
             raw_bytes = trees[context]
@@ -137,6 +138,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 raise ValueError(
                     f"Maven dependency tree root must be an object: {context}"
                 )
+            selection_sources.append(tree_source)
             evidence_sources.append(
                 {
                     "source_id": tree_source,
@@ -205,6 +207,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 raise ValueError(
                     f"invalid Maven dependency list text for {context}"
                 ) from exc
+            selection_sources.append(list_source)
             evidence_sources.append(
                 {
                     "source_id": list_source,
@@ -286,6 +289,16 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     "evidence_sources": [list_source],
                 }
             )
+
+        coverage.append(
+            {
+                "context": context,
+                "kind": "selection",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": sorted(selection_sources),
+            }
+        )
 
     normalized_selections = []
     for row in selections.values():
