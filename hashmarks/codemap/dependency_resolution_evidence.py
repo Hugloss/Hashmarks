@@ -856,9 +856,7 @@ class DependencyResolutionEvidenceMixin:
         source_ids = set(sources)
         for raw in rows:
             context = _identifier(raw.get("context"), label="coverage context")
-            kind = _identifier(raw.get("kind"), label="coverage kind")
-            if kind not in _COVERAGE_KINDS:
-                raise ValueError(f"unsupported dependency coverage kind: {kind}")
+            kind = cls._dependency_coverage_kind_v2(raw)
             if context not in contexts:
                 raise ValueError(f"unknown coverage context: {context}")
             key = (context, kind)
@@ -912,6 +910,13 @@ class DependencyResolutionEvidenceMixin:
                 }
             )
         return sorted(result, key=lambda row: (str(row["context"]), str(row["kind"])))
+
+    @staticmethod
+    def _dependency_coverage_kind_v2(raw: Mapping[str, object]) -> str:
+        kind = _identifier(raw.get("kind"), label="coverage kind")
+        if kind not in _COVERAGE_KINDS:
+            raise ValueError(f"unsupported dependency coverage kind: {kind}")
+        return kind
 
     @staticmethod
     def _validate_dependency_coverage_source_authority_v2(
