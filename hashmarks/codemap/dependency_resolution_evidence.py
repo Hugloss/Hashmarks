@@ -691,8 +691,8 @@ class DependencyResolutionEvidenceMixin:
             )
             if not refs:
                 raise ValueError("coverage must reference evidence source")
-            for ref in refs:
-                source = sources[ref]
+            referenced_sources = [sources[ref] for ref in refs]
+            for source in referenced_sources:
                 source_context = str(source.get("context") or "")
                 if source_context and source_context != context:
                     raise ValueError(
@@ -705,6 +705,21 @@ class DependencyResolutionEvidenceMixin:
                     raise ValueError(
                         f"coverage exceeds evidence source: {context}:{kind}"
                     )
+            if completeness == "incomplete" and all(
+                source.get("completeness") == "complete"
+                for source in referenced_sources
+            ):
+                raise ValueError(
+                    f"coverage understates evidence source: {context}:{kind}"
+                )
+            if truncation == "truncated" and all(
+                source.get("truncation") == "complete"
+                for source in referenced_sources
+            ):
+                raise ValueError(
+                    "coverage truncation contradicts evidence source: "
+                    f"{context}:{kind}"
+                )
             result.append(
                 {
                     "context": context,
