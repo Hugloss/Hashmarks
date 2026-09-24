@@ -310,3 +310,200 @@ def test_maven_context_membership_change_is_selection_and_inventory_delta(
 
     assert delta["comparability"] == "not-comparable"
     assert delta["reason"] == "definition-changed"
+
+
+def _uv_lock_optional_dependency(*, include: bool) -> bytes:
+    dependency = 'dependencies = [{ name = "dummy-dep" }]\n' if include else ""
+    package = '''
+[[package]]
+name = "dummy-dep"
+version = "1.0.0"
+source = { directory = "vendor/dummy_dep" }
+''' if include else ""
+    return f'''version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[[package]]
+name = "dummy-app"
+version = "0.1.0"
+source = {{ virtual = "." }}
+{dependency}{package}'''.encode()
+
+
+def _maven_tree_optional_dependency(*, include: bool) -> bytes:
+    root = {
+        "groupId": "example.fixture",
+        "artifactId": "dummy-app",
+        "version": "0.1.0",
+        "type": "jar",
+        "scope": "",
+        "children": [],
+    }
+    if include:
+        root["children"] = [
+            {
+                "groupId": "example.fixture",
+                "artifactId": "dummy-dep",
+                "version": "1.0.0",
+                "type": "jar",
+                "scope": "compile",
+            }
+        ]
+    return json.dumps(root).encode()
+
+
+def test_uv_and_maven_dependency_addition_share_delta_semantics(tmp_path: Path) -> None:
+    uv_before = uv_lock_dependency_observation(
+        lock=_uv_lock_optional_dependency(include=False)
+    )
+    uv_after = uv_lock_dependency_observation(
+        lock=_uv_lock_optional_dependency(include=True)
+    )
+    maven_before = maven_dependency_observation(
+        trees={"compile": _maven_tree_optional_dependency(include=False)},
+        inventories={"compile": b"The following files have been resolved:\n"},
+    )
+    maven_after = maven_dependency_observation(
+        trees={"compile": _maven_tree_optional_dependency(include=True)},
+        inventories={"compile": _maven_inventory_variant("1.0.0")},
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        _uv_b, _uv_a, uv_delta = _delta(codemap, uv_before, uv_after)
+        _mv_b, _mv_a, maven_delta = _delta(codemap, maven_before, maven_after)
+
+    for delta in (uv_delta, maven_delta):
+        assert delta["comparability"] == "comparable"
+        assert len(delta["components_added"]) == 1
+        assert delta["components_removed"] == []
+        assert delta["components_changed"] == []
+        assert len(delta["selections_added"]) == 1
+        assert delta["selections_removed"] == []
+        assert delta["selections_changed"] == []
+        assert len(delta["inventory_added"]) == 1
+        assert delta["inventory_removed"] == []
+        assert len(delta["relationships_added"]) == 1
+        assert delta["relationships_removed"] == []
+
+
+def test_uv_and_maven_dependency_removal_share_delta_semantics(tmp_path: Path) -> None:
+    uv_before = uv_lock_dependency_observation(
+        lock=_uv_lock_optional_dependency(include=True)
+    )
+    uv_after = uv_lock_dependency_observation(
+        lock=_uv_lock_optional_dependency(include=False)
+    )
+    maven_before = maven_dependency_observation(
+        trees={"compile": _maven_tree_optional_dependency(include=True)},
+        inventories={"compile": _maven_inventory_variant("1.0.0")},
+    )
+    maven_after = maven_dependency_observation(
+        trees={"compile": _maven_tree_optional_dependency(include=False)},
+        inventories={"compile": b"The following files have been resolved:\n"},
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        _uv_b, _uv_a, uv_delta = _delta(codemap, uv_before, uv_after)
+        _mv_b, _mv_a, maven_delta = _delta(codemap, maven_before, maven_after)
+
+    for delta in (uv_delta, maven_delta):
+        assert delta["comparability"] == "comparable"
+        assert delta["components_added"] == []
+        assert len(delta["components_removed"]) == 1
+        assert delta["components_changed"] == []
+        assert delta["selections_added"] == []
+        assert len(delta["selections_removed"]) == 1
+        assert delta["selections_changed"] == []
+        assert delta["inventory_added"] == []
+        assert len(delta["inventory_removed"]) == 1
+        assert delta["relationships_added"] == []
+        assert len(delta["relationships_removed"]) == 1
+
+
+def test_uv_simultaneous_versions_preserve_independent_selection_delta(
+    tmp_path: Path,
+) -> None:
+    before_lock = b'''version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[[package]]
+name = "dummy-app"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "shared", version = "1.0.0" },
+    { name = "shared", version = "2.0.0" },
+]
+
+[[package]]
+name = "shared"
+version = "1.0.0"
+source = { registry = "https://example.invalid/simple" }
+
+[[package]]
+name = "shared"
+version = "2.0.0"
+source = { registry = "https://example.invalid/simple" }
+'''
+    after_lock = before_lock.replace(b'version = "2.0.0"', b'version = "3.0.0"')
+    after_lock = after_lock.replace(
+        b'{ name = "shared", version = "2.0.0" }',
+        b'{ name = "shared", version = "3.0.0" }',
+    )
+    before_raw = uv_lock_dependency_observation(lock=before_lock)
+    after_raw = uv_lock_dependency_observation(lock=after_lock)
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before, after, delta = _delta(codemap, before_raw, after_raw)
+
+    shared_before = [
+        row for row in before["selections"] if row["component_id"] == "shared"
+    ]
+    shared_after = [
+        row for row in after["selections"] if row["component_id"] == "shared"
+    ]
+    assert len(shared_before) == 2
+    assert len(shared_after) == 2
+    assert {row["version"] for row in shared_before} == {"1.0.0", "2.0.0"}
+    assert {row["version"] for row in shared_after} == {"1.0.0", "3.0.0"}
+    assert len(delta["selections_added"]) == 1
+    assert len(delta["selections_removed"]) == 1
+    assert delta["selections_changed"] == []
+
+
+def test_maven_simultaneous_variants_preserve_independent_selection_delta(
+    tmp_path: Path,
+) -> None:
+    before_inventory = (
+        "The following files have been resolved:\n"
+        "   example.fixture:dummy-dep:jar:linux:1.0.0:runtime"
+        " -- module dummy.linux (auto)\n"
+        "   example.fixture:dummy-dep:jar:osx:1.0.0:runtime"
+        " -- module dummy.osx (auto)\n"
+    ).encode()
+    after_inventory = before_inventory.replace(b":osx:1.0.0:", b":windows:1.0.0:").replace(
+        b"dummy.osx", b"dummy.windows"
+    )
+    before_raw = maven_dependency_observation(
+        trees={}, inventories={"runtime": before_inventory}
+    )
+    after_raw = maven_dependency_observation(
+        trees={}, inventories={"runtime": after_inventory}
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before, after, delta = _delta(codemap, before_raw, after_raw)
+
+    assert len(before["selections"]) == 2
+    assert len(after["selections"]) == 2
+    assert len(delta["selections_added"]) == 1
+    assert len(delta["selections_removed"]) == 1
+    assert delta["selections_changed"] == []
+    assert delta["module_ownership_added"] == ["dummy.windows|runtime"]
+    assert delta["module_ownership_removed"] == ["dummy.osx|runtime"]
