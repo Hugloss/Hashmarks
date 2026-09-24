@@ -1497,3 +1497,33 @@ def test_v2_inventory_membership_requires_inventory_evidence(tmp_path: Path) -> 
         codemap.sync()
         with pytest.raises(ValueError, match="inventory evidence source kind"):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_selection_provenance_cannot_claim_unselected_context(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["selections"][2]["evidence_sources"] = ["tree:runtime"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="selection evidence source context"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_module_ownership_requires_inventory_evidence_source(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["tree:compile"],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="module ownership evidence source kind"):
+            codemap.dependency_resolution_evidence(snapshot)
