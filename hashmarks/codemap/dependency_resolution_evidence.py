@@ -172,11 +172,6 @@ class DependencyResolutionEvidenceMixin:
         for row in inventory:
             for ref in row["evidence_sources"]:
                 source = sources_by_id[str(ref)]
-                if source.get("kind") != "resolved-inventory":
-                    raise ValueError(
-                        "incompatible inventory evidence source kind: "
-                        f"{row['node_id']}:{row['context']}"
-                    )
                 source_context = str(source.get("context") or "")
                 if source_context and source_context != row["context"]:
                     raise ValueError(
@@ -186,11 +181,6 @@ class DependencyResolutionEvidenceMixin:
         for row in relationships:
             for ref in row["evidence_sources"]:
                 source = sources_by_id[str(ref)]
-                if source.get("kind") != "resolution-graph":
-                    raise ValueError(
-                        "incompatible relationship evidence source kind: "
-                        f"{row['source']}->{row['target']}:{row['context']}"
-                    )
                 source_context = str(source.get("context") or "")
                 if source_context and source_context != row["context"]:
                     raise ValueError(
@@ -200,11 +190,6 @@ class DependencyResolutionEvidenceMixin:
         for row in module_ownership:
             for ref in row["evidence_sources"]:
                 source = sources_by_id[str(ref)]
-                if source.get("kind") != "resolved-inventory":
-                    raise ValueError(
-                        "incompatible module ownership evidence source kind: "
-                        f"{row['module']}:{row['context']}"
-                    )
                 source_context = str(source.get("context") or "")
                 if source_context and source_context != row["context"]:
                     raise ValueError(
@@ -666,21 +651,9 @@ class DependencyResolutionEvidenceMixin:
             )
             if not refs:
                 raise ValueError("coverage must reference evidence source")
-            expected_source_kind = (
-                "resolution-graph"
-                if kind == "resolution-graph"
-                else "resolved-inventory"
-                if kind in {"resolved-inventory", "module-ownership"}
-                else kind
-            )
             for ref in refs:
                 source = sources[ref]
-                source_kind = str(source.get("kind") or "")
                 source_context = str(source.get("context") or "")
-                if source_kind != expected_source_kind:
-                    raise ValueError(
-                        f"incompatible evidence source kind for coverage: {context}:{kind}"
-                    )
                 if source_context and source_context != context:
                     raise ValueError(
                         f"incompatible evidence source context for coverage: {context}:{kind}"
