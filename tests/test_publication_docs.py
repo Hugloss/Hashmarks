@@ -265,11 +265,12 @@ def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None
 
 def test_ci_and_dev_check_enforce_ruff_debt_gate() -> None:
     workflow = _text(".github/workflows/ci.yml")
-    marker = "      - name: Ruff maintainability debt gate\n"
+    marker = "      - name: Enforce Ruff debt no-growth\n"
     assert marker in workflow
     gate_block = workflow.split(marker, 1)[1].split("      - name:", 1)[0]
     assert "run: make lint-debt-gate" in gate_block
     assert "continue-on-error" not in gate_block
+    assert "needs: [formatting, ruff-debt]" in workflow
 
     makefile = _text("Makefile")
     dev_check = makefile.split("dev-check: setup", 1)[1].split("\ndev-check-batch:", 1)[

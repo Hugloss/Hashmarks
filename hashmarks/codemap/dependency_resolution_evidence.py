@@ -103,35 +103,9 @@ class DependencyResolutionEvidenceMixin:
         snapshot: Mapping[str, object],
     ) -> dict[str, object]:
         """Qualify a multi-context dependency observation without executing its producer."""
-        producer = snapshot.get("producer")
-        if not isinstance(producer, Mapping):
-            raise ValueError("dependency resolution producer must be an object")
-        producer_packet = dict(producer)
-        _identifier(producer_packet.get("kind"), label="producer kind")
-        _text(
-            producer_packet.get("schema_version"),
-            label="producer schema_version",
-            required=True,
+        producer_packet, scope_packet, contexts, context_set = (
+            self._dependency_header_v2(snapshot)
         )
-        scope = snapshot.get("scope")
-        if not isinstance(scope, Mapping) or not scope:
-            raise ValueError("dependency resolution scope must be a non-empty object")
-        scope_packet = dict(scope)
-        _canonical(scope_packet)
-
-        raw_contexts = snapshot.get("contexts", ())
-        if not isinstance(raw_contexts, Sequence) or isinstance(
-            raw_contexts, (str, bytes, bytearray)
-        ):
-            raise ValueError("contexts must be a sequence")
-        contexts = [_identifier(value, label="context") for value in raw_contexts]
-        if not contexts:
-            raise ValueError("contexts must not be empty")
-        if len(contexts) > _MAX_CONTEXTS:
-            raise ValueError(f"contexts exceeds {_MAX_CONTEXTS} entries")
-        if len(set(contexts)) != len(contexts):
-            raise ValueError("duplicate dependency resolution context")
-        context_set = set(contexts)
 
         evidence_sources = self._dependency_evidence_sources_v2(
             snapshot.get("evidence_sources", ()), context_set
@@ -175,85 +149,26 @@ class DependencyResolutionEvidenceMixin:
             for row in evidence_sources
             if row.get("source_id")
         }
-        selection_contexts = {
-            str(row["node_id"]): set(row["contexts"]) for row in selections
-        }
-        for row in roots:
-            if row["context"] not in selection_contexts[str(row["node_id"])]:
-                raise ValueError(
-                    f"root context not selected: {row['node_id']}:{row['context']}"
-                )
-        for row in inventory:
-            if row["context"] not in selection_contexts[str(row["node_id"])]:
-                raise ValueError(
-                    f"inventory context not selected: {row['node_id']}:{row['context']}"
-                )
-        for row in relationships:
-            context = str(row["context"])
-            if (
-                context not in selection_contexts[str(row["source"])]
-                or context not in selection_contexts[str(row["target"])]
-            ):
-                raise ValueError(
-                    "relationship context not selected by both endpoints: "
-                    f"{row['source']}->{row['target']}:{context}"
-                )
-        for row in roots:
-            for ref in row["evidence_sources"]:
-                source = sources_by_id[str(ref)]
-                source_context = str(source.get("context") or "")
-                if source_context and source_context != row["context"]:
-                    raise ValueError(
-                        "incompatible root evidence source context: "
-                        f"{row['node_id']}:{row['context']}"
-                    )
-        for row in inventory:
-            for ref in row["evidence_sources"]:
-                source = sources_by_id[str(ref)]
-                source_context = str(source.get("context") or "")
-                if source_context and source_context != row["context"]:
-                    raise ValueError(
-                        "incompatible inventory evidence source context: "
-                        f"{row['node_id']}:{row['context']}"
-                    )
-        for row in relationships:
-            for ref in row["evidence_sources"]:
-                source = sources_by_id[str(ref)]
-                source_context = str(source.get("context") or "")
-                if source_context and source_context != row["context"]:
-                    raise ValueError(
-                        "incompatible relationship evidence source context: "
-                        f"{row['source']}->{row['target']}:{row['context']}"
-                    )
-        for row in module_ownership:
-            for ref in row["evidence_sources"]:
-                source = sources_by_id[str(ref)]
-                source_context = str(source.get("context") or "")
-                if source_context and source_context != row["context"]:
-                    raise ValueError(
-                        "incompatible module ownership evidence source context: "
-                        f"{row['module']}:{row['context']}"
-                    )
-                if row["completeness"] == "complete" and (
-                    source.get("completeness") != "complete"
-                    or source.get("truncation") != "complete"
-                ):
-                    raise ValueError(
-                        "module ownership exceeds evidence source: "
-                        f"{row['module']}:{row['context']}"
-                    )
-        for row in selections:
-            contexts_for_selection = set(row["contexts"])
-            source_contexts = {
-                str(sources_by_id[str(ref)].get("context") or "")
-                for ref in row["evidence_sources"]
-            }
-            for source_context in source_contexts:
-                if source_context and source_context not in contexts_for_selection:
-                    raise ValueError(
-                        "incompatible selection evidence source context: "
-                        f"{row['node_id']}:{source_context}"
-                    )
+        self._validate_dependency_context_membership_v2(
+            roots=roots,
+            inventory=inventory,
+            relationships=relationships,
+            selections=selections,
+        )
+        self._validate_dependency_resolution_source_contexts_v2(
+            roots=roots,
+            inventory=inventory,
+            relationships=relationships,
+            sources_by_id=sources_by_id,
+        )
+        self._validate_dependency_module_source_authority_v2(
+            module_ownership=module_ownership,
+            sources_by_id=sources_by_id,
+        )
+        self._validate_dependency_selection_source_contexts_v2(
+            selections=selections,
+            sources_by_id=sources_by_id,
+        )
 
         definition = {
             "producer": producer_packet,
@@ -333,6 +248,149 @@ class DependencyResolutionEvidenceMixin:
             "coverage": coverage,
             "negative_evidence": negative,
         }
+
+    @staticmethod
+    def _dependency_header_v2(
+        snapshot: Mapping[str, object],
+    ) -> tuple[dict[str, object], dict[str, object], list[str], set[str]]:
+        producer = snapshot.get("producer")
+        if not isinstance(producer, Mapping):
+            raise ValueError("dependency resolution producer must be an object")
+        producer_packet = dict(producer)
+        _identifier(producer_packet.get("kind"), label="producer kind")
+        _text(
+            producer_packet.get("schema_version"),
+            label="producer schema_version",
+            required=True,
+        )
+
+        scope = snapshot.get("scope")
+        if not isinstance(scope, Mapping) or not scope:
+            raise ValueError("dependency resolution scope must be a non-empty object")
+        scope_packet = dict(scope)
+        _canonical(scope_packet)
+
+        raw_contexts = snapshot.get("contexts", ())
+        if not isinstance(raw_contexts, Sequence) or isinstance(
+            raw_contexts, (str, bytes, bytearray)
+        ):
+            raise ValueError("contexts must be a sequence")
+        contexts = [_identifier(value, label="context") for value in raw_contexts]
+        if not contexts:
+            raise ValueError("contexts must not be empty")
+        if len(contexts) > _MAX_CONTEXTS:
+            raise ValueError(f"contexts exceeds {_MAX_CONTEXTS} entries")
+        if len(set(contexts)) != len(contexts):
+            raise ValueError("duplicate dependency resolution context")
+        return producer_packet, scope_packet, contexts, set(contexts)
+
+    @staticmethod
+    def _validate_dependency_context_membership_v2(
+        *,
+        roots: Sequence[Mapping[str, object]],
+        inventory: Sequence[Mapping[str, object]],
+        relationships: Sequence[Mapping[str, object]],
+        selections: Sequence[Mapping[str, object]],
+    ) -> None:
+        selection_contexts = {
+            str(row["node_id"]): set(row["contexts"]) for row in selections
+        }
+        for row in roots:
+            if row["context"] not in selection_contexts[str(row["node_id"])]:
+                raise ValueError(
+                    f"root context not selected: {row['node_id']}:{row['context']}"
+                )
+        for row in inventory:
+            if row["context"] not in selection_contexts[str(row["node_id"])]:
+                raise ValueError(
+                    f"inventory context not selected: {row['node_id']}:{row['context']}"
+                )
+        for row in relationships:
+            context = str(row["context"])
+            if (
+                context not in selection_contexts[str(row["source"])]
+                or context not in selection_contexts[str(row["target"])]
+            ):
+                raise ValueError(
+                    "relationship context not selected by both endpoints: "
+                    f"{row['source']}->{row['target']}:{context}"
+                )
+
+    @staticmethod
+    def _validate_dependency_resolution_source_contexts_v2(
+        *,
+        roots: Sequence[Mapping[str, object]],
+        inventory: Sequence[Mapping[str, object]],
+        relationships: Sequence[Mapping[str, object]],
+        sources_by_id: Mapping[str, Mapping[str, object]],
+    ) -> None:
+        for row in roots:
+            for ref in row["evidence_sources"]:
+                source_context = str(sources_by_id[str(ref)].get("context") or "")
+                if source_context and source_context != row["context"]:
+                    raise ValueError(
+                        "incompatible root evidence source context: "
+                        f"{row['node_id']}:{row['context']}"
+                    )
+        for row in inventory:
+            for ref in row["evidence_sources"]:
+                source_context = str(sources_by_id[str(ref)].get("context") or "")
+                if source_context and source_context != row["context"]:
+                    raise ValueError(
+                        "incompatible inventory evidence source context: "
+                        f"{row['node_id']}:{row['context']}"
+                    )
+        for row in relationships:
+            for ref in row["evidence_sources"]:
+                source_context = str(sources_by_id[str(ref)].get("context") or "")
+                if source_context and source_context != row["context"]:
+                    raise ValueError(
+                        "incompatible relationship evidence source context: "
+                        f"{row['source']}->{row['target']}:{row['context']}"
+                    )
+
+    @staticmethod
+    def _validate_dependency_module_source_authority_v2(
+        *,
+        module_ownership: Sequence[Mapping[str, object]],
+        sources_by_id: Mapping[str, Mapping[str, object]],
+    ) -> None:
+        for row in module_ownership:
+            for ref in row["evidence_sources"]:
+                source = sources_by_id[str(ref)]
+                source_context = str(source.get("context") or "")
+                if source_context and source_context != row["context"]:
+                    raise ValueError(
+                        "incompatible module ownership evidence source context: "
+                        f"{row['module']}:{row['context']}"
+                    )
+                if row["completeness"] == "complete" and (
+                    source.get("completeness") != "complete"
+                    or source.get("truncation") != "complete"
+                ):
+                    raise ValueError(
+                        "module ownership exceeds evidence source: "
+                        f"{row['module']}:{row['context']}"
+                    )
+
+    @staticmethod
+    def _validate_dependency_selection_source_contexts_v2(
+        *,
+        selections: Sequence[Mapping[str, object]],
+        sources_by_id: Mapping[str, Mapping[str, object]],
+    ) -> None:
+        for row in selections:
+            contexts_for_selection = set(row["contexts"])
+            source_contexts = {
+                str(sources_by_id[str(ref)].get("context") or "")
+                for ref in row["evidence_sources"]
+            }
+            for source_context in source_contexts:
+                if source_context and source_context not in contexts_for_selection:
+                    raise ValueError(
+                        "incompatible selection evidence source context: "
+                        f"{row['node_id']}:{source_context}"
+                    )
 
     @staticmethod
     def _dependency_components_v2(value: object) -> list[dict[str, object]]:
