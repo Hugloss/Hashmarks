@@ -1227,3 +1227,54 @@ def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
             ValueError, match="module ownership exceeds evidence source"
         ):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_incomplete_coverage_cannot_be_backed_only_by_complete_sources(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["coverage"][0]["completeness"] = "incomplete"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="coverage understates evidence source"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_truncated_coverage_requires_a_truncated_or_unknown_source(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["coverage"][0]["completeness"] = "incomplete"
+    snapshot["coverage"][0]["truncation"] = "truncated"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="coverage truncation contradicts evidence source"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["evidence_sources"].append(
+        {
+            "source_id": "ownership:compile",
+            "kind": "module-ownership",
+            "context": "compile",
+            "completeness": "unknown",
+            "truncation": "unknown",
+        }
+    )
+    snapshot["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["ownership:compile"],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="module ownership exceeds evidence source"):
+            codemap.dependency_resolution_evidence(snapshot)
