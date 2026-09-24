@@ -1446,3 +1446,36 @@ def test_v2_context_query_exact_bound_without_omission_is_complete(
     assert result["result"] == ["compile"]
     assert result["completeness"] == "complete"
     assert result["omissions"] == []
+
+
+def test_v2_coverage_cannot_claim_complete_over_incomplete_source(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["evidence_sources"][0]["completeness"] = "incomplete"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="coverage exceeds evidence source"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_resolution_coverage_requires_resolution_evidence_source(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["coverage"][0]["evidence_sources"] = ["list:compile"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="incompatible evidence source kind"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_coverage_source_context_must_match_coverage_context(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["coverage"][0]["evidence_sources"] = ["tree:runtime"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="incompatible evidence source context"):
+            codemap.dependency_resolution_evidence(snapshot)
