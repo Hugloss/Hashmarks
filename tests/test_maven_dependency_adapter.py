@@ -322,3 +322,10 @@ def test_maven_adapter_refuses_unparsed_inventory_coordinate() -> None:
 
     with pytest.raises(ValueError, match="unparsed Maven dependency-list coordinate"):
         maven_dependency_observation(trees={}, inventories={"test": inventory})
+
+
+def test_maven_adapter_refuses_truncated_inventory_coordinate() -> None:
+    inventory = b"""The following files have been resolved:\n   example.libs:valid:jar:3.0:test -- module example.valid\n   example.libs:omitted:jar\n"""
+
+    with pytest.raises(ValueError, match="unparsed Maven dependency-list coordinate"):
+        maven_dependency_observation(trees={}, inventories={"test": inventory})
