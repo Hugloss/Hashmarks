@@ -218,40 +218,65 @@ source = { virtual = "." }
         uv_lock_dependency_observation(lock=lock)
 
 
-@pytest.mark.parametrize(
-    ("metadata", "message"),
-    [
-        (
-            "resolution-markers = [\"sys_platform == 'linux'\"]\n",
-            "uv lock resolution forks are not modeled",
-        ),
-        (
-            (
-                "conflicts = [[\n"
-                '  { package = "demo", extra = "cpu" },\n'
-                '  { package = "demo", extra = "gpu" },\n'
-                "]]\n"
-            ),
-            "uv lock conflicts are not modeled",
-        ),
-    ],
-)
-def test_uv_lock_adapter_refuses_unmodeled_resolution_forks(
-    metadata: str,
-    message: str,
-) -> None:
-    lock = (
-        "version = 1\n"
-        "revision = 3\n"
-        'requires-python = ">=3.11"\n'
-        f"{metadata}"
-        "\n[[package]]\n"
-        'name = "demo"\n'
-        'version = "0.1.0"\n'
-        'source = { virtual = "." }\n'
-    ).encode()
+def test_uv_lock_adapter_preserves_top_level_resolution_markers() -> None:
+    lock = b"""version = 1
+revision = 3
+requires-python = ">=3.11"
+resolution-markers = [
+    "python_full_version >= '3.12'",
+    "python_full_version < '3.12'",
+]
 
-    with pytest.raises(ValueError, match=message):
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+
+    raw = uv_lock_dependency_observation(lock=lock)
+
+    assert raw["producer"]["resolution_markers"] == [
+        "python_full_version >= '3.12'",
+        "python_full_version < '3.12'",
+    ]
+
+
+def test_uv_lock_adapter_refuses_package_resolution_forks() -> None:
+    lock = b"""version = 1
+revision = 3
+requires-python = ">=3.11"
+resolution-markers = [
+    "python_full_version >= '3.12'",
+    "python_full_version < '3.12'",
+]
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+resolution-markers = ["python_full_version >= '3.12'"]
+"""
+
+    with pytest.raises(ValueError, match="uv package resolution forks are not modeled"):
+        uv_lock_dependency_observation(lock=lock)
+
+
+def test_uv_lock_adapter_refuses_unmodeled_conflicts() -> None:
+    lock = b"""version = 1
+revision = 3
+requires-python = ">=3.11"
+conflicts = [[
+  { package = "demo", extra = "cpu" },
+  { package = "demo", extra = "gpu" },
+]]
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+
+    with pytest.raises(ValueError, match="uv lock conflicts are not modeled"):
         uv_lock_dependency_observation(lock=lock)
 
 
