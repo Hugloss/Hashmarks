@@ -98,6 +98,8 @@ Producer-native coordinates, lockfile source tables, Maven scopes/classifiers, w
 
 Qualified observations expose `root_evidence` separately from semantic `roots`, so consumers can revalidate the evidence references bound by `observation_identity`. Public dependency queries, deltas, correspondence, and correlation revalidate normalized structure and content identities before using a supplied packet. This detects alteration or inconsistent reuse; because the hashes are not signatures, it does not authenticate the external producer or turn caller-declared authority into repository truth.
 
+The v3 snapshot surface is fail-closed: unknown top-level and typed fact/source/coverage fields are rejected rather than silently normalized away. `producer` metadata and semantic `scope` remain intentionally opaque JSON maps. Pure observation queries/deltas may be replayed from a structurally valid packet, but correspondence/correlation that combines dependency evidence with live repository intelligence requires the packet's repository identity and CodeMap generation to match the current CodeMap.
+
 ## Coverage and negative evidence
 
 Coverage `kind` is a semantic domain, not a producer/source format. The current coverage domains are `selection`, `resolution-graph`, `resolved-inventory`, and `module-ownership`.
