@@ -818,6 +818,13 @@ class DependencyResolutionEvidenceMixin:
             if not refs:
                 raise ValueError("coverage must reference evidence source")
             referenced_sources = [sources[ref] for ref in refs]
+            if kind == "resolution-graph" and not any(
+                source.get("kind") == "resolution-graph"
+                for source in referenced_sources
+            ):
+                raise ValueError(
+                    "resolution-graph coverage requires resolution-graph evidence source"
+                )
             for source in referenced_sources:
                 source_context = str(source.get("context") or "")
                 if source_context and source_context != context:
