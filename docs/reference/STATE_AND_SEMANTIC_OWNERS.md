@@ -187,7 +187,7 @@ The binding implementation must therefore converge on the existing owners above 
 
 ## Dependency/distribution evidence work
 
-`dependency_resolution_evidence.py` owns qualified external dependency-resolution observations. Its admitted fact is correspondence between caller-supplied, producer-neutral resolution evidence and existing repository evidence. Dependency observations remain request-scoped by default; retaining workflow labels or historical observations is consumer-owned unless a separate persistence contract is admitted.
+`dependency_resolution_contract.py` owns only the v3 schema identity, semantic-authority vocabulary, and fail-closed field allowlists. `dependency_resolution_evidence.py` owns qualified external dependency-resolution observations. Its admitted fact is correspondence between caller-supplied, producer-neutral resolution evidence and existing repository evidence. Dependency observations remain request-scoped by default; retaining workflow labels or historical observations is consumer-owned unless a separate persistence contract is admitted.
 
 It owns:
 - the typed dependency-resolution observation contract;
