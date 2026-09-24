@@ -379,8 +379,7 @@ class DependencyResolutionEvidenceMixin:
     ) -> None:
         def supports(row: Mapping[str, object], authority: str) -> bool:
             return any(
-                authority
-                in sources_by_id[str(ref)].get("authorities", ())
+                authority in sources_by_id[str(ref)].get("authorities", ())
                 for ref in row["evidence_sources"]
             )
 
@@ -409,11 +408,8 @@ class DependencyResolutionEvidenceMixin:
             str(row["node_id"]): set(row["contexts"]) for row in selections
         }
         for row in module_ownership:
-            if (
-                row["owners"] or row["completeness"] != "unknown"
-            ) and not any(
-                "module-ownership"
-                in sources_by_id[str(ref)].get("authorities", ())
+            if (row["owners"] or row["completeness"] != "unknown") and not any(
+                "module-ownership" in sources_by_id[str(ref)].get("authorities", ())
                 for ref in row["evidence_sources"]
             ):
                 raise ValueError(
@@ -450,12 +446,8 @@ class DependencyResolutionEvidenceMixin:
     ) -> None:
         for row in selections:
             contexts_for_selection = set(row["contexts"])
-            sources = [
-                sources_by_id[str(ref)] for ref in row["evidence_sources"]
-            ]
-            source_contexts = {
-                str(source.get("context") or "") for source in sources
-            }
+            sources = [sources_by_id[str(ref)] for ref in row["evidence_sources"]]
+            source_contexts = {str(source.get("context") or "") for source in sources}
             authority_contexts = {
                 str(source.get("context") or "")
                 for source in sources
@@ -925,9 +917,7 @@ class DependencyResolutionEvidenceMixin:
         sources: Sequence[Mapping[str, object]],
     ) -> None:
         if not any(kind in source.get("authorities", ()) for source in sources):
-            raise ValueError(
-                f"{kind} coverage requires {kind} evidence authority"
-            )
+            raise ValueError(f"{kind} coverage requires {kind} evidence authority")
 
     @staticmethod
     def _validate_dependency_coverage_facts_v2(
