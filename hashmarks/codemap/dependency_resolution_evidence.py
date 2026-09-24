@@ -1324,12 +1324,9 @@ class DependencyResolutionEvidenceMixin:
         observation: Mapping[str, object],
         request: Mapping[str, object],
     ) -> dict[str, object]:
-        """Compose dependency-owner projections with generic evidence correlation.
-
-        Package semantics remain owned here.  The generic correlation owner receives
-        only ordinary external anchors and repository locators.
-        """
+        """Correlate dependency owners with current repository evidence."""
         self._require_current_dependency_observation_v3(observation)
+        _contract.reject_unknown_fields(request, label="correlation request")
         raw_correlations = request.get("correlations", ())
         correlations = _objects(raw_correlations, label="correlations", limit=256)
         bundles: list[dict[str, object]] = []
@@ -1340,6 +1337,7 @@ class DependencyResolutionEvidenceMixin:
             if isinstance(row, Mapping) and row.get("module")
         ]
         for index, raw in enumerate(correlations):
+            _contract.reject_unknown_fields(raw, label="correlation row")
             module = _text(raw.get("module"), label="correlation module", required=True)
             context = _text(raw.get("context"), label="correlation context")
             anchors = raw.get("anchors", ())
