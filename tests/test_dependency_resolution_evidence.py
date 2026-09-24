@@ -1306,3 +1306,52 @@ def test_v2_path_found_before_visit_limit_remains_incomplete_when_work_is_omitte
     assert result["bounds"]["visited"] == 1
     assert result["completeness"] == "incomplete"
     assert result["omissions"] == [{"reason": "visit-limit"}]
+
+
+def test_v2_result_limit_does_not_strengthen_component_absence(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["components"].append(
+        {"component_id": "library", "name": "duplicate", "ecosystem": "test"}
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "component",
+                    "component_id": "library",
+                    "max_results": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert len(result["result"]) == 1
+    assert result["completeness"] == "incomplete"
+    assert result["omissions"] == [{"reason": "result-limit", "omitted": 1}]
+
+
+def test_v2_inventory_result_limit_preserves_source_completeness_but_reports_omission(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "inventory",
+                    "context": "compile",
+                    "max_results": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert len(result["result"]) == 1
+    assert result["completeness"] == "incomplete"
+    assert result["negative_evidence"] == "not-applicable"
+    assert result["omissions"] == [{"reason": "result-limit", "omitted": 2}]
