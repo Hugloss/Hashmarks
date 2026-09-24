@@ -1,4 +1,5 @@
 import ast
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -157,7 +158,7 @@ def test_public_release_contract_documents_stability_and_changelog() -> None:
 
 
 def test_generated_agent_evaluation_state_is_not_committed() -> None:
-    for generated_root in (
+    generated_roots = (
         "baseline",
         "challenge",
         "failure-packets",
@@ -165,8 +166,14 @@ def test_generated_agent_evaluation_state_is_not_committed() -> None:
         "packets",
         "worker-outputs",
         "benchmarks/agent_evaluation/retained",
-    ):
-        assert not (ROOT / generated_root).exists()
+    )
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z", "--", *generated_roots],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+    ).stdout
+    assert not tracked, tracked.decode("utf-8")
     evaluation_docs = _text("benchmarks/agent_evaluation/README.md")
     assert "not installed Hashmarks product state" in evaluation_docs
     assert (
@@ -287,5 +294,8 @@ def test_ci_and_dev_check_enforce_current_ruff_gate() -> None:
     ]
     assert "Current Ruff and size gates" in dev_check
     assert "--no-print-directory lint" in dev_check
+    assert dev_check.index("--no-print-directory dev-check-tests") < dev_check.index(
+        "--no-print-directory lint"
+    )
     assert "lint-debt-summary || true" not in dev_check
     assert "Ruff:        PASS (zero debt)" in dev_check

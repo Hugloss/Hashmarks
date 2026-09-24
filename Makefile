@@ -2,6 +2,7 @@ SHELL := /bin/sh
 UV ?= uv
 UV_SYNC := $(UV) sync --frozen
 UV_RUN := $(UV) run --frozen
+RUFF_RUN := UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --offline --only-group lint ruff
 FILES ?= 10000
 HOT_REQUESTS ?= 20
 TEST_SHARDS ?= 64
@@ -50,6 +51,7 @@ help:
 	  '  make test-diagnostic-shard DIAGNOSTIC_SHARD=12  Run one hosted diagnostic shard' \
 	  '  make test-diagnostic-capabilities  Show hosted capability inventory' \
 	  '  make test-profile   Run full suite and report slowest 25 tests >=1s' \
+	  '  make dependency-dogfood  Check genuine uv/Maven dependency add, change, and removal evidence' \
 	  '  make check          Junior-friendly local check: setup + compile + CodeMap + tests' \
 	  '  make bootstrap      Offline runtime-only bootstrap (CI/prepared environments)' \
 	  '  make baseline       Bootstrap + quick metrics baseline' \
@@ -174,83 +176,46 @@ hygiene:
 	@echo "PORTABLE HYGIENE PASS"
 
 ruff-available:
-	@if command -v ruff >/dev/null 2>&1; then \
-		ruff --version; \
-	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version; \
-	else \
-		echo "RUFF UNAVAILABLE"; \
-		exit 2; \
-	fi
+	@$(RUFF_RUN) --version
 
 format:
 	@echo "=== FORMAT ==="
-	@if command -v ruff >/dev/null 2>&1; then \
-		echo "Formatter authority: native ruff"; \
-		ruff format .; \
-	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
-		echo "Formatter authority: uv cached/offline ruff"; \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format .; \
-	else \
-		echo "RUFF UNAVAILABLE"; \
-		echo "Applying portable hygiene only."; \
-		$(MAKE) --no-print-directory hygiene; \
-		echo "FORMAT STATUS: UNVERIFIED"; \
-	fi
+	@$(RUFF_RUN) format .
 
 format-check:
 	@echo "=== AUTHORITATIVE FORMAT CHECK ==="
-	@if command -v ruff >/dev/null 2>&1; then \
-		ruff format --check --diff .; \
-	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format --check --diff .; \
-	else \
-		echo "ERROR: Ruff unavailable."; \
-		echo "Canonical formatting cannot be verified."; \
-		exit 2; \
-	fi
+	@$(RUFF_RUN) format --check --diff .
 	@git diff --check
 	@echo "AUTHORITATIVE FORMAT CHECK PASS"
 
 agent-finish:
 	@echo "=== AGENT FINISH ==="
 	@$(MAKE) --no-print-directory hygiene
-	@if command -v ruff >/dev/null 2>&1; then \
-		echo "Ruff available: applying safe autofixes and canonical formatting."; \
-		ruff check --fix --select $(RUFF_AUTOFIX_SELECT) .; \
-		ruff format .; \
+	@set -e; \
+		$(RUFF_RUN) check --fix --select $(RUFF_AUTOFIX_SELECT) .; \
+		$(RUFF_RUN) format .; \
 		git diff --check; \
-		ruff format --check --diff .; \
-		ruff check .; \
+		$(RUFF_RUN) format --check --diff .; \
+		$(RUFF_RUN) check .; \
 		echo "AGENT FORMAT STATUS: VERIFIED"; \
-		echo "AGENT FULL RUFF STATUS: VERIFIED"; \
-	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
-		echo "Cached Ruff available: applying safe autofixes and canonical formatting."; \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check --fix --select $(RUFF_AUTOFIX_SELECT) .; \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format .; \
-		git diff --check; \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format --check --diff .; \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check .; \
-		echo "AGENT FORMAT STATUS: VERIFIED"; \
-		echo "AGENT FULL RUFF STATUS: VERIFIED"; \
-	else \
-		echo ""; \
-		echo "AGENT FORMAT STATUS: UNVERIFIED"; \
-		echo "Portable hygiene passed, but Ruff is unavailable."; \
-	fi
+		echo "AGENT FULL RUFF STATUS: VERIFIED"
 
 agent-preflight: agent-finish
 	@$(MAKE) --no-print-directory lint-debt
 
 ruff-check:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint ruff check .
+	@$(RUFF_RUN) check .
 
 ruff-format-check:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint ruff format --check --diff .
+	@$(RUFF_RUN) format --check --diff .
 
 ruff: ruff-check ruff-format-check
 
 lint: ruff lint-debt
+
+.PHONY: dependency-dogfood
+dependency-dogfood:
+	@$(UV_RUN) --offline --no-sync --group test python -m pytest -v tests/test_dependency_dogfood.py
 
 source-hygiene:
 	@git ls-files -z -- '*.py' '*.pyi' | xargs -0 -r python3 -m scripts.source_hygiene
@@ -340,12 +305,12 @@ dev-check: setup
 	@printf '%s\n' '=== HASHMARKS DEV CHECK ==='
 	@printf '%s\n' '[1/4] Compile'
 	@$(MAKE) --no-print-directory compile
-	@printf '%s\n' '[2/4] Current Ruff and size gates'
-	@$(MAKE) --no-print-directory lint
-	@printf '%s\n' '[3/4] CodeMap sync'
+	@printf '%s\n' '[2/4] CodeMap sync'
 	@$(MAKE) --no-print-directory map >/dev/null
-	@printf '%s\n' '[4/4] Deterministic resumable pytest batches ($(TEST_SHARDS) shards, $(DEV_BATCH_SIZE) shards/batch)'
+	@printf '%s\n' '[3/4] Deterministic resumable pytest batches ($(TEST_SHARDS) shards, $(DEV_BATCH_SIZE) shards/batch)'
 	@$(MAKE) --no-print-directory dev-check-tests
+	@printf '%s\n' '[4/4] Current Ruff and size gates'
+	@$(MAKE) --no-print-directory lint
 	@VERSION=`$(UV_RUN) --offline hashmarks version`; \
 	printf '\n%s\n' '========================================' " HASHMARKS DEV CHECK: PASS ($$VERSION)" ' Setup:       PASS' ' Compile:     PASS' ' Ruff:        PASS (zero debt)' ' CodeMap:     PASS' ' Tests:       PASS' '========================================'
 

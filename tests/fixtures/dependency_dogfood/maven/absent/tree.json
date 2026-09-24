@@ -1,0 +1,9 @@
+{
+  "groupId": "example.fixture",
+  "artifactId": "dummy-app",
+  "version": "0.1.0",
+  "type": "jar",
+  "scope": "",
+  "classifier": "",
+  "optional": "false"
+}

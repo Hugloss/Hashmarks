@@ -6,12 +6,12 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
+from . import dependency_resolution_contract as _contract
 from .dependency_resolution_query import dependency_queries
 
 if TYPE_CHECKING:
     from .engine import CodeMap
 
-_SCHEMA_V3 = "hashmarks.dependency-resolution.v3"
 _MAX_CONTEXTS = 64
 _MAX_INVENTORY = 16384
 _MAX_EVIDENCE_SOURCES = 256
@@ -23,13 +23,6 @@ _MAX_MODULE_OWNERSHIP = 4096
 _MAX_ID_CHARS = 512
 _MAX_TEXT_CHARS = 4096
 _MAX_REQUEST_BYTES = 1_048_576
-_EVIDENCE_AUTHORITIES = {
-    "selection",
-    "resolution-graph",
-    "resolved-inventory",
-    "module-ownership",
-}
-_COVERAGE_KINDS = _EVIDENCE_AUTHORITIES
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MEMBER_REVISION = re.compile(r"^[0-9a-f]{64}$")
 
@@ -141,12 +134,15 @@ class DependencyResolutionEvidenceMixin:
     ) -> dict[str, object]:
         if not isinstance(snapshot, Mapping):
             raise ValueError("dependency resolution snapshot must be an object")
+        _contract.reject_unknown_fields(snapshot, label="snapshot")
         if len(_canonical(snapshot)) > _MAX_REQUEST_BYTES:
             raise ValueError(
                 f"dependency resolution snapshot exceeds {_MAX_REQUEST_BYTES} encoded bytes"
             )
-        if snapshot.get("schema") != _SCHEMA_V3:
-            raise ValueError(f"dependency resolution schema must be {_SCHEMA_V3}")
+        if snapshot.get("schema") != _contract.SCHEMA_V3:
+            raise ValueError(
+                f"dependency resolution schema must be {_contract.SCHEMA_V3}"
+            )
         return self._dependency_resolution_evidence_v3(snapshot)
 
     def _dependency_resolution_evidence_v3(  # noqa: PLR0914, PLR0915
@@ -252,7 +248,7 @@ class DependencyResolutionEvidenceMixin:
         }
         negative = self._dependency_negative_evidence_v3(coverage)
         packet = {
-            "schema": _SCHEMA_V3,
+            "schema": _contract.SCHEMA_V3,
             "authority": "qualified-external-observation",
             "producer_authority": "caller-claimed",
             "producer": producer_packet,
@@ -312,7 +308,7 @@ class DependencyResolutionEvidenceMixin:
         }
         if not isinstance(observation, Mapping) or set(observation) != fields:
             raise ValueError("dependency observation is not a qualified v3 packet")
-        if observation["schema"] != _SCHEMA_V3 or (
+        if observation["schema"] != _contract.SCHEMA_V3 or (
             observation["authority"] != "qualified-external-observation"
             or observation["producer_authority"] != "caller-claimed"
         ):
@@ -411,6 +407,18 @@ class DependencyResolutionEvidenceMixin:
             observation["observation_identity"],
         ):
             raise ValueError("dependency observation content identity mismatch")
+
+    def _require_current_dependency_observation_v3(
+        self, observation: Mapping[str, object]
+    ) -> None:
+        self._require_qualified_dependency_observation_v3(observation)
+        binding = cast("Mapping[str, object]", observation["repository_binding"])
+        if binding[
+            "repository_identity"
+        ] != self._repository_packet_identity() or binding["codemap_generation"] != int(
+            self.store.generation()
+        ):
+            raise ValueError("dependency observation repository binding mismatch")
 
     @classmethod
     def _validate_dependency_observation_sources_v3(
@@ -708,6 +716,7 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[str] = set()
         for raw in rows:
+            _contract.reject_unknown_fields(raw, label="component")
             component_id = _identifier(raw.get("component_id"), label="component_id")
             if component_id in seen:
                 raise ValueError(f"duplicate dependency component_id: {component_id}")
@@ -765,6 +774,7 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[str] = set()
         for raw in rows:
+            _contract.reject_unknown_fields(raw, label="evidence source")
             source_id = _identifier(raw.get("source_id"), label="source_id")
             if source_id in seen:
                 raise ValueError(f"duplicate dependency evidence source: {source_id}")
@@ -789,7 +799,7 @@ class DependencyResolutionEvidenceMixin:
             authorities = cls._dependency_identifier_list_v3(
                 raw.get("authorities", ()),
                 label="evidence source authority",
-                allowed=_EVIDENCE_AUTHORITIES,
+                allowed=_contract.EVIDENCE_AUTHORITIES,
             )
             result.append(
                 {
@@ -820,6 +830,7 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[str] = set()
         for raw in rows:
+            _contract.reject_unknown_fields(raw, label="selection")
             node_id = _identifier(raw.get("node_id"), label="node_id")
             if node_id in seen:
                 raise ValueError(f"duplicate dependency selection node_id: {node_id}")
@@ -864,6 +875,7 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
         for raw in rows:
+            _contract.reject_unknown_fields(raw, label="inventory")
             node_id = _identifier(raw.get("node_id"), label="inventory node_id")
             context = _identifier(raw.get("context"), label="inventory context")
             if node_id not in node_ids:
@@ -906,6 +918,7 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[tuple[str, str, str, str, str, str]] = set()
         for raw in rows:
+            _contract.reject_unknown_fields(raw, label="relationship")
             source = _identifier(raw.get("source"), label="relationship source")
             target = _identifier(raw.get("target"), label="relationship target")
             context = _identifier(raw.get("context"), label="relationship context")
@@ -973,6 +986,7 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
         for raw in rows:
+            _contract.reject_unknown_fields(raw, label="root")
             node_id = _identifier(raw.get("node_id"), label="root node_id")
             context = _identifier(raw.get("context"), label="root context")
             if node_id not in node_ids:
@@ -1011,6 +1025,7 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
         for raw in rows:
+            _contract.reject_unknown_fields(raw, label="module ownership")
             module = _text(raw.get("module"), label="module", required=True)
             context = _identifier(raw.get("context"), label="module ownership context")
             if context not in contexts:
@@ -1096,6 +1111,7 @@ class DependencyResolutionEvidenceMixin:
         }
         source_ids = set(sources)
         for raw in rows:
+            _contract.reject_unknown_fields(raw, label="coverage")
             context = _identifier(raw.get("context"), label="coverage context")
             kind = cls._dependency_coverage_kind_v3(raw)
             if context not in contexts:
@@ -1164,7 +1180,7 @@ class DependencyResolutionEvidenceMixin:
     @staticmethod
     def _dependency_coverage_kind_v3(raw: Mapping[str, object]) -> str:
         kind = _identifier(raw.get("kind"), label="coverage kind")
-        if kind not in _COVERAGE_KINDS:
+        if kind not in _contract.COVERAGE_KINDS:
             raise ValueError(f"unsupported dependency coverage kind: {kind}")
         return kind
 
@@ -1205,7 +1221,7 @@ class DependencyResolutionEvidenceMixin:
         import_target: str,
         context: str | None = None,
     ) -> dict[str, object]:
-        self._require_qualified_dependency_observation_v3(observation)
+        self._require_current_dependency_observation_v3(observation)
         candidates = self._python_import_module_candidates(source_path, import_target)
         rows = [
             row
@@ -1274,6 +1290,7 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[str] = set()
         for raw in rows:
+            _contract.reject_unknown_fields(raw, label="repository input")
             path = _identifier(raw.get("path"), label="repository input path")
             if path in seen:
                 raise ValueError(f"duplicate repository input path: {path}")
@@ -1312,7 +1329,7 @@ class DependencyResolutionEvidenceMixin:
         Package semantics remain owned here.  The generic correlation owner receives
         only ordinary external anchors and repository locators.
         """
-        self._require_qualified_dependency_observation_v3(observation)
+        self._require_current_dependency_observation_v3(observation)
         raw_correlations = request.get("correlations", ())
         correlations = _objects(raw_correlations, label="correlations", limit=256)
         bundles: list[dict[str, object]] = []

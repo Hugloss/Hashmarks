@@ -98,6 +98,8 @@ Producer-native coordinates, lockfile source tables, Maven scopes/classifiers, w
 
 Qualified observations expose `root_evidence` separately from semantic `roots`, so consumers can revalidate the evidence references bound by `observation_identity`. Public dependency queries, deltas, correspondence, and correlation revalidate normalized structure and content identities before using a supplied packet. This detects alteration or inconsistent reuse; because the hashes are not signatures, it does not authenticate the external producer or turn caller-declared authority into repository truth.
 
+The v3 snapshot surface is fail-closed: unknown top-level and typed fact/source/coverage fields are rejected rather than silently normalized away. `producer` metadata and semantic `scope` remain intentionally opaque JSON maps. Pure observation queries/deltas may be replayed from a structurally valid packet, but correspondence/correlation that combines dependency evidence with live repository intelligence requires the packet's repository identity and CodeMap generation to match the current CodeMap.
+
 ## Coverage and negative evidence
 
 Coverage `kind` is a semantic domain, not a producer/source format. The current coverage domains are `selection`, `resolution-graph`, `resolved-inventory`, and `module-ownership`.
@@ -143,6 +145,8 @@ The Maven adapter consumes already-produced dependency-tree JSON and dependency-
 
 - tree evidence is a Maven source format that can support `selection` and `resolution-graph`;
 - list evidence is a Maven source format that can support `selection`, `resolved-inventory`, and `module-ownership`;
+- complete list coverage requires a recognized list header and fully parsed content; Maven's `none` marker and a header-only list describe an empty complete inventory, while errors or unexplained content do not;
+- module-owner absence is admissible only when the list's module annotations establish complete module-ownership coverage;
 - Maven-specific parsing, scopes, classifiers, diagnostic prefixes, and module annotations stay inside the adapter.
 
 Core Hashmarks must not require Maven tree/list source kinds.
@@ -152,6 +156,8 @@ Core Hashmarks must not require Maven tree/list source kinds.
 The uv adapter consumes committed/provided `uv.lock` bytes.
 
 A single `uv.lock` artifact is one physical source and may support `selection`, `resolution-graph`, and `resolved-inventory`. It must not be split into synthetic graph/inventory sources when the underlying evidence bytes are identical.
+
+The lock's base, optional-extra, and development dependency tables all contribute graph edges. The adapter retains the one lock context and distinguishes grouped edges with `effective_scope` values such as `extra:mcp` and `dev:lint`. An unsupported group shape cannot yield complete graph coverage.
 
 uv-specific source mappings, dependency target resolution, markers, and workspace-root interpretation stay inside the adapter.
 

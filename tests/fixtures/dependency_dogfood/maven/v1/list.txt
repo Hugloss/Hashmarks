@@ -1,0 +1,2 @@
+The following files have been resolved:
+   example.fixture:dummy-dep:jar:1.0.0:compile -- module dummy.dep [auto]

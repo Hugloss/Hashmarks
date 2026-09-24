@@ -1,0 +1,30 @@
+version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[[package]]
+name = "dummy-app"
+version = "0.1.0"
+source = { virtual = "." }
+
+[package.optional-dependencies]
+extra = [
+    { name = "dummy-dep" },
+]
+
+[package.dev-dependencies]
+test = [
+    { name = "dummy-dep" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "dummy-dep", marker = "extra == 'extra'", directory = "vendor/dummy_dep" }]
+provides-extras = ["extra"]
+
+[package.metadata.requires-dev]
+test = [{ name = "dummy-dep", directory = "vendor/dummy_dep" }]
+
+[[package]]
+name = "dummy-dep"
+version = "1.0.0"
+source = { directory = "vendor/dummy_dep" }

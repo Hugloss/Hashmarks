@@ -420,6 +420,36 @@ def test_v3_negative_evidence_is_scoped_by_context_and_coverage_kind(
     assert states[("runtime", "resolution-graph")] == "not-admissible"
 
 
+@pytest.mark.parametrize(
+    ("target", "field"),
+    [
+        ("snapshot", "adapter_hint"),
+        ("source", "physical_source_id"),
+        ("selection", "producer_selection_hint"),
+        ("coverage", "producer_coverage_hint"),
+    ],
+)
+def test_v3_refuses_unknown_authority_contract_fields(
+    tmp_path: Path,
+    target: str,
+    field: str,
+) -> None:
+    changed = _snapshot_v3()
+    if target == "snapshot":
+        changed[field] = "unexpected"
+    elif target == "source":
+        changed["evidence_sources"][0][field] = "unexpected"
+    elif target == "selection":
+        changed["selections"][0][field] = "unexpected"
+    else:
+        changed["coverage"][0][field] = "unexpected"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="unknown dependency .* field"):
+            codemap.dependency_resolution_evidence(changed)
+
+
 def test_v3_rejects_dangling_evidence_source_reference(tmp_path: Path) -> None:
     changed = _snapshot_v3()
     changed["relationships"][0]["evidence_sources"] = ["missing"]
@@ -528,6 +558,50 @@ def test_v3_module_ownership_preserves_ambiguous_maven_module(
     ownership = observation["module_ownership"][0]
     assert ownership["state"] == "resolved-ambiguous"
     assert ownership["owners"] == ["inventory-only@1", "library@1"]
+
+
+def test_v3_repository_correspondence_refuses_foreign_repository_binding(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+
+    with CodeMap(source) as source_map:
+        source_map.sync()
+        observation = source_map.dependency_resolution_evidence(_snapshot_v3())
+
+    with CodeMap(target) as target_map:
+        target_map.sync()
+        with pytest.raises(
+            ValueError,
+            match="dependency observation repository binding mismatch",
+        ):
+            target_map.dependency_import_correspondence(
+                observation,
+                source_path="consumer.py",
+                import_target="library",
+            )
+
+
+def test_v3_repository_correlation_refuses_stale_generation(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        (tmp_path / "changed.py").write_text("value = 1\n")
+        codemap.sync()
+
+        with pytest.raises(
+            ValueError,
+            match="dependency observation repository binding mismatch",
+        ):
+            codemap.dependency_evidence_correlation(
+                observation,
+                {"correlations": []},
+            )
 
 
 def test_v3_dependency_correlation_preserves_contextual_ownership(
@@ -668,6 +742,54 @@ def test_v3_repository_binding_tracks_current_codemap_generation(
     assert binding["codemap_generation"] == expected_generation
 
 
+def test_v3_graph_query_refuses_node_outside_requested_context(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        with pytest.raises(
+            ValueError,
+            match="dependency query node_id not selected in context: inventory-only@1:runtime",
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "dependencies",
+                        "node_id": "inventory-only@1",
+                        "context": "runtime",
+                    }
+                ],
+            )
+
+
+def test_v3_graph_query_refuses_target_outside_requested_context(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        with pytest.raises(
+            ValueError,
+            match=(
+                "dependency query target_id not selected in context: "
+                "inventory-only@1:runtime"
+            ),
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "reachability",
+                        "node_id": "app@1",
+                        "target_id": "inventory-only@1",
+                        "context": "runtime",
+                    }
+                ],
+            )
+
+
 def test_v3_bounded_queries_report_dependencies_paths_and_contexts(
     tmp_path: Path,
 ) -> None:
@@ -738,14 +860,14 @@ def test_v3_reachability_absence_requires_complete_context_coverage(
             [
                 {
                     "operation": "reachability",
-                    "node_id": "inventory-only@1",
-                    "target_id": "library@1",
+                    "node_id": "library@1",
+                    "target_id": "app@1",
                     "context": "compile",
                 },
                 {
                     "operation": "reachability",
-                    "node_id": "inventory-only@1",
-                    "target_id": "library@1",
+                    "node_id": "library@1",
+                    "target_id": "app@1",
                     "context": "runtime",
                 },
             ],
