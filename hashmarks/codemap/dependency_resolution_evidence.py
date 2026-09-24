@@ -169,6 +169,39 @@ class DependencyResolutionEvidenceMixin:
             for row in evidence_sources
             if row.get("source_id")
         }
+        selection_contexts = {
+            str(row["node_id"]): set(row["contexts"]) for row in selections
+        }
+        for row in roots:
+            if row["context"] not in selection_contexts[str(row["node_id"])]:
+                raise ValueError(
+                    "root context not selected: "
+                    f"{row['node_id']}:{row['context']}"
+                )
+        for row in inventory:
+            if row["context"] not in selection_contexts[str(row["node_id"])]:
+                raise ValueError(
+                    "inventory context not selected: "
+                    f"{row['node_id']}:{row['context']}"
+                )
+        for row in relationships:
+            context = str(row["context"])
+            if (
+                context not in selection_contexts[str(row["source"])]
+                or context not in selection_contexts[str(row["target"])]
+            ):
+                raise ValueError(
+                    "relationship context not selected by both endpoints: "
+                    f"{row['source']}->{row['target']}:{context}"
+                )
+        for row in module_ownership:
+            context = str(row["context"])
+            for owner in row["owners"]:
+                if context not in selection_contexts[str(owner)]:
+                    raise ValueError(
+                        "module owner context not selected: "
+                        f"{owner}:{context}"
+                    )
         for row in inventory:
             for ref in row["evidence_sources"]:
                 source = sources_by_id[str(ref)]
