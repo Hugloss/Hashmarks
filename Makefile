@@ -32,6 +32,7 @@ DIAGNOSTIC_BATCH_LIMIT ?= 8
 DIAGNOSTIC_SHARD ?= 0
 DIAGNOSTIC_EXTRA_MARKER ?=
 RUFF_DEBT_PREVIOUS_BASELINE ?=
+RUFF_BLOCKING_SELECT ?= E4,E7,E9,I,T201
 
 .PHONY: help evaluation-help lock lock-check init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json lint-debt-gate test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
 
@@ -59,8 +60,8 @@ help:
 	  '  make map            Sync the derived repository CodeMap' \
 	  '  make map-status     Show CodeMap generation/staleness' \
 	  '  make map-watch      Maintain CodeMap incrementally in foreground' \
-	  '  make lint           Run the canonical project Ruff check' \
-	  '  make ruff           Run all Ruff diagnostics locally (check + format)' \
+	  '  make lint           Run Ruff correctness/format plus the no-growth debt gate' \
+	  '  make ruff           Run blocking Ruff correctness/import + format checks' \
 	  '  make ruff-check     Run blocking Ruff correctness/import checks' \
 	  '  make ruff-format-check  Run non-blocking Ruff formatting diagnostic' \
 	  '  make source-hygiene Run dependency-free LF + Python syntax checks' \
@@ -170,7 +171,7 @@ agent-runner-journal-help: bootstrap
 
 hygiene:
 	@echo "=== PORTABLE REPOSITORY HYGIENE ==="
-	@./scripts/agent-hygiene.sh
+	@bash ./scripts/agent-hygiene.sh
 	@echo "PORTABLE HYGIENE PASS"
 
 ruff-available:
@@ -187,11 +188,9 @@ format:
 	@echo "=== FORMAT ==="
 	@if command -v ruff >/dev/null 2>&1; then \
 		echo "Formatter authority: native ruff"; \
-		ruff check --fix .; \
 		ruff format .; \
 	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
 		echo "Formatter authority: uv cached/offline ruff"; \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check --fix .; \
 		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format .; \
 	else \
 		echo "RUFF UNAVAILABLE"; \
@@ -204,10 +203,8 @@ format-check:
 	@echo "=== AUTHORITATIVE FORMAT CHECK ==="
 	@if command -v ruff >/dev/null 2>&1; then \
 		ruff format --check --diff .; \
-		ruff check .; \
 	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
 		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format --check --diff .; \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check .; \
 	else \
 		echo "ERROR: Ruff unavailable."; \
 		echo "Canonical formatting cannot be verified."; \
@@ -220,31 +217,23 @@ agent-finish:
 	@echo "=== AGENT FINISH ==="
 	@$(MAKE) --no-print-directory hygiene
 	@if command -v ruff >/dev/null 2>&1; then \
-		echo "Ruff available: applying canonical formatting."; \
-		ruff check --fix .; \
+		echo "Ruff available: applying blocking correctness fixes and canonical formatting."; \
+		ruff check --fix --select $(RUFF_BLOCKING_SELECT) .; \
 		ruff format .; \
 		git diff --check; \
 		ruff format --check --diff .; \
-		if ! ruff check .; then \
-			echo ""; \
-			echo "AGENT LINT STATUS: REQUIRES SEMANTIC REPAIR"; \
-			echo "Ruff formatting is verified; remaining lint/maintainability findings are not formatter fixes."; \
-			exit 1; \
-		fi; \
+		ruff check --select $(RUFF_BLOCKING_SELECT) .; \
 		echo "AGENT FORMAT STATUS: VERIFIED"; \
+		echo "AGENT RUFF CORRECTNESS STATUS: VERIFIED"; \
 	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
-		echo "Cached Ruff available: applying canonical formatting."; \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check --fix .; \
+		echo "Cached Ruff available: applying blocking correctness fixes and canonical formatting."; \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check --fix --select $(RUFF_BLOCKING_SELECT) .; \
 		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format .; \
 		git diff --check; \
 		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format --check --diff .; \
-		if ! UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check .; then \
-			echo ""; \
-			echo "AGENT LINT STATUS: REQUIRES SEMANTIC REPAIR"; \
-			echo "Ruff formatting is verified; remaining lint/maintainability findings are not formatter fixes."; \
-			exit 1; \
-		fi; \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check --select $(RUFF_BLOCKING_SELECT) .; \
 		echo "AGENT FORMAT STATUS: VERIFIED"; \
+		echo "AGENT RUFF CORRECTNESS STATUS: VERIFIED"; \
 	else \
 		echo ""; \
 		echo "AGENT FORMAT STATUS: UNVERIFIED"; \
@@ -252,16 +241,17 @@ agent-finish:
 	fi
 
 agent-preflight: agent-finish
+	@$(MAKE) --no-print-directory lint-debt-gate
 
 ruff-check:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint ruff check .
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint ruff check --select $(RUFF_BLOCKING_SELECT) .
 
 ruff-format-check:
-	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint ruff format --check .
+	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint ruff format --check --diff .
 
 ruff: ruff-check ruff-format-check
 
-lint: ruff
+lint: ruff lint-debt-gate
 
 source-hygiene:
 	@git ls-files -z -- '*.py' '*.pyi' | xargs -0 -r python3 -m scripts.source_hygiene
