@@ -82,7 +82,8 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         if (
             isinstance(source_raw, Mapping)
             and any(key in source_raw for key in ("virtual", "editable", "directory"))
-            and sum(key in source_raw for key in ("virtual", "editable", "directory")) > 1
+            and sum(key in source_raw for key in ("virtual", "editable", "directory"))
+            > 1
         ):
             raise ValueError(
                 f"uv lock package has ambiguous local source identity: {name}"
@@ -217,9 +218,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             key=lambda row: str(row["node_id"]),
         ),
         "evidence_sources": evidence_sources,
-        "components": sorted(
-            components.values(), key=lambda row: row["component_id"]
-        ),
+        "components": sorted(components.values(), key=lambda row: row["component_id"]),
         "selections": sorted(selections, key=lambda row: str(row["node_id"])),
         "inventory": sorted(inventory, key=lambda row: str(row["node_id"])),
         "relationships": sorted(
