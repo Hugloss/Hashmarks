@@ -29,7 +29,7 @@ def _snapshot_v2() -> dict[str, object]:
             {
                 "source_id": "tree:compile",
                 "kind": "test-resolution-source",
-            "authorities": ["resolution-graph", "selection"],
+                "authorities": ["resolution-graph", "selection"],
                 "context": "compile",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -37,7 +37,7 @@ def _snapshot_v2() -> dict[str, object]:
             {
                 "source_id": "tree:runtime",
                 "kind": "test-resolution-source",
-            "authorities": ["resolution-graph", "selection"],
+                "authorities": ["resolution-graph", "selection"],
                 "context": "runtime",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -45,7 +45,7 @@ def _snapshot_v2() -> dict[str, object]:
             {
                 "source_id": "list:compile",
                 "kind": "test-inventory-source",
-            "authorities": ["module-ownership", "resolved-inventory", "selection"],
+                "authorities": ["module-ownership", "resolved-inventory", "selection"],
                 "context": "compile",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -680,9 +680,7 @@ def test_v2_contextual_module_ownership_preserves_independent_observations(
 ) -> None:
     changed = _snapshot_v2()
     runtime_source = next(
-        row
-        for row in changed["evidence_sources"]
-        if row["source_id"] == "tree:runtime"
+        row for row in changed["evidence_sources"] if row["source_id"] == "tree:runtime"
     )
     runtime_source["authorities"].append("module-ownership")
     changed["module_ownership"] = [
@@ -1095,7 +1093,7 @@ def test_v2_unscoped_module_absence_is_admissible_when_all_contexts_complete(
             {
                 "source_id": source_id,
                 "kind": "test-module-source",
-            "authorities": ["module-ownership"],
+                "authorities": ["module-ownership"],
                 "context": context,
                 "completeness": "complete",
                 "truncation": "complete",
