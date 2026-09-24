@@ -239,12 +239,22 @@ class DependencyResolutionEvidenceMixin:
                     )
         for row in selections:
             contexts_for_selection = set(row["contexts"])
-            for ref in row["evidence_sources"]:
-                source_context = str(sources_by_id[str(ref)].get("context") or "")
+            source_contexts = {
+                str(sources_by_id[str(ref)].get("context") or "")
+                for ref in row["evidence_sources"]
+            }
+            for source_context in source_contexts:
                 if source_context and source_context not in contexts_for_selection:
                     raise ValueError(
                         "incompatible selection evidence source context: "
                         f"{row['node_id']}:{source_context}"
+                    )
+            if "" not in source_contexts:
+                missing_contexts = sorted(contexts_for_selection - source_contexts)
+                if missing_contexts:
+                    raise ValueError(
+                        "selection context lacks evidence source: "
+                        f"{row['node_id']}:{missing_contexts[0]}"
                     )
 
         definition = {
