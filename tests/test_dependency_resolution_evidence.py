@@ -1400,3 +1400,49 @@ def test_v2_path_result_limit_reports_only_actual_omitted_path(
     assert len(result["result"]) == 1
     assert result["completeness"] == "incomplete"
     assert result["omissions"] == [{"reason": "result-limit"}]
+
+
+def test_v2_context_query_obeys_result_bound(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "contexts",
+                    "node_id": "app@1",
+                    "max_results": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert len(result["result"]) == 1
+    assert result["completeness"] == "incomplete"
+    assert result["omissions"] == [{"reason": "result-limit", "omitted": 1}]
+
+
+def test_v2_context_query_exact_bound_without_omission_is_complete(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["selections"][0]["contexts"] = ["compile"]
+    snapshot["roots"] = [snapshot["roots"][0]]
+    snapshot["relationships"] = [snapshot["relationships"][0]]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "contexts",
+                    "node_id": "app@1",
+                    "max_results": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert result["result"] == ["compile"]
+    assert result["completeness"] == "complete"
+    assert result["omissions"] == []
