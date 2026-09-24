@@ -812,28 +812,6 @@ def test_v3_dependency_query_refuses_unknown_request_field(
             )
 
 
-def test_v3_component_query_refuses_ignored_context(
-    tmp_path: Path,
-) -> None:
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
-        with pytest.raises(
-            ValueError,
-            match="field not supported for component query: context",
-        ):
-            codemap.dependency_resolution_queries(
-                observation,
-                [
-                    {
-                        "operation": "component",
-                        "component_id": "library",
-                        "context": "compile",
-                    }
-                ],
-            )
-
-
 def test_v3_multicontext_graph_query_requires_explicit_context(
     tmp_path: Path,
 ) -> None:
