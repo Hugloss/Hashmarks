@@ -224,16 +224,26 @@ agent-finish:
 		ruff check --fix .; \
 		ruff format .; \
 		git diff --check; \
-		ruff format --check .; \
-		ruff check .; \
+		ruff format --check --diff .; \
+		if ! ruff check .; then \
+			echo ""; \
+			echo "AGENT LINT STATUS: REQUIRES SEMANTIC REPAIR"; \
+			echo "Ruff formatting is verified; remaining lint/maintainability findings are not formatter fixes."; \
+			exit 1; \
+		fi; \
 		echo "AGENT FORMAT STATUS: VERIFIED"; \
 	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
 		echo "Cached Ruff available: applying canonical formatting."; \
 		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check --fix .; \
 		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format .; \
 		git diff --check; \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format --check .; \
-		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check .; \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format --check --diff .; \
+		if ! UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check .; then \
+			echo ""; \
+			echo "AGENT LINT STATUS: REQUIRES SEMANTIC REPAIR"; \
+			echo "Ruff formatting is verified; remaining lint/maintainability findings are not formatter fixes."; \
+			exit 1; \
+		fi; \
 		echo "AGENT FORMAT STATUS: VERIFIED"; \
 	else \
 		echo ""; \
