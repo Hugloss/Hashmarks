@@ -232,6 +232,33 @@ def test_real_producer_dependency_change_dogfood(
         )
 
 
+def test_real_uv_grouped_edges_do_not_duplicate_topology_paths(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(
+            _observation("uv", "grouped")
+        )
+        root_id = observation["roots"][0]["node_id"]
+        selection = _dummy_selection(observation, "dummy-dep")
+        paths = _query(
+            codemap,
+            observation,
+            {
+                "operation": "paths",
+                "node_id": root_id,
+                "target_id": selection["node_id"],
+                "context": "lock",
+                "max_results": 1,
+            },
+        )
+
+    assert paths["result"] == [[root_id, selection["node_id"]]]
+    assert paths["completeness"] == "complete"
+    assert paths["omissions"] == []
+
+
 @pytest.mark.parametrize(
     ("before_state", "after_state"),
     [("absent", "grouped"), ("grouped", "absent")],
