@@ -480,7 +480,7 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
         str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
     )
     snapshot = {
-        "schema": "hashmarks.dependency-resolution.v2",
+        "schema": "hashmarks.dependency-resolution.v3",
         "producer": {"kind": "test-resolver", "schema_version": "1"},
         "scope": {"environment": "test"},
         "contexts": ["runtime"],
@@ -494,7 +494,8 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
         "evidence_sources": [
             {
                 "source_id": "tree:runtime",
-                "kind": "resolution-graph",
+                "kind": "test-resolution-source",
+                "authorities": ["resolution-graph", "selection"],
                 "context": "runtime",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -540,7 +541,14 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
                 "completeness": "complete",
                 "truncation": "complete",
                 "evidence_sources": ["tree:runtime"],
-            }
+            },
+            {
+                "context": "runtime",
+                "kind": "selection",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["tree:runtime"],
+            },
         ],
         "repository_inputs": [],
         "module_ownership": [],
@@ -560,6 +568,6 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
         surface.close()
 
     assert packet["schema"] == "hashmarks.mcp-dependency-codemap.v1"
-    assert packet["observation"]["schema"] == "hashmarks.dependency-resolution.v2"
+    assert packet["observation"]["schema"] == "hashmarks.dependency-resolution.v3"
     assert packet["queries"]["results"][0]["result"][0]["node_id"] == "lib@1"
     assert packet["causation"] == "not-inferred"

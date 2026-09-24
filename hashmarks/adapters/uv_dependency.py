@@ -5,7 +5,7 @@ import json
 import tomllib
 from collections.abc import Mapping, Sequence
 
-_SCHEMA = "hashmarks.dependency-resolution.v2"
+_SCHEMA = "hashmarks.dependency-resolution.v3"
 _CONTEXT = "lock"
 
 
@@ -52,7 +52,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     lock: bytes,
     repository_inputs: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
-    """Translate already-produced uv.lock bytes into dependency-resolution v2.
+    """Translate already-produced uv.lock bytes into dependency-resolution v3.
 
     The adapter is execution-free. It reads the lock as producer evidence and never
     invokes uv, resolves packages, reads dependency source, or parses pyproject.toml
@@ -178,23 +178,18 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     evidence_sources = [
         {
             "source_id": source_id,
-            "kind": "resolution-graph",
+            "kind": "uv-lock",
+            "authorities": [
+                "resolution-graph",
+                "resolved-inventory",
+                "selection",
+            ],
             "context": _CONTEXT,
             "completeness": "complete",
             "truncation": "complete",
             "producer_digest": producer_digest,
-        },
-        {
-            "source_id": "uv:lock-inventory",
-            "kind": "resolved-inventory",
-            "context": _CONTEXT,
-            "completeness": "complete",
-            "truncation": "complete",
-            "producer_digest": producer_digest,
-        },
+        }
     ]
-    for row in inventory:
-        row["evidence_sources"] = ["uv:lock-inventory"]
 
     return {
         "schema": _SCHEMA,
@@ -245,7 +240,14 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 "kind": "resolved-inventory",
                 "completeness": "complete",
                 "truncation": "complete",
-                "evidence_sources": ["uv:lock-inventory"],
+                "evidence_sources": [source_id],
+            },
+            {
+                "context": _CONTEXT,
+                "kind": "selection",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": [source_id],
             },
         ],
         "repository_inputs": [dict(row) for row in repository_inputs],

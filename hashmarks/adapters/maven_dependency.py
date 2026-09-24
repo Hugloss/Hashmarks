@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 
-_SCHEMA = "hashmarks.dependency-resolution.v2"
+_SCHEMA = "hashmarks.dependency-resolution.v3"
 _LIST_LINE = re.compile(
     r"^[ \t]*(?P<coordinate>[^ \t:]+:[^ \t:]+:[^ \t:]+"
     r"(?::[^ \t:]+){2,3})(?:[ \t]+--[ \t]+module[ \t]+"
@@ -67,7 +67,7 @@ def _module_name(text: str) -> str:
 
 
 # This is the cohesive translation boundary between Maven's two artifact shapes and
-# the dependency-resolution v2 contract. Splitting its state across wrapper helpers
+# the dependency-resolution v3 contract. Splitting its state across wrapper helpers
 # would obscure the inventory/graph/ownership invariants it must preserve.
 def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     *,
@@ -75,7 +75,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     inventories: Mapping[str, bytes],
     repository_inputs: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
-    """Translate already-produced Maven tree/list evidence into the v2 contract.
+    """Translate already-produced Maven tree/list evidence into the v3 contract.
 
     This adapter is deliberately execution-free: callers provide Maven output bytes.
     Hashmarks does not invoke Maven, resolve packages, or inspect dependency source.
@@ -124,6 +124,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         row["evidence_sources"].add(source_id)
 
     for context in contexts:
+        selection_sources: list[str] = []
         tree_source = f"tree:{context}"
         if context in trees:
             raw_bytes = trees[context]
@@ -137,10 +138,12 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 raise ValueError(
                     f"Maven dependency tree root must be an object: {context}"
                 )
+            selection_sources.append(tree_source)
             evidence_sources.append(
                 {
                     "source_id": tree_source,
-                    "kind": "resolution-graph",
+                    "kind": "maven-dependency-tree",
+                    "authorities": ["resolution-graph", "selection"],
                     "context": context,
                     "completeness": "complete",
                     "truncation": "complete",
@@ -204,10 +207,16 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 raise ValueError(
                     f"invalid Maven dependency list text for {context}"
                 ) from exc
+            selection_sources.append(list_source)
             evidence_sources.append(
                 {
                     "source_id": list_source,
-                    "kind": "resolved-inventory",
+                    "kind": "maven-dependency-list",
+                    "authorities": [
+                        "module-ownership",
+                        "resolved-inventory",
+                        "selection",
+                    ],
                     "context": context,
                     "completeness": "complete",
                     "truncation": "complete",
@@ -280,6 +289,16 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     "evidence_sources": [list_source],
                 }
             )
+
+        coverage.append(
+            {
+                "context": context,
+                "kind": "selection",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": sorted(selection_sources),
+            }
+        )
 
     normalized_selections = []
     for row in selections.values():

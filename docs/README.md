@@ -11,6 +11,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 - [`reference/ARCHITECTURE.md`](reference/ARCHITECTURE.md) — architecture and authority model.
 - [`reference/API_STABILITY.md`](reference/API_STABILITY.md) — supported Python/CLI surface and pre-1.0 compatibility policy.
 - [`reference/EVIDENCE_CORRELATION.md`](reference/EVIDENCE_CORRELATION.md) — bounded external-observation correlation and authority limits.
+- [`reference/DEPENDENCY_EVIDENCE.md`](reference/DEPENDENCY_EVIDENCE.md) — producer-neutral dependency evidence, adapter boundaries, semantic authorities, and coverage rules.
 - [`reference/INVARIANTS.md`](reference/INVARIANTS.md) — normative correctness, freshness, and authority guarantees.
 - [`reference/OBSERVER_DELTA.md`](reference/OBSERVER_DELTA.md) — observer/delta ownership and change semantics.
 - [`reference/PRODUCT_BOUNDARY.md`](reference/PRODUCT_BOUNDARY.md) — normative feature-admission and ownership contract.

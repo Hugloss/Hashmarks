@@ -11,7 +11,7 @@ from .dependency_resolution_query import dependency_queries
 if TYPE_CHECKING:
     from .engine import CodeMap
 
-_SCHEMA_V2 = "hashmarks.dependency-resolution.v2"
+_SCHEMA_V3 = "hashmarks.dependency-resolution.v3"
 _MAX_CONTEXTS = 64
 _MAX_INVENTORY = 16384
 _MAX_EVIDENCE_SOURCES = 256
@@ -23,6 +23,13 @@ _MAX_MODULE_OWNERSHIP = 4096
 _MAX_ID_CHARS = 512
 _MAX_TEXT_CHARS = 4096
 _MAX_REQUEST_BYTES = 1_048_576
+_EVIDENCE_AUTHORITIES = {
+    "selection",
+    "resolution-graph",
+    "resolved-inventory",
+    "module-ownership",
+}
+_COVERAGE_KINDS = _EVIDENCE_AUTHORITIES
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MEMBER_REVISION = re.compile(r"^[0-9a-f]{64}$")
 
@@ -94,26 +101,26 @@ class DependencyResolutionEvidenceMixin:
             raise ValueError(
                 f"dependency resolution snapshot exceeds {_MAX_REQUEST_BYTES} encoded bytes"
             )
-        if snapshot.get("schema") != _SCHEMA_V2:
-            raise ValueError(f"dependency resolution schema must be {_SCHEMA_V2}")
-        return self._dependency_resolution_evidence_v2(snapshot)
+        if snapshot.get("schema") != _SCHEMA_V3:
+            raise ValueError(f"dependency resolution schema must be {_SCHEMA_V3}")
+        return self._dependency_resolution_evidence_v3(snapshot)
 
-    def _dependency_resolution_evidence_v2(  # noqa: PLR0914, PLR0915
+    def _dependency_resolution_evidence_v3(  # noqa: PLR0914, PLR0915
         self,
         snapshot: Mapping[str, object],
     ) -> dict[str, object]:
         """Qualify a multi-context dependency observation without executing its producer."""
         producer_packet, scope_packet, contexts, context_set = (
-            self._dependency_header_v2(snapshot)
+            self._dependency_header_v3(snapshot)
         )
 
-        evidence_sources = self._dependency_evidence_sources_v2(
+        evidence_sources = self._dependency_evidence_sources_v3(
             snapshot.get("evidence_sources", ()), context_set
         )
         source_ids = {str(row["source_id"]) for row in evidence_sources}
-        components = self._dependency_components_v2(snapshot.get("components", ()))
+        components = self._dependency_components_v3(snapshot.get("components", ()))
         component_ids = {str(row["component_id"]) for row in components}
-        selections = self._dependency_selections_v2(
+        selections = self._dependency_selections_v3(
             snapshot.get("selections", ()), component_ids, context_set, source_ids
         )
         node_ids = {str(row["node_id"]) for row in selections}
@@ -123,62 +130,60 @@ class DependencyResolutionEvidenceMixin:
             raise ValueError(
                 f"component has no dependency selection: {orphan_components[0]}"
             )
-        inventory = self._dependency_inventory_v2(
+        inventory = self._dependency_inventory_v3(
             snapshot.get("inventory", ()), node_ids, context_set, source_ids
         )
-        relationships = self._dependency_relationships_v2(
+        relationships = self._dependency_relationships_v3(
             snapshot.get("relationships", ()), node_ids, context_set, source_ids
         )
 
         raw_roots = snapshot.get("roots", ())
-        roots = self._dependency_roots_v2(raw_roots, node_ids, context_set, source_ids)
+        roots = self._dependency_roots_v3(raw_roots, node_ids, context_set, source_ids)
         repository_inputs = self._dependency_repository_inputs(
             snapshot.get("repository_inputs", ())
         )
-        module_ownership = self._dependency_module_ownership_v2(
+        module_ownership = self._dependency_module_ownership_v3(
             snapshot.get("module_ownership", ()),
             node_ids,
             context_set,
             source_ids,
         )
-        coverage = self._dependency_coverage_v2(
+        coverage = self._dependency_coverage_v3(
             snapshot.get("coverage", ()), context_set, evidence_sources
         )
-        self._validate_dependency_coverage_facts_v2(
+        self._validate_dependency_coverage_facts_v3(
             coverage=coverage,
             roots=roots,
-            inventory=inventory,
-            relationships=relationships,
         )
         sources_by_id = {
             str(row["source_id"]): row
             for row in evidence_sources
             if row.get("source_id")
         }
-        self._validate_dependency_context_membership_v2(
+        self._validate_dependency_context_membership_v3(
             roots=roots,
             inventory=inventory,
             relationships=relationships,
             selections=selections,
         )
-        self._validate_dependency_resolution_source_contexts_v2(
+        self._validate_dependency_resolution_source_contexts_v3(
             roots=roots,
             inventory=inventory,
             relationships=relationships,
             sources_by_id=sources_by_id,
         )
-        self._validate_dependency_graph_fact_source_authority_v2(
+        self._validate_dependency_fact_source_authority_v3(
             roots=roots,
             relationships=relationships,
             inventory=inventory,
             sources_by_id=sources_by_id,
         )
-        self._validate_dependency_module_source_authority_v2(
+        self._validate_dependency_module_source_authority_v3(
             module_ownership=module_ownership,
             selections=selections,
             sources_by_id=sources_by_id,
         )
-        self._validate_dependency_selection_source_contexts_v2(
+        self._validate_dependency_selection_source_contexts_v3(
             selections=selections,
             sources_by_id=sources_by_id,
         )
@@ -203,7 +208,7 @@ class DependencyResolutionEvidenceMixin:
             "relationships": relationships,
         }
         definition_identity = _identity(
-            "hashmarks.dependency-resolution-definition.v2", definition
+            "hashmarks.dependency-resolution-definition.v3", definition
         )
         identity_resolution = {
             key: [
@@ -217,7 +222,7 @@ class DependencyResolutionEvidenceMixin:
             for key, rows in resolution.items()
         }
         resolution_identity = _identity(
-            "hashmarks.dependency-resolution-graph.v2",
+            "hashmarks.dependency-resolution-graph.v3",
             {"definition_identity": definition_identity, **identity_resolution},
         )
 
@@ -242,11 +247,11 @@ class DependencyResolutionEvidenceMixin:
             "coverage": coverage,
         }
         observation_identity = _identity(
-            "hashmarks.dependency-resolution-observation.v2", observation_payload
+            "hashmarks.dependency-resolution-observation.v3", observation_payload
         )
-        negative = self._dependency_negative_evidence_v2(coverage)
+        negative = self._dependency_negative_evidence_v3(coverage)
         return {
-            "schema": _SCHEMA_V2,
+            "schema": _SCHEMA_V3,
             "authority": "qualified-external-observation",
             "producer_authority": "caller-claimed",
             "definition_identity": definition_identity,
@@ -263,7 +268,7 @@ class DependencyResolutionEvidenceMixin:
         }
 
     @staticmethod
-    def _dependency_header_v2(
+    def _dependency_header_v3(
         snapshot: Mapping[str, object],
     ) -> tuple[dict[str, object], dict[str, object], list[str], set[str]]:
         producer = snapshot.get("producer")
@@ -298,7 +303,7 @@ class DependencyResolutionEvidenceMixin:
         return producer_packet, scope_packet, contexts, set(contexts)
 
     @staticmethod
-    def _validate_dependency_context_membership_v2(
+    def _validate_dependency_context_membership_v3(
         *,
         roots: Sequence[Mapping[str, object]],
         inventory: Sequence[Mapping[str, object]],
@@ -330,7 +335,7 @@ class DependencyResolutionEvidenceMixin:
                 )
 
     @staticmethod
-    def _validate_dependency_resolution_source_contexts_v2(
+    def _validate_dependency_resolution_source_contexts_v3(
         *,
         roots: Sequence[Mapping[str, object]],
         inventory: Sequence[Mapping[str, object]],
@@ -363,30 +368,35 @@ class DependencyResolutionEvidenceMixin:
                     )
 
     @staticmethod
-    def _validate_dependency_graph_fact_source_authority_v2(
+    def _validate_dependency_fact_source_authority_v3(
         *,
         roots: Sequence[Mapping[str, object]],
         relationships: Sequence[Mapping[str, object]],
         inventory: Sequence[Mapping[str, object]],
         sources_by_id: Mapping[str, Mapping[str, object]],
     ) -> None:
+        def supports(row: Mapping[str, object], authority: str) -> bool:
+            return any(
+                authority in sources_by_id[str(ref)].get("authorities", ())
+                for ref in row["evidence_sources"]
+            )
+
         for row in roots:
-            if not any(
-                sources_by_id[str(ref)].get("kind") == "resolution-graph"
-                for ref in row["evidence_sources"]
-            ):
-                raise ValueError("root requires resolution-graph evidence source")
+            if not supports(row, "resolution-graph"):
+                raise ValueError("root requires resolution-graph evidence authority")
         for row in relationships:
-            if not any(
-                sources_by_id[str(ref)].get("kind") == "resolution-graph"
-                for ref in row["evidence_sources"]
-            ):
+            if not supports(row, "resolution-graph"):
                 raise ValueError(
-                    "relationship requires resolution-graph evidence source"
+                    "relationship requires resolution-graph evidence authority"
+                )
+        for row in inventory:
+            if not supports(row, "resolved-inventory"):
+                raise ValueError(
+                    "inventory requires resolved-inventory evidence authority"
                 )
 
     @staticmethod
-    def _validate_dependency_module_source_authority_v2(
+    def _validate_dependency_module_source_authority_v3(
         *,
         module_ownership: Sequence[Mapping[str, object]],
         selections: Sequence[Mapping[str, object]],
@@ -396,6 +406,13 @@ class DependencyResolutionEvidenceMixin:
             str(row["node_id"]): set(row["contexts"]) for row in selections
         }
         for row in module_ownership:
+            if not any(
+                "module-ownership" in sources_by_id[str(ref)].get("authorities", ())
+                for ref in row["evidence_sources"]
+            ):
+                raise ValueError(
+                    "module ownership requires module-ownership evidence authority"
+                )
             for owner in row["owners"]:
                 if row["context"] not in selection_contexts[str(owner)]:
                     raise ValueError(
@@ -420,16 +437,19 @@ class DependencyResolutionEvidenceMixin:
                     )
 
     @staticmethod
-    def _validate_dependency_selection_source_contexts_v2(
+    def _validate_dependency_selection_source_contexts_v3(
         *,
         selections: Sequence[Mapping[str, object]],
         sources_by_id: Mapping[str, Mapping[str, object]],
     ) -> None:
         for row in selections:
             contexts_for_selection = set(row["contexts"])
-            source_contexts = {
-                str(sources_by_id[str(ref)].get("context") or "")
-                for ref in row["evidence_sources"]
+            sources = [sources_by_id[str(ref)] for ref in row["evidence_sources"]]
+            source_contexts = {str(source.get("context") or "") for source in sources}
+            authority_contexts = {
+                str(source.get("context") or "")
+                for source in sources
+                if "selection" in source.get("authorities", ())
             }
             for source_context in source_contexts:
                 if source_context and source_context not in contexts_for_selection:
@@ -437,16 +457,16 @@ class DependencyResolutionEvidenceMixin:
                         "incompatible selection evidence source context: "
                         f"{row['node_id']}:{source_context}"
                     )
-            if "" not in source_contexts:
-                missing_contexts = sorted(contexts_for_selection - source_contexts)
+            if "" not in authority_contexts:
+                missing_contexts = sorted(contexts_for_selection - authority_contexts)
                 if missing_contexts:
                     raise ValueError(
-                        "selection context lacks evidence source: "
+                        "selection context lacks selection evidence authority: "
                         f"{row['node_id']}:{missing_contexts[0]}"
                     )
 
     @staticmethod
-    def _dependency_components_v2(value: object) -> list[dict[str, object]]:
+    def _dependency_components_v3(value: object) -> list[dict[str, object]]:
         rows = _objects(value, label="components", limit=_MAX_NODES)
         result: list[dict[str, object]] = []
         seen: set[str] = set()
@@ -467,7 +487,7 @@ class DependencyResolutionEvidenceMixin:
         return sorted(result, key=lambda row: str(row["component_id"]))
 
     @staticmethod
-    def _dependency_context_list_v2(
+    def _dependency_identifier_list_v3(
         value: object, *, label: str, allowed: set[str]
     ) -> list[str]:
         if not isinstance(value, Sequence) or isinstance(
@@ -485,7 +505,7 @@ class DependencyResolutionEvidenceMixin:
         return sorted(contexts)
 
     @staticmethod
-    def _dependency_source_refs_v2(
+    def _dependency_source_refs_v3(
         value: object, *, label: str, allowed: set[str]
     ) -> list[str]:
         if not isinstance(value, Sequence) or isinstance(
@@ -501,7 +521,7 @@ class DependencyResolutionEvidenceMixin:
         return sorted(refs)
 
     @classmethod
-    def _dependency_evidence_sources_v2(
+    def _dependency_evidence_sources_v3(
         cls, value: object, contexts: set[str]
     ) -> list[dict[str, object]]:
         rows = _objects(value, label="evidence_sources", limit=_MAX_EVIDENCE_SOURCES)
@@ -529,12 +549,18 @@ class DependencyResolutionEvidenceMixin:
                 raise ValueError(
                     "complete evidence source requires truncation=complete"
                 )
+            authorities = cls._dependency_identifier_list_v3(
+                raw.get("authorities", ()),
+                label="evidence source authority",
+                allowed=_EVIDENCE_AUTHORITIES,
+            )
             result.append(
                 {
                     "source_id": source_id,
                     "kind": _text(
                         raw.get("kind"), label="evidence source kind", required=True
                     ),
+                    "authorities": authorities,
                     "context": context,
                     "completeness": completeness,
                     "truncation": truncation,
@@ -546,7 +572,7 @@ class DependencyResolutionEvidenceMixin:
         return sorted(result, key=lambda row: str(row["source_id"]))
 
     @classmethod
-    def _dependency_selections_v2(
+    def _dependency_selections_v3(
         cls,
         value: object,
         component_ids: set[str],
@@ -564,14 +590,14 @@ class DependencyResolutionEvidenceMixin:
             component_id = _identifier(raw.get("component_id"), label="component_id")
             if component_id not in component_ids:
                 raise ValueError(f"dangling dependency component: {component_id}")
-            refs = cls._dependency_source_refs_v2(
+            refs = cls._dependency_source_refs_v3(
                 raw.get("evidence_sources", ()),
                 label="selection evidence source",
                 allowed=source_ids,
             )
             if not refs:
                 raise ValueError("selection must reference evidence source")
-            selection_contexts = cls._dependency_context_list_v2(
+            selection_contexts = cls._dependency_identifier_list_v3(
                 raw.get("contexts", ()),
                 label="selection context",
                 allowed=contexts,
@@ -590,7 +616,7 @@ class DependencyResolutionEvidenceMixin:
         return sorted(result, key=lambda row: str(row["node_id"]))
 
     @classmethod
-    def _dependency_inventory_v2(
+    def _dependency_inventory_v3(
         cls,
         value: object,
         node_ids: set[str],
@@ -613,7 +639,7 @@ class DependencyResolutionEvidenceMixin:
                     f"duplicate dependency inventory membership: {node_id}:{context}"
                 )
             seen.add(key)
-            refs = cls._dependency_source_refs_v2(
+            refs = cls._dependency_source_refs_v3(
                 raw.get("evidence_sources", ()),
                 label="inventory evidence source",
                 allowed=source_ids,
@@ -632,7 +658,7 @@ class DependencyResolutionEvidenceMixin:
         )
 
     @classmethod
-    def _dependency_relationships_v2(
+    def _dependency_relationships_v3(
         cls,
         value: object,
         node_ids: set[str],
@@ -652,7 +678,7 @@ class DependencyResolutionEvidenceMixin:
                 )
             if context not in contexts:
                 raise ValueError(f"unknown relationship context: {context}")
-            refs = cls._dependency_source_refs_v2(
+            refs = cls._dependency_source_refs_v3(
                 raw.get("evidence_sources", ()),
                 label="relationship evidence source",
                 allowed=source_ids,
@@ -699,7 +725,7 @@ class DependencyResolutionEvidenceMixin:
         )
 
     @classmethod
-    def _dependency_roots_v2(
+    def _dependency_roots_v3(
         cls,
         value: object,
         node_ids: set[str],
@@ -722,7 +748,7 @@ class DependencyResolutionEvidenceMixin:
                     f"duplicate dependency resolution root: {node_id}:{context}"
                 )
             seen.add(key)
-            refs = cls._dependency_source_refs_v2(
+            refs = cls._dependency_source_refs_v3(
                 raw.get("evidence_sources", ()),
                 label="root evidence source",
                 allowed=source_ids,
@@ -737,7 +763,7 @@ class DependencyResolutionEvidenceMixin:
         )
 
     @classmethod
-    def _dependency_module_ownership_v2(
+    def _dependency_module_ownership_v3(
         cls,
         value: object,
         node_ids: set[str],
@@ -776,7 +802,7 @@ class DependencyResolutionEvidenceMixin:
                 raise ValueError(
                     "module ownership completeness must be complete, incomplete, or unknown"
                 )
-            refs = cls._dependency_source_refs_v2(
+            refs = cls._dependency_source_refs_v3(
                 raw.get("evidence_sources", ()),
                 label="module ownership evidence source",
                 allowed=source_ids,
@@ -803,7 +829,7 @@ class DependencyResolutionEvidenceMixin:
         return sorted(result, key=lambda row: (str(row["module"]), str(row["context"])))
 
     @classmethod
-    def _dependency_coverage_v2(
+    def _dependency_coverage_v3(
         cls,
         value: object,
         contexts: set[str],
@@ -820,7 +846,7 @@ class DependencyResolutionEvidenceMixin:
         source_ids = set(sources)
         for raw in rows:
             context = _identifier(raw.get("context"), label="coverage context")
-            kind = _identifier(raw.get("kind"), label="coverage kind")
+            kind = cls._dependency_coverage_kind_v3(raw)
             if context not in contexts:
                 raise ValueError(f"unknown coverage context: {context}")
             key = (context, kind)
@@ -839,7 +865,7 @@ class DependencyResolutionEvidenceMixin:
                 )
             if completeness == "complete" and truncation != "complete":
                 raise ValueError("complete coverage requires truncation=complete")
-            refs = cls._dependency_source_refs_v2(
+            refs = cls._dependency_source_refs_v3(
                 raw.get("evidence_sources", ()),
                 label="coverage evidence source",
                 allowed=source_ids,
@@ -847,7 +873,7 @@ class DependencyResolutionEvidenceMixin:
             if not refs:
                 raise ValueError("coverage must reference evidence source")
             referenced_sources = [sources[ref] for ref in refs]
-            cls._validate_dependency_coverage_source_kind_v2(
+            cls._validate_dependency_coverage_source_authority_v3(
                 kind=kind,
                 sources=referenced_sources,
             )
@@ -876,31 +902,26 @@ class DependencyResolutionEvidenceMixin:
         return sorted(result, key=lambda row: (str(row["context"]), str(row["kind"])))
 
     @staticmethod
-    def _validate_dependency_coverage_source_kind_v2(
+    def _dependency_coverage_kind_v3(raw: Mapping[str, object]) -> str:
+        kind = _identifier(raw.get("kind"), label="coverage kind")
+        if kind not in _COVERAGE_KINDS:
+            raise ValueError(f"unsupported dependency coverage kind: {kind}")
+        return kind
+
+    @staticmethod
+    def _validate_dependency_coverage_source_authority_v3(
         *,
         kind: str,
         sources: Sequence[Mapping[str, object]],
     ) -> None:
-        if kind == "resolution-graph" and not any(
-            source.get("kind") == "resolution-graph" for source in sources
-        ):
-            raise ValueError(
-                "resolution-graph coverage requires resolution-graph evidence source"
-            )
-        if kind == "resolved-inventory" and not any(
-            source.get("kind") == "resolved-inventory" for source in sources
-        ):
-            raise ValueError(
-                "resolved-inventory coverage requires resolved-inventory evidence source"
-            )
+        if not any(kind in source.get("authorities", ()) for source in sources):
+            raise ValueError(f"{kind} coverage requires {kind} evidence authority")
 
     @staticmethod
-    def _validate_dependency_coverage_facts_v2(
+    def _validate_dependency_coverage_facts_v3(
         *,
         coverage: Sequence[Mapping[str, object]],
         roots: Sequence[Mapping[str, object]],
-        inventory: Sequence[Mapping[str, object]],
-        relationships: Sequence[Mapping[str, object]],
     ) -> None:
         for row in coverage:
             if row.get("completeness") != "complete":
@@ -915,7 +936,7 @@ class DependencyResolutionEvidenceMixin:
                     )
 
     @staticmethod
-    def _dependency_negative_evidence_v2(
+    def _dependency_negative_evidence_v3(
         coverage: Sequence[Mapping[str, object]],
     ) -> list[dict[str, object]]:
         return [
@@ -941,7 +962,7 @@ class DependencyResolutionEvidenceMixin:
         context: str | None = None,
     ) -> dict[str, object]:
         schema = observation.get("schema")
-        if schema != _SCHEMA_V2:
+        if schema != _SCHEMA_V3:
             raise ValueError(
                 "dependency import correspondence requires a qualified observation"
             )
@@ -1048,7 +1069,7 @@ class DependencyResolutionEvidenceMixin:
         only ordinary external anchors and repository locators.
         """
         schema = observation.get("schema")
-        if schema != _SCHEMA_V2:
+        if schema != _SCHEMA_V3:
             raise ValueError(
                 "dependency evidence correlation requires a qualified observation"
             )
@@ -1151,12 +1172,12 @@ class DependencyResolutionEvidenceMixin:
         observation: Mapping[str, object],
         requests: Sequence[Mapping[str, object]],
     ) -> dict[str, object]:
-        if observation.get("schema") != _SCHEMA_V2:
-            raise ValueError("dependency queries require qualified v2 observation")
+        if observation.get("schema") != _SCHEMA_V3:
+            raise ValueError("dependency queries require qualified v3 observation")
         return dependency_queries(observation, requests)
 
     @staticmethod
-    def _dependency_resolution_delta_v2(  # noqa: C901
+    def _dependency_resolution_delta_v3(  # noqa: C901
         before: Mapping[str, object],
         after: Mapping[str, object],
     ) -> dict[str, object]:
@@ -1168,7 +1189,7 @@ class DependencyResolutionEvidenceMixin:
             raise ValueError("dependency resolution definition identity is malformed")
         if before_definition != after_definition:
             return {
-                "schema": "hashmarks.dependency-resolution-delta.v2",
+                "schema": "hashmarks.dependency-resolution-delta.v3",
                 "comparability": "not-comparable",
                 "reason": "definition-changed",
                 "before_definition_identity": before_definition,
@@ -1254,7 +1275,7 @@ class DependencyResolutionEvidenceMixin:
             if isinstance(row, Mapping) and row.get("module")
         }
         return {
-            "schema": "hashmarks.dependency-resolution-delta.v2",
+            "schema": "hashmarks.dependency-resolution-delta.v3",
             "comparability": "comparable",
             "before_resolution_identity": before.get("resolution_identity"),
             "after_resolution_identity": after.get("resolution_identity"),
@@ -1301,10 +1322,10 @@ class DependencyResolutionEvidenceMixin:
         before: Mapping[str, object],
         after: Mapping[str, object],
     ) -> dict[str, object]:
-        if before.get("schema") != _SCHEMA_V2 or after.get("schema") != _SCHEMA_V2:
+        if before.get("schema") != _SCHEMA_V3 or after.get("schema") != _SCHEMA_V3:
             raise ValueError(
-                "dependency resolution delta requires matching qualified v2 observations"
+                "dependency resolution delta requires matching qualified v3 observations"
             )
-        return DependencyResolutionEvidenceMixin._dependency_resolution_delta_v2(
+        return DependencyResolutionEvidenceMixin._dependency_resolution_delta_v3(
             before, after
         )

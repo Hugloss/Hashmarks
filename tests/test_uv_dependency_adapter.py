@@ -77,6 +77,29 @@ def test_uv_lock_adapter_preserves_relationship_and_inventory_change(
     assert len(delta["relationships_removed"]) == 1
 
 
+def test_uv_lock_adapter_uses_one_multi_authority_physical_source() -> None:
+    raw = uv_lock_dependency_observation(lock=_lock())
+
+    assert raw["evidence_sources"] == [
+        {
+            "source_id": "uv:lock",
+            "kind": "uv-lock",
+            "authorities": [
+                "resolution-graph",
+                "resolved-inventory",
+                "selection",
+            ],
+            "context": "lock",
+            "completeness": "complete",
+            "truncation": "complete",
+            "producer_digest": raw["evidence_sources"][0]["producer_digest"],
+        }
+    ]
+    assert {ref for row in raw["inventory"] for ref in row["evidence_sources"]} == {
+        "uv:lock"
+    }
+
+
 def test_uv_lock_adapter_does_not_promote_declared_metadata_to_resolution() -> None:
     raw = uv_lock_dependency_observation(lock=_lock())
 
