@@ -272,9 +272,8 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             and str(row.get("component_id") or "") == component_id
         ]
         result: object = _limited(rows, max_results=max_results, omissions=omissions)
-        source_complete = False
         if not rows:
-            negative_evidence = "not-admissible"
+            negative_evidence = "admissible-within-declared-scope"
     elif operation == "inventory":
         rows = [
             dict(row)
