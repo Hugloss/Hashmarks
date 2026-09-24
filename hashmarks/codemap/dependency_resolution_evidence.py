@@ -163,6 +163,7 @@ class DependencyResolutionEvidenceMixin:
         )
         self._validate_dependency_module_source_authority_v2(
             module_ownership=module_ownership,
+            selections=selections,
             sources_by_id=sources_by_id,
         )
         self._validate_dependency_selection_source_contexts_v2(
@@ -353,9 +354,19 @@ class DependencyResolutionEvidenceMixin:
     def _validate_dependency_module_source_authority_v2(
         *,
         module_ownership: Sequence[Mapping[str, object]],
+        selections: Sequence[Mapping[str, object]],
         sources_by_id: Mapping[str, Mapping[str, object]],
     ) -> None:
+        selection_contexts = {
+            str(row["node_id"]): set(row["contexts"]) for row in selections
+        }
         for row in module_ownership:
+            for owner in row["owners"]:
+                if row["context"] not in selection_contexts[str(owner)]:
+                    raise ValueError(
+                        "module owner context not selected: "
+                        f"{row['module']}:{owner}:{row['context']}"
+                    )
             for ref in row["evidence_sources"]:
                 source = sources_by_id[str(ref)]
                 source_context = str(source.get("context") or "")
