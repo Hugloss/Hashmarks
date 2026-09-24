@@ -96,7 +96,10 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         row
         for row in packages
         if isinstance(row["raw"].get("source"), Mapping)
-        and str(row["raw"]["source"].get("virtual") or "") == "."
+        and any(
+            str(row["raw"]["source"].get(kind) or "") == "."
+            for kind in ("virtual", "editable", "directory")
+        )
     ]
     if not roots:
         raise ValueError("uv lock does not identify a virtual project root")
