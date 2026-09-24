@@ -1173,7 +1173,7 @@ class DependencyResolutionEvidenceMixin:
         requests: Sequence[Mapping[str, object]],
     ) -> dict[str, object]:
         if observation.get("schema") != _SCHEMA_V3:
-            raise ValueError("dependency queries require qualified v2 observation")
+            raise ValueError("dependency queries require qualified v3 observation")
         return dependency_queries(observation, requests)
 
     @staticmethod
@@ -1324,7 +1324,7 @@ class DependencyResolutionEvidenceMixin:
     ) -> dict[str, object]:
         if before.get("schema") != _SCHEMA_V3 or after.get("schema") != _SCHEMA_V3:
             raise ValueError(
-                "dependency resolution delta requires matching qualified v2 observations"
+                "dependency resolution delta requires matching qualified v3 observations"
             )
         return DependencyResolutionEvidenceMixin._dependency_resolution_delta_v3(
             before, after
