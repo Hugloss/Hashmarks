@@ -175,14 +175,12 @@ class DependencyResolutionEvidenceMixin:
         for row in roots:
             if row["context"] not in selection_contexts[str(row["node_id"])]:
                 raise ValueError(
-                    "root context not selected: "
-                    f"{row['node_id']}:{row['context']}"
+                    f"root context not selected: {row['node_id']}:{row['context']}"
                 )
         for row in inventory:
             if row["context"] not in selection_contexts[str(row["node_id"])]:
                 raise ValueError(
-                    "inventory context not selected: "
-                    f"{row['node_id']}:{row['context']}"
+                    f"inventory context not selected: {row['node_id']}:{row['context']}"
                 )
         for row in relationships:
             context = str(row["context"])
