@@ -26,6 +26,7 @@ _MAX_REQUEST_BYTES = 1_048_576
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MEMBER_REVISION = re.compile(r"^[0-9a-f]{64}$")
 
+
 def _canonical(value: object) -> bytes:
     try:
         return json.dumps(
@@ -139,7 +140,9 @@ class DependencyResolutionEvidenceMixin:
                 f"dependency resolution snapshot exceeds {_MAX_REQUEST_BYTES} encoded bytes"
             )
         if snapshot.get("schema") != _contract.SCHEMA_V3:
-            raise ValueError(f"dependency resolution schema must be {_contract.SCHEMA_V3}")
+            raise ValueError(
+                f"dependency resolution schema must be {_contract.SCHEMA_V3}"
+            )
         return self._dependency_resolution_evidence_v3(snapshot)
 
     def _dependency_resolution_evidence_v3(  # noqa: PLR0914, PLR0915
