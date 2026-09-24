@@ -164,6 +164,39 @@ class DependencyResolutionEvidenceMixin:
         coverage = self._dependency_coverage_v2(
             snapshot.get("coverage", ()), context_set, evidence_sources
         )
+        sources_by_id = {
+            str(row["source_id"]): row
+            for row in evidence_sources
+            if row.get("source_id")
+        }
+        for row in inventory:
+            for ref in row["evidence_sources"]:
+                source = sources_by_id[str(ref)]
+                if source.get("kind") != "resolved-inventory":
+                    raise ValueError(
+                        "incompatible inventory evidence source kind: "
+                        f"{row['node_id']}:{row['context']}"
+                    )
+                source_context = str(source.get("context") or "")
+                if source_context and source_context != row["context"]:
+                    raise ValueError(
+                        "incompatible inventory evidence source context: "
+                        f"{row['node_id']}:{row['context']}"
+                    )
+        for row in relationships:
+            for ref in row["evidence_sources"]:
+                source = sources_by_id[str(ref)]
+                if source.get("kind") != "resolution-graph":
+                    raise ValueError(
+                        "incompatible relationship evidence source kind: "
+                        f"{row['source']}->{row['target']}:{row['context']}"
+                    )
+                source_context = str(source.get("context") or "")
+                if source_context and source_context != row["context"]:
+                    raise ValueError(
+                        "incompatible relationship evidence source context: "
+                        f"{row['source']}->{row['target']}:{row['context']}"
+                    )
 
         definition = {
             "producer": producer_packet,
