@@ -87,7 +87,7 @@ def test_uv_lock_adapter_does_not_promote_declared_metadata_to_resolution() -> N
 
 
 def test_uv_lock_adapter_refuses_ambiguous_name_only_dependency() -> None:
-    lock = b\"\"\"version = 1
+    lock = b"""version = 1
 revision = 3
 requires-python = ">=3.11"
 
@@ -106,6 +106,6 @@ source = { registry = "https://example.invalid/simple" }
 name = "shared"
 version = "2"
 source = { directory = "vendor/shared" }
-'''
+"""
     with pytest.raises(ValueError, match="must resolve uniquely"):
         uv_lock_dependency_observation(lock=lock)

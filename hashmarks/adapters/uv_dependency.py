@@ -47,7 +47,7 @@ def _dependency_target(
     return candidates[0]
 
 
-def uv_lock_dependency_observation(
+def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     *,
     lock: bytes,
     repository_inputs: Sequence[Mapping[str, object]] = (),
@@ -103,9 +103,10 @@ def uv_lock_dependency_observation(
 
     relationships: list[dict[str, object]] = []
     for row in packages:
-        dependencies = row["raw"].get("dependencies", ())
+        raw = row["raw"]
+        dependencies = raw["dependencies"] if "dependencies" in raw else []
         if dependencies is None:
-            dependencies = ()
+            dependencies = []
         if not isinstance(dependencies, list):
             raise ValueError(f"uv lock dependencies must be a list: {row['name']}")
         for dependency in dependencies:
@@ -126,11 +127,14 @@ def uv_lock_dependency_observation(
 
     root_ids = {str(row["node_id"]) for row in roots}
     components = [
-        {\n            "component_id": str(row["name"]),\n            "name": str(row["name"]),\n            "ecosystem": "pypi",\n        }\n        for row in packages
+        {
+            "component_id": str(row["name"]),
+            "name": str(row["name"]),
+            "ecosystem": "pypi",
+        }
+        for row in packages
     ]
-    unique_components = {
-        str(row["component_id"]): row for row in components
-    }
+    unique_components = {str(row["component_id"]): row for row in components}
     selections = [
         {
             "node_id": row["node_id"],
@@ -192,12 +196,18 @@ def uv_lock_dependency_observation(
             key=lambda row: str(row["node_id"]),
         ),
         "evidence_sources": evidence_sources,
-        "components": sorted(\n            unique_components.values(), key=lambda row: row["component_id"]\n        ),
+        "components": sorted(
+            unique_components.values(), key=lambda row: row["component_id"]
+        ),
         "selections": sorted(selections, key=lambda row: str(row["node_id"])),
         "inventory": sorted(inventory, key=lambda row: str(row["node_id"])),
         "relationships": sorted(
             relationships,
-            key=lambda row: (\n                str(row["source"]),\n                str(row["target"]),\n                str(row["marker"]),\n            ),
+            key=lambda row: (
+                str(row["source"]),
+                str(row["target"]),
+                str(row["marker"]),
+            ),
         ),
         "coverage": [
             {
