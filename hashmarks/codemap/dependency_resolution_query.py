@@ -176,7 +176,13 @@ def _paths(  # noqa: C901, PLR0912
                 queue.clear()
                 break
             visited += 1
-            if candidate not in path:
+            if candidate == target:
+                if len(paths) >= max_results:
+                    omissions.append({"reason": "result-limit"})
+                    queue.clear()
+                    break
+                paths.append([*path, candidate])
+            elif candidate not in path:
                 queue.append([*path, candidate])
     return paths, visited, omissions
 
