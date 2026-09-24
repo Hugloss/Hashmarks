@@ -262,6 +262,34 @@ def test_v2_relationship_parent_change_is_not_selection_change(
     ]
 
 
+def test_v2_rejects_module_owner_outside_observed_context(tmp_path: Path) -> None:
+    changed = _snapshot_v2()
+    changed["selections"][1]["contexts"] = ["runtime"]
+    changed["selections"][1]["evidence_sources"] = ["tree:runtime"]
+    changed["inventory"] = [
+        row for row in changed["inventory"] if row["node_id"] != "library@1"
+    ]
+    changed["relationships"] = [
+        row
+        for row in changed["relationships"]
+        if row["target"] != "library@1" or row["context"] != "compile"
+    ]
+    changed["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        }
+    ]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="module owner context not selected"):
+            codemap.dependency_resolution_evidence(changed)
+
+
 def test_v2_module_ownership_preserves_ambiguous_maven_module(
     tmp_path: Path,
 ) -> None:
@@ -301,7 +329,7 @@ def test_v2_dependency_correlation_preserves_contextual_ownership(
         {
             "module": "library",
             "context": "runtime",
-            "owners": ["inventory-only@1"],
+            "owners": ["app@1"],
             "completeness": "complete",
             "evidence_sources": ["tree:runtime"],
         },
@@ -363,7 +391,7 @@ def test_v2_dependency_correlation_without_context_preserves_cross_context_ambig
         {
             "module": "library",
             "context": "runtime",
-            "owners": ["inventory-only@1"],
+            "owners": ["app@1"],
             "completeness": "complete",
             "evidence_sources": ["tree:runtime"],
         },
@@ -387,7 +415,7 @@ def test_v2_dependency_correlation_without_context_preserves_cross_context_ambig
 
     link = packet["dependency_links"][0]
     assert link["distribution_state"] == "resolved-ambiguous"
-    assert link["distribution_nodes"] == ["inventory-only@1", "library@1"]
+    assert link["distribution_nodes"] == ["app@1", "library@1"]
     assert link["observed_contexts"] == ["compile", "runtime"]
 
 
