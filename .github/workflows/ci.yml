@@ -37,8 +37,8 @@ jobs:
             echo "REPAIR: make agent-finish"
             exit 1
           fi
-      - name: Git whitespace
-        run: git diff --check
+      - name: Git whitespace in candidate diff
+        run: git diff --check HEAD^1 HEAD --
   ruff-debt:
     name: Ruff debt no-growth
     runs-on: ubuntu-latest
