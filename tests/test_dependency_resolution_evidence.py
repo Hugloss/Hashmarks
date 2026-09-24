@@ -1356,3 +1356,25 @@ def test_v2_paths_rejects_unknown_target_node(tmp_path: Path) -> None:
                     }
                 ],
             )
+
+
+def test_v2_contexts_rejects_unknown_node(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        with pytest.raises(ValueError, match="unknown dependency query node_id"):
+            codemap.dependency_resolution_queries(
+                observation,
+                [{"operation": "contexts", "node_id": "missing@1"}],
+            )
+
+
+def test_v2_inventory_rejects_unknown_node_filter(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        with pytest.raises(ValueError, match="unknown dependency query node_id"):
+            codemap.dependency_resolution_queries(
+                observation,
+                [{"operation": "inventory", "node_id": "missing@1"}],
+            )
