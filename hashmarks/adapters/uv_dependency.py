@@ -77,7 +77,17 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         version = str(raw.get("version") or "").strip()
         if not name or not version:
             raise ValueError("uv lock package requires name and version")
-        source = _source(raw.get("source"))
+        source_raw = raw.get("source")
+        source = _source(source_raw)
+        if (
+            isinstance(source_raw, Mapping)
+            and any(key in source_raw for key in ("virtual", "editable", "directory"))
+            and sum(key in source_raw for key in ("virtual", "editable", "directory"))
+            > 1
+        ):
+            raise ValueError(
+                f"uv lock package has ambiguous local source identity: {name}"
+            )
         row = {
             "name": name,
             "version": version,
@@ -129,15 +139,17 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             )
 
     root_ids = {str(row["node_id"]) for row in roots}
-    components = [
-        {
-            "component_id": str(row["name"]),
-            "name": str(row["name"]),
+    components: dict[str, dict[str, object]] = {}
+    for row in packages:
+        component_id = str(row["name"])
+        component = {
+            "component_id": component_id,
+            "name": component_id,
             "ecosystem": "pypi",
         }
-        for row in packages
-    ]
-    unique_components = {str(row["component_id"]): row for row in components}
+        previous = components.setdefault(component_id, component)
+        if previous != component:
+            raise ValueError(f"conflicting uv component identity: {component_id}")
     selections = [
         {
             "node_id": row["node_id"],
@@ -206,9 +218,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             key=lambda row: str(row["node_id"]),
         ),
         "evidence_sources": evidence_sources,
-        "components": sorted(
-            unique_components.values(), key=lambda row: row["component_id"]
-        ),
+        "components": sorted(components.values(), key=lambda row: row["component_id"]),
         "selections": sorted(selections, key=lambda row: str(row["node_id"])),
         "inventory": sorted(inventory, key=lambda row: str(row["node_id"])),
         "relationships": sorted(
