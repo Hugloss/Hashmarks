@@ -392,6 +392,19 @@ def test_maven_adapter_ignores_colon_bearing_maven_log_noise(noise: str) -> None
     ]
 
 
+def test_maven_adapter_refuses_missing_dependency_metadata_warning() -> None:
+    inventory = b"""[WARNING] The POM for example.libs:missing:jar:4.0 is missing, no dependency information available
+The following files have been resolved:
+   example.libs:valid:jar:3.0:test -- module example.valid
+"""
+
+    with pytest.raises(
+        ValueError,
+        match="Maven dependency list contains incomplete resolution warning",
+    ):
+        maven_dependency_observation(trees={}, inventories={"test": inventory})
+
+
 @pytest.mark.parametrize(
     "inventory",
     [
