@@ -195,7 +195,14 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         },
         "contexts": [_CONTEXT],
         "roots": sorted(
-            ({"node_id": row["node_id"], "context": _CONTEXT} for row in roots),
+            (
+                {
+                    "node_id": row["node_id"],
+                    "context": _CONTEXT,
+                    "evidence_sources": [source_id],
+                }
+                for row in roots
+            ),
             key=lambda row: str(row["node_id"]),
         ),
         "evidence_sources": evidence_sources,
