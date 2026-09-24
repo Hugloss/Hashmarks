@@ -1468,3 +1468,33 @@ def test_v2_paths_requires_target_selected_in_requested_context(tmp_path: Path) 
                     }
                 ],
             )
+
+
+def test_v2_component_unknown_identity_is_authoritative_absence(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "component", "component_id": "missing"}],
+        )
+
+    result = packet["results"][0]
+    assert result["result"] == []
+    assert result["negative_evidence"] == "admissible-within-declared-scope"
+
+
+def test_v2_component_present_identity_does_not_claim_negative_evidence(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "component", "component_id": "library"}],
+        )
+
+    result = packet["results"][0]
+    assert result["result"]
+    assert result["negative_evidence"] == "not-applicable"
