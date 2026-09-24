@@ -335,7 +335,6 @@ class DependencyResolutionEvidenceMixin:
         roots: Sequence[Mapping[str, object]],
         inventory: Sequence[Mapping[str, object]],
         relationships: Sequence[Mapping[str, object]],
-        inventory: Sequence[Mapping[str, object]],
         sources_by_id: Mapping[str, Mapping[str, object]],
     ) -> None:
         for row in roots:
