@@ -1868,14 +1868,23 @@ def test_v3_path_query_reports_result_bound_only_when_a_path_is_omitted(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["relationships"].append(
-        {
-            "source": "app@1",
-            "target": "library@1",
-            "kind": "depends-on",
-            "context": "compile",
-            "evidence_sources": ["tree:compile"],
-        }
+    changed["relationships"].extend(
+        [
+            {
+                "source": "app@1",
+                "target": "inventory-only@1",
+                "kind": "dependency",
+                "context": "compile",
+                "evidence_sources": ["tree:compile"],
+            },
+            {
+                "source": "inventory-only@1",
+                "target": "library@1",
+                "kind": "dependency",
+                "context": "compile",
+                "evidence_sources": ["tree:compile"],
+            },
+        ]
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
