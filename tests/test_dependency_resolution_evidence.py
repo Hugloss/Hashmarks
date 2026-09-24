@@ -1189,7 +1189,9 @@ def test_v2_query_visit_accounting_never_exceeds_declared_bound(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(_visit_limit_snapshot())
-        result = codemap.dependency_resolution_queries(observation, [request])["results"][0]
+        result = codemap.dependency_resolution_queries(observation, [request])[
+            "results"
+        ][0]
 
     assert result["bounds"]["visited"] <= result["bounds"]["max_visits"]
     assert result["completeness"] == "incomplete"
