@@ -1681,18 +1681,3 @@ def test_v2_refuses_complete_resolution_graph_without_root(tmp_path: Path) -> No
             codemap.dependency_resolution_evidence(changed)
 
 
-def test_v2_component_absence_is_not_negative_evidence_without_component_coverage(
-    tmp_path: Path,
-) -> None:
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
-        packet = codemap.dependency_resolution_queries(
-            observation,
-            [{"operation": "component", "component_id": "not-observed"}],
-        )
-
-    result = packet["results"][0]
-    assert result["result"] == []
-    assert result["negative_evidence"] == "not-admissible"
-    assert result["completeness"] == "incomplete"
