@@ -484,7 +484,13 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
         "producer": {"kind": "test-resolver", "schema_version": "1"},
         "scope": {"environment": "test"},
         "contexts": ["runtime"],
-        "roots": [{"node_id": "app@1", "context": "runtime"}],
+        "roots": [
+            {
+                "node_id": "app@1",
+                "context": "runtime",
+                "evidence_sources": ["tree:runtime"],
+            }
+        ],
         "evidence_sources": [
             {
                 "source_id": "tree:runtime",
