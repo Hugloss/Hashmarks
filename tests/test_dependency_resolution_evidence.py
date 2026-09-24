@@ -1256,3 +1256,53 @@ def test_v2_query_visit_limit_prevents_negative_evidence(
         assert result["negative_evidence"] == "not-admissible"
     else:
         assert result["negative_evidence"] == "not-applicable"
+
+
+def test_v2_dependencies_partial_result_with_visit_limit_is_not_complete(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_visit_limit_snapshot())
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "app@1",
+                    "context": "compile",
+                    "max_visits": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert [row["node_id"] for row in result["result"]] == ["left@1"]
+    assert result["bounds"]["visited"] == 1
+    assert result["completeness"] == "incomplete"
+    assert result["negative_evidence"] == "not-applicable"
+    assert result["omissions"] == [{"reason": "visit-limit"}]
+
+
+def test_v2_path_found_before_visit_limit_remains_incomplete_when_work_is_omitted(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_visit_limit_snapshot())
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "paths",
+                    "node_id": "app@1",
+                    "target_id": "left@1",
+                    "context": "compile",
+                    "max_visits": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert result["result"] == [["app@1", "left@1"]]
+    assert result["bounds"]["visited"] == 1
+    assert result["completeness"] == "incomplete"
+    assert result["omissions"] == [{"reason": "visit-limit"}]
