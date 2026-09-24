@@ -1569,6 +1569,7 @@ def test_v2_selection_requires_provenance_for_each_observed_context(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(
-            ValueError, match="selection context lacks evidence source: library@1:runtime"
+            ValueError,
+            match="selection context lacks evidence source: library@1:runtime",
         ):
             codemap.dependency_resolution_evidence(snapshot)
