@@ -12,7 +12,9 @@ locks were resolved offline with uv 0.12.17. `grouped` has no base dependency:
 its source project files.
 
 The Maven trees and lists were produced offline with Maven 3.8.7, Java 21, and
-`maven-dependency-plugin` 3.9.0. A temporary Maven repository held the cached
+`maven-dependency-plugin` 3.9.0. The dogfood harness explicitly declares these
+contexts semantically complete because the captures were generated without tree/list
+include, exclude, scope, subtree, or transitive filtering. A temporary Maven repository held the cached
 plugin tooling and a locally built dummy JAR: `jar --create --file <jar> --manifest
 maven/dummy-dep-manifest.mf`, installed under `example.fixture:dummy-dep` at
 1.0.0 and 2.0.0 with `maven-install-plugin` 2.4 `install-file`. For each POM,
