@@ -47,6 +47,8 @@ Dependency-resolution producers are edge translators, not semantic owners. Maven
 
 The shared dependency model must distinguish **physical source kind** from **semantic evidence authority**. Source `kind` is opaque provenance such as `maven-dependency-tree` or `uv-lock`; core dependency qualification must never branch on it to decide what a fact means. Semantic authority is expressed in general terms such as `selection`, `resolution-graph`, `resolved-inventory`, and `module-ownership`. One physical source may carry multiple authorities; never invent duplicate source identities for identical bytes merely to satisfy different semantic uses.
 
+Source completeness and semantic coverage are separate. A complete/untruncated artifact may still provide incomplete semantic coverage for one of its authorities; negative evidence and query completeness require explicit coverage in the relevant semantic domain.
+
 When adding or repairing an adapter:
 
 - state the producer-neutral fact/authority first, then implement producer-specific translation;
