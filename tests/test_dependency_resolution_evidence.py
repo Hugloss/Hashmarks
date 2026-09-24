@@ -1248,7 +1248,9 @@ def test_v2_truncated_coverage_requires_a_truncated_or_unknown_source(
     snapshot["coverage"][0]["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        with pytest.raises(ValueError, match="coverage truncation contradicts evidence source"):
+        with pytest.raises(
+            ValueError, match="coverage truncation contradicts evidence source"
+        ):
             codemap.dependency_resolution_evidence(snapshot)
 
 
@@ -1276,7 +1278,9 @@ def test_v2_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
     ]
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        with pytest.raises(ValueError, match="module ownership exceeds evidence source"):
+        with pytest.raises(
+            ValueError, match="module ownership exceeds evidence source"
+        ):
             codemap.dependency_resolution_evidence(snapshot)
 
 
