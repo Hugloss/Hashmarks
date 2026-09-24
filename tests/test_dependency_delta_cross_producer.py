@@ -314,13 +314,17 @@ def test_maven_context_membership_change_is_selection_and_inventory_delta(
 
 def _uv_lock_optional_dependency(*, include: bool) -> bytes:
     dependency = 'dependencies = [{ name = "dummy-dep" }]\n' if include else ""
-    package = '''
+    package = (
+        """
 [[package]]
 name = "dummy-dep"
 version = "1.0.0"
 source = { directory = "vendor/dummy_dep" }
-''' if include else ""
-    return f'''version = 1
+"""
+        if include
+        else ""
+    )
+    return f"""version = 1
 revision = 3
 requires-python = ">=3.11"
 
@@ -328,7 +332,7 @@ requires-python = ">=3.11"
 name = "dummy-app"
 version = "0.1.0"
 source = {{ virtual = "." }}
-{dependency}{package}'''.encode()
+{dependency}{package}""".encode()
 
 
 def _maven_tree_optional_dependency(*, include: bool) -> bytes:
@@ -426,7 +430,7 @@ def test_uv_and_maven_dependency_removal_share_delta_semantics(tmp_path: Path) -
 def test_uv_simultaneous_versions_preserve_independent_selection_delta(
     tmp_path: Path,
 ) -> None:
-    before_lock = b'''version = 1
+    before_lock = b"""version = 1
 revision = 3
 requires-python = ">=3.11"
 
@@ -448,7 +452,7 @@ source = { registry = "https://example.invalid/simple" }
 name = "shared"
 version = "2.0.0"
 source = { registry = "https://example.invalid/simple" }
-'''
+"""
     after_lock = before_lock.replace(b'version = "2.0.0"', b'version = "3.0.0"')
     after_lock = after_lock.replace(
         b'{ name = "shared", version = "2.0.0" }',
@@ -486,9 +490,9 @@ def test_maven_simultaneous_variants_preserve_independent_selection_delta(
         "   example.fixture:dummy-dep:jar:osx:1.0.0:runtime"
         " -- module dummy.osx (auto)\n"
     ).encode()
-    after_inventory = before_inventory.replace(b":osx:1.0.0:", b":windows:1.0.0:").replace(
-        b"dummy.osx", b"dummy.windows"
-    )
+    after_inventory = before_inventory.replace(
+        b":osx:1.0.0:", b":windows:1.0.0:"
+    ).replace(b"dummy.osx", b"dummy.windows")
     before_raw = maven_dependency_observation(
         trees={}, inventories={"runtime": before_inventory}
     )
