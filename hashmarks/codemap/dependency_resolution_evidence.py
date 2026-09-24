@@ -157,7 +157,9 @@ class DependencyResolutionEvidenceMixin:
         )
 
         raw_roots = snapshot.get("roots", ())
-        roots = self._dependency_roots_v2(raw_roots, node_ids, context_set)
+        roots = self._dependency_roots_v2(
+            raw_roots, node_ids, context_set, source_ids
+        )
         repository_inputs = self._dependency_repository_inputs(
             snapshot.get("repository_inputs", ())
         )
@@ -198,6 +200,15 @@ class DependencyResolutionEvidenceMixin:
                     "relationship context not selected by both endpoints: "
                     f"{row['source']}->{row['target']}:{context}"
                 )
+        for row in roots:
+            for ref in row["evidence_sources"]:
+                source = sources_by_id[str(ref)]
+                source_context = str(source.get("context") or "")
+                if source_context and source_context != row["context"]:
+                    raise ValueError(
+                        "incompatible root evidence source context: "
+                        f"{row['node_id']}:{row['context']}"
+                    )
         for row in inventory:
             for ref in row["evidence_sources"]:
                 source = sources_by_id[str(ref)]
@@ -565,7 +576,11 @@ class DependencyResolutionEvidenceMixin:
 
     @classmethod
     def _dependency_roots_v2(
-        cls, value: object, node_ids: set[str], contexts: set[str]
+        cls,
+        value: object,
+        node_ids: set[str],
+        contexts: set[str],
+        source_ids: set[str],
     ) -> list[dict[str, object]]:
         rows = _objects(value, label="roots", limit=_MAX_ROOTS)
         result: list[dict[str, object]] = []
@@ -583,7 +598,16 @@ class DependencyResolutionEvidenceMixin:
                     f"duplicate dependency resolution root: {node_id}:{context}"
                 )
             seen.add(key)
-            result.append({"node_id": node_id, "context": context})
+            refs = cls._dependency_source_refs_v2(
+                raw.get("evidence_sources", ()),
+                label="root evidence source",
+                allowed=source_ids,
+            )
+            if not refs:
+                raise ValueError("root must reference evidence source")
+            result.append(
+                {"node_id": node_id, "context": context, "evidence_sources": refs}
+            )
         return sorted(
             result, key=lambda row: (str(row["context"]), str(row["node_id"]))
         )
