@@ -29,7 +29,7 @@ _EVIDENCE_AUTHORITIES = {
     "resolved-inventory",
     "module-ownership",
 }
-_COVERAGE_KINDS = _EVIDENCE_AUTHORITIES - {"selection"}
+_COVERAGE_KINDS = _EVIDENCE_AUTHORITIES
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MEMBER_REVISION = re.compile(r"^[0-9a-f]{64}$")
 
