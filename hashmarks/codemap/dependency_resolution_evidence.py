@@ -157,9 +157,7 @@ class DependencyResolutionEvidenceMixin:
         )
 
         raw_roots = snapshot.get("roots", ())
-        roots = self._dependency_roots_v2(
-            raw_roots, node_ids, context_set, source_ids
-        )
+        roots = self._dependency_roots_v2(raw_roots, node_ids, context_set, source_ids)
         repository_inputs = self._dependency_repository_inputs(
             snapshot.get("repository_inputs", ())
         )
