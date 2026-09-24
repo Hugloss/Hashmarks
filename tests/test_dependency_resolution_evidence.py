@@ -1322,3 +1322,37 @@ def test_v2_unknown_coverage_can_reference_complete_source_without_strengthening
     )
     assert coverage["completeness"] == "unknown"
     assert coverage["truncation"] == "unknown"
+
+
+def test_v2_reachability_rejects_unknown_target_node(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        with pytest.raises(ValueError, match="unknown dependency query target_id"):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "reachability",
+                        "node_id": "app@1",
+                        "target_id": "missing@1",
+                    }
+                ],
+            )
+
+
+def test_v2_paths_rejects_unknown_target_node(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        with pytest.raises(ValueError, match="unknown dependency query target_id"):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "paths",
+                        "node_id": "app@1",
+                        "target_id": "missing@1",
+                    }
+                ],
+            )
