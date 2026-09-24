@@ -679,6 +679,12 @@ def test_v2_contextual_module_ownership_preserves_independent_observations(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v2()
+    runtime_source = next(
+        row
+        for row in changed["evidence_sources"]
+        if row["source_id"] == "tree:runtime"
+    )
+    runtime_source["authorities"].append("module-ownership")
     changed["module_ownership"] = [
         {
             "module": "library.module",
