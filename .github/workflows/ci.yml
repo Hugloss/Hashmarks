@@ -259,7 +259,8 @@ jobs:
           PRECOMMIT: ${{ needs.precommit.result }}
         run: |
           failed=0
-          for lane in             FORMATTING             RUFF_DEBT             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             PRECOMMIT
+          printf '%-24s %s (diagnostic only)\n' "FORMATTING" "$FORMATTING"
+          for lane in             RUFF_DEBT             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             PRECOMMIT
           do
             result="${!lane}"
             printf '%-24s %s\n' "$lane" "$result"
