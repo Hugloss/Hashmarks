@@ -143,6 +143,20 @@ def _snapshot_v2() -> dict[str, object]:
                 "truncation": "complete",
                 "evidence_sources": ["list:compile"],
             },
+            {
+                "context": "compile",
+                "kind": "selection",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["list:compile", "tree:compile"],
+            },
+            {
+                "context": "runtime",
+                "kind": "selection",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["tree:runtime"],
+            },
         ],
         "repository_inputs": [],
         "module_ownership": [],
@@ -192,8 +206,13 @@ def test_v2_negative_evidence_is_scoped_by_context_and_source_kind(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v2()
-    changed["coverage"][1]["completeness"] = "incomplete"
-    changed["coverage"][1]["truncation"] = "truncated"
+    selection_runtime = next(
+        row
+        for row in changed["coverage"]
+        if row["kind"] == "selection" and row["context"] == "runtime"
+    )
+    selection_runtime["completeness"] = "incomplete"
+    selection_runtime["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.dependency_resolution_evidence(changed)
@@ -751,7 +770,21 @@ def test_v2_source_kind_is_opaque_when_semantic_authorities_are_explicit(
                 "completeness": "complete",
                 "truncation": "complete",
                 "evidence_sources": ["resolver:lock"],
-            }
+            },
+            {
+                "context": "default",
+                "kind": "selection",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["resolver:lock"],
+            },
+            {
+                "context": "dev",
+                "kind": "selection",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["resolver:lock"],
+            },
         ],
         "repository_inputs": [],
         "module_ownership": [],
