@@ -106,6 +106,8 @@ Coverage `kind` is a semantic domain, not a producer/source format. The current 
 
 `selection` coverage owns exhaustiveness of selected-node/context membership and therefore bounds `contexts` query completeness. Graph coverage owns graph traversal/absence, inventory coverage owns inventory membership/absence, and module-ownership coverage owns module-owner absence. One domain must not stand in for another merely because a current producer emits them together.
 
+Dependency query requests are fail-closed and operation-scoped: unknown fields and fields that do not apply to the selected operation are rejected instead of ignored. Graph traversal over an observation with multiple contexts requires an explicit context so edges from distinct contexts cannot be stitched into a path that exists in no real resolution. Relationship multiplicity by marker/effective scope remains in the observation and delta, while node-topology traversal collapses duplicate source-target edges.
+
 A missing component ID is admissible absence only when selection coverage is complete in every declared context. An explicit module-ownership row with no owners retains `state: unresolved` to describe link cardinality; it supports an absent-owner query result only when both that row and the relevant module-ownership coverage are complete. Incomplete or unknown rows do not become negative evidence because another source declared complete coverage.
 
 A coverage claim must:
