@@ -51,6 +51,7 @@ help:
 	  '  make test-diagnostic-shard DIAGNOSTIC_SHARD=12  Run one hosted diagnostic shard' \
 	  '  make test-diagnostic-capabilities  Show hosted capability inventory' \
 	  '  make test-profile   Run full suite and report slowest 25 tests >=1s' \
+	  '  make dependency-dogfood  Check genuine uv/Maven dependency add, change, and removal evidence' \
 	  '  make check          Junior-friendly local check: setup + compile + CodeMap + tests' \
 	  '  make bootstrap      Offline runtime-only bootstrap (CI/prepared environments)' \
 	  '  make baseline       Bootstrap + quick metrics baseline' \
@@ -304,12 +305,12 @@ dev-check: setup
 	@printf '%s\n' '=== HASHMARKS DEV CHECK ==='
 	@printf '%s\n' '[1/4] Compile'
 	@$(MAKE) --no-print-directory compile
-	@printf '%s\n' '[2/4] Current Ruff and size gates'
-	@$(MAKE) --no-print-directory lint
-	@printf '%s\n' '[3/4] CodeMap sync'
+	@printf '%s\n' '[2/4] CodeMap sync'
 	@$(MAKE) --no-print-directory map >/dev/null
-	@printf '%s\n' '[4/4] Deterministic resumable pytest batches ($(TEST_SHARDS) shards, $(DEV_BATCH_SIZE) shards/batch)'
+	@printf '%s\n' '[3/4] Deterministic resumable pytest batches ($(TEST_SHARDS) shards, $(DEV_BATCH_SIZE) shards/batch)'
 	@$(MAKE) --no-print-directory dev-check-tests
+	@printf '%s\n' '[4/4] Current Ruff and size gates'
+	@$(MAKE) --no-print-directory lint
 	@VERSION=`$(UV_RUN) --offline hashmarks version`; \
 	printf '\n%s\n' '========================================' " HASHMARKS DEV CHECK: PASS ($$VERSION)" ' Setup:       PASS' ' Compile:     PASS' ' Ruff:        PASS (zero debt)' ' CodeMap:     PASS' ' Tests:       PASS' '========================================'
 

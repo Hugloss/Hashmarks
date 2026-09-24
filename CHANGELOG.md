@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0 — Development
+
+- Strengthen real uv/Maven dependency-change dogfood with exact version, graph-target, and module-owner assertions, including an offline uv lock whose dependency appears only in an extra and a dev group.
+
 ## 0.20.0 — Development
 
 - Begin the 0.20.0 development line.

@@ -294,5 +294,8 @@ def test_ci_and_dev_check_enforce_current_ruff_gate() -> None:
     ]
     assert "Current Ruff and size gates" in dev_check
     assert "--no-print-directory lint" in dev_check
+    assert dev_check.index("--no-print-directory dev-check-tests") < dev_check.index(
+        "--no-print-directory lint"
+    )
     assert "lint-debt-summary || true" not in dev_check
     assert "Ruff:        PASS (zero debt)" in dev_check

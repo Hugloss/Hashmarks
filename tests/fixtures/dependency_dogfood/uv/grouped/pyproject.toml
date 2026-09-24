@@ -1,0 +1,14 @@
+[project]
+name = "dummy-app"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+extra = ["dummy-dep"]
+
+[dependency-groups]
+test = ["dummy-dep"]
+
+[tool.uv.sources]
+dummy-dep = { path = "vendor/dummy_dep" }
