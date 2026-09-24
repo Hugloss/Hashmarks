@@ -1278,3 +1278,47 @@ def test_v2_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
         codemap.sync()
         with pytest.raises(ValueError, match="module ownership exceeds evidence source"):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_complete_coverage_can_combine_complete_sources(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["evidence_sources"].append(
+        {
+            "source_id": "tree:compile:second",
+            "kind": "resolution-graph",
+            "context": "compile",
+            "completeness": "complete",
+            "truncation": "complete",
+        }
+    )
+    snapshot["coverage"][0]["evidence_sources"].append("tree:compile:second")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(snapshot)
+
+    coverage = next(
+        row
+        for row in packet["coverage"]
+        if row["context"] == "compile" and row["kind"] == "resolution-graph"
+    )
+    assert coverage["completeness"] == "complete"
+    assert coverage["truncation"] == "complete"
+
+
+def test_v2_unknown_coverage_can_reference_complete_source_without_strengthening(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["coverage"][0]["completeness"] = "unknown"
+    snapshot["coverage"][0]["truncation"] = "unknown"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(snapshot)
+
+    coverage = next(
+        row
+        for row in packet["coverage"]
+        if row["context"] == "compile" and row["kind"] == "resolution-graph"
+    )
+    assert coverage["completeness"] == "unknown"
+    assert coverage["truncation"] == "unknown"
