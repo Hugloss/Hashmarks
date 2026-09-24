@@ -164,7 +164,11 @@ def _maven_tree_variant(
 
 
 def _maven_inventory_variant(
-    version: str, *, packaging: str = "jar", classifier: str = "", scope: str = "compile"
+    version: str,
+    *,
+    packaging: str = "jar",
+    classifier: str = "",
+    scope: str = "compile",
 ) -> bytes:
     variant = f":{classifier}" if classifier else ""
     return (
