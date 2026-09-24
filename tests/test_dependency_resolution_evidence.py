@@ -1329,3 +1329,74 @@ def test_v2_inventory_result_limit_preserves_source_completeness_but_reports_omi
     assert result["completeness"] == "incomplete"
     assert result["negative_evidence"] == "not-applicable"
     assert result["omissions"] == [{"reason": "result-limit", "omitted": 2}]
+
+
+def test_v2_path_exact_result_limit_with_no_remaining_paths_is_complete(
+    tmp_path: Path,
+) -> None:
+    snapshot = _visit_limit_snapshot()
+    snapshot["relationships"] = snapshot["relationships"][:1]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "paths",
+                    "node_id": "app@1",
+                    "target_id": "left@1",
+                    "context": "compile",
+                    "max_results": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert result["result"] == [["app@1", "left@1"]]
+    assert result["completeness"] == "complete"
+    assert result["omissions"] == []
+
+
+def test_v2_path_result_limit_reports_only_actual_omitted_path(
+    tmp_path: Path,
+) -> None:
+    snapshot = _visit_limit_snapshot()
+    snapshot["relationships"].extend(
+        [
+            {
+                "source": "left@1",
+                "target": "inventory-only@1",
+                "kind": "dependency",
+                "context": "compile",
+                "effective_scope": "compile",
+                "evidence_sources": ["tree:compile"],
+            },
+            {
+                "source": "right@1",
+                "target": "inventory-only@1",
+                "kind": "dependency",
+                "context": "compile",
+                "effective_scope": "compile",
+                "evidence_sources": ["tree:compile"],
+            },
+        ]
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "paths",
+                    "node_id": "app@1",
+                    "target_id": "inventory-only@1",
+                    "context": "compile",
+                    "max_results": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert len(result["result"]) == 1
+    assert result["completeness"] == "incomplete"
+    assert result["omissions"] == [{"reason": "result-limit"}]
