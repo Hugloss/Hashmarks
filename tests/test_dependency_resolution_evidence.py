@@ -29,7 +29,7 @@ def _snapshot_v2() -> dict[str, object]:
             {
                 "source_id": "tree:compile",
                 "kind": "test-resolution-source",
-                "authorities": ["resolution-graph","selection"],
+                "authorities": ["resolution-graph", "selection"],
                 "context": "compile",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -37,7 +37,7 @@ def _snapshot_v2() -> dict[str, object]:
             {
                 "source_id": "tree:runtime",
                 "kind": "test-resolution-source",
-                "authorities": ["resolution-graph","selection"],
+                "authorities": ["resolution-graph", "selection"],
                 "context": "runtime",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -45,7 +45,7 @@ def _snapshot_v2() -> dict[str, object]:
             {
                 "source_id": "list:compile",
                 "kind": "test-inventory-source",
-                "authorities": ["module-ownership","resolved-inventory","selection"],
+                "authorities": ["module-ownership", "resolved-inventory", "selection"],
                 "context": "compile",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -202,17 +202,12 @@ def test_v2_separates_component_selection_and_observation_identity(
     assert first["observation_identity"] != second["observation_identity"]
 
 
-def test_v2_negative_evidence_is_scoped_by_context_and_source_kind(
+def test_v2_negative_evidence_is_scoped_by_context_and_coverage_kind(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v2()
-    selection_runtime = next(
-        row
-        for row in changed["coverage"]
-        if row["kind"] == "selection" and row["context"] == "runtime"
-    )
-    selection_runtime["completeness"] = "incomplete"
-    selection_runtime["truncation"] = "truncated"
+    changed["coverage"][1]["completeness"] = "incomplete"
+    changed["coverage"][1]["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.dependency_resolution_evidence(changed)
@@ -491,8 +486,13 @@ def test_v2_contexts_query_exposes_incomplete_context_evidence(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v2()
-    changed["coverage"][1]["completeness"] = "incomplete"
-    changed["coverage"][1]["truncation"] = "truncated"
+    selection_runtime = next(
+        row
+        for row in changed["coverage"]
+        if row["kind"] == "selection" and row["context"] == "runtime"
+    )
+    selection_runtime["completeness"] = "incomplete"
+    selection_runtime["truncation"] = "truncated"
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -717,7 +717,7 @@ def test_v2_source_kind_is_opaque_when_semantic_authorities_are_explicit(
             {
                 "source_id": "resolver:lock",
                 "kind": "opaque-lock-format",
-                "authorities": ["resolution-graph","resolved-inventory","selection"],
+                "authorities": ["resolution-graph", "resolved-inventory", "selection"],
                 "context": "",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -960,7 +960,7 @@ def test_v2_context_query_includes_selection_context_without_inventory_or_edge(
         {
             "source_id": "tree:optional",
             "kind": "test-resolution-source",
-                "authorities": ["resolution-graph","selection"],
+                "authorities": ["resolution-graph", "selection"],
             "context": "optional",
             "completeness": "incomplete",
             "truncation": "complete",
@@ -987,7 +987,7 @@ def test_v2_inventory_absence_requires_complete_inventory_coverage(
         {
             "source_id": "list:runtime",
             "kind": "test-inventory-source",
-                "authorities": ["module-ownership","resolved-inventory","selection"],
+                "authorities": ["module-ownership", "resolved-inventory", "selection"],
             "context": "runtime",
             "completeness": "incomplete",
             "truncation": "complete",
@@ -1449,7 +1449,7 @@ def test_v2_complete_coverage_can_combine_complete_sources(tmp_path: Path) -> No
         {
             "source_id": "tree:compile:second",
             "kind": "test-resolution-source",
-                "authorities": ["resolution-graph","selection"],
+                "authorities": ["resolution-graph", "selection"],
             "context": "compile",
             "completeness": "complete",
             "truncation": "complete",
@@ -1707,7 +1707,7 @@ def test_v2_root_provenance_changes_observation_not_resolution_identity(
         {
             "source_id": "tree:compile:copy",
             "kind": "test-resolution-source",
-                "authorities": ["resolution-graph","selection"],
+                "authorities": ["resolution-graph", "selection"],
             "context": "compile",
             "completeness": "complete",
             "truncation": "complete",
