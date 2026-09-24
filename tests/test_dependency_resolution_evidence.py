@@ -1679,5 +1679,3 @@ def test_v2_refuses_complete_resolution_graph_without_root(tmp_path: Path) -> No
             ValueError, match="complete resolution-graph coverage lacks root: runtime"
         ):
             codemap.dependency_resolution_evidence(changed)
-
-
