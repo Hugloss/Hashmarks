@@ -323,7 +323,7 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             omissions=omissions,
         )
         source_complete = _coverage_complete(
-            observation, context="", kind="resolution-graph"
+            observation, context="", kind="selection"
         )
     elif operation == "module-owners":
         if not module:
