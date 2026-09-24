@@ -162,8 +162,49 @@ class DependencyResolutionEvidenceMixin:
             source_ids,
         )
         coverage = self._dependency_coverage_v2(
-            snapshot.get("coverage", ()), context_set, source_ids
+            snapshot.get("coverage", ()), context_set, evidence_sources
         )
+        sources_by_id = {
+            str(row["source_id"]): row
+            for row in evidence_sources
+            if row.get("source_id")
+        }
+        for row in inventory:
+            for ref in row["evidence_sources"]:
+                source = sources_by_id[str(ref)]
+                source_context = str(source.get("context") or "")
+                if source_context and source_context != row["context"]:
+                    raise ValueError(
+                        "incompatible inventory evidence source context: "
+                        f"{row['node_id']}:{row['context']}"
+                    )
+        for row in relationships:
+            for ref in row["evidence_sources"]:
+                source = sources_by_id[str(ref)]
+                source_context = str(source.get("context") or "")
+                if source_context and source_context != row["context"]:
+                    raise ValueError(
+                        "incompatible relationship evidence source context: "
+                        f"{row['source']}->{row['target']}:{row['context']}"
+                    )
+        for row in module_ownership:
+            for ref in row["evidence_sources"]:
+                source = sources_by_id[str(ref)]
+                source_context = str(source.get("context") or "")
+                if source_context and source_context != row["context"]:
+                    raise ValueError(
+                        "incompatible module ownership evidence source context: "
+                        f"{row['module']}:{row['context']}"
+                    )
+        for row in selections:
+            contexts_for_selection = set(row["contexts"])
+            for ref in row["evidence_sources"]:
+                source_context = str(sources_by_id[str(ref)].get("context") or "")
+                if source_context and source_context not in contexts_for_selection:
+                    raise ValueError(
+                        "incompatible selection evidence source context: "
+                        f"{row['node_id']}:{source_context}"
+                    )
 
         definition = {
             "producer": producer_packet,
@@ -393,15 +434,18 @@ class DependencyResolutionEvidenceMixin:
                     f"duplicate dependency inventory membership: {node_id}:{context}"
                 )
             seen.add(key)
+            refs = cls._dependency_source_refs_v2(
+                raw.get("evidence_sources", ()),
+                label="inventory evidence source",
+                allowed=source_ids,
+            )
+            if not refs:
+                raise ValueError("inventory must reference evidence source")
             result.append(
                 {
                     "node_id": node_id,
                     "context": context,
-                    "evidence_sources": cls._dependency_source_refs_v2(
-                        raw.get("evidence_sources", ()),
-                        label="inventory evidence source",
-                        allowed=source_ids,
-                    ),
+                    "evidence_sources": refs,
                 }
             )
         return sorted(
@@ -429,6 +473,13 @@ class DependencyResolutionEvidenceMixin:
                 )
             if context not in contexts:
                 raise ValueError(f"unknown relationship context: {context}")
+            refs = cls._dependency_source_refs_v2(
+                raw.get("evidence_sources", ()),
+                label="relationship evidence source",
+                allowed=source_ids,
+            )
+            if not refs:
+                raise ValueError("relationship must reference evidence source")
             packet = {
                 "source": source,
                 "target": target,
@@ -440,11 +491,7 @@ class DependencyResolutionEvidenceMixin:
                     raw.get("effective_scope"), label="effective scope"
                 ),
                 "marker": _text(raw.get("marker"), label="relationship marker"),
-                "evidence_sources": cls._dependency_source_refs_v2(
-                    raw.get("evidence_sources", ()),
-                    label="relationship evidence source",
-                    allowed=source_ids,
-                ),
+                "evidence_sources": refs,
             }
             key = (
                 source,
@@ -562,11 +609,20 @@ class DependencyResolutionEvidenceMixin:
 
     @classmethod
     def _dependency_coverage_v2(
-        cls, value: object, contexts: set[str], source_ids: set[str]
+        cls,
+        value: object,
+        contexts: set[str],
+        evidence_sources: Sequence[Mapping[str, object]],
     ) -> list[dict[str, object]]:
         rows = _objects(value, label="coverage", limit=_MAX_CONTEXTS * 4)
         result: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
+        sources = {
+            str(row["source_id"]): row
+            for row in evidence_sources
+            if row.get("source_id")
+        }
+        source_ids = set(sources)
         for raw in rows:
             context = _identifier(raw.get("context"), label="coverage context")
             kind = _identifier(raw.get("kind"), label="coverage kind")
@@ -588,17 +644,34 @@ class DependencyResolutionEvidenceMixin:
                 )
             if completeness == "complete" and truncation != "complete":
                 raise ValueError("complete coverage requires truncation=complete")
+            refs = cls._dependency_source_refs_v2(
+                raw.get("evidence_sources", ()),
+                label="coverage evidence source",
+                allowed=source_ids,
+            )
+            if not refs:
+                raise ValueError("coverage must reference evidence source")
+            for ref in refs:
+                source = sources[ref]
+                source_context = str(source.get("context") or "")
+                if source_context and source_context != context:
+                    raise ValueError(
+                        f"incompatible evidence source context for coverage: {context}:{kind}"
+                    )
+                if completeness == "complete" and (
+                    source.get("completeness") != "complete"
+                    or source.get("truncation") != "complete"
+                ):
+                    raise ValueError(
+                        f"coverage exceeds evidence source: {context}:{kind}"
+                    )
             result.append(
                 {
                     "context": context,
                     "kind": kind,
                     "completeness": completeness,
                     "truncation": truncation,
-                    "evidence_sources": cls._dependency_source_refs_v2(
-                        raw.get("evidence_sources", ()),
-                        label="coverage evidence source",
-                        allowed=source_ids,
-                    ),
+                    "evidence_sources": refs,
                 }
             )
         return sorted(result, key=lambda row: (str(row["context"]), str(row["kind"])))
