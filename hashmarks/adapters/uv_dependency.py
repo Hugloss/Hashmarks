@@ -63,6 +63,11 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise ValueError("invalid uv lock TOML") from exc
 
+    if document.get("resolution-markers"):
+        raise ValueError("uv lock resolution forks are not modeled")
+    if document.get("conflicts"):
+        raise ValueError("uv lock conflicts are not modeled")
+
     raw_packages = document.get("package", ())
     if not isinstance(raw_packages, list) or not raw_packages:
         raise ValueError("uv lock must contain at least one package")
