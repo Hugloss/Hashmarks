@@ -1607,3 +1607,37 @@ def test_v2_module_owner_must_be_selected_in_ownership_context(tmp_path: Path) -
         codemap.sync()
         with pytest.raises(ValueError, match="module owner context not selected"):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_each_selection_context_requires_matching_or_global_provenance(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["selections"][1]["evidence_sources"] = ["tree:compile"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="selection context lacks evidence source"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_global_selection_source_can_cover_multiple_contexts(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["evidence_sources"].append(
+        {
+            "source_id": "lock:global",
+            "kind": "lock-observation",
+            "context": "",
+            "completeness": "complete",
+            "truncation": "complete",
+        }
+    )
+    snapshot["selections"][1]["evidence_sources"] = ["lock:global"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(snapshot)
+
+    selection = next(
+        row for row in packet["selections"] if row["node_id"] == "library@1"
+    )
+    assert selection["contexts"] == ["compile", "runtime"]
+    assert selection["evidence_sources"] == ["lock:global"]
