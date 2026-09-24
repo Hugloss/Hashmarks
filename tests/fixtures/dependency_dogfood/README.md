@@ -18,9 +18,10 @@ maven/dummy-dep-manifest.mf`, installed under `example.fixture:dummy-dep` at
 1.0.0 and 2.0.0 with `maven-install-plugin` 2.4 `install-file`. For each POM,
 `dependency:tree -DoutputType=json` produced `tree.json`, and
 `dependency:list` produced `list.txt`; both used `-DoutputFile=<path>` and
-`-Dstyle.color=never`. The captures are byte-for-byte copies of the command
-outputs, including Maven's `none` marker for an empty list. No dependency
-resolution happens in Hashmarks' adapters or in CI.
+`-Dstyle.color=never`. The trees are byte-for-byte command outputs; the lists
+omit only a terminal empty line to satisfy Git whitespace checks. Maven's
+`none` marker for an empty list and all resolved facts are preserved. No
+dependency resolution happens in Hashmarks' adapters or in CI.
 
 Run `make dependency-dogfood` for the add/version-change/remove and grouped-scope
 checks. Synthetic parser-edge tests remain separate and do not claim to be
