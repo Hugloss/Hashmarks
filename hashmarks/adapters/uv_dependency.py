@@ -129,15 +129,17 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             )
 
     root_ids = {str(row["node_id"]) for row in roots}
-    components = [
-        {
-            "component_id": str(row["name"]),
-            "name": str(row["name"]),
+    components: dict[str, dict[str, object]] = {}
+    for row in packages:
+        component_id = str(row["name"])
+        component = {
+            "component_id": component_id,
+            "name": component_id,
             "ecosystem": "pypi",
         }
-        for row in packages
-    ]
-    unique_components = {str(row["component_id"]): row for row in components}
+        previous = components.setdefault(component_id, component)
+        if previous != component:
+            raise ValueError(f"conflicting uv component identity: {component_id}")
     selections = [
         {
             "node_id": row["node_id"],
@@ -207,7 +209,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         ),
         "evidence_sources": evidence_sources,
         "components": sorted(
-            unique_components.values(), key=lambda row: row["component_id"]
+            components.values(), key=lambda row: row["component_id"]
         ),
         "selections": sorted(selections, key=lambda row: str(row["node_id"])),
         "inventory": sorted(inventory, key=lambda row: str(row["node_id"])),
