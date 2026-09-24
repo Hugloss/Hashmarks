@@ -1552,3 +1552,27 @@ def test_v2_component_without_selection_is_rejected(tmp_path: Path) -> None:
         codemap.sync()
         with pytest.raises(ValueError, match="component has no dependency selection"):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_multiple_selections_for_one_component_remain_valid(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["selections"].append(
+        {
+            "node_id": "library@2",
+            "component_id": "library",
+            "version": "2",
+            "source": "registry",
+            "contexts": ["compile"],
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(snapshot)
+
+    library_nodes = {
+        row["node_id"]
+        for row in packet["selections"]
+        if row["component_id"] == "library"
+    }
+    assert library_nodes == {"library@1", "library@2"}
