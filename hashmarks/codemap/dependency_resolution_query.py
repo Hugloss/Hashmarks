@@ -355,6 +355,15 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             raise ValueError(f"{operation} query requires node_id")
         if node_id not in selections:
             raise ValueError(f"unknown dependency query node_id: {node_id}")
+        if operation in {"reachability", "paths"}:
+            if not target_id:
+                raise ValueError(f"{operation} query requires target_id")
+            if target_id not in selections:
+                raise ValueError(f"unknown dependency query target_id: {target_id}")
+        if not context and len(declared_contexts) > 1:
+            raise ValueError(
+                "graph query requires context for multi-context observation"
+            )
         if context and context not in selections[node_id].get("contexts", ()):
             raise ValueError(
                 f"dependency query node_id not selected in context: {node_id}:{context}"
@@ -377,10 +386,6 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     else "not-admissible"
                 )
         elif operation == "reachability":
-            if not target_id:
-                raise ValueError("reachability query requires target_id")
-            if target_id not in selections:
-                raise ValueError(f"unknown dependency query target_id: {target_id}")
             if context and context not in selections[target_id].get("contexts", ()):
                 raise ValueError(
                     "dependency query target_id not selected in context: "
@@ -406,10 +411,6 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 ),
             }
         else:
-            if not target_id:
-                raise ValueError("paths query requires target_id")
-            if target_id not in selections:
-                raise ValueError(f"unknown dependency query target_id: {target_id}")
             if context and context not in selections[target_id].get("contexts", ()):
                 raise ValueError(
                     "dependency query target_id not selected in context: "
