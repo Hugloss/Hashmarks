@@ -86,11 +86,11 @@ def _walk(
                 omissions.append({"reason": "depth-limit", "node_id": current})
             continue
         for candidate in adjacency.get(current, ()):
-            visited += 1
-            if visited > max_visits:
+            if visited >= max_visits:
                 omissions.append({"reason": "visit-limit"})
                 queue.clear()
                 break
+            visited += 1
             if candidate in seen:
                 continue
             seen.add(candidate)
@@ -132,10 +132,10 @@ def _reachability(  # noqa: C901
                 omissions.append({"reason": "depth-limit", "node_id": current})
             continue
         for candidate in outgoing.get(current, ()):
-            visited += 1
-            if visited > max_visits:
+            if visited >= max_visits:
                 omissions.append({"reason": "visit-limit"})
                 return False, visited, omissions
+            visited += 1
             if candidate == target:
                 return True, visited, omissions
             if candidate not in seen:
@@ -171,11 +171,11 @@ def _paths(  # noqa: C901, PLR0912
                 omissions.append({"reason": "depth-limit", "node_id": current})
             continue
         for candidate in outgoing.get(current, ()):
-            visited += 1
-            if visited > max_visits:
+            if visited >= max_visits:
                 omissions.append({"reason": "visit-limit"})
                 queue.clear()
                 break
+            visited += 1
             if candidate not in path:
                 queue.append([*path, candidate])
     return paths, visited, omissions
