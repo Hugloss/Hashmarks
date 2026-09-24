@@ -162,7 +162,7 @@ class DependencyResolutionEvidenceMixin:
             source_ids,
         )
         coverage = self._dependency_coverage_v2(
-            snapshot.get("coverage", ()), context_set, source_ids
+            snapshot.get("coverage", ()), context_set, evidence_sources
         )
 
         definition = {
@@ -562,11 +562,20 @@ class DependencyResolutionEvidenceMixin:
 
     @classmethod
     def _dependency_coverage_v2(
-        cls, value: object, contexts: set[str], source_ids: set[str]
+        cls,
+        value: object,
+        contexts: set[str],
+        evidence_sources: Sequence[Mapping[str, object]],
     ) -> list[dict[str, object]]:
         rows = _objects(value, label="coverage", limit=_MAX_CONTEXTS * 4)
         result: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
+        sources = {
+            str(row["source_id"]): row
+            for row in evidence_sources
+            if row.get("source_id")
+        }
+        source_ids = set(sources)
         for raw in rows:
             context = _identifier(raw.get("context"), label="coverage context")
             kind = _identifier(raw.get("kind"), label="coverage kind")
@@ -588,17 +597,44 @@ class DependencyResolutionEvidenceMixin:
                 )
             if completeness == "complete" and truncation != "complete":
                 raise ValueError("complete coverage requires truncation=complete")
+            refs = cls._dependency_source_refs_v2(
+                raw.get("evidence_sources", ()),
+                label="coverage evidence source",
+                allowed=source_ids,
+            )
+            expected_source_kind = (
+                "resolution-graph"
+                if kind == "resolution-graph"
+                else "resolved-inventory"
+                if kind in {"resolved-inventory", "module-ownership"}
+                else kind
+            )
+            for ref in refs:
+                source = sources[ref]
+                source_kind = str(source.get("kind") or "")
+                source_context = str(source.get("context") or "")
+                if source_kind != expected_source_kind:
+                    raise ValueError(
+                        f"incompatible evidence source kind for coverage: {context}:{kind}"
+                    )
+                if source_context and source_context != context:
+                    raise ValueError(
+                        f"incompatible evidence source context for coverage: {context}:{kind}"
+                    )
+                if completeness == "complete" and (
+                    source.get("completeness") != "complete"
+                    or source.get("truncation") != "complete"
+                ):
+                    raise ValueError(
+                        f"coverage exceeds evidence source: {context}:{kind}"
+                    )
             result.append(
                 {
                     "context": context,
                     "kind": kind,
                     "completeness": completeness,
                     "truncation": truncation,
-                    "evidence_sources": cls._dependency_source_refs_v2(
-                        raw.get("evidence_sources", ()),
-                        label="coverage evidence source",
-                        allowed=source_ids,
-                    ),
+                    "evidence_sources": refs,
                 }
             )
         return sorted(result, key=lambda row: (str(row["context"]), str(row["kind"])))
