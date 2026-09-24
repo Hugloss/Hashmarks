@@ -7,20 +7,17 @@ MAX_RESULTS = 256
 MAX_DEPTH = 16
 MAX_VISITS = 4096
 
-_COMMON_QUERY_FIELDS = {"operation", "max_depth", "max_results", "max_visits"}
-_OPERATION_QUERY_FIELDS = {
-    "component": {"component_id"},
-    "dependencies": {"node_id", "context"},
-    "dependents": {"node_id", "context"},
-    "paths": {"node_id", "target_id", "context"},
-    "reachability": {"node_id", "target_id", "context"},
-    "contexts": {"node_id"},
-    "inventory": {"node_id", "context"},
-    "module-owners": {"module", "context"},
+_QUERY_FIELDS = {
+    "operation",
+    "node_id",
+    "target_id",
+    "component_id",
+    "context",
+    "module",
+    "max_depth",
+    "max_results",
+    "max_visits",
 }
-_ALL_QUERY_FIELDS = _COMMON_QUERY_FIELDS | set().union(
-    *_OPERATION_QUERY_FIELDS.values()
-)
 
 
 def _text(value: object, *, label: str, required: bool = False) -> str:
@@ -246,15 +243,9 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
     }
     if operation not in allowed:
         raise ValueError(f"unsupported dependency query operation: {operation}")
-    unknown_fields = sorted(set(request) - _ALL_QUERY_FIELDS)
+    unknown_fields = sorted(set(request) - _QUERY_FIELDS)
     if unknown_fields:
         raise ValueError(f"unknown dependency query field: {unknown_fields[0]}")
-    supported_fields = _COMMON_QUERY_FIELDS | _OPERATION_QUERY_FIELDS[operation]
-    unsupported_fields = sorted(set(request) - supported_fields)
-    if unsupported_fields:
-        raise ValueError(
-            f"field not supported for {operation} query: {unsupported_fields[0]}"
-        )
     max_depth, max_results, max_visits = _bounds(request)
     node_id = _text(request.get("node_id"), label="dependency query node_id")
     target_id = _text(request.get("target_id"), label="dependency query target_id")
