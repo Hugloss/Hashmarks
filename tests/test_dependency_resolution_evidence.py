@@ -860,14 +860,14 @@ def test_v3_reachability_absence_requires_complete_context_coverage(
             [
                 {
                     "operation": "reachability",
-                    "node_id": "inventory-only@1",
-                    "target_id": "library@1",
+                    "node_id": "library@1",
+                    "target_id": "app@1",
                     "context": "compile",
                 },
                 {
                     "operation": "reachability",
-                    "node_id": "inventory-only@1",
-                    "target_id": "library@1",
+                    "node_id": "library@1",
+                    "target_id": "app@1",
                     "context": "runtime",
                 },
             ],

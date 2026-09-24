@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -374,7 +375,6 @@ def test_maven_adapter_refuses_short_inventory_coordinate() -> None:
     [
         "[INFO] Scanning for projects...",
         "[WARNING] Repository mirror: https://repo.example.invalid/maven2",
-        "[ERROR] Example diagnostic: retained as non-coordinate noise",
         "[DEBUG] Dependency collection: complete",
     ],
 )
@@ -390,3 +390,81 @@ def test_maven_adapter_ignores_colon_bearing_maven_log_noise(noise: str) -> None
     assert [row["node_id"] for row in raw["inventory"]] == [
         "example.libs:valid:jar:3.0"
     ]
+
+
+@pytest.mark.parametrize(
+    "inventory",
+    [
+        b"not a Maven dependency list\n",
+        b"[INFO] BUILD SUCCESS\n",
+        b"example.libs:valid:jar:3.0:test\n",
+        b"The following files have been resolved:\n[ERROR] resolution failed\n",
+        b"The following files have been resolved:\n   none\n[INFO] BUILD FAILURE\n",
+        b"The following files have been resolved:\nresolution incomplete\n",
+    ],
+)
+def test_maven_adapter_rejects_unproved_complete_inventory(
+    inventory: bytes,
+) -> None:
+    with pytest.raises(ValueError):
+        maven_dependency_observation(trees={}, inventories={"test": inventory})
+
+
+def test_maven_header_only_inventory_is_complete_empty_evidence(
+    tmp_path: Path,
+) -> None:
+    raw = maven_dependency_observation(
+        trees={}, inventories={"test": b"The following files have been resolved:\n"}
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(raw)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "inventory", "node_id": "absent", "context": "test"}],
+        )["results"][0]
+    assert result["result"] == []
+    assert result["negative_evidence"] == "admissible-within-declared-scope"
+    assert result["producer_authority"] == "caller-claimed"
+
+
+def test_maven_genuine_none_marker_is_complete_empty_evidence(
+    tmp_path: Path,
+) -> None:
+    raw = maven_dependency_observation(
+        trees={},
+        inventories={"test": b"The following files have been resolved:\n   none\n"},
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(raw)
+    assert observation["inventory"] == []
+    assert {
+        row["kind"]: row["state"]
+        for row in observation["negative_evidence"]
+        if row["context"] == "test"
+    }["resolved-inventory"] == "admissible-within-declared-scope"
+
+
+def test_maven_list_strips_producer_ansi_without_changing_source_digest() -> None:
+    inventory = (
+        b"The following files have been resolved:\n"
+        b"   example.libs:valid:jar:3.0:test\x1b[36m -- module valid.name"
+        b"\x1b[0;1;33m (auto)\x1b[m\n"
+    )
+    raw = maven_dependency_observation(trees={}, inventories={"test": inventory})
+    assert raw["inventory"][0]["node_id"] == "example.libs:valid:jar:3.0"
+    assert raw["module_ownership"][0]["module"] == "valid.name"
+    assert raw["evidence_sources"][0]["producer_digest"] == (
+        "sha256:" + hashlib.sha256(inventory).hexdigest()
+    )
+
+
+def test_maven_none_marker_cannot_hide_dependency() -> None:
+    inventory = (
+        b"The following files have been resolved:\n"
+        b"   none\n"
+        b"   example.libs:valid:jar:3.0:test\n"
+    )
+    with pytest.raises(ValueError, match="conflicting.*empty marker"):
+        maven_dependency_observation(trees={}, inventories={"test": inventory})

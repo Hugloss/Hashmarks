@@ -1,0 +1,20 @@
+{
+  "groupId": "example.fixture",
+  "artifactId": "dummy-app",
+  "version": "0.1.0",
+  "type": "jar",
+  "scope": "",
+  "classifier": "",
+  "optional": "false",
+  "children": [
+    {
+      "groupId": "example.fixture",
+      "artifactId": "dummy-dep",
+      "version": "1.0.0",
+      "type": "jar",
+      "scope": "compile",
+      "classifier": "",
+      "optional": "false"
+    }
+    ]
+}

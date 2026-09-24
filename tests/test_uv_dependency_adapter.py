@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -107,6 +108,74 @@ def test_uv_lock_adapter_does_not_promote_declared_metadata_to_resolution() -> N
     assert raw["relationships"][0]["kind"] == "dependency"
     assert raw["scope"] == {"requires_python": ">=3.11"}
     assert raw["module_ownership"] == []
+
+
+def test_uv_lock_adapter_includes_every_committed_lock_dependency_group(
+    tmp_path: Path,
+) -> None:
+    lock = (Path(__file__).resolve().parents[1] / "uv.lock").read_bytes()
+    document = tomllib.loads(lock.decode())
+    expected = sum(
+        len(package.get("dependencies", []))
+        + sum(len(rows) for rows in package.get("optional-dependencies", {}).values())
+        + sum(len(rows) for rows in package.get("dev-dependencies", {}).values())
+        for package in document["package"]
+    )
+    raw = uv_lock_dependency_observation(lock=lock)
+    assert len(raw["relationships"]) == expected
+    assert len(raw["evidence_sources"]) == 1
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(raw)
+        root_id = next(
+            row["node_id"]
+            for row in observation["roots"]
+            if row["node_id"].startswith("hashmarks:")
+        )
+        query = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "dependencies", "node_id": root_id, "context": "lock"}],
+        )["results"][0]
+
+    assert query["result"]
+    assert {row["selection"]["component_id"] for row in query["result"]} >= {
+        "mcp",
+        "ruff",
+    }
+    assert {
+        row["effective_scope"]
+        for row in observation["relationships"]
+        if row["source"] == root_id
+    } >= {
+        "extra:mcp",
+        "dev:lint",
+    }
+    assert query["producer_authority"] == "caller-claimed"
+
+
+@pytest.mark.parametrize(
+    "group_section",
+    [
+        'optional-dependencies = "unsupported"',
+        '[package.optional-dependencies]\nextra = "unsupported"',
+        '[package.dev-dependencies]\ntest = "unsupported"',
+    ],
+)
+def test_uv_lock_adapter_rejects_unsupported_group_shape(
+    group_section: str,
+) -> None:
+    lock = f"""version = 1
+revision = 3
+
+[[package]]
+name = "app"
+version = "1"
+source = {{ virtual = "." }}
+{group_section}
+""".encode()
+    with pytest.raises(ValueError, match="must be a table|must be a list"):
+        uv_lock_dependency_observation(lock=lock)
 
 
 def test_uv_lock_adapter_refuses_ambiguous_name_only_dependency() -> None:

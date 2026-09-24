@@ -120,26 +120,38 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     relationships: list[dict[str, object]] = []
     for row in packages:
         raw = row["raw"]
-        dependencies = raw["dependencies"] if "dependencies" in raw else []
-        if dependencies is None:
-            dependencies = []
-        if not isinstance(dependencies, list):
-            raise ValueError(f"uv lock dependencies must be a list: {row['name']}")
-        for dependency in dependencies:
-            if not isinstance(dependency, Mapping):
-                raise ValueError(f"uv lock dependency must be an object: {row['name']}")
-            target = _dependency_target(dependency, packages_by_name)
-            relationships.append(
-                {
-                    "source": row["node_id"],
-                    "target": target["node_id"],
-                    "kind": "dependency",
-                    "context": _CONTEXT,
-                    "effective_scope": "",
-                    "marker": str(dependency.get("marker") or ""),
-                    "evidence_sources": [source_id],
-                }
-            )
+        dependency_groups = [("", raw.get("dependencies", []))]
+        for field, prefix in (
+            ("optional-dependencies", "extra"),
+            ("dev-dependencies", "dev"),
+        ):
+            groups = raw.get(field, {})
+            if not isinstance(groups, Mapping):
+                raise ValueError(f"uv lock {field} must be a table: {row['name']}")
+            for group, dependencies in groups.items():
+                if not isinstance(group, str) or not group or group != group.strip():
+                    raise ValueError(f"uv lock {field} group name is invalid")
+                dependency_groups.append((f"{prefix}:{group}", dependencies))
+        for effective_scope, dependencies in dependency_groups:
+            if not isinstance(dependencies, list):
+                raise ValueError(f"uv lock dependencies must be a list: {row['name']}")
+            for dependency in dependencies:
+                if not isinstance(dependency, Mapping):
+                    raise ValueError(
+                        f"uv lock dependency must be an object: {row['name']}"
+                    )
+                target = _dependency_target(dependency, packages_by_name)
+                relationships.append(
+                    {
+                        "source": row["node_id"],
+                        "target": target["node_id"],
+                        "kind": "dependency",
+                        "context": _CONTEXT,
+                        "effective_scope": effective_scope,
+                        "marker": str(dependency.get("marker") or ""),
+                        "evidence_sources": [source_id],
+                    }
+                )
 
     root_ids = {str(row["node_id"]) for row in roots}
     components: dict[str, dict[str, object]] = {}
@@ -224,6 +236,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             key=lambda row: (
                 str(row["source"]),
                 str(row["target"]),
+                str(row["effective_scope"]),
                 str(row["marker"]),
             ),
         ),

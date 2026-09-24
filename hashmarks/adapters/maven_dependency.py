@@ -12,6 +12,7 @@ _LIST_LINE = re.compile(
     r"(?::[^ \t:]+){2,3})(?:[ \t]+--[ \t]+module[ \t]+"
     r"(?P<module>.+?))?[ \t]*$"
 )
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 def _digest(data: bytes) -> str:
@@ -235,19 +236,55 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             seen_inventory: set[str] = set()
             module_capable_nodes: set[str] = set()
             module_nodes: set[str] = set()
-            for line in lines:
+            header_seen = False
+            empty_marker_seen = False
+            for raw_line in lines:
+                line = _ANSI_ESCAPE.sub("", raw_line)
+                if "\x1b" in line:
+                    raise ValueError(
+                        f"unsupported Maven dependency-list escape: {context}"
+                    )
+                stripped = line.strip()
+                if stripped == "The following files have been resolved:":
+                    if header_seen:
+                        raise ValueError(
+                            f"duplicate Maven dependency-list header for {context}"
+                        )
+                    header_seen = True
+                    continue
+                if stripped.startswith("[ERROR]") or stripped == "[INFO] BUILD FAILURE":
+                    raise ValueError(f"Maven dependency list contains error: {context}")
+                if not stripped or stripped.startswith(
+                    ("[INFO]", "[WARNING]", "[DEBUG]")
+                ):
+                    continue
+                if not header_seen:
+                    raise ValueError(
+                        f"Maven dependency-list header is missing: {context}"
+                    )
+                if stripped == "none":
+                    if empty_marker_seen or seen_inventory:
+                        raise ValueError(
+                            f"conflicting Maven dependency-list empty marker: {context}"
+                        )
+                    empty_marker_seen = True
+                    continue
                 match = _LIST_LINE.match(line)
                 if match is None:
-                    stripped = line.strip()
-                    candidate = stripped.split(maxsplit=1)[0] if stripped else ""
-                    if candidate.count(":") >= 1 and not stripped.startswith(
-                        ("[INFO]", "[WARNING]", "[ERROR]", "[DEBUG]")
-                    ):
+                    candidate = stripped.split(maxsplit=1)[0]
+                    if ":" in candidate:
                         raise ValueError(
                             f"unparsed Maven dependency-list coordinate for {context}: "
                             f"{candidate}"
                         )
-                    continue
+                    raise ValueError(
+                        f"unrecognized Maven dependency-list content for {context}: "
+                        f"{stripped}"
+                    )
+                if empty_marker_seen:
+                    raise ValueError(
+                        f"conflicting Maven dependency-list empty marker: {context}"
+                    )
                 (
                     component,
                     node,
@@ -276,6 +313,8 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 if module is not None:
                     module_nodes.add(node)
                     ownership[(_module_name(module), context)].add(node)
+            if not header_seen:
+                raise ValueError(f"Maven dependency-list header is missing: {context}")
             module_completeness = (
                 "complete" if module_nodes >= module_capable_nodes else "incomplete"
             )
