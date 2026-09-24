@@ -1200,3 +1200,33 @@ def test_v2_query_visit_accounting_never_exceeds_declared_bound(
     assert result["omissions"] == [{"reason": "visit-limit"}]
 
 
+
+
+def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["evidence_sources"].append(
+        {
+            "source_id": "ownership:compile",
+            "kind": "module-ownership",
+            "context": "compile",
+            "completeness": "incomplete",
+            "truncation": "complete",
+        }
+    )
+    snapshot["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["ownership:compile"],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match="module ownership exceeds evidence source"
+        ):
+            codemap.dependency_resolution_evidence(snapshot)
