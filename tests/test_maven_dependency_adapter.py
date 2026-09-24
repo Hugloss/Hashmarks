@@ -336,3 +336,26 @@ def test_maven_adapter_refuses_short_inventory_coordinate() -> None:
 
     with pytest.raises(ValueError, match="unparsed Maven dependency-list coordinate"):
         maven_dependency_observation(trees={}, inventories={"test": inventory})
+
+
+@pytest.mark.parametrize(
+    "noise",
+    [
+        "[INFO] Scanning for projects...",
+        "[WARNING] Repository mirror: https://repo.example.invalid/maven2",
+        "[ERROR] Example diagnostic: retained as non-coordinate noise",
+        "[DEBUG] Dependency collection: complete",
+    ],
+)
+def test_maven_adapter_ignores_colon_bearing_maven_log_noise(noise: str) -> None:
+    inventory = (
+        "The following files have been resolved:\n"
+        f"{noise}\n"
+        "   example.libs:valid:jar:3.0:test -- module example.valid\n"
+    ).encode()
+
+    raw = maven_dependency_observation(trees={}, inventories={"test": inventory})
+
+    assert [row["node_id"] for row in raw["inventory"]] == [
+        "example.libs:valid:jar:3.0"
+    ]
