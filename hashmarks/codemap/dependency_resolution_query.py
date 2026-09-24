@@ -322,9 +322,7 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             max_results=max_results,
             omissions=omissions,
         )
-        source_complete = _coverage_complete(
-            observation, context="", kind="selection"
-        )
+        source_complete = _coverage_complete(observation, context="", kind="selection")
     elif operation == "module-owners":
         if not module:
             raise ValueError("module-owners query requires module")
