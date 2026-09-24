@@ -222,15 +222,15 @@ source = { virtual = "." }
     ("metadata", "message"),
     [
         (
-            'resolution-markers = ["sys_platform == \'linux\'"]\n',
+            "resolution-markers = [\"sys_platform == 'linux'\"]\n",
             "uv lock resolution forks are not modeled",
         ),
         (
             (
-                'conflicts = [[\n'
+                "conflicts = [[\n"
                 '  { package = "demo", extra = "cpu" },\n'
                 '  { package = "demo", extra = "gpu" },\n'
-                ']]\n'
+                "]]\n"
             ),
             "uv lock conflicts are not modeled",
         ),
