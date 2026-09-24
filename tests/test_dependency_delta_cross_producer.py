@@ -511,3 +511,114 @@ def test_maven_simultaneous_variants_preserve_independent_selection_delta(
     assert delta["selections_changed"] == []
     assert delta["module_ownership_added"] == ["dummy.windows|runtime"]
     assert delta["module_ownership_removed"] == ["dummy.osx|runtime"]
+
+
+def test_uv_repository_input_change_preserves_resolution_delta(
+    tmp_path: Path,
+) -> None:
+    lock = _uv_lock("1.0.0")
+    before_raw = uv_lock_dependency_observation(
+        lock=lock,
+        repository_inputs=[
+            {"path": "uv.lock", "member_revision": "a" * 64},
+        ],
+    )
+    after_raw = uv_lock_dependency_observation(
+        lock=lock,
+        repository_inputs=[
+            {"path": "uv.lock", "member_revision": "b" * 64},
+        ],
+    )
+    with CodeMap(tmp_path) as codemap:
+        (tmp_path / "uv.lock").write_bytes(lock)
+        codemap.sync()
+        before, after, delta = _delta(codemap, before_raw, after_raw)
+
+    assert before["resolution_identity"] == after["resolution_identity"]
+    assert before["observation_identity"] != after["observation_identity"]
+    assert delta["comparability"] == "comparable"
+    assert delta["components_added"] == []
+    assert delta["components_removed"] == []
+    assert delta["selections_added"] == []
+    assert delta["selections_removed"] == []
+    assert delta["inventory_added"] == []
+    assert delta["inventory_removed"] == []
+    assert delta["relationships_added"] == []
+    assert delta["relationships_removed"] == []
+
+
+def test_maven_module_ownership_change_does_not_change_resolution_identity(
+    tmp_path: Path,
+) -> None:
+    tree = _maven_tree_variant("1.0.0")
+    before_raw = maven_dependency_observation(
+        trees={"compile": tree},
+        inventories={
+            "compile": (
+                "The following files have been resolved:\n"
+                "   example.fixture:dummy-dep:jar:1.0.0:compile"
+                " -- module dummy.old (auto)\n"
+            ).encode()
+        },
+    )
+    after_raw = maven_dependency_observation(
+        trees={"compile": tree},
+        inventories={
+            "compile": (
+                "The following files have been resolved:\n"
+                "   example.fixture:dummy-dep:jar:1.0.0:compile"
+                " -- module dummy.new (auto)\n"
+            ).encode()
+        },
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before, after, delta = _delta(codemap, before_raw, after_raw)
+
+    assert before["resolution_identity"] == after["resolution_identity"]
+    assert before["observation_identity"] != after["observation_identity"]
+    assert delta["selections_added"] == []
+    assert delta["selections_removed"] == []
+    assert delta["inventory_added"] == []
+    assert delta["inventory_removed"] == []
+    assert delta["relationships_added"] == []
+    assert delta["relationships_removed"] == []
+    assert delta["module_ownership_added"] == ["dummy.new|compile"]
+    assert delta["module_ownership_removed"] == ["dummy.old|compile"]
+    assert delta["module_ownership_changed"] == []
+
+
+def test_maven_same_module_owner_change_is_observation_delta_only(
+    tmp_path: Path,
+) -> None:
+    before_raw = maven_dependency_observation(
+        trees={},
+        inventories={
+            "runtime": (
+                "The following files have been resolved:\n"
+                "   example.fixture:dummy-dep:jar:linux:1.0.0:runtime"
+                " -- module dummy.dep (auto)\n"
+            ).encode()
+        },
+    )
+    after_raw = maven_dependency_observation(
+        trees={},
+        inventories={
+            "runtime": (
+                "The following files have been resolved:\n"
+                "   example.fixture:dummy-dep:jar:windows:1.0.0:runtime"
+                " -- module dummy.dep (auto)\n"
+            ).encode()
+        },
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before, after, delta = _delta(codemap, before_raw, after_raw)
+
+    assert before["resolution_identity"] != after["resolution_identity"]
+    assert before["observation_identity"] != after["observation_identity"]
+    assert len(delta["selections_added"]) == 1
+    assert len(delta["selections_removed"]) == 1
+    assert delta["module_ownership_added"] == []
+    assert delta["module_ownership_removed"] == []
+    assert delta["module_ownership_changed"] == ["dummy.dep|runtime"]
