@@ -5,7 +5,7 @@ import json
 import tomllib
 from collections.abc import Mapping, Sequence
 
-_SCHEMA = "hashmarks.dependency-resolution.v2"
+_SCHEMA = "hashmarks.dependency-resolution.v3"
 _CONTEXT = "lock"
 
 
