@@ -187,7 +187,13 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     visit(child, node)
                 return node
 
-            roots.append({"node_id": visit(root_raw), "context": context})
+            roots.append(
+                {
+                    "node_id": visit(root_raw),
+                    "context": context,
+                    "evidence_sources": [tree_source],
+                }
+            )
 
         list_source = f"list:{context}"
         if context in inventories:

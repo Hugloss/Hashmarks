@@ -137,5 +137,7 @@ source = {{ registry = "https://example.invalid/simple" }}
     root_id = raw["roots"][0]["node_id"]
     assert root_id.startswith("app:0.1.0@")
     assert {row["node_id"] for row in raw["inventory"]} == {
-        next(row["node_id"] for row in raw["selections"] if row["component_id"] == "dep")
+        next(
+            row["node_id"] for row in raw["selections"] if row["component_id"] == "dep"
+        )
     }

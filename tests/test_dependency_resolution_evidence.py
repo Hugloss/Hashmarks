@@ -14,8 +14,16 @@ def _snapshot_v2() -> dict[str, object]:
         "scope": {"environment": "test"},
         "contexts": ["compile", "runtime"],
         "roots": [
-            {"node_id": "app@1", "context": "compile"},
-            {"node_id": "app@1", "context": "runtime"},
+            {
+                "node_id": "app@1",
+                "context": "compile",
+                "evidence_sources": ["tree:compile"],
+            },
+            {
+                "node_id": "app@1",
+                "context": "runtime",
+                "evidence_sources": ["tree:runtime"],
+            },
         ],
         "evidence_sources": [
             {
@@ -1492,3 +1500,49 @@ def test_v2_selection_without_any_context_is_rejected(tmp_path: Path) -> None:
         codemap.sync()
         with pytest.raises(ValueError, match="selection context must not be empty"):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_root_requires_evidence_source_provenance(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["roots"][0]["evidence_sources"] = []
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="root must reference evidence source"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_root_rejects_incompatible_evidence_source_context(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["roots"][0]["evidence_sources"] = ["tree:runtime"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match="incompatible root evidence source context"
+        ):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_root_provenance_changes_observation_not_resolution_identity(
+    tmp_path: Path,
+) -> None:
+    baseline = _snapshot_v2()
+    changed = _snapshot_v2()
+    changed["evidence_sources"].append(
+        {
+            "source_id": "tree:compile:copy",
+            "kind": "resolution-graph",
+            "context": "compile",
+            "completeness": "complete",
+            "truncation": "complete",
+        }
+    )
+    changed["roots"][0]["evidence_sources"] = ["tree:compile:copy"]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(baseline)
+        after = codemap.dependency_resolution_evidence(changed)
+
+    assert before["definition_identity"] == after["definition_identity"]
+    assert before["resolution_identity"] == after["resolution_identity"]
+    assert before["observation_identity"] != after["observation_identity"]
