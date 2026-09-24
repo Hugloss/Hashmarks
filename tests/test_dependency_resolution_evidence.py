@@ -1753,3 +1753,18 @@ def test_v2_root_refuses_inventory_only_source_authority(tmp_path: Path) -> None
             match="root requires resolution-graph evidence source",
         ):
             codemap.dependency_resolution_evidence(changed)
+
+
+def test_v2_complete_inventory_coverage_refuses_graph_only_source_authority(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["coverage"][2]["evidence_sources"] = ["tree:compile"]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="resolved-inventory coverage requires resolved-inventory evidence source",
+        ):
+            codemap.dependency_resolution_evidence(changed)
