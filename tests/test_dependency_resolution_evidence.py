@@ -1512,3 +1512,29 @@ def test_v2_root_rejects_incompatible_evidence_source_context(tmp_path: Path) ->
             ValueError, match="incompatible root evidence source context"
         ):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_root_provenance_changes_observation_not_resolution_identity(
+    tmp_path: Path,
+) -> None:
+    baseline = _snapshot_v2()
+    changed = _snapshot_v2()
+    changed["evidence_sources"].append(
+        {
+            "source_id": "tree:compile:copy",
+            "kind": "resolution-graph",
+            "context": "compile",
+            "completeness": "complete",
+            "truncation": "complete",
+        }
+    )
+    changed["roots"][0]["evidence_sources"] = ["tree:compile:copy"]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(baseline)
+        after = codemap.dependency_resolution_evidence(changed)
+
+    assert before["definition_identity"] == after["definition_identity"]
+    assert before["resolution_identity"] == after["resolution_identity"]
+    assert before["observation_identity"] != after["observation_identity"]
