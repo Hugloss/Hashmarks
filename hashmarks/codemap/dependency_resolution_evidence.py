@@ -169,6 +169,29 @@ class DependencyResolutionEvidenceMixin:
             for row in evidence_sources
             if row.get("source_id")
         }
+        selection_contexts = {
+            str(row["node_id"]): set(row["contexts"]) for row in selections
+        }
+        for row in roots:
+            if row["context"] not in selection_contexts[str(row["node_id"])]:
+                raise ValueError(
+                    f"root context not selected: {row['node_id']}:{row['context']}"
+                )
+        for row in inventory:
+            if row["context"] not in selection_contexts[str(row["node_id"])]:
+                raise ValueError(
+                    f"inventory context not selected: {row['node_id']}:{row['context']}"
+                )
+        for row in relationships:
+            context = str(row["context"])
+            if (
+                context not in selection_contexts[str(row["source"])]
+                or context not in selection_contexts[str(row["target"])]
+            ):
+                raise ValueError(
+                    "relationship context not selected by both endpoints: "
+                    f"{row['source']}->{row['target']}:{context}"
+                )
         for row in inventory:
             for ref in row["evidence_sources"]:
                 source = sources_by_id[str(ref)]
@@ -196,10 +219,21 @@ class DependencyResolutionEvidenceMixin:
                         "incompatible module ownership evidence source context: "
                         f"{row['module']}:{row['context']}"
                     )
+                if row["completeness"] == "complete" and (
+                    source.get("completeness") != "complete"
+                    or source.get("truncation") != "complete"
+                ):
+                    raise ValueError(
+                        "module ownership exceeds evidence source: "
+                        f"{row['module']}:{row['context']}"
+                    )
         for row in selections:
             contexts_for_selection = set(row["contexts"])
-            for ref in row["evidence_sources"]:
-                source_context = str(sources_by_id[str(ref)].get("context") or "")
+            source_contexts = {
+                str(sources_by_id[str(ref)].get("context") or "")
+                for ref in row["evidence_sources"]
+            }
+            for source_context in source_contexts:
                 if source_context and source_context not in contexts_for_selection:
                     raise ValueError(
                         "incompatible selection evidence source context: "
@@ -389,6 +423,13 @@ class DependencyResolutionEvidenceMixin:
             component_id = _identifier(raw.get("component_id"), label="component_id")
             if component_id not in component_ids:
                 raise ValueError(f"dangling dependency component: {component_id}")
+            refs = cls._dependency_source_refs_v2(
+                raw.get("evidence_sources", ()),
+                label="selection evidence source",
+                allowed=source_ids,
+            )
+            if not refs:
+                raise ValueError("selection must reference evidence source")
             result.append(
                 {
                     "node_id": node_id,
@@ -401,11 +442,7 @@ class DependencyResolutionEvidenceMixin:
                         label="selection context",
                         allowed=contexts,
                     ),
-                    "evidence_sources": cls._dependency_source_refs_v2(
-                        raw.get("evidence_sources", ()),
-                        label="selection evidence source",
-                        allowed=source_ids,
-                    ),
+                    "evidence_sources": refs,
                 }
             )
         return sorted(result, key=lambda row: str(row["node_id"]))
@@ -584,6 +621,13 @@ class DependencyResolutionEvidenceMixin:
                 raise ValueError(
                     "module ownership completeness must be complete, incomplete, or unknown"
                 )
+            refs = cls._dependency_source_refs_v2(
+                raw.get("evidence_sources", ()),
+                label="module ownership evidence source",
+                allowed=source_ids,
+            )
+            if not refs:
+                raise ValueError("module ownership must reference evidence source")
             result.append(
                 {
                     "module": module,
@@ -597,11 +641,7 @@ class DependencyResolutionEvidenceMixin:
                         else "unresolved"
                     ),
                     "completeness": completeness,
-                    "evidence_sources": cls._dependency_source_refs_v2(
-                        raw.get("evidence_sources", ()),
-                        label="module ownership evidence source",
-                        allowed=source_ids,
-                    ),
+                    "evidence_sources": refs,
                     "authority": "qualified-external-observation",
                 }
             )

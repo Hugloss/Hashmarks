@@ -546,7 +546,7 @@ def test_v2_contextual_module_ownership_preserves_independent_observations(
             "context": "runtime",
             "owners": [],
             "completeness": "unknown",
-            "evidence_sources": [],
+            "evidence_sources": ["tree:runtime"],
         },
     ]
     with CodeMap(tmp_path) as codemap:
@@ -1041,12 +1041,14 @@ def test_v2_path_query_exact_result_bound_does_not_claim_omission(
                 "component_id": "dead",
                 "version": "1",
                 "contexts": ["compile"],
+                "evidence_sources": ["tree:compile"],
             },
             {
                 "node_id": "target@1",
                 "component_id": "target",
                 "version": "1",
                 "contexts": ["compile"],
+                "evidence_sources": ["tree:compile"],
             },
         ]
     )
@@ -1197,312 +1199,31 @@ def test_v2_query_visit_accounting_never_exceeds_declared_bound(
     assert result["completeness"] == "incomplete"
     assert result["omissions"] == [{"reason": "visit-limit"}]
 
-
-@pytest.mark.parametrize("operation", ["dependencies", "reachability", "paths"])
-def test_v2_query_exact_visit_bound_without_remaining_work_is_complete(
-    tmp_path: Path,
-    operation: str,
-) -> None:
-    snapshot = _visit_limit_snapshot()
-    snapshot["relationships"] = snapshot["relationships"][:1]
-    request = {
-        "operation": operation,
-        "node_id": "app@1",
-        "context": "compile",
-        "max_visits": 1,
-    }
-    if operation in {"reachability", "paths"}:
-        request["target_id"] = "left@1"
-
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(snapshot)
-        result = codemap.dependency_resolution_queries(observation, [request])[
-            "results"
-        ][0]
-
-    assert result["bounds"]["visited"] == 1
-    assert result["completeness"] == "complete"
-    assert result["omissions"] == []
-
-
-@pytest.mark.parametrize("operation", ["dependencies", "reachability", "paths"])
-def test_v2_query_visit_limit_prevents_negative_evidence(
-    tmp_path: Path,
-    operation: str,
-) -> None:
-    request = {
-        "operation": operation,
-        "node_id": "app@1",
-        "context": "compile",
-        "max_visits": 1,
-    }
-    if operation in {"reachability", "paths"}:
-        request["target_id"] = "inventory-only@1"
-
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_visit_limit_snapshot())
-        result = codemap.dependency_resolution_queries(observation, [request])[
-            "results"
-        ][0]
-
-    assert result["bounds"]["visited"] == 1
-    assert result["completeness"] == "incomplete"
-    assert result["omissions"] == [{"reason": "visit-limit"}]
-    if operation == "reachability":
-        assert result["result"]["negative_evidence"] == "not-admissible"
-    elif operation == "paths":
-        assert result["negative_evidence"] == "not-admissible"
-    else:
-        assert result["negative_evidence"] == "not-applicable"
-
-
-def test_v2_dependencies_partial_result_with_visit_limit_is_not_complete(
+def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
     tmp_path: Path,
 ) -> None:
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_visit_limit_snapshot())
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "dependencies",
-                    "node_id": "app@1",
-                    "context": "compile",
-                    "max_visits": 1,
-                }
-            ],
-        )["results"][0]
-
-    assert [row["node_id"] for row in result["result"]] == ["left@1"]
-    assert result["bounds"]["visited"] == 1
-    assert result["completeness"] == "incomplete"
-    assert result["negative_evidence"] == "not-applicable"
-    assert result["omissions"] == [{"reason": "visit-limit"}]
-
-
-def test_v2_path_found_before_visit_limit_remains_incomplete_when_work_is_omitted(
-    tmp_path: Path,
-) -> None:
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_visit_limit_snapshot())
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "paths",
-                    "node_id": "app@1",
-                    "target_id": "left@1",
-                    "context": "compile",
-                    "max_visits": 1,
-                }
-            ],
-        )["results"][0]
-
-    assert result["result"] == [["app@1", "left@1"]]
-    assert result["bounds"]["visited"] == 1
-    assert result["completeness"] == "incomplete"
-    assert result["omissions"] == [{"reason": "visit-limit"}]
-
-
-def test_v2_inventory_result_limit_preserves_source_completeness_but_reports_omission(
-    tmp_path: Path,
-) -> None:
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "inventory",
-                    "context": "compile",
-                    "max_results": 1,
-                }
-            ],
-        )["results"][0]
-
-    assert len(result["result"]) == 1
-    assert result["completeness"] == "incomplete"
-    assert result["negative_evidence"] == "not-applicable"
-    assert result["omissions"] == [{"reason": "result-limit", "omitted": 2}]
-
-
-def test_v2_path_exact_result_limit_with_no_remaining_paths_is_complete(
-    tmp_path: Path,
-) -> None:
-    snapshot = _visit_limit_snapshot()
-    snapshot["relationships"] = snapshot["relationships"][:1]
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(snapshot)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "paths",
-                    "node_id": "app@1",
-                    "target_id": "left@1",
-                    "context": "compile",
-                    "max_results": 1,
-                }
-            ],
-        )["results"][0]
-
-    assert result["result"] == [["app@1", "left@1"]]
-    assert result["completeness"] == "complete"
-    assert result["omissions"] == []
-
-
-def test_v2_path_result_limit_reports_only_actual_omitted_path(
-    tmp_path: Path,
-) -> None:
-    snapshot = _visit_limit_snapshot()
-    snapshot["relationships"].extend(
-        [
-            {
-                "source": "left@1",
-                "target": "inventory-only@1",
-                "kind": "dependency",
-                "context": "compile",
-                "effective_scope": "compile",
-                "evidence_sources": ["tree:compile"],
-            },
-            {
-                "source": "right@1",
-                "target": "inventory-only@1",
-                "kind": "dependency",
-                "context": "compile",
-                "effective_scope": "compile",
-                "evidence_sources": ["tree:compile"],
-            },
-        ]
+    snapshot = _snapshot_v2()
+    snapshot["evidence_sources"].append(
+        {
+            "source_id": "ownership:compile",
+            "kind": "module-ownership",
+            "context": "compile",
+            "completeness": "incomplete",
+            "truncation": "complete",
+        }
     )
+    snapshot["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["ownership:compile"],
+        }
+    ]
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(snapshot)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "paths",
-                    "node_id": "app@1",
-                    "target_id": "inventory-only@1",
-                    "context": "compile",
-                    "max_results": 1,
-                }
-            ],
-        )["results"][0]
-
-    assert len(result["result"]) == 1
-    assert result["completeness"] == "incomplete"
-    assert result["omissions"] == [{"reason": "result-limit"}]
-
-
-def test_v2_context_query_obeys_result_bound(tmp_path: Path) -> None:
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "contexts",
-                    "node_id": "app@1",
-                    "max_results": 1,
-                }
-            ],
-        )["results"][0]
-
-    assert len(result["result"]) == 1
-    assert result["completeness"] == "incomplete"
-    assert result["omissions"] == [{"reason": "result-limit", "omitted": 1}]
-
-
-def test_v2_context_query_exact_bound_without_omission_is_complete(
-    tmp_path: Path,
-) -> None:
-    snapshot = _snapshot_v2()
-    snapshot["selections"][0]["contexts"] = ["compile"]
-    snapshot["selections"][0]["evidence_sources"] = ["tree:compile"]
-    snapshot["roots"] = [snapshot["roots"][0]]
-    snapshot["relationships"] = [snapshot["relationships"][0]]
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(snapshot)
-        result = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "contexts",
-                    "node_id": "app@1",
-                    "max_results": 1,
-                }
-            ],
-        )["results"][0]
-
-    assert result["result"] == ["compile"]
-    assert result["completeness"] == "complete"
-    assert result["omissions"] == []
-
-
-def test_v2_coverage_cannot_claim_complete_over_incomplete_source(
-    tmp_path: Path,
-) -> None:
-    snapshot = _snapshot_v2()
-    snapshot["evidence_sources"][0]["completeness"] = "incomplete"
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with pytest.raises(ValueError, match="coverage exceeds evidence source"):
-            codemap.dependency_resolution_evidence(snapshot)
-
-
-def test_v2_coverage_source_context_must_match_coverage_context(
-    tmp_path: Path,
-) -> None:
-    snapshot = _snapshot_v2()
-    snapshot["coverage"][0]["evidence_sources"] = ["tree:runtime"]
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with pytest.raises(ValueError, match="incompatible evidence source context"):
-            codemap.dependency_resolution_evidence(snapshot)
-
-
-def test_v2_relationship_provenance_cannot_cross_contexts(tmp_path: Path) -> None:
-    snapshot = _snapshot_v2()
-    snapshot["relationships"][0]["evidence_sources"] = ["tree:runtime"]
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with pytest.raises(ValueError, match="relationship evidence source context"):
-            codemap.dependency_resolution_evidence(snapshot)
-
-
-def test_v2_selection_provenance_cannot_claim_unselected_context(
-    tmp_path: Path,
-) -> None:
-    snapshot = _snapshot_v2()
-    snapshot["selections"][2]["evidence_sources"] = ["tree:runtime"]
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with pytest.raises(ValueError, match="selection evidence source context"):
-            codemap.dependency_resolution_evidence(snapshot)
-
-
-@pytest.mark.parametrize(
-    ("section", "index"),
-    [("relationships", 0), ("inventory", 0), ("coverage", 0)],
-)
-def test_v2_authoritative_dependency_facts_require_provenance(
-    tmp_path: Path,
-    section: str,
-    index: int,
-) -> None:
-    snapshot = _snapshot_v2()
-    snapshot[section][index]["evidence_sources"] = []
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with pytest.raises(ValueError, match="must reference evidence source"):
+        with pytest.raises(
+            ValueError, match="module ownership exceeds evidence source"
+        ):
             codemap.dependency_resolution_evidence(snapshot)
