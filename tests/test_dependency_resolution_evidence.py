@@ -28,21 +28,21 @@ def _snapshot_v2() -> dict[str, object]:
         "evidence_sources": [
             {
                 "source_id": "tree:compile",
-                "kind": "resolution-graph",
+                "kind": "test-resolution-source",\n                "authorities": ["resolution-graph","selection"],
                 "context": "compile",
                 "completeness": "complete",
                 "truncation": "complete",
             },
             {
                 "source_id": "tree:runtime",
-                "kind": "resolution-graph",
+                "kind": "test-resolution-source",\n                "authorities": ["resolution-graph","selection"],
                 "context": "runtime",
                 "completeness": "complete",
                 "truncation": "complete",
             },
             {
                 "source_id": "list:compile",
-                "kind": "resolved-inventory",
+                "kind": "test-inventory-source",\n                "authorities": ["module-ownership","resolved-inventory","selection"],
                 "context": "compile",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -694,7 +694,7 @@ def test_v2_producer_neutral_model_accepts_uv_contexts_without_maven_semantics(
         "evidence_sources": [
             {
                 "source_id": "uv:lock",
-                "kind": "resolution-graph",
+                "kind": "opaque-lock-format",\n                "authorities": ["resolution-graph","resolved-inventory","selection"],
                 "context": "",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -776,13 +776,23 @@ def test_v2_module_owner_absence_requires_complete_ownership_coverage(
             "evidence_sources": ["list:compile"],
         }
     )
+    changed["evidence_sources"].append(
+        {
+            "source_id": "modules:runtime",
+            "kind": "test-module-source",
+            "authorities": ["module-ownership"],
+            "context": "runtime",
+            "completeness": "incomplete",
+            "truncation": "complete",
+        }
+    )
     changed["coverage"].append(
         {
             "context": "runtime",
             "kind": "module-ownership",
             "completeness": "incomplete",
             "truncation": "complete",
-            "evidence_sources": ["tree:runtime"],
+            "evidence_sources": ["modules:runtime"],
         }
     )
     with CodeMap(tmp_path) as codemap:
@@ -912,7 +922,7 @@ def test_v2_context_query_includes_selection_context_without_inventory_or_edge(
     changed["evidence_sources"].append(
         {
             "source_id": "tree:optional",
-            "kind": "resolution-graph",
+            "kind": "test-resolution-source",\n                "authorities": ["resolution-graph","selection"],
             "context": "optional",
             "completeness": "incomplete",
             "truncation": "complete",
@@ -938,7 +948,7 @@ def test_v2_inventory_absence_requires_complete_inventory_coverage(
     changed["evidence_sources"].append(
         {
             "source_id": "list:runtime",
-            "kind": "resolved-inventory",
+            "kind": "test-inventory-source",\n                "authorities": ["module-ownership","resolved-inventory","selection"],
             "context": "runtime",
             "completeness": "incomplete",
             "truncation": "complete",
@@ -988,7 +998,7 @@ def test_v2_unscoped_module_absence_requires_coverage_for_every_context(
     changed["evidence_sources"].append(
         {
             "source_id": "modules:compile",
-            "kind": "module-ownership",
+            "kind": "test-module-source",\n                "authorities": ["module-ownership"],
             "context": "compile",
             "completeness": "complete",
             "truncation": "complete",
@@ -1026,7 +1036,8 @@ def test_v2_unscoped_module_absence_is_admissible_when_all_contexts_complete(
         changed["evidence_sources"].append(
             {
                 "source_id": source_id,
-                "kind": "module-ownership",
+                "kind": "test-module-source",
+                "authorities": ["module-ownership"],
                 "context": context,
                 "completeness": "complete",
                 "truncation": "complete",
@@ -1337,7 +1348,7 @@ def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
     snapshot["evidence_sources"].append(
         {
             "source_id": "ownership:compile",
-            "kind": "module-ownership",
+            "kind": "test-module-source",\n                "authorities": ["module-ownership"],
             "context": "compile",
             "completeness": "incomplete",
             "truncation": "complete",
@@ -1367,7 +1378,7 @@ def test_v2_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
     snapshot["evidence_sources"].append(
         {
             "source_id": "ownership:compile",
-            "kind": "module-ownership",
+            "kind": "test-module-source",\n                "authorities": ["module-ownership"],
             "context": "compile",
             "completeness": "unknown",
             "truncation": "unknown",
@@ -1395,7 +1406,7 @@ def test_v2_complete_coverage_can_combine_complete_sources(tmp_path: Path) -> No
     snapshot["evidence_sources"].append(
         {
             "source_id": "tree:compile:second",
-            "kind": "resolution-graph",
+            "kind": "test-resolution-source",\n                "authorities": ["resolution-graph","selection"],
             "context": "compile",
             "completeness": "complete",
             "truncation": "complete",
@@ -1652,7 +1663,7 @@ def test_v2_root_provenance_changes_observation_not_resolution_identity(
     changed["evidence_sources"].append(
         {
             "source_id": "tree:compile:copy",
-            "kind": "resolution-graph",
+            "kind": "test-resolution-source",\n                "authorities": ["resolution-graph","selection"],
             "context": "compile",
             "completeness": "complete",
             "truncation": "complete",
@@ -1684,7 +1695,7 @@ def test_v2_selection_requires_provenance_for_each_observed_context(
         codemap.sync()
         with pytest.raises(
             ValueError,
-            match="selection context lacks evidence source: library@1:runtime",
+            match="selection context lacks selection evidence authority: library@1:runtime",
         ):
             codemap.dependency_resolution_evidence(snapshot)
 
@@ -1736,13 +1747,14 @@ def test_v2_complete_graph_coverage_refuses_inventory_only_source_authority(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v2()
-    changed["coverage"][0]["evidence_sources"] = ["list:compile"]
+    changed["evidence_sources"][0]["authorities"] = ["selection"]
+    changed["coverage"][0]["evidence_sources"] = ["tree:compile"]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(
             ValueError,
-            match="resolution-graph coverage requires resolution-graph evidence source",
+            match="resolution-graph coverage requires resolution-graph evidence authority",
         ):
             codemap.dependency_resolution_evidence(changed)
 
@@ -1751,26 +1763,28 @@ def test_v2_relationship_refuses_inventory_only_source_authority(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v2()
-    changed["relationships"][0]["evidence_sources"] = ["list:compile"]
+    changed["evidence_sources"][0]["authorities"] = ["selection"]
+    changed["relationships"][0]["evidence_sources"] = ["tree:compile"]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(
             ValueError,
-            match="relationship requires resolution-graph evidence source",
+            match="relationship requires resolution-graph evidence authority",
         ):
             codemap.dependency_resolution_evidence(changed)
 
 
 def test_v2_root_refuses_inventory_only_source_authority(tmp_path: Path) -> None:
     changed = _snapshot_v2()
-    changed["roots"][0]["evidence_sources"] = ["list:compile"]
+    changed["evidence_sources"][0]["authorities"] = ["selection"]
+    changed["roots"][0]["evidence_sources"] = ["tree:compile"]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(
             ValueError,
-            match="root requires resolution-graph evidence source",
+            match="root requires resolution-graph evidence authority",
         ):
             codemap.dependency_resolution_evidence(changed)
 
@@ -1779,12 +1793,13 @@ def test_v2_complete_inventory_coverage_refuses_graph_only_source_authority(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v2()
-    changed["coverage"][2]["evidence_sources"] = ["tree:compile"]
+    changed["evidence_sources"][2]["authorities"] = ["selection"]
+    changed["coverage"][2]["evidence_sources"] = ["list:compile"]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(
             ValueError,
-            match="resolved-inventory coverage requires resolved-inventory evidence source",
+            match="resolved-inventory coverage requires resolved-inventory evidence authority",
         ):
             codemap.dependency_resolution_evidence(changed)
