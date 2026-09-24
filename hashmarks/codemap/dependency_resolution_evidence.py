@@ -436,6 +436,13 @@ class DependencyResolutionEvidenceMixin:
             )
             if not refs:
                 raise ValueError("selection must reference evidence source")
+            selection_contexts = cls._dependency_context_list_v2(
+                raw.get("contexts", ()),
+                label="selection context",
+                allowed=contexts,
+            )
+            if not selection_contexts:
+                raise ValueError(f"selection must declare context: {node_id}")
             result.append(
                 {
                     "node_id": node_id,
@@ -443,11 +450,7 @@ class DependencyResolutionEvidenceMixin:
                     "version": _text(raw.get("version"), label="version"),
                     "source": _text(raw.get("source"), label="source"),
                     "marker": _text(raw.get("marker"), label="marker"),
-                    "contexts": cls._dependency_context_list_v2(
-                        raw.get("contexts", ()),
-                        label="selection context",
-                        allowed=contexts,
-                    ),
+                    "contexts": selection_contexts,
                     "evidence_sources": refs,
                 }
             )
