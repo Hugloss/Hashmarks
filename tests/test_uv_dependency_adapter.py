@@ -115,7 +115,7 @@ source = { directory = "vendor/shared" }
 def test_uv_lock_adapter_accepts_local_project_root_source_forms(
     source_key: str,
 ) -> None:
-    lock = f'''version = 1
+    lock = f"""version = 1
 revision = 3
 requires-python = ">=3.11"
 
@@ -129,7 +129,7 @@ dependencies = [{{ name = "dep" }}]
 name = "dep"
 version = "1.0.0"
 source = {{ registry = "https://example.invalid/simple" }}
-'''.encode()
+""".encode()
 
     raw = uv_lock_dependency_observation(lock=lock)
 
@@ -137,9 +137,5 @@ source = {{ registry = "https://example.invalid/simple" }}
     root_id = raw["roots"][0]["node_id"]
     assert root_id.startswith("app:0.1.0@")
     assert {row["node_id"] for row in raw["inventory"]} == {
-        next(
-            row["node_id"]
-            for row in raw["selections"]
-            if row["component_id"] == "dep"
-        )
+        next(row["node_id"] for row in raw["selections"] if row["component_id"] == "dep")
     }
