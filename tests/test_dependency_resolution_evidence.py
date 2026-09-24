@@ -805,7 +805,17 @@ def test_v2_context_query_includes_selection_context_without_inventory_or_edge(
 ) -> None:
     changed = _snapshot_v2()
     changed["contexts"].append("optional")
+    changed["evidence_sources"].append(
+        {
+            "source_id": "tree:optional",
+            "kind": "resolution-graph",
+            "context": "optional",
+            "completeness": "incomplete",
+            "truncation": "complete",
+        }
+    )
     changed["selections"][1]["contexts"].append("optional")
+    changed["selections"][1]["evidence_sources"].append("tree:optional")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
@@ -1554,3 +1564,22 @@ def test_v2_root_provenance_changes_observation_not_resolution_identity(
     assert before["definition_identity"] == after["definition_identity"]
     assert before["resolution_identity"] == after["resolution_identity"]
     assert before["observation_identity"] != after["observation_identity"]
+
+
+def test_v2_selection_requires_provenance_for_each_observed_context(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    library = next(
+        row for row in snapshot["selections"] if row["node_id"] == "library@1"
+    )
+    library["contexts"] = ["compile", "runtime"]
+    library["evidence_sources"] = ["tree:compile"]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="selection context lacks evidence source: library@1:runtime",
+        ):
+            codemap.dependency_resolution_evidence(snapshot)

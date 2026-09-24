@@ -391,6 +391,13 @@ class DependencyResolutionEvidenceMixin:
                         "incompatible selection evidence source context: "
                         f"{row['node_id']}:{source_context}"
                     )
+            if "" not in source_contexts:
+                missing_contexts = sorted(contexts_for_selection - source_contexts)
+                if missing_contexts:
+                    raise ValueError(
+                        "selection context lacks evidence source: "
+                        f"{row['node_id']}:{missing_contexts[0]}"
+                    )
 
     @staticmethod
     def _dependency_components_v2(value: object) -> list[dict[str, object]]:

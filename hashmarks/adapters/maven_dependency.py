@@ -229,6 +229,14 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             for line in lines:
                 match = _LIST_LINE.match(line)
                 if match is None:
+                    candidate = (
+                        line.strip().split(maxsplit=1)[0] if line.strip() else ""
+                    )
+                    if candidate.count(":") >= 3:
+                        raise ValueError(
+                            f"unparsed Maven dependency-list coordinate for {context}: "
+                            f"{candidate}"
+                        )
                     continue
                 (
                     component,
