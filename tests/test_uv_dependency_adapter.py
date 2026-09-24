@@ -95,11 +95,9 @@ def test_uv_lock_adapter_uses_one_multi_authority_physical_source() -> None:
             "producer_digest": raw["evidence_sources"][0]["producer_digest"],
         }
     ]
-    assert {
-        ref
-        for row in raw["inventory"]
-        for ref in row["evidence_sources"]
-    } == {"uv:lock"}
+    assert {ref for row in raw["inventory"] for ref in row["evidence_sources"]} == {
+        "uv:lock"
+    }
 
 
 def test_uv_lock_adapter_does_not_promote_declared_metadata_to_resolution() -> None:
