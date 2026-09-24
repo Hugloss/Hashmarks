@@ -410,9 +410,10 @@ class DependencyResolutionEvidenceMixin:
     ) -> None:
         self._require_qualified_dependency_observation_v3(observation)
         binding = cast("Mapping[str, object]", observation["repository_binding"])
-        if (
-            binding["repository_identity"] != self._repository_packet_identity()
-            or binding["codemap_generation"] != int(self.store.generation())
+        if binding[
+            "repository_identity"
+        ] != self._repository_packet_identity() or binding["codemap_generation"] != int(
+            self.store.generation()
         ):
             raise ValueError("dependency observation repository binding mismatch")
 
