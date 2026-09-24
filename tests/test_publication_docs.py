@@ -275,7 +275,7 @@ def test_ci_and_dev_check_enforce_ruff_debt_gate() -> None:
     assert "      - ruff-debt" in convergence
     assert "FORMATTING: ${{ needs.formatting.result }}" in convergence
     assert "RUFF_DEBT: ${{ needs.ruff-debt.result }}" in convergence
-    assert "test \"$failed\" -eq 0" in convergence
+    assert 'test "$failed" -eq 0' in convergence
 
     makefile = _text("Makefile")
     dev_check = makefile.split("dev-check: setup", 1)[1].split("\ndev-check-batch:", 1)[
