@@ -705,12 +705,6 @@ class DependencyResolutionEvidenceMixin:
                     raise ValueError(
                         f"coverage exceeds evidence source: {context}:{kind}"
                     )
-            if truncation == "truncated" and all(
-                source.get("truncation") == "complete" for source in referenced_sources
-            ):
-                raise ValueError(
-                    f"coverage truncation contradicts evidence source: {context}:{kind}"
-                )
             result.append(
                 {
                     "context": context,
