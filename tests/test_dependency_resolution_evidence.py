@@ -1671,9 +1671,7 @@ def test_v2_selection_requires_provenance_for_each_observed_context(
 
 def test_v2_refuses_complete_resolution_graph_without_root(tmp_path: Path) -> None:
     changed = _snapshot_v2()
-    changed["roots"] = [
-        row for row in changed["roots"] if row["context"] != "runtime"
-    ]
+    changed["roots"] = [row for row in changed["roots"] if row["context"] != "runtime"]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -1681,5 +1679,3 @@ def test_v2_refuses_complete_resolution_graph_without_root(tmp_path: Path) -> No
             ValueError, match="complete resolution-graph coverage lacks root: runtime"
         ):
             codemap.dependency_resolution_evidence(changed)
-
-
