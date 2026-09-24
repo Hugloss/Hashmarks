@@ -530,6 +530,50 @@ def test_v3_module_ownership_preserves_ambiguous_maven_module(
     assert ownership["owners"] == ["inventory-only@1", "library@1"]
 
 
+def test_v3_repository_correspondence_refuses_foreign_repository_binding(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+
+    with CodeMap(source) as source_map:
+        source_map.sync()
+        observation = source_map.dependency_resolution_evidence(_snapshot_v3())
+
+    with CodeMap(target) as target_map:
+        target_map.sync()
+        with pytest.raises(
+            ValueError,
+            match="dependency observation repository binding mismatch",
+        ):
+            target_map.dependency_import_correspondence(
+                observation,
+                source_path="consumer.py",
+                import_target="library",
+            )
+
+
+def test_v3_repository_correlation_refuses_stale_generation(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        (tmp_path / "changed.py").write_text("value = 1\n")
+        codemap.sync()
+
+        with pytest.raises(
+            ValueError,
+            match="dependency observation repository binding mismatch",
+        ):
+            codemap.dependency_evidence_correlation(
+                observation,
+                {"correlations": []},
+            )
+
+
 def test_v3_dependency_correlation_preserves_contextual_ownership(
     tmp_path: Path,
 ) -> None:
