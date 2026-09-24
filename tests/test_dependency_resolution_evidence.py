@@ -420,6 +420,36 @@ def test_v3_negative_evidence_is_scoped_by_context_and_coverage_kind(
     assert states[("runtime", "resolution-graph")] == "not-admissible"
 
 
+@pytest.mark.parametrize(
+    ("target", "field"),
+    [
+        ("snapshot", "adapter_hint"),
+        ("source", "physical_source_id"),
+        ("selection", "producer_selection_hint"),
+        ("coverage", "producer_coverage_hint"),
+    ],
+)
+def test_v3_refuses_unknown_authority_contract_fields(
+    tmp_path: Path,
+    target: str,
+    field: str,
+) -> None:
+    changed = _snapshot_v3()
+    if target == "snapshot":
+        changed[field] = "unexpected"
+    elif target == "source":
+        changed["evidence_sources"][0][field] = "unexpected"
+    elif target == "selection":
+        changed["selections"][0][field] = "unexpected"
+    else:
+        changed["coverage"][0][field] = "unexpected"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="unknown dependency .* field"):
+            codemap.dependency_resolution_evidence(changed)
+
+
 def test_v3_rejects_dangling_evidence_source_reference(tmp_path: Path) -> None:
     changed = _snapshot_v3()
     changed["relationships"][0]["evidence_sources"] = ["missing"]
