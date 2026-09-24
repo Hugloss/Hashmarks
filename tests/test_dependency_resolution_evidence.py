@@ -834,6 +834,52 @@ def test_v3_component_query_refuses_ignored_context(
             )
 
 
+def test_v3_multicontext_graph_query_requires_explicit_context(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v3()
+    changed["relationships"] = [
+        row
+        for row in changed["relationships"]
+        if row["context"] == "compile"
+    ]
+    inventory_only = next(
+        row
+        for row in changed["selections"]
+        if row["node_id"] == "inventory-only@1"
+    )
+    inventory_only["contexts"].append("runtime")
+    inventory_only["evidence_sources"].append("tree:runtime")
+    changed["relationships"].append(
+        {
+            "source": "library@1",
+            "target": "inventory-only@1",
+            "kind": "dependency",
+            "context": "runtime",
+            "effective_scope": "runtime",
+            "evidence_sources": ["tree:runtime"],
+        }
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        with pytest.raises(
+            ValueError,
+            match="graph query requires context for multi-context observation",
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "paths",
+                        "node_id": "app@1",
+                        "target_id": "inventory-only@1",
+                    }
+                ],
+            )
+
+
 def test_v3_bounded_queries_report_dependencies_paths_and_contexts(
     tmp_path: Path,
 ) -> None:
