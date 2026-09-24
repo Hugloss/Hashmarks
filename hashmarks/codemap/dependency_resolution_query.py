@@ -358,6 +358,8 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
         elif operation == "reachability":
             if not target_id:
                 raise ValueError("reachability query requires target_id")
+            if target_id not in selections:
+                raise ValueError(f"unknown dependency query target_id: {target_id}")
             found, visited, omissions = _reachability(
                 node_id,
                 target_id,
@@ -380,6 +382,8 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
         else:
             if not target_id:
                 raise ValueError("paths query requires target_id")
+            if target_id not in selections:
+                raise ValueError(f"unknown dependency query target_id: {target_id}")
             result, visited, omissions = _paths(
                 node_id,
                 target_id,
