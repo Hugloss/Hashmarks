@@ -273,8 +273,6 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
         ]
         result: object = _limited(rows, max_results=max_results, omissions=omissions)
     elif operation == "inventory":
-        if node_id and node_id not in selections:
-            raise ValueError(f"unknown dependency query node_id: {node_id}")
         rows = [
             dict(row)
             for row in observation.get("inventory", ())
