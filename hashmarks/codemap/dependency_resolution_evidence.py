@@ -23,6 +23,13 @@ _MAX_MODULE_OWNERSHIP = 4096
 _MAX_ID_CHARS = 512
 _MAX_TEXT_CHARS = 4096
 _MAX_REQUEST_BYTES = 1_048_576
+_EVIDENCE_AUTHORITIES = {
+    "selection",
+    "resolution-graph",
+    "resolved-inventory",
+    "module-ownership",
+}
+_COVERAGE_KINDS = _EVIDENCE_AUTHORITIES - {"selection"}
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MEMBER_REVISION = re.compile(r"^[0-9a-f]{64}$")
 
@@ -167,7 +174,7 @@ class DependencyResolutionEvidenceMixin:
             relationships=relationships,
             sources_by_id=sources_by_id,
         )
-        self._validate_dependency_graph_fact_source_authority_v2(
+        self._validate_dependency_fact_source_authority_v2(
             roots=roots,
             relationships=relationships,
             inventory=inventory,
@@ -363,26 +370,32 @@ class DependencyResolutionEvidenceMixin:
                     )
 
     @staticmethod
-    def _validate_dependency_graph_fact_source_authority_v2(
+    def _validate_dependency_fact_source_authority_v2(
         *,
         roots: Sequence[Mapping[str, object]],
         relationships: Sequence[Mapping[str, object]],
         inventory: Sequence[Mapping[str, object]],
         sources_by_id: Mapping[str, Mapping[str, object]],
     ) -> None:
+        def supports(row: Mapping[str, object], authority: str) -> bool:
+            return any(
+                authority
+                in sources_by_id[str(ref)].get("authorities", ())
+                for ref in row["evidence_sources"]
+            )
+
         for row in roots:
-            if not any(
-                sources_by_id[str(ref)].get("kind") == "resolution-graph"
-                for ref in row["evidence_sources"]
-            ):
-                raise ValueError("root requires resolution-graph evidence source")
+            if not supports(row, "resolution-graph"):
+                raise ValueError("root requires resolution-graph evidence authority")
         for row in relationships:
-            if not any(
-                sources_by_id[str(ref)].get("kind") == "resolution-graph"
-                for ref in row["evidence_sources"]
-            ):
+            if not supports(row, "resolution-graph"):
                 raise ValueError(
-                    "relationship requires resolution-graph evidence source"
+                    "relationship requires resolution-graph evidence authority"
+                )
+        for row in inventory:
+            if not supports(row, "resolved-inventory"):
+                raise ValueError(
+                    "inventory requires resolved-inventory evidence authority"
                 )
 
     @staticmethod
@@ -396,6 +409,14 @@ class DependencyResolutionEvidenceMixin:
             str(row["node_id"]): set(row["contexts"]) for row in selections
         }
         for row in module_ownership:
+            if row["owners"] and not any(
+                "module-ownership"
+                in sources_by_id[str(ref)].get("authorities", ())
+                for ref in row["evidence_sources"]
+            ):
+                raise ValueError(
+                    "module ownership requires module-ownership evidence authority"
+                )
             for owner in row["owners"]:
                 if row["context"] not in selection_contexts[str(owner)]:
                     raise ValueError(
@@ -427,9 +448,16 @@ class DependencyResolutionEvidenceMixin:
     ) -> None:
         for row in selections:
             contexts_for_selection = set(row["contexts"])
+            sources = [
+                sources_by_id[str(ref)] for ref in row["evidence_sources"]
+            ]
             source_contexts = {
-                str(sources_by_id[str(ref)].get("context") or "")
-                for ref in row["evidence_sources"]
+                str(source.get("context") or "") for source in sources
+            }
+            authority_contexts = {
+                str(source.get("context") or "")
+                for source in sources
+                if "selection" in source.get("authorities", ())
             }
             for source_context in source_contexts:
                 if source_context and source_context not in contexts_for_selection:
@@ -437,11 +465,11 @@ class DependencyResolutionEvidenceMixin:
                         "incompatible selection evidence source context: "
                         f"{row['node_id']}:{source_context}"
                     )
-            if "" not in source_contexts:
-                missing_contexts = sorted(contexts_for_selection - source_contexts)
+            if "" not in authority_contexts:
+                missing_contexts = sorted(contexts_for_selection - authority_contexts)
                 if missing_contexts:
                     raise ValueError(
-                        "selection context lacks evidence source: "
+                        "selection context lacks selection evidence authority: "
                         f"{row['node_id']}:{missing_contexts[0]}"
                     )
 
@@ -529,12 +557,18 @@ class DependencyResolutionEvidenceMixin:
                 raise ValueError(
                     "complete evidence source requires truncation=complete"
                 )
+            authorities = cls._dependency_context_list_v2(
+                raw.get("authorities", ()),
+                label="evidence source authority",
+                allowed=_EVIDENCE_AUTHORITIES,
+            )
             result.append(
                 {
                     "source_id": source_id,
                     "kind": _text(
                         raw.get("kind"), label="evidence source kind", required=True
                     ),
+                    "authorities": authorities,
                     "context": context,
                     "completeness": completeness,
                     "truncation": truncation,
@@ -821,6 +855,8 @@ class DependencyResolutionEvidenceMixin:
         for raw in rows:
             context = _identifier(raw.get("context"), label="coverage context")
             kind = _identifier(raw.get("kind"), label="coverage kind")
+            if kind not in _COVERAGE_KINDS:
+                raise ValueError(f"unsupported dependency coverage kind: {kind}")
             if context not in contexts:
                 raise ValueError(f"unknown coverage context: {context}")
             key = (context, kind)
@@ -847,7 +883,7 @@ class DependencyResolutionEvidenceMixin:
             if not refs:
                 raise ValueError("coverage must reference evidence source")
             referenced_sources = [sources[ref] for ref in refs]
-            cls._validate_dependency_coverage_source_kind_v2(
+            cls._validate_dependency_coverage_source_authority_v2(
                 kind=kind,
                 sources=referenced_sources,
             )
@@ -876,22 +912,14 @@ class DependencyResolutionEvidenceMixin:
         return sorted(result, key=lambda row: (str(row["context"]), str(row["kind"])))
 
     @staticmethod
-    def _validate_dependency_coverage_source_kind_v2(
+    def _validate_dependency_coverage_source_authority_v2(
         *,
         kind: str,
         sources: Sequence[Mapping[str, object]],
     ) -> None:
-        if kind == "resolution-graph" and not any(
-            source.get("kind") == "resolution-graph" for source in sources
-        ):
+        if not any(kind in source.get("authorities", ()) for source in sources):
             raise ValueError(
-                "resolution-graph coverage requires resolution-graph evidence source"
-            )
-        if kind == "resolved-inventory" and not any(
-            source.get("kind") == "resolved-inventory" for source in sources
-        ):
-            raise ValueError(
-                "resolved-inventory coverage requires resolved-inventory evidence source"
+                f"{kind} coverage requires {kind} evidence authority"
             )
 
     @staticmethod
