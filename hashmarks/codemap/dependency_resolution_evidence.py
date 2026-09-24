@@ -713,12 +713,10 @@ class DependencyResolutionEvidenceMixin:
                     f"coverage understates evidence source: {context}:{kind}"
                 )
             if truncation == "truncated" and all(
-                source.get("truncation") == "complete"
-                for source in referenced_sources
+                source.get("truncation") == "complete" for source in referenced_sources
             ):
                 raise ValueError(
-                    "coverage truncation contradicts evidence source: "
-                    f"{context}:{kind}"
+                    f"coverage truncation contradicts evidence source: {context}:{kind}"
                 )
             result.append(
                 {
