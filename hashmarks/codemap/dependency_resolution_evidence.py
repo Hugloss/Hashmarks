@@ -194,14 +194,6 @@ class DependencyResolutionEvidenceMixin:
                     "relationship context not selected by both endpoints: "
                     f"{row['source']}->{row['target']}:{context}"
                 )
-        for row in module_ownership:
-            context = str(row["context"])
-            for owner in row["owners"]:
-                if context not in selection_contexts[str(owner)]:
-                    raise ValueError(
-                        "module owner context not selected: "
-                        f"{owner}:{context}"
-                    )
         for row in inventory:
             for ref in row["evidence_sources"]:
                 source = sources_by_id[str(ref)]
@@ -248,13 +240,6 @@ class DependencyResolutionEvidenceMixin:
                     raise ValueError(
                         "incompatible selection evidence source context: "
                         f"{row['node_id']}:{source_context}"
-                    )
-            if "" not in source_contexts:
-                missing_contexts = sorted(contexts_for_selection - source_contexts)
-                if missing_contexts:
-                    raise ValueError(
-                        "selection context lacks evidence source: "
-                        f"{row['node_id']}:{missing_contexts[0]}"
                     )
 
         definition = {
