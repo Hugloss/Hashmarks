@@ -77,7 +77,16 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         version = str(raw.get("version") or "").strip()
         if not name or not version:
             raise ValueError("uv lock package requires name and version")
-        source = _source(raw.get("source"))
+        source_raw = raw.get("source")
+        source = _source(source_raw)
+        if (
+            isinstance(source_raw, Mapping)
+            and any(key in source_raw for key in ("virtual", "editable", "directory"))
+            and sum(key in source_raw for key in ("virtual", "editable", "directory")) > 1
+        ):
+            raise ValueError(
+                f"uv lock package has ambiguous local source identity: {name}"
+            )
         row = {
             "name": name,
             "version": version,
