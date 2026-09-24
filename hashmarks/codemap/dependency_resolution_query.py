@@ -18,7 +18,9 @@ _OPERATION_QUERY_FIELDS = {
     "inventory": {"node_id", "context"},
     "module-owners": {"module", "context"},
 }
-_ALL_QUERY_FIELDS = _COMMON_QUERY_FIELDS | set().union(\n    *_OPERATION_QUERY_FIELDS.values()\n)
+_ALL_QUERY_FIELDS = _COMMON_QUERY_FIELDS | set().union(
+    *_OPERATION_QUERY_FIELDS.values()
+)
 
 
 def _text(value: object, *, label: str, required: bool = False) -> str:
