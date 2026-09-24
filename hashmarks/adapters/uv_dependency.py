@@ -242,6 +242,13 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 "truncation": "complete",
                 "evidence_sources": [source_id],
             },
+            {
+                "context": _CONTEXT,
+                "kind": "selection",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": [source_id],
+            },
         ],
         "repository_inputs": [dict(row) for row in repository_inputs],
         "module_ownership": [],
