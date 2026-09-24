@@ -1679,3 +1679,34 @@ def test_v2_refuses_complete_resolution_graph_without_root(tmp_path: Path) -> No
             ValueError, match="complete resolution-graph coverage lacks root: runtime"
         ):
             codemap.dependency_resolution_evidence(changed)
+
+
+def test_v2_unscoped_inventory_absence_requires_coverage_for_every_context(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "inventory", "node_id": "missing@1"}],
+        )
+
+    result = packet["results"][0]
+    assert result["result"] == []
+    assert result["completeness"] == "incomplete"
+    assert result["negative_evidence"] == "not-admissible"
+
+
+def test_v2_complete_graph_coverage_requires_root_in_each_complete_context(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["roots"] = [row for row in changed["roots"] if row["context"] != "compile"]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match="complete resolution-graph coverage lacks root: compile"
+        ):
+            codemap.dependency_resolution_evidence(changed)
