@@ -122,6 +122,9 @@ def test_uv_lock_adapter_includes_every_committed_lock_dependency_group(
         for package in document["package"]
     )
     raw = uv_lock_dependency_observation(lock=lock)
+    assert raw["producer"]["resolution_markers"] == document.get(
+        "resolution-markers", []
+    )
     assert len(raw["relationships"]) == expected
     assert len(raw["evidence_sources"]) == 1
 
