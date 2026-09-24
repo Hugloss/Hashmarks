@@ -790,6 +790,50 @@ def test_v3_graph_query_refuses_target_outside_requested_context(
             )
 
 
+def test_v3_dependency_query_refuses_unknown_request_field(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        with pytest.raises(
+            ValueError,
+            match="unknown dependency query field: contxt",
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "inventory",
+                        "node_id": "library@1",
+                        "contxt": "compile",
+                    }
+                ],
+            )
+
+
+def test_v3_component_query_refuses_ignored_context(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        with pytest.raises(
+            ValueError,
+            match="field not supported for component query: context",
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "component",
+                        "component_id": "library",
+                        "context": "compile",
+                    }
+                ],
+            )
+
+
 def test_v3_bounded_queries_report_dependencies_paths_and_contexts(
     tmp_path: Path,
 ) -> None:
