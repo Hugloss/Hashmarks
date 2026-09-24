@@ -141,3 +141,18 @@ source = {{ registry = "https://example.invalid/simple" }}
             row["node_id"] for row in raw["selections"] if row["component_id"] == "dep"
         )
     }
+
+
+def test_uv_lock_adapter_refuses_ambiguous_local_source_identity() -> None:
+    lock = b"""version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[[package]]
+name = "app"
+version = "0.1.0"
+source = { virtual = ".", directory = "." }
+"""
+
+    with pytest.raises(ValueError, match="ambiguous local source identity"):
+        uv_lock_dependency_observation(lock=lock)
