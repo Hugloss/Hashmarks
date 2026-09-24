@@ -408,7 +408,7 @@ class DependencyResolutionEvidenceMixin:
             str(row["node_id"]): set(row["contexts"]) for row in selections
         }
         for row in module_ownership:
-            if (row["owners"] or row["completeness"] != "unknown") and not any(
+            if not any(
                 "module-ownership" in sources_by_id[str(ref)].get("authorities", ())
                 for ref in row["evidence_sources"]
             ):
