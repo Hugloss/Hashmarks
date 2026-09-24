@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
 from hashmarks.python_ast_cache import ast_cache_info, clear_ast_cache
-from hashmarks.test_shards import plan, select
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from hashmarks.test_shards import ISOLATED_NODEIDS, plan, select
 
 
 def _write(root: Path, name: str, body: str) -> None:
@@ -53,7 +50,7 @@ def test_selector_rejects_invalid_shard(tmp_path: Path) -> None:
 def test_process_sensitive_nodes_are_isolated(tmp_path: Path) -> None:
     tests = tmp_path / "tests"
     tests.mkdir()
-    (tests / "test_codemap.py").write_text(
+    (tests / "test_codemap_watcher.py").write_text(
         "def test_codemap_watcher_keeps_map_hot_without_identity_daemon(): pass\n"
         "def test_other(): pass\n",
         encoding="utf-8",
@@ -62,8 +59,22 @@ def test_process_sensitive_nodes_are_isolated(tmp_path: Path) -> None:
     isolated = [row for row in payload["shards"] if row["isolated_process"]]
     assert len(isolated) == 1
     assert isolated[0]["nodeids"] == [
-        "tests/test_codemap.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon"
+        "tests/test_codemap_watcher.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon"
     ]
+
+
+def test_real_repository_isolated_nodes_have_exact_singleton_membership() -> None:
+    root = Path(__file__).resolve().parents[1]
+    payload = plan(root, 64)
+    shards = payload["shards"]
+    membership = [nodeid for shard in shards for nodeid in shard["nodeids"]]
+    assert len(membership) == len(set(membership)) == payload["test_node_count"]
+    assert all(
+        len(shard["nodeids"]) == 1 for shard in shards if shard["isolated_process"]
+    )
+    assert {
+        shard["nodeids"][0] for shard in shards if shard["isolated_process"]
+    } == set(ISOLATED_NODEIDS)
 
 
 def test_selector_rejects_more_shards_than_test_nodes(tmp_path: Path) -> None:

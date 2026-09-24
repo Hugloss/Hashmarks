@@ -210,7 +210,7 @@ Hashmarks is a repository observer that exposes repository intelligence, not an 
 
 ## Tooling and release discipline
 
-**G40. Ruff debt is explicit, monotonic, and cannot be suppressed.** Historical complexity debt may exist only while represented by the checked-in baseline. `noqa`, relaxed thresholds, per-file ignores, or moving complexity between files are not debt closure.
+**G40. Current Ruff complexity debt is zero.** The full configured Ruff check and current complexity/file-size inventory must pass without a historical baseline. Relaxed thresholds, per-file ignores, new suppressions, or moving complexity between files are not debt closure.
 
 **G46. Evidence-context hashing and validation remain producer-owned.** Consumers may compare or store opaque identities but must not silently recreate semantic canonicalization.
 

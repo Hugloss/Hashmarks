@@ -29,10 +29,8 @@ jobs:
       - run: uv sync --frozen --group test --extra mcp --python 3.14
       - name: Validate release tag against package version
         run: uv run --frozen --no-sync python scripts/release_contract.py validate-tag --tag "${{ github.event.release.tag_name }}"
-      - name: Run canonical Ruff check
-        run: make ruff
-      - name: Enforce Ruff structural debt gate
-        run: make lint-debt-gate
+      - name: Enforce configured Ruff and zero complexity debt
+        run: make lint
       - name: Run native release tests
         run: make test
       - name: Run MCP concurrency stress

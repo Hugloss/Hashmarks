@@ -16,7 +16,6 @@ FORBIDDEN_SDIST_ROOTS = {
     "Makefile",
     "benchmarks",
     "opencode.json",
-    "qualification-classification.json",
     "scripts",
     "tests",
 }

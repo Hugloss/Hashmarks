@@ -318,66 +318,59 @@ class DependencyResolutionEvidenceMixin:
         ):
             raise ValueError("dependency observation authority is malformed")
 
-        producer, scope, contexts, context_set = cls._dependency_header_v3(observation)
+        header = cls._dependency_header_v3(observation)
+        context_set = header[3]
         sources = cls._dependency_evidence_sources_v3(
             observation["evidence_sources"], context_set
         )
         source_ids = {str(row["source_id"]) for row in sources}
         components = cls._dependency_components_v3(observation["components"])
-        component_ids = {str(row["component_id"]) for row in components}
         selections = cls._dependency_selections_v3(
-            observation["selections"], component_ids, context_set, source_ids
+            observation["selections"],
+            {str(row["component_id"]) for row in components},
+            context_set,
+            source_ids,
         )
         node_ids = {str(row["node_id"]) for row in selections}
-        if component_ids - {str(row["component_id"]) for row in selections}:
+        if {str(row["component_id"]) for row in components} - {
+            str(row["component_id"]) for row in selections
+        }:
             raise ValueError("dependency component has no selection")
         inventory = cls._dependency_inventory_v3(
-            observation["inventory"], node_ids, context_set, source_ids
+            observation["inventory"],
+            node_ids,
+            context_set,
+            source_ids,
         )
         relationships = cls._dependency_relationships_v3(
-            observation["relationships"], node_ids, context_set, source_ids
+            observation["relationships"],
+            node_ids,
+            context_set,
+            source_ids,
         )
         roots = cls._dependency_roots_v3(
-            observation["root_evidence"], node_ids, context_set, source_ids
+            observation["root_evidence"],
+            node_ids,
+            context_set,
+            source_ids,
         )
         module_ownership = cls._dependency_module_ownership_v3(
-            observation["module_ownership"], node_ids, context_set, source_ids
+            observation["module_ownership"],
+            node_ids,
+            context_set,
+            source_ids,
         )
         coverage = cls._dependency_coverage_v3(
             observation["coverage"], context_set, sources
         )
-        sources_by_id = {str(row["source_id"]): row for row in sources}
-        cls._validate_dependency_context_membership_v3(
-            roots=roots,
-            inventory=inventory,
-            relationships=relationships,
-            selections=selections,
-        )
-        cls._validate_dependency_resolution_source_contexts_v3(
-            roots=roots,
-            inventory=inventory,
-            relationships=relationships,
-            sources_by_id=sources_by_id,
-        )
-        cls._validate_dependency_fact_source_authority_v3(
-            roots=roots,
-            inventory=inventory,
-            relationships=relationships,
-            sources_by_id=sources_by_id,
-        )
-        cls._validate_dependency_module_source_authority_v3(
-            module_ownership=module_ownership,
-            selections=selections,
-            sources_by_id=sources_by_id,
-        )
-        cls._validate_dependency_selection_source_contexts_v3(
-            selections=selections, sources_by_id=sources_by_id
+        cls._validate_dependency_observation_sources_v3(
+            roots, inventory, relationships, selections, module_ownership, sources
         )
 
         expected = {
-            "producer": producer,
-            "scope": scope,
-            "contexts": sorted(contexts),
+            "producer": header[0],
+            "scope": header[1],
+            "contexts": sorted(header[2]),
             "roots": [
                 {
                     field: value
@@ -409,6 +402,58 @@ class DependencyResolutionEvidenceMixin:
         ):
             raise ValueError("dependency observation is not normalized")
 
+        cls._validate_dependency_repository_binding_v3(observation)
+
+        identities = _dependency_identities_v3(observation)
+        if identities != (
+            observation["definition_identity"],
+            observation["resolution_identity"],
+            observation["observation_identity"],
+        ):
+            raise ValueError("dependency observation content identity mismatch")
+
+    @classmethod
+    def _validate_dependency_observation_sources_v3(
+        cls,
+        roots: Sequence[Mapping[str, object]],
+        inventory: Sequence[Mapping[str, object]],
+        relationships: Sequence[Mapping[str, object]],
+        selections: Sequence[Mapping[str, object]],
+        module_ownership: Sequence[Mapping[str, object]],
+        sources: Sequence[Mapping[str, object]],
+    ) -> None:
+        sources_by_id = {str(row["source_id"]): row for row in sources}
+        cls._validate_dependency_context_membership_v3(
+            roots=roots,
+            inventory=inventory,
+            relationships=relationships,
+            selections=selections,
+        )
+        cls._validate_dependency_resolution_source_contexts_v3(
+            roots=roots,
+            inventory=inventory,
+            relationships=relationships,
+            sources_by_id=sources_by_id,
+        )
+        cls._validate_dependency_fact_source_authority_v3(
+            roots=roots,
+            inventory=inventory,
+            relationships=relationships,
+            sources_by_id=sources_by_id,
+        )
+        cls._validate_dependency_module_source_authority_v3(
+            module_ownership=module_ownership,
+            selections=selections,
+            sources_by_id=sources_by_id,
+        )
+        cls._validate_dependency_selection_source_contexts_v3(
+            selections=selections, sources_by_id=sources_by_id
+        )
+
+    @staticmethod
+    def _validate_dependency_repository_binding_v3(
+        observation: Mapping[str, object],
+    ) -> None:
         binding = observation["repository_binding"]
         if not isinstance(binding, Mapping) or set(binding) != {
             "repository_identity",
@@ -460,14 +505,6 @@ class DependencyResolutionEvidenceMixin:
                 raise ValueError("dependency repository input equivalence is malformed")
         if paths != sorted(set(paths)):
             raise ValueError("dependency repository inputs are not normalized")
-
-        identities = _dependency_identities_v3(observation)
-        if identities != (
-            observation["definition_identity"],
-            observation["resolution_identity"],
-            observation["observation_identity"],
-        ):
-            raise ValueError("dependency observation content identity mismatch")
 
     @staticmethod
     def _dependency_header_v3(
@@ -544,30 +581,24 @@ class DependencyResolutionEvidenceMixin:
         relationships: Sequence[Mapping[str, object]],
         sources_by_id: Mapping[str, Mapping[str, object]],
     ) -> None:
-        for row in roots:
-            for ref in row["evidence_sources"]:
-                source_context = str(sources_by_id[str(ref)].get("context") or "")
-                if source_context and source_context != row["context"]:
-                    raise ValueError(
-                        "incompatible root evidence source context: "
-                        f"{row['node_id']}:{row['context']}"
-                    )
-        for row in inventory:
-            for ref in row["evidence_sources"]:
-                source_context = str(sources_by_id[str(ref)].get("context") or "")
-                if source_context and source_context != row["context"]:
-                    raise ValueError(
-                        "incompatible inventory evidence source context: "
-                        f"{row['node_id']}:{row['context']}"
-                    )
-        for row in relationships:
-            for ref in row["evidence_sources"]:
-                source_context = str(sources_by_id[str(ref)].get("context") or "")
-                if source_context and source_context != row["context"]:
-                    raise ValueError(
-                        "incompatible relationship evidence source context: "
-                        f"{row['source']}->{row['target']}:{row['context']}"
-                    )
+        for label, rows in (
+            ("root", roots),
+            ("inventory", inventory),
+            ("relationship", relationships),
+        ):
+            for row in rows:
+                for ref in row["evidence_sources"]:
+                    source_context = str(sources_by_id[str(ref)].get("context") or "")
+                    if source_context and source_context != row["context"]:
+                        owner = (
+                            f"{row['source']}->{row['target']}"
+                            if label == "relationship"
+                            else str(row["node_id"])
+                        )
+                        raise ValueError(
+                            f"incompatible {label} evidence source context: "
+                            f"{owner}:{row['context']}"
+                        )
 
     @staticmethod
     def _validate_dependency_fact_source_authority_v3(
@@ -990,50 +1021,63 @@ class DependencyResolutionEvidenceMixin:
                     f"duplicate module ownership observation: {module}:{context}"
                 )
             seen.add(key)
-            raw_owners = raw.get("owners", ())
-            if not isinstance(raw_owners, Sequence) or isinstance(
-                raw_owners, (str, bytes, bytearray)
-            ):
-                raise ValueError("module ownership owners must be a sequence")
-            owners = [_identifier(owner, label="module owner") for owner in raw_owners]
-            if len(set(owners)) != len(owners):
-                raise ValueError(f"duplicate owner for module: {module}")
-            dangling = sorted(set(owners) - node_ids)
-            if dangling:
-                raise ValueError(
-                    f"dangling module ownership node for {module}: {dangling[0]}"
-                )
-            completeness = str(raw.get("completeness") or "unknown").strip()
-            if completeness not in {"complete", "incomplete", "unknown"}:
-                raise ValueError(
-                    "module ownership completeness must be complete, incomplete, or unknown"
-                )
-            refs = cls._dependency_source_refs_v3(
-                raw.get("evidence_sources", ()),
-                label="module ownership evidence source",
-                allowed=source_ids,
-            )
-            if not refs:
-                raise ValueError("module ownership must reference evidence source")
             result.append(
-                {
-                    "module": module,
-                    "context": context,
-                    "owners": sorted(owners),
-                    "state": (
-                        "resolved-unique"
-                        if len(owners) == 1
-                        else "resolved-ambiguous"
-                        if owners
-                        else "unresolved"
-                    ),
-                    "completeness": completeness,
-                    "evidence_sources": refs,
-                    "authority": "qualified-external-observation",
-                    "producer_authority": "caller-claimed",
-                }
+                cls._dependency_module_ownership_row_v3(
+                    raw, module, context, node_ids, source_ids
+                )
             )
         return sorted(result, key=lambda row: (str(row["module"]), str(row["context"])))
+
+    @classmethod
+    def _dependency_module_ownership_row_v3(
+        cls,
+        raw: Mapping[str, object],
+        module: str,
+        context: str,
+        node_ids: set[str],
+        source_ids: set[str],
+    ) -> dict[str, object]:
+        raw_owners = raw.get("owners", ())
+        if not isinstance(raw_owners, Sequence) or isinstance(
+            raw_owners, (str, bytes, bytearray)
+        ):
+            raise ValueError("module ownership owners must be a sequence")
+        owners = [_identifier(owner, label="module owner") for owner in raw_owners]
+        if len(set(owners)) != len(owners):
+            raise ValueError(f"duplicate owner for module: {module}")
+        dangling = sorted(set(owners) - node_ids)
+        if dangling:
+            raise ValueError(
+                f"dangling module ownership node for {module}: {dangling[0]}"
+            )
+        completeness = str(raw.get("completeness") or "unknown").strip()
+        if completeness not in {"complete", "incomplete", "unknown"}:
+            raise ValueError(
+                "module ownership completeness must be complete, incomplete, or unknown"
+            )
+        refs = cls._dependency_source_refs_v3(
+            raw.get("evidence_sources", ()),
+            label="module ownership evidence source",
+            allowed=source_ids,
+        )
+        if not refs:
+            raise ValueError("module ownership must reference evidence source")
+        return {
+            "module": module,
+            "context": context,
+            "owners": sorted(owners),
+            "state": (
+                "resolved-unique"
+                if len(owners) == 1
+                else "resolved-ambiguous"
+                if owners
+                else "unresolved"
+            ),
+            "completeness": completeness,
+            "evidence_sources": refs,
+            "authority": "qualified-external-observation",
+            "producer_authority": "caller-claimed",
+        }
 
     @classmethod
     def _dependency_coverage_v3(
@@ -1060,53 +1104,62 @@ class DependencyResolutionEvidenceMixin:
             if key in seen:
                 raise ValueError(f"duplicate dependency coverage: {context}:{kind}")
             seen.add(key)
-            completeness = str(raw.get("completeness") or "unknown").strip()
-            truncation = str(raw.get("truncation") or "unknown").strip()
-            if completeness not in {"complete", "incomplete", "unknown"}:
-                raise ValueError(
-                    "coverage completeness must be complete, incomplete, or unknown"
-                )
-            if truncation not in {"complete", "truncated", "unknown"}:
-                raise ValueError(
-                    "coverage truncation must be complete, truncated, or unknown"
-                )
-            if completeness == "complete" and truncation != "complete":
-                raise ValueError("complete coverage requires truncation=complete")
-            refs = cls._dependency_source_refs_v3(
-                raw.get("evidence_sources", ()),
-                label="coverage evidence source",
-                allowed=source_ids,
-            )
-            if not refs:
-                raise ValueError("coverage must reference evidence source")
-            referenced_sources = [sources[ref] for ref in refs]
-            cls._validate_dependency_coverage_source_authority_v3(
-                kind=kind,
-                sources=referenced_sources,
-            )
-            for source in referenced_sources:
-                source_context = str(source.get("context") or "")
-                if source_context and source_context != context:
-                    raise ValueError(
-                        f"incompatible evidence source context for coverage: {context}:{kind}"
-                    )
-                if completeness == "complete" and (
-                    source.get("completeness") != "complete"
-                    or source.get("truncation") != "complete"
-                ):
-                    raise ValueError(
-                        f"coverage exceeds evidence source: {context}:{kind}"
-                    )
             result.append(
-                {
-                    "context": context,
-                    "kind": kind,
-                    "completeness": completeness,
-                    "truncation": truncation,
-                    "evidence_sources": refs,
-                }
+                cls._dependency_coverage_row_v3(raw, context, kind, sources, source_ids)
             )
         return sorted(result, key=lambda row: (str(row["context"]), str(row["kind"])))
+
+    @classmethod
+    def _dependency_coverage_row_v3(
+        cls,
+        raw: Mapping[str, object],
+        context: str,
+        kind: str,
+        sources: Mapping[str, Mapping[str, object]],
+        source_ids: set[str],
+    ) -> dict[str, object]:
+        completeness = str(raw.get("completeness") or "unknown").strip()
+        truncation = str(raw.get("truncation") or "unknown").strip()
+        if completeness not in {"complete", "incomplete", "unknown"}:
+            raise ValueError(
+                "coverage completeness must be complete, incomplete, or unknown"
+            )
+        if truncation not in {"complete", "truncated", "unknown"}:
+            raise ValueError(
+                "coverage truncation must be complete, truncated, or unknown"
+            )
+        if completeness == "complete" and truncation != "complete":
+            raise ValueError("complete coverage requires truncation=complete")
+        refs = cls._dependency_source_refs_v3(
+            raw.get("evidence_sources", ()),
+            label="coverage evidence source",
+            allowed=source_ids,
+        )
+        if not refs:
+            raise ValueError("coverage must reference evidence source")
+        referenced_sources = [sources[ref] for ref in refs]
+        cls._validate_dependency_coverage_source_authority_v3(
+            kind=kind,
+            sources=referenced_sources,
+        )
+        for source in referenced_sources:
+            source_context = str(source.get("context") or "")
+            if source_context and source_context != context:
+                raise ValueError(
+                    f"incompatible evidence source context for coverage: {context}:{kind}"
+                )
+            if completeness == "complete" and (
+                source.get("completeness") != "complete"
+                or source.get("truncation") != "complete"
+            ):
+                raise ValueError(f"coverage exceeds evidence source: {context}:{kind}")
+        return {
+            "context": context,
+            "kind": kind,
+            "completeness": completeness,
+            "truncation": truncation,
+            "evidence_sources": refs,
+        }
 
     @staticmethod
     def _dependency_coverage_kind_v3(raw: Mapping[str, object]) -> str:

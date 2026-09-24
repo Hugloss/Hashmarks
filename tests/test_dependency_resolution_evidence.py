@@ -9,6 +9,18 @@ import pytest
 from hashmarks.codemap.engine import CodeMap
 
 
+def _without_source_refs(value: object) -> object:
+    if isinstance(value, dict):
+        return {
+            key: _without_source_refs(item)
+            for key, item in value.items()
+            if key != "evidence_sources"
+        }
+    if isinstance(value, list):
+        return [_without_source_refs(item) for item in value]
+    return value
+
+
 def _snapshot_v3() -> dict[str, object]:
     return {
         "schema": "hashmarks.dependency-resolution.v3",
@@ -1124,17 +1136,6 @@ def test_v3_equivalent_producer_packets_have_query_and_delta_parity(
         {"operation": "module-owners", "module": "missing", "context": "compile"},
     ]
 
-    def without_source_refs(value: object) -> object:
-        if isinstance(value, dict):
-            return {
-                key: without_source_refs(item)
-                for key, item in value.items()
-                if key != "evidence_sources"
-            }
-        if isinstance(value, list):
-            return [without_source_refs(item) for item in value]
-        return value
-
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         before = codemap.dependency_resolution_evidence(original)
@@ -1149,7 +1150,7 @@ def test_v3_equivalent_producer_packets_have_query_and_delta_parity(
     for left, right in zip(
         before_queries["results"], after_queries["results"], strict=True
     ):
-        assert without_source_refs(left["result"]) == without_source_refs(
+        assert _without_source_refs(left["result"]) == _without_source_refs(
             right["result"]
         )
         assert left["completeness"] == right["completeness"]

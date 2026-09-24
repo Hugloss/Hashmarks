@@ -91,7 +91,7 @@ _FORBIDDEN_EXECUTION_POLICY_KEYS = frozenset(
 # external execution layer still decides deadlines, retries, runtime
 # subdivision, scheduling, and resume behavior.
 PROCESS_SENSITIVE_NODEIDS = (
-    "tests/test_codemap.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon",
+    "tests/test_codemap_watcher.py::test_codemap_watcher_keeps_map_hot_without_identity_daemon",
 )
 
 # These are benchmark/measurement assertions, not release-correctness owners.

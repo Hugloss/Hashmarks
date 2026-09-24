@@ -263,12 +263,12 @@ def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None
     assert (ROOT / ".codex" / "config.toml").is_file()
 
 
-def test_ci_and_dev_check_enforce_ruff_debt_gate() -> None:
+def test_ci_and_dev_check_enforce_current_ruff_gate() -> None:
     workflow = _text(".github/workflows/ci.yml")
-    marker = "      - name: Enforce Ruff debt no-growth\n"
+    marker = "      - name: Enforce configured Ruff and zero complexity debt\n"
     assert marker in workflow
     gate_block = workflow.split(marker, 1)[1].split("      - name:", 1)[0]
-    assert "run: make lint-debt-gate" in gate_block
+    assert "run: make lint" in gate_block
     assert "continue-on-error" not in gate_block
     convergence = workflow.split("  qualification-convergence:", 1)[1]
     assert "      - formatting" in convergence
@@ -285,7 +285,7 @@ def test_ci_and_dev_check_enforce_ruff_debt_gate() -> None:
     dev_check = makefile.split("dev-check: setup", 1)[1].split("\ndev-check-batch:", 1)[
         0
     ]
-    assert "Ruff debt no-growth gate" in dev_check
-    assert "lint-debt-gate" in dev_check
+    assert "Current Ruff and size gates" in dev_check
+    assert "--no-print-directory lint" in dev_check
     assert "lint-debt-summary || true" not in dev_check
-    assert "Ruff debt:   PASS (no growth)" in dev_check
+    assert "Ruff:        PASS (zero debt)" in dev_check
