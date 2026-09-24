@@ -805,7 +805,17 @@ def test_v2_context_query_includes_selection_context_without_inventory_or_edge(
 ) -> None:
     changed = _snapshot_v2()
     changed["contexts"].append("optional")
+    changed["evidence_sources"].append(
+        {
+            "source_id": "tree:optional",
+            "kind": "resolution-graph",
+            "context": "optional",
+            "completeness": "incomplete",
+            "truncation": "complete",
+        }
+    )
     changed["selections"][1]["contexts"].append("optional")
+    changed["selections"][1]["evidence_sources"].append("tree:optional")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
