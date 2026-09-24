@@ -88,7 +88,9 @@ Producer-native coordinates, lockfile source tables, Maven scopes/classifiers, w
 
 ## Coverage and negative evidence
 
-Coverage `kind` is a semantic domain, not a producer/source format. Supported coverage domains are the domains for which Hashmarks can make scoped completeness and negative-evidence claims.
+Coverage `kind` is a semantic domain, not a producer/source format. The current coverage domains are `selection`, `resolution-graph`, `resolved-inventory`, and `module-ownership`.
+
+`selection` coverage owns exhaustiveness of selected-node/context membership and therefore bounds `contexts` query completeness. Graph coverage owns graph traversal/absence, inventory coverage owns inventory membership/absence, and module-ownership coverage owns module-owner absence. One domain must not stand in for another merely because a current producer emits them together.
 
 A coverage claim must:
 
