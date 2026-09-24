@@ -197,6 +197,29 @@ class DependencyResolutionEvidenceMixin:
                         "incompatible relationship evidence source context: "
                         f"{row['source']}->{row['target']}:{row['context']}"
                     )
+        for row in module_ownership:
+            for ref in row["evidence_sources"]:
+                source = sources_by_id[str(ref)]
+                if source.get("kind") != "resolved-inventory":
+                    raise ValueError(
+                        "incompatible module ownership evidence source kind: "
+                        f"{row['module']}:{row['context']}"
+                    )
+                source_context = str(source.get("context") or "")
+                if source_context and source_context != row["context"]:
+                    raise ValueError(
+                        "incompatible module ownership evidence source context: "
+                        f"{row['module']}:{row['context']}"
+                    )
+        for row in selections:
+            contexts_for_selection = set(row["contexts"])
+            for ref in row["evidence_sources"]:
+                source_context = str(sources_by_id[str(ref)].get("context") or "")
+                if source_context and source_context not in contexts_for_selection:
+                    raise ValueError(
+                        "incompatible selection evidence source context: "
+                        f"{row['node_id']}:{source_context}"
+                    )
 
         definition = {
             "producer": producer_packet,
