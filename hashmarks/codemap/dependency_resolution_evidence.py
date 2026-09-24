@@ -818,6 +818,10 @@ class DependencyResolutionEvidenceMixin:
             if not refs:
                 raise ValueError("coverage must reference evidence source")
             referenced_sources = [sources[ref] for ref in refs]
+            cls._validate_dependency_coverage_source_kind_v2(
+                kind=kind,
+                sources=referenced_sources,
+            )
             for source in referenced_sources:
                 source_context = str(source.get("context") or "")
                 if source_context and source_context != context:
@@ -841,6 +845,19 @@ class DependencyResolutionEvidenceMixin:
                 }
             )
         return sorted(result, key=lambda row: (str(row["context"]), str(row["kind"])))
+
+    @staticmethod
+    def _validate_dependency_coverage_source_kind_v2(
+        *,
+        kind: str,
+        sources: Sequence[Mapping[str, object]],
+    ) -> None:
+        if kind == "resolution-graph" and not any(
+            source.get("kind") == "resolution-graph" for source in sources
+        ):
+            raise ValueError(
+                "resolution-graph coverage requires resolution-graph evidence source"
+            )
 
     @staticmethod
     def _validate_dependency_coverage_facts_v2(

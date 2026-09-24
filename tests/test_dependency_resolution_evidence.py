@@ -1710,3 +1710,18 @@ def test_v2_complete_graph_coverage_requires_root_in_each_complete_context(
             ValueError, match="complete resolution-graph coverage lacks root: compile"
         ):
             codemap.dependency_resolution_evidence(changed)
+
+
+def test_v2_complete_graph_coverage_refuses_inventory_only_source_authority(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["coverage"][0]["evidence_sources"] = ["list:compile"]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="resolution-graph coverage requires resolution-graph evidence source",
+        ):
+            codemap.dependency_resolution_evidence(changed)
