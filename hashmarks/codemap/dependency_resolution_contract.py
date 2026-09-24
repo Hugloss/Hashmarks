@@ -36,6 +36,10 @@ _FIELDS = {
         "context kind completeness truncation evidence_sources".split()
     ),
     "repository input": frozenset("path member_revision".split()),
+    "correlation request": frozenset("correlations path_mappings".split()),
+    "correlation row": frozenset(
+        "module context completeness truncation anchors".split()
+    ),
 }
 
 
