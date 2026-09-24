@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from hashmarks.adapters import maven_dependency_observation
+from hashmarks.codemap.engine import CodeMap
 
 
 def _complete_maven_observation(
@@ -22,7 +23,6 @@ def _complete_maven_observation(
         complete_inventory_contexts=tuple(inventories),
         repository_inputs=repository_inputs,
     )
-from hashmarks.codemap.engine import CodeMap
 
 
 def _tree(*, child_parent: bool = True) -> bytes:
