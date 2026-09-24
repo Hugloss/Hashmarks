@@ -1252,5 +1252,7 @@ def test_v2_query_visit_limit_prevents_negative_evidence(
     assert result["omissions"] == [{"reason": "visit-limit"}]
     if operation == "reachability":
         assert result["result"]["negative_evidence"] == "not-admissible"
+    elif operation == "paths":
+        assert result["negative_evidence"] == "not-admissible"
     else:
         assert result["negative_evidence"] == "not-applicable"
