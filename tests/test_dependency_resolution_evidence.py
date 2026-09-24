@@ -163,6 +163,19 @@ def _snapshot_v3() -> dict[str, object]:
     }
 
 
+def test_v3_refuses_obsolete_v2_schema(tmp_path: Path) -> None:
+    snapshot = _snapshot_v3()
+    snapshot["schema"] = "hashmarks.dependency-resolution.v2"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="dependency resolution schema must be hashmarks.dependency-resolution.v3",
+        ):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
 def test_v3_distinguishes_inventory_membership_from_graph_reachability(
     tmp_path: Path,
 ) -> None:
