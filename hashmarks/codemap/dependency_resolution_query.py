@@ -240,6 +240,13 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
     )
     context = _text(request.get("context"), label="dependency query context")
     module = _text(request.get("module"), label="dependency query module")
+    declared_contexts = {
+        str(value)
+        for value in observation.get("contexts", ())
+        if str(value)
+    }
+    if context and context not in declared_contexts:
+        raise ValueError(f"unknown dependency query context: {context}")
     omissions: list[dict[str, object]] = []
     visited = 0
     negative_evidence = "not-applicable"
