@@ -170,6 +170,7 @@ class DependencyResolutionEvidenceMixin:
         self._validate_dependency_graph_fact_source_authority_v2(
             roots=roots,
             relationships=relationships,
+            inventory=inventory,
             sources_by_id=sources_by_id,
         )
         self._validate_dependency_module_source_authority_v2(
@@ -334,6 +335,7 @@ class DependencyResolutionEvidenceMixin:
         roots: Sequence[Mapping[str, object]],
         inventory: Sequence[Mapping[str, object]],
         relationships: Sequence[Mapping[str, object]],
+        inventory: Sequence[Mapping[str, object]],
         sources_by_id: Mapping[str, Mapping[str, object]],
     ) -> None:
         for row in roots:
@@ -381,6 +383,15 @@ class DependencyResolutionEvidenceMixin:
             ):
                 raise ValueError(
                     "relationship requires resolution-graph evidence source"
+                )
+
+        for row in inventory:
+            if not any(
+                sources_by_id[str(ref)].get("kind") == "resolved-inventory"
+                for ref in row["evidence_sources"]
+            ):
+                raise ValueError(
+                    "inventory requires resolved-inventory evidence source"
                 )
 
     @staticmethod
@@ -884,6 +895,12 @@ class DependencyResolutionEvidenceMixin:
         ):
             raise ValueError(
                 "resolution-graph coverage requires resolution-graph evidence source"
+            )
+        if kind == "resolved-inventory" and not any(
+            source.get("kind") == "resolved-inventory" for source in sources
+        ):
+            raise ValueError(
+                "resolved-inventory coverage requires resolved-inventory evidence source"
             )
 
     @staticmethod
