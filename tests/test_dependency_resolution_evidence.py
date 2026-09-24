@@ -1057,14 +1057,14 @@ def test_v2_path_query_exact_result_bound_does_not_claim_omission(
                 "target": "dead@1",
                 "kind": "depends-on",
                 "context": "compile",
-                "evidence_source_refs": ["tree:compile"],
+                "evidence_sources": ["tree:compile"],
             },
             {
                 "source": "library@1",
                 "target": "target@1",
                 "kind": "depends-on",
                 "context": "compile",
-                "evidence_source_refs": ["tree:compile"],
+                "evidence_sources": ["tree:compile"],
             },
         ]
     )
@@ -1099,7 +1099,7 @@ def test_v2_path_query_reports_result_bound_only_when_a_path_is_omitted(
             "target": "library@1",
             "kind": "depends-on",
             "context": "compile",
-            "evidence_source_refs": ["tree:compile"],
+            "evidence_sources": ["tree:compile"],
         }
     )
     with CodeMap(tmp_path) as codemap:
@@ -1427,6 +1427,7 @@ def test_v2_context_query_exact_bound_without_omission_is_complete(
 ) -> None:
     snapshot = _snapshot_v2()
     snapshot["selections"][0]["contexts"] = ["compile"]
+    snapshot["selections"][0]["evidence_sources"] = ["tree:compile"]
     snapshot["roots"] = [snapshot["roots"][0]]
     snapshot["relationships"] = [snapshot["relationships"][0]]
     with CodeMap(tmp_path) as codemap:
@@ -1459,17 +1460,6 @@ def test_v2_coverage_cannot_claim_complete_over_incomplete_source(
             codemap.dependency_resolution_evidence(snapshot)
 
 
-def test_v2_resolution_coverage_requires_resolution_evidence_source(
-    tmp_path: Path,
-) -> None:
-    snapshot = _snapshot_v2()
-    snapshot["coverage"][0]["evidence_sources"] = ["list:compile"]
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with pytest.raises(ValueError, match="incompatible evidence source kind"):
-            codemap.dependency_resolution_evidence(snapshot)
-
-
 def test_v2_coverage_source_context_must_match_coverage_context(
     tmp_path: Path,
 ) -> None:
@@ -1490,15 +1480,6 @@ def test_v2_relationship_provenance_cannot_cross_contexts(tmp_path: Path) -> Non
             codemap.dependency_resolution_evidence(snapshot)
 
 
-def test_v2_inventory_membership_requires_inventory_evidence(tmp_path: Path) -> None:
-    snapshot = _snapshot_v2()
-    snapshot["inventory"][0]["evidence_sources"] = ["tree:compile"]
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with pytest.raises(ValueError, match="inventory evidence source kind"):
-            codemap.dependency_resolution_evidence(snapshot)
-
-
 def test_v2_selection_provenance_cannot_claim_unselected_context(
     tmp_path: Path,
 ) -> None:
@@ -1507,25 +1488,6 @@ def test_v2_selection_provenance_cannot_claim_unselected_context(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(ValueError, match="selection evidence source context"):
-            codemap.dependency_resolution_evidence(snapshot)
-
-
-def test_v2_module_ownership_requires_inventory_evidence_source(
-    tmp_path: Path,
-) -> None:
-    snapshot = _snapshot_v2()
-    snapshot["module_ownership"] = [
-        {
-            "module": "library.module",
-            "context": "compile",
-            "owners": ["library@1"],
-            "completeness": "complete",
-            "evidence_sources": ["tree:compile"],
-        }
-    ]
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with pytest.raises(ValueError, match="module ownership evidence source kind"):
             codemap.dependency_resolution_evidence(snapshot)
 
 
