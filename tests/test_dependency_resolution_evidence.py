@@ -1667,3 +1667,55 @@ def test_v2_selection_requires_provenance_for_each_observed_context(
             match="selection context lacks evidence source: library@1:runtime",
         ):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_refuses_complete_resolution_graph_without_root(tmp_path: Path) -> None:
+    changed = _snapshot_v2()
+    changed["roots"] = [
+        row for row in changed["roots"] if row["context"] != "runtime"
+    ]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match="complete resolution-graph coverage lacks root: runtime"
+        ):
+            codemap.dependency_resolution_evidence(changed)
+
+
+def test_v2_refuses_complete_inventory_without_observed_membership(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["inventory"] = []
+    changed["coverage"] = [
+        row
+        for row in changed["coverage"]
+        if not (row["context"] == "compile" and row["kind"] == "resolution-graph")
+    ]
+    changed["roots"] = [
+        row for row in changed["roots"] if row["context"] != "compile"
+    ]
+    changed["relationships"] = [
+        row for row in changed["relationships"] if row["context"] != "compile"
+    ]
+    changed["selections"] = [
+        {
+            **row,
+            "contexts": [context for context in row["contexts"] if context != "compile"],
+            "evidence_sources": [
+                source
+                for source in row["evidence_sources"]
+                if source != "tree:compile" and source != "list:compile"
+            ],
+        }
+        for row in changed["selections"]
+        if row["node_id"] != "inventory-only@1"
+    ]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match="complete resolved-inventory coverage lacks inventory: compile"
+        ):
+            codemap.dependency_resolution_evidence(changed)
