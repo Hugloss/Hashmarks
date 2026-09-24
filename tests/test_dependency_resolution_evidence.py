@@ -1576,3 +1576,21 @@ def test_v2_multiple_selections_for_one_component_remain_valid(tmp_path: Path) -
         if row["component_id"] == "library"
     }
     assert library_nodes == {"library@1", "library@2"}
+
+
+def test_v2_selection_without_any_context_is_rejected(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    selection = next(row for row in snapshot["selections"] if row["node_id"] == "library@1")
+    selection["contexts"] = []
+    snapshot["inventory"] = [
+        row for row in snapshot["inventory"] if row["node_id"] != "library@1"
+    ]
+    snapshot["relationships"] = [
+        row
+        for row in snapshot["relationships"]
+        if row["source"] != "library@1" and row["target"] != "library@1"
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="selection must declare context"):
+            codemap.dependency_resolution_evidence(snapshot)
