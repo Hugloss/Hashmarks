@@ -270,7 +270,12 @@ def test_ci_and_dev_check_enforce_ruff_debt_gate() -> None:
     gate_block = workflow.split(marker, 1)[1].split("      - name:", 1)[0]
     assert "run: make lint-debt-gate" in gate_block
     assert "continue-on-error" not in gate_block
-    assert "needs: [formatting, ruff-debt]" in workflow
+    convergence = workflow.split("  qualification-convergence:", 1)[1]
+    assert "      - formatting" in convergence
+    assert "      - ruff-debt" in convergence
+    assert "FORMATTING: ${{ needs.formatting.result }}" in convergence
+    assert "RUFF_DEBT: ${{ needs.ruff-debt.result }}" in convergence
+    assert "test \"$failed\" -eq 0" in convergence
 
     makefile = _text("Makefile")
     dev_check = makefile.split("dev-check: setup", 1)[1].split("\ndev-check-batch:", 1)[
