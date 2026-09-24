@@ -204,6 +204,21 @@ source = { directory = "vendor/shared" }
 
 
 @pytest.mark.parametrize("source_key", ["virtual", "editable", "directory"])
+def test_uv_lock_adapter_refuses_unknown_lock_schema_version() -> None:
+    lock = b"""version = 2
+revision = 0
+requires-python = ">=3.11"
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+
+    with pytest.raises(ValueError, match="unsupported uv lock schema version: 2"):
+        uv_lock_dependency_observation(lock=lock)
+
+
 @pytest.mark.parametrize(
     ("metadata", "message"),
     [
