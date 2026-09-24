@@ -1227,3 +1227,244 @@ def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
             ValueError, match="module ownership exceeds evidence source"
         ):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["evidence_sources"].append(
+        {
+            "source_id": "ownership:compile",
+            "kind": "module-ownership",
+            "context": "compile",
+            "completeness": "unknown",
+            "truncation": "unknown",
+        }
+    )
+    snapshot["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["ownership:compile"],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match="module ownership exceeds evidence source"
+        ):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_complete_coverage_can_combine_complete_sources(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["evidence_sources"].append(
+        {
+            "source_id": "tree:compile:second",
+            "kind": "resolution-graph",
+            "context": "compile",
+            "completeness": "complete",
+            "truncation": "complete",
+        }
+    )
+    snapshot["coverage"][0]["evidence_sources"].append("tree:compile:second")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(snapshot)
+
+    coverage = next(
+        row
+        for row in packet["coverage"]
+        if row["context"] == "compile" and row["kind"] == "resolution-graph"
+    )
+    assert coverage["completeness"] == "complete"
+    assert coverage["truncation"] == "complete"
+
+
+def test_v2_unknown_coverage_can_reference_complete_source_without_strengthening(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["coverage"][0]["completeness"] = "unknown"
+    snapshot["coverage"][0]["truncation"] = "unknown"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(snapshot)
+
+    coverage = next(
+        row
+        for row in packet["coverage"]
+        if row["context"] == "compile" and row["kind"] == "resolution-graph"
+    )
+    assert coverage["completeness"] == "unknown"
+    assert coverage["truncation"] == "unknown"
+
+
+def test_v2_reachability_rejects_unknown_target_node(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        with pytest.raises(ValueError, match="unknown dependency query target_id"):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "reachability",
+                        "node_id": "app@1",
+                        "target_id": "missing@1",
+                    }
+                ],
+            )
+
+
+def test_v2_paths_rejects_unknown_target_node(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        with pytest.raises(ValueError, match="unknown dependency query target_id"):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "paths",
+                        "node_id": "app@1",
+                        "target_id": "missing@1",
+                    }
+                ],
+            )
+
+
+def test_v2_contexts_rejects_unknown_node(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        with pytest.raises(ValueError, match="unknown dependency query node_id"):
+            codemap.dependency_resolution_queries(
+                observation,
+                [{"operation": "contexts", "node_id": "missing@1"}],
+            )
+
+
+def test_v2_queries_reject_unknown_context_filter(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        for request in (
+            {
+                "operation": "dependencies",
+                "node_id": "app@1",
+                "context": "missing",
+            },
+            {"operation": "inventory", "context": "missing"},
+            {"operation": "module-owners", "module": "library", "context": "missing"},
+        ):
+            with pytest.raises(ValueError, match="unknown dependency query context"):
+                codemap.dependency_resolution_queries(observation, [request])
+
+
+def test_v2_reachability_requires_target_selected_in_requested_context(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["components"].append(
+        {"component_id": "compile-only", "name": "compile-only", "ecosystem": "test"}
+    )
+    snapshot["selections"].append(
+        {
+            "node_id": "compile-only@1",
+            "component_id": "compile-only",
+            "version": "1",
+            "source": "registry",
+            "contexts": ["compile"],
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        with pytest.raises(
+            ValueError, match="dependency query target_id not selected in context"
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "reachability",
+                        "node_id": "app@1",
+                        "target_id": "compile-only@1",
+                        "context": "runtime",
+                    }
+                ],
+            )
+
+
+def test_v2_traversal_requires_start_selected_in_requested_context(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["components"].append(
+        {"component_id": "compile-only", "name": "compile-only", "ecosystem": "test"}
+    )
+    snapshot["selections"].append(
+        {
+            "node_id": "compile-only@1",
+            "component_id": "compile-only",
+            "version": "1",
+            "source": "registry",
+            "contexts": ["compile"],
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        with pytest.raises(
+            ValueError, match="dependency query node_id not selected in context"
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "dependencies",
+                        "node_id": "compile-only@1",
+                        "context": "runtime",
+                    }
+                ],
+            )
+
+
+def test_v2_paths_requires_target_selected_in_requested_context(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["components"].append(
+        {"component_id": "compile-only", "name": "compile-only", "ecosystem": "test"}
+    )
+    snapshot["selections"].append(
+        {
+            "node_id": "compile-only@1",
+            "component_id": "compile-only",
+            "version": "1",
+            "source": "registry",
+            "contexts": ["compile"],
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        with pytest.raises(
+            ValueError, match="dependency query target_id not selected in context"
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "paths",
+                        "node_id": "app@1",
+                        "target_id": "compile-only@1",
+                        "context": "runtime",
+                    }
+                ],
+            )

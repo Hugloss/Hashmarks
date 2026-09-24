@@ -240,6 +240,11 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
     )
     context = _text(request.get("context"), label="dependency query context")
     module = _text(request.get("module"), label="dependency query module")
+    declared_contexts = {
+        str(value) for value in observation.get("contexts", ()) if str(value)
+    }
+    if context and context not in declared_contexts:
+        raise ValueError(f"unknown dependency query context: {context}")
     omissions: list[dict[str, object]] = []
     visited = 0
     negative_evidence = "not-applicable"
@@ -288,6 +293,8 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
     elif operation == "contexts":
         if not node_id:
             raise ValueError("contexts query requires node_id")
+        if node_id not in selections:
+            raise ValueError(f"unknown dependency query node_id: {node_id}")
         values = {
             str(row.get("context") or "")
             for row in observation.get("inventory", ())
@@ -338,6 +345,12 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             raise ValueError(f"{operation} query requires node_id")
         if node_id not in selections:
             raise ValueError(f"unknown dependency query node_id: {node_id}")
+        if context and context not in {
+            str(value) for value in selections[node_id].get("contexts", ())
+        }:
+            raise ValueError(
+                f"dependency query node_id not selected in context: {node_id}:{context}"
+            )
         source_complete = _coverage_complete(observation, context=context)
         outgoing, incoming = _adjacency(relationships)
         if operation in {"dependencies", "dependents"}:
@@ -358,6 +371,15 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
         elif operation == "reachability":
             if not target_id:
                 raise ValueError("reachability query requires target_id")
+            if target_id not in selections:
+                raise ValueError(f"unknown dependency query target_id: {target_id}")
+            if context and context not in {
+                str(value) for value in selections[target_id].get("contexts", ())
+            }:
+                raise ValueError(
+                    "dependency query target_id not selected in context: "
+                    f"{target_id}:{context}"
+                )
             found, visited, omissions = _reachability(
                 node_id,
                 target_id,
@@ -380,6 +402,15 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
         else:
             if not target_id:
                 raise ValueError("paths query requires target_id")
+            if target_id not in selections:
+                raise ValueError(f"unknown dependency query target_id: {target_id}")
+            if context and context not in {
+                str(value) for value in selections[target_id].get("contexts", ())
+            }:
+                raise ValueError(
+                    "dependency query target_id not selected in context: "
+                    f"{target_id}:{context}"
+                )
             result, visited, omissions = _paths(
                 node_id,
                 target_id,

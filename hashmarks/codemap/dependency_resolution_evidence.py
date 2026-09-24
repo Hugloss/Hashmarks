@@ -691,8 +691,8 @@ class DependencyResolutionEvidenceMixin:
             )
             if not refs:
                 raise ValueError("coverage must reference evidence source")
-            for ref in refs:
-                source = sources[ref]
+            referenced_sources = [sources[ref] for ref in refs]
+            for source in referenced_sources:
                 source_context = str(source.get("context") or "")
                 if source_context and source_context != context:
                     raise ValueError(
