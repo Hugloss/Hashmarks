@@ -861,15 +861,6 @@ class DependencyResolutionEvidenceMixin:
                     raise ValueError(
                         f"complete resolution-graph coverage lacks root: {context}"
                     )
-            elif kind == "resolved-inventory":
-                has_inventory = any(
-                    str(item["context"]) == context for item in inventory
-                )
-                if not has_inventory:
-                    raise ValueError(
-                        f"complete resolved-inventory coverage lacks inventory: {context}"
-                    )
-
     @staticmethod
     def _dependency_negative_evidence_v2(
         coverage: Sequence[Mapping[str, object]],
