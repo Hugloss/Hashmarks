@@ -1199,6 +1199,7 @@ def test_v2_query_visit_accounting_never_exceeds_declared_bound(
     assert result["completeness"] == "incomplete"
     assert result["omissions"] == [{"reason": "visit-limit"}]
 
+
 def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
     tmp_path: Path,
 ) -> None:
@@ -1365,54 +1366,97 @@ def test_v2_queries_reject_unknown_context_filter(tmp_path: Path) -> None:
                 codemap.dependency_resolution_queries(observation, [request])
 
 
-def test_v2_reachability_requires_target_selected_in_requested_context(
+def test_v2_component_unknown_identity_is_authoritative_absence(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "component", "component_id": "missing"}],
+        )
+
+    result = packet["results"][0]
+    assert result["result"] == []
+    assert result["negative_evidence"] == "admissible-within-declared-scope"
+
+
+def test_v2_component_present_identity_does_not_claim_negative_evidence(
     tmp_path: Path,
 ) -> None:
-    snapshot = _snapshot_v2()
-    snapshot["components"].append(
-        {"component_id": "compile-only", "name": "compile-only", "ecosystem": "test"}
-    )
-    snapshot["selections"].append(
-        {
-            "node_id": "compile-only@1",
-            "component_id": "compile-only",
-            "version": "1",
-            "source": "registry",
-            "contexts": ["compile"],
-            "evidence_sources": ["tree:compile"],
-        }
-    )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(snapshot)
-        with pytest.raises(
-            ValueError, match="dependency query target_id not selected in context"
-        ):
-            codemap.dependency_resolution_queries(
-                observation,
-                [
-                    {
-                        "operation": "reachability",
-                        "node_id": "app@1",
-                        "target_id": "compile-only@1",
-                        "context": "runtime",
-                    }
-                ],
-            )
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "component", "component_id": "library"}],
+        )
+
+    result = packet["results"][0]
+    assert result["result"]
+    assert result["negative_evidence"] == "not-applicable"
 
 
-def test_v2_traversal_requires_start_selected_in_requested_context(
+def test_v2_component_absence_remains_authoritative_with_incomplete_resolution_coverage(
     tmp_path: Path,
 ) -> None:
+    changed = _snapshot_v2()
+    changed["coverage"][1]["completeness"] = "incomplete"
+    changed["coverage"][1]["truncation"] = "truncated"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "component", "component_id": "missing"}],
+        )
+
+    result = packet["results"][0]
+    assert result["result"] == []
+    assert result["completeness"] == "complete"
+    assert result["negative_evidence"] == "admissible-within-declared-scope"
+
+
+def test_v2_component_result_limit_does_not_weaken_exact_identity_lookup(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        packet = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "component",
+                    "component_id": "library",
+                    "max_results": 1,
+                }
+            ],
+        )
+
+    result = packet["results"][0]
+    assert len(result["result"]) == 1
+    assert result["completeness"] == "complete"
+    assert result["omissions"] == []
+
+
+def test_v2_component_without_selection_is_rejected(tmp_path: Path) -> None:
     snapshot = _snapshot_v2()
     snapshot["components"].append(
-        {"component_id": "compile-only", "name": "compile-only", "ecosystem": "test"}
+        {"component_id": "orphan", "name": "orphan", "ecosystem": "test"}
     )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="component has no dependency selection"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_multiple_selections_for_one_component_remain_valid(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
     snapshot["selections"].append(
         {
-            "node_id": "compile-only@1",
-            "component_id": "compile-only",
-            "version": "1",
+            "node_id": "library@2",
+            "component_id": "library",
+            "version": "2",
             "source": "registry",
             "contexts": ["compile"],
             "evidence_sources": ["tree:compile"],
@@ -1420,51 +1464,31 @@ def test_v2_traversal_requires_start_selected_in_requested_context(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(snapshot)
-        with pytest.raises(
-            ValueError, match="dependency query node_id not selected in context"
-        ):
-            codemap.dependency_resolution_queries(
-                observation,
-                [
-                    {
-                        "operation": "dependencies",
-                        "node_id": "compile-only@1",
-                        "context": "runtime",
-                    }
-                ],
-            )
+        packet = codemap.dependency_resolution_evidence(snapshot)
+
+    library_nodes = {
+        row["node_id"]
+        for row in packet["selections"]
+        if row["component_id"] == "library"
+    }
+    assert library_nodes == {"library@1", "library@2"}
 
 
-def test_v2_paths_requires_target_selected_in_requested_context(tmp_path: Path) -> None:
+def test_v2_selection_without_any_context_is_rejected(tmp_path: Path) -> None:
     snapshot = _snapshot_v2()
-    snapshot["components"].append(
-        {"component_id": "compile-only", "name": "compile-only", "ecosystem": "test"}
+    selection = next(
+        row for row in snapshot["selections"] if row["node_id"] == "library@1"
     )
-    snapshot["selections"].append(
-        {
-            "node_id": "compile-only@1",
-            "component_id": "compile-only",
-            "version": "1",
-            "source": "registry",
-            "contexts": ["compile"],
-            "evidence_sources": ["tree:compile"],
-        }
-    )
+    selection["contexts"] = []
+    snapshot["inventory"] = [
+        row for row in snapshot["inventory"] if row["node_id"] != "library@1"
+    ]
+    snapshot["relationships"] = [
+        row
+        for row in snapshot["relationships"]
+        if row["source"] != "library@1" and row["target"] != "library@1"
+    ]
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        observation = codemap.dependency_resolution_evidence(snapshot)
-        with pytest.raises(
-            ValueError, match="dependency query target_id not selected in context"
-        ):
-            codemap.dependency_resolution_queries(
-                observation,
-                [
-                    {
-                        "operation": "paths",
-                        "node_id": "app@1",
-                        "target_id": "compile-only@1",
-                        "context": "runtime",
-                    }
-                ],
-            )
+        with pytest.raises(ValueError, match="selection context must not be empty"):
+            codemap.dependency_resolution_evidence(snapshot)

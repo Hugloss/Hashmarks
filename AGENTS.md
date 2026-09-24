@@ -260,3 +260,16 @@ The full-suite runtime profile is owned by `make test-profile` and reports the s
 Expected caller-visible failures are translated exactly once at the public boundary that owns the transport. Repository/domain methods raise their own errors; leaf CLI handlers must not wrap every call in local `try/except`, and MCP repository methods must not import or raise SDK transport exceptions. The repository CLI adapter owns repository-request translation, the top-level CLI dispatcher owns process-exit translation, the MCP server owns `McpSurfaceError -> ToolError`, and local daemon/CodeMap IPC handlers share one JSON request/error serialization boundary.
 
 Local exception handling remains appropriate only when the current scope owns a resource or fallback invariant that must be repaired there: transaction rollback, lock/single-flight propagation, watcher/process cleanup, optional-provider isolation, or bounded retry of explicitly classified transient repository races. Do not add broad defensive catches, and never add a catch-and-immediate-reraise block. Architecture tests freeze the current broad-exception allowlist so new `Exception`/`BaseException` catches require an explicit boundary decision.
+
+
+## Formatting and text hygiene
+
+Ruff is the repository's canonical Python formatter and linter.
+
+Before handing an edit back, run `make agent-finish`. If Ruff is available, apply and verify canonical Ruff formatting. If Ruff is unavailable, run portable repository hygiene, do not install or substitute another Python formatter merely to mimic Ruff, do not manually guess Ruff formatting, and report canonical formatting as `UNVERIFIED`.
+
+Portable hygiene may normalize CRLF to LF, missing final newlines, ordinary trailing whitespace, and Git whitespace errors. It must not rewrite Python semantics or formatting structure. Do not wait for full CI to discover text hygiene or locally available Ruff formatting errors. Missing Ruff reduces local evidence; it does not block unrelated useful repository work. CI remains authoritative when Ruff was unavailable locally.
+
+### Cheap normalization checkpoint
+
+After every meaningful repair batch and before expensive validation, run `make agent-finish`, then focused validation, then continue semantic dogfood. Formatting normalization is routine candidate hygiene, not a campaign boundary, and successful formatting is not evidence that repaired behavior is correct.

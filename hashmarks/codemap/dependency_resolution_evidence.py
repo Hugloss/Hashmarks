@@ -143,6 +143,12 @@ class DependencyResolutionEvidenceMixin:
             snapshot.get("selections", ()), component_ids, context_set, source_ids
         )
         node_ids = {str(row["node_id"]) for row in selections}
+        selected_component_ids = {str(row["component_id"]) for row in selections}
+        orphan_components = sorted(component_ids - selected_component_ids)
+        if orphan_components:
+            raise ValueError(
+                f"component has no dependency selection: {orphan_components[0]}"
+            )
         inventory = self._dependency_inventory_v2(
             snapshot.get("inventory", ()), node_ids, context_set, source_ids
         )
@@ -430,6 +436,11 @@ class DependencyResolutionEvidenceMixin:
             )
             if not refs:
                 raise ValueError("selection must reference evidence source")
+            selection_contexts = cls._dependency_context_list_v2(
+                raw.get("contexts", ()),
+                label="selection context",
+                allowed=contexts,
+            )
             result.append(
                 {
                     "node_id": node_id,
@@ -437,11 +448,7 @@ class DependencyResolutionEvidenceMixin:
                     "version": _text(raw.get("version"), label="version"),
                     "source": _text(raw.get("source"), label="source"),
                     "marker": _text(raw.get("marker"), label="marker"),
-                    "contexts": cls._dependency_context_list_v2(
-                        raw.get("contexts", ()),
-                        label="selection context",
-                        allowed=contexts,
-                    ),
+                    "contexts": selection_contexts,
                     "evidence_sources": refs,
                 }
             )

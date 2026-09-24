@@ -33,7 +33,7 @@ DIAGNOSTIC_SHARD ?= 0
 DIAGNOSTIC_EXTRA_MARKER ?=
 RUFF_DEBT_PREVIOUS_BASELINE ?=
 
-.PHONY: help evaluation-help lock lock-check init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json lint-debt-gate test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
+.PHONY: help evaluation-help lock lock-check init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json lint-debt-gate test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
 
 help:
 	@printf '%s\n' \
@@ -167,6 +167,81 @@ map-watch:
 
 agent-runner-journal-help: bootstrap
 	@$(UV_RUN) --offline python -m scripts.agent_evaluation.agent_runner_journal --help
+
+hygiene:
+	@echo "=== PORTABLE REPOSITORY HYGIENE ==="
+	@./scripts/agent-hygiene.sh
+	@echo "PORTABLE HYGIENE PASS"
+
+ruff-available:
+	@if command -v ruff >/dev/null 2>&1; then \
+		ruff --version; \
+	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version; \
+	else \
+		echo "RUFF UNAVAILABLE"; \
+		exit 2; \
+	fi
+
+format:
+	@echo "=== FORMAT ==="
+	@if command -v ruff >/dev/null 2>&1; then \
+		echo "Formatter authority: native ruff"; \
+		ruff check --fix .; \
+		ruff format .; \
+	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
+		echo "Formatter authority: uv cached/offline ruff"; \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check --fix .; \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format .; \
+	else \
+		echo "RUFF UNAVAILABLE"; \
+		echo "Applying portable hygiene only."; \
+		$(MAKE) --no-print-directory hygiene; \
+		echo "FORMAT STATUS: UNVERIFIED"; \
+	fi
+
+format-check:
+	@echo "=== AUTHORITATIVE FORMAT CHECK ==="
+	@if command -v ruff >/dev/null 2>&1; then \
+		ruff format --check --diff .; \
+		ruff check .; \
+	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format --check --diff .; \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check .; \
+	else \
+		echo "ERROR: Ruff unavailable."; \
+		echo "Canonical formatting cannot be verified."; \
+		exit 2; \
+	fi
+	@git diff --check
+	@echo "AUTHORITATIVE FORMAT CHECK PASS"
+
+agent-finish:
+	@echo "=== AGENT FINISH ==="
+	@$(MAKE) --no-print-directory hygiene
+	@if command -v ruff >/dev/null 2>&1; then \
+		echo "Ruff available: applying canonical formatting."; \
+		ruff check --fix .; \
+		ruff format .; \
+		git diff --check; \
+		ruff format --check .; \
+		ruff check .; \
+		echo "AGENT FORMAT STATUS: VERIFIED"; \
+	elif command -v uv >/dev/null 2>&1 && UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff --version >/dev/null 2>&1; then \
+		echo "Cached Ruff available: applying canonical formatting."; \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check --fix .; \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format .; \
+		git diff --check; \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff format --check .; \
+		UV_PROJECT_ENVIRONMENT=.ruff-venv uv run --offline --frozen --only-group lint ruff check .; \
+		echo "AGENT FORMAT STATUS: VERIFIED"; \
+	else \
+		echo ""; \
+		echo "AGENT FORMAT STATUS: UNVERIFIED"; \
+		echo "Portable hygiene passed, but Ruff is unavailable."; \
+	fi
+
+agent-preflight: agent-finish
 
 ruff-check:
 	@UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --only-group lint ruff check .
