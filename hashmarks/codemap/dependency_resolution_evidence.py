@@ -385,15 +385,6 @@ class DependencyResolutionEvidenceMixin:
                     "relationship requires resolution-graph evidence source"
                 )
 
-        for row in inventory:
-            if not any(
-                sources_by_id[str(ref)].get("kind") == "resolved-inventory"
-                for ref in row["evidence_sources"]
-            ):
-                raise ValueError(
-                    "inventory requires resolved-inventory evidence source"
-                )
-
     @staticmethod
     def _validate_dependency_module_source_authority_v2(
         *,
