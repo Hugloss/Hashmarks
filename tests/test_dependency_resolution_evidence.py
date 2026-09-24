@@ -28,21 +28,24 @@ def _snapshot_v2() -> dict[str, object]:
         "evidence_sources": [
             {
                 "source_id": "tree:compile",
-                "kind": "test-resolution-source",\n                "authorities": ["resolution-graph","selection"],
+                "kind": "test-resolution-source",
+                "authorities": ["resolution-graph","selection"],
                 "context": "compile",
                 "completeness": "complete",
                 "truncation": "complete",
             },
             {
                 "source_id": "tree:runtime",
-                "kind": "test-resolution-source",\n                "authorities": ["resolution-graph","selection"],
+                "kind": "test-resolution-source",
+                "authorities": ["resolution-graph","selection"],
                 "context": "runtime",
                 "completeness": "complete",
                 "truncation": "complete",
             },
             {
                 "source_id": "list:compile",
-                "kind": "test-inventory-source",\n                "authorities": ["module-ownership","resolved-inventory","selection"],
+                "kind": "test-inventory-source",
+                "authorities": ["module-ownership","resolved-inventory","selection"],
                 "context": "compile",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -694,7 +697,8 @@ def test_v2_producer_neutral_model_accepts_uv_contexts_without_maven_semantics(
         "evidence_sources": [
             {
                 "source_id": "uv:lock",
-                "kind": "opaque-lock-format",\n                "authorities": ["resolution-graph","resolved-inventory","selection"],
+                "kind": "opaque-lock-format",
+                "authorities": ["resolution-graph","resolved-inventory","selection"],
                 "context": "",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -922,7 +926,8 @@ def test_v2_context_query_includes_selection_context_without_inventory_or_edge(
     changed["evidence_sources"].append(
         {
             "source_id": "tree:optional",
-            "kind": "test-resolution-source",\n                "authorities": ["resolution-graph","selection"],
+            "kind": "test-resolution-source",
+                "authorities": ["resolution-graph","selection"],
             "context": "optional",
             "completeness": "incomplete",
             "truncation": "complete",
@@ -948,7 +953,8 @@ def test_v2_inventory_absence_requires_complete_inventory_coverage(
     changed["evidence_sources"].append(
         {
             "source_id": "list:runtime",
-            "kind": "test-inventory-source",\n                "authorities": ["module-ownership","resolved-inventory","selection"],
+            "kind": "test-inventory-source",
+                "authorities": ["module-ownership","resolved-inventory","selection"],
             "context": "runtime",
             "completeness": "incomplete",
             "truncation": "complete",
@@ -998,7 +1004,8 @@ def test_v2_unscoped_module_absence_requires_coverage_for_every_context(
     changed["evidence_sources"].append(
         {
             "source_id": "modules:compile",
-            "kind": "test-module-source",\n                "authorities": ["module-ownership"],
+            "kind": "test-module-source",
+                "authorities": ["module-ownership"],
             "context": "compile",
             "completeness": "complete",
             "truncation": "complete",
@@ -1348,7 +1355,8 @@ def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
     snapshot["evidence_sources"].append(
         {
             "source_id": "ownership:compile",
-            "kind": "test-module-source",\n                "authorities": ["module-ownership"],
+            "kind": "test-module-source",
+                "authorities": ["module-ownership"],
             "context": "compile",
             "completeness": "incomplete",
             "truncation": "complete",
@@ -1378,7 +1386,8 @@ def test_v2_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
     snapshot["evidence_sources"].append(
         {
             "source_id": "ownership:compile",
-            "kind": "test-module-source",\n                "authorities": ["module-ownership"],
+            "kind": "test-module-source",
+                "authorities": ["module-ownership"],
             "context": "compile",
             "completeness": "unknown",
             "truncation": "unknown",
@@ -1406,7 +1415,8 @@ def test_v2_complete_coverage_can_combine_complete_sources(tmp_path: Path) -> No
     snapshot["evidence_sources"].append(
         {
             "source_id": "tree:compile:second",
-            "kind": "test-resolution-source",\n                "authorities": ["resolution-graph","selection"],
+            "kind": "test-resolution-source",
+                "authorities": ["resolution-graph","selection"],
             "context": "compile",
             "completeness": "complete",
             "truncation": "complete",
@@ -1663,7 +1673,8 @@ def test_v2_root_provenance_changes_observation_not_resolution_identity(
     changed["evidence_sources"].append(
         {
             "source_id": "tree:compile:copy",
-            "kind": "test-resolution-source",\n                "authorities": ["resolution-graph","selection"],
+            "kind": "test-resolution-source",
+                "authorities": ["resolution-graph","selection"],
             "context": "compile",
             "completeness": "complete",
             "truncation": "complete",
