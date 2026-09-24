@@ -204,6 +204,43 @@ source = { directory = "vendor/shared" }
 
 
 @pytest.mark.parametrize("source_key", ["virtual", "editable", "directory"])
+@pytest.mark.parametrize(
+    ("metadata", "message"),
+    [
+        (
+            'resolution-markers = ["sys_platform == \'linux\'"]\n',
+            "uv lock resolution forks are not modeled",
+        ),
+        (
+            (
+                'conflicts = [[\n'
+                '  { package = "demo", extra = "cpu" },\n'
+                '  { package = "demo", extra = "gpu" },\n'
+                ']]\n'
+            ),
+            "uv lock conflicts are not modeled",
+        ),
+    ],
+)
+def test_uv_lock_adapter_refuses_unmodeled_resolution_forks(
+    metadata: str,
+    message: str,
+) -> None:
+    lock = (
+        "version = 1\n"
+        "revision = 3\n"
+        'requires-python = ">=3.11"\n'
+        f"{metadata}"
+        "\n[[package]]\n"
+        'name = "demo"\n'
+        'version = "0.1.0"\n'
+        'source = { virtual = "." }\n'
+    ).encode()
+
+    with pytest.raises(ValueError, match=message):
+        uv_lock_dependency_observation(lock=lock)
+
+
 def test_uv_lock_adapter_accepts_local_project_root_source_forms(
     source_key: str,
 ) -> None:
