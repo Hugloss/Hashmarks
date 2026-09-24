@@ -20,6 +20,8 @@ def _observation(producer: str, state: str) -> dict[str, object]:
     return maven_dependency_observation(
         trees={"compile": (base / "tree.json").read_bytes()},
         inventories={"compile": (base / "list.txt").read_bytes()},
+        complete_tree_contexts=("compile",),
+        complete_inventory_contexts=("compile",),
     )
 
 
