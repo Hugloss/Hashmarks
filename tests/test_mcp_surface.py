@@ -541,7 +541,14 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
                 "completeness": "complete",
                 "truncation": "complete",
                 "evidence_sources": ["tree:runtime"],
-            }
+            },
+            {
+                "context": "runtime",
+                "kind": "selection",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["tree:runtime"],
+            },
         ],
         "repository_inputs": [],
         "module_ownership": [],
