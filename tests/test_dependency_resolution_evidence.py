@@ -604,6 +604,32 @@ def test_v3_repository_correlation_refuses_stale_generation(
             )
 
 
+@pytest.mark.parametrize(
+    "request",
+    [
+        {"correlatons": []},
+        {
+            "correlations": [
+                {
+                    "module": "library",
+                    "anchors": [],
+                    "diagnosis": "caller-owned",
+                }
+            ]
+        },
+    ],
+)
+def test_v3_dependency_correlation_refuses_unknown_fields(
+    tmp_path: Path,
+    request: dict[str, object],
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        with pytest.raises(ValueError, match="unknown dependency correlation"):
+            codemap.dependency_evidence_correlation(observation, request)
+
+
 def test_v3_dependency_correlation_preserves_contextual_ownership(
     tmp_path: Path,
 ) -> None:
