@@ -18,7 +18,7 @@ Package-manager and resolver semantics belong at the adapter edge. The shared de
 
 An adapter may know how Maven, uv, Gradle, npm, Cargo, an SBOM producer, or another resolver represents dependency information. Core dependency qualification must not.
 
-The adapter translates producer-native material into the general `hashmarks.dependency-resolution.v2` contract. After that translation:
+The adapter translates producer-native material into the general `hashmarks.dependency-resolution.v3` contract. After that translation:
 
 - core code must not branch on producer names such as `maven`, `uv`, `gradle`, or `npm`;
 - core code must not interpret producer-specific source-format names;
@@ -62,6 +62,10 @@ For example, one `uv.lock` source can support selection, graph, and resolved-inv
 The general invariant is:
 
 > A fact or completeness claim may be no stronger than the cited evidence source's declared semantic authority, completeness, truncation, context, and provenance.
+
+Source completeness and semantic coverage are separate axes. Source completeness says whether the supplied producer artifact/observation itself is complete and untruncated within its declared context. Coverage says whether a specific semantic domain is exhaustive. A physically complete source may therefore support incomplete `module-ownership` coverage, and carrying an authority never by itself makes that authority complete.
+
+Semantic authorities are producer/caller declarations inside an external observation. Core qualification checks that facts and coverage do not exceed those declarations; it does not infer authority from `kind` or independently certify the external producer. Repository truth remains governed by the normal Hashmarks correlation and repository-evidence boundaries.
 
 The invariant is **not**:
 
