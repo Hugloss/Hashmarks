@@ -1479,3 +1479,21 @@ def test_v2_coverage_source_context_must_match_coverage_context(
         codemap.sync()
         with pytest.raises(ValueError, match="incompatible evidence source context"):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_relationship_provenance_cannot_cross_contexts(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["relationships"][0]["evidence_sources"] = ["tree:runtime"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="relationship evidence source context"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_inventory_membership_requires_inventory_evidence(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["inventory"][0]["evidence_sources"] = ["tree:compile"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="inventory evidence source kind"):
+            codemap.dependency_resolution_evidence(snapshot)
