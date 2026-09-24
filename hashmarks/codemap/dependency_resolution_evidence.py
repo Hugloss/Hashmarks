@@ -402,8 +402,16 @@ class DependencyResolutionEvidenceMixin:
                         "module owner context not selected: "
                         f"{row['module']}:{owner}:{row['context']}"
                     )
-            for ref in row["evidence_sources"]:
-                source = sources_by_id[str(ref)]
+            sources = [
+                sources_by_id[str(ref)] for ref in row["evidence_sources"]
+            ]
+            if row["completeness"] == "complete" and not any(
+                source.get("kind") == "resolved-inventory" for source in sources
+            ):
+                raise ValueError(
+                    "complete module ownership requires inventory evidence source"
+                )
+            for source in sources:
                 source_context = str(source.get("context") or "")
                 if source_context and source_context != row["context"]:
                     raise ValueError(
