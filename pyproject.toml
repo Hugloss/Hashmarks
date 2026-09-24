@@ -88,6 +88,9 @@ markers = [
 force-exclude = true
 required-version = "==0.16.8"
 
+[tool.ruff.format]
+line-ending = "lf"
+
 [tool.ruff.lint]
 preview = true
 explicit-preview-rules = true
