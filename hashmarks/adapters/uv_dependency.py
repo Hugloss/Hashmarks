@@ -66,8 +66,15 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     lock_version = document.get("version")
     if lock_version != 1:
         raise ValueError(f"unsupported uv lock schema version: {lock_version}")
-    if document.get("resolution-markers"):
-        raise ValueError("uv lock resolution forks are not modeled")
+    raw_resolution_markers = document.get("resolution-markers", ())
+    if not isinstance(raw_resolution_markers, list) or any(
+        not isinstance(marker, str) or not marker.strip()
+        for marker in raw_resolution_markers
+    ):
+        raise ValueError("uv lock resolution-markers must be a list of strings")
+    resolution_markers = [marker.strip() for marker in raw_resolution_markers]
+    if len(set(resolution_markers)) != len(resolution_markers):
+        raise ValueError("uv lock contains duplicate resolution marker")
     if document.get("conflicts"):
         raise ValueError("uv lock conflicts are not modeled")
 
@@ -81,6 +88,8 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     for raw in raw_packages:
         if not isinstance(raw, Mapping):
             raise ValueError("uv lock package must be an object")
+        if raw.get("resolution-markers"):
+            raise ValueError("uv package resolution forks are not modeled")
         name = str(raw.get("name") or "").strip()
         version = str(raw.get("version") or "").strip()
         if not name or not version:
@@ -217,6 +226,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "kind": "uv-lock",
             "schema_version": str(document.get("version") or ""),
             "revision": str(document.get("revision") or ""),
+            "resolution_markers": resolution_markers,
         },
         "scope": (
             {"requires_python": str(document["requires-python"])}
