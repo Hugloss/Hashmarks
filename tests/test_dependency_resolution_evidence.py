@@ -29,7 +29,7 @@ def _snapshot_v2() -> dict[str, object]:
             {
                 "source_id": "tree:compile",
                 "kind": "test-resolution-source",
-                "authorities": ["resolution-graph", "selection"],
+            "authorities": ["resolution-graph", "selection"],
                 "context": "compile",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -37,7 +37,7 @@ def _snapshot_v2() -> dict[str, object]:
             {
                 "source_id": "tree:runtime",
                 "kind": "test-resolution-source",
-                "authorities": ["resolution-graph", "selection"],
+            "authorities": ["resolution-graph", "selection"],
                 "context": "runtime",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -45,7 +45,7 @@ def _snapshot_v2() -> dict[str, object]:
             {
                 "source_id": "list:compile",
                 "kind": "test-inventory-source",
-                "authorities": ["module-ownership", "resolved-inventory", "selection"],
+            "authorities": ["module-ownership", "resolved-inventory", "selection"],
                 "context": "compile",
                 "completeness": "complete",
                 "truncation": "complete",
@@ -972,7 +972,7 @@ def test_v2_context_query_includes_selection_context_without_inventory_or_edge(
         {
             "source_id": "tree:optional",
             "kind": "test-resolution-source",
-                "authorities": ["resolution-graph", "selection"],
+            "authorities": ["resolution-graph", "selection"],
             "context": "optional",
             "completeness": "incomplete",
             "truncation": "complete",
@@ -999,7 +999,7 @@ def test_v2_inventory_absence_requires_complete_inventory_coverage(
         {
             "source_id": "list:runtime",
             "kind": "test-inventory-source",
-                "authorities": ["module-ownership", "resolved-inventory", "selection"],
+            "authorities": ["module-ownership", "resolved-inventory", "selection"],
             "context": "runtime",
             "completeness": "incomplete",
             "truncation": "complete",
@@ -1050,7 +1050,7 @@ def test_v2_unscoped_module_absence_requires_coverage_for_every_context(
         {
             "source_id": "modules:compile",
             "kind": "test-module-source",
-                "authorities": ["module-ownership"],
+            "authorities": ["module-ownership"],
             "context": "compile",
             "completeness": "complete",
             "truncation": "complete",
@@ -1089,7 +1089,7 @@ def test_v2_unscoped_module_absence_is_admissible_when_all_contexts_complete(
             {
                 "source_id": source_id,
                 "kind": "test-module-source",
-                "authorities": ["module-ownership"],
+            "authorities": ["module-ownership"],
                 "context": context,
                 "completeness": "complete",
                 "truncation": "complete",
@@ -1401,7 +1401,7 @@ def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
         {
             "source_id": "ownership:compile",
             "kind": "test-module-source",
-                "authorities": ["module-ownership"],
+            "authorities": ["module-ownership"],
             "context": "compile",
             "completeness": "incomplete",
             "truncation": "complete",
@@ -1432,7 +1432,7 @@ def test_v2_complete_module_ownership_cannot_be_backed_only_by_unknown_source(
         {
             "source_id": "ownership:compile",
             "kind": "test-module-source",
-                "authorities": ["module-ownership"],
+            "authorities": ["module-ownership"],
             "context": "compile",
             "completeness": "unknown",
             "truncation": "unknown",
@@ -1461,7 +1461,7 @@ def test_v2_complete_coverage_can_combine_complete_sources(tmp_path: Path) -> No
         {
             "source_id": "tree:compile:second",
             "kind": "test-resolution-source",
-                "authorities": ["resolution-graph", "selection"],
+            "authorities": ["resolution-graph", "selection"],
             "context": "compile",
             "completeness": "complete",
             "truncation": "complete",
@@ -1719,7 +1719,7 @@ def test_v2_root_provenance_changes_observation_not_resolution_identity(
         {
             "source_id": "tree:compile:copy",
             "kind": "test-resolution-source",
-                "authorities": ["resolution-graph", "selection"],
+            "authorities": ["resolution-graph", "selection"],
             "context": "compile",
             "completeness": "complete",
             "truncation": "complete",
