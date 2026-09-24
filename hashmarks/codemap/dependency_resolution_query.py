@@ -62,18 +62,17 @@ def _limited(
 def _adjacency(
     relationships: Sequence[Mapping[str, object]],
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
-    outgoing: dict[str, list[str]] = {}
-    incoming: dict[str, list[str]] = {}
+    outgoing: dict[str, set[str]] = {}
+    incoming: dict[str, set[str]] = {}
     for row in relationships:
         source = str(row.get("source") or "")
         target = str(row.get("target") or "")
-        outgoing.setdefault(source, []).append(target)
-        incoming.setdefault(target, []).append(source)
-    for values in outgoing.values():
-        values.sort()
-    for values in incoming.values():
-        values.sort()
-    return outgoing, incoming
+        outgoing.setdefault(source, set()).add(target)
+        incoming.setdefault(target, set()).add(source)
+    return (
+        {node: sorted(values) for node, values in outgoing.items()},
+        {node: sorted(values) for node, values in incoming.items()},
+    )
 
 
 def _walk(
