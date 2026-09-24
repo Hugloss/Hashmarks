@@ -41,6 +41,23 @@ Coding agents working on Hashmarks must therefore:
 
 If a third-party project is itself the explicitly admitted target repository, analyze it as that repository. The prohibition is on dependency-driven recursive ecosystem archaeology, not on analyzing a repository the caller deliberately selected.
 
+## Dependency adapters translate; core stays producer-neutral
+
+Dependency-resolution producers are edge translators, not semantic owners. Maven, uv, Gradle, npm, SBOM, and future producer formats may have adapter-specific parsing, but producer syntax must terminate in the adapter.
+
+The shared dependency model must distinguish **physical source kind** from **semantic evidence authority**. Source `kind` is opaque provenance such as `maven-dependency-tree` or `uv-lock`; core dependency qualification must never branch on it to decide what a fact means. Semantic authority is expressed in general terms such as `selection`, `resolution-graph`, `resolved-inventory`, and `module-ownership`. One physical source may carry multiple authorities; never invent duplicate source identities for identical bytes merely to satisfy different semantic uses.
+
+When adding or repairing an adapter:
+
+- state the producer-neutral fact/authority first, then implement producer-specific translation;
+- keep package-manager parsing, coordinates, source tables, scopes/classifiers, workspace encodings, diagnostic prefixes, and similar syntax in the adapter;
+- do not add Maven/uv/other producer names or source-format assumptions to core dependency validators;
+- preserve ambiguity, context, completeness, truncation, and provenance;
+- add cross-producer semantic regressions when two producers can express the same fact;
+- if a new concept cannot be explained without naming the producer, it is not yet a general core concept.
+
+The normative contract is [`docs/reference/DEPENDENCY_EVIDENCE.md`](docs/reference/DEPENDENCY_EVIDENCE.md).
+
 When asked to "improve Hashmarks", prefer repository-intelligence correctness, freshness, authority safety, evidence quality, evidence economics, simplification, and removal of misplaced responsibilities over adding features.
 
 ## Non-negotiable product boundary
