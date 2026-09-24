@@ -1558,3 +1558,52 @@ def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
             ValueError, match="module ownership exceeds evidence source"
         ):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_root_context_requires_selection_membership(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["selections"][0]["contexts"] = ["compile"]
+    snapshot["selections"][0]["evidence_sources"] = ["tree:compile"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="root context not selected"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_inventory_context_requires_selection_membership(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["inventory"][2]["context"] = "runtime"
+    snapshot["inventory"][2]["evidence_sources"] = ["tree:runtime"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="inventory context not selected"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_relationship_context_requires_both_endpoint_selections(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["selections"][1]["contexts"] = ["compile"]
+    snapshot["selections"][1]["evidence_sources"] = ["tree:compile"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="relationship context not selected"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v2_module_owner_must_be_selected_in_ownership_context(tmp_path: Path) -> None:
+    snapshot = _snapshot_v2()
+    snapshot["module_ownership"] = [
+        {
+            "module": "inventory.module",
+            "context": "runtime",
+            "owners": ["inventory-only@1"],
+            "completeness": "incomplete",
+            "evidence_sources": ["tree:runtime"],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="module owner context not selected"):
+            codemap.dependency_resolution_evidence(snapshot)
