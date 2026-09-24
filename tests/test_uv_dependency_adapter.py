@@ -156,3 +156,23 @@ source = { virtual = ".", directory = "." }
 
     with pytest.raises(ValueError, match="ambiguous local source identity"):
         uv_lock_dependency_observation(lock=lock)
+
+
+def test_uv_lock_adapter_refuses_to_infer_non_dot_workspace_root() -> None:
+    lock = b"""version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[[package]]
+name = "member"
+version = "0.1.0"
+source = { editable = "packages/member" }
+
+[[package]]
+name = "local-dependency"
+version = "1.0.0"
+source = { directory = "vendor/local-dependency" }
+"""
+
+    with pytest.raises(ValueError, match="workspace membership evidence is required"):
+        uv_lock_dependency_observation(lock=lock)
