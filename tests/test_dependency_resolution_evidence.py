@@ -839,14 +839,10 @@ def test_v3_multicontext_graph_query_requires_explicit_context(
 ) -> None:
     changed = _snapshot_v3()
     changed["relationships"] = [
-        row
-        for row in changed["relationships"]
-        if row["context"] == "compile"
+        row for row in changed["relationships"] if row["context"] == "compile"
     ]
     inventory_only = next(
-        row
-        for row in changed["selections"]
-        if row["node_id"] == "inventory-only@1"
+        row for row in changed["selections"] if row["node_id"] == "inventory-only@1"
     )
     inventory_only["contexts"].append("runtime")
     inventory_only["evidence_sources"].append("tree:runtime")
