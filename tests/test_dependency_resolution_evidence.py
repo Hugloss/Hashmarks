@@ -311,6 +311,12 @@ def test_v2_module_ownership_preserves_ambiguous_maven_module(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot_v2()
+    runtime_source = next(
+        row
+        for row in snapshot["evidence_sources"]
+        if row["source_id"] == "tree:runtime"
+    )
+    runtime_source["authorities"].append("module-ownership")
     snapshot["module_ownership"] = [
         {
             "module": "shared.module",
@@ -335,6 +341,12 @@ def test_v2_dependency_correlation_preserves_contextual_ownership(
 ) -> None:
     (tmp_path / "consumer.py").write_text("import library\n")
     snapshot = _snapshot_v2()
+    runtime_source = next(
+        row
+        for row in snapshot["evidence_sources"]
+        if row["source_id"] == "tree:runtime"
+    )
+    runtime_source["authorities"].append("module-ownership")
     snapshot["module_ownership"] = [
         {
             "module": "library",
@@ -1791,10 +1803,17 @@ def test_v2_inventory_requires_resolved_inventory_evidence_authority(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v2()
-    changed["evidence_sources"][2]["authorities"] = [
-        "module-ownership",
-        "selection",
-    ]
+    changed["evidence_sources"].append(
+        {
+            "source_id": "fact:inventory:compile",
+            "kind": "opaque-fact-source",
+            "authorities": ["selection"],
+            "context": "compile",
+            "completeness": "complete",
+            "truncation": "complete",
+        }
+    )
+    changed["inventory"][0]["evidence_sources"] = ["fact:inventory:compile"]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -1886,8 +1905,17 @@ def test_v2_relationship_refuses_inventory_only_source_authority(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v2()
-    changed["evidence_sources"][0]["authorities"] = ["selection"]
-    changed["relationships"][0]["evidence_sources"] = ["tree:compile"]
+    changed["evidence_sources"].append(
+        {
+            "source_id": "fact:relationship:compile",
+            "kind": "opaque-fact-source",
+            "authorities": ["selection"],
+            "context": "compile",
+            "completeness": "complete",
+            "truncation": "complete",
+        }
+    )
+    changed["relationships"][0]["evidence_sources"] = ["fact:relationship:compile"]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -1900,8 +1928,17 @@ def test_v2_relationship_refuses_inventory_only_source_authority(
 
 def test_v2_root_refuses_inventory_only_source_authority(tmp_path: Path) -> None:
     changed = _snapshot_v2()
-    changed["evidence_sources"][0]["authorities"] = ["selection"]
-    changed["roots"][0]["evidence_sources"] = ["tree:compile"]
+    changed["evidence_sources"].append(
+        {
+            "source_id": "fact:root:compile",
+            "kind": "opaque-fact-source",
+            "authorities": ["selection"],
+            "context": "compile",
+            "completeness": "complete",
+            "truncation": "complete",
+        }
+    )
+    changed["roots"][0]["evidence_sources"] = ["fact:root:compile"]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
