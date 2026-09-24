@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
@@ -38,11 +39,38 @@ jobs:
           fi
       - name: Git whitespace
         run: git diff --check
+  ruff-debt:
+    name: Ruff debt no-growth
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: formatting
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.11
+      - name: Materialize locked Ruff environment
+        run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --frozen --only-group lint --python 3.11
+      - name: Resolve previous-main Ruff debt baseline
+        run: git show HEAD^1:ruff-debt-baseline.json > "$RUNNER_TEMP/ruff-debt-baseline.previous.json"
+      - name: Enforce Ruff debt no-growth
+        env:
+          RUFF_DEBT_PREVIOUS_BASELINE: ${{ runner.temp }}/ruff-debt-baseline.previous.json
+        run: make lint-debt-gate
+      - name: Exact current Ruff debt inventory
+        if: always()
+        continue-on-error: true
+        run: make lint-debt-json
+
   fast-gate:
     name: Fast validation gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: formatting
+    needs: [formatting, ruff-debt]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,19 +83,10 @@ jobs:
       - name: Check committed dependency convergence
         run: uv lock --check
       - run: uv sync --frozen --group test --python 3.11
-      - name: Resolve previous-main Ruff debt baseline
-        run: git show HEAD^1:ruff-debt-baseline.json > "$RUNNER_TEMP/ruff-debt-baseline.previous.json"
-      - name: Ruff maintainability debt gate
-        env:
-          RUFF_DEBT_PREVIOUS_BASELINE: ${{ runner.temp }}/ruff-debt-baseline.previous.json
-        run: make lint-debt-gate
-      - name: Exact current Ruff debt inventory
-        continue-on-error: true
-        run: make lint-debt-json
       - run: make compile
   authority-diagnostics:
     name: Workspace authority diagnostics
-    needs: formatting
+    needs: [formatting, ruff-debt]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -84,7 +103,7 @@ jobs:
 
   evidence-binding-diagnostics:
     name: Repository evidence binding diagnostics
-    needs: formatting
+    needs: [formatting, ruff-debt]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -104,7 +123,7 @@ jobs:
 
   consumer-wheel-artifact:
     name: Consumer wheel artifact
-    needs: formatting
+    needs: [formatting, ruff-debt]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -127,7 +146,7 @@ jobs:
 
   release-environment:
     name: Release qualification environment (Python 3.14)
-    needs: formatting
+    needs: [formatting, ruff-debt]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -144,7 +163,7 @@ jobs:
 
   python-support:
     name: Tests / Python ${{ matrix.python }}
-    needs: formatting
+    needs: [formatting, ruff-debt]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -167,7 +186,7 @@ jobs:
 
   mcp-interop:
     name: ${{ matrix.label }} / Python ${{ matrix.python }}
-    needs: formatting
+    needs: [formatting, ruff-debt]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -203,7 +222,7 @@ jobs:
 
   precommit:
     name: Pre-commit checks
-    needs: formatting
+    needs: [formatting, ruff-debt]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -223,6 +242,7 @@ jobs:
     if: always()
     needs:
       - formatting
+      - ruff-debt
       - fast-gate
       - authority-diagnostics
       - evidence-binding-diagnostics
@@ -237,6 +257,7 @@ jobs:
       - name: Require every authoritative qualification lane
         env:
           FORMATTING: ${{ needs.formatting.result }}
+          RUFF_DEBT: ${{ needs.ruff-debt.result }}
           FAST_GATE: ${{ needs.fast-gate.result }}
           WORKSPACE_AUTHORITY: ${{ needs.authority-diagnostics.result }}
           EVIDENCE_BINDINGS: ${{ needs.evidence-binding-diagnostics.result }}
@@ -247,7 +268,7 @@ jobs:
           PRECOMMIT: ${{ needs.precommit.result }}
         run: |
           failed=0
-          for lane in             FORMATTING             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             PRECOMMIT
+          for lane in             FORMATTING             RUFF_DEBT             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             PRECOMMIT
           do
             result="${!lane}"
             printf '%-24s %s\n' "$lane" "$result"
