@@ -308,7 +308,11 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             if isinstance(row, Mapping) and str(row.get("node_id") or "") == node_id
             for value in row.get("contexts", ())
         )
-        result = sorted(value for value in values if value)
+        result = _limited(
+            sorted(value for value in values if value),
+            max_results=max_results,
+            omissions=omissions,
+        )
     elif operation == "module-owners":
         if not module:
             raise ValueError("module-owners query requires module")
