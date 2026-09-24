@@ -1378,3 +1378,20 @@ def test_v2_inventory_rejects_unknown_node_filter(tmp_path: Path) -> None:
                 observation,
                 [{"operation": "inventory", "node_id": "missing@1"}],
             )
+
+
+def test_v2_queries_reject_unknown_context_filter(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
+        for request in (
+            {
+                "operation": "dependencies",
+                "node_id": "app@1",
+                "context": "missing",
+            },
+            {"operation": "inventory", "context": "missing"},
+            {"operation": "module-owners", "module": "library", "context": "missing"},
+        ):
+            with pytest.raises(ValueError, match="unknown dependency query context"):
+                codemap.dependency_resolution_queries(observation, [request])
