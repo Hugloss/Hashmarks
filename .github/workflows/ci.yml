@@ -27,10 +27,24 @@ jobs:
       - run: uv python install 3.11
       - name: Materialize locked Ruff environment
         run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --frozen --only-group lint --python 3.11
-      - name: Ruff format
-        run: .ruff-venv/bin/ruff format --check --diff .
-      - name: Ruff lint
-        run: .ruff-venv/bin/ruff check .
+      - name: Ruff format — show exact repair diff
+        shell: bash
+        run: |
+          if ! .ruff-venv/bin/ruff format --check --diff .; then
+            echo "::error title=Ruff formatting required::Canonical Python formatting differs. Apply the diff above, or run: make agent-finish"
+            echo ""
+            echo "REPAIR: make agent-finish"
+            exit 1
+          fi
+      - name: Ruff lint — show actionable failure
+        shell: bash
+        run: |
+          if ! .ruff-venv/bin/ruff check .; then
+            echo "::error title=Ruff lint failed::Run: make agent-finish"
+            echo ""
+            echo "REPAIR: make agent-finish"
+            exit 1
+          fi
       - name: Git whitespace
         run: git diff --check
 
