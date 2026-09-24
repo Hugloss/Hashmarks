@@ -494,7 +494,8 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
         "evidence_sources": [
             {
                 "source_id": "tree:runtime",
-                "kind": "resolution-graph",
+                "kind": "test-resolution-source",
+                "authorities": ["resolution-graph", "selection"],
                 "context": "runtime",
                 "completeness": "complete",
                 "truncation": "complete",
