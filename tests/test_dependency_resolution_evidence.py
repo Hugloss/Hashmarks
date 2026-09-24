@@ -313,6 +313,29 @@ def test_v2_module_ownership_preserves_ambiguous_maven_module(
     assert ownership["owners"] == ["inventory-only@1", "library@1"]
 
 
+def test_v2_complete_module_ownership_refuses_graph_only_source_authority(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "runtime",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["tree:runtime"],
+        }
+    ]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="complete module ownership requires inventory evidence source",
+        ):
+            codemap.dependency_resolution_evidence(changed)
+
+
 def test_v2_dependency_correlation_preserves_contextual_ownership(
     tmp_path: Path,
 ) -> None:
