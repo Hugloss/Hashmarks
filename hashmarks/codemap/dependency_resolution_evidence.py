@@ -167,6 +167,11 @@ class DependencyResolutionEvidenceMixin:
             relationships=relationships,
             sources_by_id=sources_by_id,
         )
+        self._validate_dependency_graph_fact_source_authority_v2(
+            roots=roots,
+            relationships=relationships,
+            sources_by_id=sources_by_id,
+        )
         self._validate_dependency_module_source_authority_v2(
             module_ownership=module_ownership,
             selections=selections,
@@ -355,6 +360,28 @@ class DependencyResolutionEvidenceMixin:
                         "incompatible relationship evidence source context: "
                         f"{row['source']}->{row['target']}:{row['context']}"
                     )
+
+    @staticmethod
+    def _validate_dependency_graph_fact_source_authority_v2(
+        *,
+        roots: Sequence[Mapping[str, object]],
+        relationships: Sequence[Mapping[str, object]],
+        sources_by_id: Mapping[str, Mapping[str, object]],
+    ) -> None:
+        for row in roots:
+            if not any(
+                sources_by_id[str(ref)].get("kind") == "resolution-graph"
+                for ref in row["evidence_sources"]
+            ):
+                raise ValueError("root requires resolution-graph evidence source")
+        for row in relationships:
+            if not any(
+                sources_by_id[str(ref)].get("kind") == "resolution-graph"
+                for ref in row["evidence_sources"]
+            ):
+                raise ValueError(
+                    "relationship requires resolution-graph evidence source"
+                )
 
     @staticmethod
     def _validate_dependency_module_source_authority_v2(
