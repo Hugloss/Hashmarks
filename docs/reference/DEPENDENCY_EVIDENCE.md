@@ -147,7 +147,8 @@ The Maven adapter consumes already-produced dependency-tree JSON and dependency-
 
 - tree evidence is a Maven source format that can support `selection` and `resolution-graph`;
 - list evidence is a Maven source format that can support `selection`, `resolved-inventory`, and `module-ownership`;
-- complete list coverage requires a recognized list header and fully parsed content; Maven's `none` marker and a header-only list describe an empty complete inventory, while errors, dependency-resolution warnings that negate metadata completeness, or unexplained content do not;
+- Maven tree/list bytes establish positive facts, but do not by themselves prove semantic exhaustiveness because Maven goals support caller-selected filters; complete graph/inventory coverage requires an explicit caller declaration for the supplied context;
+- complete list coverage additionally requires a recognized list header and fully parsed content; Maven's `none` marker and a header-only list can describe an empty complete inventory only when that context was explicitly declared complete, while errors, dependency-resolution warnings that negate metadata completeness, or unexplained content do not;
 - module-owner absence is admissible only when the list's module annotations establish complete module-ownership coverage;
 - Maven-specific parsing, scopes, classifiers, diagnostic prefixes, and module annotations stay inside the adapter.
 
