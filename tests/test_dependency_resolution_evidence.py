@@ -1696,3 +1696,19 @@ def test_v2_unscoped_inventory_absence_requires_coverage_for_every_context(
     assert result["result"] == []
     assert result["completeness"] == "incomplete"
     assert result["negative_evidence"] == "not-admissible"
+
+
+def test_v2_complete_graph_coverage_requires_root_in_each_complete_context(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v2()
+    changed["roots"] = [
+        row for row in changed["roots"] if row["context"] != "compile"
+    ]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match="complete resolution-graph coverage lacks root: compile"
+        ):
+            codemap.dependency_resolution_evidence(changed)
