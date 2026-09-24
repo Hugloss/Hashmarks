@@ -441,8 +441,6 @@ class DependencyResolutionEvidenceMixin:
                 label="selection context",
                 allowed=contexts,
             )
-            if not selection_contexts:
-                raise ValueError(f"selection must declare context: {node_id}")
             result.append(
                 {
                     "node_id": node_id,
