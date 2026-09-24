@@ -182,6 +182,8 @@ Hashmarks is a repository observer that exposes repository intelligence, not an 
 
 **PB12. Dependency adapters translate producer syntax into producer-neutral semantic authority.** Maven, uv, Gradle, npm, SBOM, and future producer-specific formats terminate at their adapters. Core dependency qualification may use producer-neutral semantic authorities such as selection, resolution graph, resolved inventory, and module ownership, but it must not derive authority from a producer/source-format `kind`, require a package-manager-specific source shape, or duplicate one physical artifact into synthetic sources merely to represent different semantic uses. One evidence source may carry multiple semantic authorities. See `DEPENDENCY_EVIDENCE.md`.
 
+**PB13. Physical-source completeness and semantic coverage are distinct.** A complete, untruncated producer artifact does not imply complete graph, inventory, selection, or module-ownership coverage merely because the source declares that authority. Negative evidence and query completeness require explicit qualified coverage in the relevant semantic domain; source completeness only bounds the cited artifact itself.
+
 ## Evidence, interchange, and consumer conformance
 
 **E1. Hashmarks-produced evidence identities bind the exact authority-relevant fields they claim to represent.** Consumers compare or validate producer-owned identities; they do not recreate hidden canonicalization rules.
