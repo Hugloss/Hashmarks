@@ -547,6 +547,62 @@ def test_v2_query_exposes_depth_omission_instead_of_silent_partial_result(
     assert result["omissions"] == [{"reason": "depth-limit", "node_id": "library@1"}]
 
 
+def test_v2_repository_input_change_is_observation_only(tmp_path: Path) -> None:
+    dependency_input = tmp_path / "dependency.lock"
+    dependency_input.write_text("before\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        snapshot = _snapshot_v2()
+        snapshot["repository_inputs"] = [{"path": "dependency.lock"}]
+        before = codemap.dependency_resolution_evidence(snapshot)
+
+        dependency_input.write_text("after\n")
+        codemap.sync()
+        after = codemap.dependency_resolution_evidence(snapshot)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert before["resolution_identity"] == after["resolution_identity"]
+    assert before["observation_identity"] != after["observation_identity"]
+    assert delta["selections_changed"] == []
+    assert delta["relationships_added"] == []
+    assert delta["relationships_removed"] == []
+
+
+def test_v2_module_ownership_change_is_observation_only(tmp_path: Path) -> None:
+    before_snapshot = _snapshot_v2()
+    before_snapshot["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        }
+    ]
+    after_snapshot = _snapshot_v2()
+    after_snapshot["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["inventory-only@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(before_snapshot)
+        after = codemap.dependency_resolution_evidence(after_snapshot)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert before["resolution_identity"] == after["resolution_identity"]
+    assert before["observation_identity"] != after["observation_identity"]
+    assert delta["module_ownership_changed"] == ["library.module|compile"]
+    assert delta["selections_changed"] == []
+    assert delta["relationships_added"] == []
+    assert delta["relationships_removed"] == []
+
+
 def test_v2_provenance_change_does_not_masquerade_as_resolution_change(
     tmp_path: Path,
 ) -> None:
