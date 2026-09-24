@@ -203,7 +203,6 @@ source = { directory = "vendor/shared" }
         uv_lock_dependency_observation(lock=lock)
 
 
-@pytest.mark.parametrize("source_key", ["virtual", "editable", "directory"])
 def test_uv_lock_adapter_refuses_unknown_lock_schema_version() -> None:
     lock = b"""version = 2
 revision = 0
@@ -256,6 +255,7 @@ def test_uv_lock_adapter_refuses_unmodeled_resolution_forks(
         uv_lock_dependency_observation(lock=lock)
 
 
+@pytest.mark.parametrize("source_key", ["virtual", "editable", "directory"])
 def test_uv_lock_adapter_accepts_local_project_root_source_forms(
     source_key: str,
 ) -> None:
