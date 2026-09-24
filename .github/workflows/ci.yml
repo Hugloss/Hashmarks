@@ -36,13 +36,14 @@ jobs:
             echo "REPAIR: make agent-finish"
             exit 1
           fi
-      - name: Ruff lint — show actionable failure
+      - name: Ruff lint — classify non-formatting defects
         shell: bash
         run: |
           if ! .ruff-venv/bin/ruff check .; then
-            echo "::error title=Ruff lint failed::Run: make agent-finish"
+            echo "::error title=Ruff lint or maintainability defect::Formatting already passed. This is not another formatting repair. Fix the reported semantic lint/complexity finding before qualification."
             echo ""
-            echo "REPAIR: make agent-finish"
+            echo "FORMAT STATUS: VERIFIED"
+            echo "LINT STATUS: REQUIRES SEMANTIC REPAIR"
             exit 1
           fi
       - name: Git whitespace
