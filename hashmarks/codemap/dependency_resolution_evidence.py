@@ -127,6 +127,14 @@ def _objects(value: object, *, label: str, limit: int) -> list[Mapping[str, obje
     return rows
 
 
+def _reject_unknown_fields(
+    value: Mapping[str, object], *, label: str, allowed: set[str]
+) -> None:
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        raise ValueError(f"unknown dependency {label} field: {unknown[0]}")
+
+
 class DependencyResolutionEvidenceMixin:
     """Qualify producer-neutral dependency resolution observations.
 
@@ -141,6 +149,25 @@ class DependencyResolutionEvidenceMixin:
     ) -> dict[str, object]:
         if not isinstance(snapshot, Mapping):
             raise ValueError("dependency resolution snapshot must be an object")
+        _reject_unknown_fields(
+            snapshot,
+            label="snapshot",
+            allowed={
+                "schema",
+                "producer",
+                "scope",
+                "contexts",
+                "roots",
+                "evidence_sources",
+                "components",
+                "selections",
+                "inventory",
+                "relationships",
+                "coverage",
+                "repository_inputs",
+                "module_ownership",
+            },
+        )
         if len(_canonical(snapshot)) > _MAX_REQUEST_BYTES:
             raise ValueError(
                 f"dependency resolution snapshot exceeds {_MAX_REQUEST_BYTES} encoded bytes"
@@ -719,6 +746,11 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[str] = set()
         for raw in rows:
+            _reject_unknown_fields(
+                raw,
+                label="component",
+                allowed={"component_id", "name", "ecosystem"},
+            )
             component_id = _identifier(raw.get("component_id"), label="component_id")
             if component_id in seen:
                 raise ValueError(f"duplicate dependency component_id: {component_id}")
@@ -776,6 +808,19 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[str] = set()
         for raw in rows:
+            _reject_unknown_fields(
+                raw,
+                label="evidence source",
+                allowed={
+                    "source_id",
+                    "kind",
+                    "authorities",
+                    "context",
+                    "completeness",
+                    "truncation",
+                    "producer_digest",
+                },
+            )
             source_id = _identifier(raw.get("source_id"), label="source_id")
             if source_id in seen:
                 raise ValueError(f"duplicate dependency evidence source: {source_id}")
@@ -831,6 +876,19 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[str] = set()
         for raw in rows:
+            _reject_unknown_fields(
+                raw,
+                label="selection",
+                allowed={
+                    "node_id",
+                    "component_id",
+                    "version",
+                    "source",
+                    "marker",
+                    "contexts",
+                    "evidence_sources",
+                },
+            )
             node_id = _identifier(raw.get("node_id"), label="node_id")
             if node_id in seen:
                 raise ValueError(f"duplicate dependency selection node_id: {node_id}")
@@ -875,6 +933,11 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
         for raw in rows:
+            _reject_unknown_fields(
+                raw,
+                label="inventory",
+                allowed={"node_id", "context", "evidence_sources"},
+            )
             node_id = _identifier(raw.get("node_id"), label="inventory node_id")
             context = _identifier(raw.get("context"), label="inventory context")
             if node_id not in node_ids:
@@ -917,6 +980,19 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[tuple[str, str, str, str, str, str]] = set()
         for raw in rows:
+            _reject_unknown_fields(
+                raw,
+                label="relationship",
+                allowed={
+                    "source",
+                    "target",
+                    "kind",
+                    "context",
+                    "effective_scope",
+                    "marker",
+                    "evidence_sources",
+                },
+            )
             source = _identifier(raw.get("source"), label="relationship source")
             target = _identifier(raw.get("target"), label="relationship target")
             context = _identifier(raw.get("context"), label="relationship context")
@@ -984,6 +1060,11 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
         for raw in rows:
+            _reject_unknown_fields(
+                raw,
+                label="root",
+                allowed={"node_id", "context", "evidence_sources"},
+            )
             node_id = _identifier(raw.get("node_id"), label="root node_id")
             context = _identifier(raw.get("context"), label="root context")
             if node_id not in node_ids:
@@ -1022,6 +1103,20 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
         for raw in rows:
+            _reject_unknown_fields(
+                raw,
+                label="module ownership",
+                allowed={
+                    "module",
+                    "context",
+                    "owners",
+                    "completeness",
+                    "evidence_sources",
+                    "state",
+                    "authority",
+                    "producer_authority",
+                },
+            )
             module = _text(raw.get("module"), label="module", required=True)
             context = _identifier(raw.get("context"), label="module ownership context")
             if context not in contexts:
@@ -1107,6 +1202,17 @@ class DependencyResolutionEvidenceMixin:
         }
         source_ids = set(sources)
         for raw in rows:
+            _reject_unknown_fields(
+                raw,
+                label="coverage",
+                allowed={
+                    "context",
+                    "kind",
+                    "completeness",
+                    "truncation",
+                    "evidence_sources",
+                },
+            )
             context = _identifier(raw.get("context"), label="coverage context")
             kind = cls._dependency_coverage_kind_v3(raw)
             if context not in contexts:
@@ -1285,6 +1391,11 @@ class DependencyResolutionEvidenceMixin:
         result: list[dict[str, object]] = []
         seen: set[str] = set()
         for raw in rows:
+            _reject_unknown_fields(
+                raw,
+                label="repository input",
+                allowed={"path", "member_revision"},
+            )
             path = _identifier(raw.get("path"), label="repository input path")
             if path in seen:
                 raise ValueError(f"duplicate repository input path: {path}")
