@@ -52,7 +52,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     lock: bytes,
     repository_inputs: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
-    """Translate already-produced uv.lock bytes into dependency-resolution v2.
+    """Translate already-produced uv.lock bytes into dependency-resolution v3.
 
     The adapter is execution-free. It reads the lock as producer evidence and never
     invokes uv, resolves packages, reads dependency source, or parses pyproject.toml
