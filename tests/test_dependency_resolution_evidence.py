@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 
 import pytest
@@ -215,6 +216,111 @@ def test_v3_separates_component_selection_and_observation_identity(
     assert first["observation_identity"] != second["observation_identity"]
 
 
+def test_v3_identity_separates_semantics_from_producer_provenance(
+    tmp_path: Path,
+) -> None:
+    base = _snapshot_v3()
+    provenance = copy.deepcopy(base)
+    provenance["producer"] = {"kind": "other-resolver", "schema_version": "9"}
+    for source in provenance["evidence_sources"]:
+        source["kind"] = "other-source-format"
+        source["producer_digest"] = "sha256:other"
+    semantic_scope = copy.deepcopy(base)
+    semantic_scope["scope"] = {"environment": "production"}
+    changed_resolution = copy.deepcopy(base)
+    changed_resolution["selections"][1]["version"] = "2"
+    changed_coverage = copy.deepcopy(base)
+    changed_coverage["coverage"][0]["completeness"] = "incomplete"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        original = codemap.dependency_resolution_evidence(base)
+        other_producer = codemap.dependency_resolution_evidence(provenance)
+        other_scope = codemap.dependency_resolution_evidence(semantic_scope)
+        other_resolution = codemap.dependency_resolution_evidence(changed_resolution)
+        other_coverage = codemap.dependency_resolution_evidence(changed_coverage)
+        delta = codemap.dependency_resolution_delta(original, other_producer)
+        scope_delta = codemap.dependency_resolution_delta(original, other_scope)
+
+    assert original["definition_identity"] == other_producer["definition_identity"]
+    assert original["resolution_identity"] == other_producer["resolution_identity"]
+    assert original["observation_identity"] != other_producer["observation_identity"]
+    assert delta["comparability"] == "comparable"
+    assert delta["selections_changed"] == []
+    assert original["definition_identity"] != other_scope["definition_identity"]
+    assert original["resolution_identity"] != other_scope["resolution_identity"]
+    assert scope_delta["comparability"] == "not-comparable"
+    assert scope_delta["producer_authority"] == "caller-claimed"
+    assert original["definition_identity"] == other_resolution["definition_identity"]
+    assert original["resolution_identity"] != other_resolution["resolution_identity"]
+    assert original["resolution_identity"] == other_coverage["resolution_identity"]
+    assert original["observation_identity"] != other_coverage["observation_identity"]
+
+
+def test_v3_opaque_empty_semantic_scope_is_valid(tmp_path: Path) -> None:
+    snapshot = _snapshot_v3()
+    snapshot["scope"] = {}
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.dependency_resolution_evidence(snapshot)
+    assert packet["scope"] == {}
+
+
+@pytest.mark.parametrize(
+    "authority",
+    ["selection", "resolution-graph", "resolved-inventory", "module-ownership"],
+)
+def test_v3_each_coverage_domain_is_independent_of_source_completeness(
+    tmp_path: Path,
+    authority: str,
+) -> None:
+    snapshot = {
+        "schema": "hashmarks.dependency-resolution.v3",
+        "producer": {"kind": "generic", "schema_version": "1"},
+        "scope": {},
+        "contexts": ["empty"],
+        "roots": [],
+        "components": [],
+        "selections": [],
+        "inventory": [],
+        "relationships": [],
+        "module_ownership": [],
+        "repository_inputs": [],
+        "evidence_sources": [
+            {
+                "source_id": "one-artifact",
+                "kind": "opaque",
+                "authorities": [authority],
+                "context": "empty",
+                "completeness": "complete",
+                "truncation": "complete",
+            }
+        ],
+        "coverage": [
+            {
+                "context": "empty",
+                "kind": authority,
+                "completeness": "incomplete",
+                "truncation": "complete",
+                "evidence_sources": ["one-artifact"],
+            }
+        ],
+    }
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        partial = codemap.dependency_resolution_evidence(snapshot)
+        snapshot["coverage"][0]["completeness"] = "complete"
+        complete = codemap.dependency_resolution_evidence(snapshot)
+        snapshot["evidence_sources"][0]["completeness"] = "incomplete"
+        with pytest.raises(ValueError, match="coverage exceeds evidence source"):
+            codemap.dependency_resolution_evidence(snapshot)
+
+    assert partial["negative_evidence"][0]["state"] == "not-admissible"
+    assert (
+        complete["negative_evidence"][0]["state"] == "admissible-within-declared-scope"
+    )
+
+
 def test_v3_negative_evidence_is_scoped_by_context_and_coverage_kind(
     tmp_path: Path,
 ) -> None:
@@ -402,9 +508,14 @@ def test_v3_dependency_correlation_preserves_contextual_ownership(
             "distribution_nodes": ["library@1"],
             "ownership_completeness": "complete",
             "observed_contexts": ["compile"],
+            "authority": "qualified-external-observation",
+            "producer_authority": "caller-claimed",
             "causation": "not-inferred",
         }
     ]
+    assert packet["producer_authority"] == "caller-claimed"
+    assert packet["observation_identity"] == observation["observation_identity"]
+    assert packet["correlation"]["bundles"][0]["producer_authority"] == "caller-claimed"
     assert packet["correlation"]["bundles"][0]["scope"] == {
         "kind": "dependency-module-correlation",
         "module": "library",
@@ -827,6 +938,95 @@ def test_v3_source_kind_is_opaque_when_semantic_authorities_are_explicit(
     assert packet["relationships"][0]["context"] == "dev"
     assert "groupId" not in repr(packet)
     assert "artifactId" not in repr(packet)
+
+
+@pytest.mark.parametrize("producer_kind", ["maven-like", "uv-like"])
+def test_v3_equivalent_producer_packets_have_query_and_delta_parity(
+    tmp_path: Path,
+    producer_kind: str,
+) -> None:
+    original = _snapshot_v3()
+    translated = copy.deepcopy(original)
+    translated["producer"] = {"kind": producer_kind, "schema_version": "42"}
+    source_ids = {
+        source["source_id"]: f"other:{index}"
+        for index, source in enumerate(translated["evidence_sources"])
+    }
+    for source in translated["evidence_sources"]:
+        source["source_id"] = source_ids[source["source_id"]]
+        source["kind"] = f"{producer_kind}-physical-format"
+    for family in (
+        "roots",
+        "selections",
+        "inventory",
+        "relationships",
+        "coverage",
+        "module_ownership",
+    ):
+        for row in translated[family]:
+            row["evidence_sources"] = [
+                source_ids[ref] for ref in row["evidence_sources"]
+            ]
+
+    requests = [
+        {"operation": "dependencies", "node_id": "app@1", "context": "compile"},
+        {"operation": "inventory", "context": "compile"},
+        {"operation": "module-owners", "module": "missing", "context": "compile"},
+    ]
+
+    def without_source_refs(value: object) -> object:
+        if isinstance(value, dict):
+            return {
+                key: without_source_refs(item)
+                for key, item in value.items()
+                if key != "evidence_sources"
+            }
+        if isinstance(value, list):
+            return [without_source_refs(item) for item in value]
+        return value
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(original)
+        after = codemap.dependency_resolution_evidence(translated)
+        before_queries = codemap.dependency_resolution_queries(before, requests)
+        after_queries = codemap.dependency_resolution_queries(after, requests)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert before["definition_identity"] == after["definition_identity"]
+    assert before["resolution_identity"] == after["resolution_identity"]
+    assert before["observation_identity"] != after["observation_identity"]
+    for left, right in zip(
+        before_queries["results"], after_queries["results"], strict=True
+    ):
+        assert without_source_refs(left["result"]) == without_source_refs(
+            right["result"]
+        )
+        assert left["completeness"] == right["completeness"]
+        assert left["negative_evidence"] == right["negative_evidence"]
+        assert (
+            left["producer_authority"]
+            == right["producer_authority"]
+            == "caller-claimed"
+        )
+    assert delta["comparability"] == "comparable"
+    for field in (
+        "components_added",
+        "components_removed",
+        "components_changed",
+        "selections_added",
+        "selections_removed",
+        "selections_changed",
+        "inventory_added",
+        "inventory_removed",
+        "relationships_added",
+        "relationships_removed",
+        "module_ownership_added",
+        "module_ownership_removed",
+        "module_ownership_changed",
+    ):
+        assert delta[field] == []
+    assert delta["producer_authority"] == "caller-claimed"
 
 
 def test_v3_module_owner_absence_requires_complete_ownership_coverage(
@@ -1773,16 +1973,28 @@ def test_v3_selection_requires_provenance_for_each_observed_context(
             codemap.dependency_resolution_evidence(snapshot)
 
 
-def test_v3_refuses_complete_resolution_graph_without_root(tmp_path: Path) -> None:
+def test_v3_complete_resolution_graph_can_have_selected_nodes_without_root(
+    tmp_path: Path,
+) -> None:
     changed = _snapshot_v3()
     changed["roots"] = [row for row in changed["roots"] if row["context"] != "runtime"]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        with pytest.raises(
-            ValueError, match="complete resolution-graph coverage lacks root: runtime"
-        ):
-            codemap.dependency_resolution_evidence(changed)
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "library@1",
+                    "context": "runtime",
+                }
+            ],
+        )["results"][0]
+
+    assert result["result"] == []
+    assert result["negative_evidence"] == "admissible-within-declared-scope"
 
 
 def test_v3_unscoped_inventory_absence_requires_coverage_for_every_context(
@@ -1802,18 +2014,47 @@ def test_v3_unscoped_inventory_absence_requires_coverage_for_every_context(
     assert result["negative_evidence"] == "not-admissible"
 
 
-def test_v3_complete_graph_coverage_requires_root_in_each_complete_context(
+def test_v3_empty_complete_graph_and_inventory_preserve_negative_evidence(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["roots"] = [row for row in changed["roots"] if row["context"] != "compile"]
+    changed["roots"] = []
+    changed["components"] = []
+    changed["selections"] = []
+    changed["inventory"] = []
+    changed["relationships"] = []
+    changed["module_ownership"] = []
+    changed["coverage"].append(
+        {
+            "context": "compile",
+            "kind": "module-ownership",
+            "completeness": "complete",
+            "truncation": "complete",
+            "evidence_sources": ["list:compile"],
+        }
+    )
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        with pytest.raises(
-            ValueError, match="complete resolution-graph coverage lacks root: compile"
-        ):
-            codemap.dependency_resolution_evidence(changed)
+        observation = codemap.dependency_resolution_evidence(changed)
+        results = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {"operation": "inventory", "node_id": "absent", "context": "compile"},
+                {
+                    "operation": "module-owners",
+                    "module": "absent",
+                    "context": "compile",
+                },
+            ],
+        )["results"]
+
+    assert observation["roots"] == []
+    assert observation["negative_evidence"][0]["producer_authority"] == "caller-claimed"
+    assert all(
+        row["negative_evidence"] == "admissible-within-declared-scope"
+        for row in results
+    )
 
 
 def test_v3_inventory_requires_resolved_inventory_evidence_authority(
@@ -1876,15 +2117,18 @@ def test_v3_selection_requires_selection_evidence_authority(
         "module-ownership",
         "resolved-inventory",
     ]
+    selection_coverage = next(
+        row
+        for row in changed["coverage"]
+        if row["context"] == "compile" and row["kind"] == "selection"
+    )
+    selection_coverage["evidence_sources"] = ["tree:compile"]
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         with pytest.raises(
             ValueError,
-            match=(
-                "selection context lacks selection evidence authority: "
-                "inventory-only@1:compile"
-            ),
+            match="selection requires selection evidence authority",
         ):
             codemap.dependency_resolution_evidence(changed)
 
@@ -1980,3 +2224,81 @@ def test_v3_complete_inventory_coverage_refuses_graph_only_source_authority(
             match="resolved-inventory coverage requires resolved-inventory evidence authority",
         ):
             codemap.dependency_resolution_evidence(changed)
+
+
+@pytest.mark.parametrize(
+    ("family", "index", "unsupported", "message"),
+    [
+        ("roots", 0, "list:compile", "root requires resolution-graph"),
+        ("relationships", 0, "list:compile", "relationship requires resolution-graph"),
+        ("inventory", 0, "tree:compile", "inventory requires resolved-inventory"),
+        (
+            "coverage",
+            0,
+            "list:compile",
+            "resolution-graph coverage requires resolution-graph",
+        ),
+        (
+            "coverage",
+            2,
+            "tree:compile",
+            "resolved-inventory coverage requires resolved-inventory",
+        ),
+        ("coverage", 3, "tree:runtime", "incompatible evidence source context"),
+    ],
+)
+def test_v3_every_cited_source_must_support_its_fact_or_coverage(
+    tmp_path: Path,
+    family: str,
+    index: int,
+    unsupported: str,
+    message: str,
+) -> None:
+    snapshot = _snapshot_v3()
+    snapshot[family][index]["evidence_sources"].append(unsupported)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match=message):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v3_mixed_module_ownership_sources_do_not_borrow_authority(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v3()
+    snapshot["module_ownership"] = [
+        {
+            "module": "library.module",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile", "tree:compile"],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match="module ownership requires module-ownership"
+        ):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v3_mixed_selection_sources_do_not_borrow_authority(tmp_path: Path) -> None:
+    snapshot = _snapshot_v3()
+    snapshot["evidence_sources"].append(
+        {
+            "source_id": "ownership-only:compile",
+            "kind": "opaque",
+            "authorities": ["module-ownership"],
+            "context": "compile",
+            "completeness": "complete",
+            "truncation": "complete",
+        }
+    )
+    snapshot["selections"][0]["evidence_sources"].append("ownership-only:compile")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match="selection requires selection evidence authority"
+        ):
+            codemap.dependency_resolution_evidence(snapshot)

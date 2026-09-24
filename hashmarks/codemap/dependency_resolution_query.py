@@ -406,6 +406,7 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
         "negative_evidence": negative_evidence,
         "omissions": omissions,
         "authority": "qualified-external-observation",
+        "producer_authority": "caller-claimed",
         "causation": "not-inferred",
     }
 
@@ -430,5 +431,6 @@ def dependency_queries(
         "observation_identity": observation.get("observation_identity"),
         "results": results,
         "authority": "qualified-external-observation",
+        "producer_authority": "caller-claimed",
         "causation": "not-inferred",
     }

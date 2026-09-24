@@ -260,6 +260,7 @@ class HashmarksMcpSurface:
                 "schema": "hashmarks.mcp-dependency-codemap.v1",
                 "observation": observation,
                 "authority": "repository-intelligence-only",
+                "producer_authority": "caller-claimed",
                 "interpretation_authority": "consumer-owned",
                 "causation": "not-inferred",
             }

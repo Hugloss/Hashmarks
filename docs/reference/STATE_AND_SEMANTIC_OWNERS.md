@@ -101,13 +101,13 @@ Workspace/local projects may simultaneously have repository-project identity and
 
 ### Maven artifact adapter
 
-`hashmarks.adapters.maven_dependency_observation` is an execution-free qualification adapter for already-produced Maven dependency evidence. It translates caller-supplied dependency-tree JSON and dependency-list text into the typed dependency-resolution v2 observation contract.
+`hashmarks.adapters.maven_dependency_observation` is an execution-free qualification adapter for already-produced Maven dependency evidence. It translates caller-supplied dependency-tree JSON and dependency-list text into the typed dependency-resolution v3 observation contract.
 
 The adapter is not a second dependency semantic owner. It must not invoke Maven, resolve packages, inspect dependency implementation source, parse a POM as resolved truth, or infer repair/vulnerability/causal conclusions. Tree evidence owns graph relationships and effective Maven scope; list evidence owns resolved inventory and reported Java-module ownership. A package present only in list evidence remains inventory-only rather than being invented into graph reachability. Maven contexts such as compile/runtime/test remain observation contexts and are not interchangeable with each edge's effective scope.
 
 ### uv lock adapter
 
-`hashmarks.adapters.uv_lock_dependency_observation` is an execution-free qualification adapter for already-produced `uv.lock` bytes. It translates lock selections, sources, inventory membership, and lock-declared dependency relationships into the existing dependency-resolution v2 observation contract.
+`hashmarks.adapters.uv_lock_dependency_observation` is an execution-free qualification adapter for already-produced `uv.lock` bytes. It translates lock selections, sources, inventory membership, and lock-declared dependency relationships into the existing dependency-resolution v3 observation contract.
 
 The adapter does not invoke uv, synchronize an environment, inspect dependency implementation source, or parse `pyproject.toml` as resolved truth. Lock package source identity is preserved as part of concrete selection identity; a directory selection remains distinct from a registry or other source selection even when name and version match. Name-only dependency references are admitted only when they resolve uniquely within the supplied lock. Ambiguous lock references are rejected rather than guessed.
 
@@ -194,7 +194,7 @@ It owns:
 - logical component identity separately from concrete resolved selection identity;
 - resolved inventory membership separately from graph reachability;
 - multi-context dependency relationships, roots, and effective-scope observations;
-- compact producer-evidence references and context/source-kind coverage;
+- compact producer-evidence references and context/semantic-authority coverage;
 - resolution definition, resolution graph, and full qualified-observation identities;
 - comparability and factual component/selection/inventory/relationship delta for equivalent definitions;
 - bounded dependency traversal with explicit omission accounting;
@@ -212,7 +212,7 @@ It does not own:
 - vulnerability authority, causal diagnosis, upgrade advice, or repair recommendation;
 - consumer phase labels such as `before`, `after-fix`, or `final`.
 
-Inventory membership does not prove graph reachability, and absence from a graph or inventory is authoritative only when the corresponding context/source-kind coverage is explicitly complete and non-truncated. Producer evidence may support individual selections, inventory memberships, and relationships without becoming repository authority.
+Inventory membership does not prove graph reachability, and absence from a graph or inventory is admissible within the caller-declared scope only when the corresponding context/semantic-authority coverage is explicitly complete and non-truncated. Producer evidence may support individual selections, inventory memberships, and relationships without becoming repository authority. Semantic scope and roots define resolution comparability; producer identity is bound to the full observation, not the semantic definition. Complete graph coverage can describe an empty or rootless graph.
 
 A producer claim that a resolution came from a repository input is not source-equivalence proof. Without an independently comparable member revision, source equivalence remains `unknown`; matching and mismatching revisions produce `proven` and `mismatch` respectively.
 

@@ -151,10 +151,6 @@ class DependencyResolutionEvidenceMixin:
         coverage = self._dependency_coverage_v3(
             snapshot.get("coverage", ()), context_set, evidence_sources
         )
-        self._validate_dependency_coverage_facts_v3(
-            coverage=coverage,
-            roots=roots,
-        )
         sources_by_id = {
             str(row["source_id"]): row
             for row in evidence_sources
@@ -189,7 +185,6 @@ class DependencyResolutionEvidenceMixin:
         )
 
         definition = {
-            "producer": producer_packet,
             "scope": scope_packet,
             "contexts": sorted(contexts),
             "roots": [
@@ -232,6 +227,7 @@ class DependencyResolutionEvidenceMixin:
         }
         observation_payload = {
             "resolution_identity": resolution_identity,
+            "producer": producer_packet,
             "repository_binding": repository_binding,
             "repository_inputs": repository_inputs,
             "root_evidence": [
@@ -257,6 +253,7 @@ class DependencyResolutionEvidenceMixin:
             "definition_identity": definition_identity,
             "resolution_identity": resolution_identity,
             "observation_identity": observation_identity,
+            "producer": producer_packet,
             **definition,
             **resolution,
             "repository_binding": repository_binding,
@@ -283,8 +280,8 @@ class DependencyResolutionEvidenceMixin:
         )
 
         scope = snapshot.get("scope")
-        if not isinstance(scope, Mapping) or not scope:
-            raise ValueError("dependency resolution scope must be a non-empty object")
+        if not isinstance(scope, Mapping):
+            raise ValueError("dependency resolution scope must be an object")
         scope_packet = dict(scope)
         _canonical(scope_packet)
 
@@ -376,7 +373,7 @@ class DependencyResolutionEvidenceMixin:
         sources_by_id: Mapping[str, Mapping[str, object]],
     ) -> None:
         def supports(row: Mapping[str, object], authority: str) -> bool:
-            return any(
+            return all(
                 authority in sources_by_id[str(ref)].get("authorities", ())
                 for ref in row["evidence_sources"]
             )
@@ -406,7 +403,7 @@ class DependencyResolutionEvidenceMixin:
             str(row["node_id"]): set(row["contexts"]) for row in selections
         }
         for row in module_ownership:
-            if not any(
+            if not all(
                 "module-ownership" in sources_by_id[str(ref)].get("authorities", ())
                 for ref in row["evidence_sources"]
             ):
@@ -451,6 +448,10 @@ class DependencyResolutionEvidenceMixin:
                 for source in sources
                 if "selection" in source.get("authorities", ())
             }
+            if any(
+                "selection" not in source.get("authorities", ()) for source in sources
+            ):
+                raise ValueError("selection requires selection evidence authority")
             for source_context in source_contexts:
                 if source_context and source_context not in contexts_for_selection:
                     raise ValueError(
@@ -824,6 +825,7 @@ class DependencyResolutionEvidenceMixin:
                     "completeness": completeness,
                     "evidence_sources": refs,
                     "authority": "qualified-external-observation",
+                    "producer_authority": "caller-claimed",
                 }
             )
         return sorted(result, key=lambda row: (str(row["module"]), str(row["context"])))
@@ -914,26 +916,8 @@ class DependencyResolutionEvidenceMixin:
         kind: str,
         sources: Sequence[Mapping[str, object]],
     ) -> None:
-        if not any(kind in source.get("authorities", ()) for source in sources):
+        if not all(kind in source.get("authorities", ()) for source in sources):
             raise ValueError(f"{kind} coverage requires {kind} evidence authority")
-
-    @staticmethod
-    def _validate_dependency_coverage_facts_v3(
-        *,
-        coverage: Sequence[Mapping[str, object]],
-        roots: Sequence[Mapping[str, object]],
-    ) -> None:
-        for row in coverage:
-            if row.get("completeness") != "complete":
-                continue
-            context = str(row["context"])
-            kind = str(row["kind"])
-            if kind == "resolution-graph":
-                has_root = any(str(item["context"]) == context for item in roots)
-                if not has_root:
-                    raise ValueError(
-                        f"complete resolution-graph coverage lacks root: {context}"
-                    )
 
     @staticmethod
     def _dependency_negative_evidence_v3(
@@ -949,6 +933,8 @@ class DependencyResolutionEvidenceMixin:
                     and row.get("truncation") == "complete"
                     else "not-admissible"
                 ),
+                "authority": "qualified-external-observation",
+                "producer_authority": "caller-claimed",
             }
             for row in coverage
         ]
@@ -986,6 +972,8 @@ class DependencyResolutionEvidenceMixin:
                 "repository_paths": repository_paths,
                 "distribution_state": "unknown",
                 "distribution_nodes": [],
+                "authority": "qualified-external-observation",
+                "producer_authority": "caller-claimed",
                 "causation": "not-inferred",
             }
 
@@ -1022,6 +1010,8 @@ class DependencyResolutionEvidenceMixin:
             "distribution_nodes": owners,
             "ownership_completeness": completeness,
             "observed_contexts": contexts,
+            "authority": "qualified-external-observation",
+            "producer_authority": "caller-claimed",
             "causation": "not-inferred",
         }
 
@@ -1133,6 +1123,8 @@ class DependencyResolutionEvidenceMixin:
                     "distribution_nodes": owners,
                     "ownership_completeness": completeness,
                     "observed_contexts": observed_contexts,
+                    "authority": "qualified-external-observation",
+                    "producer_authority": "caller-claimed",
                     "causation": "not-inferred",
                 }
             )
@@ -1142,6 +1134,7 @@ class DependencyResolutionEvidenceMixin:
                     "producer": {
                         "kind": "dependency-correlation-adapter",
                         "resolution_identity": observation.get("resolution_identity"),
+                        "observation_identity": observation.get("observation_identity"),
                     },
                     "completeness": str(raw.get("completeness") or "unknown"),
                     "scope": {
@@ -1160,9 +1153,11 @@ class DependencyResolutionEvidenceMixin:
         return {
             "schema": "hashmarks.dependency-evidence-correlation.v1",
             "resolution_identity": observation.get("resolution_identity"),
+            "observation_identity": observation.get("observation_identity"),
             "correlation": packet,
             "dependency_links": dependency_links,
             "authority": "repository-intelligence-only",
+            "producer_authority": "caller-claimed",
             "interpretation_authority": "consumer-owned",
             "causation": "not-inferred",
         }
@@ -1194,6 +1189,8 @@ class DependencyResolutionEvidenceMixin:
                 "reason": "definition-changed",
                 "before_definition_identity": before_definition,
                 "after_definition_identity": after_definition,
+                "authority": "qualified-external-observation",
+                "producer_authority": "caller-claimed",
             }
 
         def keyed(rows: object, field: str) -> dict[str, Mapping[str, object]]:
@@ -1216,7 +1213,8 @@ class DependencyResolutionEvidenceMixin:
                 return {
                     key: value
                     for key, value in row.items()
-                    if key not in {"evidence_sources", "authority"}
+                    if key
+                    not in {"evidence_sources", "authority", "producer_authority"}
                 }
 
             return sorted(
@@ -1314,6 +1312,8 @@ class DependencyResolutionEvidenceMixin:
                 before_ownership.keys() - after_ownership.keys()
             ),
             "module_ownership_changed": changed(before_ownership, after_ownership),
+            "authority": "qualified-external-observation",
+            "producer_authority": "caller-claimed",
             "causation": "not-inferred",
         }
 

@@ -324,7 +324,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     return {
         "schema": _SCHEMA,
         "producer": {"kind": "maven-dependency-artifacts", "schema_version": "1"},
-        "scope": {"ecosystem": "maven", "evidence": "provided-artifacts"},
+        "scope": {},
         "contexts": contexts,
         "roots": sorted(roots, key=lambda row: (row["context"], row["node_id"])),
         "evidence_sources": sorted(evidence_sources, key=lambda row: row["source_id"]),

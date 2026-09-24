@@ -128,6 +128,36 @@ def test_maven_adapter_is_execution_free(monkeypatch) -> None:
     assert raw["contexts"] == ["compile"]
 
 
+def test_maven_distinct_same_byte_artifacts_keep_distinct_sources() -> None:
+    tree = _tree()
+    inventory = _inventory()
+    raw = maven_dependency_observation(
+        trees={"compile": tree, "runtime": tree},
+        inventories={"compile": inventory, "runtime": inventory},
+    )
+
+    sources = {row["source_id"]: row for row in raw["evidence_sources"]}
+    assert set(sources) == {
+        "tree:compile",
+        "tree:runtime",
+        "list:compile",
+        "list:runtime",
+    }
+    assert (
+        sources["tree:compile"]["producer_digest"]
+        == sources["tree:runtime"]["producer_digest"]
+    )
+    assert (
+        sources["list:compile"]["producer_digest"]
+        == sources["list:runtime"]["producer_digest"]
+    )
+    assert sources["list:compile"]["authorities"] == [
+        "module-ownership",
+        "resolved-inventory",
+        "selection",
+    ]
+
+
 def test_maven_adapter_relationship_change_is_not_selection_change(
     tmp_path: Path,
 ) -> None:
