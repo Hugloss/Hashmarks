@@ -140,7 +140,8 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             evidence_sources.append(
                 {
                     "source_id": tree_source,
-                    "kind": "resolution-graph",
+                    "kind": "maven-dependency-tree",
+                    "authorities": ["resolution-graph", "selection"],
                     "context": context,
                     "completeness": "complete",
                     "truncation": "complete",
@@ -207,7 +208,12 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             evidence_sources.append(
                 {
                     "source_id": list_source,
-                    "kind": "resolved-inventory",
+                    "kind": "maven-dependency-list",
+                    "authorities": [
+                        "module-ownership",
+                        "resolved-inventory",
+                        "selection",
+                    ],
                     "context": context,
                     "completeness": "complete",
                     "truncation": "complete",
