@@ -861,6 +861,7 @@ class DependencyResolutionEvidenceMixin:
                     raise ValueError(
                         f"complete resolution-graph coverage lacks root: {context}"
                     )
+
     @staticmethod
     def _dependency_negative_evidence_v2(
         coverage: Sequence[Mapping[str, object]],
