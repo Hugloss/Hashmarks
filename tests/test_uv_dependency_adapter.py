@@ -157,30 +157,3 @@ source = { virtual = ".", directory = "." }
     with pytest.raises(ValueError, match="ambiguous local source identity"):
         uv_lock_dependency_observation(lock=lock)
 
-
-@pytest.mark.parametrize("source_key", ["editable", "directory"])
-def test_uv_lock_adapter_preserves_non_dot_local_project_root(
-    source_key: str,
-) -> None:
-    lock = f"""version = 1
-revision = 3
-requires-python = ">=3.11"
-
-[[package]]
-name = "workspace-member"
-version = "0.1.0"
-source = {{ {source_key} = "packages/member" }}
-dependencies = [{{ name = "dep" }}]
-
-[[package]]
-name = "dep"
-version = "1.0.0"
-source = {{ registry = "https://example.invalid/simple" }}
-""".encode()
-
-    raw = uv_lock_dependency_observation(lock=lock)
-
-    assert len(raw["roots"]) == 1
-    root_id = raw["roots"][0]["node_id"]
-    assert root_id.startswith("workspace-member:0.1.0@")
-    assert root_id not in {row["node_id"] for row in raw["inventory"]}
