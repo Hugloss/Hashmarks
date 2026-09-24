@@ -117,7 +117,7 @@ def test_uv_and_maven_version_changes_share_dependency_delta_semantics(
 
 
 def _uv_lock_with_source(version: str, source: str, *, marker: str = "") -> bytes:
-    marker_field = f', marker = "{marker}"' if marker else ""
+    marker_field = f", marker = {json.dumps(marker)}" if marker else ""
     return f'''version = 1
 revision = 3
 requires-python = ">=3.11"
@@ -136,7 +136,11 @@ source = {source}
 
 
 def _maven_tree_variant(
-    version: str, *, packaging: str = "jar", classifier: str = "", scope: str = "compile"
+    version: str,
+    *,
+    packaging: str = "jar",
+    classifier: str = "",
+    scope: str = "compile",
 ) -> bytes:
     child = {
         "groupId": "example.fixture",
@@ -231,9 +235,7 @@ def test_maven_classifier_change_is_selection_change_without_component_change(
     )
     after_raw = maven_dependency_observation(
         trees={"compile": _maven_tree_variant("1.0.0", classifier="tests")},
-        inventories={
-            "compile": _maven_inventory_variant("1.0.0", classifier="tests")
-        },
+        inventories={"compile": _maven_inventory_variant("1.0.0", classifier="tests")},
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -254,7 +256,9 @@ def test_maven_classifier_change_is_selection_change_without_component_change(
     assert delta["module_ownership_changed"] == ["dummy.dep|compile"]
 
 
-def test_maven_effective_scope_change_is_relationship_only_delta(tmp_path: Path) -> None:
+def test_maven_effective_scope_change_is_relationship_only_delta(
+    tmp_path: Path,
+) -> None:
     before_raw = maven_dependency_observation(
         trees={"test": _maven_tree_variant("1.0.0", scope="compile")},
         inventories={"test": _maven_inventory_variant("1.0.0", scope="compile")},
