@@ -14,8 +14,16 @@ def _snapshot_v2() -> dict[str, object]:
         "scope": {"environment": "test"},
         "contexts": ["compile", "runtime"],
         "roots": [
-            {"node_id": "app@1", "context": "compile", "evidence_sources": ["tree:compile"]},
-            {"node_id": "app@1", "context": "runtime", "evidence_sources": ["tree:runtime"]},
+            {
+                "node_id": "app@1",
+                "context": "compile",
+                "evidence_sources": ["tree:compile"],
+            },
+            {
+                "node_id": "app@1",
+                "context": "runtime",
+                "evidence_sources": ["tree:runtime"],
+            },
         ],
         "evidence_sources": [
             {
