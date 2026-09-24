@@ -55,6 +55,35 @@ def _inventory() -> bytes:
 """
 
 
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        (
+            {
+                "trees": {"compile": _tree()},
+                "inventories": {},
+                "complete_tree_contexts": ("runtime",),
+            },
+            "complete Maven tree context has no supplied tree: runtime",
+        ),
+        (
+            {
+                "trees": {},
+                "inventories": {"compile": _inventory()},
+                "complete_inventory_contexts": ("runtime",),
+            },
+            "complete Maven inventory context has no supplied list: runtime",
+        ),
+    ],
+)
+def test_maven_complete_context_requires_supplied_artifact(
+    kwargs: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        maven_dependency_observation(**kwargs)
+
+
 def test_maven_adapter_does_not_infer_complete_coverage_from_bytes(
     tmp_path: Path,
 ) -> None:
