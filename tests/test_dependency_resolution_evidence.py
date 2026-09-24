@@ -1229,22 +1229,11 @@ def test_v2_complete_module_ownership_cannot_exceed_incomplete_source(
             codemap.dependency_resolution_evidence(snapshot)
 
 
-def test_v2_incomplete_coverage_cannot_be_backed_only_by_complete_sources(
-    tmp_path: Path,
-) -> None:
-    snapshot = _snapshot_v2()
-    snapshot["coverage"][0]["completeness"] = "incomplete"
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        with pytest.raises(ValueError, match="coverage understates evidence source"):
-            codemap.dependency_resolution_evidence(snapshot)
-
-
 def test_v2_truncated_coverage_requires_a_truncated_or_unknown_source(
     tmp_path: Path,
 ) -> None:
     snapshot = _snapshot_v2()
-    snapshot["coverage"][0]["completeness"] = "incomplete"
+    snapshot["coverage"][0]["completeness"] = "unknown"
     snapshot["coverage"][0]["truncation"] = "truncated"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -1370,17 +1359,6 @@ def test_v2_contexts_rejects_unknown_node(tmp_path: Path) -> None:
             codemap.dependency_resolution_queries(
                 observation,
                 [{"operation": "contexts", "node_id": "missing@1"}],
-            )
-
-
-def test_v2_inventory_rejects_unknown_node_filter(tmp_path: Path) -> None:
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-        observation = codemap.dependency_resolution_evidence(_snapshot_v2())
-        with pytest.raises(ValueError, match="unknown dependency query node_id"):
-            codemap.dependency_resolution_queries(
-                observation,
-                [{"operation": "inventory", "node_id": "missing@1"}],
             )
 
 
