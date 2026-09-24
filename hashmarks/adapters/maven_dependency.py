@@ -231,11 +231,8 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 if match is None:
                     stripped = line.strip()
                     candidate = stripped.split(maxsplit=1)[0] if stripped else ""
-                    if (
-                        candidate.count(":") >= 1
-                        and not stripped.startswith(
-                            ("[INFO]", "[WARNING]", "[ERROR]", "[DEBUG]")
-                        )
+                    if candidate.count(":") >= 1 and not stripped.startswith(
+                        ("[INFO]", "[WARNING]", "[ERROR]", "[DEBUG]")
                     ):
                         raise ValueError(
                             f"unparsed Maven dependency-list coordinate for {context}: "
