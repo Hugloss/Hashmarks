@@ -576,8 +576,16 @@ def test_v2_producer_neutral_model_accepts_uv_contexts_without_maven_semantics(
         "scope": {"python": "3.14", "platform": "linux"},
         "contexts": ["default", "dev"],
         "roots": [
-            {"node_id": "demo@workspace", "context": "default"},
-            {"node_id": "demo@workspace", "context": "dev"},
+            {
+                "node_id": "demo@workspace",
+                "context": "default",
+                "evidence_sources": ["uv:lock"],
+            },
+            {
+                "node_id": "demo@workspace",
+                "context": "dev",
+                "evidence_sources": ["uv:lock"],
+            },
         ],
         "evidence_sources": [
             {
