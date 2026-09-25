@@ -37,12 +37,25 @@ def _coordinate(
 
 
 def _tree_node(raw: Mapping[str, object]) -> tuple[str, str, str, str, str, str]:
-    group = str(raw.get("groupId") or "").strip()
-    artifact = str(raw.get("artifactId") or "").strip()
-    packaging = str(raw.get("type") or "jar").strip()
-    classifier = str(raw.get("classifier") or "").strip()
-    version = str(raw.get("version") or "").strip()
-    scope = str(raw.get("scope") or "").strip()
+    values: dict[str, str] = {}
+    for field, default in (
+        ("groupId", ""),
+        ("artifactId", ""),
+        ("type", "jar"),
+        ("classifier", ""),
+        ("version", ""),
+        ("scope", ""),
+    ):
+        value = raw.get(field, default)
+        if not isinstance(value, str):
+            raise ValueError(f"Maven tree node {field} must be a string")
+        values[field] = value.strip()
+    group = values["groupId"]
+    artifact = values["artifactId"]
+    packaging = values["type"]
+    classifier = values["classifier"]
+    version = values["version"]
+    scope = values["scope"]
     if not group or not artifact or not version:
         raise ValueError("Maven tree node requires groupId, artifactId, and version")
     component, node = _coordinate(group, artifact, packaging, classifier, version)
