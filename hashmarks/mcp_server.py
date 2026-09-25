@@ -143,6 +143,25 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         )
 
     @server.tool(
+        name="repository_declarations",
+        description=(
+            "Compare explicitly correlated repository declarations across files and "
+            "formats while preserving provenance, ambiguity, coverage, and freshness."
+        ),
+        annotations=annotations,
+    )
+    def repository_declarations(
+        groups: list[dict[str, Any]],
+        previous_observation: dict[str, Any] | None = None,
+    ) -> dict[str, object]:
+        return _call_surface(
+            ToolError,
+            surface.repository_declarations,
+            groups,
+            previous_observation=previous_observation,
+        )
+
+    @server.tool(
         name="post_change",
         description="Refresh caller-reported changed paths against a previous task_evidence packet and return only invalidated/reused/replacement evidence.",
         annotations=annotations,
