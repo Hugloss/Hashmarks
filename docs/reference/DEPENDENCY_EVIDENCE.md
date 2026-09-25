@@ -172,11 +172,14 @@ Before adding a Gradle, npm, Cargo, SBOM, or other adapter:
 
 1. identify the producer-native artifacts and their exact provenance;
 2. state which existing semantic authorities each artifact can support;
-3. translate into the existing general facts;
-4. add producer-neutral contract tests first when a genuinely new semantic fact is required;
-5. add adapter-specific parsing tests second;
-6. add cross-producer behavior tests where another adapter can express the same fact;
-7. verify that no core dependency module imports the new adapter or branches on its producer/source kind.
+3. separate semantic resolution-domain constraints from producer bookkeeping: normalize the former into general `scope`, keep the latter in provenance, and reject producer constructs whose semantics the general model cannot represent;
+4. validate producer identity/coordinate field types before normalization; do not turn malformed booleans/numbers into authoritative strings;
+5. treat completeness as an authority claim, not a parser side effect: if the producer can emit filtered/subset artifacts whose filters are not encoded in the bytes, require explicit completeness evidence instead of inferring exhaustiveness from syntax;
+6. translate into the existing general facts;
+7. add producer-neutral contract tests first when a genuinely new semantic fact is required;
+8. add adapter-specific parsing tests second;
+9. add cross-producer behavior tests where another adapter can express the same fact;
+10. verify that no core dependency module imports the new adapter or branches on its producer/source kind.
 
 A new adapter is not complete merely because it parses its native format. It is complete when producer-native detail terminates at the adapter boundary and the resulting observation behaves like any other producer of the same semantic facts.
 
