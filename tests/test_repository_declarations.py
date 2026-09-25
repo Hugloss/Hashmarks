@@ -423,7 +423,7 @@ def test_resolved_provider_value_with_missing_evidence_cannot_create_conflict(
     assert by_id["missing"]["evidence_state"] == "known-absent"
     assert group["comparison"] == {
         "state": "ambiguous",
-        "reason": "repository-evidence-not-current",
+        "reason": "repository-evidence-not-qualified",
         "unqualified_declaration_ids": ["missing"],
         "distinct_values": [],
     }
@@ -455,7 +455,7 @@ def test_unsupported_declaration_evidence_cannot_create_equivalence(
     by_id = {row["declaration_id"]: row for row in group["declarations"]}
     assert by_id["binary"]["evidence_state"] == "unsupported"
     assert group["comparison"]["state"] == "ambiguous"
-    assert group["comparison"]["reason"] == "repository-evidence-not-current"
+    assert group["comparison"]["reason"] == "repository-evidence-not-qualified"
     assert group["comparison"]["unqualified_declaration_ids"] == ["binary"]
 
 
