@@ -98,9 +98,7 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
     name = "npm-package-graph"
 
     def detect(self, workspace: Path) -> bool:
-        return (workspace / "package.json").is_file() or bool(
-            self._manifest_paths(workspace, "package.json")
-        )
+        return bool(self._manifest_paths(workspace, "package.json"))
 
     def _package_rows(
         self, workspace: Path
@@ -308,9 +306,7 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
     name = "maven-pom-graph"
 
     def detect(self, workspace: Path) -> bool:
-        return (workspace / "pom.xml").is_file() or bool(
-            self._manifest_paths(workspace, "pom.xml")
-        )
+        return bool(self._manifest_paths(workspace, "pom.xml"))
 
     @staticmethod
     def _module_indexes(modules):
@@ -556,9 +552,7 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
     name = "cargo-metadata"
 
     def detect(self, workspace: Path) -> bool:
-        return (workspace / "Cargo.toml").is_file() or bool(
-            self._manifest_paths(workspace, "Cargo.toml")
-        )
+        return bool(self._manifest_paths(workspace, "Cargo.toml"))
 
     def _fallback_rows(
         self, workspace: Path
