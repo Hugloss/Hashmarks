@@ -2,6 +2,7 @@
 
 ## 0.22.0 — Standalone MCP distribution and declaration authority
 
+- Converge repository-file admission across derived evidence: targeted Python import-root refresh, manifest-based project discovery, native project-node/edge persistence, and manifest freshness now reuse the canonical policy/pruning/symlink/visibility owner. Denied project files cannot survive as current project evidence, and live allow→deny policy changes fail closed until admitted evidence is rebuilt.
 - Add a checksum-verified standalone Linux x86_64 Hashmarks CLI/MCP executable published through GitHub Releases, plus a curl installer that does not require Python, uv, pip, or PyPI on the target machine.
 - Add `hashmarks install --opencode` to register the exact installed Hashmarks executable through OpenCode's native MCP CLI with `--workspace . mcp`.
 - Keep GitHub Release publication independent from PyPI: release qualification still builds and verifies wheel/sdist artifacts, but public release publication uploads the qualified Python artifacts, manifests, checksums, and standalone executable to GitHub Releases without an automatic PyPI side effect.
