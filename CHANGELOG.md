@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.22.0 — Development
+
+- Fail closed on malformed dependency-v3 observations and requests, stale repository bindings, cross-context graph traversal, and unsupported relationship kinds instead of treating uncertain evidence as authoritative.
+- Preserve uv marker-qualified dependencies as conditional graph evidence without flattening them into unconditional reachability or absence; retain environment-domain scope and reject lock forks or conflicts the shared model cannot represent.
+- Require explicit, context-bound Maven completeness declarations before using tree or list output as negative evidence, and reject warnings or incomplete output that undermine those claims.
+- Keep dependency component and selection identities free of producer provenance, with expanded Maven/uv dogfood and cross-producer regressions for graph, version-change, and removal behavior.
+- Make local wheel/sdist preflight non-destructive to existing `dist/` artifacts and remove duplicate CLI/Make entrypoints and unused Ruff-parity tooling.
+
 ## 0.21.0 — Development
 
 - Strengthen real uv/Maven dependency-change dogfood with exact version, graph-target, and module-owner assertions, including an offline uv lock whose dependency appears only in an extra and a dev group.
