@@ -68,16 +68,14 @@ def _qualified_declaration_indexes(
     bindings_raw = evidence_packet.get("bindings")
     if not isinstance(bindings_raw, list):
         raise ValueError("declaration discovery nested bindings are malformed")
-    groups = {
-        str(row.get("group_id") or ""): row
-        for row in groups_raw
-        if isinstance(row, Mapping)
-    }
-    bindings = {
-        str(row.get("binding_id") or ""): row
-        for row in bindings_raw
-        if isinstance(row, Mapping)
-    }
+    group_rows = [row for row in groups_raw if isinstance(row, Mapping)]
+    binding_rows = [row for row in bindings_raw if isinstance(row, Mapping)]
+    groups = {str(row.get("group_id") or ""): row for row in group_rows}
+    bindings = {str(row.get("binding_id") or ""): row for row in binding_rows}
+    if len(groups) != len(group_rows):
+        raise ValueError("declaration discovery qualified group ids are duplicated")
+    if len(bindings) != len(binding_rows):
+        raise ValueError("declaration discovery qualified binding ids are duplicated")
     return groups, bindings
 
 
