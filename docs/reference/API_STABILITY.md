@@ -19,6 +19,8 @@ The documented dependency-resolution observation/query surface uses `hashmarks.d
 
 The documented `CodeMap.repository_declarations()` surface is supported Python API. Its schemas are `hashmarks.repository-declarations.v1` and `hashmarks.repository-declarations-delta.v1`; see [`REPOSITORY_DECLARATIONS.md`](REPOSITORY_DECLARATIONS.md). Semantic extraction, normalized values, correspondence, and coverage remain provider claims; the repository-evidence binding, identity, freshness, ambiguity, qualified-absence, and factual-delta behavior is the Hashmarks contract.
 
+The documented `RepositoryDeclarationProvider`, `RepositoryDeclarationProviderResult`, `RepositoryDeclarationProviderError`, and `CodeMap.discover_repository_declarations()` surface is also supported Python API. Discovery uses the `hashmarks.repository-declaration-discovery.v1` and `hashmarks.repository-declaration-discovery-delta.v1` wrapper schemas. Providers are explicitly supplied Python objects; ambient entry-point loading and arbitrary provider execution inside MCP are not part of the public contract.
+
 `CodeMap.task_evidence()` is the supported role-separated task-evidence API. Its schema is `hashmarks.task-evidence.v2`: bounded retrieval, explicit-target evidence, ownership, verification, related evidence, freshness and provenance are distinct authority domains.
 
 Importable implementation submodules under `hashmarks.*` are **not automatically public** merely because Python allows importing them. Internal helpers, storage classes, parsers, adapters, and mixins may change without compatibility guarantees unless a current public document explicitly promotes them into the contract.
