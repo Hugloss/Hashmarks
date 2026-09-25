@@ -91,6 +91,11 @@ class _RepositoryDeclarationProviderContext:
                 "declaration provider path enumeration exceeds "
                 f"{MAX_PROVIDER_ENUMERATED_PATHS} paths for prefix {normalized!r}"
             )
+        if paths != tuple(sorted(paths)) or len(set(paths)) != len(paths):
+            raise RepositoryDeclarationProviderError(
+                "declaration provider path enumeration must be unique and "
+                f"deterministically ordered for prefix {normalized!r}"
+            )
         previous = self._enumerations.get(normalized)
         if previous is not None and previous != paths:
             raise RepositoryDeclarationProviderError(
