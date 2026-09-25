@@ -40,10 +40,10 @@ def test_publish_workflow_uses_trusted_publishing_without_static_token() -> None
 
 
 def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
-    job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\\n")
+    job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\n")
     for name in ("ci.yml", "publish.yml"):
         text = (_root() / ".github" / "workflows" / name).read_text(encoding="utf-8")
-        jobs = text.split("jobs:\\n", 1)[1]
+        jobs = text.split("jobs:\n", 1)[1]
         matches = list(job_heading.finditer(jobs))
         assert matches
         for index, match in enumerate(matches):
