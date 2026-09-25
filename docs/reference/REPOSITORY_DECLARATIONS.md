@@ -31,9 +31,10 @@ The declaration provider owns:
 - producer-specific parsing;
 - semantic extraction;
 - normalization of comparable values;
-- the claim that declarations correspond to the same conceptual fact;
+- provenance for each declaration;
+- the claim, with explicit provenance/basis, that declarations correspond to the same conceptual fact;
 - the semantic scope in which they are comparable;
-- coverage claims and expected declaration membership.
+- coverage claims, coverage provenance, and expected declaration membership.
 
 Hashmarks core owns:
 
@@ -154,6 +155,8 @@ or a whole admitted repository member:
 ~~~
 
 The existing repository-evidence-binding authority supplies member revisions, span identities, visibility, freshness, and current repository identity.
+
+Each projected declaration also carries an `evidence_state`. A provider may claim a resolved normalized value, but that value participates in equivalence/difference only when **all cited exact evidence is `known-present`**. Known-absent, unsupported, or otherwise unqualified repository evidence makes the group comparison ambiguous rather than allowing a stale provider claim to manufacture equivalence or disagreement.
 
 A provider value is therefore bound to exact current repository evidence without pretending that core independently parsed or certified the provider's semantic interpretation.
 
