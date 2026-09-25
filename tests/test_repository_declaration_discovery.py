@@ -919,3 +919,62 @@ def test_single_provider_output_is_bounded_before_aggregate_qualification(
         ):
             codemap.discover_repository_declarations([_OversizedGroupProvider()])
 
+class _OversizedDeclarationProvider:
+    name = "oversized-declarations"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return True
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        declarations = tuple(
+            {
+                "declaration_id": f"value-{index}",
+                "value_state": "unresolved",
+                "producer": {"provider": self.name},
+                "evidence": [{"path": "value.txt", "start_line": 1, "end_line": 1}],
+            }
+            for index in range(257)
+        )
+        context.read_text("value.txt")
+        return RepositoryDeclarationProviderResult(
+            groups=(
+                {
+                    "group_id": "many-values",
+                    "concept": {"kind": "fixture"},
+                    "scope": {},
+                    "correspondence": {
+                        "state": "unresolved",
+                        "basis": {"provider": self.name},
+                    },
+                    "declarations": declarations,
+                    "coverage": {
+                        "state": "unknown",
+                        "truncation": "unknown",
+                        "expected_declaration_ids": [],
+                        "scope": {},
+                        "provenance": {"provider": self.name},
+                    },
+                },
+            ),
+            provenance={"provider": self.name},
+        )
+
+
+def test_single_provider_declarations_are_bounded_before_qualification(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value\n", encoding="utf-8")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="declarations exceed 256 entries",
+        ):
+            codemap.discover_repository_declarations([_OversizedDeclarationProvider()])
+
