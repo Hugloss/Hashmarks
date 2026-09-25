@@ -547,3 +547,23 @@ def test_provider_repository_input_reads_are_bounded(tmp_path: Path) -> None:
             match="inputs exceed 256 paths",
         ):
             codemap.discover_repository_declarations([_ManyInputsProvider()])
+
+
+def test_provider_context_cannot_read_pruned_repository_scope(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    hidden = repo / "node_modules" / "pkg"
+    hidden.mkdir(parents=True)
+    (hidden / "metadata.txt").write_text("value: hidden\n", encoding="utf-8")
+    provider = _SingleProvider("pruned-provider", "node_modules/pkg/metadata.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="pruned-provider discovery failed",
+        ) as exc_info:
+            codemap.discover_repository_declarations([provider])
+
+    assert "cannot read current repository bytes" in str(exc_info.value)
+    assert "unsupported" in str(exc_info.value)
