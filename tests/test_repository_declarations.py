@@ -85,7 +85,7 @@ def test_cross_file_declarations_preserve_exact_evidence_and_equivalence(
         "state": "equivalent",
         "distinct_values": [">=3.12"],
     }
-    assert group["absence"]["state"] == "none"
+    assert group["absence"]["state"] == "known-present"
     bindings = {
         row["binding_id"]: row for row in packet["repository_evidence"]["bindings"]
     }
@@ -157,7 +157,7 @@ def test_absence_requires_complete_untruncated_semantic_coverage(
         "reason": "coverage-does-not-authorize-negative-evidence",
     }
     assert absent["groups"][0]["absence"] == {
-        "state": "present",
+        "state": "known-absent",
         "missing_declaration_ids": ["owner-b"],
         "unseen_expected_declaration_ids": [],
     }
@@ -244,6 +244,7 @@ def test_declaration_delta_separates_value_change_from_group_definition(
     assert changed["definition_changed"] is False
     assert changed["value_changed_declaration_ids"] == ["b"]
     assert changed["comparison_changed"] is True
+    assert delta["repository_evidence"]["bindings"]["changed"] == []
 
 
 def test_previous_declaration_packet_is_revalidated_before_delta(
@@ -290,3 +291,110 @@ def test_fail_closed_unknown_fields_and_invalid_complete_coverage(
                     )
                 ]
             )
+
+
+def test_definition_identity_binds_exact_evidence_definition(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.txt").write_text("3.12\n3.12\n", encoding="utf-8")
+    before_group = _group([_declaration("runtime", "runtime.txt", "3.12", line=1)])
+    after_group = _group([_declaration("runtime", "runtime.txt", "3.12", line=2)])
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([before_group])
+        after = codemap.repository_declarations(
+            [after_group],
+            previous_observation=before,
+        )
+
+    previous = before["groups"][0]["declarations"][0]
+    current = after["groups"][0]["declarations"][0]
+    assert (
+        previous["declaration_definition_identity"]
+        != current["declaration_definition_identity"]
+    )
+    changed = after["delta_from_previous"]["changed_groups"][0]
+    assert changed["definition_changed"] is True
+    assert changed["definition_changed_declaration_ids"] == ["runtime"]
+
+
+def test_group_definition_identity_binds_coverage_scope(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "owner.yaml").write_text("owner: team-a\n", encoding="utf-8")
+    declaration = [_declaration("owner", "owner.yaml", "team-a")]
+    team_scope = _group(declaration)
+    org_scope = _group(declaration)
+    team_scope["coverage"]["scope"] = {"registry": "team"}
+    org_scope["coverage"]["scope"] = {"registry": "organization"}
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        team = codemap.repository_declarations([team_scope])
+        organization = codemap.repository_declarations([org_scope])
+
+    assert (
+        team["groups"][0]["group_definition_identity"]
+        != organization["groups"][0]["group_definition_identity"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("concept", "paths", "value"),
+    [
+        (
+            {"kind": "runtime-compatibility", "identity": "python"},
+            ("pyproject.toml", "Dockerfile"),
+            "3.12",
+        ),
+        (
+            {"kind": "package-identity", "identity": "widget"},
+            ("package.json", "Cargo.toml"),
+            "widget",
+        ),
+        (
+            {"kind": "ownership", "identity": "component-a"},
+            ("CODEOWNERS", "metadata.yaml"),
+            "team-a",
+        ),
+    ],
+)
+def test_contract_is_format_and_concept_neutral(
+    tmp_path: Path,
+    concept: dict[str, object],
+    paths: tuple[str, str],
+    value: str,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for path in paths:
+        (repo / path).write_text(f"{value}\n", encoding="utf-8")
+    declarations = [
+        _declaration("first", paths[0], value),
+        _declaration("second", paths[1], value),
+    ]
+    group = _group(declarations)
+    group["concept"] = concept
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations([group])
+
+    assert packet["groups"][0]["concept"] == concept
+    assert packet["groups"][0]["comparison"]["state"] == "equivalent"
+
+
+def test_encoded_request_budget_fails_closed_before_repository_projection(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.toml").write_text('version = "1"\n', encoding="utf-8")
+    group = _group([_declaration("a", "a.toml", "1")])
+    group["concept"] = {"opaque": "x" * 1_048_576}
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="groups exceeds .* encoded bytes"):
+            codemap.repository_declarations([group])
