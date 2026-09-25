@@ -4,11 +4,26 @@ Hashmarks exposes an optional **local, read-only stdio Model Context Protocol (M
 
 ## Install
 
+For end users on Linux x86_64 (including WSL2), install the self-contained CLI + MCP runtime:
+
 ```bash
-pip install "hashmarks[mcp]"
+curl -fsSL https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh | sh
+hashmarks --version
 ```
 
-The core `hashmarks` package keeps no required runtime dependencies. The `mcp` extra installs the official MCP Python SDK.
+The installer downloads the matching executable and SHA-256 asset from GitHub Releases, verifies the executable before installing it to `~/.local/bin/hashmarks`, and does not require Python, uv, pip, or PyPI access on the target machine.
+
+Source contributors should not replace the locked development environment with the standalone binary. Use `uv sync --frozen --extra mcp --group test` when developing or qualifying Hashmarks itself.
+
+For OpenCode end users, register Hashmarks from the repository OpenCode should analyze:
+
+```bash
+cd /path/to/target/repository
+hashmarks install --opencode
+opencode mcp list
+```
+
+Hashmarks delegates configuration writing to OpenCode's own CLI and registers the exact installed Hashmarks executable with `--workspace . mcp`. This avoids requiring users to know OpenCode's config-file schema.
 
 ## Run
 
