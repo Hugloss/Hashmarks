@@ -40,11 +40,17 @@ def _dependency_target(
     dependency: Mapping[str, object],
     packages_by_name: Mapping[str, list[dict[str, object]]],
 ) -> dict[str, object]:
-    name = str(dependency.get("name") or "").strip()
+    raw_name = dependency.get("name")
+    if not isinstance(raw_name, str):
+        raise ValueError("uv lock dependency name must be a string")
+    name = raw_name.strip()
     if not name:
         raise ValueError("uv lock dependency name must not be empty")
     candidates = list(packages_by_name.get(name, ()))
-    version = str(dependency.get("version") or "").strip()
+    raw_version = dependency.get("version")
+    if raw_version is not None and not isinstance(raw_version, str):
+        raise ValueError("uv lock dependency version must be a string")
+    version = (raw_version or "").strip()
     if version:
         candidates = [row for row in candidates if row["version"] == version]
     source_raw = dependency.get("source")
@@ -179,6 +185,9 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                         f"uv lock dependency must be an object: {row['name']}"
                     )
                 target = _dependency_target(dependency, packages_by_name)
+                raw_marker = dependency.get("marker")
+                if raw_marker is not None and not isinstance(raw_marker, str):
+                    raise ValueError("uv lock dependency marker must be a string")
                 relationships.append(
                     {
                         "source": row["node_id"],
@@ -186,7 +195,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                         "kind": "dependency",
                         "context": _CONTEXT,
                         "effective_scope": effective_scope,
-                        "marker": str(dependency.get("marker") or ""),
+                        "marker": (raw_marker or "").strip(),
                         "evidence_sources": [source_id],
                     }
                 )
