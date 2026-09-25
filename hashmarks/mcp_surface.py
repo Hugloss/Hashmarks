@@ -255,20 +255,23 @@ class HashmarksMcpSurface:
         )
 
         def project() -> dict[str, object]:
-            observation = self._map.dependency_resolution_evidence(raw_snapshot)
-            result: dict[str, object] = {
-                "schema": "hashmarks.mcp-dependency-codemap.v1",
-                "observation": observation,
-                "authority": "repository-intelligence-only",
-                "producer_authority": "caller-claimed",
-                "interpretation_authority": "consumer-owned",
-                "causation": "not-inferred",
-            }
-            if bounded_queries:
-                result["queries"] = self._map.dependency_resolution_queries(
-                    observation, bounded_queries
-                )
-            return result
+            try:
+                observation = self._map.dependency_resolution_evidence(raw_snapshot)
+                result: dict[str, object] = {
+                    "schema": "hashmarks.mcp-dependency-codemap.v1",
+                    "observation": observation,
+                    "authority": "repository-intelligence-only",
+                    "producer_authority": "caller-claimed",
+                    "interpretation_authority": "consumer-owned",
+                    "causation": "not-inferred",
+                }
+                if bounded_queries:
+                    result["queries"] = self._map.dependency_resolution_queries(
+                        observation, bounded_queries
+                    )
+                return result
+            except ValueError as exc:
+                raise McpSurfaceError(str(exc)) from exc
 
         return self._read(project)
 

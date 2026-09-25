@@ -25,10 +25,13 @@ _QUERY_FIELDS = {
 class _TopologyEdges:
     unconditional: Mapping[str, Sequence[str]]
     conditional: Mapping[str, Sequence[str]]
+    conditional_nodes: frozenset[str]
 
 
 def _text(value: object, *, label: str, required: bool = False) -> str:
-    text = str(value or "").strip()
+    if value is not None and not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    text = (value or "").strip()
     if required and not text:
         raise ValueError(f"{label} must not be empty")
     return text
@@ -37,12 +40,9 @@ def _text(value: object, *, label: str, required: bool = False) -> str:
 def _bounds(request: Mapping[str, object]) -> tuple[int, int, int]:
     def bounded(name: str, default: int, maximum: int) -> int:
         raw = request.get(name, default)
-        if isinstance(raw, bool):
+        if isinstance(raw, bool) or not isinstance(raw, int):
             raise ValueError(f"{name} must be a positive integer")
-        try:
-            value = int(raw)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"{name} must be a positive integer") from exc
+        value = raw
         if value < 1 or value > maximum:
             raise ValueError(f"{name} must be between 1 and {maximum}")
         return value
@@ -67,15 +67,23 @@ def _limited(
 
 def _adjacency(
     relationships: Sequence[Mapping[str, object]],
+    selections: Mapping[str, Mapping[str, object]],
 ) -> tuple[_TopologyEdges, _TopologyEdges]:
     outgoing: dict[str, set[str]] = {}
     incoming: dict[str, set[str]] = {}
     conditional_outgoing: dict[str, set[str]] = {}
     conditional_incoming: dict[str, set[str]] = {}
+    conditional_nodes = frozenset(
+        node_id for node_id, row in selections.items() if row.get("marker")
+    )
     for row in relationships:
         source = str(row.get("source") or "")
         target = str(row.get("target") or "")
-        if str(row.get("marker") or ""):
+        if (
+            row.get("marker")
+            or source in conditional_nodes
+            or target in conditional_nodes
+        ):
             conditional_outgoing.setdefault(source, set()).add(target)
             conditional_incoming.setdefault(target, set()).add(source)
         else:
@@ -91,19 +99,23 @@ def _adjacency(
             conditional={
                 node: sorted(values) for node, values in conditional_outgoing.items()
             },
+            conditional_nodes=conditional_nodes,
         ),
         _TopologyEdges(
             unconditional={node: sorted(values) for node, values in incoming.items()},
             conditional={
                 node: sorted(values) for node, values in conditional_incoming.items()
             },
+            conditional_nodes=conditional_nodes,
         ),
     )
 
 
-def _conditional_edge_omissions(
+def _conditional_omissions(
     node_id: str, topology: _TopologyEdges
 ) -> list[dict[str, object]]:
+    if node_id in topology.conditional_nodes:
+        return [{"reason": "conditional-selection", "node_id": node_id}]
     if topology.conditional.get(node_id):
         return [{"reason": "conditional-edge", "node_id": node_id}]
     return []
@@ -131,7 +143,7 @@ def _walk(
             if topology.unconditional.get(current) or topology.conditional.get(current):
                 omissions.append({"reason": "depth-limit", "node_id": current})
             continue
-        omissions.extend(_conditional_edge_omissions(current, topology))
+        omissions.extend(_conditional_omissions(current, topology))
         for candidate in topology.unconditional.get(current, ()):
             if visited >= max_visits:
                 omissions.append({"reason": "visit-limit"})
@@ -178,7 +190,7 @@ def _reachability(  # noqa: C901
             if topology.unconditional.get(current) or topology.conditional.get(current):
                 omissions.append({"reason": "depth-limit", "node_id": current})
             continue
-        omissions.extend(_conditional_edge_omissions(current, topology))
+        omissions.extend(_conditional_omissions(current, topology))
         for candidate in topology.unconditional.get(current, ()):
             if visited >= max_visits:
                 omissions.append({"reason": "visit-limit"})
@@ -218,7 +230,7 @@ def _paths(  # noqa: C901, PLR0912
             if topology.unconditional.get(current) or topology.conditional.get(current):
                 omissions.append({"reason": "depth-limit", "node_id": current})
             continue
-        omissions.extend(_conditional_edge_omissions(current, topology))
+        omissions.extend(_conditional_omissions(current, topology))
         for candidate in topology.unconditional.get(current, ()):
             if visited >= max_visits:
                 omissions.append({"reason": "visit-limit"})
@@ -400,7 +412,7 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 f"dependency query node_id not selected in context: {node_id}:{context}"
             )
         source_complete = _coverage_complete(observation, context=context)
-        outgoing, incoming = _adjacency(relationships)
+        outgoing, incoming = _adjacency(relationships, selections)
         if operation in {"dependencies", "dependents"}:
             result, visited, omissions = _walk(
                 node_id,

@@ -937,12 +937,13 @@ class DependencyResolutionEvidenceMixin:
             )
             if not refs:
                 raise ValueError("relationship must reference evidence source")
+            kind = _text(raw.get("kind"), label="relationship kind", required=True)
+            if kind != "dependency":
+                raise ValueError(f"unsupported dependency relationship kind: {kind}")
             packet = {
                 "source": source,
                 "target": target,
-                "kind": _text(
-                    raw.get("kind"), label="relationship kind", required=True
-                ),
+                "kind": kind,
                 "context": context,
                 "effective_scope": _text(
                     raw.get("effective_scope"), label="effective scope"
