@@ -49,7 +49,9 @@ def test_publish_workflow_binds_reviewed_request_to_exact_source() -> None:
     assert 'request.get("source_sha", "")' in text
     assert 'request.get("publication_attempt", 1)' in text
     assert "publication_attempt must be a positive integer" in text
-    assert "publication_attempt: ${{ steps.request.outputs.publication_attempt }}" in text
+    assert (
+        "publication_attempt: ${{ steps.request.outputs.publication_attempt }}" in text
+    )
     assert "DISPATCH_SOURCE_SHA:" in text
     assert "TRIGGER_SOURCE_SHA:" in text
     assert "dispatch_source or request_source or trigger_source" in text
