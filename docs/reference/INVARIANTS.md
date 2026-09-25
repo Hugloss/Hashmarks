@@ -170,7 +170,7 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **G53. Provider execution does not cross the MCP boundary.** MCP may transport already normalized declaration claims into the read-only declaration qualification surface, but it must not dynamically import or execute arbitrary Python declaration providers.
 
-**G54. Provider path enumeration is repository observation, not ambient filesystem access.** Provider enumeration is derived from the admitted indexed repository generation, is bounded, is recorded in provider observation identity, and is revalidated during qualification. Enumeration must not grant providers an opaque raw workspace path or silently convert unindexed/pruned filesystem contents into repository evidence.
+**G54. Provider path enumeration is repository observation, not ambient filesystem access.** Provider enumeration uses the shared repository admission/pruning/symlink discovery owner, is bounded, is recorded in provider observation identity, and is revalidated during qualification. Admitted files may be enumerated even when CodeMap has no parser for their format, but enumeration alone does not certify their contents or semantics: declarations still require revision-bound exact repository evidence reads. Enumeration must not grant providers an opaque raw workspace path or expose denied, internal, pruned, or symlink-descended material.
 
 ## Product-boundary constitution
 
