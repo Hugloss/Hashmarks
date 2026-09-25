@@ -156,7 +156,8 @@ def test_ci_qualifies_native_linux_wsl_and_windows_install_paths() -> None:
 
     assert "windows-latest" in windows
     assert "windows_installer_smoke.ps1" in windows
-    assert "hashmarks-windows-x86_64.exe.sha256" in windows
+    assert "hashmarks-windows-x86_64.exe" in windows
+    assert '$checksum = "$asset.sha256"' in windows
     assert "standalone-qualification" in windows
     assert "--platform windows" in windows
 
@@ -182,7 +183,8 @@ def test_publish_requires_native_linux_wsl_and_windows_release_identity() -> Non
     assert "windows-latest" in windows
     assert "windows_installer_smoke.ps1" in windows
     assert "RELEASE_VERSION: ${{ needs.prepare.outputs.version }}" in windows
-    assert "hashmarks-windows-x86_64.exe.sha256" in windows
+    assert "hashmarks-windows-x86_64.exe" in windows
+    assert '$checksum = "$asset.sha256"' in windows
     assert "--platform windows" in windows
 
     assert "needs: [prepare, build, standalone-linux, standalone-windows]" in publish
