@@ -11,7 +11,7 @@ import pytest
 import hashmarks
 import hashmarks_build
 from scripts import release_contract
-from scripts.release_contract import release_manifest
+from scripts.release_contract import release_manifest, verify_release_manifest
 
 
 def _root() -> Path:
@@ -68,35 +68,50 @@ def test_release_contract_cli_translates_invalid_tag_without_traceback(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     dist = _dist(tmp_path)
+    manifest = release_manifest(_root(), dist, tag=f"v{hashmarks.__version__}")
+    manifest_path = tmp_path / "release-manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
     with pytest.raises(SystemExit, match="release tag mismatch"):
         release_contract.main(
             [
                 "verify",
                 "--root",
-                str(_root()),
+                str(tmp_path / "source-tree-not-required"),
                 "--dist",
                 str(dist),
                 "--tag",
                 "v999.0.0",
                 "--manifest",
-                str(tmp_path / "missing.json"),
+                str(manifest_path),
             ]
         )
     captured = capsys.readouterr()
     assert "Traceback" not in captured.err
 
 
-def test_release_contract_cli_runs_without_installed_hashmarks(tmp_path: Path) -> None:
+def test_release_contract_verify_runs_without_source_or_installed_hashmarks(
+    tmp_path: Path,
+) -> None:
+    dist = _dist(tmp_path)
+    manifest = release_manifest(_root(), dist, tag=f"v{hashmarks.__version__}")
+    manifest_path = tmp_path / "release-manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
     result = subprocess.run(
         [
             sys.executable,
             "-I",
             str(_root() / "scripts" / "release_contract.py"),
-            "validate-tag",
+            "verify",
             "--root",
-            str(_root()),
+            str(tmp_path / "source-tree-not-required"),
+            "--dist",
+            str(dist),
             "--tag",
             f"v{hashmarks.__version__}",
+            "--manifest",
+            str(manifest_path),
         ],
         cwd=tmp_path,
         check=False,
@@ -105,8 +120,24 @@ def test_release_contract_cli_runs_without_installed_hashmarks(tmp_path: Path) -
     )
 
     assert result.returncode == 0
-    assert f"Hashmarks release tag: PASS (v{hashmarks.__version__})" in result.stdout
+    assert "Hashmarks release artifact manifest: PASS" in result.stdout
     assert result.stderr == ""
+
+
+def test_release_verifier_rejects_downloaded_distribution_byte_drift(
+    tmp_path: Path,
+) -> None:
+    dist = _dist(tmp_path)
+    manifest = release_manifest(_root(), dist, tag=f"v{hashmarks.__version__}")
+    wheel = next(dist.glob("*.whl"))
+    wheel.write_bytes(wheel.read_bytes() + b"tampered")
+
+    with pytest.raises(ValueError, match="downloaded distribution bytes"):
+        verify_release_manifest(
+            dist,
+            tag=f"v{hashmarks.__version__}",
+            recorded=manifest,
+        )
 
 
 def test_release_manifest_is_stable_for_unchanged_bytes(tmp_path: Path) -> None:
