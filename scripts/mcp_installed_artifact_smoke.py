@@ -38,6 +38,8 @@ def _fixture(root: Path) -> Path:
         "def test_flare041():\n    assert flare041(1) == 2\n",
         encoding="utf-8",
     )
+    (repo / "runtime-a.txt").write_text("3.12\n", encoding="utf-8")
+    (repo / "runtime-b.txt").write_text("3.12\n", encoding="utf-8")
     return repo
 
 
@@ -71,6 +73,68 @@ async def _exercise(executable: Path, repo: Path, state_dir: Path) -> None:
             assert any(
                 row["path"] == "src/feature.py"
                 for row in found.structured_content["results"]
+            )
+
+            declarations = await session.call_tool(
+                "repository_declarations",
+                arguments={
+                    "groups": [
+                        {
+                            "group_id": "runtime",
+                            "concept": {"kind": "runtime", "identity": "python"},
+                            "scope": {},
+                            "correspondence": {
+                                "state": "declared",
+                                "basis": {"provider": "installed-smoke"},
+                            },
+                            "declarations": [
+                                {
+                                    "declaration_id": "a",
+                                    "value_state": "resolved",
+                                    "value": "3.12",
+                                    "producer": {"kind": "fixture"},
+                                    "evidence": [
+                                        {
+                                            "path": "runtime-a.txt",
+                                            "start_line": 1,
+                                            "end_line": 1,
+                                        }
+                                    ],
+                                },
+                                {
+                                    "declaration_id": "b",
+                                    "value_state": "resolved",
+                                    "value": "3.12",
+                                    "producer": {"kind": "fixture"},
+                                    "evidence": [
+                                        {
+                                            "path": "runtime-b.txt",
+                                            "start_line": 1,
+                                            "end_line": 1,
+                                        }
+                                    ],
+                                },
+                            ],
+                            "coverage": {
+                                "state": "complete",
+                                "truncation": "complete",
+                                "expected_declaration_ids": ["a", "b"],
+                                "scope": {},
+                                "provenance": {"provider": "installed-smoke"},
+                            },
+                        }
+                    ]
+                },
+            )
+            assert declarations.is_error is not True
+            assert declarations.structured_content is not None
+            assert (
+                declarations.structured_content["schema"]
+                == "hashmarks.repository-declarations.v1"
+            )
+            assert (
+                declarations.structured_content["groups"][0]["comparison"]["state"]
+                == "equivalent"
             )
 
             invalid = await session.call_tool(
