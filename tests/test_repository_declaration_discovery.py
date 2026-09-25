@@ -978,3 +978,28 @@ def test_single_provider_declarations_are_bounded_before_qualification(
         ):
             codemap.discover_repository_declarations([_OversizedDeclarationProvider()])
 
+def test_provider_evidence_validation_rejects_duplicate_input_index_rows(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value: stable\n", encoding="utf-8")
+    provider = _SingleProvider("fixture-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.discover_repository_declarations([provider])
+        provider_row = packet["providers"][0]
+        provider_row["inputs"].append(dict(provider_row["inputs"][0]))
+        try:
+            from hashmarks.codemap.repository_declaration_discovery import (
+                _validate_provider_evidence_revisions,
+            )
+            _validate_provider_evidence_revisions(
+                packet["providers"], packet["declarations"]
+            )
+        except ValueError as exc:
+            assert "provider input paths are duplicated" in str(exc)
+        else:
+            raise AssertionError("duplicate provider input index must fail closed")
+
