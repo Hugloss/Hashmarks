@@ -39,9 +39,11 @@ class RepositoryDeclarationProvider(Protocol):
 
     def detect(self, workspace: Path) -> bool:
         """Return whether this provider applies to the workspace."""
+        ...
 
     def discover(self, workspace: Path) -> RepositoryDeclarationProviderResult:
         """Return producer-normalized declaration groups for the workspace."""
+        ...
 
 
 def _provider_name(provider: RepositoryDeclarationProvider) -> str:
