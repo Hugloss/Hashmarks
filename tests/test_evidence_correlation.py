@@ -1435,7 +1435,7 @@ def test_correlation_delta_rejects_nested_repository_evidence_tampering(
         with pytest.raises(ValueError, match="bindings identity mismatch"):
             codemap.evidence_correlation_delta(tampered, packet)
 
-def test_correlation_definition_identity_is_bundle_order_invariant(tmp_path: Path) -> None:
+def test_correlation_definition_identity_is_bundle_order_invariant(\n    tmp_path: Path,\n) -> None:
     (tmp_path / "a.py").write_text("A = 1\n", encoding="utf-8")
     (tmp_path / "b.py").write_text("B = 1\n", encoding="utf-8")
     first = _bundle({"anchor_id": "a", "path": "a.py"})[0]
@@ -1470,4 +1470,3 @@ def test_incomplete_correlation_never_admits_negative_evidence(tmp_path: Path) -
 
     assert packet["completeness"]["state"] == "unknown"
     assert packet["completeness"]["negative_evidence"] == "not-admissible"
-
