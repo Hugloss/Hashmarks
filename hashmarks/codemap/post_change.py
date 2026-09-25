@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+
 @dataclass(frozen=True, slots=True)
 class PostChangeOptions:
     """Previous anchors and bounds for one post-change projection."""
@@ -25,6 +26,7 @@ class PostChangeOptions:
     limit: int = 20
     per_role: int = 3
     token_budget: int = 512
+
 
 
 class PostChangeMixin(ChangeImpactMixin):
@@ -167,7 +169,10 @@ class PostChangeMixin(ChangeImpactMixin):
         generation_before: int,
     ) -> list[str]:
         reasons: list[str] = []
-        if str(receipt.get("repository_identity") or "") != self._repository_packet_identity():
+        if (
+            str(receipt.get("repository_identity") or "")
+            != self._repository_packet_identity()
+        ):
             reasons.append("repository-mismatch")
         expected_task = self._packet_digest("hashmarks.task.v1", {"task": task})
         if str(receipt.get("task_identity") or "") != expected_task:
