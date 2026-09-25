@@ -137,9 +137,12 @@ def test_public_readme_tracks_release_version_and_markdown_boundaries() -> None:
 
     assert f"Current package version: **{project_version}**." in readme
     assert "Hashmarks.\\n- **Evidence correlation.**" not in readme
-    assert "REPOSITORY_EVIDENCE_BINDINGS.md)\\n- [Evidence correlation]" not in readme
+    assert "REPOSITORY_EVIDENCE_BINDINGS.md)\\n" not in readme
+    assert "REPOSITORY_DECLARATIONS.md)\\n" not in readme
     assert "Hashmarks.\n- **Evidence correlation.**" in readme
-    assert "REPOSITORY_EVIDENCE_BINDINGS.md)\n- [Evidence correlation]" in readme
+    assert "[Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md)" in readme
+    assert "[Repository declarations](docs/reference/REPOSITORY_DECLARATIONS.md)" in readme
+    assert "[Evidence correlation](docs/reference/EVIDENCE_CORRELATION.md)" in readme
 
 
 def test_public_release_contract_documents_stability_and_changelog() -> None:
@@ -244,12 +247,15 @@ def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None
     mcp = _text("docs/integration/MCP.md")
     assert "Apache License 2.0" in readme
     assert "integration/MCP.md" in docs
-    assert "only six tools" in mcp
+    assert "small read-only repository-intelligence tool catalog" in mcp
     for tool in (
         "repository_context",
         "find",
         "task_evidence",
         "change_impact",
+        "correlate_evidence",
+        "dependency_codemap",
+        "repository_declarations",
         "post_change",
     ):
         assert f"`{tool}`" in mcp
