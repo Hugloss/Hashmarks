@@ -146,6 +146,8 @@ def test_uv_lock_adapter_includes_every_committed_lock_dependency_group(
         "mcp",
         "ruff",
     }
+    assert query["completeness"] == "incomplete"
+    assert any(row["reason"] == "conditional-edge" for row in query["omissions"])
     assert {
         row["effective_scope"]
         for row in observation["relationships"]
