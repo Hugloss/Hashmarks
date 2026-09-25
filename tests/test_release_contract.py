@@ -357,7 +357,14 @@ def test_publication_verification_rejects_post_manifest_mutation(
         source_sha,
     ]
     release_contract.main(
-        ["publication-manifest", *args, "--output", str(output), "--sha256sums", str(sums)]
+        [
+            "publication-manifest",
+            *args,
+            "--output",
+            str(output),
+            "--sha256sums",
+            str(sums),
+        ]
     )
     windows_checksum = windows / "hashmarks-windows-x86_64.exe.sha256"
     windows_checksum.write_text(
@@ -369,9 +376,7 @@ def test_publication_verification_rejects_post_manifest_mutation(
         SystemExit,
         match="standalone installer checksum does not match qualified standalone bytes",
     ):
-        release_contract.main(
-            ["verify-publication", *args, "--manifest", str(output)]
-        )
+        release_contract.main(["verify-publication", *args, "--manifest", str(output)])
 
 
 def test_release_contract_cli_translates_invalid_tag_without_traceback(
