@@ -918,7 +918,7 @@ def test_v3_multicontext_graph_query_requires_explicit_context(
     "operation",
     ["dependencies", "dependents", "reachability", "paths"],
 )
-def test_v3_graph_query_refuses_conditional_relationship_flattening(
+def test_v3_graph_query_reports_conditional_relationship_omission(
     tmp_path: Path,
     operation: str,
 ) -> None:
@@ -935,11 +935,21 @@ def test_v3_graph_query_refuses_conditional_relationship_flattening(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(changed)
-        with pytest.raises(
-            ValueError,
-            match="graph query cannot flatten conditional relationships",
-        ):
-            codemap.dependency_resolution_queries(observation, [request])
+        result = codemap.dependency_resolution_queries(observation, [request])[
+            "results"
+        ][0]
+
+    assert result["completeness"] == "incomplete"
+    assert result["omissions"] == [{"reason": "conditional-edge", "node_id": request["node_id"]}]
+    if operation == "reachability":
+        assert result["result"]["reachable"] is False
+        assert result["result"]["negative_evidence"] == "not-admissible"
+    elif operation == "paths":
+        assert result["result"] == []
+        assert result["negative_evidence"] == "not-admissible"
+    else:
+        assert result["result"] == []
+        assert result["negative_evidence"] == "not-admissible"
 
 
 def test_v3_duplicate_unconditional_edges_do_not_duplicate_node_paths(
