@@ -1301,9 +1301,7 @@ class DependencyResolutionEvidenceMixin:
             if claimed is not None and (
                 not isinstance(claimed, str) or not _MEMBER_REVISION.fullmatch(claimed)
             ):
-                raise ValueError(
-                    "repository input member_revision must be lowercase sha256 hex"
-                )
+                raise ValueError("member_revision must be lowercase sha256 hex")
             member, _raw = self._repository_member_observation(path)
             observed = member.get("member_revision")
             if claimed is None or observed is None:
