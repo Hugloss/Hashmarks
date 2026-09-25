@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import os
+import signal
 import subprocess
+import time
 from pathlib import Path
 
 
@@ -68,6 +70,74 @@ def test_installer_downloads_verifies_and_installs_release_binary(
     assert os.access(installed, os.X_OK)
     assert "Hashmarks installed:" in result.stdout
     assert list((tmp_path / "bin").glob(".hashmarks-install.*")) == []
+
+
+def test_installer_upgrades_existing_binary_only_after_candidate_qualifies(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "release"
+    source.mkdir()
+    _, payload = _asset(source)
+    install_dir = tmp_path / "bin"
+    installed, previous = _working_binary(install_dir)
+
+    result = subprocess.run(
+        ["sh", str(_root() / "install.sh")],
+        env=_environment(tmp_path, source),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert installed.read_bytes() == payload
+    assert installed.read_bytes() != previous
+    assert list(install_dir.glob(".hashmarks-install.*")) == []
+    assert "Hashmarks installed:" in result.stdout
+
+
+def test_installer_interruption_before_replacement_preserves_working_binary(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "release"
+    source.mkdir()
+    ready = tmp_path / "candidate-ready"
+    payload = (
+        b"#!/bin/sh\n"
+        b': > "$HASHMARKS_TEST_SMOKE_READY"\n'
+        b"trap 'exit 143' HUP INT TERM\n"
+        b"while :; do sleep 1; done\n"
+    )
+    _write_asset(source, payload)
+
+    install_dir = tmp_path / "bin"
+    installed, previous = _working_binary(install_dir)
+    env = _environment(tmp_path, source)
+    env["HASHMARKS_TEST_SMOKE_READY"] = str(ready)
+    process = subprocess.Popen(
+        ["sh", str(_root() / "install.sh")],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        deadline = time.monotonic() + 10
+        while not ready.exists() and process.poll() is None:
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.05)
+        assert ready.exists()
+        os.killpg(process.pid, signal.SIGTERM)
+        process.communicate(timeout=10)
+    finally:
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait(timeout=5)
+
+    assert process.returncode != 0
+    assert installed.read_bytes() == previous
+    assert list(install_dir.glob(".hashmarks-install.*")) == []
 
 
 def test_installer_accepts_v_prefixed_explicit_release_version(tmp_path: Path) -> None:
