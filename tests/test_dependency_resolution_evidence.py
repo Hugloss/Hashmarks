@@ -1068,7 +1068,7 @@ def test_v3_repository_input_revision_requires_string_sha256(
         codemap.sync()
         with pytest.raises(
             ValueError,
-            match="repository input member_revision must be lowercase sha256 hex",
+            match="member_revision must be lowercase sha256 hex",
         ):
             codemap.dependency_resolution_evidence(snapshot)
 
