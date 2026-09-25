@@ -88,12 +88,14 @@ def _provider_group_ids_and_inputs(
     group_ids = provider.get("group_ids")
     if not isinstance(inputs_raw, list) or not isinstance(group_ids, list):
         raise ValueError("declaration discovery provider evidence is malformed")
-    inputs = {
-        str(row.get("path") or ""): row
-        for row in inputs_raw
-        if isinstance(row, Mapping)
-    }
-    return [str(group_id) for group_id in group_ids], inputs
+    input_rows = [row for row in inputs_raw if isinstance(row, Mapping)]
+    inputs = {str(row.get("path") or ""): row for row in input_rows}
+    if len(inputs) != len(input_rows):
+        raise ValueError("declaration discovery provider input paths are duplicated")
+    normalized_group_ids = [str(group_id) for group_id in group_ids]
+    if len(set(normalized_group_ids)) != len(normalized_group_ids):
+        raise ValueError("declaration discovery provider group ids are duplicated")
+    return normalized_group_ids, inputs
 
 
 def _declaration_evidence_rows(
