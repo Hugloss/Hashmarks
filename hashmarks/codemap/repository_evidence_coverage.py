@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+
 @dataclass
 class _CoverageBindingChanges:
     direct_changed: set[str] = field(default_factory=set)
@@ -41,6 +42,7 @@ class _CoverageBindingChanges:
             | self.member_state_changed
             | self.locator_changed
         )
+
 
 
 class RepositoryEvidenceCoverageMixin:
@@ -326,12 +328,21 @@ class RepositoryEvidenceCoverageMixin:
         repository_identity: str,
         bindings_identity: object,
     ) -> None:
-        if binding_delta.get("schema") != "hashmarks.repository-evidence-binding-delta.v1":
-            raise ValueError("binding_delta must be a repository evidence binding delta")
+        if (
+            binding_delta.get("schema")
+            != "hashmarks.repository-evidence-binding-delta.v1"
+        ):
+            raise ValueError(
+                "binding_delta must be a repository evidence binding delta"
+            )
         delta_identity = binding_delta.get("delta_identity")
         expected_delta_identity = "sha256:" + self._packet_digest(
             "hashmarks.repository-evidence-binding-delta.v1",
-            {key: value for key, value in binding_delta.items() if key != "delta_identity"},
+            {
+                key: value
+                for key, value in binding_delta.items()
+                if key != "delta_identity"
+            },
         )
         if delta_identity != expected_delta_identity:
             raise ValueError("binding_delta identity mismatch")
@@ -342,13 +353,19 @@ class RepositoryEvidenceCoverageMixin:
             else (None, None)
         )
         delta_repository_identities = tuple(
-            str(row.get("repository_identity") or "") if isinstance(row, Mapping) else ""
+            str(row.get("repository_identity") or "")
+            if isinstance(row, Mapping)
+            else ""
             for row in repository_rows
         )
-        if any(identity != repository_identity for identity in delta_repository_identities):
+        if any(
+            identity != repository_identity for identity in delta_repository_identities
+        ):
             raise ValueError("binding_delta repository-mismatch")
         identities = binding_delta.get("bindings_identity")
-        after_identity = identities.get("after") if isinstance(identities, Mapping) else None
+        after_identity = (
+            identities.get("after") if isinstance(identities, Mapping) else None
+        )
         if after_identity != bindings_identity:
             raise ValueError("binding_delta after identity must match bindings_packet")
 
@@ -362,7 +379,11 @@ class RepositoryEvidenceCoverageMixin:
         identity = bindings_packet.get("bindings_identity")
         expected_identity = "sha256:" + self._packet_digest(
             "hashmarks.repository-evidence-bindings.v1",
-            {key: value for key, value in bindings_packet.items() if key != "bindings_identity"},
+            {
+                key: value
+                for key, value in bindings_packet.items()
+                if key != "bindings_identity"
+            },
         )
         if identity != expected_identity:
             raise ValueError("bindings_packet bindings identity mismatch")
