@@ -60,23 +60,37 @@ def _limited(
 
 def _adjacency(
     relationships: Sequence[Mapping[str, object]],
-) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+) -> tuple[
+    dict[str, list[str]],
+    dict[str, list[str]],
+    dict[str, list[str]],
+    dict[str, list[str]],
+]:
     outgoing: dict[str, set[str]] = {}
     incoming: dict[str, set[str]] = {}
+    conditional_outgoing: dict[str, set[str]] = {}
+    conditional_incoming: dict[str, set[str]] = {}
     for row in relationships:
         source = str(row.get("source") or "")
         target = str(row.get("target") or "")
-        outgoing.setdefault(source, set()).add(target)
-        incoming.setdefault(target, set()).add(source)
+        if str(row.get("marker") or ""):
+            conditional_outgoing.setdefault(source, set()).add(target)
+            conditional_incoming.setdefault(target, set()).add(source)
+        else:
+            outgoing.setdefault(source, set()).add(target)
+            incoming.setdefault(target, set()).add(source)
     return (
         {node: sorted(values) for node, values in outgoing.items()},
         {node: sorted(values) for node, values in incoming.items()},
+        {node: sorted(values) for node, values in conditional_outgoing.items()},
+        {node: sorted(values) for node, values in conditional_incoming.items()},
     )
 
 
 def _walk(
     start: str,
     adjacency: Mapping[str, Sequence[str]],
+    conditional: Mapping[str, Sequence[str]],
     selections: Mapping[str, Mapping[str, object]],
     *,
     max_depth: int,
@@ -92,6 +106,8 @@ def _walk(
     visited = 0
     while queue:
         current, depth = queue.pop(0)
+        if conditional.get(current):
+            omissions.append({"reason": "conditional-edge", "node_id": current})
         if depth >= max_depth:
             if adjacency.get(current):
                 omissions.append({"reason": "depth-limit", "node_id": current})
@@ -126,6 +142,7 @@ def _reachability(  # noqa: C901
     start: str,
     target: str,
     outgoing: Mapping[str, Sequence[str]],
+    conditional: Mapping[str, Sequence[str]],
     *,
     max_depth: int,
     max_visits: int,
@@ -138,6 +155,8 @@ def _reachability(  # noqa: C901
         return True, visited, omissions
     while queue:
         current, depth = queue.pop(0)
+        if conditional.get(current):
+            omissions.append({"reason": "conditional-edge", "node_id": current})
         if depth >= max_depth:
             if outgoing.get(current):
                 omissions.append({"reason": "depth-limit", "node_id": current})
@@ -159,6 +178,7 @@ def _paths(  # noqa: C901, PLR0912
     start: str,
     target: str,
     outgoing: Mapping[str, Sequence[str]],
+    conditional: Mapping[str, Sequence[str]],
     *,
     max_depth: int,
     max_results: int,
@@ -171,6 +191,8 @@ def _paths(  # noqa: C901, PLR0912
     while queue:
         path = queue.pop(0)
         current = path[-1]
+        if conditional.get(current):
+            omissions.append({"reason": "conditional-edge", "node_id": current})
         if current == target:
             if len(paths) >= max_results:
                 omissions.append({"reason": "result-limit"})
@@ -361,14 +383,17 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             raise ValueError(
                 f"dependency query node_id not selected in context: {node_id}:{context}"
             )
-        if any(str(row.get("marker") or "") for row in relationships):
-            raise ValueError("graph query cannot flatten conditional relationships")
         source_complete = _coverage_complete(observation, context=context)
-        outgoing, incoming = _adjacency(relationships)
+        outgoing, incoming, conditional_outgoing, conditional_incoming = _adjacency(
+            relationships
+        )
         if operation in {"dependencies", "dependents"}:
             result, visited, omissions = _walk(
                 node_id,
                 outgoing if operation == "dependencies" else incoming,
+                conditional_outgoing
+                if operation == "dependencies"
+                else conditional_incoming,
                 selections,
                 max_depth=max_depth,
                 max_results=max_results,
@@ -390,6 +415,7 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 node_id,
                 target_id,
                 outgoing,
+                conditional_outgoing,
                 max_depth=max_depth,
                 max_visits=max_visits,
             )
@@ -415,6 +441,7 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 node_id,
                 target_id,
                 outgoing,
+                conditional_outgoing,
                 max_depth=max_depth,
                 max_results=max_results,
                 max_visits=max_visits,
