@@ -1435,3 +1435,39 @@ def test_correlation_delta_rejects_nested_repository_evidence_tampering(
         with pytest.raises(ValueError, match="bindings identity mismatch"):
             codemap.evidence_correlation_delta(tampered, packet)
 
+def test_correlation_definition_identity_is_bundle_order_invariant(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("A = 1\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("B = 1\n", encoding="utf-8")
+    first = _bundle({"anchor_id": "a", "path": "a.py"})[0]
+    second = _bundle({"anchor_id": "b", "path": "b.py"})[0]
+    second["bundle_id"] = "observation:2"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        forward = codemap.correlate_evidence(
+            [first, second], include_relationships=False
+        )
+        reverse = codemap.correlate_evidence(
+            [second, first], include_relationships=False
+        )
+
+    assert (
+        forward["evidence_definition_identity"]
+        == reverse["evidence_definition_identity"]
+    )
+
+
+def test_incomplete_correlation_never_admits_negative_evidence(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence(
+            _bundle(
+                {"anchor_id": "missing", "path": "missing.py"},
+                completeness="incomplete",
+            ),
+            include_relationships=False,
+        )
+
+    assert packet["completeness"]["state"] == "unknown"
+    assert packet["completeness"]["negative_evidence"] == "not-admissible"
+
