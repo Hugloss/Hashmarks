@@ -64,7 +64,7 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
     assert set(request) == {"version"}
     version = request["version"]
     assert isinstance(version, str)
-    assert re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+", version)
+    assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)
 
 
 def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
