@@ -88,6 +88,18 @@ class EvidenceFreshnessMapMixin:
             )
         return revisions
 
+    def _validate_prior_scope(
+        self,
+        previous_map: Mapping[str, object],
+        *,
+        expected_task_identity: str,
+    ) -> tuple[str, str]:
+        repository_identity, task_identity = self._validate_prior_scope(
+            previous_map,
+            expected_task_identity=expected_task_identity,
+        )
+        return repository_identity, task_identity
+
     def _prior_entries(
         self,
         previous_map: Mapping[str, object] | None,
