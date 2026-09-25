@@ -352,6 +352,11 @@ def _provider_result(
             "RepositoryDeclarationProviderResult"
         )
     groups = _provider_groups(result.groups, provider_name=provider_name)
+    if len(groups) > MAX_DECLARATION_PROVIDERS * 4:
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} groups exceed "
+            f"{MAX_DECLARATION_PROVIDERS * 4} entries"
+        )
     evidence_paths = _declared_evidence_paths(groups)
     unread = sorted(evidence_paths - set(context.content_paths()))
     if unread:
