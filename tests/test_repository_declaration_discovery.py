@@ -13,7 +13,6 @@ from hashmarks.codemap import (
 )
 
 
-
 def _value(context: RepositoryDeclarationProviderContext, path: str) -> str:
     text = context.read_text(path).strip()
     if "=" in text:
@@ -21,7 +20,6 @@ def _value(context: RepositoryDeclarationProviderContext, path: str) -> str:
     if ":" in text:
         return text.split(":", 1)[1].strip().strip('"')
     return text
-
 
 
 @dataclass
@@ -93,7 +91,6 @@ class _PairProvider:
         )
 
 
-
 @dataclass
 class _SingleProvider:
     name: str
@@ -143,7 +140,6 @@ class _SingleProvider:
             ),
             provenance={"provider": self.name},
         )
-
 
 
 class _FailingProvider:
@@ -236,7 +232,6 @@ def test_discovery_is_format_and_domain_neutral(
     assert packet["observation_identity"].startswith("sha256:")
 
 
-
 def test_provider_order_is_not_discovery_identity(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -255,7 +250,6 @@ def test_provider_order_is_not_discovery_identity(tmp_path: Path) -> None:
         "a-provider",
         "b-provider",
     ]
-
 
 
 def test_not_detected_provider_is_observable_without_claiming_absence(
@@ -281,7 +275,6 @@ def test_not_detected_provider_is_observable_without_claiming_absence(
     assert packet["declarations"]["groups"] == []
 
 
-
 def test_detected_provider_failure_fails_closed_instead_of_returning_partial_data(
     tmp_path: Path,
 ) -> None:
@@ -295,7 +288,6 @@ def test_detected_provider_failure_fails_closed_instead_of_returning_partial_dat
             match="failing-provider discovery failed",
         ):
             codemap.discover_repository_declarations([_FailingProvider()])
-
 
 
 def test_duplicate_provider_names_fail_closed(tmp_path: Path) -> None:
@@ -315,7 +307,6 @@ def test_duplicate_provider_names_fail_closed(tmp_path: Path) -> None:
                     _SingleProvider("same", "a.txt"),
                 ]
             )
-
 
 
 def test_discovery_delta_separates_provider_provenance_from_declaration_change(
@@ -362,7 +353,6 @@ def test_discovery_delta_separates_provider_provenance_from_declaration_change(
     assert before["observation_identity"] != after["observation_identity"]
 
 
-
 def test_discovery_delta_reuses_nested_repository_evidence_delta(
     tmp_path: Path,
 ) -> None:
@@ -395,7 +385,6 @@ def test_discovery_delta_reuses_nested_repository_evidence_delta(
     assert changed_bindings[0]["binding_id"].endswith("value-1")
 
 
-
 def test_previous_discovery_packet_is_tamper_checked(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -414,7 +403,6 @@ def test_previous_discovery_packet_is_tamper_checked(tmp_path: Path) -> None:
                 [provider],
                 previous_observation=previous,
             )
-
 
 
 def test_previous_discovery_from_foreign_repository_fails_before_providers_run(
@@ -444,7 +432,6 @@ def test_previous_discovery_from_foreign_repository_fails_before_providers_run(
             )
 
 
-
 def test_discovery_has_no_ambient_default_providers(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -457,7 +444,6 @@ def test_discovery_has_no_ambient_default_providers(tmp_path: Path) -> None:
 
     assert packet["providers"] == []
     assert packet["declarations"]["groups"] == []
-
 
 
 def test_cross_provider_group_identity_collision_fails_closed(tmp_path: Path) -> None:
@@ -484,7 +470,6 @@ def test_cross_provider_group_identity_collision_fails_closed(tmp_path: Path) ->
             codemap.discover_repository_declarations([first, second])
 
 
-
 @dataclass
 class _DuplicateGroupProvider(_SingleProvider):
     def discover(
@@ -496,7 +481,6 @@ class _DuplicateGroupProvider(_SingleProvider):
             groups=(result.groups[0], result.groups[0]),
             provenance={"provider": self.name},
         )
-
 
 
 def test_duplicate_group_identity_from_one_provider_fails_at_provider_boundary(
@@ -514,7 +498,6 @@ def test_duplicate_group_identity_from_one_provider_fails_at_provider_boundary(
             match="returned duplicate group_id values",
         ):
             codemap.discover_repository_declarations([provider])
-
 
 
 class _UnreadEvidenceProvider:
@@ -565,7 +548,6 @@ class _UnreadEvidenceProvider:
         )
 
 
-
 @dataclass
 class _MutatingProvider(_SingleProvider):
     mutation_root: Path | None = None
@@ -584,7 +566,6 @@ class _MutatingProvider(_SingleProvider):
         return result
 
 
-
 def test_provider_cannot_bind_semantic_value_to_unread_evidence(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -597,7 +578,6 @@ def test_provider_cannot_bind_semantic_value_to_unread_evidence(tmp_path: Path) 
             match="evidence was not read through the provider context",
         ):
             codemap.discover_repository_declarations([_UnreadEvidenceProvider()])
-
 
 
 def test_provider_input_change_after_parse_fails_closed(tmp_path: Path) -> None:
@@ -619,7 +599,6 @@ def test_provider_input_change_after_parse_fails_closed(tmp_path: Path) -> None:
             codemap.discover_repository_declarations([provider])
 
 
-
 class _ManyInputsProvider:
     name = "many-inputs"
 
@@ -635,7 +614,6 @@ class _ManyInputsProvider:
         raise AssertionError("discovery must not run")
 
 
-
 def test_provider_repository_input_reads_are_bounded(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -647,7 +625,6 @@ def test_provider_repository_input_reads_are_bounded(tmp_path: Path) -> None:
             match="inputs exceed 256 paths",
         ):
             codemap.discover_repository_declarations([_ManyInputsProvider()])
-
 
 
 def test_provider_context_cannot_read_pruned_repository_scope(tmp_path: Path) -> None:
@@ -670,7 +647,6 @@ def test_provider_context_cannot_read_pruned_repository_scope(tmp_path: Path) ->
     assert "unsupported" in str(exc_info.value)
 
 
-
 @dataclass
 class _HelperInputProvider(_SingleProvider):
     helper_path: str = "helper.txt"
@@ -681,7 +657,6 @@ class _HelperInputProvider(_SingleProvider):
     ) -> RepositoryDeclarationProviderResult:
         context.read_text(self.helper_path)
         return super().discover(context)
-
 
 
 def test_helper_input_delta_does_not_masquerade_as_declaration_delta(
@@ -720,7 +695,6 @@ def test_helper_input_delta_does_not_masquerade_as_declaration_delta(
     )
 
 
-
 @dataclass
 class _EnumeratingHelperProvider(_SingleProvider):
     enumeration_prefix: str = "helpers"
@@ -736,7 +710,6 @@ class _EnumeratingHelperProvider(_SingleProvider):
     ) -> RepositoryDeclarationProviderResult:
         context.paths(self.enumeration_prefix)
         return super().discover(context)
-
 
 
 def test_provider_path_enumeration_is_bounded_tracked_and_has_no_raw_workspace(
@@ -764,7 +737,6 @@ def test_provider_path_enumeration_is_bounded_tracked_and_has_no_raw_workspace(
     ]
     assert packet["bounds"]["max_path_enumerations_per_provider"] == 32
     assert packet["bounds"]["max_enumerated_paths_per_provider"] == 256
-
 
 
 def test_provider_path_enumeration_delta_is_separate_from_declaration_delta(
@@ -800,7 +772,6 @@ def test_provider_path_enumeration_delta_is_separate_from_declaration_delta(
     )
 
 
-
 class _TooBroadEnumerationProvider:
     name = "too-broad-enumeration"
 
@@ -813,7 +784,6 @@ class _TooBroadEnumerationProvider:
         context: RepositoryDeclarationProviderContext,
     ) -> RepositoryDeclarationProviderResult:
         raise AssertionError("discovery must not run")
-
 
 
 def test_provider_path_enumeration_fails_closed_above_bound(tmp_path: Path) -> None:
@@ -832,7 +802,6 @@ def test_provider_path_enumeration_fails_closed_above_bound(tmp_path: Path) -> N
             codemap.discover_repository_declarations([_TooBroadEnumerationProvider()])
 
 
-
 class _RootEnumerationProvider:
     name = "root-enumeration"
 
@@ -848,7 +817,6 @@ class _RootEnumerationProvider:
         context: RepositoryDeclarationProviderContext,
     ) -> RepositoryDeclarationProviderResult:
         raise AssertionError("discovery must not run")
-
 
 
 def test_provider_path_enumeration_respects_pruned_repository_scope(
@@ -885,7 +853,6 @@ class _UnstableEnumerationProvider:
         context: RepositoryDeclarationProviderContext,
     ) -> RepositoryDeclarationProviderResult:
         raise AssertionError("discovery must not run")
-
 
 
 def test_provider_path_enumeration_requires_deterministic_repository_order(
@@ -940,7 +907,6 @@ class _OversizedGroupProvider:
             ),
             provenance={"provider": self.name},
         )
-
 
 
 def test_single_provider_output_is_bounded_before_aggregate_qualification(
@@ -1000,7 +966,6 @@ class _OversizedDeclarationProvider:
             ),
             provenance={"provider": self.name},
         )
-
 
 
 def test_single_provider_declarations_are_bounded_before_qualification(
