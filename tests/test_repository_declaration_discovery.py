@@ -379,3 +379,41 @@ def test_previous_discovery_packet_is_tamper_checked(tmp_path: Path) -> None:
                 [provider],
                 previous_observation=previous,
             )
+
+
+def test_discovery_has_no_ambient_default_providers(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "Chart.yaml").write_text("owner: team-a\n", encoding="utf-8")
+    (repo / "catalog-info.yaml").write_text("owner: team-a\n", encoding="utf-8")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.discover_repository_declarations([])
+
+    assert packet["providers"] == []
+    assert packet["declarations"]["groups"] == []
+
+
+def test_cross_provider_group_identity_collision_fails_closed(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.txt").write_text("value: a\n", encoding="utf-8")
+    (repo / "b.txt").write_text("value: a\n", encoding="utf-8")
+    first = _PairProvider(
+        name="first-provider",
+        group_id="same-group",
+        concept={"kind": "fixture", "identity": "value"},
+        paths=("a.txt", "b.txt"),
+    )
+    second = _PairProvider(
+        name="second-provider",
+        group_id="same-group",
+        concept={"kind": "fixture", "identity": "value"},
+        paths=("a.txt", "b.txt"),
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="duplicate group_id"):
+            codemap.discover_repository_declarations([first, second])
