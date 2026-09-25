@@ -87,7 +87,7 @@ def test_publish_workflow_publishes_only_verified_github_release_assets() -> Non
     assert '--target "${{ needs.prepare.outputs.source_sha }}"' in text
     assert "--notes-file release/release-notes.md" in text
     assert "--generate-notes" not in text
-    assert 'git rev-list -n 1 "$RELEASE_TAG"' in text
+    assert 'git -C source rev-list -n 1 "$RELEASE_TAG"' in text
     assert 'if [ "$tag_commit" != "${{ needs.prepare.outputs.source_sha }}" ]' in text
     assert "Materialize reviewed changelog section as release notes" in text
     assert "--draft" in text
