@@ -767,7 +767,8 @@ def test_provider_path_enumeration_respects_pruned_repository_scope(
 ) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    (repo / "visible.txt").write_text("value\n", encoding="utf-8")
+    (repo / "visible.meta").write_text("value\n", encoding="utf-8")
+    (repo / ".env").write_text("SECRET=value\n", encoding="utf-8")
     hidden = repo / "node_modules" / "pkg"
     hidden.mkdir(parents=True)
     (hidden / "hidden.txt").write_text("hidden\n", encoding="utf-8")
@@ -777,7 +778,7 @@ def test_provider_path_enumeration_respects_pruned_repository_scope(
         codemap.sync()
         packet = codemap.discover_repository_declarations([provider])
 
-    assert provider.paths == ("visible.txt",)
+    assert provider.paths == ("visible.meta",)
     assert packet["providers"][0]["enumerations"] == [
-        {"prefix": "", "paths": ["visible.txt"]}
+        {"prefix": "", "paths": ["visible.meta"]}
     ]
