@@ -519,3 +519,31 @@ def test_provider_input_change_after_parse_fails_closed(tmp_path: Path) -> None:
             match="input changed during discovery",
         ):
             codemap.discover_repository_declarations([provider])
+
+
+class _ManyInputsProvider:
+    name = "many-inputs"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        for index in range(257):
+            context.exists(f"input-{index}.txt")
+        return False
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        raise AssertionError("discovery must not run")
+
+
+def test_provider_repository_input_reads_are_bounded(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="inputs exceed 256 paths",
+        ):
+            codemap.discover_repository_declarations([_ManyInputsProvider()])
