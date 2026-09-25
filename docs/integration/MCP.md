@@ -15,6 +15,16 @@ The installer downloads the matching executable and SHA-256 asset from GitHub Re
 
 Source contributors should not replace the locked development environment with the standalone binary. Use `uv sync --frozen --extra mcp --group test` when developing or qualifying Hashmarks itself.
 
+For OpenCode end users, register Hashmarks from the repository OpenCode should analyze:
+
+```bash
+cd /path/to/target/repository
+hashmarks install --opencode
+opencode mcp list
+```
+
+Hashmarks delegates configuration writing to OpenCode's own CLI and registers the exact installed Hashmarks executable with `--workspace . mcp`. This avoids requiring users to know OpenCode's config-file schema.
+
 ## Run
 
 From a repository:
