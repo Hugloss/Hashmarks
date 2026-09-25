@@ -345,6 +345,13 @@ Hashmarks does not scan Python entry points, import arbitrary repository code, o
 guess providers from similar filenames or keys. Callers select the provider
 objects that are allowed to run.
 
+The provider SPI is a **trusted in-process extension boundary**, not a sandbox.
+The provider contract is read-only and Hashmarks itself performs no repository
+mutation, but arbitrary Python provider code is not sandboxed. Callers are
+responsible for selecting providers they trust. The discovery packet reports
+this distinction explicitly instead of treating provider purity as mechanically
+proven.
+
 Provider semantic inputs are freshness-bound through
 `RepositoryDeclarationProviderContext`. Declaration evidence paths must have
 been consumed through `read_bytes` / `read_text`; Hashmarks records the exact
