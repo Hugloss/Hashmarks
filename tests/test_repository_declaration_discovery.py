@@ -207,7 +207,11 @@ def test_discovery_is_format_and_domain_neutral(
         packet = codemap.discover_repository_declarations([provider])
 
     assert packet["schema"] == "hashmarks.repository-declaration-discovery.v1"
-    assert packet["execution_effect"] == "none"
+    assert packet["execution_effect"] == {
+        "hashmarks": "none",
+        "provider_contract": "read-only",
+        "provider_sandboxed": False,
+    }
     provider_row = packet["providers"][0]
     assert provider_row["name"] == "fixture-provider"
     assert provider_row["state"] == "collected"
