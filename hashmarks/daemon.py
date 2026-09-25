@@ -9,7 +9,7 @@ import socketserver
 import threading
 from typing import TYPE_CHECKING, Any
 
-from .client import default_socket_path, default_state_dir
+from .client import default_socket_path, prepare_default_state_dir
 from .engine import IdentityEngine
 from .inputs import InputManifest
 from .ipc_boundary import dispatch_json_request
@@ -86,7 +86,7 @@ class IdentityDaemon:
     ) -> None:
         self.workspace = canonical_host_path(workspace)
         self.state_dir = (
-            default_state_dir(self.workspace)
+            prepare_default_state_dir(self.workspace)
             if state_dir is None
             else canonical_host_path(state_dir)
         )
