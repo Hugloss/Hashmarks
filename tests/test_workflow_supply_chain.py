@@ -102,6 +102,9 @@ def test_publish_workflow_publishes_only_verified_github_release_assets() -> Non
     assert "qualified-standalone-release-bundle" in text
     assert "hashmarks-linux-x86_64.sha256" in text
     assert "sha256sum -c hashmarks-linux-x86_64.sha256" in text
+    assert "release/standalone/install.sh" in text
+    assert "release/standalone/install.sh.sha256" in text
+    assert "sha256sum -c install.sh.sha256" in text
     assert "environment: pypi" not in text
     assert "id-token: write" not in text
     assert "PYPI_TOKEN" not in text
@@ -140,7 +143,9 @@ def test_ci_standalone_installs_exact_frozen_artifact_through_public_installer()
         1,
     )[0]
 
-    assert "Install exact standalone through public installer" in standalone
+    assert "Install exact standalone through qualified installer copy" in standalone
+    assert 'install -m 0755 install.sh "$bundle/install.sh"' in standalone
+    assert "sha256sum install.sh > install.sh.sha256" in standalone
     assert 'HASHMARKS_DOWNLOAD_BASE_URL="file://$bundle"' in standalone
     assert 'HASHMARKS_INSTALL_DIR="$target"' in standalone
     assert 'HASHMARKS_VERSION="$version"' in standalone
@@ -155,7 +160,7 @@ def test_publish_standalone_binds_installer_and_asset_to_release_version() -> No
     standalone = text.split("  standalone:\n", 1)[1].split("\n  publish:\n", 1)[0]
     publish = text.split("  publish:\n", 1)[1]
 
-    assert "Install exact standalone through public installer" in standalone
+    assert "Install exact standalone through qualified installer" in standalone
     assert 'HASHMARKS_VERSION="$RELEASE_VERSION"' in standalone
     assert (
         'test "$(./dist/hashmarks --version)" = "hashmarks version $RELEASE_VERSION"'
@@ -167,6 +172,8 @@ def test_publish_standalone_binds_installer_and_asset_to_release_version() -> No
     )
     assert 'test "$(release/standalone/hashmarks-linux-x86_64 --version)" =' in publish
     assert '"hashmarks version $RELEASE_VERSION"' in publish
+    assert 'sh release/standalone/install.sh' in publish
+    assert 'HASHMARKS_DOWNLOAD_BASE_URL="file://$PWD/release/standalone"' in publish
 
 
 def test_release_profile_installs_mcp_before_full_native_qualification() -> None:
