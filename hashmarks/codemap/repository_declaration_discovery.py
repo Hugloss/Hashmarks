@@ -47,9 +47,7 @@ def _provider_delta(
         "added": sorted(set(after) - set(before)),
         "removed": sorted(set(before) - set(after)),
         "changed": sorted(
-            name
-            for name in set(before) & set(after)
-            if before[name] != after[name]
+            name for name in set(before) & set(after) if before[name] != after[name]
         ),
     }
 
@@ -118,13 +116,10 @@ def _validate_evidence_revisions(
         path = str(row.get("path") or "")
         provider_input = inputs.get(path)
         if not isinstance(provider_input, Mapping):
-            raise ValueError(
-                f"declaration discovery provider input missing for {path}"
-            )
-        if (
-            provider_input.get("state") != "known-present"
-            or row.get("member_revision") != provider_input.get("member_revision")
-        ):
+            raise ValueError(f"declaration discovery provider input missing for {path}")
+        if provider_input.get("state") != "known-present" or row.get(
+            "member_revision"
+        ) != provider_input.get("member_revision"):
             raise ValueError(f"declaration provider evidence revision changed: {path}")
 
 
@@ -287,9 +282,7 @@ class RepositoryDeclarationDiscoveryMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
 
-        previous_declarations = self._previous_declaration_packet(
-            previous_observation
-        )
+        previous_declarations = self._previous_declaration_packet(previous_observation)
         groups, provider_observations = collect_repository_declaration_providers(
             self.workspace,
             self._declaration_provider_member_read,
