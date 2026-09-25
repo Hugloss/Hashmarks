@@ -216,8 +216,9 @@ def test_repository_derived_file_evidence_uses_canonical_admission_owner() -> No
         "default_project_graph_providers(\n            self._visible_repository_manifests"
         in engine
     )
-    assert "self._path_admitted_for_analysis(rel)" in freshness
-    assert "self.policy.decide(rel)" in freshness
+    assert "def _manifest_admitted(" in freshness
+    assert "self._path_admitted_for_analysis(relpath)" in freshness
+    assert "self.policy.decide(relpath)" in freshness
     assert "self._admit_project_graph(" in graph
     assert graph.index("self._admit_project_graph(") < graph.index(
         "self.store.replace_project_graph("
