@@ -81,8 +81,7 @@ def test_installer_preserves_working_binary_on_requested_version_mismatch(
 
     assert result.returncode != 0
     assert (
-        "requested version 1.2.3 but downloaded binary reports 9.9.9"
-        in result.stderr
+        "requested version 1.2.3 but downloaded binary reports 9.9.9" in result.stderr
     )
     assert installed.read_bytes() == previous
     assert list(install_dir.glob(".hashmarks-install.*")) == []
