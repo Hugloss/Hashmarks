@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
 
-
 if TYPE_CHECKING:
     from .engine import CodeMap
 
