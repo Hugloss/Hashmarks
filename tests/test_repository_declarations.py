@@ -454,3 +454,43 @@ def test_unsupported_declaration_evidence_cannot_create_equivalence(
     assert group["comparison"]["state"] == "ambiguous"
     assert group["comparison"]["reason"] == "repository-evidence-not-current"
     assert group["comparison"]["unqualified_declaration_ids"] == ["binary"]
+
+
+def test_declaration_claims_require_provenance_and_distinct_ambiguity(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.yaml").write_text("value: a\n", encoding="utf-8")
+    base = _group([_declaration("a", "a.yaml", "a")])
+
+    missing_basis = _group([_declaration("a", "a.yaml", "a")])
+    missing_basis["correspondence"]["basis"] = {}
+
+    missing_coverage_provenance = _group([_declaration("a", "a.yaml", "a")])
+    missing_coverage_provenance["coverage"]["provenance"] = {}
+
+    missing_producer = _group([_declaration("a", "a.yaml", "a")])
+    missing_producer["declarations"][0]["producer"] = {}
+
+    duplicate_candidates = _group([_declaration("a", "a.yaml", "a")])
+    ambiguous = duplicate_candidates["declarations"][0]
+    ambiguous["value_state"] = "ambiguous"
+    ambiguous.pop("value")
+    ambiguous["candidate_values"] = ["same", "same"]
+
+    empty_concept = dict(base)
+    empty_concept["concept"] = {}
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="correspondence.basis"):
+            codemap.repository_declarations([missing_basis])
+        with pytest.raises(ValueError, match="coverage.provenance"):
+            codemap.repository_declarations([missing_coverage_provenance])
+        with pytest.raises(ValueError, match="producer must be"):
+            codemap.repository_declarations([missing_producer])
+        with pytest.raises(ValueError, match="distinct candidate values"):
+            codemap.repository_declarations([duplicate_candidates])
+        with pytest.raises(ValueError, match="concept must be"):
+            codemap.repository_declarations([empty_concept])
