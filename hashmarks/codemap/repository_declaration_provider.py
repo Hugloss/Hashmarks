@@ -10,6 +10,8 @@ from hashmarks.paths import normalize_relative_path
 from .repository_declaration_contract import encoded_json_bytes, json_value
 
 MAX_DECLARATION_PROVIDERS = 32
+MAX_PROVIDER_INPUTS = 256
+MAX_PROVIDER_NAME_CHARS = 256
 MAX_PROVIDER_PROVENANCE_BYTES = 4_096
 MAX_PROVIDER_WARNINGS = 32
 MAX_PROVIDER_WARNING_CHARS = 1_024
@@ -78,6 +80,10 @@ class RepositoryDeclarationProviderContext:
             raise RepositoryDeclarationProviderError(
                 f"declaration provider input changed while reading: {path}"
             )
+        if path not in self._inputs and len(self._inputs) >= MAX_PROVIDER_INPUTS:
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider inputs exceed {MAX_PROVIDER_INPUTS} paths"
+            )
         self._inputs[path] = signature
         if content:
             self._content_paths.add(path)
@@ -145,7 +151,12 @@ def _provider_name(provider: RepositoryDeclarationProvider) -> str:
         raise RepositoryDeclarationProviderError(
             "declaration provider name must be a non-empty string"
         )
-    return name.strip()
+    normalized = name.strip()
+    if len(normalized) > MAX_PROVIDER_NAME_CHARS:
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider name exceeds {MAX_PROVIDER_NAME_CHARS} characters"
+        )
+    return normalized
 
 
 def _provider_provenance(
