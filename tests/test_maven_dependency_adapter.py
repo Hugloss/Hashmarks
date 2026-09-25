@@ -74,6 +74,22 @@ def _inventory() -> bytes:
             },
             "complete Maven inventory context has no supplied list: runtime",
         ),
+        (
+            {
+                "trees": {"compile": _tree()},
+                "inventories": {},
+                "complete_tree_contexts": (123,),
+            },
+            "complete Maven tree context must be a string",
+        ),
+        (
+            {
+                "trees": {},
+                "inventories": {"compile": _inventory()},
+                "complete_inventory_contexts": (False,),
+            },
+            "complete Maven inventory context must be a string",
+        ),
     ],
 )
 def test_maven_complete_context_requires_supplied_artifact(
