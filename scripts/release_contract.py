@@ -20,6 +20,7 @@ def _log_command_output(*values: object) -> None:
 SCHEMA = "hashmarks.release-artifact-manifest.v2"
 PUBLICATION_SCHEMA = "hashmarks.release-publication-manifest.v1"
 STANDALONE_FILENAME = "hashmarks-linux-x86_64"
+STANDALONE_CHECKSUM_FILENAME = f"{STANDALONE_FILENAME}.sha256"
 
 
 def _project(root: Path) -> dict[str, object]:
@@ -185,10 +186,39 @@ def _standalone_row(path: Path, *, version: str) -> dict[str, object]:
     }
 
 
+def _standalone_checksum_row(
+    path: Path,
+    standalone: dict[str, object],
+) -> dict[str, object]:
+    path = path.resolve()
+    if path.name != STANDALONE_CHECKSUM_FILENAME:
+        raise ValueError(
+            "standalone checksum filename mismatch: "
+            f"expected {STANDALONE_CHECKSUM_FILENAME!r}, got {path.name!r}"
+        )
+    if not path.is_file():
+        raise ValueError(f"standalone checksum artifact is missing: {path}")
+
+    digest = str(standalone["sha256"]).removeprefix("sha256:")
+    expected = f"{digest}  {STANDALONE_FILENAME}\n"
+    if path.read_text(encoding="utf-8") != expected:
+        raise ValueError(
+            "standalone installer checksum does not match qualified standalone bytes"
+        )
+    return {
+        "kind": "installer-checksum",
+        "filename": path.name,
+        "size_bytes": path.stat().st_size,
+        "sha256": _sha256(path),
+        "for": STANDALONE_FILENAME,
+    }
+
+
 def publication_manifest(
     root: Path,
     dist: Path,
     standalone: Path,
+    standalone_checksum: Path,
     *,
     tag: str,
     source_sha: str,
@@ -200,6 +230,7 @@ def publication_manifest(
 
     package = release_manifest(root, dist, tag=tag)
     version = str(package["version"])
+    standalone_row = _standalone_row(standalone, version=version)
     payload: dict[str, object] = {
         "schema": PUBLICATION_SCHEMA,
         "project": package["project"],
@@ -207,7 +238,10 @@ def publication_manifest(
         "tag": package["tag"],
         "source": {"commit_sha": source_sha},
         "distributions": package["distributions"],
-        "standalone": _standalone_row(standalone, version=version),
+        "standalone": standalone_row,
+        "installer_checksum": _standalone_checksum_row(
+            standalone_checksum, standalone_row
+        ),
         "qualification_dependency_resolution": package[
             "qualification_dependency_resolution"
         ],
@@ -226,6 +260,10 @@ def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
     if standalone is not None:
         assert isinstance(standalone, dict)
         checksum_rows.append(standalone)
+    installer_checksum = manifest.get("installer_checksum")
+    if installer_checksum is not None:
+        assert isinstance(installer_checksum, dict)
+        checksum_rows.append(installer_checksum)
 
     lines = []
     for row in checksum_rows:
@@ -277,6 +315,7 @@ def main(argv: list[str] | None = None) -> int:
     publication.add_argument("--root", default=".")
     publication.add_argument("--dist", required=True)
     publication.add_argument("--standalone", required=True)
+    publication.add_argument("--standalone-checksum", required=True)
     publication.add_argument("--tag", required=True)
     publication.add_argument("--source-sha", required=True)
     publication.add_argument("--output", required=True)
@@ -286,6 +325,7 @@ def main(argv: list[str] | None = None) -> int:
     verify_publication.add_argument("--root", default=".")
     verify_publication.add_argument("--dist", required=True)
     verify_publication.add_argument("--standalone", required=True)
+    verify_publication.add_argument("--standalone-checksum", required=True)
     verify_publication.add_argument("--tag", required=True)
     verify_publication.add_argument("--source-sha", required=True)
     verify_publication.add_argument("--manifest", required=True)
@@ -313,6 +353,7 @@ def _run_command(args) -> int:
             root,
             Path(args.dist),
             Path(args.standalone),
+            Path(args.standalone_checksum),
             tag=args.tag,
             source_sha=args.source_sha,
         )
