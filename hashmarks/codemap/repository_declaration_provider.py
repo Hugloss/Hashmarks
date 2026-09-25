@@ -30,10 +30,8 @@ _MemberReader = Callable[
 _PathEnumerator = Callable[[str], tuple[str, ...]]
 
 
-
 class RepositoryDeclarationProviderError(ValueError):
     """A declaration provider violated the discovery contract."""
-
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,7 +41,6 @@ class RepositoryDeclarationProviderResult:
     groups: tuple[Mapping[str, object], ...]
     provenance: Mapping[str, object]
     warnings: tuple[str, ...] = ()
-
 
 
 class RepositoryDeclarationProviderContext(Protocol):
@@ -64,7 +61,6 @@ class RepositoryDeclarationProviderContext(Protocol):
     def read_text(self, path: str, *, encoding: str = "utf-8") -> str:
         """Read stable admitted repository text and bind its revision."""
         ...
-
 
 
 class _RepositoryDeclarationProviderContext:
@@ -215,7 +211,6 @@ class _RepositoryDeclarationProviderContext:
         )
 
 
-
 class RepositoryDeclarationProvider(Protocol):
     """Explicit read-only producer for repository declaration claims."""
 
@@ -233,7 +228,6 @@ class RepositoryDeclarationProvider(Protocol):
         ...
 
 
-
 def _provider_name(provider: RepositoryDeclarationProvider) -> str:
     name = getattr(provider, "name", None)
     if not isinstance(name, str) or not name.strip():
@@ -246,7 +240,6 @@ def _provider_name(provider: RepositoryDeclarationProvider) -> str:
             f"declaration provider name exceeds {MAX_PROVIDER_NAME_CHARS} characters"
         )
     return normalized
-
 
 
 def _provider_provenance(
@@ -276,7 +269,6 @@ def _provider_provenance(
     return normalized
 
 
-
 def _provider_warnings(
     warnings: Sequence[str],
     *,
@@ -303,7 +295,6 @@ def _provider_warnings(
     return normalized
 
 
-
 def _provider_groups(
     groups: Sequence[Mapping[str, object]],
     *,
@@ -322,7 +313,6 @@ def _provider_groups(
     return [group for group in normalized if isinstance(group, dict)]
 
 
-
 def _provider_evidence_path(item: object) -> str | None:
     if not isinstance(item, Mapping) or not isinstance(item.get("path"), str):
         return None
@@ -332,7 +322,6 @@ def _provider_evidence_path(item: object) -> str | None:
         raise RepositoryDeclarationProviderError(
             "declaration provider evidence path is invalid"
         ) from exc
-
 
 
 def _declaration_evidence_paths(declaration: object) -> set[str]:
@@ -346,7 +335,6 @@ def _declaration_evidence_paths(declaration: object) -> set[str]:
     }
 
 
-
 def _declared_evidence_paths(groups: Sequence[Mapping[str, object]]) -> set[str]:
     paths: set[str] = set()
     for group in groups:
@@ -356,7 +344,6 @@ def _declared_evidence_paths(groups: Sequence[Mapping[str, object]]) -> set[str]
         for declaration in declarations:
             paths.update(_declaration_evidence_paths(declaration))
     return paths
-
 
 
 def _provider_result(
@@ -424,7 +411,6 @@ def _provider_result(
     }
 
 
-
 def _named_providers(
     providers: Sequence[RepositoryDeclarationProvider],
 ) -> list[tuple[str, RepositoryDeclarationProvider]]:
@@ -441,7 +427,6 @@ def _named_providers(
             "declaration provider names must be unique"
         )
     return sorted(named, key=lambda item: item[0])
-
 
 
 def _collect_provider(
@@ -477,7 +462,6 @@ def _collect_provider(
     return _provider_result(name, result, context)
 
 
-
 def collect_repository_declaration_providers(
     read_member: _MemberReader,
     enumerate_paths: _PathEnumerator,
@@ -496,7 +480,6 @@ def collect_repository_declaration_providers(
         groups.extend(provider_groups)
         observations.append(observation)
     return groups, observations
-
 
 
 def _validate_provider_enumerations(
@@ -541,7 +524,6 @@ def _validate_provider_enumerations(
             )
 
 
-
 def _validate_provider_input(
     read_member: _MemberReader,
     provider_name: str,
@@ -564,7 +546,6 @@ def _validate_provider_input(
         raise RepositoryDeclarationProviderError(
             f"declaration provider {provider_name} input changed during discovery: {path}"
         )
-
 
 
 def validate_repository_declaration_provider_inputs(
