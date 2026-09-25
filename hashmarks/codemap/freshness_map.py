@@ -88,16 +88,42 @@ class EvidenceFreshnessMapMixin:
             )
         return revisions
 
-    @staticmethod
     def _prior_entries(
+        self,
         previous_map: Mapping[str, object] | None,
     ) -> list[Mapping[str, object]]:
+        if previous_map is None:
+            return []
         if not isinstance(previous_map, Mapping):
-            return []
+            raise ValueError("previous_map must be an object")
+        if previous_map.get("schema") != "hashmarks.evidence-freshness-map.v1":
+            raise ValueError(
+                "previous_map must be a hashmarks.evidence-freshness-map.v1 packet"
+            )
+        repository = previous_map.get("repository")
+        if not isinstance(repository, Mapping):
+            raise ValueError("previous_map.repository must be an object")
+        repository_identity = str(repository.get("repository_identity") or "")
+        if repository_identity != self._repository_packet_identity():
+            raise ValueError("previous_map repository-mismatch")
+        task_identity = str(previous_map.get("task_identity") or "")
         entries = previous_map.get("entries")
-        if not isinstance(entries, list):
-            return []
-        return [row for row in entries if isinstance(row, Mapping)]
+        if not isinstance(entries, list) or any(
+            not isinstance(row, Mapping) for row in entries
+        ):
+            raise ValueError("previous_map.entries must be a list of objects")
+        identity = previous_map.get("freshness_map_identity")
+        expected_identity = self._freshness_identity(
+            "map",
+            {
+                "repository_identity": repository_identity,
+                "task_identity": task_identity,
+                "entries": entries,
+            },
+        )
+        if not isinstance(identity, str) or identity != expected_identity:
+            raise ValueError("previous_map freshness identity mismatch")
+        return list(entries)
 
     @staticmethod
     def _prior_key(row: Mapping[str, object]) -> tuple[str, str | None]:
