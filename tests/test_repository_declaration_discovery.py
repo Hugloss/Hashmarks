@@ -571,3 +571,47 @@ def test_provider_context_cannot_read_pruned_repository_scope(tmp_path: Path) ->
 
     assert "cannot read current repository bytes" in str(exc_info.value)
     assert "unsupported" in str(exc_info.value)
+
+
+@dataclass
+class _HelperInputProvider(_SingleProvider):
+    helper_path: str = "helper.txt"
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        context.read_text(self.helper_path)
+        return super().discover(context)
+
+
+def test_helper_input_delta_does_not_masquerade_as_declaration_delta(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value: stable\n", encoding="utf-8")
+    (repo / "helper.txt").write_text("mode: first\n", encoding="utf-8")
+    provider = _HelperInputProvider("helper-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.discover_repository_declarations([provider])
+        (repo / "helper.txt").write_text("mode: second\n", encoding="utf-8")
+        codemap.sync(["helper.txt"])
+        after = codemap.discover_repository_declarations(
+            [provider],
+            previous_observation=before,
+        )
+
+    delta = after["delta_from_previous"]
+    assert delta["providers"] == {
+        "added": [],
+        "removed": [],
+        "changed": ["helper-provider"],
+    }
+    assert delta["declarations"]["changed_groups"] == []
+    assert (
+        before["declarations"]["observation_identity"]
+        == after["declarations"]["observation_identity"]
+    )
