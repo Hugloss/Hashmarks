@@ -9,6 +9,7 @@ from hashmarks.client import (
     IdentityClient,
     RepositoryObservation,
     default_state_dir,
+    prepare_default_state_dir,
 )
 from hashmarks.file_store import FileDigestStore
 from hashmarks.native_vitest import (  # noqa: F401 - evidence_graph uses these engine module attributes
@@ -140,7 +141,11 @@ class CodeMap(
         max_index_bytes: int = _MAX_INDEX_BYTES,
     ) -> None:
         self.workspace = canonical_host_path(workspace)
-        self.state_dir = self._resolve_state_dir(state_dir)
+        self.state_dir = (
+            prepare_default_state_dir(self.workspace)
+            if state_dir is None
+            else self._resolve_state_dir(state_dir)
+        )
         self.state_dir.mkdir(parents=True, exist_ok=True)
         try:
             self._state_rel = (
