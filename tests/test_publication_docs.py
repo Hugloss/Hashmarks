@@ -150,6 +150,15 @@ def test_public_readme_tracks_release_version_and_markdown_boundaries() -> None:
     assert "[Evidence correlation](docs/reference/EVIDENCE_CORRELATION.md)" in readme
 
 
+def test_first_reviewed_release_request_is_0_22_0_and_changelog_is_finalized() -> None:
+    request = tomllib.loads(_text(".github/release-request.toml"))
+    changelog = _text("CHANGELOG.md")
+
+    assert request == {"version": "0.22.0"}
+    assert "## 0.22.0 — Standalone MCP distribution and declaration authority" in changelog
+    assert "## 0.22.0 — Development" not in changelog
+
+
 def test_public_release_contract_documents_stability_and_changelog() -> None:
     readme = _text("README.md")
     docs = _text("docs/README.md")
