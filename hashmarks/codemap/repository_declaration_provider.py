@@ -45,6 +45,32 @@ class RepositoryDeclarationProviderContext(Protocol):
         """Return bounded admitted indexed paths under a repository prefix."""
         ...
 
+    def exists(self, path: str) -> bool:
+        """Return whether an admitted repository member is currently present."""
+        ...
+
+    def read_bytes(self, path: str) -> bytes:
+        """Read stable admitted repository bytes and bind their revision."""
+        ...
+
+    def read_text(self, path: str, *, encoding: str = "utf-8") -> str:
+        """Read stable admitted repository text and bind its revision."""
+        ...
+
+
+class _RepositoryDeclarationProviderContext:
+    """Concrete Hashmarks-owned provider input tracker."""
+
+    def __init__(
+        self,
+        read_member: _MemberReader,
+        enumerate_paths: _PathEnumerator,
+    ) -> None:
+        self._read_member = read_member
+        self._enumerate_paths = enumerate_paths
+        self._inputs: dict[str, dict[str, object]] = {}
+        self._enumerations: dict[str, tuple[str, ...]] = {}
+
     def paths(self, prefix: str = "") -> tuple[str, ...]:
         try:
             normalized = normalize_relative_path(prefix, allow_root=True)
@@ -81,32 +107,6 @@ class RepositoryDeclarationProviderContext(Protocol):
             )
         self._enumerations[normalized] = paths
         return paths
-
-    def exists(self, path: str) -> bool:
-        """Return whether an admitted repository member is currently present."""
-        ...
-
-    def read_bytes(self, path: str) -> bytes:
-        """Read stable admitted repository bytes and bind their revision."""
-        ...
-
-    def read_text(self, path: str, *, encoding: str = "utf-8") -> str:
-        """Read stable admitted repository text and bind its revision."""
-        ...
-
-
-class _RepositoryDeclarationProviderContext:
-    """Concrete Hashmarks-owned provider input tracker."""
-
-    def __init__(
-        self,
-        read_member: _MemberReader,
-        enumerate_paths: _PathEnumerator,
-    ) -> None:
-        self._read_member = read_member
-        self._enumerate_paths = enumerate_paths
-        self._inputs: dict[str, dict[str, object]] = {}
-        self._enumerations: dict[str, tuple[str, ...]] = {}
 
     @staticmethod
     def _signature(observation: Mapping[str, object]) -> dict[str, object]:
