@@ -8,6 +8,7 @@ from .repository_declaration_contract import (
     MAX_EXPECTED_PER_GROUP,
     MAX_GROUPS,
     MAX_PACKET_BYTES,
+    MAX_REQUEST_BYTES,
     absence,
     comparison,
     encoded_json_bytes,
@@ -191,6 +192,7 @@ class RepositoryDeclarationsMixin:
                 "max_groups": MAX_GROUPS,
                 "max_declarations": MAX_DECLARATIONS,
                 "max_expected_declarations_per_group": MAX_EXPECTED_PER_GROUP,
+                "max_request_bytes": MAX_REQUEST_BYTES,
                 "max_packet_bytes": MAX_PACKET_BYTES,
             },
             "storage": "derived-not-persisted",
@@ -219,8 +221,21 @@ class RepositoryDeclarationsMixin:
                     f"previous_observation exceeds {MAX_PACKET_BYTES} encoded bytes"
                 )
             self._validate_previous_declarations(previous_observation)
+            previous_repository_evidence = previous_observation.get(
+                "repository_evidence"
+            )
+            if not isinstance(previous_repository_evidence, Mapping):
+                raise ValueError(
+                    "previous_observation.repository_evidence must be an object"
+                )
+            repository_evidence_delta = self.repository_evidence_binding_delta(
+                previous_repository_evidence,
+                evidence_packet,
+            )
             packet["delta_from_previous"] = declaration_delta(
-                previous_observation, packet
+                previous_observation,
+                packet,
+                repository_evidence_delta=repository_evidence_delta,
             )
             if encoded_json_bytes(packet, name="declaration packet") > MAX_PACKET_BYTES:
                 raise ValueError(
