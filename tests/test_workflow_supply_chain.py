@@ -181,14 +181,17 @@ def test_publish_requires_native_linux_wsl_and_windows_release_identity() -> Non
     assert "Build verified standalone Windows CLI/MCP" in windows
     assert "windows-latest" in windows
     assert "windows_installer_smoke.ps1" in windows
-    assert 'RELEASE_VERSION: ${{ needs.prepare.outputs.version }}' in windows
+    assert "RELEASE_VERSION: ${{ needs.prepare.outputs.version }}" in windows
     assert "hashmarks-windows-x86_64.exe.sha256" in windows
     assert "--platform windows" in windows
 
     assert "needs: [prepare, build, standalone-linux, standalone-windows]" in publish
     assert "--standalone-bundle release/standalone/linux" in publish
     assert "--standalone-bundle release/standalone/windows" in publish
-    assert 'test "$(release/standalone/linux/hashmarks-linux-x86_64 --version)" =' in publish
+    assert (
+        'test "$(release/standalone/linux/hashmarks-linux-x86_64 --version)" ='
+        in publish
+    )
     assert '"hashmarks version $RELEASE_VERSION"' in publish
 
 
