@@ -312,17 +312,26 @@ Hashmarks also exposes a Python-side provider SPI for integrations that need to
 ~~~python
 from pathlib import Path
 
-from hashmarks import CodeMap, RepositoryDeclarationProviderResult
+from hashmarks import (
+    CodeMap,
+    RepositoryDeclarationProviderContext,
+    RepositoryDeclarationProviderResult,
+)
 
 class MyProvider:
     name = "my-repository-metadata"
 
-    def detect(self, workspace: Path) -> bool:
-        return (workspace / "metadata.example").is_file()
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return context.exists("metadata.example")
 
-    def discover(self, workspace: Path) -> RepositoryDeclarationProviderResult:
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        text = context.read_text("metadata.example")
+        groups = normalize_my_format(text)
         return RepositoryDeclarationProviderResult(
-            groups=(...),
+            groups=groups,
             provenance={"provider": self.name, "version": "1"},
         )
 
@@ -335,6 +344,16 @@ Discovery is deliberately **explicit composition**, not ambient plugin loading.
 Hashmarks does not scan Python entry points, import arbitrary repository code, or
 guess providers from similar filenames or keys. Callers select the provider
 objects that are allowed to run.
+
+Provider semantic inputs are freshness-bound through
+`RepositoryDeclarationProviderContext`. Declaration evidence paths must have
+been consumed through `read_bytes` / `read_text`; Hashmarks records the exact
+member revisions observed by the provider and revalidates those inputs across
+declaration qualification. If a provider input changes during discovery, the
+call fails closed instead of pairing a stale normalized value with newer
+repository evidence. Providers may use `context.workspace` for path
+enumeration, but repository bytes that influence semantic claims should be read
+through the context so they participate in this revision binding.
 
 Provider discovery has separate wrapper schemas:
 
