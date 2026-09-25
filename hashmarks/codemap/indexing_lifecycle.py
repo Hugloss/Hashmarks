@@ -27,7 +27,7 @@ from .repository_index_store import (
 from .source_languages import SOURCE_LANGUAGES
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Iterable, Iterator, Sequence
 
     from hashmarks.client import RepositoryObservation
 
@@ -492,45 +492,30 @@ class IndexingLifecycleMixin:
             visibility=decision.evidence_visibility,
         )
 
-    def _walk_admitted_repository_files(
+    def _iter_admitted_repository_files(
         self,
         prefix: str = "",
-        *,
-        limit: int | None = None,
-        visible_only: bool = False,
-    ) -> tuple[_AdmittedRepositoryFile, ...]:
+    ) -> Iterator[_AdmittedRepositoryFile]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         rel = normalize_relative_path(prefix, allow_root=True)
-        if limit is not None and limit < 1:
-            raise ValueError("limit must be positive")
-
         root = self.workspace if not rel else self.workspace / rel
         if root.is_symlink():
-            return ()
+            return
         if rel and (
             self._internal_path(rel)
             or _is_pruned_relative_path(rel)
             or not self.policy.decide(rel).index
         ):
-            return ()
-
-        admitted: list[_AdmittedRepositoryFile] = []
-
-        def append(path: Path) -> bool:
-            item = self._admitted_repository_file(path)
-            if item is None:
-                return False
-            if visible_only and item.visibility is EvidenceVisibility.DENY:
-                return False
-            admitted.append(item)
-            return limit is not None and len(admitted) >= limit
+            return
 
         if root.is_file():
-            append(root)
-            return tuple(admitted)
+            item = self._admitted_repository_file(root)
+            if item is not None:
+                yield item
+            return
         if not root.is_dir():
-            return ()
+            return
 
         for current_root, dirs, files in os.walk(
             root,
@@ -540,8 +525,26 @@ class IndexingLifecycleMixin:
             root_path = Path(current_root)
             self._prune_discovery_dirs(root_path, dirs)
             for name in sorted(files):
-                if append(root_path / name):
-                    return tuple(admitted)
+                item = self._admitted_repository_file(root_path / name)
+                if item is not None:
+                    yield item
+
+    def _walk_admitted_repository_files(
+        self,
+        prefix: str = "",
+        *,
+        limit: int | None = None,
+        visible_only: bool = False,
+    ) -> tuple[_AdmittedRepositoryFile, ...]:
+        if limit is not None and limit < 1:
+            raise ValueError("limit must be positive")
+        admitted: list[_AdmittedRepositoryFile] = []
+        for item in self._iter_admitted_repository_files(prefix):
+            if visible_only and item.visibility is EvidenceVisibility.DENY:
+                continue
+            admitted.append(item)
+            if limit is not None and len(admitted) >= limit:
+                break
         return tuple(admitted)
 
     def _discovered_file(
@@ -581,7 +584,7 @@ class IndexingLifecycleMixin:
             self = cast("CodeMap", self)
         result: list[_DiscoveredFile] = []
         warnings: list[str] = []
-        for admitted in self._walk_admitted_repository_files():
+        for admitted in self._iter_admitted_repository_files():
             item = self._discovered_file(admitted.path, warnings=warnings)
             if item is not None:
                 result.append(item)
@@ -609,7 +612,7 @@ class IndexingLifecycleMixin:
     def _discover_subtree(self, rel: str) -> list[_DiscoveredFile]:
         self = cast("CodeMap", self)
         result: list[_DiscoveredFile] = []
-        for admitted in self._walk_admitted_repository_files(rel):
+        for admitted in self._iter_admitted_repository_files(rel):
             item = self._discovered_file(admitted.path)
             if item is not None:
                 result.append(item)
