@@ -450,6 +450,40 @@ def test_v3_refuses_unknown_authority_contract_fields(
             codemap.dependency_resolution_evidence(changed)
 
 
+@pytest.mark.parametrize(
+    ("target", "field", "value", "message"),
+    [
+        ("producer", "kind", 123, "producer kind must be a string"),
+        ("component", "component_id", True, "component_id must be a string"),
+        ("component", "name", 123, "component name must be a string"),
+        ("selection", "version", 1, "version must be a string"),
+        ("selection", "source", False, "source must be a string"),
+        ("relationship", "marker", 123, "marker must be a string"),
+    ],
+)
+def test_v3_refuses_non_string_typed_fields(
+    tmp_path: Path,
+    target: str,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    changed = _snapshot_v3()
+    if target == "producer":
+        changed["producer"][field] = value
+    elif target == "component":
+        changed["components"][0][field] = value
+    elif target == "selection":
+        changed["selections"][0][field] = value
+    else:
+        changed["relationships"][0][field] = value
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match=message):
+            codemap.dependency_resolution_evidence(changed)
+
+
 def test_v3_rejects_dangling_evidence_source_reference(tmp_path: Path) -> None:
     changed = _snapshot_v3()
     changed["relationships"][0]["evidence_sources"] = ["missing"]
