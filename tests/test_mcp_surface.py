@@ -667,3 +667,87 @@ def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
     assert packet["groups"][0]["comparison"]["state"] == "differing"
     assert packet["winner"] == "not-selected"
     assert packet["interpretation_authority"] == "consumer-owned"
+
+def test_mcp_correlation_preserves_core_authority_and_completeness(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    bundles = [
+        {
+            "bundle_id": "runtime:incomplete",
+            "producer": {"kind": "traceback"},
+            "completeness": "incomplete",
+            "scope": {"kind": "traceback-request"},
+            "truncation": "truncated",
+            "anchors": [{"anchor_id": "missing", "path": "missing.py"}],
+        }
+    ]
+    with CodeMap(repo) as codemap:
+        codemap.sync()
+        core = codemap.correlate_evidence(bundles, include_relationships=False)
+    surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "mcp-state"))
+    try:
+        projected = surface.correlate_evidence(bundles, include_relationships=False)
+    finally:
+        surface.close()
+
+    for key in (
+        "evidence_definition_identity",
+        "completeness",
+        "authority",
+        "external_claims_authority",
+        "interpretation_authority",
+        "causation",
+        "execution_effect",
+    ):
+        assert projected[key] == core[key]
+    assert projected["completeness"]["negative_evidence"] == "not-admissible"
+
+
+def test_mcp_correlation_rejects_recomputed_outer_identity_over_tampered_nested_evidence(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
+    try:
+        before = surface.correlate_evidence(
+            [
+                {
+                    "bundle_id": "runtime:1",
+                    "producer": {"kind": "traceback"},
+                    "completeness": "complete",
+                    "scope": {"kind": "traceback-request"},
+                    "truncation": "complete",
+                    "anchors": [{"anchor_id": "frame", "path": "src/feature.py"}],
+                }
+            ],
+            include_relationships=False,
+        )
+        tampered = json.loads(json.dumps(before))
+        tampered["repository_evidence"]["bindings"][0]["binding_id"] = (
+            "repository-evidence:forged"
+        )
+        tampered["correlation_identity"] = "sha256:" + surface._map._packet_digest(
+            "hashmarks.evidence-correlation.v1",
+            {
+                key: value
+                for key, value in tampered.items()
+                if key not in {"correlation_identity", "delta_from_previous"}
+            },
+        )
+        with pytest.raises(McpSurfaceError, match="bindings identity mismatch"):
+            surface.correlate_evidence(
+                [
+                    {
+                        "bundle_id": "runtime:1",
+                        "producer": {"kind": "traceback"},
+                        "completeness": "complete",
+                        "scope": {"kind": "traceback-request"},
+                        "truncation": "complete",
+                        "anchors": [{"anchor_id": "frame", "path": "src/feature.py"}],
+                    }
+                ],
+                previous_correlation=tampered,
+                include_relationships=False,
+            )
+    finally:
+        surface.close()
+
