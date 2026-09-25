@@ -470,8 +470,10 @@ def _validate_provider_enumerations(
             )
         prefix = previous.get("prefix")
         paths = previous.get("paths")
-        if not isinstance(prefix, str) or not isinstance(paths, list) or any(
-            not isinstance(path, str) for path in paths
+        if (
+            not isinstance(prefix, str)
+            or not isinstance(paths, list)
+            or any(not isinstance(path, str) for path in paths)
         ):
             raise RepositoryDeclarationProviderError(
                 f"declaration provider {provider_name} enumeration is malformed"
