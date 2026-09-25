@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -57,8 +58,19 @@ class ProjectGraphEvidence:
     warnings: tuple[str, ...] = ()
 
 
+ManifestFinder = Callable[[str], tuple[Path, ...]]
+
+
 class ProjectGraphProvider:
     name = "project-graph"
+
+    def __init__(self, manifest_finder: ManifestFinder | None = None) -> None:
+        self._manifest_finder = manifest_finder
+
+    def _manifest_paths(self, workspace: Path, filename: str) -> tuple[Path, ...]:
+        if self._manifest_finder is not None:
+            return self._manifest_finder(filename)
+        return tuple(_walk_manifests(workspace, filename))
 
     def detect(self, workspace: Path) -> bool:
         raise NotImplementedError
@@ -87,7 +99,7 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
 
     def detect(self, workspace: Path) -> bool:
         return (workspace / "package.json").is_file() or bool(
-            _walk_manifests(workspace, "package.json")
+            self._manifest_paths(workspace, "package.json")
         )
 
     def _package_rows(
@@ -95,7 +107,7 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
     ) -> tuple[list[tuple[Path, dict[str, Any]]], list[str]]:
         rows: list[tuple[Path, dict[str, Any]]] = []
         warnings: list[str] = []
-        for manifest in _walk_manifests(workspace, "package.json"):
+        for manifest in self._manifest_paths(workspace, "package.json"):
             try:
                 value = json.loads(manifest.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
@@ -297,7 +309,7 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
 
     def detect(self, workspace: Path) -> bool:
         return (workspace / "pom.xml").is_file() or bool(
-            _walk_manifests(workspace, "pom.xml")
+            self._manifest_paths(workspace, "pom.xml")
         )
 
     @staticmethod
@@ -545,7 +557,7 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
 
     def detect(self, workspace: Path) -> bool:
         return (workspace / "Cargo.toml").is_file() or bool(
-            _walk_manifests(workspace, "Cargo.toml")
+            self._manifest_paths(workspace, "Cargo.toml")
         )
 
     def _fallback_rows(
@@ -553,7 +565,7 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
     ) -> tuple[list[tuple[Path, dict[str, Any]]], list[str]]:
         rows: list[tuple[Path, dict[str, Any]]] = []
         warnings: list[str] = []
-        for manifest in _walk_manifests(workspace, "Cargo.toml"):
+        for manifest in self._manifest_paths(workspace, "Cargo.toml"):
             try:
                 value = tomllib.loads(manifest.read_text(encoding="utf-8"))
             except (OSError, tomllib.TOMLDecodeError) as exc:
@@ -867,14 +879,16 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
         )
 
 
-def default_project_graph_providers() -> tuple[ProjectGraphProvider, ...]:
+def default_project_graph_providers(
+    manifest_finder: ManifestFinder | None = None,
+) -> tuple[ProjectGraphProvider, ...]:
     return (
-        NxProjectGraphProvider(),
-        PantsProjectGraphProvider(),
-        NpmProjectGraphProvider(),
-        MavenProjectGraphProvider(),
-        GradleProjectGraphProvider(),
-        GoProjectGraphProvider(),
-        CargoProjectGraphProvider(),
-        DeclaredProjectLinksProvider(),
+        NxProjectGraphProvider(manifest_finder),
+        PantsProjectGraphProvider(manifest_finder),
+        NpmProjectGraphProvider(manifest_finder),
+        MavenProjectGraphProvider(manifest_finder),
+        GradleProjectGraphProvider(manifest_finder),
+        GoProjectGraphProvider(manifest_finder),
+        CargoProjectGraphProvider(manifest_finder),
+        DeclaredProjectLinksProvider(manifest_finder),
     )
