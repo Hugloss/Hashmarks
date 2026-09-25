@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from itertools import islice
 from typing import TYPE_CHECKING, cast
 
 from .decision_session import decision_scoped
@@ -200,12 +201,12 @@ class RepositoryDeclarationDiscoveryMixin:
     def _declaration_provider_paths(self, prefix: str) -> tuple[str, ...]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        admitted = self._walk_admitted_repository_files(
-            prefix,
-            limit=MAX_PROVIDER_ENUMERATED_PATHS + 1,
-            visible_only=True,
+        visible = (
+            item.rel
+            for item in self._iter_admitted_repository_files(prefix)
+            if item.visibility.value != "deny"
         )
-        return tuple(item.rel for item in admitted)
+        return tuple(islice(visible, MAX_PROVIDER_ENUMERATED_PATHS + 1))
 
     def _declaration_discovery_identity(
         self,
