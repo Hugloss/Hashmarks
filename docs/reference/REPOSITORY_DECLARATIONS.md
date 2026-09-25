@@ -384,9 +384,10 @@ downgrade that group's \`coverage.state\` / \`coverage.truncation\`; warnings do
 not give Hashmarks permission to invent completeness.
 
 Provider order is canonicalized, provider names must be unique, provider
-metadata is bounded, and the whole discovery packet is bounded. Provider
-provenance changes are reported separately from nested declaration/repository
-change.
+metadata is bounded, and each provider may observe at most **256 distinct
+repository input paths** through the Hashmarks context. The whole discovery
+packet is also bounded. Provider provenance/input changes are reported
+separately from nested declaration/repository change.
 
 The MCP server does **not** execute arbitrary Python declaration providers.
 External producer adapters may run in their own integration boundary and pass
