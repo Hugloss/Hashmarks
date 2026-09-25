@@ -191,14 +191,14 @@ def _paths(  # noqa: C901, PLR0912
     while queue:
         path = queue.pop(0)
         current = path[-1]
-        if conditional.get(current):
-            omissions.append({"reason": "conditional-edge", "node_id": current})
         if current == target:
             if len(paths) >= max_results:
                 omissions.append({"reason": "result-limit"})
                 break
             paths.append(path)
             continue
+        if conditional.get(current):
+            omissions.append({"reason": "conditional-edge", "node_id": current})
         if len(path) - 1 >= max_depth:
             if outgoing.get(current):
                 omissions.append({"reason": "depth-limit", "node_id": current})
