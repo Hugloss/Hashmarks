@@ -4,16 +4,22 @@ Hashmarks provides local repository intelligence, codebase search for coding age
 
 ## Requirements
 
-- Python 3.11 or newer
-- Linux or WSL is recommended for watcher/daemon behavior and performance qualification
+For the standalone CLI and MCP server:
 
-Hashmarks has no required third-party runtime dependency. Git and `uv` are development/qualification tools, not requirements for the core installed package.
+- Linux x86_64, including WSL2
+- `curl`
+- `sha256sum` or `shasum`
+
+Python 3.11 or newer is required only for the Python API and source development. Python, Git, and `uv` are development/qualification tools, not requirements for the standalone CLI or MCP server.
 
 ## Install and try Hashmarks
 
 ```bash
-pip install hashmarks
+curl -fsSL https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh | sh
+hashmarks --version
 ```
+
+The installer downloads the current standalone release executable and its SHA-256 asset from GitHub Releases, verifies the executable, and installs it to `~/.local/bin/hashmarks`.
 
 Check the installed CLI against a repository:
 
@@ -48,6 +54,12 @@ hashmarks --workspace . affected hashmarks/codemap/engine.py
 This progressive pattern is useful for agents, IDE integrations, and humans because it keeps repository evidence bounded.
 
 ## Python API
+
+The Python API is an in-process integration surface. When working from the Hashmarks source checkout, materialize the repository-owned environment before using it:
+
+```bash
+uv sync --frozen --group test
+```
 
 ```python
 from pathlib import Path
@@ -133,15 +145,18 @@ make test-shard TEST_SHARD=0
 
 ## Local MCP server for coding agents
 
-Hashmarks can act as a local, read-only Model Context Protocol (MCP) server for coding agents. Install the optional MCP support:
+The standalone Hashmarks executable already includes the local, read-only Model Context Protocol (MCP) runtime; no second package install is required.
+
+For OpenCode, run this from the **target repository**:
 
 ```bash
-pip install "hashmarks[mcp]"
+hashmarks install --opencode
+opencode mcp list
 ```
 
-For normal agent use, put the Hashmarks MCP registration in the **target repository** and start your coding-agent host from that repository. The host launches `hashmarks --workspace . mcp` as a stdio child process; you do not need to keep a separate Hashmarks server running.
+The registration launches the exact installed Hashmarks executable as `hashmarks --workspace . mcp`. You do not need to keep a separate Hashmarks server running.
 
-Claude Code and Pi with `pi-mcp-adapter` can use a project-local `.mcp.json`; Codex uses `.codex/config.toml`; OpenCode uses `opencode.json`. See [`integration/MCP.md`](integration/MCP.md) for copy-ready host configuration and the five-tool contract. MCP is a read-only repository-intelligence transport; the external agent retains editing, execution, git, reasoning, and orchestration.
+Claude Code and Pi with `pi-mcp-adapter` can use a project-local `.mcp.json`; Codex uses `.codex/config.toml`. See [`integration/MCP.md`](integration/MCP.md) for the complete read-only tool contract and host configuration. MCP is a repository-intelligence transport; the external agent retains editing, execution, git, reasoning, and orchestration.
 
 To inspect the server manually, run:
 
