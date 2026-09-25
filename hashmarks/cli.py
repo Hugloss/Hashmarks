@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import shutil
 import subprocess
 import sys
 import time
@@ -168,6 +169,52 @@ def _mcp(args) -> int:
     return 0
 
 
+def _installed_hashmarks_executable() -> Path:
+    if getattr(sys, "frozen", False):
+        return canonical_host_path(sys.executable)
+    resolved = shutil.which("hashmarks")
+    if resolved is None:
+        raise UserFacingError(
+            "hashmarks executable is not on PATH; install the standalone binary first"
+        )
+    return canonical_host_path(resolved)
+
+
+def _install(args) -> int:
+    if not args.opencode:
+        raise UserFacingError("choose a host to register, for example --opencode")
+    opencode = shutil.which("opencode")
+    if opencode is None:
+        raise UserFacingError("opencode executable is not on PATH")
+    executable = _installed_hashmarks_executable()
+    command = [
+        opencode,
+        "mcp",
+        "add",
+        "hashmarks",
+        "--",
+        str(executable),
+        "--workspace",
+        ".",
+        "mcp",
+    ]
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as exc:
+        raise UserFacingError(
+            f"OpenCode rejected Hashmarks MCP registration (exit {exc.returncode})"
+        ) from exc
+    _print(
+        {
+            "host": "opencode",
+            "registered": True,
+            "hashmarks": str(executable),
+            "workspace": ".",
+        }
+    )
+    return 0
+
+
 def _add_mode_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--mode",
@@ -249,6 +296,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     _add_common_arguments(mcp, inherited=True)
     mcp.set_defaults(func=_mcp)
+    install = sub.add_parser(
+        "install", help="register the installed Hashmarks executable with agent hosts"
+    )
+    install.add_argument("--opencode", action="store_true")
+    install.set_defaults(func=_install)
     from .repository_cli import add_repository_cli
 
     add_repository_cli(sub, add_common_arguments=_add_common_arguments)
