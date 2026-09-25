@@ -53,9 +53,7 @@ def test_publish_workflow_binds_reviewed_request_to_exact_source() -> None:
     assert "Optional exact reviewed source SHA" in text
     assert "Checkout reviewed release request" in text
     assert "Resolve reviewed release request" in text
-    assert (
-        'set(request) - {"version", "source_sha", "publication_attempt"}' in text
-    )
+    assert 'set(request) - {"version", "source_sha", "publication_attempt"}' in text
     assert 'request.get("publication_attempt", 1)' in text
     assert 'request.get("source_sha", "")' in text
     assert "DISPATCH_SOURCE_SHA:" in text
