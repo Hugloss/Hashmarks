@@ -103,6 +103,17 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
         assert re.fullmatch(r"[0-9a-f]{40}", source_sha)
 
 
+def test_release_profile_installs_mcp_before_full_native_qualification() -> None:
+    text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    release_job = text.split("  release-environment:\n", 1)[1].split(
+        "\n  python-support:\n",
+        1,
+    )[0]
+
+    assert "uv sync --frozen --group test --extra mcp --python 3.14" in release_job
+    assert release_job.index("--extra mcp") < release_job.index("make test-profile")
+
+
 def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
     job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\n")
     for name in ("ci.yml", "publish.yml"):

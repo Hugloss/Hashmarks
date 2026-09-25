@@ -21,6 +21,7 @@ _EXPECTED_TOOLS = [
     "change_impact",
     "correlate_evidence",
     "dependency_codemap",
+    "repository_declarations",
     "post_change",
 ]
 

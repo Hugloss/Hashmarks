@@ -1,8 +1,15 @@
 # Changelog
 
-## 0.22.0 — Standalone MCP distribution and declaration authority
+## 0.23.0 — Qualified standalone MCP release
 
 - Converge repository-file admission across derived evidence: targeted Python import-root refresh, manifest-based project discovery, native project-node/edge persistence, and manifest freshness now reuse the canonical policy/pruning/symlink/visibility owner. Denied project files cannot survive as current project evidence, and live allow→deny policy changes fail closed until admitted evidence is rebuilt.
+- Publish the first checksum-verified standalone Linux x86_64 Hashmarks CLI/MCP release through GitHub Releases, with the curl installer and `hashmarks install --opencode` end-user flow introduced during the 0.22 release work.
+- Repair the native MCP interoperability contract so the advertised tool catalog includes `repository_declarations`, matching the actual read-only server surface.
+- Make the normal PR release-profile lane install the optional MCP runtime before running the full native suite, so MCP-gated regressions fail before release promotion instead of first appearing inside the Publish workflow.
+- Preserve reviewed PR-driven release promotion, exact-source retry authority, GitHub-native release assets, and the no-PyPI publication boundary.
+
+## 0.22.0 — Unpublished release candidate
+
 - Add a checksum-verified standalone Linux x86_64 Hashmarks CLI/MCP executable published through GitHub Releases, plus a curl installer that does not require Python, uv, pip, or PyPI on the target machine.
 - Add `hashmarks install --opencode` to register the exact installed Hashmarks executable through OpenCode's native MCP CLI with `--workspace . mcp`.
 - Keep GitHub Release publication independent from PyPI: release qualification still builds and verifies wheel/sdist artifacts, but public release publication uploads the qualified Python artifacts, manifests, checksums, and standalone executable to GitHub Releases without an automatic PyPI side effect.

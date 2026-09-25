@@ -146,7 +146,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv python install 3.14
-      - run: uv sync --frozen --group test --python 3.14
+      - run: uv sync --frozen --group test --extra mcp --python 3.14
       - run: make test-profile
       - name: Smoke artifacts without changing existing dist
         run: |
