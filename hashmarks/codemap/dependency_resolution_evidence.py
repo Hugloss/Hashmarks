@@ -1298,15 +1298,17 @@ class DependencyResolutionEvidenceMixin:
                 raise ValueError(f"duplicate repository input path: {path}")
             seen.add(path)
             claimed = raw.get("member_revision")
-            if claimed is not None and not _MEMBER_REVISION.fullmatch(str(claimed)):
+            if claimed is not None and (
+                not isinstance(claimed, str) or not _MEMBER_REVISION.fullmatch(claimed)
+            ):
                 raise ValueError(
-                    "repository input member_revision must be a lowercase 64-character sha256 hex digest"
+                    "repository input member_revision must be lowercase sha256 hex"
                 )
             member, _raw = self._repository_member_observation(path)
             observed = member.get("member_revision")
             if claimed is None or observed is None:
                 equivalence = "unknown"
-            elif str(claimed) == str(observed):
+            elif claimed == observed:
                 equivalence = "proven"
             else:
                 equivalence = "mismatch"
