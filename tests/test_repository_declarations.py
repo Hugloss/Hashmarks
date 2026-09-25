@@ -7,6 +7,7 @@ import pytest
 from hashmarks import CodeMap
 
 
+
 def _group(
     declarations: list[dict[str, object]],
     *,
@@ -37,6 +38,7 @@ def _group(
     }
 
 
+
 def _declaration(
     declaration_id: str,
     path: str,
@@ -57,6 +59,7 @@ def _declaration(
             }
         ],
     }
+
 
 
 def test_cross_file_declarations_preserve_exact_evidence_and_equivalence(
@@ -102,6 +105,7 @@ def test_cross_file_declarations_preserve_exact_evidence_and_equivalence(
     )
 
 
+
 def test_differing_declarations_are_reported_without_precedence(
     tmp_path: Path,
 ) -> None:
@@ -124,6 +128,7 @@ def test_differing_declarations_are_reported_without_precedence(
     assert packet["winner"] == "not-selected"
     assert "preferred" not in comparison
     assert "authoritative_value" not in comparison
+
 
 
 def test_absence_requires_complete_untruncated_semantic_coverage(
@@ -165,6 +170,7 @@ def test_absence_requires_complete_untruncated_semantic_coverage(
     }
 
 
+
 def test_ambiguous_correspondence_never_becomes_a_conflict_or_equivalence(
     tmp_path: Path,
 ) -> None:
@@ -190,6 +196,7 @@ def test_ambiguous_correspondence_never_becomes_a_conflict_or_equivalence(
     }
 
 
+
 def test_scope_is_part_of_definition_identity_and_prevents_cross_context_merging(
     tmp_path: Path,
 ) -> None:
@@ -213,6 +220,7 @@ def test_scope_is_part_of_definition_identity_and_prevents_cross_context_merging
     )
     assert linux["groups"][0]["comparison"]["state"] == "insufficient"
     assert windows["groups"][0]["comparison"]["state"] == "insufficient"
+
 
 
 def test_declaration_delta_separates_value_change_from_group_definition(
@@ -249,6 +257,7 @@ def test_declaration_delta_separates_value_change_from_group_definition(
     assert delta["repository_evidence"]["bindings"]["changed"] == []
 
 
+
 def test_previous_declaration_packet_is_revalidated_before_delta(
     tmp_path: Path,
 ) -> None:
@@ -268,6 +277,7 @@ def test_previous_declaration_packet_is_revalidated_before_delta(
                 [_group(declarations)],
                 previous_observation=before,
             )
+
 
 
 def test_fail_closed_unknown_fields_and_invalid_complete_coverage(
@@ -295,6 +305,7 @@ def test_fail_closed_unknown_fields_and_invalid_complete_coverage(
             )
 
 
+
 def test_definition_identity_binds_exact_evidence_definition(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -319,6 +330,7 @@ def test_definition_identity_binds_exact_evidence_definition(tmp_path: Path) -> 
     changed = after["delta_from_previous"]["changed_groups"][0]
     assert changed["definition_changed"] is True
     assert changed["definition_changed_declaration_ids"] == ["runtime"]
+
 
 
 def test_group_definition_identity_binds_coverage_scope(tmp_path: Path) -> None:
@@ -387,6 +399,7 @@ def test_contract_is_format_and_concept_neutral(
     assert packet["groups"][0]["comparison"]["state"] == "equivalent"
 
 
+
 def test_encoded_request_budget_fails_closed_before_repository_projection(
     tmp_path: Path,
 ) -> None:
@@ -400,6 +413,7 @@ def test_encoded_request_budget_fails_closed_before_repository_projection(
         codemap.sync()
         with pytest.raises(ValueError, match="groups exceeds .* encoded bytes"):
             codemap.repository_declarations([group])
+
 
 
 def test_resolved_provider_value_with_missing_evidence_cannot_create_conflict(
@@ -435,6 +449,7 @@ def test_resolved_provider_value_with_missing_evidence_cannot_create_conflict(
     }
 
 
+
 def test_unsupported_declaration_evidence_cannot_create_equivalence(
     tmp_path: Path,
 ) -> None:
@@ -457,6 +472,7 @@ def test_unsupported_declaration_evidence_cannot_create_equivalence(
     assert group["comparison"]["state"] == "ambiguous"
     assert group["comparison"]["reason"] == "repository-evidence-not-qualified"
     assert group["comparison"]["unqualified_declaration_ids"] == ["binary"]
+
 
 
 def test_declaration_claims_require_provenance_and_distinct_ambiguity(
@@ -499,6 +515,7 @@ def test_declaration_claims_require_provenance_and_distinct_ambiguity(
             codemap.repository_declarations([empty_concept])
 
 
+
 def test_ambiguous_candidate_order_does_not_change_observation_identity(
     tmp_path: Path,
 ) -> None:
@@ -520,6 +537,7 @@ def test_ambiguous_candidate_order_does_not_change_observation_identity(
 
     assert first["observation_identity"] == second["observation_identity"]
     assert first["groups"][0]["declarations"][0]["candidate_values"] == ["a", "b"]
+
 
 
 def test_expected_membership_exposes_unexpected_current_declaration(
@@ -545,6 +563,7 @@ def test_expected_membership_exposes_unexpected_current_declaration(
         "unexpected_declaration_ids": ["b"],
     }
 
+
 def test_previous_declaration_packet_from_foreign_repository_fails_closed(
     tmp_path: Path,
 ) -> None:
@@ -567,4 +586,3 @@ def test_previous_declaration_packet_from_foreign_repository_fails_closed(
             match="previous declaration observation repository-mismatch",
         ):
             codemap.repository_declarations([group], previous_observation=previous)
-
