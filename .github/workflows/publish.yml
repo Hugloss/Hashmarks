@@ -51,9 +51,13 @@ jobs:
           request = tomllib.loads(
               pathlib.Path(".github/release-request.toml").read_text(encoding="utf-8")
           )
-          unknown = set(request) - {"version", "source_sha"}
+          unknown = set(request) - {"version", "source_sha", "publication_attempt"}
           if unknown:
               raise SystemExit(f"unsupported release-request fields: {sorted(unknown)!r}")
+
+          attempt = request.get("publication_attempt", 1)
+          if isinstance(attempt, bool) or not isinstance(attempt, int) or attempt < 1:
+              raise SystemExit("publication_attempt must be a positive integer")
 
           version = str(request["version"])
           if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) is None:
@@ -190,6 +194,26 @@ jobs:
             --tag "${{ needs.prepare.outputs.tag }}" \
             --output release/release-manifest.json \
             --sha256sums release/SHA256SUMS.txt
+      - name: Bind reviewed source release notes
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+
+          version = os.environ["RELEASE_VERSION"]
+          changelog = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          marker = f"## {version} — "
+          start = changelog.index(marker)
+          remainder = changelog[start:]
+          boundary = remainder.find("\n## ", len(marker))
+          section = remainder if boundary < 0 else remainder[:boundary]
+          pathlib.Path("release/release-notes.md").write_text(
+              section.rstrip() + "\n",
+              encoding="utf-8",
+          )
+          PY
       - name: Upload exact qualified release bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -259,9 +283,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout reviewed publication machinery
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.prepare.outputs.source_sha }}
+          ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
       - name: Download exact qualified Python release bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -286,26 +312,7 @@ jobs:
             sha256sum -c hashmarks-linux-x86_64.sha256
           )
           release/standalone/hashmarks-linux-x86_64 --version
-      - name: Materialize reviewed changelog section as release notes
-        env:
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          python3 - <<'PY'
-          import os
-          import pathlib
-
-          version = os.environ["RELEASE_VERSION"]
-          changelog = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
-          marker = f"## {version} — "
-          start = changelog.index(marker)
-          remainder = changelog[start:]
-          boundary = remainder.find("\n## ", len(marker))
-          section = remainder if boundary < 0 else remainder[:boundary]
-          pathlib.Path("release/release-notes.md").write_text(
-              section.rstrip() + "\n",
-              encoding="utf-8",
-          )
-          PY
+          test -s release/release-notes.md
       - name: Verify any existing release tag resolves to this exact merge SHA
         env:
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
