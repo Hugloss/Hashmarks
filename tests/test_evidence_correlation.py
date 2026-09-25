@@ -1408,3 +1408,30 @@ def test_previous_correlation_from_foreign_repository_fails_closed(
                 include_relationships=False,
                 previous_correlation=previous,
             )
+
+def test_correlation_delta_rejects_nested_repository_evidence_tampering(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence(
+            _bundle({"anchor_id": "member", "path": "owner.py"}),
+            include_relationships=False,
+        )
+        tampered = json.loads(json.dumps(packet))
+        tampered["repository_evidence"]["bindings"][0]["binding_id"] = (
+            "repository-evidence:forged"
+        )
+        tampered["correlation_identity"] = "sha256:" + codemap._packet_digest(
+            "hashmarks.evidence-correlation.v1",
+            {
+                key: value
+                for key, value in tampered.items()
+                if key not in {"correlation_identity", "delta_from_previous"}
+            },
+        )
+
+        with pytest.raises(ValueError, match="bindings identity mismatch"):
+            codemap.evidence_correlation_delta(tampered, packet)
+
