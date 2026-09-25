@@ -45,8 +45,11 @@ def test_publish_workflow_binds_reviewed_request_to_exact_source() -> None:
     assert "Optional exact reviewed source SHA" in text
     assert "Checkout reviewed release request" in text
     assert "Resolve reviewed release request" in text
-    assert 'set(request) - {"version", "source_sha"}' in text
+    assert 'set(request) - {"version", "source_sha", "publication_attempt"}' in text
     assert 'request.get("source_sha", "")' in text
+    assert 'request.get("publication_attempt", 1)' in text
+    assert "publication_attempt must be a positive integer" in text
+    assert "publication_attempt: ${{ steps.request.outputs.publication_attempt }}" in text
     assert "DISPATCH_SOURCE_SHA:" in text
     assert "TRIGGER_SOURCE_SHA:" in text
     assert "dispatch_source or request_source or trigger_source" in text
@@ -109,7 +112,7 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
     )
 
     assert "version" in request
-    assert set(request) <= {"version", "source_sha"}
+    assert set(request) <= {"version", "source_sha", "publication_attempt"}
     version = request["version"]
     assert isinstance(version, str)
     assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)
@@ -118,6 +121,12 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
     if source_sha is not None:
         assert isinstance(source_sha, str)
         assert re.fullmatch(r"[0-9a-f]{40}", source_sha)
+
+    publication_attempt = request.get("publication_attempt")
+    if publication_attempt is not None:
+        assert isinstance(publication_attempt, int)
+        assert not isinstance(publication_attempt, bool)
+        assert publication_attempt >= 1
 
 
 def test_ci_standalone_installs_exact_frozen_artifact_through_public_installer() -> (
