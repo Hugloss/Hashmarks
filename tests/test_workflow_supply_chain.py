@@ -36,6 +36,14 @@ def _publish_workflow_text() -> str:
     )
 
 
+def _publish_job(name: str, next_name: str | None = None) -> str:
+    text = _publish_workflow_text()
+    block = text.split(f"  {name}:\n", 1)[1]
+    if next_name is not None:
+        block = block.split(f"\n  {next_name}:\n", 1)[0]
+    return block
+
+
 def test_publish_workflow_binds_reviewed_request_to_exact_source() -> None:
     text = _publish_workflow_text()
     assert "branches: [main]" in text
@@ -66,6 +74,23 @@ def test_publish_workflow_binds_reviewed_request_to_exact_source() -> None:
     )
     assert "release:\n    types: [published]" not in text
     assert "release publication is authorized only from main" in text
+
+
+def test_publish_workflow_separates_source_from_publication_machinery() -> None:
+    build = _publish_job("build", "standalone")
+    standalone = _publish_job("standalone", "publish")
+    publish = _publish_job("publish")
+
+    source_ref = "ref: ${{ needs.prepare.outputs.source_sha }}"
+    assert source_ref in build
+    assert source_ref in standalone
+    assert "Bind reviewed source release notes" in build
+
+    assert "Checkout reviewed publication machinery" in publish
+    assert "ref: ${{ github.sha }}" in publish
+    assert source_ref not in publish
+    assert "test -s release/release-notes.md" in publish
+    assert "Materialize reviewed changelog section as release notes" not in publish
 
 
 def test_publish_workflow_publishes_only_verified_github_release_assets() -> None:
