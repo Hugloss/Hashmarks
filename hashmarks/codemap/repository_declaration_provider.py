@@ -62,9 +62,7 @@ class RepositoryDeclarationProviderContext:
             "reason",
         )
         return {
-            key: observation[key]
-            for key in keys
-            if observation.get(key) is not None
+            key: observation[key] for key in keys if observation.get(key) is not None
         }
 
     def _record(
@@ -404,7 +402,9 @@ def validate_repository_declaration_provider_inputs(
                     f"declaration provider {name} input path is malformed"
                 )
             current, _raw = read_member(path, False)
-            if RepositoryDeclarationProviderContext._signature(current) != dict(previous):
+            if RepositoryDeclarationProviderContext._signature(current) != dict(
+                previous
+            ):
                 raise RepositoryDeclarationProviderError(
                     f"declaration provider {name} input changed during discovery: {path}"
                 )
