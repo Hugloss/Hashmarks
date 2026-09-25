@@ -19,7 +19,7 @@ curl -fsSL https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh |
 hashmarks --version
 ```
 
-The installer downloads the current standalone release executable and its SHA-256 asset from GitHub Releases, verifies the executable, and installs it to `~/.local/bin/hashmarks`.
+The installer downloads the current standalone release executable and its SHA-256 asset from GitHub Releases, verifies the executable, smoke-tests the downloaded candidate, and only then atomically replaces `~/.local/bin/hashmarks`. A broken candidate therefore does not destroy an existing working installation.
 
 Check the installed CLI against a repository:
 
@@ -34,7 +34,7 @@ hashmarks --workspace . map sync
 hashmarks --workspace . map status
 ```
 
-The CodeMap is derived state. It can be rebuilt from repository bytes and supported repository metadata.
+The CodeMap is derived state. It can be rebuilt from repository bytes and supported repository metadata. Default repository-local state lives under `.hashmarks/`; Hashmarks makes that directory self-ignored by Git and owner-private where the platform exposes POSIX permissions. A pre-existing default-state symlink is rejected rather than followed.
 
 ## Orient before reading source
 
