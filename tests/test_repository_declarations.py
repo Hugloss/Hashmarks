@@ -398,3 +398,59 @@ def test_encoded_request_budget_fails_closed_before_repository_projection(
         codemap.sync()
         with pytest.raises(ValueError, match="groups exceeds .* encoded bytes"):
             codemap.repository_declarations([group])
+
+
+def test_resolved_provider_value_with_missing_evidence_cannot_create_conflict(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "current.yaml").write_text("owner: team-a\n", encoding="utf-8")
+    declarations = [
+        _declaration("current", "current.yaml", "team-a"),
+        _declaration("missing", "missing.yaml", "team-b"),
+    ]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations([_group(declarations)])
+
+    group = packet["groups"][0]
+    by_id = {row["declaration_id"]: row for row in group["declarations"]}
+    assert by_id["current"]["evidence_state"] == "known-present"
+    assert by_id["missing"]["evidence_state"] == "known-absent"
+    assert group["comparison"] == {
+        "state": "ambiguous",
+        "reason": "repository-evidence-not-current",
+        "unqualified_declaration_ids": ["missing"],
+        "distinct_values": [],
+    }
+    assert group["absence"] == {
+        "state": "known-absent",
+        "missing_declaration_ids": ["missing"],
+        "unseen_expected_declaration_ids": [],
+    }
+
+
+def test_unsupported_declaration_evidence_cannot_create_equivalence(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "current.txt").write_text("same\n", encoding="utf-8")
+    (repo / "binary.dat").write_bytes(b"\xff\xfe")
+    declarations = [
+        _declaration("current", "current.txt", "same"),
+        _declaration("binary", "binary.dat", "same"),
+    ]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations([_group(declarations)])
+
+    group = packet["groups"][0]
+    by_id = {row["declaration_id"]: row for row in group["declarations"]}
+    assert by_id["binary"]["evidence_state"] == "unsupported"
+    assert group["comparison"]["state"] == "ambiguous"
+    assert group["comparison"]["reason"] == "repository-evidence-not-current"
+    assert group["comparison"]["unqualified_declaration_ids"] == ["binary"]
