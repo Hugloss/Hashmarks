@@ -91,6 +91,8 @@ Hashmarks core must not invent a universal metadata ontology, infer semantic cor
 
 The normative contract is [Repository declarations](REPOSITORY_DECLARATIONS.md).
 
+Producer discovery is an explicit extension boundary: caller-selected Python providers may detect and translate producer-native repository syntax into the neutral declaration contract, but Hashmarks must not ambiently load provider entry points, execute repository-supplied provider code, or run arbitrary provider implementations through MCP. A provider detection miss is observability about that provider only, never semantic absence. Detected provider failure fails closed rather than yielding partial negative evidence.
+
 ### Dependency-adapter translation boundary
 
 Package-manager and resolver syntax is an edge concern. Maven, uv, Gradle, npm, SBOM, and future producer formats may be parsed by dedicated adapters, but shared dependency qualification must reason only about producer-neutral facts and semantic evidence authorities. A source-format `kind` is provenance, not authority; one physical source may support several semantic authorities, and a complete physical artifact does not by itself establish complete semantic coverage. New adapters must translate into the general dependency evidence contract rather than teach core Hashmarks the producer's native shape.
