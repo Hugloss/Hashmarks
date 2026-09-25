@@ -1001,6 +1001,7 @@ def test_provider_evidence_validation_rejects_duplicate_input_index_rows(
             from hashmarks.codemap.repository_declaration_discovery import (
                 _validate_provider_evidence_revisions,
             )
+
             _validate_provider_evidence_revisions(
                 packet["providers"], packet["declarations"]
             )
