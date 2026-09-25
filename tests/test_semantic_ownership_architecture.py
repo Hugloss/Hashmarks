@@ -178,12 +178,10 @@ def test_declaration_provider_context_has_no_raw_workspace_authority() -> None:
     )
 
 
-
 def test_repository_file_discovery_has_one_semantic_owner() -> None:
     owned = {
         "_path_admitted_for_analysis",
         "_iter_admitted_repository_files",
-        "_walk_admitted_repository_files",
     }
     definitions: dict[str, list[str]] = {name: [] for name in owned}
     for path in sorted(CODEMAP.glob("*.py")):
