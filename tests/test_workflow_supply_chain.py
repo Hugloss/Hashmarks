@@ -37,6 +37,17 @@ def test_publish_workflow_is_reviewed_request_driven_and_github_native() -> None
     assert "branches: [main]" in text
     assert '".github/release-request.toml"' in text
     assert "workflow_dispatch:" in text
+    assert "source_sha:" in text
+    assert "Exact reviewed main commit to qualify and publish" in text
+    assert "RELEASE_SOURCE_SHA:" in text
+    assert "source_sha: ${{ steps.release.outputs.source_sha }}" in text
+    assert "ref: ${{ needs.prepare.outputs.source_sha }}" in text
+    assert "git merge-base --is-ancestor" in text
+    assert "Materialize locked lint toolchain" in text
+    assert (
+        "UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --frozen --only-group lint"
+        in text
+    )
     assert "release:\n    types: [published]" not in text
     assert "Validate reviewed release request" in text
     assert "release publication is authorized only from main" in text
