@@ -528,17 +528,17 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(str(exc)) from exc
 
 
-def _run_command(args) -> int:
-    root = Path(args.root).resolve()
-    if args.command == "validate-tag":
-        expected = _expected_tag(root)
-        if args.tag != expected:
-            raise SystemExit(
-                f"release tag mismatch: expected {expected!r}, got {args.tag!r}"
-            )
-        _log_command_output(f"Hashmarks release tag: PASS ({expected})")
-        return 0
+def _run_validate_tag(args, root: Path) -> int:
+    expected = _expected_tag(root)
+    if args.tag != expected:
+        raise SystemExit(
+            f"release tag mismatch: expected {expected!r}, got {args.tag!r}"
+        )
+    _log_command_output(f"Hashmarks release tag: PASS ({expected})")
+    return 0
 
+
+def _run_standalone_command(args, root: Path) -> int:
     if args.command == "standalone-qualification":
         value = standalone_qualification(
             root,
@@ -550,35 +550,36 @@ def _run_command(args) -> int:
         _write_json(value, Path(args.output))
         _log_command_output(json.dumps(value, indent=2, sort_keys=True))
         return 0
+    _load_standalone_bundle(root, Path(args.bundle))
+    _log_command_output("Hashmarks standalone qualification: PASS")
+    return 0
 
-    if args.command == "verify-standalone-qualification":
-        _load_standalone_bundle(root, Path(args.bundle))
-        _log_command_output("Hashmarks standalone qualification: PASS")
-        return 0
 
-    if args.command in {"publication-manifest", "verify-publication"}:
-        value = publication_manifest(
-            root,
-            Path(args.dist),
-            [Path(item) for item in args.standalone_bundles],
-            tag=args.tag,
-            source_sha=args.source_sha,
+def _run_publication_command(args, root: Path) -> int:
+    value = publication_manifest(
+        root,
+        Path(args.dist),
+        [Path(item) for item in args.standalone_bundles],
+        tag=args.tag,
+        source_sha=args.source_sha,
+    )
+    if args.command == "publication-manifest":
+        _write_manifest(
+            value,
+            output_path=args.output,
+            sha256sums_path=args.sha256sums,
         )
-        if args.command == "publication-manifest":
-            _write_manifest(
-                value,
-                output_path=args.output,
-                sha256sums_path=args.sha256sums,
-            )
-            return 0
-        recorded = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
-        if recorded != value:
-            raise SystemExit(
-                "release publication manifest does not match current artifact bytes"
-            )
-        _log_command_output("Hashmarks release publication manifest: PASS")
         return 0
+    recorded = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
+    if recorded != value:
+        raise SystemExit(
+            "release publication manifest does not match current artifact bytes"
+        )
+    _log_command_output("Hashmarks release publication manifest: PASS")
+    return 0
 
+
+def _run_package_command(args, root: Path) -> int:
     value = release_manifest(root, Path(args.dist), tag=args.tag)
     if args.command == "manifest":
         _write_manifest(
@@ -587,7 +588,6 @@ def _run_command(args) -> int:
             sha256sums_path=args.sha256sums,
         )
         return 0
-
     recorded = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
     if recorded != value:
         raise SystemExit(
@@ -595,6 +595,17 @@ def _run_command(args) -> int:
         )
     _log_command_output("Hashmarks release artifact manifest: PASS")
     return 0
+
+
+def _run_command(args) -> int:
+    root = Path(args.root).resolve()
+    if args.command == "validate-tag":
+        return _run_validate_tag(args, root)
+    if args.command in {"standalone-qualification", "verify-standalone-qualification"}:
+        return _run_standalone_command(args, root)
+    if args.command in {"publication-manifest", "verify-publication"}:
+        return _run_publication_command(args, root)
+    return _run_package_command(args, root)
 
 
 if __name__ == "__main__":
