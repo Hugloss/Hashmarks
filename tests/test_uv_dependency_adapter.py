@@ -269,6 +269,17 @@ source = { virtual = "." }
         (
             b"""version = 1
 revision = 3
+requires-python = true
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+""",
+            "uv lock requires-python must be a string",
+        ),
+        (
+            b"""version = 1
+revision = 3
 [[package]]
 name = 123
 version = "0.1.0"
