@@ -154,12 +154,14 @@ def test_absence_requires_complete_untruncated_semantic_coverage(
         "state": "unknown",
         "missing_declaration_ids": [],
         "unseen_expected_declaration_ids": ["owner-b"],
+        "unexpected_declaration_ids": [],
         "reason": "coverage-does-not-authorize-negative-evidence",
     }
     assert absent["groups"][0]["absence"] == {
         "state": "known-absent",
         "missing_declaration_ids": ["owner-b"],
         "unseen_expected_declaration_ids": [],
+        "unexpected_declaration_ids": [],
     }
 
 
@@ -429,6 +431,7 @@ def test_resolved_provider_value_with_missing_evidence_cannot_create_conflict(
         "state": "known-absent",
         "missing_declaration_ids": ["missing"],
         "unseen_expected_declaration_ids": [],
+        "unexpected_declaration_ids": [],
     }
 
 
@@ -494,3 +497,55 @@ def test_declaration_claims_require_provenance_and_distinct_ambiguity(
             codemap.repository_declarations([duplicate_candidates])
         with pytest.raises(ValueError, match="concept must be"):
             codemap.repository_declarations([empty_concept])
+
+
+def test_ambiguous_candidate_order_does_not_change_observation_identity(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.yaml").write_text("value: maybe\n", encoding="utf-8")
+
+    def ambiguous(values: list[str]) -> dict[str, object]:
+        declaration = _declaration("value", "value.yaml", "unused")
+        declaration["value_state"] = "ambiguous"
+        declaration.pop("value")
+        declaration["candidate_values"] = values
+        return _group([declaration])
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        first = codemap.repository_declarations([ambiguous(["b", "a"])])
+        second = codemap.repository_declarations([ambiguous(["a", "b"])])
+
+    assert (
+        first["observation_identity"]
+        == second["observation_identity"]
+    )
+    assert first["groups"][0]["declarations"][0]["candidate_values"] == ["a", "b"]
+
+
+def test_expected_membership_exposes_unexpected_current_declaration(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.yaml").write_text("value: a\n", encoding="utf-8")
+    (repo / "b.yaml").write_text("value: b\n", encoding="utf-8")
+    declarations = [
+        _declaration("a", "a.yaml", "a"),
+        _declaration("b", "b.yaml", "b"),
+    ]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations(
+            [_group(declarations, expected=["a"])]
+        )
+
+    assert packet["groups"][0]["absence"] == {
+        "state": "known-present",
+        "missing_declaration_ids": [],
+        "unseen_expected_declaration_ids": [],
+        "unexpected_declaration_ids": ["b"],
+    }
