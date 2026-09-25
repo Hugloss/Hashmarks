@@ -172,6 +172,8 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **G54. Provider path enumeration is repository observation, not ambient filesystem access.** Provider enumeration uses the shared repository admission/pruning/symlink discovery owner, is bounded, is recorded in provider observation identity, and is revalidated during qualification. Admitted files may be enumerated even when CodeMap has no parser for their format, but enumeration alone does not certify their contents or semantics: declarations still require revision-bound exact repository evidence reads. Enumeration must not grant providers an opaque raw workspace path or expose denied, internal, pruned, or symlink-descended material.
 
+**G55. Repository-derived file evidence has one admission authority.** Producer-specific parsers, native tools, project graphs, import-root discovery, and freshness projections may own their semantic interpretation, but they must not create a second filesystem-admission model. Repository files that support derived CodeMap evidence must pass the canonical repository-file admission/visibility owner before they can be parsed into project evidence, persisted as project nodes/edges, or used as manifest freshness authority. A live allow→deny policy change must stop denied derived evidence from participating before a producer refresh can re-establish the remaining admitted graph.
+
 ## Product-boundary constitution
 
 Hashmarks is a repository observer that exposes repository intelligence, not an autonomous coding agent, policy engine, or execution engine.
