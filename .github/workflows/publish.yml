@@ -212,6 +212,38 @@ jobs:
             sha256sum -c hashmarks-linux-x86_64.sha256
           )
           release/standalone/hashmarks-linux-x86_64 --version
+      - name: Materialize reviewed changelog section as release notes
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+
+          version = os.environ["RELEASE_VERSION"]
+          changelog = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          marker = f"## {version} — "
+          start = changelog.index(marker)
+          remainder = changelog[start:]
+          boundary = remainder.find("\n## ", len(marker))
+          section = remainder if boundary < 0 else remainder[:boundary]
+          pathlib.Path("release/release-notes.md").write_text(
+              section.rstrip() + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Verify any existing release tag resolves to this exact merge SHA
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            git fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+            tag_commit=$(git rev-list -n 1 "$RELEASE_TAG")
+            if [ "$tag_commit" != "${{ github.sha }}" ]; then
+              echo "::error::Existing tag $RELEASE_TAG resolves to $tag_commit, not ${{ github.sha }}"
+              exit 1
+            fi
+          fi
       - name: Create reviewed draft release if needed
         env:
           GH_TOKEN: ${{ github.token }}
@@ -233,7 +265,7 @@ jobs:
             gh release create "$RELEASE_TAG" \
               --target "${{ github.sha }}" \
               --title "Hashmarks $RELEASE_VERSION" \
-              --generate-notes \
+              --notes-file release/release-notes.md \
               --draft
           fi
       - name: Upload qualified assets to reviewed draft
