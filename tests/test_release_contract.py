@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -82,6 +84,29 @@ def test_release_contract_cli_translates_invalid_tag_without_traceback(
         )
     captured = capsys.readouterr()
     assert "Traceback" not in captured.err
+
+
+def test_release_contract_cli_runs_without_installed_hashmarks(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            str(_root() / "scripts" / "release_contract.py"),
+            "validate-tag",
+            "--root",
+            str(_root()),
+            "--tag",
+            f"v{hashmarks.__version__}",
+        ],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert f"Hashmarks release tag: PASS (v{hashmarks.__version__})" in result.stdout
+    assert result.stderr == ""
 
 
 def test_release_manifest_is_stable_for_unchanged_bytes(tmp_path: Path) -> None:
