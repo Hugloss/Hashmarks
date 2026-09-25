@@ -85,8 +85,8 @@ def normalize_correspondence(raw: object) -> dict[str, object]:
             "correspondence.state must be declared, ambiguous, or unresolved"
         )
     basis = json_value(row.get("basis", {}), name="correspondence.basis")
-    if not isinstance(basis, dict):
-        raise ValueError("correspondence.basis must be an object")
+    if not isinstance(basis, dict) or not basis:
+        raise ValueError("correspondence.basis must be a non-empty object")
     return {"state": state, "basis": basis}
 
 
@@ -118,8 +118,10 @@ def normalize_coverage(raw: object) -> dict[str, object]:
 
     scope = json_value(row.get("scope", {}), name="coverage.scope")
     provenance = json_value(row.get("provenance", {}), name="coverage.provenance")
-    if not isinstance(scope, dict) or not isinstance(provenance, dict):
-        raise ValueError("coverage scope/provenance must be objects")
+    if not isinstance(scope, dict):
+        raise ValueError("coverage.scope must be an object")
+    if not isinstance(provenance, dict) or not provenance:
+        raise ValueError("coverage.provenance must be a non-empty object")
     return {
         "state": state,
         "truncation": truncation,
@@ -157,11 +159,24 @@ def _normalized_ambiguous_value(
         raise ValueError("ambiguous declaration requires candidate_values list")
     if len(candidates) < 2:
         raise ValueError("ambiguous declaration requires at least two candidate values")
-    return {
-        "candidate_values": [
-            json_value(value, name="candidate value") for value in candidates
-        ]
+    normalized = [
+        json_value(value, name="candidate value") for value in candidates
+    ]
+    identities = {
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+        for value in normalized
     }
+    if len(identities) < 2:
+        raise ValueError(
+            "ambiguous declaration requires at least two distinct candidate values"
+        )
+    return {"candidate_values": normalized}
 
 
 def _normalized_value_fields(
@@ -192,8 +207,8 @@ def normalize_declaration(
     if value_state not in {"resolved", "ambiguous", "unresolved"}:
         raise ValueError("value_state must be resolved, ambiguous, or unresolved")
     producer = json_value(row.get("producer", {}), name="producer")
-    if not isinstance(producer, dict):
-        raise ValueError("producer must be an object")
+    if not isinstance(producer, dict) or not producer:
+        raise ValueError("producer must be a non-empty object")
 
     binding_id = _binding_id(group_id, declaration_id)
     result = {
@@ -313,8 +328,10 @@ def _normalize_group(
     group_id = required_text(raw_group.get("group_id"), name="group_id")
     concept = json_value(raw_group.get("concept"), name="concept")
     scope = json_value(raw_group.get("scope", {}), name="scope")
-    if not isinstance(concept, dict) or not isinstance(scope, dict):
-        raise ValueError("concept and scope must be objects")
+    if not isinstance(concept, dict) or not concept:
+        raise ValueError("concept must be a non-empty object")
+    if not isinstance(scope, dict):
+        raise ValueError("scope must be an object")
 
     raw_declarations = raw_group.get("declarations")
     if not isinstance(raw_declarations, Sequence) or isinstance(
