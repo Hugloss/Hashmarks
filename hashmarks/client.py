@@ -63,6 +63,19 @@ def default_state_dir(workspace: str | Path) -> Path:
     return canonical_host_path(workspace) / ".hashmarks"
 
 
+def prepare_default_state_dir(workspace: str | Path) -> Path:
+    """Create default repository-local state without dirtying Git status."""
+    state = default_state_dir(workspace)
+    state.mkdir(parents=True, exist_ok=True)
+    ignore = state / ".gitignore"
+    try:
+        with ignore.open("x", encoding="utf-8") as stream:
+            stream.write("*\n")
+    except FileExistsError:
+        pass
+    return state
+
+
 def _workspace_runtime_key(workspace: str | Path) -> str:
     canonical = canonical_host_path(workspace)
     # The key is only a collision-resistant namespace for ephemeral local IPC;
