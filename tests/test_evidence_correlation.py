@@ -1359,6 +1359,7 @@ def test_external_evidence_conflict_is_retained_without_mutating_owner(
     assert anchor["resolution"]["state"] == "claim-conflict"
     assert before["ownership_authority"] == after["ownership_authority"]
 
+
 def test_correlation_delta_rejects_foreign_repository_packet(tmp_path: Path) -> None:
     left = tmp_path / "left"
     right = tmp_path / "right"
@@ -1407,4 +1408,3 @@ def test_previous_correlation_from_foreign_repository_fails_closed(
                 include_relationships=False,
                 previous_correlation=previous,
             )
-
