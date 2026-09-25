@@ -212,6 +212,46 @@ jobs:
       - name: Smoke installed wheel through official MCP SDK
         run: .mcp-venv/bin/python -I scripts/mcp_installed_artifact_smoke.py --hashmarks "$PWD/.mcp-venv/bin/hashmarks"
 
+  standalone-artifact:
+    name: Standalone CLI/MCP artifact
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.14
+      - name: Materialize locked Hashmarks + MCP runtime
+        run: uv sync --frozen --extra mcp --python 3.14
+      - name: Add pinned standalone packager
+        run: uv pip install --python .venv/bin/python "pyinstaller==6.22.3"
+      - name: Build and smoke self-contained executable
+        run: |
+          .venv/bin/pyinstaller \
+            --clean \
+            --noconfirm \
+            --onefile \
+            --name hashmarks \
+            --collect-all hashmarks \
+            --collect-all mcp \
+            scripts/hashmarks_entrypoint.py
+          ./dist/hashmarks --version
+          ./dist/hashmarks version
+          .venv/bin/python -I scripts/mcp_installed_artifact_smoke.py \
+            --hashmarks "$PWD/dist/hashmarks"
+      - name: Record standalone artifact identity
+        run: sha256sum dist/hashmarks > dist/hashmarks-linux-x86_64.sha256
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hashmarks-standalone-${{ github.sha }}
+          path: |
+            dist/hashmarks
+            dist/hashmarks-linux-x86_64.sha256
+          if-no-files-found: error
+
   precommit:
     name: Pre-commit checks
     runs-on: ubuntu-latest
@@ -241,6 +281,7 @@ jobs:
       - release-environment
       - python-support
       - mcp-interop
+      - standalone-artifact
       - precommit
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -256,11 +297,12 @@ jobs:
           RELEASE_ENVIRONMENT: ${{ needs.release-environment.result }}
           PYTHON_SUPPORT: ${{ needs.python-support.result }}
           MCP_INTEROP: ${{ needs.mcp-interop.result }}
+          STANDALONE_ARTIFACT: ${{ needs.standalone-artifact.result }}
           PRECOMMIT: ${{ needs.precommit.result }}
         run: |
           failed=0
           printf '%-24s %s (diagnostic only)\n' "FORMATTING" "$FORMATTING"
-          for lane in             RUFF_DEBT             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             PRECOMMIT
+          for lane in             RUFF_DEBT             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             STANDALONE_ARTIFACT             PRECOMMIT
           do
             result="${!lane}"
             printf '%-24s %s\n' "$lane" "$result"
