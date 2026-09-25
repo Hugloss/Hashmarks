@@ -367,10 +367,7 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
         selection_complete = bool(selection_sources) and (
             (context not in trees or context in complete_trees)
-            and (
-                context not in inventories
-                or context in complete_inventories
-            )
+            and (context not in inventories or context in complete_inventories)
         )
         coverage.append(
             {
