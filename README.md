@@ -117,23 +117,14 @@ Then start Codex from that project directory.
 
 ### OpenCode MCP server
 
-Add Hashmarks to `opencode.json` in the target project:
+From the target project, let Hashmarks register its exact installed executable through OpenCode's own CLI:
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "hashmarks": {
-      "type": "local",
-      "command": ["hashmarks", "--workspace", ".", "mcp"],
-      "cwd": ".",
-      "enabled": true
-    }
-  }
-}
+```bash
+hashmarks install --opencode
+opencode mcp list
 ```
 
-Then start OpenCode from that project directory.
+The registration runs Hashmarks as `hashmarks --workspace . mcp`, so each OpenCode project binds the server to that project instead of to the Hashmarks source checkout. Then start OpenCode from that project directory.
 
 ### Pi MCP server
 
