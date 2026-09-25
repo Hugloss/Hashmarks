@@ -25,6 +25,24 @@ _SCHEMA = "hashmarks.repository-declarations.v1"
 class RepositoryDeclarationsMixin:
     """Project cross-artifact declarations without choosing a winning value."""
 
+    @staticmethod
+    def _binding_evidence_state(binding: Mapping[str, object]) -> str:
+        evidence = binding.get("evidence")
+        if not isinstance(evidence, list) or not evidence:
+            return "unknown"
+        states = {
+            str(row.get("state") or "unknown")
+            for row in evidence
+            if isinstance(row, Mapping)
+        }
+        if states == {"known-present"}:
+            return "known-present"
+        if "unsupported" in states:
+            return "unsupported"
+        if "known-absent" in states:
+            return "known-absent"
+        return "unknown"
+
     def _project_declaration(
         self,
         normalized: Mapping[str, object],
@@ -37,6 +55,7 @@ class RepositoryDeclarationsMixin:
             self = cast("CodeMap", self)
         declaration_id = str(normalized["declaration_id"])
         binding = binding_rows[str(normalized["binding_id"])]
+        evidence_state = self._binding_evidence_state(binding)
         definition = {
             "group_id": group_id,
             "concept": concept,
@@ -54,10 +73,12 @@ class RepositoryDeclarationsMixin:
                 else {}
             ),
             "producer": normalized["producer"],
+            "evidence_state": evidence_state,
             "binding_observation_identity": binding["binding_observation_identity"],
         }
         return {
             **normalized,
+            "evidence_state": evidence_state,
             "declaration_definition_identity": "sha256:"
             + self._packet_digest(
                 "hashmarks.repository-declaration-definition.v1",
