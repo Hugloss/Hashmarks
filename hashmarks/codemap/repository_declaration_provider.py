@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -13,6 +13,11 @@ MAX_PROVIDER_WARNINGS = 32
 MAX_PROVIDER_WARNING_CHARS = 1_024
 MAX_DISCOVERY_PACKET_BYTES = 1_572_864
 
+_MemberReader = Callable[
+    [str, bool],
+    tuple[dict[str, object], bytes | None],
+]
+
 
 class RepositoryDeclarationProviderError(ValueError):
     """A declaration provider violated the discovery contract."""
@@ -20,16 +25,99 @@ class RepositoryDeclarationProviderError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class RepositoryDeclarationProviderResult:
-    """Producer-owned declaration discovery result.
-
-    Providers own parsing, semantic extraction, normalization, scope,
-    correspondence, coverage, and their provenance. Hashmarks qualifies the
-    returned claims against canonical repository evidence afterwards.
-    """
+    """Producer-owned declaration discovery result."""
 
     groups: tuple[Mapping[str, object], ...]
     provenance: Mapping[str, object]
     warnings: tuple[str, ...] = ()
+
+
+class RepositoryDeclarationProviderContext:
+    """Freshness-binding read context for one provider invocation.
+
+    Providers may use workspace for path enumeration, but every repository byte
+    that influences a semantic claim should be consumed through read_bytes or
+    read_text. Declaration evidence paths are required to have been read
+    through this context.
+    """
+
+    def __init__(self, workspace: Path, read_member: _MemberReader) -> None:
+        self.workspace = workspace
+        self._read_member = read_member
+        self._inputs: dict[str, dict[str, object]] = {}
+        self._content_paths: set[str] = set()
+
+    @staticmethod
+    def _signature(observation: Mapping[str, object]) -> dict[str, object]:
+        keys = (
+            "path",
+            "state",
+            "member_revision",
+            "evidence_visibility",
+            "index_state",
+            "reason",
+        )
+        return {
+            key: observation[key]
+            for key in keys
+            if observation.get(key) is not None
+        }
+
+    def _record(
+        self,
+        path: str,
+        observation: Mapping[str, object],
+        *,
+        content: bool,
+    ) -> None:
+        signature = self._signature(observation)
+        previous = self._inputs.get(path)
+        if previous is not None and previous != signature:
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider input changed while reading: {path}"
+            )
+        self._inputs[path] = signature
+        if content:
+            self._content_paths.add(path)
+
+    def exists(self, path: str) -> bool:
+        observation, _raw = self._read_member(path, False)
+        normalized = str(observation.get("path") or path)
+        self._record(normalized, observation, content=False)
+        state = observation.get("state")
+        if state == "known-present":
+            return True
+        if state == "known-absent":
+            return False
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider cannot qualify existence for {normalized}: {state}"
+        )
+
+    def read_bytes(self, path: str) -> bytes:
+        observation, raw = self._read_member(path, True)
+        normalized = str(observation.get("path") or path)
+        self._record(normalized, observation, content=True)
+        if observation.get("state") != "known-present" or raw is None:
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider cannot read current repository bytes for "
+                f"{normalized}: {observation.get('state')}"
+            )
+        return raw
+
+    def read_text(self, path: str, *, encoding: str = "utf-8") -> str:
+        raw = self.read_bytes(path)
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError as exc:
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider cannot decode {path} as {encoding}"
+            ) from exc
+
+    def input_observations(self) -> list[dict[str, object]]:
+        return [self._inputs[path] for path in sorted(self._inputs)]
+
+    def content_paths(self) -> frozenset[str]:
+        return frozenset(self._content_paths)
 
 
 class RepositoryDeclarationProvider(Protocol):
@@ -37,11 +125,14 @@ class RepositoryDeclarationProvider(Protocol):
 
     name: str
 
-    def detect(self, workspace: Path) -> bool:
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
         """Return whether this provider applies to the workspace."""
         ...
 
-    def discover(self, workspace: Path) -> RepositoryDeclarationProviderResult:
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
         """Return producer-normalized declaration groups for the workspace."""
         ...
 
@@ -126,9 +217,28 @@ def _provider_groups(
     return [group for group in normalized if isinstance(group, dict)]
 
 
+def _declared_evidence_paths(groups: Sequence[Mapping[str, object]]) -> set[str]:
+    paths: set[str] = set()
+    for group in groups:
+        declarations = group.get("declarations")
+        if not isinstance(declarations, list):
+            continue
+        for declaration in declarations:
+            if not isinstance(declaration, Mapping):
+                continue
+            evidence = declaration.get("evidence")
+            if not isinstance(evidence, list):
+                continue
+            for item in evidence:
+                if isinstance(item, Mapping) and isinstance(item.get("path"), str):
+                    paths.add(str(item["path"]))
+    return paths
+
+
 def _provider_result(
     provider_name: str,
     result: object,
+    context: RepositoryDeclarationProviderContext,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     if not isinstance(result, RepositoryDeclarationProviderResult):
         raise RepositoryDeclarationProviderError(
@@ -136,6 +246,14 @@ def _provider_result(
             "RepositoryDeclarationProviderResult"
         )
     groups = _provider_groups(result.groups, provider_name=provider_name)
+    evidence_paths = _declared_evidence_paths(groups)
+    unread = sorted(evidence_paths - set(context.content_paths()))
+    if unread:
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} evidence was not read through "
+            f"the provider context: {', '.join(unread)}"
+        )
+
     provenance = _provider_provenance(
         result.provenance,
         provider_name=provider_name,
@@ -159,11 +277,13 @@ def _provider_result(
         "provenance": provenance,
         "warnings": warnings,
         "group_ids": sorted(group_ids),
+        "inputs": context.input_observations(),
     }
 
 
 def collect_repository_declaration_providers(
     workspace: Path,
+    read_member: _MemberReader,
     providers: Sequence[RepositoryDeclarationProvider],
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     """Run explicit providers deterministically and fail closed on provider errors."""
@@ -184,8 +304,9 @@ def collect_repository_declaration_providers(
     groups: list[dict[str, object]] = []
     observations: list[dict[str, object]] = []
     for name, provider in sorted(named, key=lambda item: item[0]):
+        context = RepositoryDeclarationProviderContext(workspace, read_member)
         try:
-            detected = provider.detect(workspace)
+            detected = provider.detect(context)
         except Exception as exc:
             raise RepositoryDeclarationProviderError(
                 f"declaration provider {name} detection failed: {exc}"
@@ -195,16 +316,51 @@ def collect_repository_declaration_providers(
                 f"declaration provider {name} detect() must return bool"
             )
         if not detected:
-            observations.append({"name": name, "state": "not-detected"})
+            observations.append(
+                {
+                    "name": name,
+                    "state": "not-detected",
+                    "inputs": context.input_observations(),
+                }
+            )
             continue
         try:
-            result = provider.discover(workspace)
+            result = provider.discover(context)
         except Exception as exc:
             raise RepositoryDeclarationProviderError(
                 f"declaration provider {name} discovery failed: {exc}"
             ) from exc
-        provider_groups, observation = _provider_result(name, result)
+        provider_groups, observation = _provider_result(name, result, context)
         groups.extend(provider_groups)
         observations.append(observation)
 
     return groups, observations
+
+
+def validate_repository_declaration_provider_inputs(
+    read_member: _MemberReader,
+    provider_observations: Sequence[Mapping[str, object]],
+) -> None:
+    """Revalidate every provider input after declaration qualification."""
+    for provider in provider_observations:
+        name = str(provider.get("name") or "")
+        inputs = provider.get("inputs")
+        if not isinstance(inputs, list):
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {name} inputs are malformed"
+            )
+        for previous in inputs:
+            if not isinstance(previous, Mapping):
+                raise RepositoryDeclarationProviderError(
+                    f"declaration provider {name} input observation is malformed"
+                )
+            path = previous.get("path")
+            if not isinstance(path, str) or not path:
+                raise RepositoryDeclarationProviderError(
+                    f"declaration provider {name} input path is malformed"
+                )
+            current, _raw = read_member(path, False)
+            if RepositoryDeclarationProviderContext._signature(current) != dict(previous):
+                raise RepositoryDeclarationProviderError(
+                    f"declaration provider {name} input changed during discovery: {path}"
+                )
