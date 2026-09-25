@@ -875,3 +875,47 @@ def test_provider_path_enumeration_requires_deterministic_repository_order(
         ):
             codemap.discover_repository_declarations([provider])
 
+class _OversizedGroupProvider:
+    name = "oversized-groups"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return True
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        group = {
+            "group_id": "placeholder",
+            "concept": {"kind": "fixture"},
+            "scope": {},
+            "correspondence": {"state": "declared", "basis": {"provider": self.name}},
+            "declarations": [],
+            "coverage": {
+                "state": "unknown",
+                "truncation": "unknown",
+                "expected_declaration_ids": [],
+                "scope": {},
+                "provenance": {"provider": self.name},
+            },
+        }
+        return RepositoryDeclarationProviderResult(
+            groups=tuple({**group, "group_id": f"group-{index}"} for index in range(129)),
+            provenance={"provider": self.name},
+        )
+
+
+def test_single_provider_output_is_bounded_before_aggregate_qualification(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="groups exceed 128 entries",
+        ):
+            codemap.discover_repository_declarations([_OversizedGroupProvider()])
+
