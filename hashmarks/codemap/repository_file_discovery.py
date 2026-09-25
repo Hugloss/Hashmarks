@@ -142,4 +142,3 @@ class RepositoryFileDiscoveryMixin:
             return
         if root.is_dir():
             yield from self._iter_admitted_directory_files(root)
-
