@@ -544,3 +544,27 @@ def test_expected_membership_exposes_unexpected_current_declaration(
         "unseen_expected_declaration_ids": [],
         "unexpected_declaration_ids": ["b"],
     }
+
+def test_previous_declaration_packet_from_foreign_repository_fails_closed(
+    tmp_path: Path,
+) -> None:
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.mkdir()
+    right.mkdir()
+    for repo in (left, right):
+        (repo / "owner.yaml").write_text("owner: team-a\n", encoding="utf-8")
+    group = _group([_declaration("owner", "owner.yaml", "team-a")])
+
+    with CodeMap(left, state_dir=tmp_path / "left-state") as codemap:
+        codemap.sync()
+        previous = codemap.repository_declarations([group])
+
+    with CodeMap(right, state_dir=tmp_path / "right-state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="previous declaration observation repository-mismatch",
+        ):
+            codemap.repository_declarations([group], previous_observation=previous)
+
