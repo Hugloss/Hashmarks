@@ -952,6 +952,32 @@ def test_v3_graph_query_reports_conditional_relationship_omission(
         assert result["negative_evidence"] == "not-admissible"
 
 
+def test_v3_zero_length_path_does_not_consume_conditional_edges(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v3()
+    changed["relationships"][0]["marker"] = "sys_platform == 'linux'"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "paths",
+                    "node_id": "app@1",
+                    "target_id": "app@1",
+                    "context": "compile",
+                }
+            ],
+        )["results"][0]
+
+    assert result["result"] == [["app@1"]]
+    assert result["completeness"] == "complete"
+    assert result["omissions"] == []
+
+
 def test_v3_duplicate_unconditional_edges_do_not_duplicate_node_paths(
     tmp_path: Path,
 ) -> None:
