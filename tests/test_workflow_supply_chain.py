@@ -34,7 +34,7 @@ def test_publish_workflow_is_reviewed_request_driven_and_github_native() -> None
     text = (_root() / ".github" / "workflows" / "publish.yml").read_text(
         encoding="utf-8"
     )
-    assert 'branches: [main]' in text
+    assert "branches: [main]" in text
     assert '".github/release-request.toml"' in text
     assert "workflow_dispatch:" in text
     assert "release:\n    types: [published]" not in text
