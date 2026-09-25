@@ -243,7 +243,7 @@ def comparison(
     if unsupported:
         return {
             "state": "ambiguous",
-            "reason": "repository-evidence-not-current",
+            "reason": "repository-evidence-not-qualified",
             "unqualified_declaration_ids": unsupported,
             "distinct_values": [],
         }
