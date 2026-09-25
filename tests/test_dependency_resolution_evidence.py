@@ -952,6 +952,41 @@ def test_v3_graph_query_reports_conditional_relationship_omission(
         assert result["negative_evidence"] == "not-admissible"
 
 
+def test_v3_depth_bound_precedes_conditional_edge_omission(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v3()
+    changed["relationships"].append(
+        {
+            "source": "library@1",
+            "target": "inventory-only@1",
+            "kind": "dependency",
+            "context": "compile",
+            "marker": "sys_platform == 'linux'",
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "app@1",
+                    "context": "compile",
+                    "max_depth": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert [row["node_id"] for row in result["result"]] == ["library@1"]
+    assert result["omissions"] == [{"reason": "depth-limit", "node_id": "library@1"}]
+    assert result["completeness"] == "incomplete"
+
+
 def test_v3_zero_length_path_does_not_consume_conditional_edges(
     tmp_path: Path,
 ) -> None:
