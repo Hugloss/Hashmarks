@@ -101,6 +101,8 @@ Package-manager and resolver syntax is an edge concern. Maven, uv, Gradle, npm, 
 
 Hashmarks has several authority domains rather than one universal truth score. Content identity, freshness, repository relationships, qualified provider evidence, selection, and consumer projections answer different questions. Do not collapse them into one numeric confidence or a single total ordering.
 
+Repository-file admission is shared across those authority domains. A producer may discover or interpret project/build/package metadata using producer-native semantics, but CodeMap-derived evidence cannot persist or qualify repository files through a producer-local pruning, visibility, or symlink policy. Project graphs, packaging-derived import roots, manifest freshness, and declaration-provider discovery reuse the canonical repository-file admission owner; producer semantics begin only after that boundary.
+
 The safe precedence rule is directional:
 
 > A weaker, derived, cached, summarized, or presentation layer may not silently strengthen, repair, override, or redefine the stronger authority it depends on.
