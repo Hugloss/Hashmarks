@@ -340,7 +340,9 @@ class EvidenceGraphMixin:
         nodes: tuple[object, ...],
         edges: tuple[object, ...],
     ) -> tuple[tuple[object, ...], tuple[object, ...], int, int]:
-        admitted_nodes = tuple(node for node in nodes if self._project_node_admitted(node))
+        admitted_nodes = tuple(
+            node for node in nodes if self._project_node_admitted(node)
+        )
         admitted_ids = {
             str(self._project_node_value(node, "project_id") or "")
             for node in admitted_nodes
