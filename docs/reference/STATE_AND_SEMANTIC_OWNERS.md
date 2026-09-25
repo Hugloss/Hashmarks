@@ -233,7 +233,7 @@ It must not create a second repository observer, source identity, freshness mode
 
 ## Repository declaration work
 
-`repository_declaration_contract.py` owns the producer-neutral request contract, scope/correspondence/value-state normalization, exact-value equality/difference classification, and coverage-qualified declaration absence. `repository_declarations.py` binds those provider claims to existing repository-evidence bindings and issues declaration/group observation identities. `repository_declaration_delta.py` owns only factual before/after comparison of those declaration packets.
+`repository_declaration_contract.py` owns the producer-neutral request contract, scope/correspondence/value-state normalization, exact-value equality/difference classification, coverage-qualified declaration absence, and core request/packet byte budgets. `repository_declarations.py` binds those provider claims to existing repository-evidence bindings and issues declaration/group observation identities. `repository_declaration_delta.py` owns only factual before/after comparison of declaration semantics and composes the existing repository-evidence-binding delta rather than inventing another repository/observer change authority.
 
 This is a new semantic projection owner for **declaration correspondence**, not a new repository observer. It must reuse canonical repository member/span observation, repository identity/generation, freshness, and evidence-binding identities. Semantic extraction, normalized values, expected membership, correspondence, and coverage remain provider claims unless a separate Hashmarks authority explicitly establishes them.
 
