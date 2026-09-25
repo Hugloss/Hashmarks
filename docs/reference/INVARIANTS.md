@@ -162,7 +162,7 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **G49. Declaration semantics and repository evidence retain separate authority.** Producer normalization, semantic values, correspondence, expected membership, and coverage remain provider claims unless a separate Hashmarks authority establishes them. Exact member/span identity, repository freshness, and repository presence remain owned by canonical repository-evidence authorities.
 
-**G50. Declaration deltas are factual and tamper-detecting.** Previous declaration observations must validate their producer-owned identity before comparison. Deltas may report changed definitions, values, evidence/provenance, correspondence, coverage, equivalence/difference, or absence, but never whether a change is correct or desirable.
+**G50. Declaration deltas are factual and tamper-detecting.** Previous declaration observations must validate their Hashmarks-issued observation identity before comparison. Deltas may report changed definitions, values, provider observations/provenance, correspondence, coverage, equivalence/difference, or absence, but never whether a change is correct or desirable. Exact repository-evidence and observer deltas remain owned by the existing repository-evidence-binding delta authority.
 
 ## Product-boundary constitution
 
