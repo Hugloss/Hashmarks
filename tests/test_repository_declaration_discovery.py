@@ -7,13 +7,14 @@ import pytest
 
 from hashmarks import CodeMap
 from hashmarks.codemap import (
+    RepositoryDeclarationProviderContext,
     RepositoryDeclarationProviderError,
     RepositoryDeclarationProviderResult,
 )
 
 
-def _value(path: Path) -> str:
-    text = path.read_text(encoding="utf-8").strip()
+def _value(context: RepositoryDeclarationProviderContext, path: str) -> str:
+    text = context.read_text(path).strip()
     if "=" in text:
         return text.split("=", 1)[1].strip().strip('"')
     if ":" in text:
@@ -31,17 +32,20 @@ class _PairProvider:
     detected: bool = True
     warning: str | None = None
 
-    def detect(self, workspace: Path) -> bool:
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
         return self.detected
 
-    def discover(self, workspace: Path) -> RepositoryDeclarationProviderResult:
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
         declarations = []
         for index, path in enumerate(self.paths):
             declarations.append(
                 {
                     "declaration_id": f"value-{index}",
                     "value_state": "resolved",
-                    "value": _value(workspace / path),
+                    "value": _value(context, path),
                     "producer": {
                         "provider": self.name,
                         "path_kind": Path(path).suffix or Path(path).name,
@@ -93,10 +97,13 @@ class _SingleProvider:
     path: str
     detected: bool = True
 
-    def detect(self, workspace: Path) -> bool:
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
         return self.detected
 
-    def discover(self, workspace: Path) -> RepositoryDeclarationProviderResult:
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
         return RepositoryDeclarationProviderResult(
             groups=(
                 {
@@ -111,7 +118,7 @@ class _SingleProvider:
                         {
                             "declaration_id": "value",
                             "value_state": "resolved",
-                            "value": _value(workspace / self.path),
+                            "value": _value(context, self.path),
                             "producer": {"provider": self.name},
                             "evidence": [
                                 {
@@ -138,10 +145,13 @@ class _SingleProvider:
 class _FailingProvider:
     name = "failing-provider"
 
-    def detect(self, workspace: Path) -> bool:
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
         return True
 
-    def discover(self, workspace: Path) -> RepositoryDeclarationProviderResult:
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
         raise RuntimeError("fixture discovery failure")
 
 
@@ -198,15 +208,20 @@ def test_discovery_is_format_and_domain_neutral(
 
     assert packet["schema"] == "hashmarks.repository-declaration-discovery.v1"
     assert packet["execution_effect"] == "none"
-    assert packet["providers"] == [
-        {
-            "name": "fixture-provider",
-            "state": "collected",
-            "provenance": {"provider": "fixture-provider", "version": "1"},
-            "warnings": [],
-            "group_ids": ["fixture-group"],
-        }
-    ]
+    provider_row = packet["providers"][0]
+    assert provider_row["name"] == "fixture-provider"
+    assert provider_row["state"] == "collected"
+    assert provider_row["provenance"] == {
+        "provider": "fixture-provider",
+        "version": "1",
+    }
+    assert provider_row["warnings"] == []
+    assert provider_row["group_ids"] == ["fixture-group"]
+    assert [row["path"] for row in provider_row["inputs"]] == sorted(paths)
+    assert all(
+        row["state"] == "known-present" and row.get("member_revision")
+        for row in provider_row["inputs"]
+    )
     group = packet["declarations"]["groups"][0]
     assert group["concept"] == concept
     assert group["comparison"]["state"] == "equivalent"
@@ -417,3 +432,90 @@ def test_cross_provider_group_identity_collision_fails_closed(tmp_path: Path) ->
         codemap.sync()
         with pytest.raises(ValueError, match="duplicate group_id"):
             codemap.discover_repository_declarations([first, second])
+
+
+class _UnreadEvidenceProvider:
+    name = "unread-evidence"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return True
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        return RepositoryDeclarationProviderResult(
+            groups=(
+                {
+                    "group_id": "unread",
+                    "concept": {"kind": "fixture", "identity": "value"},
+                    "scope": {},
+                    "correspondence": {
+                        "state": "declared",
+                        "basis": {"provider": self.name},
+                    },
+                    "declarations": [
+                        {
+                            "declaration_id": "value",
+                            "value_state": "resolved",
+                            "value": "claimed-without-read",
+                            "producer": {"provider": self.name},
+                            "evidence": [
+                                {
+                                    "path": "value.txt",
+                                    "start_line": 1,
+                                    "end_line": 1,
+                                }
+                            ],
+                        }
+                    ],
+                    "coverage": {
+                        "state": "complete",
+                        "truncation": "complete",
+                        "expected_declaration_ids": ["value"],
+                        "scope": {},
+                        "provenance": {"provider": self.name},
+                    },
+                },
+            ),
+            provenance={"provider": self.name},
+        )
+
+
+class _MutatingProvider(_SingleProvider):
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        result = super().discover(context)
+        (context.workspace / self.path).write_text("value: changed\n", encoding="utf-8")
+        return result
+
+
+def test_provider_cannot_bind_semantic_value_to_unread_evidence(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value: actual\n", encoding="utf-8")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="evidence was not read through the provider context",
+        ):
+            codemap.discover_repository_declarations([_UnreadEvidenceProvider()])
+
+
+def test_provider_input_change_after_parse_fails_closed(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value: before\n", encoding="utf-8")
+    provider = _MutatingProvider("mutating-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="input changed during discovery",
+        ):
+            codemap.discover_repository_declarations([provider])
