@@ -84,13 +84,30 @@ mkdir -p "$install_dir"
 target="$install_dir/hashmarks"
 candidate="$(mktemp "$install_dir/.hashmarks-install.XXXXXX")"
 install -m 0755 "$binary" "$candidate"
-if ! "$candidate" --version >/dev/null 2>&1; then
+if ! reported="$("$candidate" --version 2>/dev/null)"; then
   printf '%s\n' 'hashmarks installer: downloaded binary failed version smoke test' >&2
   exit 1
 fi
+case "$reported" in
+  "hashmarks version "*) reported_version="${reported#hashmarks version }" ;;
+  *)
+    printf '%s\n' 'hashmarks installer: downloaded binary returned unexpected version output' >&2
+    exit 1
+    ;;
+esac
+[ -n "$reported_version" ] || {
+  printf '%s\n' 'hashmarks installer: downloaded binary returned an empty version' >&2
+  exit 1
+}
+if [ "$version" != "latest" ]; then
+  requested_version="${version#v}"
+  [ "$reported_version" = "$requested_version" ] || {
+    printf '%s\n' "hashmarks installer: requested version $requested_version but downloaded binary reports $reported_version" >&2
+    exit 1
+  }
+fi
 mv -f "$candidate" "$target"
 candidate=""
-"$target" --version >/dev/null
 
 printf 'Hashmarks installed: %s\n' "$target"
 if ! command -v hashmarks >/dev/null 2>&1; then
