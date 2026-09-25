@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.22.0 — Development
+## 0.22.0 — Standalone MCP distribution and declaration authority
+
+- Add a checksum-verified standalone Linux x86_64 Hashmarks CLI/MCP executable published through GitHub Releases, plus a curl installer that does not require Python, uv, pip, or PyPI on the target machine.
+- Add `hashmarks install --opencode` to register the exact installed Hashmarks executable through OpenCode's native MCP CLI with `--workspace . mcp`.
+- Keep GitHub Release publication independent from PyPI: release qualification still builds and verifies wheel/sdist artifacts, but public release publication uploads the qualified Python artifacts, manifests, checksums, and standalone executable to GitHub Releases without an automatic PyPI side effect.
 
 - Add an explicit producer-side repository declaration discovery SPI and deterministic discovery wrapper: caller-selected providers may detect/normalize producer syntax, while Hashmarks keeps provider provenance/detection separate from declaration semantics, requires declaration evidence to be read through a revision-binding provider context, fails closed on provider input races/errors, performs no ambient plugin loading, and keeps arbitrary provider execution outside MCP.
 - Add producer-neutral cross-artifact repository declarations: explicitly scoped correspondence across files/formats, exact repository-evidence binding, canonical normalized equality/difference, ambiguity preservation, coverage-qualified absence, stable definition/observation identities, factual deltas, and a read-only MCP surface without source-of-truth precedence or winner selection.
