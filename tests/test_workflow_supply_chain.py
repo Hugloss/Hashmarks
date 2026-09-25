@@ -45,8 +45,7 @@ def test_publish_workflow_is_reviewed_request_driven_and_github_native() -> None
     assert "git merge-base --is-ancestor" in text
     assert "Materialize locked lint toolchain" in text
     assert (
-        "UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --frozen --only-group lint"
-        in text
+        "UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --frozen --only-group lint" in text
     )
     assert "release:\n    types: [published]" not in text
     assert "Validate reviewed release request" in text
