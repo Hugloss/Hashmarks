@@ -707,8 +707,17 @@ class RepositoryDeltaMixin:
         expected_task = self._packet_digest("hashmarks.task.v1", {"task": task})
         if str(previous_snapshot.get("task_identity") or "") != expected_task:
             raise ValueError("previous_snapshot task-mismatch")
-        if not previous_snapshot.get("snapshot_identity"):
-            raise ValueError("previous_snapshot must contain snapshot_identity")
+        identity = previous_snapshot.get("snapshot_identity")
+        expected_identity = "sha256:" + self._packet_digest(
+            "hashmarks.repository-intelligence-snapshot.v1",
+            {
+                key: value
+                for key, value in previous_snapshot.items()
+                if key != "snapshot_identity"
+            },
+        )
+        if not isinstance(identity, str) or identity != expected_identity:
+            raise ValueError("previous_snapshot snapshot identity mismatch")
         return repository, repository_identity
 
     @classmethod
