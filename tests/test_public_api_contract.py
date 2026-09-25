@@ -9,6 +9,7 @@ EXPECTED_PUBLIC = {
     "RepositoryIdentity",
     "RepositoryIdentityMode",
     "RepositoryDeclarationProvider",
+    "RepositoryDeclarationProviderContext",
     "RepositoryDeclarationProviderError",
     "RepositoryDeclarationProviderResult",
     "IdentityCycleError",
