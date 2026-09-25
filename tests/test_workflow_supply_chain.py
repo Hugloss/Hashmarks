@@ -38,9 +38,17 @@ def test_publish_workflow_is_reviewed_request_driven_and_github_native() -> None
     assert '".github/release-request.toml"' in text
     assert "workflow_dispatch:" in text
     assert "source_sha:" in text
-    assert "Exact reviewed main commit to qualify and publish" in text
-    assert "RELEASE_SOURCE_SHA:" in text
+    assert "Optional exact reviewed source SHA" in text
+    assert "Checkout reviewed release request" in text
+    assert "Resolve reviewed release request" in text
+    assert 'set(request) - {"version", "source_sha"}' in text
+    assert 'request.get("source_sha", "")' in text
+    assert "DISPATCH_SOURCE_SHA:" in text
+    assert "TRIGGER_SOURCE_SHA:" in text
+    assert "dispatch_source or request_source or trigger_source" in text
+    assert "Checkout exact release source" in text
     assert "source_sha: ${{ steps.release.outputs.source_sha }}" in text
+    assert "ref: ${{ steps.request.outputs.source_sha }}" in text
     assert "ref: ${{ needs.prepare.outputs.source_sha }}" in text
     assert "git merge-base --is-ancestor" in text
     assert "Materialize locked lint toolchain" in text
@@ -48,13 +56,7 @@ def test_publish_workflow_is_reviewed_request_driven_and_github_native() -> None
         "UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --frozen --only-group lint" in text
     )
     assert "release:\n    types: [published]" not in text
-    assert "Validate reviewed release request" in text
     assert "release publication is authorized only from main" in text
-    assert (
-        "github.event_name == 'workflow_dispatch' && inputs.source_sha || github.sha"
-        in text
-    )
-    assert "ref: ${{ github.sha }}" not in text
     assert "Publish exact qualified bytes to GitHub Release" in text
     assert "gh release create" in text
     assert '--target "${{ needs.prepare.outputs.source_sha }}"' in text
@@ -81,10 +83,16 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
         (_root() / ".github" / "release-request.toml").read_text(encoding="utf-8")
     )
 
-    assert set(request) == {"version"}
+    assert "version" in request
+    assert set(request) <= {"version", "source_sha"}
     version = request["version"]
     assert isinstance(version, str)
     assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)
+
+    source_sha = request.get("source_sha")
+    if source_sha is not None:
+        assert isinstance(source_sha, str)
+        assert re.fullmatch(r"[0-9a-f]{40}", source_sha)
 
 
 def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
