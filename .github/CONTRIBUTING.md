@@ -135,13 +135,18 @@ The release request is an auditable trigger record, not a second version authori
 
 The workflow must fail closed if the request version does not match the package version at the release merge SHA, if the changelog is not finalized, or if the release/tag already represents different authority.
 
-If publication fails because the workflow implementation itself is defective, repair the workflow through a normal reviewed pull request. Do not promote the repair commit as the release source and do not merely rerun the broken historical workflow definition. Retry from current `main` with the exact original reviewed release-source commit:
+If publication fails because the workflow implementation itself is defective, repair the workflow through a normal reviewed pull request. Do not promote the repair commit as the release source and do not merely rerun the broken historical workflow definition.
 
-```bash
-gh workflow run Publish --ref main -f source_sha=<reviewed-release-merge-sha>
+Retry through another focused release pull request by adding the original reviewed release-source commit to `.github/release-request.toml`:
+
+```toml
+version = "<release-version>"
+source_sha = "<reviewed-release-merge-sha>"
 ```
 
-The retry workflow must verify that `source_sha` is an exact commit reachable from current `main`, then checkout, qualify, tag, and publish those source bytes. The workflow implementation may be newer; release source authority remains the explicit reviewed commit supplied to the retry.
+Merging that retry pull request triggers Publish from the repaired workflow on current `main`, but the workflow first reads the reviewed request and then separately checks out, qualifies, tags, and publishes `source_sha`. It must verify that the SHA is exact and reachable from current `main`. The retry pull request is publication intent only; it does not become the release source.
+
+For exceptional operator recovery, the GitHub Actions **Run workflow** UI may supply the same exact `source_sha` manually. The reviewed pull-request path is preferred because the retry intent remains in repository history.
 
 ## Development-tool policy
 
