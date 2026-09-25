@@ -306,7 +306,7 @@ def test_task_post_change_delta_rejects_tampered_retained_ownership(
                 task, ["src/owner.py"], previous_evidence=previous
             )
         except ValueError as exc:
-            assert "evidence-identity-mismatch" in str(exc)
+            assert "evidence-packet-identity-mismatch" in str(exc)
         else:
             raise AssertionError("tampered retained decision evidence must fail closed")
 
@@ -325,7 +325,7 @@ def test_task_post_change_delta_rejects_tampered_retained_verification(
                 task, ["src/owner.py"], previous_evidence=previous
             )
         except ValueError as exc:
-            assert "evidence-identity-mismatch" in str(exc)
+            assert "evidence-packet-identity-mismatch" in str(exc)
         else:
             raise AssertionError("tampered retained verification must fail closed")
 
