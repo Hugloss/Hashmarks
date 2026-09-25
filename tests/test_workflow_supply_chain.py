@@ -63,6 +63,23 @@ def test_publish_workflow_binds_reviewed_request_to_exact_source() -> None:
     assert "release publication is authorized only from main" in text
 
 
+def test_publish_job_separates_release_machinery_from_source_bytes() -> None:
+    text = _publish_workflow_text()
+    publish = text.split("  publish:\n", 1)[1]
+
+    assert "Checkout release machinery" in publish
+    assert "ref: ${{ github.sha }}" in publish
+    assert "path: workflow" in publish
+    assert "Checkout exact release source" in publish
+    assert "ref: ${{ needs.prepare.outputs.source_sha }}" in publish
+    assert "path: source" in publish
+    assert "python3 workflow/scripts/release_contract.py verify" in publish
+    assert "--root source" in publish
+    assert 'pathlib.Path("source/CHANGELOG.md")' in publish
+    assert 'git -C source rev-list -n 1 "$RELEASE_TAG"' in publish
+    assert "GH_REPO: ${{ github.repository }}" in publish
+
+
 def test_publish_workflow_publishes_only_verified_github_release_assets() -> None:
     text = _publish_workflow_text()
     assert "Publish exact qualified bytes to GitHub Release" in text
