@@ -230,6 +230,28 @@ def test_project_graph_allow_to_deny_converges_without_denied_residue(
     )
 
 
+
+def test_denied_declared_project_links_do_not_activate_or_parse(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".hashmarks-project-links.toml").write_text(
+        "[[link]\nthis is deliberately invalid toml",
+        encoding="utf-8",
+    )
+    (tmp_path / ".hashmarks-context.toml").write_text(
+        '[[rule]]\npattern = ".hashmarks-project-links.toml"\nindex = false\n',
+        encoding="utf-8",
+    )
+
+    with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
+        codemap.sync()
+        enriched = codemap.enrich_projects(("declared-project-links",))
+
+    assert enriched["projects"] == []
+    assert enriched["edges"] == []
+    assert all(".hashmarks-project-links.toml" not in warning for warning in enriched["warnings"])
+
+
 def test_targeted_python_import_root_refresh_ignores_denied_pyproject(
     tmp_path: Path,
 ) -> None:
