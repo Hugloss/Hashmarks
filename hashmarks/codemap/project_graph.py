@@ -197,7 +197,7 @@ class NxProjectGraphProvider(ProjectGraphProvider):
         return find_nx(workspace)
 
     def detect(self, workspace: Path) -> bool:
-        return (workspace / "nx.json").is_file()
+        return bool(self._manifest_paths(workspace, "nx.json"))
 
     @staticmethod
     def _node_manifest(workspace: Path, root: str) -> str:
@@ -256,7 +256,7 @@ class PantsProjectGraphProvider(ProjectGraphProvider):
     name = "pants-target-graph"
 
     def detect(self, workspace: Path) -> bool:
-        return (workspace / "pants.toml").is_file()
+        return bool(self._manifest_paths(workspace, "pants.toml"))
 
     @staticmethod
     def _root(address: str, sources: tuple[str, ...]) -> str:
@@ -376,7 +376,7 @@ class GradleProjectGraphProvider(ProjectGraphProvider):
 
     def detect(self, workspace: Path) -> bool:
         return any(
-            (workspace / name).is_file()
+            self._manifest_paths(workspace, name)
             for name in (
                 "settings.gradle",
                 "settings.gradle.kts",
@@ -423,7 +423,7 @@ class GoProjectGraphProvider(ProjectGraphProvider):
     name = "go-list"
 
     def detect(self, workspace: Path) -> bool:
-        return (workspace / "go.mod").is_file()
+        return bool(self._manifest_paths(workspace, "go.mod"))
 
     @staticmethod
     def _json_stream(text: str) -> Iterable[dict[str, Any]]:
@@ -742,12 +742,15 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
     filename = ".hashmarks-project-links.toml"
 
     def detect(self, workspace: Path) -> bool:
-        return (workspace / self.filename).is_file()
+        return bool(self._manifest_paths(workspace, self.filename))
 
     def _read_links(
         self, workspace: Path
     ) -> tuple[dict[str, Any] | None, tuple[str, ...]]:
-        path = workspace / self.filename
+        paths = self._manifest_paths(workspace, self.filename)
+        if not paths:
+            return None, ()
+        path = paths[0]
         try:
             value = tomllib.loads(path.read_text(encoding="utf-8"))
         except (OSError, tomllib.TOMLDecodeError) as exc:
