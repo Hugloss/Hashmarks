@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: Exact reviewed main commit to qualify and publish
-        required: true
+        description: Optional exact reviewed source SHA; otherwise use release-request.toml
+        required: false
         type: string
 
 permissions:
@@ -19,8 +19,6 @@ jobs:
   prepare:
     name: Validate reviewed release request
     runs-on: ubuntu-latest
-    env:
-      RELEASE_SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || github.sha }}
     timeout-minutes: 5
     permissions:
       contents: read
@@ -29,20 +27,61 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
       source_sha: ${{ steps.release.outputs.source_sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout reviewed release request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.RELEASE_SOURCE_SHA }}
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: request
+        name: Resolve reviewed release request
+        env:
+          DISPATCH_SOURCE_SHA: ${{ inputs.source_sha }}
+          TRIGGER_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+          import tomllib
+
+          if os.environ["GITHUB_REF"] != "refs/heads/main":
+              raise SystemExit("release publication is authorized only from main")
+
+          request = tomllib.loads(
+              pathlib.Path(".github/release-request.toml").read_text(encoding="utf-8")
+          )
+          unknown = set(request) - {"version", "source_sha"}
+          if unknown:
+              raise SystemExit(f"unsupported release-request fields: {sorted(unknown)!r}")
+
+          version = str(request["version"])
+          if re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+", version) is None:
+              raise SystemExit(f"invalid release version: {version!r}")
+
+          dispatch_source = os.environ.get("DISPATCH_SOURCE_SHA", "").strip()
+          request_source = str(request.get("source_sha", "")).strip()
+          trigger_source = os.environ["TRIGGER_SOURCE_SHA"].strip()
+          source_sha = dispatch_source or request_source or trigger_source
+          if re.fullmatch(r"[0-9a-f]{40}", source_sha) is None:
+              raise SystemExit(
+                  "source_sha must be an exact lowercase 40-character commit SHA"
+              )
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"requested_version={version}\\n")
+              output.write(f"source_sha={source_sha}\\n")
+          PY
+      - name: Checkout exact release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.request.outputs.source_sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Verify release source is reachable from current main
+        env:
+          RELEASE_SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
         run: |
-          case "$RELEASE_SOURCE_SHA" in
-            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
-            *)
-              echo "::error::source_sha must be an exact lowercase 40-character commit SHA"
-              exit 1
-              ;;
-          esac
           test "$(git rev-parse HEAD)" = "$RELEASE_SOURCE_SHA"
           git fetch --no-tags origin main
           if ! git merge-base --is-ancestor "$RELEASE_SOURCE_SHA" origin/main; then
@@ -50,16 +89,16 @@ jobs:
             exit 1
           fi
       - id: release
-        name: Bind request to package version and finalized changelog
+        name: Bind request to source package version and finalized changelog
+        env:
+          RELEASE_SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
+          REQUESTED_VERSION: ${{ steps.request.outputs.requested_version }}
         run: |
           python3 - <<'PY'
           import os
           import pathlib
           import subprocess
           import tomllib
-
-          if os.environ["GITHUB_REF"] != "refs/heads/main":
-              raise SystemExit("release publication is authorized only from main")
 
           root = pathlib.Path(".")
           source_sha = os.environ["RELEASE_SOURCE_SHA"]
@@ -71,14 +110,12 @@ jobs:
               raise SystemExit(
                   f"release source mismatch: requested={source_sha!r} observed={observed_sha!r}"
               )
-          request = tomllib.loads(
-              (root / ".github" / "release-request.toml").read_text(encoding="utf-8")
-          )
+
           project = tomllib.loads(
               (root / "pyproject.toml").read_text(encoding="utf-8")
           )["project"]
           version = str(project["version"])
-          requested = str(request["version"])
+          requested = os.environ["REQUESTED_VERSION"]
           if requested != version:
               raise SystemExit(
                   f"release request/version mismatch: request={requested!r} project={version!r}"
@@ -88,14 +125,14 @@ jobs:
           heading = f"## {version} — "
           if heading not in changelog:
               raise SystemExit(f"CHANGELOG.md has no finalized {version} heading")
-          section = changelog.split(heading, 1)[1].split("\n## ", 1)[0]
+          section = changelog.split(heading, 1)[1].split("\\n## ", 1)[0]
           if "Development" in section.splitlines()[0]:
               raise SystemExit(f"CHANGELOG.md still marks {version} as Development")
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"version={version}\n")
-              output.write(f"tag=v{version}\n")
-              output.write(f"source_sha={source_sha}\n")
+              output.write(f"version={version}\\n")
+              output.write(f"tag=v{version}\\n")
+              output.write(f"source_sha={source_sha}\\n")
           PY
 
   build:
