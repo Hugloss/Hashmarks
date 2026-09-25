@@ -151,7 +151,6 @@ def test_declarations_reuse_repository_evidence_authorities() -> None:
     assert "self.repository_evidence_binding_delta(" in source
 
 
-
 def test_declaration_provider_context_has_no_raw_workspace_authority() -> None:
     provider_path = CODEMAP / "repository_declaration_provider.py"
     discovery_path = CODEMAP / "repository_declaration_discovery.py"
@@ -172,4 +171,7 @@ def test_declaration_provider_context_has_no_raw_workspace_authority() -> None:
     discovery = discovery_path.read_text(encoding="utf-8")
     assert "self.store.visible_paths_under_bounded(" in discovery
     assert "limit=MAX_PROVIDER_ENUMERATED_PATHS + 1" in discovery
-    assert "collect_repository_declaration_providers(\n            self.workspace" not in discovery
+    assert (
+        "collect_repository_declaration_providers(\n            self.workspace"
+        not in discovery
+    )
