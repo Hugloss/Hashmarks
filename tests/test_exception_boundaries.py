@@ -186,7 +186,7 @@ def test_broad_exception_handlers_are_restricted_to_explicit_failure_boundaries(
         ("hashmarks/codemap/providers.py", "enrich"),
         (
             "hashmarks/codemap/repository_declaration_provider.py",
-            "collect_repository_declaration_providers",
+            "_collect_provider",
         ),
         ("hashmarks/codemap/repository_index_store.py", "bulk_file_writes"),
         ("hashmarks/codemap/repository_index_store.py", "set_file"),
