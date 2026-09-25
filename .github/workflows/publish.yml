@@ -26,6 +26,7 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
       source_sha: ${{ steps.release.outputs.source_sha }}
+      publication_attempt: ${{ steps.request.outputs.publication_attempt }}
     steps:
       - name: Checkout reviewed release request
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,9 +52,17 @@ jobs:
           request = tomllib.loads(
               pathlib.Path(".github/release-request.toml").read_text(encoding="utf-8")
           )
-          unknown = set(request) - {"version", "source_sha"}
+          unknown = set(request) - {"version", "source_sha", "publication_attempt"}
           if unknown:
               raise SystemExit(f"unsupported release-request fields: {sorted(unknown)!r}")
+
+          publication_attempt = request.get("publication_attempt", 1)
+          if (
+              isinstance(publication_attempt, bool)
+              or not isinstance(publication_attempt, int)
+              or publication_attempt < 1
+          ):
+              raise SystemExit("publication_attempt must be a positive integer")
 
           version = str(request["version"])
           if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) is None:
@@ -71,6 +80,7 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"requested_version={version}\n")
               output.write(f"source_sha={source_sha}\n")
+              output.write(f"publication_attempt={publication_attempt}\n")
           PY
       - name: Checkout exact release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

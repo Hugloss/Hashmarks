@@ -137,12 +137,15 @@ The workflow must fail closed if the request version does not match the package 
 
 If publication fails because the workflow implementation itself is defective, repair the workflow through a normal reviewed pull request. Do not promote the repair commit as the release source and do not merely rerun the broken historical workflow definition.
 
-Retry through another focused release pull request by adding the original reviewed release-source commit to `.github/release-request.toml`:
+Retry through another focused release pull request by preserving the original reviewed release-source commit and incrementing an auditable publication attempt in `.github/release-request.toml`:
 
 ```toml
 version = "<release-version>"
 source_sha = "<reviewed-release-merge-sha>"
+publication_attempt = 2
 ```
+
+`publication_attempt` is a positive integer used only to make repeated reviewed publication intent explicit and to produce a real request-file change. It does not participate in release identity.
 
 Merging that retry pull request triggers Publish from the repaired workflow on current `main`, but the workflow first reads the reviewed request and then separately checks out, qualifies, tags, and publishes `source_sha`. It must verify that the SHA is exact and reachable from current `main`. The retry pull request is publication intent only; it does not become the release source.
 
