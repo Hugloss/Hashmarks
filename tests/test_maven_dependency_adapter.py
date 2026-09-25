@@ -125,6 +125,42 @@ def test_maven_adapter_does_not_infer_complete_coverage_from_bytes(
     assert missing_inventory["negative_evidence"] == "not-admissible"
 
 
+@pytest.mark.parametrize(
+    ("complete_tree_contexts", "complete_inventory_contexts"),
+    [
+        (("compile",), ()),
+        ((), ("compile",)),
+    ],
+)
+def test_maven_selection_coverage_requires_all_supplied_sources_complete(
+    tmp_path: Path,
+    complete_tree_contexts: tuple[str, ...],
+    complete_inventory_contexts: tuple[str, ...],
+) -> None:
+    raw = maven_dependency_observation(
+        trees={"compile": _tree()},
+        inventories={"compile": _inventory()},
+        complete_tree_contexts=complete_tree_contexts,
+        complete_inventory_contexts=complete_inventory_contexts,
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(raw)
+        missing = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "component", "component_id": "missing"}],
+        )["results"][0]
+
+    selection_coverage = next(
+        row
+        for row in observation["coverage"]
+        if row["context"] == "compile" and row["kind"] == "selection"
+    )
+    assert selection_coverage["completeness"] == "incomplete"
+    assert missing["negative_evidence"] == "not-admissible"
+
+
 def test_maven_adapter_preserves_inventory_topology_and_module_ambiguity(
     tmp_path: Path,
 ) -> None:
