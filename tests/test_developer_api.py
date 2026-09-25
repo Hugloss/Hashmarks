@@ -219,7 +219,7 @@ def test_local_watcher_mode_detects_immediate_edit_without_manual_record(
         assert second.hash != first.hash
 
 
-def test_cli_root_auto_mode_safely_falls_back_local(tmp_path: Path, capsys):
+def test_cli_snapshot_auto_mode_safely_falls_back_local(tmp_path: Path, capsys):
     from hashmarks.cli import main
 
     workspace = tmp_path / "repo"
@@ -229,7 +229,7 @@ def test_cli_root_auto_mode_safely_falls_back_local(tmp_path: Path, capsys):
         [
             "--workspace",
             str(workspace),
-            "root",
+            "snapshot",
             "--mode",
             "auto",
             "--input",

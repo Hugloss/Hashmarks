@@ -35,7 +35,7 @@ DIAGNOSTIC_EXTRA_MARKER ?=
 RUFF_DEBT_PREVIOUS_BASELINE ?=
 RUFF_AUTOFIX_SELECT ?= E4,E7,E9,I,T201
 
-.PHONY: help evaluation-help lock lock-check init setup bootstrap check baseline start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check verify metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
+.PHONY: help evaluation-help lock lock-check init setup bootstrap check start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
 
 help:
 	@printf '%s\n' \
@@ -54,7 +54,6 @@ help:
 	  '  make dependency-dogfood  Check genuine uv/Maven dependency add, change, and removal evidence' \
 	  '  make check          Junior-friendly local check: setup + compile + CodeMap + tests' \
 	  '  make bootstrap      Offline runtime-only bootstrap (CI/prepared environments)' \
-	  '  make baseline       Bootstrap + quick metrics baseline' \
 	  '  make start          Bootstrap and start the identity daemon' \
 	  '  make stop           Stop the identity daemon' \
 	  '  make doctor         Show resolved runtime/daemon state' \
@@ -86,7 +85,6 @@ help:
 	  '  make mcp-host-status  Inspect project-local OpenCode/Claude/Codex/Pi MCP integration state' \
 	  '  make mcp-concurrency-stress  Stress concurrent MCP-style readers during live repository mutation' \
 	  '  make release-check  Local release preflight; does not replace canonical artifact/readback proof' \
-	  '  make verify         Alias for make dev-check' \
 	  '  make metrics-fast   Quick baseline without daemon benchmarks' \
 	  '  make metrics-500k   Explicit heavy 500k repository-intelligence baseline' \
 	  '  make metrics        Quick 10k repository-intelligence baseline including daemon + impact metrics' \
@@ -143,8 +141,6 @@ bootstrap:
 	@$(UV_SYNC) --offline --group test
 	@$(MAKE) --no-print-directory doctor >/dev/null
 	@printf '%s\n' 'Hashmarks bootstrap ready (offline, committed locked supply).'
-
-baseline: metrics
 
 start: bootstrap
 	@$(UV_RUN) --offline hashmarks daemon start --workspace .
@@ -349,18 +345,21 @@ dev-check-tests:
 
 artifact-check:
 	@set -eu; \
-	rm -rf dist .artifact-check-wheel .artifact-check-sdist; \
-	trap 'rm -rf .artifact-check-wheel .artifact-check-sdist' EXIT INT TERM; \
-	$(UV) build --out-dir dist; \
-	wheel=$$(find dist -maxdepth 1 -type f -name '*.whl' -print -quit); \
-	sdist=$$(find dist -maxdepth 1 -type f -name '*.tar.gz' -print -quit); \
-	test -n "$$wheel" -a -n "$$sdist"; \
-	$(UV) venv --python $(ARTIFACT_PYTHON) .artifact-check-wheel >/dev/null; \
-	$(UV) pip install --offline --python .artifact-check-wheel/bin/python "$$wheel" >/dev/null; \
-	.artifact-check-wheel/bin/python -I scripts/installed_artifact_smoke.py; \
-	$(UV) venv --python $(ARTIFACT_PYTHON) .artifact-check-sdist >/dev/null; \
-	$(UV) pip install --offline --python .artifact-check-sdist/bin/python "$$sdist" >/dev/null; \
-	.artifact-check-sdist/bin/python -I scripts/installed_artifact_smoke.py; \
+	artifact_check_dir=$$(mktemp -d); \
+	trap 'rm -rf -- "$$artifact_check_dir"' EXIT HUP INT TERM; \
+	$(UV) build --out-dir "$$artifact_check_dir"; \
+	set -- "$$artifact_check_dir"/*.whl; \
+	test "$$#" -eq 1 && test -f "$$1"; \
+	wheel=$$1; \
+	set -- "$$artifact_check_dir"/*.tar.gz; \
+	test "$$#" -eq 1 && test -f "$$1"; \
+	sdist=$$1; \
+	$(UV) venv --python $(ARTIFACT_PYTHON) "$$artifact_check_dir/wheel-env" >/dev/null; \
+	$(UV) pip install --offline --python "$$artifact_check_dir/wheel-env/bin/python" "$$wheel" >/dev/null; \
+	"$$artifact_check_dir/wheel-env/bin/python" -I scripts/installed_artifact_smoke.py; \
+	$(UV) venv --python $(ARTIFACT_PYTHON) "$$artifact_check_dir/sdist-env" >/dev/null; \
+	$(UV) pip install --offline --python "$$artifact_check_dir/sdist-env/bin/python" "$$sdist" >/dev/null; \
+	"$$artifact_check_dir/sdist-env/bin/python" -I scripts/installed_artifact_smoke.py; \
 	printf '%s\n' 'Hashmarks installed-artifact qualification: PASS (wheel + sdist).'
 
 mcp-host-status:
@@ -411,8 +410,6 @@ release-check: dev-check artifact-check
 	  ' Canonical promotion still requires deterministic artifact,' \
 	  ' exact-parent replay/package proof, persistence, and readback.' \
 	  '========================================'
-
-verify: dev-check
 
 metrics: bootstrap
 	@$(UV_RUN) --offline python scripts/metrics.py --files $(FILES) --hot-requests $(HOT_REQUESTS)

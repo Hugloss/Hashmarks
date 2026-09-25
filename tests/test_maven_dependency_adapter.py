@@ -10,6 +10,21 @@ from hashmarks.adapters import maven_dependency_observation
 from hashmarks.codemap.engine import CodeMap
 
 
+def _complete_maven_observation(
+    *,
+    trees: dict[str, bytes],
+    inventories: dict[str, bytes],
+    repository_inputs=(),
+) -> dict[str, object]:
+    return maven_dependency_observation(
+        trees=trees,
+        inventories=inventories,
+        complete_tree_contexts=tuple(trees),
+        complete_inventory_contexts=tuple(inventories),
+        repository_inputs=repository_inputs,
+    )
+
+
 def _tree(*, child_parent: bool = True) -> bytes:
     child = {
         "groupId": "example.libs",
@@ -40,10 +55,160 @@ def _inventory() -> bytes:
 """
 
 
-def test_maven_adapter_preserves_inventory_topology_and_module_ambiguity(
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        (
+            {
+                "trees": {"compile": _tree()},
+                "inventories": {},
+                "complete_tree_contexts": ("runtime",),
+            },
+            "complete Maven tree context has no supplied tree: runtime",
+        ),
+        (
+            {
+                "trees": {},
+                "inventories": {"compile": _inventory()},
+                "complete_inventory_contexts": ("runtime",),
+            },
+            "complete Maven inventory context has no supplied list: runtime",
+        ),
+        (
+            {
+                "trees": {"compile": _tree()},
+                "inventories": {},
+                "complete_tree_contexts": (123,),
+            },
+            "complete Maven tree context must be a string",
+        ),
+        (
+            {
+                "trees": {},
+                "inventories": {"compile": _inventory()},
+                "complete_inventory_contexts": (False,),
+            },
+            "complete Maven inventory context must be a string",
+        ),
+    ],
+)
+def test_maven_complete_context_requires_supplied_artifact(
+    kwargs: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        maven_dependency_observation(**kwargs)
+
+
+def test_maven_adapter_does_not_infer_complete_coverage_from_bytes(
     tmp_path: Path,
 ) -> None:
     raw = maven_dependency_observation(
+        trees={"compile": _tree()},
+        inventories={"compile": _inventory()},
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(raw)
+        missing_component = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "component", "component_id": "missing"}],
+        )["results"][0]
+        missing_inventory = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "inventory",
+                    "node_id": "missing@1",
+                    "context": "compile",
+                }
+            ],
+        )["results"][0]
+
+    coverage = {
+        row["kind"]: row["completeness"]
+        for row in observation["coverage"]
+        if row["context"] == "compile"
+    }
+    assert coverage == {
+        "module-ownership": "incomplete",
+        "resolution-graph": "incomplete",
+        "resolved-inventory": "incomplete",
+        "selection": "incomplete",
+    }
+    assert missing_component["negative_evidence"] == "not-admissible"
+    assert missing_inventory["negative_evidence"] == "not-admissible"
+
+
+@pytest.mark.parametrize(
+    ("complete_tree_contexts", "complete_inventory_contexts"),
+    [
+        (("compile",), ()),
+        ((), ("compile",)),
+    ],
+)
+def test_maven_selection_coverage_requires_all_supplied_sources_complete(
+    tmp_path: Path,
+    complete_tree_contexts: tuple[str, ...],
+    complete_inventory_contexts: tuple[str, ...],
+) -> None:
+    raw = maven_dependency_observation(
+        trees={"compile": _tree()},
+        inventories={"compile": _inventory()},
+        complete_tree_contexts=complete_tree_contexts,
+        complete_inventory_contexts=complete_inventory_contexts,
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(raw)
+        missing = codemap.dependency_resolution_queries(
+            observation,
+            [{"operation": "component", "component_id": "missing"}],
+        )["results"][0]
+
+    selection_coverage = next(
+        row
+        for row in observation["coverage"]
+        if row["context"] == "compile" and row["kind"] == "selection"
+    )
+    assert selection_coverage["completeness"] == "incomplete"
+    assert missing["negative_evidence"] == "not-admissible"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("groupId", 123),
+        ("artifactId", True),
+        ("version", 1),
+        ("type", 42),
+        ("classifier", False),
+        ("scope", 7),
+    ],
+)
+def test_maven_tree_refuses_non_string_coordinate_fields(
+    field: str,
+    value: object,
+) -> None:
+    tree = json.loads(_tree())
+    tree[field] = value
+
+    with pytest.raises(
+        ValueError,
+        match=f"Maven tree node {field} must be a string",
+    ):
+        maven_dependency_observation(
+            trees={"compile": json.dumps(tree).encode()},
+            inventories={},
+        )
+
+
+def test_maven_adapter_preserves_inventory_topology_and_module_ambiguity(
+    tmp_path: Path,
+) -> None:
+    raw = _complete_maven_observation(
         trees={"compile": _tree()},
         inventories={"compile": _inventory()},
     )
@@ -74,7 +239,7 @@ def test_maven_adapter_keeps_context_separate_from_effective_scope(
 ) -> None:
     runtime_tree = json.loads(_tree())
     runtime_tree["children"][0]["scope"] = "compile"
-    raw = maven_dependency_observation(
+    raw = _complete_maven_observation(
         trees={"runtime": json.dumps(runtime_tree).encode()},
         inventories={},
     )
@@ -95,7 +260,7 @@ def test_maven_adapter_preserves_classifier_as_selection_identity(
    io.netty:native:jar:linux-x86_64:1.0:runtime -- module native.linux [auto]
    io.netty:native:jar:osx-x86_64:1.0:runtime -- module native.osx [auto]
 """
-    raw = maven_dependency_observation(
+    raw = _complete_maven_observation(
         trees={},
         inventories={"runtime": inventory},
     )
@@ -120,7 +285,7 @@ def test_maven_adapter_is_execution_free(monkeypatch) -> None:
         raise AssertionError("Maven adapter must not execute package tooling")
 
     monkeypatch.setattr(subprocess, "run", forbidden)
-    raw = maven_dependency_observation(
+    raw = _complete_maven_observation(
         trees={"compile": _tree()},
         inventories={"compile": _inventory()},
     )
@@ -133,7 +298,7 @@ def test_maven_adapter_is_execution_free(monkeypatch) -> None:
 def test_maven_distinct_same_byte_artifacts_keep_distinct_sources() -> None:
     tree = _tree()
     inventory = _inventory()
-    raw = maven_dependency_observation(
+    raw = _complete_maven_observation(
         trees={"compile": tree, "runtime": tree},
         inventories={"compile": inventory, "runtime": inventory},
     )
@@ -163,7 +328,7 @@ def test_maven_distinct_same_byte_artifacts_keep_distinct_sources() -> None:
 def test_maven_adapter_relationship_change_is_not_selection_change(
     tmp_path: Path,
 ) -> None:
-    before_raw = maven_dependency_observation(
+    before_raw = _complete_maven_observation(
         trees={"compile": _tree()},
         inventories={"compile": _inventory()},
     )
@@ -181,7 +346,7 @@ def test_maven_adapter_relationship_change_is_not_selection_change(
             "children": [child],
         }
     ]
-    after_raw = maven_dependency_observation(
+    after_raw = _complete_maven_observation(
         trees={"compile": json.dumps(changed_tree).encode()},
         inventories={"compile": _inventory()},
     )
@@ -206,7 +371,7 @@ def test_maven_adapter_preserves_inventory_without_module_metadata(
    example.root:parent:pom:1.0:compile
    example.libs:owned:jar:3.0:test -- module example.owned
 """
-    raw = maven_dependency_observation(
+    raw = _complete_maven_observation(
         trees={},
         inventories={"test": inventory},
     )
@@ -232,7 +397,7 @@ def test_maven_adapter_does_not_overclaim_module_ownership_completeness(
    example.libs:owned:jar:3.0:test -- module example.owned
    example.libs:unannotated:jar:4.0:test
 """
-    raw = maven_dependency_observation(
+    raw = _complete_maven_observation(
         trees={},
         inventories={"test": inventory},
     )
@@ -263,7 +428,7 @@ def test_maven_pom_inventory_does_not_make_module_coverage_incomplete(
    example.root:parent:pom:1.0:compile
    example.libs:owned:jar:3.0:compile -- module example.owned
 """
-    raw = maven_dependency_observation(
+    raw = _complete_maven_observation(
         trees={},
         inventories={"compile": inventory},
     )
@@ -289,7 +454,7 @@ def test_maven_duplicate_inventory_rows_do_not_overclaim_module_completeness(
    example.libs:owned:jar:3.0:test -- module example.owned
    example.libs:owned:jar:3.0:test -- module example.owned
 """
-    raw = maven_dependency_observation(trees={}, inventories={"test": inventory})
+    raw = _complete_maven_observation(trees={}, inventories={"test": inventory})
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -310,7 +475,7 @@ def test_maven_duplicate_module_annotation_cannot_hide_unannotated_inventory(
    example.libs:owned:jar:3.0:test -- module example.owned
    example.libs:missing:jar:4.0:test
 """
-    raw = maven_dependency_observation(trees={}, inventories={"test": inventory})
+    raw = _complete_maven_observation(trees={}, inventories={"test": inventory})
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -330,7 +495,7 @@ def test_maven_conflicting_duplicate_module_annotations_preserve_ambiguity(
    example.libs:owned:jar:3.0:test -- module example.one
    example.libs:owned:jar:3.0:test -- module example.two
 """
-    raw = maven_dependency_observation(trees={}, inventories={"test": inventory})
+    raw = _complete_maven_observation(trees={}, inventories={"test": inventory})
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
@@ -353,21 +518,21 @@ def test_maven_adapter_refuses_unparsed_inventory_coordinate() -> None:
     inventory = b"""The following files have been resolved:\n   example.libs:valid:jar:3.0:test -- module example.valid\n   example.libs:omitted:jar:4.0\n"""
 
     with pytest.raises(ValueError, match="unparsed Maven dependency-list coordinate"):
-        maven_dependency_observation(trees={}, inventories={"test": inventory})
+        _complete_maven_observation(trees={}, inventories={"test": inventory})
 
 
 def test_maven_adapter_refuses_truncated_inventory_coordinate() -> None:
     inventory = b"""The following files have been resolved:\n   example.libs:valid:jar:3.0:test -- module example.valid\n   example.libs:omitted:jar\n"""
 
     with pytest.raises(ValueError, match="unparsed Maven dependency-list coordinate"):
-        maven_dependency_observation(trees={}, inventories={"test": inventory})
+        _complete_maven_observation(trees={}, inventories={"test": inventory})
 
 
 def test_maven_adapter_refuses_short_inventory_coordinate() -> None:
     inventory = b"""The following files have been resolved:\n   example.libs:valid:jar:3.0:test -- module example.valid\n   example.libs:omitted\n"""
 
     with pytest.raises(ValueError, match="unparsed Maven dependency-list coordinate"):
-        maven_dependency_observation(trees={}, inventories={"test": inventory})
+        _complete_maven_observation(trees={}, inventories={"test": inventory})
 
 
 @pytest.mark.parametrize(
@@ -385,11 +550,24 @@ def test_maven_adapter_ignores_colon_bearing_maven_log_noise(noise: str) -> None
         "   example.libs:valid:jar:3.0:test -- module example.valid\n"
     ).encode()
 
-    raw = maven_dependency_observation(trees={}, inventories={"test": inventory})
+    raw = _complete_maven_observation(trees={}, inventories={"test": inventory})
 
     assert [row["node_id"] for row in raw["inventory"]] == [
         "example.libs:valid:jar:3.0"
     ]
+
+
+def test_maven_adapter_refuses_missing_dependency_metadata_warning() -> None:
+    inventory = b"""[WARNING] The POM for example.libs:missing:jar:4.0 is missing, no dependency information available
+The following files have been resolved:
+   example.libs:valid:jar:3.0:test -- module example.valid
+"""
+
+    with pytest.raises(
+        ValueError,
+        match="Maven dependency list contains incomplete resolution warning",
+    ):
+        _complete_maven_observation(trees={}, inventories={"test": inventory})
 
 
 @pytest.mark.parametrize(
@@ -407,13 +585,13 @@ def test_maven_adapter_rejects_unproved_complete_inventory(
     inventory: bytes,
 ) -> None:
     with pytest.raises(ValueError):
-        maven_dependency_observation(trees={}, inventories={"test": inventory})
+        _complete_maven_observation(trees={}, inventories={"test": inventory})
 
 
 def test_maven_header_only_inventory_is_complete_empty_evidence(
     tmp_path: Path,
 ) -> None:
-    raw = maven_dependency_observation(
+    raw = _complete_maven_observation(
         trees={}, inventories={"test": b"The following files have been resolved:\n"}
     )
     with CodeMap(tmp_path) as codemap:
@@ -431,7 +609,7 @@ def test_maven_header_only_inventory_is_complete_empty_evidence(
 def test_maven_genuine_none_marker_is_complete_empty_evidence(
     tmp_path: Path,
 ) -> None:
-    raw = maven_dependency_observation(
+    raw = _complete_maven_observation(
         trees={},
         inventories={"test": b"The following files have been resolved:\n   none\n"},
     )
@@ -452,7 +630,7 @@ def test_maven_list_strips_producer_ansi_without_changing_source_digest() -> Non
         b"   example.libs:valid:jar:3.0:test\x1b[36m -- module valid.name"
         b"\x1b[0;1;33m (auto)\x1b[m\n"
     )
-    raw = maven_dependency_observation(trees={}, inventories={"test": inventory})
+    raw = _complete_maven_observation(trees={}, inventories={"test": inventory})
     assert raw["inventory"][0]["node_id"] == "example.libs:valid:jar:3.0"
     assert raw["module_ownership"][0]["module"] == "valid.name"
     assert raw["evidence_sources"][0]["producer_digest"] == (
@@ -467,4 +645,4 @@ def test_maven_none_marker_cannot_hide_dependency() -> None:
         b"   example.libs:valid:jar:3.0:test\n"
     )
     with pytest.raises(ValueError, match="conflicting.*empty marker"):
-        maven_dependency_observation(trees={}, inventories={"test": inventory})
+        _complete_maven_observation(trees={}, inventories={"test": inventory})

@@ -122,6 +122,9 @@ def test_uv_lock_adapter_includes_every_committed_lock_dependency_group(
         for package in document["package"]
     )
     raw = uv_lock_dependency_observation(lock=lock)
+    assert raw["producer"]["resolution_markers"] == document.get(
+        "resolution-markers", []
+    )
     assert len(raw["relationships"]) == expected
     assert len(raw["evidence_sources"]) == 1
 
@@ -143,6 +146,8 @@ def test_uv_lock_adapter_includes_every_committed_lock_dependency_group(
         "mcp",
         "ruff",
     }
+    assert query["completeness"] == "incomplete"
+    assert any(row["reason"] == "conditional-edge" for row in query["omissions"])
     assert {
         row["effective_scope"]
         for row in observation["relationships"]
@@ -178,6 +183,43 @@ source = {{ virtual = "." }}
         uv_lock_dependency_observation(lock=lock)
 
 
+@pytest.mark.parametrize(
+    ("dependency", "message"),
+    [
+        ("{ name = 123 }", "uv lock dependency name must be a string"),
+        (
+            '{ name = "dep", version = 1 }',
+            "uv lock dependency version must be a string",
+        ),
+        (
+            '{ name = "dep", marker = 123 }',
+            "uv lock dependency marker must be a string",
+        ),
+    ],
+)
+def test_uv_lock_adapter_refuses_malformed_dependency_identity(
+    dependency: str,
+    message: str,
+) -> None:
+    lock = f"""version = 1
+revision = 3
+
+[[package]]
+name = "app"
+version = "1"
+source = {{ virtual = "." }}
+dependencies = [{dependency}]
+
+[[package]]
+name = "dep"
+version = "1"
+source = {{ registry = "https://example.invalid/simple" }}
+""".encode()
+
+    with pytest.raises(ValueError, match=message):
+        uv_lock_dependency_observation(lock=lock)
+
+
 def test_uv_lock_adapter_refuses_ambiguous_name_only_dependency() -> None:
     lock = b"""version = 1
 revision = 3
@@ -200,6 +242,233 @@ version = "2"
 source = { directory = "vendor/shared" }
 """
     with pytest.raises(ValueError, match="must resolve uniquely"):
+        uv_lock_dependency_observation(lock=lock)
+
+
+@pytest.mark.parametrize(
+    ("lock", "message"),
+    [
+        (
+            b"""version = true
+revision = 3
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+""",
+            "unsupported uv lock schema version",
+        ),
+        (
+            b"""version = 1
+revision = true
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+""",
+            "uv lock revision must be a positive integer",
+        ),
+        (
+            b"""version = 1
+revision = 3
+requires-python = true
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+""",
+            "uv lock requires-python must be a string",
+        ),
+        (
+            b"""version = 1
+revision = 3
+[[package]]
+name = 123
+version = "0.1.0"
+source = { virtual = "." }
+""",
+            "uv lock package requires string name and version",
+        ),
+        (
+            b"""version = 1
+revision = 3
+[[package]]
+name = "demo"
+version = 1
+source = { virtual = "." }
+""",
+            "uv lock package requires string name and version",
+        ),
+    ],
+)
+def test_uv_lock_adapter_refuses_malformed_identity_fields(
+    lock: bytes,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        uv_lock_dependency_observation(lock=lock)
+
+
+def test_uv_lock_adapter_refuses_unknown_lock_schema_version() -> None:
+    lock = b"""version = 2
+revision = 0
+requires-python = ">=3.11"
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+
+    with pytest.raises(ValueError, match="unsupported uv lock schema version: 2"):
+        uv_lock_dependency_observation(lock=lock)
+
+
+def test_uv_lock_adapter_preserves_top_level_resolution_markers() -> None:
+    lock = b"""version = 1
+revision = 3
+requires-python = ">=3.11"
+resolution-markers = [
+    "python_full_version >= '3.12'",
+    "python_full_version < '3.12'",
+]
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+
+    raw = uv_lock_dependency_observation(lock=lock)
+
+    assert raw["producer"]["resolution_markers"] == [
+        "python_full_version >= '3.12'",
+        "python_full_version < '3.12'",
+    ]
+
+
+def test_uv_lock_adapter_binds_environment_domain_to_semantic_scope(
+    tmp_path: Path,
+) -> None:
+    base = """version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+    constrained = """version = 1
+revision = 3
+requires-python = ">=3.11"
+supported-markers = ["sys_platform == 'linux'"]
+required-markers = ["platform_machine == 'x86_64' and sys_platform == 'linux'"]
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(
+            uv_lock_dependency_observation(lock=base.encode())
+        )
+        after = codemap.dependency_resolution_evidence(
+            uv_lock_dependency_observation(lock=constrained.encode())
+        )
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert before["scope"] == {"requires_python": ">=3.11"}
+    assert after["scope"] == {
+        "requires_python": ">=3.11",
+        "required_environments": [
+            "platform_machine == 'x86_64' and sys_platform == 'linux'"
+        ],
+        "supported_environments": ["sys_platform == 'linux'"],
+    }
+    assert before["definition_identity"] != after["definition_identity"]
+    assert delta["comparability"] == "not-comparable"
+    assert delta["reason"] == "definition-changed"
+
+
+def test_uv_top_level_resolution_markers_are_observation_only(
+    tmp_path: Path,
+) -> None:
+    before_lock = b"""version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+    after_lock = b"""version = 1
+revision = 3
+requires-python = ">=3.11"
+resolution-markers = ["python_full_version >= '3.12'"]
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(
+            uv_lock_dependency_observation(lock=before_lock)
+        )
+        after = codemap.dependency_resolution_evidence(
+            uv_lock_dependency_observation(lock=after_lock)
+        )
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert before["definition_identity"] == after["definition_identity"]
+    assert before["resolution_identity"] == after["resolution_identity"]
+    assert before["observation_identity"] != after["observation_identity"]
+    assert delta["comparability"] == "comparable"
+
+
+def test_uv_lock_adapter_refuses_package_resolution_forks() -> None:
+    lock = b"""version = 1
+revision = 3
+requires-python = ">=3.11"
+resolution-markers = [
+    "python_full_version >= '3.12'",
+    "python_full_version < '3.12'",
+]
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+resolution-markers = ["python_full_version >= '3.12'"]
+"""
+
+    with pytest.raises(ValueError, match="uv package resolution forks are not modeled"):
+        uv_lock_dependency_observation(lock=lock)
+
+
+def test_uv_lock_adapter_refuses_unmodeled_conflicts() -> None:
+    lock = b"""version = 1
+revision = 3
+requires-python = ">=3.11"
+conflicts = [[
+  { package = "demo", extra = "cpu" },
+  { package = "demo", extra = "gpu" },
+]]
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+
+    with pytest.raises(ValueError, match="uv lock conflicts are not modeled"):
         uv_lock_dependency_observation(lock=lock)
 
 

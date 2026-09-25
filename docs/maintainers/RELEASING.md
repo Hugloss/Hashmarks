@@ -1,26 +1,18 @@
 # Releasing Hashmarks
 
-This document describes the current repository-owned release flow. It is operational guidance, not product authority.
+Release preparation is a normal pull request. CI, not a local agent run, owns the required qualification.
 
-## Prepare the release line
+## Release pull request
 
-1. Start from current `main` and record the exact commit.
-2. Update the package version in `pyproject.toml` and `hashmarks/_version.py`.
-3. Update the README project-status version and add one concise public release entry to `CHANGELOG.md`.
-4. If dependency intent changed, run `make lock` and review the committed `uv.lock` diff. Otherwise keep the existing locked resolution except for project-version metadata required by uv.
-5. Run `make lock-check` and the normal qualification commands through the committed lock.
-
-## Qualify exact bytes
-
-The release candidate must pass the repository CI on its exact head. The release workflow builds wheel and sdist once, qualifies those exact artifacts, records their SHA-256 identities, and binds the repository qualification dependency resolution to the exact committed `uv.lock` bytes.
-
-Do not rebuild publication artifacts after qualification. A failed or cancelled lane is not promotion evidence.
+1. Update the version in `pyproject.toml`, `hashmarks/_version.py`, the README project status, and the project entry in `uv.lock`. Add a concise, substantive public entry to `CHANGELOG.md`. If dependency intent also changed, refresh the lock intentionally and review that diff.
+2. Open a pull request and let CI (`.github/workflows/ci.yml`) run the configured checks. Local focused checks are useful when editing behavior, but a local `make release-check` or full-suite rerun is not required just for version, changelog, or documentation edits and does not replace CI.
+3. Merge once the pull-request CI is green. The publish workflow independently qualifies the tagged merge commit.
 
 ## Publish
 
-Create the GitHub release/tag for the exact package version only after the release candidate is merged and green. The publish workflow validates the tag against package metadata and uses PyPI Trusted Publishing for the already-qualified artifacts.
+Create a GitHub release with tag `vX.Y.Z` pointing at the merged commit. The publish workflow (`.github/workflows/publish.yml`) validates the tag against the package version, runs its release checks, builds and smoke-tests the exact wheel and sdist, and publishes that same qualified artifact bundle through PyPI Trusted Publishing. A failed or cancelled publish workflow is not a completed release.
 
-External GitHub/PyPI approvals and Trusted Publisher configuration remain release-owner responsibilities.
+GitHub/PyPI approvals and Trusted Publisher configuration remain release-owner responsibilities.
 
 ## History policy
 

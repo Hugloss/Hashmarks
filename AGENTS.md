@@ -53,6 +53,7 @@ When adding or repairing an adapter:
 
 - state the producer-neutral fact/authority first, then implement producer-specific translation;
 - keep package-manager parsing, coordinates, source tables, scopes/classifiers, workspace encodings, diagnostic prefixes, and similar syntax in the adapter;
+- derive `component_id` and `node_id` only from semantic component/selection identity; never embed adapter names, evidence source IDs/kinds, producer digests, or other provenance into semantic IDs;
 - do not add Maven/uv/other producer names or source-format assumptions to core dependency validators;
 - preserve ambiguity, context, completeness, truncation, and provenance;
 - add cross-producer semantic regressions when two producers can express the same fact;

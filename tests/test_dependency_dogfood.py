@@ -20,6 +20,8 @@ def _observation(producer: str, state: str) -> dict[str, object]:
     return maven_dependency_observation(
         trees={"compile": (base / "tree.json").read_bytes()},
         inventories={"compile": (base / "list.txt").read_bytes()},
+        complete_tree_contexts=("compile",),
+        complete_inventory_contexts=("compile",),
     )
 
 
@@ -230,6 +232,33 @@ def test_real_producer_dependency_change_dogfood(
         _assert_maven_module_change(
             after, after_module, delta, before_state, after_state
         )
+
+
+def test_real_uv_grouped_edges_do_not_duplicate_topology_paths(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(
+            _observation("uv", "grouped")
+        )
+        root_id = observation["roots"][0]["node_id"]
+        selection = _dummy_selection(observation, "dummy-dep")
+        paths = _query(
+            codemap,
+            observation,
+            {
+                "operation": "paths",
+                "node_id": root_id,
+                "target_id": selection["node_id"],
+                "context": "lock",
+                "max_results": 1,
+            },
+        )
+
+    assert paths["result"] == [[root_id, selection["node_id"]]]
+    assert paths["completeness"] == "complete"
+    assert paths["omissions"] == []
 
 
 @pytest.mark.parametrize(

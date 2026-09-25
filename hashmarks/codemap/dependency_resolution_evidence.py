@@ -33,9 +33,7 @@ def _canonical(value: object) -> bytes:
             value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            "dependency resolution snapshot must contain JSON-compatible values"
-        ) from exc
+        raise ValueError("dependency snapshot must be JSON-compatible") from exc
 
 
 def _identity(domain: str, value: object) -> str:
@@ -90,7 +88,9 @@ def _dependency_identities_v3(packet: Mapping[str, object]) -> tuple[str, str, s
 
 
 def _identifier(value: object, *, label: str) -> str:
-    text = str(value or "").strip()
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    text = value.strip()
     if not text:
         raise ValueError(f"{label} must not be empty")
     if len(text) > _MAX_ID_CHARS:
@@ -99,7 +99,9 @@ def _identifier(value: object, *, label: str) -> str:
 
 
 def _text(value: object, *, label: str, required: bool = False) -> str:
-    text = str(value or "").strip()
+    if value is not None and not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    text = (value or "").strip()
     if required and not text:
         raise ValueError(f"{label} must not be empty")
     if len(text) > _MAX_TEXT_CHARS:
@@ -935,12 +937,13 @@ class DependencyResolutionEvidenceMixin:
             )
             if not refs:
                 raise ValueError("relationship must reference evidence source")
+            kind = _text(raw.get("kind"), label="relationship kind", required=True)
+            if kind != "dependency":
+                raise ValueError(f"unsupported dependency relationship kind: {kind}")
             packet = {
                 "source": source,
                 "target": target,
-                "kind": _text(
-                    raw.get("kind"), label="relationship kind", required=True
-                ),
+                "kind": kind,
                 "context": context,
                 "effective_scope": _text(
                     raw.get("effective_scope"), label="effective scope"
@@ -1296,15 +1299,15 @@ class DependencyResolutionEvidenceMixin:
                 raise ValueError(f"duplicate repository input path: {path}")
             seen.add(path)
             claimed = raw.get("member_revision")
-            if claimed is not None and not _MEMBER_REVISION.fullmatch(str(claimed)):
-                raise ValueError(
-                    "repository input member_revision must be a lowercase 64-character sha256 hex digest"
-                )
+            if claimed is not None and (
+                not isinstance(claimed, str) or not _MEMBER_REVISION.fullmatch(claimed)
+            ):
+                raise ValueError("member_revision must be lowercase sha256 hex")
             member, _raw = self._repository_member_observation(path)
             observed = member.get("member_revision")
             if claimed is None or observed is None:
                 equivalence = "unknown"
-            elif str(claimed) == str(observed):
+            elif claimed == observed:
                 equivalence = "proven"
             else:
                 equivalence = "mismatch"
@@ -1324,12 +1327,9 @@ class DependencyResolutionEvidenceMixin:
         observation: Mapping[str, object],
         request: Mapping[str, object],
     ) -> dict[str, object]:
-        """Compose dependency-owner projections with generic evidence correlation.
-
-        Package semantics remain owned here.  The generic correlation owner receives
-        only ordinary external anchors and repository locators.
-        """
+        """Correlate dependency owners with current repository evidence."""
         self._require_current_dependency_observation_v3(observation)
+        _contract.reject_unknown_fields(request, label="correlation request")
         raw_correlations = request.get("correlations", ())
         correlations = _objects(raw_correlations, label="correlations", limit=256)
         bundles: list[dict[str, object]] = []
@@ -1340,6 +1340,7 @@ class DependencyResolutionEvidenceMixin:
             if isinstance(row, Mapping) and row.get("module")
         ]
         for index, raw in enumerate(correlations):
+            _contract.reject_unknown_fields(raw, label="correlation row")
             module = _text(raw.get("module"), label="correlation module", required=True)
             context = _text(raw.get("context"), label="correlation context")
             anchors = raw.get("anchors", ())

@@ -24,15 +24,33 @@ def _node_id(name: str, version: str, source: str) -> str:
     return f"{name}:{version}@{source_identity}"
 
 
+def _marker_list(document: Mapping[str, object], field: str) -> list[str]:
+    raw = document.get(field, [])
+    if not isinstance(raw, list) or any(
+        not isinstance(marker, str) or not marker.strip() for marker in raw
+    ):
+        raise ValueError(f"uv lock {field} must be a list of strings")
+    markers = [marker.strip() for marker in raw]
+    if len(set(markers)) != len(markers):
+        raise ValueError(f"uv lock contains duplicate values in {field}")
+    return markers
+
+
 def _dependency_target(
     dependency: Mapping[str, object],
     packages_by_name: Mapping[str, list[dict[str, object]]],
 ) -> dict[str, object]:
-    name = str(dependency.get("name") or "").strip()
+    raw_name = dependency.get("name")
+    if not isinstance(raw_name, str):
+        raise ValueError("uv lock dependency name must be a string")
+    name = raw_name.strip()
     if not name:
         raise ValueError("uv lock dependency name must not be empty")
     candidates = list(packages_by_name.get(name, ()))
-    version = str(dependency.get("version") or "").strip()
+    raw_version = dependency.get("version")
+    if raw_version is not None and not isinstance(raw_version, str):
+        raise ValueError("uv lock dependency version must be a string")
+    version = (raw_version or "").strip()
     if version:
         candidates = [row for row in candidates if row["version"] == version]
     source_raw = dependency.get("source")
@@ -63,6 +81,26 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise ValueError("invalid uv lock TOML") from exc
 
+    lock_version = document.get("version")
+    if (
+        not isinstance(lock_version, int)
+        or isinstance(lock_version, bool)
+        or lock_version != 1
+    ):
+        raise ValueError(f"unsupported uv lock schema version: {lock_version}")
+    revision = document.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
+        raise ValueError("uv lock revision must be a positive integer")
+    raw_requires_python = document.get("requires-python")
+    if raw_requires_python is not None and not isinstance(raw_requires_python, str):
+        raise ValueError("uv lock requires-python must be a string")
+    requires_python = (raw_requires_python or "").strip()
+    resolution_markers = _marker_list(document, "resolution-markers")
+    supported_environments = sorted(_marker_list(document, "supported-markers"))
+    required_environments = sorted(_marker_list(document, "required-markers"))
+    if document.get("conflicts"):
+        raise ValueError("uv lock conflicts are not modeled")
+
     raw_packages = document.get("package", ())
     if not isinstance(raw_packages, list) or not raw_packages:
         raise ValueError("uv lock must contain at least one package")
@@ -73,10 +111,16 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     for raw in raw_packages:
         if not isinstance(raw, Mapping):
             raise ValueError("uv lock package must be an object")
-        name = str(raw.get("name") or "").strip()
-        version = str(raw.get("version") or "").strip()
+        if raw.get("resolution-markers"):
+            raise ValueError("uv package resolution forks are not modeled")
+        raw_name = raw.get("name")
+        raw_version = raw.get("version")
+        if not isinstance(raw_name, str) or not isinstance(raw_version, str):
+            raise ValueError("uv lock package requires string name and version")
+        name = raw_name.strip()
+        version = raw_version.strip()
         if not name or not version:
-            raise ValueError("uv lock package requires name and version")
+            raise ValueError("uv lock package requires string name and version")
         source_raw = raw.get("source")
         source = _source(source_raw)
         if (
@@ -141,6 +185,9 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                         f"uv lock dependency must be an object: {row['name']}"
                     )
                 target = _dependency_target(dependency, packages_by_name)
+                raw_marker = dependency.get("marker")
+                if raw_marker is not None and not isinstance(raw_marker, str):
+                    raise ValueError("uv lock dependency marker must be a string")
                 relationships.append(
                     {
                         "source": row["node_id"],
@@ -148,7 +195,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                         "kind": "dependency",
                         "context": _CONTEXT,
                         "effective_scope": effective_scope,
-                        "marker": str(dependency.get("marker") or ""),
+                        "marker": (raw_marker or "").strip(),
                         "evidence_sources": [source_id],
                     }
                 )
@@ -207,14 +254,23 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         "schema": _SCHEMA,
         "producer": {
             "kind": "uv-lock",
-            "schema_version": str(document.get("version") or ""),
-            "revision": str(document.get("revision") or ""),
+            "schema_version": str(lock_version),
+            "revision": str(revision),
+            "resolution_markers": resolution_markers,
         },
-        "scope": (
-            {"requires_python": str(document["requires-python"])}
-            if document.get("requires-python")
-            else {}
-        ),
+        "scope": {
+            **({"requires_python": requires_python} if requires_python else {}),
+            **(
+                {"supported_environments": supported_environments}
+                if supported_environments
+                else {}
+            ),
+            **(
+                {"required_environments": required_environments}
+                if required_environments
+                else {}
+            ),
+        },
         "contexts": [_CONTEXT],
         "roots": sorted(
             (

@@ -190,6 +190,38 @@ def test_v3_refuses_obsolete_v2_schema(tmp_path: Path) -> None:
             codemap.dependency_resolution_evidence(snapshot)
 
 
+@pytest.mark.parametrize("kind", ["depends-on", "conflicts-with"])
+def test_v3_rejects_non_dependency_relationship_kind(tmp_path: Path, kind: str) -> None:
+    snapshot = _snapshot_v3()
+    snapshot["relationships"][0]["kind"] = kind
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError, match=f"unsupported dependency relationship kind: {kind}"
+        ):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v3_replay_rejects_non_dependency_relationship_kind(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        tampered = copy.deepcopy(observation)
+        tampered["relationships"][0]["kind"] = "conflicts-with"
+
+        with pytest.raises(
+            ValueError, match="unsupported dependency relationship kind"
+        ):
+            codemap.dependency_resolution_queries(
+                tampered, [{"operation": "inventory"}]
+            )
+        with pytest.raises(
+            ValueError, match="unsupported dependency relationship kind"
+        ):
+            codemap.dependency_resolution_delta(observation, tampered)
+
+
 def test_v3_distinguishes_inventory_membership_from_graph_reachability(
     tmp_path: Path,
 ) -> None:
@@ -450,6 +482,40 @@ def test_v3_refuses_unknown_authority_contract_fields(
             codemap.dependency_resolution_evidence(changed)
 
 
+@pytest.mark.parametrize(
+    ("target", "field", "value", "message"),
+    [
+        ("producer", "kind", 123, "producer kind must be a string"),
+        ("component", "component_id", True, "component_id must be a string"),
+        ("component", "name", 123, "component name must be a string"),
+        ("selection", "version", 1, "version must be a string"),
+        ("selection", "source", False, "source must be a string"),
+        ("relationship", "marker", 123, "marker must be a string"),
+    ],
+)
+def test_v3_refuses_non_string_typed_fields(
+    tmp_path: Path,
+    target: str,
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    changed = _snapshot_v3()
+    if target == "producer":
+        changed["producer"][field] = value
+    elif target == "component":
+        changed["components"][0][field] = value
+    elif target == "selection":
+        changed["selections"][0][field] = value
+    else:
+        changed["relationships"][0][field] = value
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match=message):
+            codemap.dependency_resolution_evidence(changed)
+
+
 def test_v3_rejects_dangling_evidence_source_reference(tmp_path: Path) -> None:
     changed = _snapshot_v3()
     changed["relationships"][0]["evidence_sources"] = ["missing"]
@@ -602,6 +668,32 @@ def test_v3_repository_correlation_refuses_stale_generation(
                 observation,
                 {"correlations": []},
             )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"correlatons": []},
+        {
+            "correlations": [
+                {
+                    "module": "library",
+                    "anchors": [],
+                    "diagnosis": "caller-owned",
+                }
+            ]
+        },
+    ],
+)
+def test_v3_dependency_correlation_refuses_unknown_fields(
+    tmp_path: Path,
+    payload: dict[str, object],
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        with pytest.raises(ValueError, match="unknown dependency correlation"):
+            codemap.dependency_evidence_correlation(observation, payload)
 
 
 def test_v3_dependency_correlation_preserves_contextual_ownership(
@@ -790,6 +882,390 @@ def test_v3_graph_query_refuses_target_outside_requested_context(
             )
 
 
+def test_v3_dependency_query_refuses_unknown_request_field(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        with pytest.raises(
+            ValueError,
+            match="unknown dependency query field: contxt",
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "inventory",
+                        "node_id": "library@1",
+                        "contxt": "compile",
+                    }
+                ],
+            )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("operation", True),
+        ("node_id", 7),
+        ("target_id", False),
+        ("component_id", ["library"]),
+        ("context", 1),
+        ("module", {"name": "library"}),
+    ],
+)
+def test_v3_dependency_query_rejects_non_string_identifiers(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    request: dict[str, object] = {
+        "operation": "dependencies",
+        "node_id": "app@1",
+        "context": "compile",
+    }
+    request[field] = value
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        with pytest.raises(ValueError, match="must be a string"):
+            codemap.dependency_resolution_queries(observation, [request])
+
+
+@pytest.mark.parametrize("field", ["max_depth", "max_results", "max_visits"])
+@pytest.mark.parametrize("value", [True, 1.0, "1"])
+def test_v3_dependency_query_rejects_coerced_bounds(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    request: dict[str, object] = {
+        "operation": "dependencies",
+        "node_id": "app@1",
+        "context": "compile",
+    }
+    request[field] = value
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        with pytest.raises(ValueError, match=f"{field} must be a positive integer"):
+            codemap.dependency_resolution_queries(observation, [request])
+
+
+def test_v3_multicontext_graph_query_requires_explicit_context(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v3()
+    changed["relationships"] = [
+        row for row in changed["relationships"] if row["context"] == "compile"
+    ]
+    inventory_only = next(
+        row for row in changed["selections"] if row["node_id"] == "inventory-only@1"
+    )
+    inventory_only["contexts"].append("runtime")
+    inventory_only["evidence_sources"].append("tree:runtime")
+    changed["relationships"].append(
+        {
+            "source": "library@1",
+            "target": "inventory-only@1",
+            "kind": "dependency",
+            "context": "runtime",
+            "effective_scope": "runtime",
+            "evidence_sources": ["tree:runtime"],
+        }
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        with pytest.raises(
+            ValueError,
+            match="graph query requires context for multi-context observation",
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "paths",
+                        "node_id": "app@1",
+                        "target_id": "inventory-only@1",
+                    }
+                ],
+            )
+
+
+@pytest.mark.parametrize(
+    "operation",
+    ["dependencies", "dependents", "reachability", "paths"],
+)
+def test_v3_graph_query_reports_conditional_relationship_omission(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    changed = _snapshot_v3()
+    changed["relationships"][0]["marker"] = "sys_platform == 'linux'"
+    request = {
+        "operation": operation,
+        "node_id": "app@1" if operation != "dependents" else "library@1",
+        "context": "compile",
+    }
+    if operation in {"reachability", "paths"}:
+        request["target_id"] = "library@1"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(observation, [request])[
+            "results"
+        ][0]
+
+    assert result["completeness"] == "incomplete"
+    assert result["omissions"] == [
+        {"reason": "conditional-edge", "node_id": request["node_id"]}
+    ]
+    if operation == "reachability":
+        assert result["result"]["reachable"] is False
+        assert result["result"]["negative_evidence"] == "not-admissible"
+    elif operation == "paths":
+        assert result["result"] == []
+        assert result["negative_evidence"] == "not-admissible"
+    else:
+        assert result["result"] == []
+        assert result["negative_evidence"] == "not-admissible"
+
+
+@pytest.mark.parametrize("marked_node", ["app@1", "library@1"])
+@pytest.mark.parametrize(
+    "operation", ["dependencies", "dependents", "reachability", "paths"]
+)
+def test_v3_graph_query_does_not_traverse_marker_qualified_selection(
+    tmp_path: Path, operation: str, marked_node: str
+) -> None:
+    changed = _snapshot_v3()
+    selection = next(
+        row for row in changed["selections"] if row["node_id"] == marked_node
+    )
+    selection["marker"] = "sys_platform == 'linux'"
+    start = "library@1" if operation == "dependents" else "app@1"
+    request = {"operation": operation, "node_id": start, "context": "compile"}
+    if operation in {"reachability", "paths"}:
+        request["target_id"] = "library@1"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(observation, [request])[
+            "results"
+        ][0]
+
+    reason = "conditional-selection" if start == marked_node else "conditional-edge"
+    assert result["omissions"] == [{"reason": reason, "node_id": start}]
+    assert result["completeness"] == "incomplete"
+    if operation == "reachability":
+        assert result["result"] == {
+            "reachable": False,
+            "negative_evidence": "not-admissible",
+        }
+    else:
+        assert result["result"] == []
+        assert result["negative_evidence"] == "not-admissible"
+
+
+def test_v3_isolated_conditional_selection_cannot_prove_graph_absence(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v3()
+    changed["selections"][2]["marker"] = "sys_platform == 'linux'"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        results = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "inventory-only@1",
+                    "context": "compile",
+                },
+                {
+                    "operation": "dependencies",
+                    "node_id": "app@1",
+                    "context": "compile",
+                },
+            ],
+        )["results"]
+
+    assert results[0]["result"] == []
+    assert results[0]["negative_evidence"] == "not-admissible"
+    assert results[0]["omissions"] == [
+        {"reason": "conditional-selection", "node_id": "inventory-only@1"}
+    ]
+    assert [row["node_id"] for row in results[1]["result"]] == ["library@1"]
+    assert results[1]["completeness"] == "complete"
+
+
+def test_v3_depth_bound_precedes_conditional_edge_omission(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v3()
+    changed["relationships"].append(
+        {
+            "source": "library@1",
+            "target": "inventory-only@1",
+            "kind": "dependency",
+            "context": "compile",
+            "marker": "sys_platform == 'linux'",
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "app@1",
+                    "context": "compile",
+                    "max_depth": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert [row["node_id"] for row in result["result"]] == ["library@1"]
+    assert result["omissions"] == [{"reason": "depth-limit", "node_id": "library@1"}]
+    assert result["completeness"] == "incomplete"
+
+
+def test_v3_zero_length_path_does_not_consume_conditional_edges(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v3()
+    changed["relationships"][0]["marker"] = "sys_platform == 'linux'"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "paths",
+                    "node_id": "app@1",
+                    "target_id": "app@1",
+                    "context": "compile",
+                }
+            ],
+        )["results"][0]
+
+    assert result["result"] == [["app@1"]]
+    assert result["completeness"] == "complete"
+    assert result["omissions"] == []
+
+
+@pytest.mark.parametrize("operation", ["paths", "reachability"])
+def test_v3_zero_length_identity_query_preserves_conditional_selection(
+    tmp_path: Path, operation: str
+) -> None:
+    changed = _snapshot_v3()
+    changed["selections"][0]["marker"] = "sys_platform == 'linux'"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": operation,
+                    "node_id": "app@1",
+                    "target_id": "app@1",
+                    "context": "compile",
+                }
+            ],
+        )["results"][0]
+
+    assert result["result"] == (
+        [["app@1"]]
+        if operation == "paths"
+        else {"reachable": True, "negative_evidence": "not-applicable"}
+    )
+    assert result["completeness"] == "complete"
+    assert result["omissions"] == []
+
+
+def test_v3_conditional_duplicate_does_not_weaken_unconditional_topology(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v3()
+    changed["relationships"].append(
+        {
+            "source": "app@1",
+            "target": "library@1",
+            "kind": "dependency",
+            "context": "compile",
+            "marker": "sys_platform == 'linux'",
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "app@1",
+                    "context": "compile",
+                }
+            ],
+        )["results"][0]
+
+    assert [row["node_id"] for row in result["result"]] == ["library@1"]
+    assert result["completeness"] == "complete"
+    assert result["omissions"] == []
+
+
+def test_v3_duplicate_unconditional_edges_do_not_duplicate_node_paths(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v3()
+    changed["relationships"].append(
+        {
+            "source": "app@1",
+            "target": "library@1",
+            "kind": "dependency",
+            "context": "compile",
+            "effective_scope": "alternate",
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "paths",
+                    "node_id": "app@1",
+                    "target_id": "library@1",
+                    "context": "compile",
+                    "max_results": 1,
+                }
+            ],
+        )["results"][0]
+
+    assert result["result"] == [["app@1", "library@1"]]
+    assert result["completeness"] == "complete"
+    assert result["omissions"] == []
+
+
 def test_v3_bounded_queries_report_dependencies_paths_and_contexts(
     tmp_path: Path,
 ) -> None:
@@ -926,6 +1402,27 @@ def test_v3_query_exposes_depth_omission_instead_of_silent_partial_result(
     assert [row["node_id"] for row in result["result"]] == ["library@1"]
     assert result["completeness"] == "incomplete"
     assert result["omissions"] == [{"reason": "depth-limit", "node_id": "library@1"}]
+
+
+def test_v3_repository_input_revision_requires_string_sha256(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v3()
+    snapshot["repository_inputs"] = [
+        {
+            "path": "dependency.lock",
+            "member_revision": int("1" * 64),
+        }
+    ]
+    (tmp_path / "dependency.lock").write_text("content\n")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="member_revision must be lowercase sha256 hex",
+        ):
+            codemap.dependency_resolution_evidence(snapshot)
 
 
 def test_v3_repository_input_change_is_observation_only(tmp_path: Path) -> None:
@@ -1740,14 +2237,14 @@ def test_v3_path_query_exact_result_bound_does_not_claim_omission(
             {
                 "source": "app@1",
                 "target": "dead@1",
-                "kind": "depends-on",
+                "kind": "dependency",
                 "context": "compile",
                 "evidence_sources": ["tree:compile"],
             },
             {
                 "source": "library@1",
                 "target": "target@1",
-                "kind": "depends-on",
+                "kind": "dependency",
                 "context": "compile",
                 "evidence_sources": ["tree:compile"],
             },
@@ -1778,14 +2275,23 @@ def test_v3_path_query_reports_result_bound_only_when_a_path_is_omitted(
     tmp_path: Path,
 ) -> None:
     changed = _snapshot_v3()
-    changed["relationships"].append(
-        {
-            "source": "app@1",
-            "target": "library@1",
-            "kind": "depends-on",
-            "context": "compile",
-            "evidence_sources": ["tree:compile"],
-        }
+    changed["relationships"].extend(
+        [
+            {
+                "source": "app@1",
+                "target": "inventory-only@1",
+                "kind": "dependency",
+                "context": "compile",
+                "evidence_sources": ["tree:compile"],
+            },
+            {
+                "source": "inventory-only@1",
+                "target": "library@1",
+                "kind": "dependency",
+                "context": "compile",
+                "evidence_sources": ["tree:compile"],
+            },
+        ]
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()

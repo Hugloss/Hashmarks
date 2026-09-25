@@ -119,7 +119,7 @@ def _daemon_stop(args) -> int:
     return 0
 
 
-def _root(args) -> int:
+def _snapshot(args) -> int:
     with RepositoryIdentity(
         args.workspace,
         state_dir=args.state_dir,
@@ -208,19 +208,12 @@ def _add_daemon_cli(sub) -> None:
 
 
 def _add_identity_cli(sub) -> None:
-    root = sub.add_parser("root")
-    _add_common_arguments(root, inherited=True)
-    _add_mode_argument(root)
-    root.add_argument("--input", action="append", required=True)
-    root.add_argument("--verify", action="store_true")
-    root.set_defaults(func=_root)
-
     snapshot = sub.add_parser("snapshot")
     _add_common_arguments(snapshot, inherited=True)
     _add_mode_argument(snapshot)
     snapshot.add_argument("--input", action="append", required=True)
     snapshot.add_argument("--verify", action="store_true")
-    snapshot.set_defaults(func=_root)
+    snapshot.set_defaults(func=_snapshot)
 
     stats = sub.add_parser("stats")
     _add_common_arguments(stats, inherited=True)

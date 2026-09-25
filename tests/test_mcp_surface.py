@@ -564,6 +564,30 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
                 }
             ],
         )
+        invalid_snapshot = {
+            **snapshot,
+            "relationships": [
+                {**snapshot["relationships"][0], "kind": "conflicts-with"}
+            ],
+        }
+        with pytest.raises(
+            McpSurfaceError, match="unsupported dependency relationship kind"
+        ):
+            surface.dependency_codemap(invalid_snapshot)
+        with pytest.raises(
+            McpSurfaceError, match="max_depth must be a positive integer"
+        ):
+            surface.dependency_codemap(
+                snapshot,
+                [
+                    {
+                        "operation": "dependencies",
+                        "node_id": "app@1",
+                        "context": "runtime",
+                        "max_depth": "1",
+                    }
+                ],
+            )
     finally:
         surface.close()
 

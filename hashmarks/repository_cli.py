@@ -381,8 +381,7 @@ def _post_change_code(args) -> int:
 def _add_map_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     map_cmd = sub.add_parser("map", help="derived repository CodeMap")
     add_common_arguments(map_cmd, inherited=True)
-    map_cmd.set_defaults(func=_map_orient)
-    map_sub = map_cmd.add_subparsers(dest="map_command", required=False)
+    map_sub = map_cmd.add_subparsers(dest="map_command", required=True)
     map_sync = map_sub.add_parser(
         "sync", help="index repository structure; use --path for incremental updates"
     )

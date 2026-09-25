@@ -13,6 +13,11 @@ _LIST_LINE = re.compile(
     r"(?P<module>.+?))?[ \t]*$"
 )
 _ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+_INCOMPLETE_RESOLUTION_WARNINGS = (
+    "no dependency information available",
+    "could not be resolved",
+    "failed to read artifact descriptor",
+)
 
 
 def _digest(data: bytes) -> str:
@@ -32,12 +37,25 @@ def _coordinate(
 
 
 def _tree_node(raw: Mapping[str, object]) -> tuple[str, str, str, str, str, str]:
-    group = str(raw.get("groupId") or "").strip()
-    artifact = str(raw.get("artifactId") or "").strip()
-    packaging = str(raw.get("type") or "jar").strip()
-    classifier = str(raw.get("classifier") or "").strip()
-    version = str(raw.get("version") or "").strip()
-    scope = str(raw.get("scope") or "").strip()
+    values: dict[str, str] = {}
+    for field, default in (
+        ("groupId", ""),
+        ("artifactId", ""),
+        ("type", "jar"),
+        ("classifier", ""),
+        ("version", ""),
+        ("scope", ""),
+    ):
+        value = raw.get(field, default)
+        if not isinstance(value, str):
+            raise ValueError(f"Maven tree node {field} must be a string")
+        values[field] = value.strip()
+    group = values["groupId"]
+    artifact = values["artifactId"]
+    packaging = values["type"]
+    classifier = values["classifier"]
+    version = values["version"]
+    scope = values["scope"]
     if not group or not artifact or not version:
         raise ValueError("Maven tree node requires groupId, artifactId, and version")
     component, node = _coordinate(group, artifact, packaging, classifier, version)
@@ -74,6 +92,8 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     *,
     trees: Mapping[str, bytes],
     inventories: Mapping[str, bytes],
+    complete_tree_contexts: Sequence[str] = (),
+    complete_inventory_contexts: Sequence[str] = (),
     repository_inputs: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
     """Translate already-produced Maven tree/list evidence into the v3 contract.
@@ -84,6 +104,30 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     contexts = sorted(set(trees) | set(inventories))
     if not contexts:
         raise ValueError("at least one Maven dependency context is required")
+    if any(
+        not isinstance(context, str) or not context
+        for context in complete_tree_contexts
+    ):
+        raise ValueError("complete Maven tree context must be a string")
+    if any(
+        not isinstance(context, str) or not context
+        for context in complete_inventory_contexts
+    ):
+        raise ValueError("complete Maven inventory context must be a string")
+    complete_trees = set(complete_tree_contexts)
+    complete_inventories = set(complete_inventory_contexts)
+    unknown_complete_trees = sorted(complete_trees - set(trees))
+    if unknown_complete_trees:
+        raise ValueError(
+            "complete Maven tree context has no supplied tree: "
+            f"{unknown_complete_trees[0]}"
+        )
+    unknown_complete_inventories = sorted(complete_inventories - set(inventories))
+    if unknown_complete_inventories:
+        raise ValueError(
+            "complete Maven inventory context has no supplied list: "
+            f"{unknown_complete_inventories[0]}"
+        )
 
     components: dict[str, dict[str, object]] = {}
     selections: dict[str, dict[str, object]] = {}
@@ -155,7 +199,9 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 {
                     "context": context,
                     "kind": "resolution-graph",
-                    "completeness": "complete",
+                    "completeness": (
+                        "complete" if context in complete_trees else "incomplete"
+                    ),
                     "truncation": "complete",
                     "evidence_sources": [tree_source],
                 }
@@ -228,7 +274,9 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 {
                     "context": context,
                     "kind": "resolved-inventory",
-                    "completeness": "complete",
+                    "completeness": (
+                        "complete" if context in complete_inventories else "incomplete"
+                    ),
                     "truncation": "complete",
                     "evidence_sources": [list_source],
                 }
@@ -254,6 +302,14 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     continue
                 if stripped.startswith("[ERROR]") or stripped == "[INFO] BUILD FAILURE":
                     raise ValueError(f"Maven dependency list contains error: {context}")
+                if stripped.startswith("[WARNING]") and any(
+                    marker in stripped.lower()
+                    for marker in _INCOMPLETE_RESOLUTION_WARNINGS
+                ):
+                    raise ValueError(
+                        "Maven dependency list contains incomplete resolution warning: "
+                        f"{context}"
+                    )
                 if not stripped or stripped.startswith(
                     ("[INFO]", "[WARNING]", "[DEBUG]")
                 ):
@@ -316,7 +372,10 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             if not header_seen:
                 raise ValueError(f"Maven dependency-list header is missing: {context}")
             module_completeness = (
-                "complete" if module_nodes >= module_capable_nodes else "incomplete"
+                "complete"
+                if context in complete_inventories
+                and module_nodes >= module_capable_nodes
+                else "incomplete"
             )
             ownership_completeness[context] = module_completeness
             coverage.append(
@@ -329,11 +388,15 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 }
             )
 
+        selection_complete = bool(selection_sources) and (
+            (context not in trees or context in complete_trees)
+            and (context not in inventories or context in complete_inventories)
+        )
         coverage.append(
             {
                 "context": context,
                 "kind": "selection",
-                "completeness": "complete",
+                "completeness": "complete" if selection_complete else "incomplete",
                 "truncation": "complete",
                 "evidence_sources": sorted(selection_sources),
             }

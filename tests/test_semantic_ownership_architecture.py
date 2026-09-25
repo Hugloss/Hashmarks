@@ -14,21 +14,9 @@ def _tree(path: Path) -> ast.AST:
     return read_python_ast(path).tree
 
 
-def test_dependency_core_cannot_branch_on_producer_format_or_import_adapters() -> None:
-    forbidden = (
-        "maven",
-        "uv-lock",
-        "gradle",
-        "npm",
-        "dependency-tree",
-        "dependency-list",
-        "classifier",
-        "groupId",
-        "artifactId",
-    )
+def test_codemap_cannot_import_dependency_adapters() -> None:
     violations: list[str] = []
-    for name in ("dependency_resolution_evidence.py", "dependency_resolution_query.py"):
-        path = CODEMAP / name
+    for path in sorted(CODEMAP.glob("*.py")):
         for node in ast.walk(_tree(path)):
             if isinstance(node, ast.Import):
                 modules = [alias.name for alias in node.names]
@@ -43,8 +31,30 @@ def test_dependency_core_cannot_branch_on_producer_format_or_import_adapters() -
                 modules = [module, *(f"{module}.{alias.name}" for alias in node.names)]
             else:
                 modules = []
-            if any(module.startswith("hashmarks.adapters") for module in modules):
-                violations.append(f"{name}:{node.lineno}:adapter import")
+            if any(
+                module == "hashmarks.adapters"
+                or module.startswith("hashmarks.adapters.")
+                for module in modules
+            ):
+                violations.append(f"{path.name}:{node.lineno}:adapter import")
+    assert violations == []
+
+
+def test_dependency_core_cannot_branch_on_producer_format() -> None:
+    forbidden = (
+        "maven",
+        "uv-lock",
+        "gradle",
+        "npm",
+        "dependency-tree",
+        "dependency-list",
+        "classifier",
+        "groupId",
+        "artifactId",
+    )
+    violations: list[str] = []
+    for path in sorted(CODEMAP.glob("dependency_resolution*.py")):
+        for node in ast.walk(_tree(path)):
             if isinstance(node, (ast.Compare, ast.Match)):
                 values = (
                     child.value
@@ -52,7 +62,7 @@ def test_dependency_core_cannot_branch_on_producer_format_or_import_adapters() -
                     if isinstance(child, ast.Constant) and isinstance(child.value, str)
                 )
                 if any(any(term in value for term in forbidden) for value in values):
-                    violations.append(f"{name}:{node.lineno}:producer branch")
+                    violations.append(f"{path.name}:{node.lineno}:producer branch")
     assert violations == []
 
 
