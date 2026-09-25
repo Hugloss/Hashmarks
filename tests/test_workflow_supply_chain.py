@@ -29,14 +29,20 @@ def test_external_github_actions_are_immutable_sha_pinned() -> None:
     assert not offenders, "mutable/unpinned workflow actions:\n" + "\n".join(offenders)
 
 
-def test_publish_workflow_uses_trusted_publishing_without_static_token() -> None:
+def test_publish_workflow_publishes_only_qualified_github_release_assets() -> None:
     text = (_root() / ".github" / "workflows" / "publish.yml").read_text(
         encoding="utf-8"
     )
-    assert "environment: pypi" in text
-    assert "id-token: write" in text
+    assert "Publish exact qualified bytes to GitHub Release" in text
+    assert "gh release upload" in text
+    assert "qualified-python-release-bundle" in text
+    assert "qualified-standalone-release-bundle" in text
+    assert "hashmarks-linux-x86_64.sha256" in text
+    assert "sha256sum -c hashmarks-linux-x86_64.sha256" in text
+    assert "environment: pypi" not in text
+    assert "id-token: write" not in text
     assert "PYPI_TOKEN" not in text
-    assert "pypa/gh-action-pypi-publish@" in text
+    assert "pypa/gh-action-pypi-publish@" not in text
 
 
 def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
