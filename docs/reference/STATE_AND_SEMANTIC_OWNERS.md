@@ -37,6 +37,8 @@ Similar-looking state words are not interchangeable. A consumer must know which 
 | External evidence claim | Request-scoped caller observation that may point into repository truth | `evidence_correlation.py` owns only the claim/correlation projection; repository facts remain with existing owners | Preserve the claim separately. Opaque metadata never becomes repository authority by naming convention. |
 | Evidence correlation resolution | Whether a bounded path/line/symbol/module claim maps uniquely, ambiguously, not at all, or conflicts with admitted repository evidence | `evidence_correlation.py` over canonical member observation plus bounded indexed symbol/module queries | State vocabulary is `resolved-unique | resolved-ambiguous | unresolved | claim-conflict`; it describes correspondence, never causation. |
 | Source equivalence | Whether explicitly qualified external source identity matches the correlated repository member/range identity | `evidence_correlation.py` comparison over repository-evidence binding identities | State vocabulary is `proven | mismatch | unknown`. Keep it independent from repository freshness and correlation resolution. |
+| Declaration correspondence/value | Whether provider-normalized declarations are scoped as the same conceptual fact and whether their resolved normalized values are equal, different, ambiguous, or insufficient for comparison | `repository_declaration_contract.py` + `repository_declarations.py`; exact repository evidence remains owned by repository-evidence bindings | Provider correspondence/value claims stay provider-claimed. Core does not infer correspondence, semantic compatibility, precedence, or a winning value. |
+| Declaration absence | Whether an expected declaration is proven missing inside a declared semantic scope | `repository_declaration_contract.py` over provider coverage plus explicit expected declaration membership | Absence is authoritative only for complete, explicitly non-truncated coverage. Otherwise unseen expected declarations remain unknown. |
 
 ## Evidence strengthening admission and persistence contract
 
@@ -228,3 +230,11 @@ It must reuse:
 - repository evidence binding delta for before/after repository change.
 
 It must not create a second repository observer, source identity, freshness model, completeness model, relationship graph, repository delta, persistent runtime-evidence store, or causal interpretation layer.
+
+## Repository declaration work
+
+`repository_declaration_contract.py` owns the producer-neutral request contract, scope/correspondence/value-state normalization, exact-value equality/difference classification, and coverage-qualified declaration absence. `repository_declarations.py` binds those provider claims to existing repository-evidence bindings and issues declaration/group observation identities. `repository_declaration_delta.py` owns only factual before/after comparison of those declaration packets.
+
+This is a new semantic projection owner for **declaration correspondence**, not a new repository observer. It must reuse canonical repository member/span observation, repository identity/generation, freshness, and evidence-binding identities. Semantic extraction, normalized values, expected membership, correspondence, and coverage remain provider claims unless a separate Hashmarks authority explicitly establishes them.
+
+Persistence class: **qualified external observation / derived-not-persisted**. Public Python surface: `CodeMap.repository_declarations(...)`. MCP surface: read-only `repository_declarations`. Explicit non-goals: universal metadata ontology, source-of-truth precedence, majority voting, fuzzy/model correspondence, edits, generated metadata repair, execution, and consumer workflow policy.
