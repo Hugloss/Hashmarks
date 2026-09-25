@@ -1013,6 +1013,40 @@ def test_v3_zero_length_path_does_not_consume_conditional_edges(
     assert result["omissions"] == []
 
 
+def test_v3_conditional_duplicate_does_not_weaken_unconditional_topology(
+    tmp_path: Path,
+) -> None:
+    changed = _snapshot_v3()
+    changed["relationships"].append(
+        {
+            "source": "app@1",
+            "target": "library@1",
+            "kind": "dependency",
+            "context": "compile",
+            "marker": "sys_platform == 'linux'",
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(changed)
+        result = codemap.dependency_resolution_queries(
+            observation,
+            [
+                {
+                    "operation": "dependencies",
+                    "node_id": "app@1",
+                    "context": "compile",
+                }
+            ],
+        )["results"][0]
+
+    assert [row["node_id"] for row in result["result"]] == ["library@1"]
+    assert result["completeness"] == "complete"
+    assert result["omissions"] == []
+
+
 def test_v3_duplicate_unconditional_edges_do_not_duplicate_node_paths(
     tmp_path: Path,
 ) -> None:
