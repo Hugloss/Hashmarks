@@ -60,9 +60,9 @@ Provider claims do not become repository truth merely because Hashmarks carries 
 
 ## No universal schema
 
-A declaration group has an opaque \`concept\` object and an opaque semantic \`scope\`.
+A declaration group has a non-empty opaque \`concept\` object and an opaque semantic \`scope\`.
 
-Core does not interpret either object.
+Core does not interpret either object. Declaration producer metadata, correspondence basis, and coverage provenance are required to be non-empty objects so semantic claims cannot silently lose the provenance that made them meaningful.
 
 For example, a provider may use:
 
@@ -118,16 +118,19 @@ Each declaration has:
 
 - a stable request-local \`declaration_id\`;
 - exact repository \`evidence\`;
-- opaque producer provenance;
+- non-empty opaque producer provenance;
 - \`value_state = resolved | ambiguous | unresolved\`;
 - a normalized \`value\` or bounded \`candidate_values\` when applicable.
 
+An ambiguous declaration requires at least two **distinct** normalized candidate values. Candidate alternatives are canonically ordered, so presentation order cannot change declaration observation identity.
+
 For uniquely declared correspondence:
 
-- fewer than two resolved declarations => \`comparison.state = insufficient\`;
+- any declaration whose exact repository evidence is not \`known-present\` => \`ambiguous\`;
+- fewer than two evidence-qualified resolved declarations => \`comparison.state = insufficient\`;
 - all normalized values equal => \`equivalent\`;
 - two or more normalized values differ => \`differing\`;
-- any unresolved/ambiguous value => \`ambiguous\`.
+- any unresolved/ambiguous provider value => \`ambiguous\`.
 
 Equality is canonical JSON equality over the provider-normalized value. Core does not add version-range, alias, compatibility, language, or organization-specific equivalence rules.
 
@@ -174,16 +177,10 @@ A group may provide:
 Only \`complete + complete\` coverage can turn an unseen expected declaration into:
 
 ~~~text
-absence.state = present
+absence.state = known-absent
 ~~~
 
-Otherwise Hashmarks reports:
-
-~~~text
-absence.state = unknown
-~~~
-
-and preserves the unseen expected IDs separately.
+When every explicitly expected declaration is observed with current evidence, the state is \`known-present\`. The result also exposes any current \`unexpected_declaration_ids\` when explicit expected membership was declared, without deciding whether those extra declarations are erroneous. Incomplete or truncated coverage reports \`unknown\` and preserves unseen expected IDs separately. If no expected membership is declared, absence is also \`unknown\` rather than inventing an expectation.
 
 Hashmarks does not invent expectations such as "every deployment must contain file X." Expected declaration membership is provider evidence.
 
