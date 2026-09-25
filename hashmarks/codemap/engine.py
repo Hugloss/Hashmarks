@@ -186,7 +186,9 @@ class CodeMap(
         # Missing tree-sitter support is expected and never affects Identity.
         self.range_provider = TreeSitterRangeProvider.auto()
         self.structural_search_provider = AstGrepSearchProvider(self.workspace)
-        self.project_graph_providers = default_project_graph_providers()
+        self.project_graph_providers = default_project_graph_providers(
+            self._visible_repository_manifests
+        )
         self.typescript_resolver = TypeScriptResolverProvider()
         self.pyright_type_server = PyrightTypeServerProvider()
         self._reverse_file_graph_cache: tuple[int, dict[str, set[str]]] | None = None
