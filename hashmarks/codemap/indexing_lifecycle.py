@@ -500,15 +500,8 @@ class IndexingLifecycleMixin:
             self = cast("CodeMap", self)
         rel = normalize_relative_path(prefix, allow_root=True)
         root = self.workspace if not rel else self.workspace / rel
-        if root.is_symlink():
+        if root.is_symlink() or (rel and not self._path_admitted_for_analysis(rel)):
             return
-        if rel and (
-            self._internal_path(rel)
-            or _is_pruned_relative_path(rel)
-            or not self.policy.decide(rel).index
-        ):
-            return
-
         if root.is_file():
             item = self._admitted_repository_file(root)
             if item is not None:
@@ -516,36 +509,13 @@ class IndexingLifecycleMixin:
             return
         if not root.is_dir():
             return
-
-        for current_root, dirs, files in os.walk(
-            root,
-            topdown=True,
-            followlinks=False,
-        ):
+        for current_root, dirs, files in os.walk(root, topdown=True, followlinks=False):
             root_path = Path(current_root)
             self._prune_discovery_dirs(root_path, dirs)
             for name in sorted(files):
                 item = self._admitted_repository_file(root_path / name)
                 if item is not None:
                     yield item
-
-    def _walk_admitted_repository_files(
-        self,
-        prefix: str = "",
-        *,
-        limit: int | None = None,
-        visible_only: bool = False,
-    ) -> tuple[_AdmittedRepositoryFile, ...]:
-        if limit is not None and limit < 1:
-            raise ValueError("limit must be positive")
-        admitted: list[_AdmittedRepositoryFile] = []
-        for item in self._iter_admitted_repository_files(prefix):
-            if visible_only and item.visibility is EvidenceVisibility.DENY:
-                continue
-            admitted.append(item)
-            if limit is not None and len(admitted) >= limit:
-                break
-        return tuple(admitted)
 
     def _indexable_discovered_file(
         self,
