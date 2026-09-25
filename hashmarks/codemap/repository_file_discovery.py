@@ -169,8 +169,7 @@ class RepositoryFileDiscoveryMixin:
         return tuple(
             item.path
             for item in self._iter_admitted_repository_files()
-            if item.path.name == name
-            and item.visibility is not EvidenceVisibility.DENY
+            if item.path.name == name and item.visibility is not EvidenceVisibility.DENY
         )
 
     def _repository_scope_has_visible_file(self, prefix: str) -> bool:
