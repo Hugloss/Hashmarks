@@ -328,7 +328,7 @@ class MyProvider:
         context: RepositoryDeclarationProviderContext,
     ) -> RepositoryDeclarationProviderResult:
         text = context.read_text("metadata.example")
-        groups = normalize_my_format(text)
+        groups = tuple(normalize_my_format(text))
         return RepositoryDeclarationProviderResult(
             groups=groups,
             provenance={"provider": self.name, "version": "1"},
