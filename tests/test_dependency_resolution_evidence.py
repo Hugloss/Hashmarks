@@ -940,7 +940,9 @@ def test_v3_graph_query_reports_conditional_relationship_omission(
         ][0]
 
     assert result["completeness"] == "incomplete"
-    assert result["omissions"] == [{"reason": "conditional-edge", "node_id": request["node_id"]}]
+    assert result["omissions"] == [
+        {"reason": "conditional-edge", "node_id": request["node_id"]}
+    ]
     if operation == "reachability":
         assert result["result"]["reachable"] is False
         assert result["result"]["negative_evidence"] == "not-admissible"
