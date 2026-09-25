@@ -342,7 +342,5 @@ def normalize_request(
         for binding in group_bindings
     ]
     if len(bindings) > MAX_DECLARATIONS:
-        raise ValueError(
-            f"declaration request exceeds {MAX_DECLARATIONS} declarations"
-        )
+        raise ValueError(f"declaration request exceeds {MAX_DECLARATIONS} declarations")
     return normalized_groups, bindings
