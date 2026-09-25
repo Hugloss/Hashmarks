@@ -127,13 +127,84 @@ def release_manifest(root: Path, dist: Path, *, tag: str) -> dict[str, object]:
         },
         "publication_authority": "external",
     }
+    payload["manifest_identity"] = _manifest_identity(payload)
+    return payload
+
+
+def _manifest_identity(payload: dict[str, object]) -> str:
     canonical = json.dumps(
         payload, sort_keys=True, separators=(",", ":"), allow_nan=False
     ).encode()
-    payload["manifest_identity"] = (
-        "sha256:" + hashlib.sha256(SCHEMA.encode() + b"\0" + canonical).hexdigest()
-    )
-    return payload
+    return "sha256:" + hashlib.sha256(SCHEMA.encode() + b"\0" + canonical).hexdigest()
+
+
+def verify_release_manifest(
+    dist: Path,
+    *,
+    tag: str,
+    recorded: dict[str, object],
+) -> None:
+    expected_keys = {
+        "schema",
+        "project",
+        "version",
+        "tag",
+        "distributions",
+        "qualification_dependency_resolution",
+        "publication_authority",
+        "manifest_identity",
+    }
+    if set(recorded) != expected_keys:
+        raise ValueError("release artifact manifest has unexpected fields")
+    if recorded["schema"] != SCHEMA:
+        raise ValueError("release artifact manifest schema mismatch")
+
+    name = str(recorded["project"])
+    version = str(recorded["version"])
+    if recorded["tag"] != tag or tag != f"v{version}":
+        raise ValueError(
+            f"release tag mismatch: manifest={recorded['tag']!r}, requested={tag!r}"
+        )
+    if recorded["publication_authority"] != "external":
+        raise ValueError("release publication authority mismatch")
+
+    lock = recorded["qualification_dependency_resolution"]
+    if not isinstance(lock, dict) or set(lock) != {"path", "sha256"}:
+        raise ValueError("release dependency-resolution identity is malformed")
+    if lock["path"] != "uv.lock":
+        raise ValueError("release dependency-resolution path mismatch")
+    lock_digest = str(lock["sha256"])
+    if (
+        not lock_digest.startswith("sha256:")
+        or len(lock_digest) != len("sha256:") + 64
+        or any(char not in "0123456789abcdef" for char in lock_digest[7:])
+    ):
+        raise ValueError("release dependency-resolution digest is malformed")
+
+    dist = dist.resolve()
+    expected_wheel = f"{name.replace('-', '_')}-{version}-py3-none-any.whl"
+    expected_sdist = f"{name}-{version}.tar.gz"
+    expected_entries = sorted((expected_wheel, expected_sdist))
+    entries = sorted(path.name for path in dist.iterdir())
+    if entries != expected_entries:
+        raise ValueError(
+            "release dist must contain exactly the manifest wheel and sdist; "
+            f"expected {expected_entries!r}, got {entries!r}"
+        )
+
+    rows = [
+        _distribution_row(dist / expected_wheel, kind="wheel"),
+        _distribution_row(dist / expected_sdist, kind="sdist"),
+    ]
+    if recorded["distributions"] != rows:
+        raise ValueError(
+            "release artifact manifest does not match downloaded distribution bytes"
+        )
+
+    payload = dict(recorded)
+    identity = str(payload.pop("manifest_identity"))
+    if identity != _manifest_identity(payload):
+        raise ValueError("release artifact manifest identity mismatch")
 
 
 def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
@@ -188,23 +259,22 @@ def _run_command(args) -> int:
         _log_command_output(f"Hashmarks release tag: PASS ({expected})")
         return 0
 
-    value = release_manifest(root, Path(args.dist), tag=args.tag)
-    if args.command == "manifest":
-        output = Path(args.output)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(
-            json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-        _write_sha256sums(value, Path(args.sha256sums))
-        _log_command_output(json.dumps(value, indent=2, sort_keys=True))
+    if args.command == "verify":
+        recorded = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
+        if not isinstance(recorded, dict):
+            raise ValueError("release artifact manifest must be a JSON object")
+        verify_release_manifest(Path(args.dist), tag=args.tag, recorded=recorded)
+        _log_command_output("Hashmarks release artifact manifest: PASS")
         return 0
 
-    recorded = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
-    if recorded != value:
-        raise SystemExit(
-            "release artifact manifest does not match current distribution bytes"
-        )
-    _log_command_output("Hashmarks release artifact manifest: PASS")
+    value = release_manifest(root, Path(args.dist), tag=args.tag)
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    _write_sha256sums(value, Path(args.sha256sums))
+    _log_command_output(json.dumps(value, indent=2, sort_keys=True))
     return 0
 
 
