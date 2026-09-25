@@ -986,6 +986,27 @@ def test_binding_delta_preserves_duplicate_evidence_multiplicity(
     assert changed["member_evidence"]["state"] == "preserved"
 
 
+def test_coverage_rejects_tampered_binding_packet(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("a\n", encoding="utf-8")
+    binding = [
+        {
+            "binding_id": "coverage-authenticated",
+            "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(binding)
+        packet["bindings"][0]["evidence"][0]["state"] = "known-absent"
+
+        with pytest.raises(ValueError, match="bindings identity mismatch"):
+            codemap.repository_evidence_coverage(
+                packet,
+                changed_paths=["a.py"],
+                change_set_complete=True,
+            )
+
+
 def test_coverage_rejects_delta_for_different_binding_packet(tmp_path: Path) -> None:
     source = tmp_path / "a.py"
     source.write_text("a\n", encoding="utf-8")
