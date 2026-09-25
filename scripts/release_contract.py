@@ -138,12 +138,11 @@ def _manifest_identity(payload: dict[str, object]) -> str:
     return "sha256:" + hashlib.sha256(SCHEMA.encode() + b"\0" + canonical).hexdigest()
 
 
-def verify_release_manifest(
-    dist: Path,
+def _validated_manifest_header(
+    recorded: dict[str, object],
     *,
     tag: str,
-    recorded: dict[str, object],
-) -> None:
+) -> tuple[str, str]:
     expected_keys = {
         "schema",
         "project",
@@ -167,20 +166,32 @@ def verify_release_manifest(
         )
     if recorded["publication_authority"] != "external":
         raise ValueError("release publication authority mismatch")
+    return name, version
 
+
+def _validate_lock_identity(recorded: dict[str, object]) -> None:
     lock = recorded["qualification_dependency_resolution"]
     if not isinstance(lock, dict) or set(lock) != {"path", "sha256"}:
         raise ValueError("release dependency-resolution identity is malformed")
     if lock["path"] != "uv.lock":
         raise ValueError("release dependency-resolution path mismatch")
+
     lock_digest = str(lock["sha256"])
+    digest = lock_digest.removeprefix("sha256:")
     if (
         not lock_digest.startswith("sha256:")
-        or len(lock_digest) != len("sha256:") + 64
-        or any(char not in "0123456789abcdef" for char in lock_digest[7:])
+        or len(digest) != 64
+        or any(char not in "0123456789abcdef" for char in digest)
     ):
         raise ValueError("release dependency-resolution digest is malformed")
 
+
+def _verified_distribution_rows(
+    dist: Path,
+    *,
+    name: str,
+    version: str,
+) -> list[dict[str, object]]:
     dist = dist.resolve()
     expected_wheel = f"{name.replace('-', '_')}-{version}-py3-none-any.whl"
     expected_sdist = f"{name}-{version}.tar.gz"
@@ -192,10 +203,22 @@ def verify_release_manifest(
             f"expected {expected_entries!r}, got {entries!r}"
         )
 
-    rows = [
+    return [
         _distribution_row(dist / expected_wheel, kind="wheel"),
         _distribution_row(dist / expected_sdist, kind="sdist"),
     ]
+
+
+def verify_release_manifest(
+    dist: Path,
+    *,
+    tag: str,
+    recorded: dict[str, object],
+) -> None:
+    name, version = _validated_manifest_header(recorded, tag=tag)
+    _validate_lock_identity(recorded)
+
+    rows = _verified_distribution_rows(dist, name=name, version=version)
     if recorded["distributions"] != rows:
         raise ValueError(
             "release artifact manifest does not match downloaded distribution bytes"
