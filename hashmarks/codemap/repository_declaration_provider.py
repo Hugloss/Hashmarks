@@ -36,14 +36,26 @@ class RepositoryDeclarationProviderResult:
     warnings: tuple[str, ...] = ()
 
 
-class RepositoryDeclarationProviderContext:
-    """Freshness-binding read context for one provider invocation.
+class RepositoryDeclarationProviderContext(Protocol):
+    """Read-only, revision-bound repository input surface for providers."""
 
-    Providers may use workspace for path enumeration, but every repository byte
-    that influences a semantic claim should be consumed through read_bytes or
-    read_text. Declaration evidence paths are required to have been read
-    through this context.
-    """
+    workspace: Path
+
+    def exists(self, path: str) -> bool:
+        """Return whether an admitted repository member is currently present."""
+        ...
+
+    def read_bytes(self, path: str) -> bytes:
+        """Read stable admitted repository bytes and bind their revision."""
+        ...
+
+    def read_text(self, path: str, *, encoding: str = "utf-8") -> str:
+        """Read stable admitted repository text and bind its revision."""
+        ...
+
+
+class _RepositoryDeclarationProviderContext:
+    """Concrete Hashmarks-owned provider input tracker."""
 
     def __init__(self, workspace: Path, read_member: _MemberReader) -> None:
         self.workspace = workspace
@@ -105,7 +117,7 @@ class RepositoryDeclarationProviderContext:
         self._record(normalized, observation, content=True)
         if observation.get("state") != "known-present" or raw is None:
             raise RepositoryDeclarationProviderError(
-                f"declaration provider cannot read current repository bytes for "
+                "declaration provider cannot read current repository bytes for "
                 f"{normalized}: {observation.get('state')}"
             )
         return raw
@@ -266,7 +278,7 @@ def _declared_evidence_paths(groups: Sequence[Mapping[str, object]]) -> set[str]
 def _provider_result(
     provider_name: str,
     result: object,
-    context: RepositoryDeclarationProviderContext,
+    context: _RepositoryDeclarationProviderContext,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     if not isinstance(result, RepositoryDeclarationProviderResult):
         raise RepositoryDeclarationProviderError(
@@ -333,7 +345,7 @@ def _collect_provider(
     name: str,
     provider: RepositoryDeclarationProvider,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
-    context = RepositoryDeclarationProviderContext(workspace, read_member)
+    context = _RepositoryDeclarationProviderContext(workspace, read_member)
     try:
         detected = provider.detect(context)
     except Exception as exc:
@@ -402,7 +414,7 @@ def validate_repository_declaration_provider_inputs(
                     f"declaration provider {name} input path is malformed"
                 )
             current, _raw = read_member(path, False)
-            if RepositoryDeclarationProviderContext._signature(current) != dict(
+            if _RepositoryDeclarationProviderContext._signature(current) != dict(
                 previous
             ):
                 raise RepositoryDeclarationProviderError(
