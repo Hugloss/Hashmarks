@@ -405,6 +405,33 @@ def test_previous_discovery_packet_is_tamper_checked(tmp_path: Path) -> None:
             )
 
 
+def test_previous_discovery_from_foreign_repository_fails_before_providers_run(
+    tmp_path: Path,
+) -> None:
+    first_repo = tmp_path / "first"
+    second_repo = tmp_path / "second"
+    first_repo.mkdir()
+    second_repo.mkdir()
+    (first_repo / "value.txt").write_text("value: same\n", encoding="utf-8")
+    (second_repo / "value.txt").write_text("value: same\n", encoding="utf-8")
+    provider = _SingleProvider("fixture-provider", "value.txt")
+
+    with CodeMap(first_repo, state_dir=tmp_path / "first-state") as first:
+        first.sync()
+        previous = first.discover_repository_declarations([provider])
+
+    with CodeMap(second_repo, state_dir=tmp_path / "second-state") as second:
+        second.sync()
+        with pytest.raises(
+            ValueError,
+            match="previous declaration discovery repository-mismatch",
+        ):
+            second.discover_repository_declarations(
+                [provider],
+                previous_observation=previous,
+            )
+
+
 def test_discovery_has_no_ambient_default_providers(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
