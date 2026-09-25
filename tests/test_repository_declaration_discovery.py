@@ -265,7 +265,12 @@ def test_not_detected_provider_is_observable_without_claiming_absence(
         packet = codemap.discover_repository_declarations([provider])
 
     assert packet["providers"] == [
-        {"name": "optional-provider", "state": "not-detected", "inputs": []}
+        {
+            "name": "optional-provider",
+            "state": "not-detected",
+            "inputs": [],
+            "enumerations": [],
+        }
     ]
     assert packet["declarations"]["groups"] == []
 
@@ -486,13 +491,21 @@ class _UnreadEvidenceProvider:
         )
 
 
+@dataclass
 class _MutatingProvider(_SingleProvider):
+    mutation_root: Path | None = None
+
     def discover(
         self,
         context: RepositoryDeclarationProviderContext,
     ) -> RepositoryDeclarationProviderResult:
         result = super().discover(context)
-        (context.workspace / self.path).write_text("value: changed\n", encoding="utf-8")
+        if self.mutation_root is None:
+            raise AssertionError("mutation root is required")
+        (self.mutation_root / self.path).write_text(
+            "value: changed\n",
+            encoding="utf-8",
+        )
         return result
 
 
@@ -514,7 +527,11 @@ def test_provider_input_change_after_parse_fails_closed(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "value.txt").write_text("value: before\n", encoding="utf-8")
-    provider = _MutatingProvider("mutating-provider", "value.txt")
+    provider = _MutatingProvider(
+        "mutating-provider",
+        "value.txt",
+        mutation_root=repo,
+    )
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.sync()
@@ -619,3 +636,149 @@ def test_helper_input_delta_does_not_masquerade_as_declaration_delta(
         before["declarations"]["observation_identity"]
         != after["declarations"]["observation_identity"]
     )
+
+
+
+@dataclass
+class _EnumeratingHelperProvider(_SingleProvider):
+    enumeration_prefix: str = "helpers"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        assert not hasattr(context, "workspace")
+        context.paths(self.enumeration_prefix)
+        return True
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        context.paths(self.enumeration_prefix)
+        return super().discover(context)
+
+
+def test_provider_path_enumeration_is_bounded_tracked_and_has_no_raw_workspace(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    helpers = repo / "helpers"
+    helpers.mkdir()
+    (helpers / "a.meta").write_text("helper: one\n", encoding="utf-8")
+    (helpers / "b.meta").write_text("helper: two\n", encoding="utf-8")
+    (repo / "value.txt").write_text("value: stable\n", encoding="utf-8")
+    provider = _EnumeratingHelperProvider("enumerating-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.discover_repository_declarations([provider])
+
+    provider_row = packet["providers"][0]
+    assert provider_row["enumerations"] == [
+        {
+            "prefix": "helpers",
+            "paths": ["helpers/a.meta", "helpers/b.meta"],
+        }
+    ]
+    assert packet["bounds"]["max_path_enumerations_per_provider"] == 32
+    assert packet["bounds"]["max_enumerated_paths_per_provider"] == 256
+
+
+def test_provider_path_enumeration_delta_is_separate_from_declaration_delta(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    helpers = repo / "helpers"
+    helpers.mkdir()
+    (helpers / "a.meta").write_text("helper: one\n", encoding="utf-8")
+    (repo / "value.txt").write_text("value: stable\n", encoding="utf-8")
+    provider = _EnumeratingHelperProvider("enumerating-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.discover_repository_declarations([provider])
+        (helpers / "b.meta").write_text("helper: two\n", encoding="utf-8")
+        codemap.sync(["helpers/b.meta"])
+        after = codemap.discover_repository_declarations(
+            [provider],
+            previous_observation=before,
+        )
+
+    delta = after["delta_from_previous"]
+    assert delta["providers"] == {
+        "added": [],
+        "removed": [],
+        "changed": ["enumerating-provider"],
+    }
+    assert delta["declarations"]["changed_groups"] == []
+    assert before["providers"][0]["enumerations"] != after["providers"][0]["enumerations"]
+
+
+class _TooBroadEnumerationProvider:
+    name = "too-broad-enumeration"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        context.paths("many")
+        return False
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        raise AssertionError("discovery must not run")
+
+
+def test_provider_path_enumeration_fails_closed_above_bound(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    many = repo / "many"
+    many.mkdir(parents=True)
+    for index in range(257):
+        (many / f"{index:03}.txt").write_text("value\n", encoding="utf-8")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="path enumeration exceeds 256 paths",
+        ):
+            codemap.discover_repository_declarations(
+                [_TooBroadEnumerationProvider()]
+            )
+
+
+class _RootEnumerationProvider:
+    name = "root-enumeration"
+
+    def __init__(self) -> None:
+        self.paths: tuple[str, ...] = ()
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        self.paths = context.paths()
+        return False
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        raise AssertionError("discovery must not run")
+
+
+def test_provider_path_enumeration_respects_pruned_repository_scope(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "visible.txt").write_text("value\n", encoding="utf-8")
+    hidden = repo / "node_modules" / "pkg"
+    hidden.mkdir(parents=True)
+    (hidden / "hidden.txt").write_text("hidden\n", encoding="utf-8")
+    provider = _RootEnumerationProvider()
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.discover_repository_declarations([provider])
+
+    assert provider.paths == ("visible.txt",)
+    assert packet["providers"][0]["enumerations"] == [
+        {"prefix": "", "paths": ["visible.txt"]}
+    ]
