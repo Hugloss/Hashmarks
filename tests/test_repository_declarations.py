@@ -518,10 +518,7 @@ def test_ambiguous_candidate_order_does_not_change_observation_identity(
         first = codemap.repository_declarations([ambiguous(["b", "a"])])
         second = codemap.repository_declarations([ambiguous(["a", "b"])])
 
-    assert (
-        first["observation_identity"]
-        == second["observation_identity"]
-    )
+    assert first["observation_identity"] == second["observation_identity"]
     assert first["groups"][0]["declarations"][0]["candidate_values"] == ["a", "b"]
 
 
@@ -539,9 +536,7 @@ def test_expected_membership_exposes_unexpected_current_declaration(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.sync()
-        packet = codemap.repository_declarations(
-            [_group(declarations, expected=["a"])]
-        )
+        packet = codemap.repository_declarations([_group(declarations, expected=["a"])])
 
     assert packet["groups"][0]["absence"] == {
         "state": "known-present",
