@@ -1030,3 +1030,33 @@ def test_provider_revalidation_rejects_duplicate_input_rows_before_reread(
                 packet["providers"],
             )
 
+def test_provider_revalidation_rejects_duplicate_enumeration_prefixes(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    helpers = repo / "helpers"
+    helpers.mkdir()
+    (helpers / "a.meta").write_text("a\n", encoding="utf-8")
+    (repo / "value.txt").write_text("value: stable\n", encoding="utf-8")
+    provider = _EnumeratingHelperProvider("enumerating-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.discover_repository_declarations([provider])
+        observation = packet["providers"][0]
+        observation["enumerations"].append(dict(observation["enumerations"][0]))
+        from hashmarks.codemap.repository_declaration_provider import (
+            validate_repository_declaration_provider_inputs,
+        )
+
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="enumeration prefixes are duplicated",
+        ):
+            validate_repository_declaration_provider_inputs(
+                codemap._declaration_provider_member_read,
+                codemap._declaration_provider_paths,
+                packet["providers"],
+            )
+
