@@ -132,6 +132,21 @@ def test_prior_map_invalidates_only_changed_evidence_identity(tmp_path: Path) ->
     )
 
 
+def test_prior_map_accepts_authenticated_same_task_scope(tmp_path: Path) -> None:
+    task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.evidence_freshness_map(task, ["src/case/engine.py"])
+        after = codemap.evidence_freshness_map(
+            task,
+            ["src/case/engine.py"],
+            previous_map=before,
+        )
+
+    assert after["prior"]
+    assert all(row["state"] == "current" for row in after["prior"])
+
+
 def test_prior_map_rejects_tampered_retained_evidence(tmp_path: Path) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
