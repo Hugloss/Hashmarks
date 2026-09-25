@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from pathlib import Path
 
 _SHA_PIN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}(?:\s+#.*)?$")
@@ -53,6 +54,17 @@ def test_publish_workflow_is_reviewed_request_driven_and_github_native() -> None
     assert "id-token: write" not in text
     assert "PYPI_TOKEN" not in text
     assert "pypa/gh-action-pypi-publish@" not in text
+
+
+def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
+    request = tomllib.loads(
+        (_root() / ".github" / "release-request.toml").read_text(encoding="utf-8")
+    )
+
+    assert set(request) == {"version"}
+    version = request["version"]
+    assert isinstance(version, str)
+    assert re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+", version)
 
 
 def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
