@@ -230,6 +230,30 @@ def _provider_groups(
     return [group for group in normalized if isinstance(group, dict)]
 
 
+def _provider_evidence_path(item: object) -> str | None:
+    if not isinstance(item, Mapping) or not isinstance(item.get("path"), str):
+        return None
+    try:
+        return normalize_relative_path(str(item["path"]), allow_root=False)
+    except ValueError as exc:
+        raise RepositoryDeclarationProviderError(
+            "declaration provider evidence path is invalid"
+        ) from exc
+
+
+def _declaration_evidence_paths(declaration: object) -> set[str]:
+    if not isinstance(declaration, Mapping):
+        return set()
+    evidence = declaration.get("evidence")
+    if not isinstance(evidence, list):
+        return set()
+    return {
+        path
+        for item in evidence
+        if (path := _provider_evidence_path(item)) is not None
+    }
+
+
 def _declared_evidence_paths(groups: Sequence[Mapping[str, object]]) -> set[str]:
     paths: set[str] = set()
     for group in groups:
@@ -237,24 +261,7 @@ def _declared_evidence_paths(groups: Sequence[Mapping[str, object]]) -> set[str]
         if not isinstance(declarations, list):
             continue
         for declaration in declarations:
-            if not isinstance(declaration, Mapping):
-                continue
-            evidence = declaration.get("evidence")
-            if not isinstance(evidence, list):
-                continue
-            for item in evidence:
-                if isinstance(item, Mapping) and isinstance(item.get("path"), str):
-                    try:
-                        paths.add(
-                            normalize_relative_path(
-                                str(item["path"]),
-                                allow_root=False,
-                            )
-                        )
-                    except ValueError as exc:
-                        raise RepositoryDeclarationProviderError(
-                            "declaration provider evidence path is invalid"
-                        ) from exc
+            paths.update(_declaration_evidence_paths(declaration))
     return paths
 
 
@@ -304,59 +311,73 @@ def _provider_result(
     }
 
 
-def collect_repository_declaration_providers(
-    workspace: Path,
-    read_member: _MemberReader,
+def _named_providers(
     providers: Sequence[RepositoryDeclarationProvider],
-) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-    """Run explicit providers deterministically and fail closed on provider errors."""
+) -> list[tuple[str, RepositoryDeclarationProvider]]:
     if not isinstance(providers, Sequence) or isinstance(providers, (str, bytes)):
         raise RepositoryDeclarationProviderError("providers must be a sequence")
     if len(providers) > MAX_DECLARATION_PROVIDERS:
         raise RepositoryDeclarationProviderError(
             f"providers exceeds {MAX_DECLARATION_PROVIDERS} entries"
         )
-
     named = [(_provider_name(provider), provider) for provider in providers]
     names = [name for name, _provider in named]
     if len(set(names)) != len(names):
         raise RepositoryDeclarationProviderError(
             "declaration provider names must be unique"
         )
+    return sorted(named, key=lambda item: item[0])
 
+
+def _collect_provider(
+    workspace: Path,
+    read_member: _MemberReader,
+    name: str,
+    provider: RepositoryDeclarationProvider,
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    context = RepositoryDeclarationProviderContext(workspace, read_member)
+    try:
+        detected = provider.detect(context)
+    except Exception as exc:
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {name} detection failed: {exc}"
+        ) from exc
+    if not isinstance(detected, bool):
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {name} detect() must return bool"
+        )
+    if not detected:
+        return [], {
+            "name": name,
+            "state": "not-detected",
+            "inputs": context.input_observations(),
+        }
+    try:
+        result = provider.discover(context)
+    except Exception as exc:
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {name} discovery failed: {exc}"
+        ) from exc
+    return _provider_result(name, result, context)
+
+
+def collect_repository_declaration_providers(
+    workspace: Path,
+    read_member: _MemberReader,
+    providers: Sequence[RepositoryDeclarationProvider],
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    """Run explicit providers deterministically and fail closed on provider errors."""
     groups: list[dict[str, object]] = []
     observations: list[dict[str, object]] = []
-    for name, provider in sorted(named, key=lambda item: item[0]):
-        context = RepositoryDeclarationProviderContext(workspace, read_member)
-        try:
-            detected = provider.detect(context)
-        except Exception as exc:
-            raise RepositoryDeclarationProviderError(
-                f"declaration provider {name} detection failed: {exc}"
-            ) from exc
-        if not isinstance(detected, bool):
-            raise RepositoryDeclarationProviderError(
-                f"declaration provider {name} detect() must return bool"
-            )
-        if not detected:
-            observations.append(
-                {
-                    "name": name,
-                    "state": "not-detected",
-                    "inputs": context.input_observations(),
-                }
-            )
-            continue
-        try:
-            result = provider.discover(context)
-        except Exception as exc:
-            raise RepositoryDeclarationProviderError(
-                f"declaration provider {name} discovery failed: {exc}"
-            ) from exc
-        provider_groups, observation = _provider_result(name, result, context)
+    for name, provider in _named_providers(providers):
+        provider_groups, observation = _collect_provider(
+            workspace,
+            read_member,
+            name,
+            provider,
+        )
         groups.extend(provider_groups)
         observations.append(observation)
-
     return groups, observations
 
 
