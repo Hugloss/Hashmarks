@@ -344,7 +344,7 @@ Run `hashmarks --help` for the complete command surface.
 
 ### Is Hashmarks an MCP server?
 
-Yes. `pip install "hashmarks[mcp]"` adds the official MCP Python SDK and enables a local read-only stdio MCP server. The same package also works directly as a CLI and Python library.
+Yes. The standalone Hashmarks executable from GitHub Releases includes the local read-only stdio MCP server and runtime. Install it with the checksum-verifying `install.sh`; no separate Python or MCP package installation is required for the end-user CLI/MCP path.
 
 ### Does Hashmarks work with Claude Code, Codex, OpenCode, and Pi?
 

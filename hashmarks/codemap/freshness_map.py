@@ -94,22 +94,6 @@ class EvidenceFreshnessMapMixin:
         *,
         expected_task_identity: str,
     ) -> tuple[str, str]:
-        repository_identity, task_identity = self._validate_prior_scope(
-            previous_map,
-            expected_task_identity=expected_task_identity,
-        )
-        return repository_identity, task_identity
-
-    def _prior_entries(
-        self,
-        previous_map: Mapping[str, object] | None,
-        *,
-        expected_task_identity: str,
-    ) -> list[Mapping[str, object]]:
-        if previous_map is None:
-            return []
-        if not isinstance(previous_map, Mapping):
-            raise ValueError("previous_map must be an object")
         if previous_map.get("schema") != "hashmarks.evidence-freshness-map.v1":
             raise ValueError(
                 "previous_map must be a hashmarks.evidence-freshness-map.v1 packet"
@@ -123,6 +107,22 @@ class EvidenceFreshnessMapMixin:
         task_identity = str(previous_map.get("task_identity") or "")
         if task_identity != expected_task_identity:
             raise ValueError("previous_map task-mismatch")
+        return repository_identity, task_identity
+
+    def _prior_entries(
+        self,
+        previous_map: Mapping[str, object] | None,
+        *,
+        expected_task_identity: str,
+    ) -> list[Mapping[str, object]]:
+        if previous_map is None:
+            return []
+        if not isinstance(previous_map, Mapping):
+            raise ValueError("previous_map must be an object")
+        repository_identity, task_identity = self._validate_prior_scope(
+            previous_map,
+            expected_task_identity=expected_task_identity,
+        )
         entries = previous_map.get("entries")
         if not isinstance(entries, list) or any(
             not isinstance(row, Mapping) for row in entries
