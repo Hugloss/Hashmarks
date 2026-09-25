@@ -42,32 +42,32 @@ class EvidenceFreshnessMixin:
     def _evidence_key(self, kind: str, producer: str) -> str:
         return f"native_evidence:{kind}:{producer}"
 
-    def _manifest_observation(self, relpath: str) -> tuple[bool, str | None]:
+    def _manifest_admitted(self, relpath: str) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        path = self.workspace / relpath
+        decision = self.policy.decide(relpath)
+        return (
+            self._path_admitted_for_analysis(relpath)
+            and decision.evidence_visibility.value != "deny"
+            and not path.is_symlink()
+        )
+
+    def _manifest_digest(self, relpath: str) -> str | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         try:
             rel = normalize_relative_path(relpath, allow_root=False)
         except ValueError:
-            return False, None
-        if not self._path_admitted_for_analysis(rel):
-            return False, None
-        decision = self.policy.decide(rel)
-        if decision.evidence_visibility.value == "deny":
-            return False, None
+            return None
         path = self.workspace / rel
-        if path.is_symlink():
-            return False, None
-        if not path.is_file():
-            return True, None
+        if path.is_symlink() or not path.is_file():
+            return None
         try:
             data = path.read_bytes()
         except OSError:
-            return False, None
-        return True, hashlib.sha256(data).hexdigest()
-
-    def _manifest_digest(self, relpath: str) -> str | None:
-        admitted, digest = self._manifest_observation(relpath)
-        return digest if admitted else None
+            return None
+        return hashlib.sha256(data).hexdigest()
 
     def _record_evidence_snapshot(
         self,
@@ -87,11 +87,10 @@ class EvidenceFreshnessMixin:
             except ValueError:
                 inadmissible_manifest_count += 1
                 continue
-            admitted, digest = self._manifest_observation(rel)
-            if not admitted:
+            if not self._manifest_admitted(rel):
                 inadmissible_manifest_count += 1
                 continue
-            manifest_rows[rel] = digest
+            manifest_rows[rel] = self._manifest_digest(rel)
         value = {
             "generation": self.store.generation(),
             "bind_generation": bool(bind_generation),
@@ -123,12 +122,12 @@ class EvidenceFreshnessMixin:
         manifests = value.get("manifests") or {}
         if not isinstance(manifests, dict):
             return ()
-        changed: list[str] = []
-        for rel, expected in manifests.items():
-            admitted, digest = self._manifest_observation(str(rel))
-            if not admitted or digest != expected:
-                changed.append(str(rel))
-        return tuple(changed)
+        return tuple(
+            str(rel)
+            for rel, expected in manifests.items()
+            if not self._manifest_admitted(str(rel))
+            or self._manifest_digest(str(rel)) != expected
+        )
 
     def _declared_project_shared_input(self, relpath: str) -> bool:
         if TYPE_CHECKING:
@@ -182,31 +181,46 @@ class EvidenceFreshnessMixin:
             )
         return True, None
 
+    def _snapshot_manifests(
+        self,
+        value: dict[str, object],
+    ) -> tuple[dict[object, object] | None, str | None]:
+        inadmissible = _inadmissible_manifest_count(value)
+        if inadmissible is None:
+            return None, "invalid manifest admission snapshot"
+        if inadmissible > 0:
+            return None, "evidence manifest outside repository admission"
+        manifests = value.get("manifests") or {}
+        if not isinstance(manifests, dict):
+            return None, "invalid manifest snapshot"
+        return manifests, None
+
+    def _manifest_snapshot_fresh(
+        self,
+        manifests: dict[object, object],
+    ) -> tuple[bool, str | None]:
+        for rel, expected in manifests.items():
+            path = str(rel)
+            if not self._manifest_admitted(path):
+                return False, "evidence manifest outside repository admission"
+            if self._manifest_digest(path) != expected:
+                return False, f"manifest changed: {rel}"
+        return True, None
+
     def _evidence_fresh(self, kind: str, producer: str) -> tuple[bool, str | None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         value = self._evidence_snapshot(kind, producer)
         if value is None:
             return False, "no freshness snapshot"
-        inadmissible = _inadmissible_manifest_count(value)
-        if inadmissible is None:
-            return False, "invalid manifest admission snapshot"
-        if inadmissible > 0:
-            return False, "evidence manifest outside repository admission"
         if bool(value.get("bind_generation", False)):
             fresh, reason = self._generation_snapshot_fresh(value)
             if not fresh:
                 return fresh, reason
-        manifests = value.get("manifests") or {}
-        if not isinstance(manifests, dict):
-            return False, "invalid manifest snapshot"
-        for rel, expected in manifests.items():
-            admitted, digest = self._manifest_observation(str(rel))
-            if not admitted:
-                return False, "evidence manifest outside repository admission"
-            if digest != expected:
-                return False, f"manifest changed: {rel}"
-        return True, None
+        manifests, reason = self._snapshot_manifests(value)
+        if manifests is None:
+            return False, reason
+        return self._manifest_snapshot_fresh(manifests)
 
     def _fresh_native_file_edges(self) -> list[dict]:
         if TYPE_CHECKING:
