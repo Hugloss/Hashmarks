@@ -443,6 +443,36 @@ def test_cross_provider_group_identity_collision_fails_closed(tmp_path: Path) ->
             codemap.discover_repository_declarations([first, second])
 
 
+@dataclass
+class _DuplicateGroupProvider(_SingleProvider):
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        result = super().discover(context)
+        return RepositoryDeclarationProviderResult(
+            groups=(result.groups[0], result.groups[0]),
+            provenance={"provider": self.name},
+        )
+
+
+def test_duplicate_group_identity_from_one_provider_fails_at_provider_boundary(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value: stable\n", encoding="utf-8")
+    provider = _DuplicateGroupProvider("duplicate-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="returned duplicate group_id values",
+        ):
+            codemap.discover_repository_declarations([provider])
+
+
 class _UnreadEvidenceProvider:
     name = "unread-evidence"
 
