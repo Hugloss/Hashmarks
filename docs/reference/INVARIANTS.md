@@ -164,6 +164,12 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **G50. Declaration deltas are factual and tamper-detecting.** Previous declaration observations must validate their Hashmarks-issued observation identity before comparison. Deltas may report changed definitions, values, provider observations/provenance, correspondence, coverage, equivalence/difference, or absence, but never whether a change is correct or desirable. Exact repository-evidence and observer deltas remain owned by the existing repository-evidence-binding delta authority.
 
+**G51. Declaration provider discovery is explicit, deterministic composition.** Hashmarks runs only caller-selected provider objects, canonicalizes provider order, requires unique provider names, and records provider provenance separately from nested declaration evidence. Ambient entry-point discovery, repository-supplied code loading, and hidden default providers are not authority.
+
+**G52. Provider detection and semantic absence are different facts.** `not-detected` means only that one selected provider did not apply. A detected provider failure must fail the discovery call closed; neither state may be converted into declaration absence. Negative declaration evidence still requires the nested complete, untruncated coverage contract.
+
+**G53. Provider execution does not cross the MCP boundary.** MCP may transport already normalized declaration claims into the read-only declaration qualification surface, but it must not dynamically import or execute arbitrary Python declaration providers.
+
 ## Product-boundary constitution
 
 Hashmarks is a repository observer that exposes repository intelligence, not an autonomous coding agent, policy engine, or execution engine.
