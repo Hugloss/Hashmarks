@@ -55,7 +55,7 @@ For a normal release, the reviewed release-request merge SHA becomes the release
 9. verifies any existing release tag still resolves to the exact release-source SHA;
 10. creates a draft GitHub Release, uploads only the qualified public assets, and publishes the draft after all checks pass.
 
-The release workflow does not automatically publish to PyPI. A failed or cancelled Publish run is not a completed release.
+Hashmarks publishes these qualified artifacts through GitHub Releases. The release workflow does not automatically publish to PyPI. A failed or cancelled Publish run is not a completed release.
 
 The public GitHub Release contains:
 
