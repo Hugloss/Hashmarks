@@ -1315,11 +1315,7 @@ def test_binding_delta_keeps_observer_change_separate_from_repository_change(
         }
         after["bindings_identity"] = "sha256:" + codemap._packet_digest(
             "hashmarks.repository-evidence-bindings.v1",
-            {
-                key: value
-                for key, value in after.items()
-                if key != "bindings_identity"
-            },
+            {key: value for key, value in after.items() if key != "bindings_identity"},
         )
         delta = codemap.repository_evidence_binding_delta(before, after)
 
