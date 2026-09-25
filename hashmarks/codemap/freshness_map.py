@@ -91,6 +91,8 @@ class EvidenceFreshnessMapMixin:
     def _prior_entries(
         self,
         previous_map: Mapping[str, object] | None,
+        *,
+        expected_task_identity: str,
     ) -> list[Mapping[str, object]]:
         if previous_map is None:
             return []
@@ -107,6 +109,8 @@ class EvidenceFreshnessMapMixin:
         if repository_identity != self._repository_packet_identity():
             raise ValueError("previous_map repository-mismatch")
         task_identity = str(previous_map.get("task_identity") or "")
+        if task_identity != expected_task_identity:
+            raise ValueError("previous_map task-mismatch")
         entries = previous_map.get("entries")
         if not isinstance(entries, list) or any(
             not isinstance(row, Mapping) for row in entries
@@ -294,7 +298,10 @@ class EvidenceFreshnessMapMixin:
     ) -> list[dict[str, object]]:
         current_by_key = {self._prior_key(row): row for row in entries}
         prior: list[dict[str, object]] = []
-        for old in self._prior_entries(previous_map):
+        for old in self._prior_entries(
+            previous_map,
+            expected_task_identity=entries[0]["task_identity"] if entries else "",
+        ):
             key = self._prior_key(old)
             current = current_by_key.get(key)
             old_identity = str(old.get("evidence_identity") or "")
