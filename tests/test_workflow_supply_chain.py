@@ -40,11 +40,19 @@ def test_publish_workflow_uses_trusted_publishing_without_static_token() -> None
 
 
 def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
+    job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\n")
     for name in ("ci.yml", "publish.yml"):
         text = (_root() / ".github" / "workflows" / name).read_text(encoding="utf-8")
-        assert text.count("    runs-on: ubuntu-latest") == text.count(
-            "    timeout-minutes:"
-        )
+        jobs = text.split("jobs:\n", 1)[1]
+        matches = list(job_heading.finditer(jobs))
+        assert matches
+        for index, match in enumerate(matches):
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(jobs)
+            block = jobs[match.end() : end]
+            assert "    runs-on:" in block, f"{name}:{match.group(1)} has no runner"
+            assert "    timeout-minutes:" in block, (
+                f"{name}:{match.group(1)} has no bounded timeout"
+            )
 
 
 def test_ci_checkout_does_not_persist_git_credentials() -> None:

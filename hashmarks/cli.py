@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import shutil
 import subprocess
 import sys
 import time
@@ -45,6 +46,23 @@ def _print(value) -> None:
     log_command_output(logger, json.dumps(value, indent=2, sort_keys=True))
 
 
+def _daemon_serve_command(workspace: Path, state: Path) -> list[str]:
+    command = [sys.executable]
+    if not getattr(sys, "frozen", False):
+        command.extend(["-m", "hashmarks.cli"])
+    command.extend(
+        [
+            "--workspace",
+            str(workspace),
+            "--state-dir",
+            str(state),
+            "daemon",
+            "serve",
+        ]
+    )
+    return command
+
+
 def _daemon_start(args) -> int:
     client = _client(args)
     try:
@@ -69,17 +87,7 @@ def _daemon_start(args) -> int:
     state.mkdir(parents=True, exist_ok=True)
     log_path = state / "identity-daemon.log"
     log = log_path.open("ab", buffering=0)
-    cmd = [
-        sys.executable,
-        "-m",
-        "hashmarks.cli",
-        "--workspace",
-        str(workspace),
-        "--state-dir",
-        str(state),
-        "daemon",
-        "serve",
-    ]
+    cmd = _daemon_serve_command(workspace, state)
     subprocess.Popen(
         cmd,
         stdin=subprocess.DEVNULL,
@@ -161,6 +169,51 @@ def _mcp(args) -> int:
     return 0
 
 
+def _installed_hashmarks_executable() -> Path:
+    if getattr(sys, "frozen", False):
+        return canonical_host_path(sys.executable)
+    resolved = shutil.which("hashmarks")
+    if resolved is None:
+        raise UserFacingError(
+            "hashmarks executable is not on PATH; install the standalone binary first"
+        )
+    return canonical_host_path(resolved)
+
+
+def _install(args) -> int:
+    if not args.opencode:
+        raise UserFacingError("choose a host to register, for example --opencode")
+    opencode = shutil.which("opencode")
+    if opencode is None:
+        raise UserFacingError("opencode executable is not on PATH")
+    executable = _installed_hashmarks_executable()
+    command = [
+        opencode,
+        "mcp",
+        "add",
+        "hashmarks",
+        "--",
+        str(executable),
+        "--workspace",
+        ".",
+        "mcp",
+    ]
+    result = subprocess.run(command, check=False)
+    if result.returncode != 0:
+        raise UserFacingError(
+            f"OpenCode rejected Hashmarks MCP registration (exit {result.returncode})"
+        )
+    _print(
+        {
+            "host": "opencode",
+            "registered": True,
+            "hashmarks": str(executable),
+            "workspace": ".",
+        }
+    )
+    return 0
+
+
 def _add_mode_argument(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--mode",
@@ -228,6 +281,11 @@ def _add_identity_cli(sub) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="hashmarks")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"hashmarks version {__version__}",
+    )
     _add_common_arguments(parser)
     sub = parser.add_subparsers(dest="command", required=True)
     _add_daemon_cli(sub)
@@ -237,6 +295,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     _add_common_arguments(mcp, inherited=True)
     mcp.set_defaults(func=_mcp)
+    install = sub.add_parser(
+        "install", help="register the installed Hashmarks executable with agent hosts"
+    )
+    install.add_argument("--opencode", action="store_true")
+    install.set_defaults(func=_install)
     from .repository_cli import add_repository_cli
 
     add_repository_cli(sub, add_common_arguments=_add_common_arguments)

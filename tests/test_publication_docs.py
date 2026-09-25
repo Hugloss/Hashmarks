@@ -190,16 +190,17 @@ def test_generated_agent_evaluation_state_is_not_committed() -> None:
     )
 
 
-def test_public_onboarding_leads_with_installed_package_not_source_checkout() -> None:
+def test_public_onboarding_leads_with_standalone_install_not_source_checkout() -> None:
     readme = _text("README.md")
     getting_started = _text("docs/GETTING_STARTED.md")
-    assert "pip install hashmarks" in readme
-    assert readme.index("pip install hashmarks") < readme.index("make init")
-    assert "pip install hashmarks" in getting_started
-    assert getting_started.index("pip install hashmarks") < getting_started.index(
-        "make init"
+    installer = "raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh"
+    assert installer in readme
+    assert readme.index(installer) < readme.index("make init")
+    assert installer in getting_started
+    assert getting_started.index(installer) < getting_started.index("make init")
+    assert (
+        "Python, Git, and `uv` are development/qualification tools" in getting_started
     )
-    assert "Git and `uv` are development/qualification tools" in getting_started
 
 
 def test_agent_evaluation_executables_are_isolated_from_product_script_root() -> None:
