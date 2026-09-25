@@ -218,7 +218,10 @@ The contract separates definition from observation.
 - exact repository-evidence observations;
 - comparison and absence result.
 
-Each declaration likewise has definition and observation identities.
+Each declaration likewise has definition and observation identities. A
+declaration definition also binds the existing repository-evidence binding
+definition, so moving a declaration to a different file/range cannot masquerade
+as the same declaration definition.
 
 A previous packet is revalidated before delta. Mutation under an old identity is rejected.
 
@@ -226,13 +229,16 @@ The factual delta reports:
 
 - added/removed groups;
 - added/removed declarations;
-- value changes;
-- evidence/provenance changes;
-- definition changes;
+- declaration/group definition changes;
+- normalized value changes;
+- observation/provenance changes;
 - correspondence changes;
 - coverage changes;
-- comparison/absence changes;
-- repository and observer change.
+- comparison/absence changes.
+
+Exact repository/observer change is not reimplemented here. Declaration delta
+composes the existing repository-evidence-binding delta authority, which keeps
+repository evidence and observer-capability change distinct.
 
 A delta does not say whether any change is correct or desirable.
 
