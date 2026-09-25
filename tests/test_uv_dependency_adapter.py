@@ -184,7 +184,7 @@ source = {{ virtual = "." }}
 @pytest.mark.parametrize(
     ("dependency", "message"),
     [
-        ('{ name = 123 }', "uv lock dependency name must be a string"),
+        ("{ name = 123 }", "uv lock dependency name must be a string"),
         (
             '{ name = "dep", version = 1 }',
             "uv lock dependency version must be a string",
