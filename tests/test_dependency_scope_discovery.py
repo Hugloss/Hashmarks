@@ -69,20 +69,20 @@ def test_incremental_scope_pruning_is_segment_aware(tmp_path: Path) -> None:
 def test_incremental_scope_removes_previously_admitted_dependency_rows(
     tmp_path: Path, monkeypatch
 ) -> None:
-    import hashmarks.codemap.indexing_lifecycle as lifecycle
+    import hashmarks.codemap.repository_file_discovery as discovery
 
     paths = _write_scope_fixture(tmp_path)
     dep_rel = paths["venv_dep"].relative_to(tmp_path).as_posix()
-    original_prune_dirs = lifecycle._PRUNE_DIRS
+    original_prune_dirs = discovery._PRUNE_DIRS
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         # Simulate a pre-HM299 incremental admission through the same public
         # CodeMap surface, then restore the current scope contract.
-        monkeypatch.setattr(lifecycle, "_PRUNE_DIRS", original_prune_dirs - {".venv"})
+        monkeypatch.setattr(discovery, "_PRUNE_DIRS", original_prune_dirs - {".venv"})
         historical = codemap.sync(paths=[dep_rel])
         assert historical.discovered == 1
         assert dep_rel in codemap.store.paths()
 
-        monkeypatch.setattr(lifecycle, "_PRUNE_DIRS", original_prune_dirs)
+        monkeypatch.setattr(discovery, "_PRUNE_DIRS", original_prune_dirs)
         result = codemap.sync(paths=[dep_rel])
         assert result.discovered == 0
         assert dep_rel not in codemap.store.paths()
