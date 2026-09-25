@@ -4,15 +4,11 @@ import argparse
 import email
 import hashlib
 import json
-import logging
 import sys
 import tarfile
 import tomllib
 import zipfile
 from pathlib import Path
-
-logger = logging.getLogger(__name__)
-
 
 def _log_command_output(*values: object) -> None:
     sys.stdout.write(" ".join(str(value) for value in values) + "\n")
