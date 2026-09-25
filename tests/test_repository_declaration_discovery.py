@@ -638,7 +638,6 @@ def test_helper_input_delta_does_not_masquerade_as_declaration_delta(
     )
 
 
-
 @dataclass
 class _EnumeratingHelperProvider(_SingleProvider):
     enumeration_prefix: str = "helpers"
@@ -711,7 +710,9 @@ def test_provider_path_enumeration_delta_is_separate_from_declaration_delta(
         "changed": ["enumerating-provider"],
     }
     assert delta["declarations"]["changed_groups"] == []
-    assert before["providers"][0]["enumerations"] != after["providers"][0]["enumerations"]
+    assert (
+        before["providers"][0]["enumerations"] != after["providers"][0]["enumerations"]
+    )
 
 
 class _TooBroadEnumerationProvider:
@@ -741,9 +742,7 @@ def test_provider_path_enumeration_fails_closed_above_bound(tmp_path: Path) -> N
             RepositoryDeclarationProviderError,
             match="path enumeration exceeds 256 paths",
         ):
-            codemap.discover_repository_declarations(
-                [_TooBroadEnumerationProvider()]
-            )
+            codemap.discover_repository_declarations([_TooBroadEnumerationProvider()])
 
 
 class _RootEnumerationProvider:
