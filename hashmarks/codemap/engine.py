@@ -54,6 +54,7 @@ from .python_ast import estimate_tokens
 from .query_surface import QuerySurfaceMixin
 from .relationships import RelationshipsMixin
 from .repository_context import ContextPlanningMixin
+from .repository_declarations import RepositoryDeclarationsMixin
 from .repository_delta import RepositoryDeltaMixin
 from .repository_evidence_binding_delta import RepositoryEvidenceBindingDeltaMixin
 from .repository_evidence_bindings import RepositoryEvidenceBindingsMixin
@@ -64,7 +65,6 @@ from .repository_index_store import (
     default_artifact_db,
 )
 from .repository_intelligence_query import RepositoryIntelligenceQueryMixin
-from .repository_declarations import RepositoryDeclarationsMixin
 from .repository_task_action import TaskActionMixin
 from .singleflight import SingleFlight
 from .structural_locality import StructuralLocalityMixin
