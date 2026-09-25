@@ -120,7 +120,9 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
         assert re.fullmatch(r"[0-9a-f]{40}", source_sha)
 
 
-def test_ci_standalone_installs_exact_frozen_artifact_through_public_installer() -> None:
+def test_ci_standalone_installs_exact_frozen_artifact_through_public_installer() -> (
+    None
+):
     text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     standalone = text.split("  standalone-artifact:\n", 1)[1].split(
         "\n  precommit:\n",
@@ -150,13 +152,9 @@ def test_publish_standalone_binds_installer_and_asset_to_release_version() -> No
     )
     assert (
         'test "$("$target/hashmarks" --version)" = '
-        '"hashmarks version $RELEASE_VERSION"'
-        in standalone
+        '"hashmarks version $RELEASE_VERSION"' in standalone
     )
-    assert (
-        'test "$(release/standalone/hashmarks-linux-x86_64 --version)" ='
-        in publish
-    )
+    assert 'test "$(release/standalone/hashmarks-linux-x86_64 --version)" =' in publish
     assert '"hashmarks version $RELEASE_VERSION"' in publish
 
 
