@@ -34,6 +34,7 @@ __all__ = [
     "RepositoryIdentity",
     "RepositoryIdentityMode",
     "RepositoryDeclarationProvider",
+    "RepositoryDeclarationProviderContext",
     "RepositoryDeclarationProviderError",
     "RepositoryDeclarationProviderResult",
     "IdentityCycleError",
@@ -66,17 +67,20 @@ def __getattr__(name: str):
         return CodeMap
     if name in {
         "RepositoryDeclarationProvider",
+        "RepositoryDeclarationProviderContext",
         "RepositoryDeclarationProviderError",
         "RepositoryDeclarationProviderResult",
     }:
         from .codemap import (
             RepositoryDeclarationProvider,
+            RepositoryDeclarationProviderContext,
             RepositoryDeclarationProviderError,
             RepositoryDeclarationProviderResult,
         )
 
         return {
             "RepositoryDeclarationProvider": RepositoryDeclarationProvider,
+            "RepositoryDeclarationProviderContext": RepositoryDeclarationProviderContext,
             "RepositoryDeclarationProviderError": RepositoryDeclarationProviderError,
             "RepositoryDeclarationProviderResult": RepositoryDeclarationProviderResult,
         }[name]
