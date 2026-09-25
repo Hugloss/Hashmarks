@@ -9,10 +9,8 @@ from .codemap.evidence_correlation import (
     CORRELATION_PACKET_MAX_BYTES,
     CORRELATION_REQUEST_MAX_BYTES,
 )
-from .codemap.repository_declaration_contract import (
-    MAX_PACKET_BYTES as DECLARATION_PACKET_MAX_BYTES,
-    MAX_REQUEST_BYTES as DECLARATION_REQUEST_MAX_BYTES,
-)
+from .codemap.repository_declaration_contract import MAX_PACKET_BYTES
+from .codemap.repository_declaration_contract import MAX_REQUEST_BYTES
 from .repository_retry import retry_transient_repository_race
 
 if TYPE_CHECKING:
@@ -289,7 +287,7 @@ class HashmarksMcpSurface:
         bounded_groups = _bounded_json(
             groups,
             name="groups",
-            maximum=DECLARATION_REQUEST_MAX_BYTES,
+            maximum=MAX_REQUEST_BYTES,
             expected_type=list,
         )
         previous = (
@@ -298,7 +296,7 @@ class HashmarksMcpSurface:
             else _bounded_json(
                 previous_observation,
                 name="previous_observation",
-                maximum=DECLARATION_PACKET_MAX_BYTES,
+                maximum=MAX_PACKET_BYTES,
                 expected_type=dict,
             )
         )
