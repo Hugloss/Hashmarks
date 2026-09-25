@@ -14,6 +14,7 @@ from pathlib import Path
 def _log_command_output(*values: object) -> None:
     sys.stdout.write(" ".join(str(value) for value in values) + "\n")
 
+
 SCHEMA = "hashmarks.release-artifact-manifest.v2"
 
 
