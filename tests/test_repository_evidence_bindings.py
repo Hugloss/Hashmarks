@@ -1039,6 +1039,33 @@ def test_coverage_rejects_delta_for_different_binding_packet(tmp_path: Path) -> 
             )
 
 
+def test_coverage_rejects_tampered_binding_delta(tmp_path: Path) -> None:
+    source = tmp_path / "a.py"
+    source.write_text("a\n", encoding="utf-8")
+    binding = [
+        {
+            "binding_id": "delta-authenticated",
+            "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(binding)
+        source.write_text("b\n", encoding="utf-8")
+        codemap.sync(["a.py"])
+        after = codemap.repository_evidence_bindings(binding)
+        delta = codemap.repository_evidence_binding_delta(before, after)
+        delta["bindings"]["changed"].clear()
+
+        with pytest.raises(ValueError, match="binding_delta identity mismatch"):
+            codemap.repository_evidence_coverage(
+                after,
+                changed_paths=["a.py"],
+                change_set_complete=True,
+                binding_delta=delta,
+            )
+
+
 def test_whole_member_binding_cannot_bypass_pruned_analysis_scope(
     tmp_path: Path,
 ) -> None:
