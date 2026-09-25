@@ -319,6 +319,54 @@ class RepositoryEvidenceCoverageMixin:
             },
         )
 
+    def _validate_coverage_binding_delta(
+        self,
+        binding_delta: Mapping[str, object],
+        *,
+        repository_identity: str,
+        bindings_identity: object,
+    ) -> None:
+        if (
+            binding_delta.get("schema")
+            != "hashmarks.repository-evidence-binding-delta.v1"
+        ):
+            raise ValueError(
+                "binding_delta must be a repository evidence binding delta"
+            )
+        delta_identity = binding_delta.get("delta_identity")
+        expected_delta_identity = "sha256:" + self._packet_digest(
+            "hashmarks.repository-evidence-binding-delta.v1",
+            {
+                key: value
+                for key, value in binding_delta.items()
+                if key != "delta_identity"
+            },
+        )
+        if delta_identity != expected_delta_identity:
+            raise ValueError("binding_delta identity mismatch")
+        delta_repository = binding_delta.get("repository")
+        repository_rows = (
+            (delta_repository.get("before"), delta_repository.get("after"))
+            if isinstance(delta_repository, Mapping)
+            else (None, None)
+        )
+        delta_repository_identities = tuple(
+            str(row.get("repository_identity") or "")
+            if isinstance(row, Mapping)
+            else ""
+            for row in repository_rows
+        )
+        if any(
+            identity != repository_identity for identity in delta_repository_identities
+        ):
+            raise ValueError("binding_delta repository-mismatch")
+        identities = binding_delta.get("bindings_identity")
+        after_identity = (
+            identities.get("after") if isinstance(identities, Mapping) else None
+        )
+        if after_identity != bindings_identity:
+            raise ValueError("binding_delta after identity must match bindings_packet")
+
     def _validate_coverage_packets(
         self,
         bindings_packet: Mapping[str, object],
@@ -335,38 +383,22 @@ class RepositoryEvidenceCoverageMixin:
                 if key != "bindings_identity"
             },
         )
-        if not isinstance(identity, str) or identity != expected_identity:
+        if identity != expected_identity:
             raise ValueError("bindings_packet bindings identity mismatch")
-        if (
-            binding_delta is not None
-            and binding_delta.get("schema")
-            != "hashmarks.repository-evidence-binding-delta.v1"
-        ):
-            raise ValueError(
-                "binding_delta must be a repository evidence binding delta"
+        repository = bindings_packet.get("repository")
+        repository_identity = (
+            str(repository.get("repository_identity") or "")
+            if isinstance(repository, Mapping)
+            else ""
+        )
+        if repository_identity != self._repository_packet_identity():
+            raise ValueError("bindings_packet repository-mismatch")
+        if binding_delta is not None:
+            self._validate_coverage_binding_delta(
+                binding_delta,
+                repository_identity=repository_identity,
+                bindings_identity=identity,
             )
-        if binding_delta is None:
-            return
-        delta_identity = binding_delta.get("delta_identity")
-        expected_delta_identity = "sha256:" + self._packet_digest(
-            "hashmarks.repository-evidence-binding-delta.v1",
-            {
-                key: value
-                for key, value in binding_delta.items()
-                if key != "delta_identity"
-            },
-        )
-        if (
-            not isinstance(delta_identity, str)
-            or delta_identity != expected_delta_identity
-        ):
-            raise ValueError("binding_delta identity mismatch")
-        identities = binding_delta.get("bindings_identity")
-        after_identity = (
-            identities.get("after") if isinstance(identities, Mapping) else None
-        )
-        if after_identity != bindings_packet.get("bindings_identity"):
-            raise ValueError("binding_delta after identity must match bindings_packet")
 
     @staticmethod
     def _delta_evidence_paths(

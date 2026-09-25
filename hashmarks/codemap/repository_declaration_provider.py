@@ -6,7 +6,12 @@ from typing import Protocol
 
 from hashmarks.paths import normalize_relative_path
 
-from .repository_declaration_contract import encoded_json_bytes, json_value
+from .repository_declaration_contract import (
+    MAX_DECLARATIONS,
+    MAX_GROUPS,
+    encoded_json_bytes,
+    json_value,
+)
 
 MAX_DECLARATION_PROVIDERS = 32
 MAX_PROVIDER_INPUTS = 256
@@ -90,6 +95,11 @@ class _RepositoryDeclarationProviderContext:
             raise RepositoryDeclarationProviderError(
                 "declaration provider path enumeration exceeds "
                 f"{MAX_PROVIDER_ENUMERATED_PATHS} paths for prefix {normalized!r}"
+            )
+        if paths != tuple(sorted(paths)) or len(set(paths)) != len(paths):
+            raise RepositoryDeclarationProviderError(
+                "declaration provider path enumeration must be unique and "
+                f"deterministically ordered for prefix {normalized!r}"
             )
         previous = self._enumerations.get(normalized)
         if previous is not None and previous != paths:
@@ -347,6 +357,20 @@ def _provider_result(
             "RepositoryDeclarationProviderResult"
         )
     groups = _provider_groups(result.groups, provider_name=provider_name)
+    if len(groups) > MAX_GROUPS:
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} groups exceed {MAX_GROUPS} entries"
+        )
+    declaration_count = sum(
+        len(declarations)
+        for group in groups
+        if isinstance((declarations := group.get("declarations")), list)
+    )
+    if declaration_count > MAX_DECLARATIONS:
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} declarations exceed "
+            f"{MAX_DECLARATIONS} entries"
+        )
     evidence_paths = _declared_evidence_paths(groups)
     unread = sorted(evidence_paths - set(context.content_paths()))
     if unread:
@@ -372,6 +396,10 @@ def _provider_result(
                 "without a non-empty group_id"
             )
         group_ids.append(group_id.strip())
+    if len(set(group_ids)) != len(group_ids):
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} returned duplicate group_id values"
+        )
     return groups, {
         "name": provider_name,
         "state": "collected",
@@ -463,6 +491,7 @@ def _validate_provider_enumerations(
         raise RepositoryDeclarationProviderError(
             f"declaration provider {provider_name} enumerations are malformed"
         )
+    seen_prefixes: set[str] = set()
     for previous in raw:
         if not isinstance(previous, Mapping):
             raise RepositoryDeclarationProviderError(
@@ -478,12 +507,45 @@ def _validate_provider_enumerations(
             raise RepositoryDeclarationProviderError(
                 f"declaration provider {provider_name} enumeration is malformed"
             )
+        if prefix in seen_prefixes:
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {provider_name} enumeration prefixes are duplicated"
+            )
+        seen_prefixes.add(prefix)
+        if paths != sorted(paths) or len(set(paths)) != len(paths):
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {provider_name} enumeration paths are ambiguous"
+            )
         current = list(enumerate_paths(prefix))
         if current != paths:
             raise RepositoryDeclarationProviderError(
                 "declaration provider "
                 f"{provider_name} path enumeration changed during discovery: {prefix!r}"
             )
+
+
+def _validate_provider_input(
+    read_member: _MemberReader,
+    provider_name: str,
+    previous: Mapping[str, object],
+) -> None:
+    path = previous.get("path")
+    if not isinstance(path, str) or not path:
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} input path is malformed"
+        )
+    observation_kind = previous.get("observation_kind")
+    if observation_kind not in {"content", "existence"}:
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} input kind is malformed"
+        )
+    current, _raw = read_member(path, observation_kind == "content")
+    current_signature = _RepositoryDeclarationProviderContext._signature(current)
+    current_signature["observation_kind"] = observation_kind
+    if current_signature != dict(previous):
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} input changed during discovery: {path}"
+        )
 
 
 def validate_repository_declaration_provider_inputs(
@@ -495,36 +557,24 @@ def validate_repository_declaration_provider_inputs(
     for provider in provider_observations:
         name = str(provider.get("name") or "")
         inputs = provider.get("inputs")
+        if not isinstance(inputs, list):
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {name} inputs are malformed"
+            )
+        if any(not isinstance(row, Mapping) for row in inputs):
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {name} input observation is malformed"
+            )
+        typed_inputs = [row for row in inputs if isinstance(row, Mapping)]
+        input_paths = [str(row.get("path") or "") for row in typed_inputs]
+        if len(set(input_paths)) != len(input_paths):
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {name} input paths are duplicated or malformed"
+            )
         _validate_provider_enumerations(
             enumerate_paths,
             name,
             provider.get("enumerations"),
         )
-        if not isinstance(inputs, list):
-            raise RepositoryDeclarationProviderError(
-                f"declaration provider {name} inputs are malformed"
-            )
-        for previous in inputs:
-            if not isinstance(previous, Mapping):
-                raise RepositoryDeclarationProviderError(
-                    f"declaration provider {name} input observation is malformed"
-                )
-            path = previous.get("path")
-            if not isinstance(path, str) or not path:
-                raise RepositoryDeclarationProviderError(
-                    f"declaration provider {name} input path is malformed"
-                )
-            observation_kind = previous.get("observation_kind")
-            if observation_kind not in {"content", "existence"}:
-                raise RepositoryDeclarationProviderError(
-                    f"declaration provider {name} input kind is malformed"
-                )
-            current, _raw = read_member(path, observation_kind == "content")
-            current_signature = _RepositoryDeclarationProviderContext._signature(
-                current
-            )
-            current_signature["observation_kind"] = observation_kind
-            if current_signature != dict(previous):
-                raise RepositoryDeclarationProviderError(
-                    f"declaration provider {name} input changed during discovery: {path}"
-                )
+        for previous in typed_inputs:
+            _validate_provider_input(read_member, name, previous)

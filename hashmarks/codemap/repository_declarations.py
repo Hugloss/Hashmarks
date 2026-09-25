@@ -173,6 +173,29 @@ class RepositoryDeclarationsMixin:
             identity, str
         ) or identity != self._declaration_packet_identity(previous):
             raise ValueError("previous declaration observation identity mismatch")
+        repository = previous.get("repository")
+        repository_identity = (
+            str(repository.get("repository_identity") or "")
+            if isinstance(repository, Mapping)
+            else ""
+        )
+        if repository_identity != self._repository_packet_identity():
+            raise ValueError("previous declaration observation repository-mismatch")
+        repository_evidence = previous.get("repository_evidence")
+        evidence_repository = (
+            repository_evidence.get("repository")
+            if isinstance(repository_evidence, Mapping)
+            else None
+        )
+        evidence_repository_identity = (
+            str(evidence_repository.get("repository_identity") or "")
+            if isinstance(evidence_repository, Mapping)
+            else ""
+        )
+        if evidence_repository_identity != repository_identity:
+            raise ValueError(
+                "previous declaration observation evidence repository-mismatch"
+            )
 
     def repository_declarations(
         self,

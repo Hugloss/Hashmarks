@@ -292,6 +292,44 @@ def test_task_post_change_delta_rejects_tampered_context_identity(
             raise AssertionError("tampered evidence context must fail closed")
 
 
+def test_task_post_change_delta_rejects_tampered_retained_ownership(
+    tmp_path: Path,
+) -> None:
+    _source, task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        previous = codemap.task_evidence(task)
+        previous["ownership"]["candidate"]["path"] = "tests/test_owner.py"
+
+        try:
+            codemap.task_post_change_delta(
+                task, ["src/owner.py"], previous_evidence=previous
+            )
+        except ValueError as exc:
+            assert "evidence-packet-identity-mismatch" in str(exc)
+        else:
+            raise AssertionError("tampered retained decision evidence must fail closed")
+
+
+def test_task_post_change_delta_rejects_tampered_retained_verification(
+    tmp_path: Path,
+) -> None:
+    _source, task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        previous = codemap.task_evidence(task)
+        previous["verification"]["plan"]["argv"] = ["pytest", "forged-target"]
+
+        try:
+            codemap.task_post_change_delta(
+                task, ["src/owner.py"], previous_evidence=previous
+            )
+        except ValueError as exc:
+            assert "evidence-packet-identity-mismatch" in str(exc)
+        else:
+            raise AssertionError("tampered retained verification must fail closed")
+
+
 def test_task_post_change_delta_rejects_previous_generation_before_reuse(
     tmp_path: Path,
 ) -> None:

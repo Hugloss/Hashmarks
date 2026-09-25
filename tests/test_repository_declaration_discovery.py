@@ -405,6 +405,33 @@ def test_previous_discovery_packet_is_tamper_checked(tmp_path: Path) -> None:
             )
 
 
+def test_previous_discovery_from_foreign_repository_fails_before_providers_run(
+    tmp_path: Path,
+) -> None:
+    first_repo = tmp_path / "first"
+    second_repo = tmp_path / "second"
+    first_repo.mkdir()
+    second_repo.mkdir()
+    (first_repo / "value.txt").write_text("value: same\n", encoding="utf-8")
+    (second_repo / "value.txt").write_text("value: same\n", encoding="utf-8")
+    provider = _SingleProvider("fixture-provider", "value.txt")
+
+    with CodeMap(first_repo, state_dir=tmp_path / "first-state") as first:
+        first.sync()
+        previous = first.discover_repository_declarations([provider])
+
+    with CodeMap(second_repo, state_dir=tmp_path / "second-state") as second:
+        second.sync()
+        with pytest.raises(
+            ValueError,
+            match="previous declaration discovery repository-mismatch",
+        ):
+            second.discover_repository_declarations(
+                [provider],
+                previous_observation=previous,
+            )
+
+
 def test_discovery_has_no_ambient_default_providers(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -441,6 +468,36 @@ def test_cross_provider_group_identity_collision_fails_closed(tmp_path: Path) ->
         codemap.sync()
         with pytest.raises(ValueError, match="duplicate group_id"):
             codemap.discover_repository_declarations([first, second])
+
+
+@dataclass
+class _DuplicateGroupProvider(_SingleProvider):
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        result = super().discover(context)
+        return RepositoryDeclarationProviderResult(
+            groups=(result.groups[0], result.groups[0]),
+            provenance={"provider": self.name},
+        )
+
+
+def test_duplicate_group_identity_from_one_provider_fails_at_provider_boundary(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value: stable\n", encoding="utf-8")
+    provider = _DuplicateGroupProvider("duplicate-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="returned duplicate group_id values",
+        ):
+            codemap.discover_repository_declarations([provider])
 
 
 class _UnreadEvidenceProvider:
@@ -782,3 +839,272 @@ def test_provider_path_enumeration_respects_pruned_repository_scope(
     assert packet["providers"][0]["enumerations"] == [
         {"prefix": "", "paths": ["visible.meta"]}
     ]
+
+
+class _UnstableEnumerationProvider:
+    name = "unstable-enumeration"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        context.paths()
+        return False
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        raise AssertionError("discovery must not run")
+
+
+def test_provider_path_enumeration_requires_deterministic_repository_order(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "z.meta").write_text("z\n", encoding="utf-8")
+    (repo / "a.meta").write_text("a\n", encoding="utf-8")
+    provider = _UnstableEnumerationProvider()
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        original = codemap._declaration_provider_paths
+        codemap._declaration_provider_paths = lambda prefix: tuple(
+            reversed(original(prefix))
+        )
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="deterministically ordered",
+        ):
+            codemap.discover_repository_declarations([provider])
+
+
+class _OversizedGroupProvider:
+    name = "oversized-groups"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return True
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        group = {
+            "group_id": "placeholder",
+            "concept": {"kind": "fixture"},
+            "scope": {},
+            "correspondence": {"state": "declared", "basis": {"provider": self.name}},
+            "declarations": [],
+            "coverage": {
+                "state": "unknown",
+                "truncation": "unknown",
+                "expected_declaration_ids": [],
+                "scope": {},
+                "provenance": {"provider": self.name},
+            },
+        }
+        return RepositoryDeclarationProviderResult(
+            groups=tuple(
+                {**group, "group_id": f"group-{index}"} for index in range(129)
+            ),
+            provenance={"provider": self.name},
+        )
+
+
+def test_single_provider_output_is_bounded_before_aggregate_qualification(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="groups exceed 128 entries",
+        ):
+            codemap.discover_repository_declarations([_OversizedGroupProvider()])
+
+
+class _OversizedDeclarationProvider:
+    name = "oversized-declarations"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return True
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        declarations = tuple(
+            {
+                "declaration_id": f"value-{index}",
+                "value_state": "unresolved",
+                "producer": {"provider": self.name},
+                "evidence": [{"path": "value.txt", "start_line": 1, "end_line": 1}],
+            }
+            for index in range(257)
+        )
+        context.read_text("value.txt")
+        return RepositoryDeclarationProviderResult(
+            groups=(
+                {
+                    "group_id": "many-values",
+                    "concept": {"kind": "fixture"},
+                    "scope": {},
+                    "correspondence": {
+                        "state": "unresolved",
+                        "basis": {"provider": self.name},
+                    },
+                    "declarations": declarations,
+                    "coverage": {
+                        "state": "unknown",
+                        "truncation": "unknown",
+                        "expected_declaration_ids": [],
+                        "scope": {},
+                        "provenance": {"provider": self.name},
+                    },
+                },
+            ),
+            provenance={"provider": self.name},
+        )
+
+
+def test_single_provider_declarations_are_bounded_before_qualification(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value\n", encoding="utf-8")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="declarations exceed 256 entries",
+        ):
+            codemap.discover_repository_declarations([_OversizedDeclarationProvider()])
+
+
+def test_provider_evidence_validation_rejects_duplicate_input_index_rows(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value: stable\n", encoding="utf-8")
+    provider = _SingleProvider("fixture-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.discover_repository_declarations([provider])
+        provider_row = packet["providers"][0]
+        provider_row["inputs"].append(dict(provider_row["inputs"][0]))
+        try:
+            from hashmarks.codemap.repository_declaration_discovery import (
+                _validate_provider_evidence_revisions,
+            )
+
+            _validate_provider_evidence_revisions(
+                packet["providers"], packet["declarations"]
+            )
+        except ValueError as exc:
+            assert "provider input paths are duplicated" in str(exc)
+        else:
+            raise AssertionError("duplicate provider input index must fail closed")
+
+
+def test_provider_revalidation_rejects_duplicate_input_rows_before_reread(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value: stable\n", encoding="utf-8")
+    provider = _SingleProvider("fixture-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.discover_repository_declarations([provider])
+        observation = packet["providers"][0]
+        observation["inputs"].append(dict(observation["inputs"][0]))
+        from hashmarks.codemap.repository_declaration_provider import (
+            validate_repository_declaration_provider_inputs,
+        )
+
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="input paths are duplicated or malformed",
+        ):
+            validate_repository_declaration_provider_inputs(
+                codemap._declaration_provider_member_read,
+                codemap._declaration_provider_paths,
+                packet["providers"],
+            )
+
+
+def test_provider_revalidation_rejects_duplicate_enumeration_prefixes(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    helpers = repo / "helpers"
+    helpers.mkdir()
+    (helpers / "a.meta").write_text("a\n", encoding="utf-8")
+    (repo / "value.txt").write_text("value: stable\n", encoding="utf-8")
+    provider = _EnumeratingHelperProvider("enumerating-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.discover_repository_declarations([provider])
+        observation = packet["providers"][0]
+        observation["enumerations"].append(dict(observation["enumerations"][0]))
+        from hashmarks.codemap.repository_declaration_provider import (
+            validate_repository_declaration_provider_inputs,
+        )
+
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="enumeration prefixes are duplicated",
+        ):
+            validate_repository_declaration_provider_inputs(
+                codemap._declaration_provider_member_read,
+                codemap._declaration_provider_paths,
+                packet["providers"],
+            )
+
+
+def test_previous_discovery_rejects_authenticated_nested_repository_divergence(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value: same\n", encoding="utf-8")
+    provider = _SingleProvider("fixture-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        previous = codemap.discover_repository_declarations([provider])
+        previous["declarations"]["repository"] = dict(
+            previous["declarations"]["repository"]
+        )
+        previous["declarations"]["repository"]["repository_identity"] = "sha256:foreign"
+        previous["declarations"]["observation_identity"] = (
+            "sha256:"
+            + codemap._packet_digest(
+                "hashmarks.repository-declarations.v1",
+                {
+                    key: value
+                    for key, value in previous["declarations"].items()
+                    if key not in {"observation_identity", "delta_from_previous"}
+                },
+            )
+        )
+        previous["observation_identity"] = codemap._declaration_discovery_identity(
+            previous
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="nested repository-mismatch",
+        ):
+            codemap.discover_repository_declarations(
+                [provider],
+                previous_observation=previous,
+            )

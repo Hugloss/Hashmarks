@@ -157,23 +157,15 @@ class PostChangeMixin(ChangeImpactMixin):
             changes.append(item)
         return changes
 
-    def _validate_post_change_previous_evidence(
+    def _post_change_previous_evidence_reasons(
         self,
         task: str,
         previous_evidence: Mapping[str, object],
+        receipt: Mapping[str, object],
+        provenance: Mapping[str, object],
         *,
         generation_before: int,
-    ) -> None:
-        """Fail closed unless previous evidence belongs to this exact continuity cut."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        receipt = previous_evidence.get("evidence_receipt")
-        provenance = previous_evidence.get("provenance")
-        if not isinstance(receipt, Mapping) or not isinstance(provenance, Mapping):
-            raise ValueError(
-                "previous_evidence must contain bound authority receipt and provenance"
-            )
-
+    ) -> list[str]:
         reasons: list[str] = []
         if (
             str(receipt.get("repository_identity") or "")
@@ -188,6 +180,40 @@ class PostChangeMixin(ChangeImpactMixin):
         context = validate_evidence_context(receipt, provenance)
         if not context["valid"]:
             reasons.extend(str(reason) for reason in context["reasons"])
+        packet_identity = previous_evidence.get("evidence_packet_identity")
+        expected_packet_identity = "sha256:" + self._packet_digest(
+            "hashmarks.task-evidence.v2",
+            {
+                key: value
+                for key, value in previous_evidence.items()
+                if key != "evidence_packet_identity"
+            },
+        )
+        if packet_identity != expected_packet_identity:
+            reasons.append("evidence-packet-identity-mismatch")
+        return reasons
+
+    def _validate_post_change_previous_evidence(
+        self,
+        task: str,
+        previous_evidence: Mapping[str, object],
+        *,
+        generation_before: int,
+    ) -> None:
+        """Fail closed unless previous evidence belongs to this exact continuity cut."""
+        receipt = previous_evidence.get("evidence_receipt")
+        provenance = previous_evidence.get("provenance")
+        if not isinstance(receipt, Mapping) or not isinstance(provenance, Mapping):
+            raise ValueError(
+                "previous_evidence must contain bound authority receipt and provenance"
+            )
+        reasons = self._post_change_previous_evidence_reasons(
+            task,
+            previous_evidence,
+            receipt,
+            provenance,
+            generation_before=generation_before,
+        )
         if reasons:
             raise ValueError(
                 "previous_evidence continuity mismatch: "

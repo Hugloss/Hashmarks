@@ -68,16 +68,14 @@ def _qualified_declaration_indexes(
     bindings_raw = evidence_packet.get("bindings")
     if not isinstance(bindings_raw, list):
         raise ValueError("declaration discovery nested bindings are malformed")
-    groups = {
-        str(row.get("group_id") or ""): row
-        for row in groups_raw
-        if isinstance(row, Mapping)
-    }
-    bindings = {
-        str(row.get("binding_id") or ""): row
-        for row in bindings_raw
-        if isinstance(row, Mapping)
-    }
+    group_rows = [row for row in groups_raw if isinstance(row, Mapping)]
+    binding_rows = [row for row in bindings_raw if isinstance(row, Mapping)]
+    groups = {str(row.get("group_id") or ""): row for row in group_rows}
+    bindings = {str(row.get("binding_id") or ""): row for row in binding_rows}
+    if len(groups) != len(group_rows):
+        raise ValueError("declaration discovery qualified group ids are duplicated")
+    if len(bindings) != len(binding_rows):
+        raise ValueError("declaration discovery qualified binding ids are duplicated")
     return groups, bindings
 
 
@@ -88,12 +86,14 @@ def _provider_group_ids_and_inputs(
     group_ids = provider.get("group_ids")
     if not isinstance(inputs_raw, list) or not isinstance(group_ids, list):
         raise ValueError("declaration discovery provider evidence is malformed")
-    inputs = {
-        str(row.get("path") or ""): row
-        for row in inputs_raw
-        if isinstance(row, Mapping)
-    }
-    return [str(group_id) for group_id in group_ids], inputs
+    input_rows = [row for row in inputs_raw if isinstance(row, Mapping)]
+    inputs = {str(row.get("path") or ""): row for row in input_rows}
+    if len(inputs) != len(input_rows):
+        raise ValueError("declaration discovery provider input paths are duplicated")
+    normalized_group_ids = [str(group_id) for group_id in group_ids]
+    if len(set(normalized_group_ids)) != len(normalized_group_ids):
+        raise ValueError("declaration discovery provider group ids are duplicated")
+    return normalized_group_ids, inputs
 
 
 def _declaration_evidence_rows(
@@ -245,7 +245,26 @@ class RepositoryDeclarationDiscoveryMixin:
             self._declaration_discovery_identity(previous)
         ):
             raise ValueError("previous declaration discovery identity mismatch")
+        repository = previous.get("repository")
+        repository_identity = (
+            str(repository.get("repository_identity") or "")
+            if isinstance(repository, Mapping)
+            else ""
+        )
+        if repository_identity != self._repository_packet_identity():
+            raise ValueError("previous declaration discovery repository-mismatch")
         _provider_rows(previous.get("providers"))
+        declarations = _previous_declarations(previous)
+        declaration_repository = declarations.get("repository")
+        declaration_repository_identity = (
+            str(declaration_repository.get("repository_identity") or "")
+            if isinstance(declaration_repository, Mapping)
+            else ""
+        )
+        if declaration_repository_identity != repository_identity:
+            raise ValueError(
+                "previous declaration discovery nested repository-mismatch"
+            )
 
     def _previous_declaration_packet(
         self,
