@@ -22,7 +22,7 @@ One server process binds one canonical workspace. Start another process for anot
 
 ## Tool surface
 
-Hashmarks intentionally exposes only six tools:
+Hashmarks intentionally exposes a small read-only repository-intelligence tool catalog:
 
 | Tool | Purpose |
 | --- | --- |
@@ -31,6 +31,8 @@ Hashmarks intentionally exposes only six tools:
 | `task_evidence` | role-separated retrieval, explicit-target, ownership, verification, freshness, ambiguity, and next-read repository evidence |
 | `change_impact` | bounded structural impact for caller-reported changed paths |
 | `correlate_evidence` | correlate bounded external/derived observations to canonical repository evidence without inferring causation |
+| `dependency_codemap` | qualify producer-neutral dependency observations and run bounded factual dependency queries |
+| `repository_declarations` | bind explicitly correlated declarations across files/formats to exact repository evidence and report equality/difference, ambiguity, qualified absence, and factual deltas |
 | `post_change` | refresh changed paths against a previous `task_evidence` packet and return evidence deltas |
 
 The tools are read-only from the repository consumer's perspective. Hashmarks may update its own disposable derived cache while answering them.
@@ -38,6 +40,8 @@ The tools are read-only from the repository consumer's perspective. Hashmarks ma
 `task_evidence` uses `hashmarks.task-evidence.v2`. Retrieval order is relevance evidence only and carries no ownership authority. Ownership resolution, ambiguity, verification, and freshness are separate fields; current freshness never implies a uniquely resolved owner. The consumer remains responsible for deciding whether and how to act on the evidence.
 
 `correlate_evidence` accepts structured evidence bundles, not raw log streams. Producer-specific parsing/ingestion remains outside the MCP adapter. The tool preserves external claims, ambiguity, completeness, source equivalence, and repository deltas; interpretation and action remain consumer-owned. See [Evidence correlation](../reference/EVIDENCE_CORRELATION.md).
+
+`repository_declarations` accepts producer-normalized declaration groups. Semantic extraction, grouping, normalized values, correspondence, and coverage remain provider claims; Hashmarks binds them to current exact repository evidence and reports canonical equality/difference, ambiguity, coverage-qualified absence, identity, freshness, and factual deltas without selecting a winning declaration. See [Repository declarations](../reference/REPOSITORY_DECLARATIONS.md).
 
 ## Freshness and concurrency
 
