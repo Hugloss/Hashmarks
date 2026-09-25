@@ -94,8 +94,9 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 - `repository_declaration_contract.py` — producer-neutral cross-artifact declaration request contract: scoped correspondence/value-state validation, exact normalized equality/difference, and coverage-qualified absence. It owns no repository reads and no source precedence.
 - `repository_declarations.py` — projection owner that binds declaration/provider claims to existing exact repository-evidence bindings, issues definition/observation identities, and preserves provider authority separately from repository authority.
 - `repository_declaration_delta.py` — factual before/after declaration packet comparison only; it does not decide whether a changed value or correspondence is correct.
-- `repository_declaration_provider.py` — explicit provider SPI plus bounded provider-envelope validation; no ambient plugin loading or repository evidence ownership.
-- `repository_declaration_discovery.py` — deterministic caller-selected provider composition and provider-run delta around the canonical declaration packet; no second declaration or repository-evidence authority.
+- `repository_file_discovery.py` — one format-neutral owner for repository-file admission and bounded traversal; indexing and declaration-provider discovery reuse it instead of creating parallel filesystem scanners.
+- `repository_declaration_provider.py` — explicit provider SPI plus bounded revision-bound reads and tracked admitted path enumeration; no raw workspace handle, ambient plugin loading, or repository evidence ownership.
+- `repository_declaration_discovery.py` — deterministic caller-selected provider composition and bounded admitted repository-file enumeration through `repository_file_discovery.py`, plus provider-run delta around the canonical declaration packet; no parser-format requirement and no second declaration or repository-evidence authority.
 - `repository_intelligence_query.py` — thin query facade over those producers; it is not a second source of truth.
 
 ### Task evidence packets

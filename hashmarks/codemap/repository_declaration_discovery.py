@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from itertools import islice
 from typing import TYPE_CHECKING, cast
 
 from .decision_session import decision_scoped
@@ -8,6 +9,8 @@ from .repository_declaration_contract import encoded_json_bytes
 from .repository_declaration_provider import (
     MAX_DECLARATION_PROVIDERS,
     MAX_DISCOVERY_PACKET_BYTES,
+    MAX_PROVIDER_ENUMERATED_PATHS,
+    MAX_PROVIDER_ENUMERATIONS,
     MAX_PROVIDER_INPUTS,
     RepositoryDeclarationProvider,
     collect_repository_declaration_providers,
@@ -195,6 +198,16 @@ class RepositoryDeclarationDiscoveryMixin:
             include_bytes=include_bytes,
         )
 
+    def _declaration_provider_paths(self, prefix: str) -> tuple[str, ...]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        visible = (
+            item.rel
+            for item in self._iter_admitted_repository_files(prefix)
+            if item.visibility.value != "deny"
+        )
+        return tuple(islice(visible, MAX_PROVIDER_ENUMERATED_PATHS + 1))
+
     def _declaration_discovery_identity(
         self,
         packet: Mapping[str, object],
@@ -258,6 +271,8 @@ class RepositoryDeclarationDiscoveryMixin:
             "bounds": {
                 "max_providers": MAX_DECLARATION_PROVIDERS,
                 "max_inputs_per_provider": MAX_PROVIDER_INPUTS,
+                "max_path_enumerations_per_provider": MAX_PROVIDER_ENUMERATIONS,
+                "max_enumerated_paths_per_provider": MAX_PROVIDER_ENUMERATED_PATHS,
                 "max_packet_bytes": MAX_DISCOVERY_PACKET_BYTES,
             },
             "storage": "derived-not-persisted",
@@ -284,12 +299,13 @@ class RepositoryDeclarationDiscoveryMixin:
 
         previous_declarations = self._previous_declaration_packet(previous_observation)
         groups, provider_observations = collect_repository_declaration_providers(
-            self.workspace,
             self._declaration_provider_member_read,
+            self._declaration_provider_paths,
             providers,
         )
         validate_repository_declaration_provider_inputs(
             self._declaration_provider_member_read,
+            self._declaration_provider_paths,
             provider_observations,
         )
         declarations = self.repository_declarations(
@@ -298,6 +314,7 @@ class RepositoryDeclarationDiscoveryMixin:
         )
         validate_repository_declaration_provider_inputs(
             self._declaration_provider_member_read,
+            self._declaration_provider_paths,
             provider_observations,
         )
         _validate_provider_evidence_revisions(

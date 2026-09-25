@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Protocol
 
 from hashmarks.paths import normalize_relative_path
@@ -11,6 +10,8 @@ from .repository_declaration_contract import encoded_json_bytes, json_value
 
 MAX_DECLARATION_PROVIDERS = 32
 MAX_PROVIDER_INPUTS = 256
+MAX_PROVIDER_ENUMERATIONS = 32
+MAX_PROVIDER_ENUMERATED_PATHS = 256
 MAX_PROVIDER_NAME_CHARS = 256
 MAX_PROVIDER_PROVENANCE_BYTES = 4_096
 MAX_PROVIDER_WARNINGS = 32
@@ -21,6 +22,7 @@ _MemberReader = Callable[
     [str, bool],
     tuple[dict[str, object], bytes | None],
 ]
+_PathEnumerator = Callable[[str], tuple[str, ...]]
 
 
 class RepositoryDeclarationProviderError(ValueError):
@@ -39,7 +41,9 @@ class RepositoryDeclarationProviderResult:
 class RepositoryDeclarationProviderContext(Protocol):
     """Read-only, revision-bound repository input surface for providers."""
 
-    workspace: Path
+    def paths(self, prefix: str = "") -> tuple[str, ...]:
+        """Return bounded admitted indexed paths under a repository prefix."""
+        ...
 
     def exists(self, path: str) -> bool:
         """Return whether an admitted repository member is currently present."""
@@ -57,10 +61,52 @@ class RepositoryDeclarationProviderContext(Protocol):
 class _RepositoryDeclarationProviderContext:
     """Concrete Hashmarks-owned provider input tracker."""
 
-    def __init__(self, workspace: Path, read_member: _MemberReader) -> None:
-        self.workspace = workspace
+    def __init__(
+        self,
+        read_member: _MemberReader,
+        enumerate_paths: _PathEnumerator,
+    ) -> None:
         self._read_member = read_member
+        self._enumerate_paths = enumerate_paths
         self._inputs: dict[str, dict[str, object]] = {}
+        self._enumerations: dict[str, tuple[str, ...]] = {}
+
+    def paths(self, prefix: str = "") -> tuple[str, ...]:
+        try:
+            normalized = normalize_relative_path(prefix, allow_root=True)
+        except ValueError as exc:
+            raise RepositoryDeclarationProviderError(
+                "declaration provider path-enumeration prefix is invalid"
+            ) from exc
+        if normalized not in self._enumerations and (
+            len(self._enumerations) >= MAX_PROVIDER_ENUMERATIONS
+        ):
+            raise RepositoryDeclarationProviderError(
+                "declaration provider path enumerations exceed "
+                f"{MAX_PROVIDER_ENUMERATIONS} queries"
+            )
+        paths = self._enumerate_paths(normalized)
+        if len(paths) > MAX_PROVIDER_ENUMERATED_PATHS:
+            raise RepositoryDeclarationProviderError(
+                "declaration provider path enumeration exceeds "
+                f"{MAX_PROVIDER_ENUMERATED_PATHS} paths for prefix {normalized!r}"
+            )
+        previous = self._enumerations.get(normalized)
+        if previous is not None and previous != paths:
+            raise RepositoryDeclarationProviderError(
+                "declaration provider path enumeration changed while reading: "
+                f"{normalized!r}"
+            )
+        total_paths = set(paths)
+        for observed in self._enumerations.values():
+            total_paths.update(observed)
+        if len(total_paths) > MAX_PROVIDER_ENUMERATED_PATHS:
+            raise RepositoryDeclarationProviderError(
+                "declaration provider enumerated path set exceeds "
+                f"{MAX_PROVIDER_ENUMERATED_PATHS} distinct paths"
+            )
+        self._enumerations[normalized] = paths
+        return paths
 
     @staticmethod
     def _signature(observation: Mapping[str, object]) -> dict[str, object]:
@@ -140,6 +186,12 @@ class _RepositoryDeclarationProviderContext:
 
     def input_observations(self) -> list[dict[str, object]]:
         return [self._inputs[path] for path in sorted(self._inputs)]
+
+    def enumeration_observations(self) -> list[dict[str, object]]:
+        return [
+            {"prefix": prefix, "paths": list(self._enumerations[prefix])}
+            for prefix in sorted(self._enumerations)
+        ]
 
     def content_paths(self) -> frozenset[str]:
         return frozenset(
@@ -327,6 +379,7 @@ def _provider_result(
         "warnings": warnings,
         "group_ids": sorted(group_ids),
         "inputs": context.input_observations(),
+        "enumerations": context.enumeration_observations(),
     }
 
 
@@ -349,12 +402,12 @@ def _named_providers(
 
 
 def _collect_provider(
-    workspace: Path,
     read_member: _MemberReader,
+    enumerate_paths: _PathEnumerator,
     name: str,
     provider: RepositoryDeclarationProvider,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
-    context = _RepositoryDeclarationProviderContext(workspace, read_member)
+    context = _RepositoryDeclarationProviderContext(read_member, enumerate_paths)
     try:
         detected = provider.detect(context)
     except Exception as exc:
@@ -370,6 +423,7 @@ def _collect_provider(
             "name": name,
             "state": "not-detected",
             "inputs": context.input_observations(),
+            "enumerations": context.enumeration_observations(),
         }
     try:
         result = provider.discover(context)
@@ -381,8 +435,8 @@ def _collect_provider(
 
 
 def collect_repository_declaration_providers(
-    workspace: Path,
     read_member: _MemberReader,
+    enumerate_paths: _PathEnumerator,
     providers: Sequence[RepositoryDeclarationProvider],
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     """Run explicit providers deterministically and fail closed on provider errors."""
@@ -390,8 +444,8 @@ def collect_repository_declaration_providers(
     observations: list[dict[str, object]] = []
     for name, provider in _named_providers(providers):
         provider_groups, observation = _collect_provider(
-            workspace,
             read_member,
+            enumerate_paths,
             name,
             provider,
         )
@@ -400,14 +454,52 @@ def collect_repository_declaration_providers(
     return groups, observations
 
 
+def _validate_provider_enumerations(
+    enumerate_paths: _PathEnumerator,
+    provider_name: str,
+    raw: object,
+) -> None:
+    if not isinstance(raw, list):
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} enumerations are malformed"
+        )
+    for previous in raw:
+        if not isinstance(previous, Mapping):
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {provider_name} enumeration is malformed"
+            )
+        prefix = previous.get("prefix")
+        paths = previous.get("paths")
+        if (
+            not isinstance(prefix, str)
+            or not isinstance(paths, list)
+            or any(not isinstance(path, str) for path in paths)
+        ):
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {provider_name} enumeration is malformed"
+            )
+        current = list(enumerate_paths(prefix))
+        if current != paths:
+            raise RepositoryDeclarationProviderError(
+                "declaration provider "
+                f"{provider_name} path enumeration changed during discovery: {prefix!r}"
+            )
+
+
 def validate_repository_declaration_provider_inputs(
     read_member: _MemberReader,
+    enumerate_paths: _PathEnumerator,
     provider_observations: Sequence[Mapping[str, object]],
 ) -> None:
     """Revalidate every provider input after declaration qualification."""
     for provider in provider_observations:
         name = str(provider.get("name") or "")
         inputs = provider.get("inputs")
+        _validate_provider_enumerations(
+            enumerate_paths,
+            name,
+            provider.get("enumerations"),
+        )
         if not isinstance(inputs, list):
             raise RepositoryDeclarationProviderError(
                 f"declaration provider {name} inputs are malformed"

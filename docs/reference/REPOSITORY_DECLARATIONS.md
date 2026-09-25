@@ -358,9 +358,17 @@ been consumed through `read_bytes` / `read_text`; Hashmarks records the exact
 member revisions observed by the provider and revalidates those inputs across
 declaration qualification. If a provider input changes during discovery, the
 call fails closed instead of pairing a stale normalized value with newer
-repository evidence. Providers may use `context.workspace` for path
-enumeration, but repository bytes that influence semantic claims should be read
-through the context so they participate in this revision binding.
+repository evidence.
+
+Dynamic file discovery uses `context.paths(prefix)`, which enumerates admitted
+repository files through the same policy/pruning/symlink-safe discovery owner
+used by CodeMap indexing, **without requiring the file format itself to be
+indexable by CodeMap**. The public provider context does **not** expose the raw
+repository filesystem path. Enumeration queries and their exact result sets are
+recorded in provider observation state and revalidated around declaration
+qualification, so a completeness decision cannot quietly depend on an
+untracked directory snapshot. Enumeration is fail-closed and bounded: at most
+32 distinct prefix queries and 256 distinct enumerated paths per provider.
 
 Provider discovery has separate wrapper schemas:
 
@@ -391,10 +399,12 @@ downgrade that group's \`coverage.state\` / \`coverage.truncation\`; warnings do
 not give Hashmarks permission to invent completeness.
 
 Provider order is canonicalized, provider names must be unique, provider
-metadata is bounded, and each provider may observe at most **256 distinct
-repository input paths** through the Hashmarks context. The whole discovery
-packet is also bounded. Provider provenance/input changes are reported
-separately from nested declaration/repository change.
+metadata is bounded, and each provider may content/existence-observe at most
+**256 distinct repository input paths** through the Hashmarks context. Path
+enumeration is separately bounded to **32 prefix queries** and **256 distinct
+enumerated paths**. The whole discovery packet is also bounded. Provider
+provenance/input/enumeration changes are reported separately from nested
+declaration/repository change.
 
 The MCP server does **not** execute arbitrary Python declaration providers.
 External producer adapters may run in their own integration boundary and pass

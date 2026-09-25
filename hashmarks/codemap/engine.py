@@ -60,6 +60,7 @@ from .repository_delta import RepositoryDeltaMixin
 from .repository_evidence_binding_delta import RepositoryEvidenceBindingDeltaMixin
 from .repository_evidence_bindings import RepositoryEvidenceBindingsMixin
 from .repository_evidence_coverage import RepositoryEvidenceCoverageMixin
+from .repository_file_discovery import RepositoryFileDiscoveryMixin
 from .repository_index_store import (
     ArtifactStore,
     WorkspaceMapStore,
@@ -115,6 +116,7 @@ class CodeMap(
     QuerySurfaceMixin,
     WorkContextMixin,
     IndexWatchMixin,
+    RepositoryFileDiscoveryMixin,
     IndexingLifecycleMixin,
     TaskRetrievalMixin,
     OwnershipGraphMixin,

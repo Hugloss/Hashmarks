@@ -265,7 +265,7 @@ Bindings are read-only repository intelligence: the ID is opaque, exact line/mem
 
 `CodeMap.repository_declarations(...)` binds provider-normalized declaration claims to exact current repository evidence and reports equivalence, difference, ambiguity, and coverage-qualified absence. Semantic extraction/correspondence remain provider claims; Hashmarks does not choose a winning declaration. See [Repository declarations](docs/reference/REPOSITORY_DECLARATIONS.md).
 
-For in-process integrations, `RepositoryDeclarationProvider` plus `RepositoryDeclarationProviderContext` and `CodeMap.discover_repository_declarations(...)` provides an explicit, revision-bound provider-discovery seam. Providers are caller-selected and producer-specific; Hashmarks does not auto-load plugins or run arbitrary providers inside MCP. The existing MCP `repository_declarations` tool accepts already normalized groups.
+For in-process integrations, `RepositoryDeclarationProvider` plus `RepositoryDeclarationProviderContext` and `CodeMap.discover_repository_declarations(...)` provides an explicit, revision-bound provider-discovery seam. The context exposes bounded admitted `paths(prefix)`, `exists`, and revision-bound `read_*` operations rather than a raw workspace filesystem handle. Providers are caller-selected and producer-specific; Hashmarks does not auto-load plugins or run arbitrary providers inside MCP. The existing MCP `repository_declarations` tool accepts already normalized groups.
 
 ### Canonical repository identity with `RepositoryIdentity`
 

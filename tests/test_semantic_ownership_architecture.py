@@ -149,3 +149,56 @@ def test_declarations_reuse_repository_evidence_authorities() -> None:
     assert violations == []
     assert "self.repository_evidence_bindings(" in source
     assert "self.repository_evidence_binding_delta(" in source
+
+
+def test_declaration_provider_context_has_no_raw_workspace_authority() -> None:
+    provider_path = CODEMAP / "repository_declaration_provider.py"
+    discovery_path = CODEMAP / "repository_declaration_discovery.py"
+    provider_tree = _tree(provider_path)
+    protocol = next(
+        node
+        for node in ast.walk(provider_tree)
+        if isinstance(node, ast.ClassDef)
+        and node.name == "RepositoryDeclarationProviderContext"
+    )
+    declared_names = {
+        node.target.id
+        for node in protocol.body
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+    }
+    assert "workspace" not in declared_names
+
+    discovery = discovery_path.read_text(encoding="utf-8")
+    assert "self._iter_admitted_repository_files(" in discovery
+    assert "MAX_PROVIDER_ENUMERATED_PATHS + 1" in discovery
+    assert 'item.visibility.value != "deny"' in discovery
+    assert (
+        "collect_repository_declaration_providers(\n            self.workspace"
+        not in discovery
+    )
+
+
+def test_repository_file_discovery_has_one_semantic_owner() -> None:
+    owned = {
+        "_path_admitted_for_analysis",
+        "_iter_admitted_repository_files",
+    }
+    definitions: dict[str, list[str]] = {name: [] for name in owned}
+    for path in sorted(CODEMAP.glob("*.py")):
+        for node in ast.walk(_tree(path)):
+            if isinstance(node, ast.FunctionDef) and node.name in definitions:
+                definitions[node.name].append(f"{path.name}:{node.lineno}")
+
+    for name in sorted(owned):
+        assert len(definitions[name]) == 1
+        assert definitions[name][0].startswith("repository_file_discovery.py:")
+
+    indexing = (CODEMAP / "indexing_lifecycle.py").read_text(encoding="utf-8")
+    declarations = (CODEMAP / "repository_declaration_discovery.py").read_text(
+        encoding="utf-8"
+    )
+    owner = (CODEMAP / "repository_file_discovery.py").read_text(encoding="utf-8")
+    assert "os.walk(" not in indexing
+    assert "os.walk(" not in declarations
+    assert "os.walk(" in owner
+    assert "self.policy.decide(" in owner
