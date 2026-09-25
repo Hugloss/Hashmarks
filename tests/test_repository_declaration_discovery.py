@@ -261,7 +261,7 @@ def test_not_detected_provider_is_observable_without_claiming_absence(
         packet = codemap.discover_repository_declarations([provider])
 
     assert packet["providers"] == [
-        {"name": "optional-provider", "state": "not-detected"}
+        {"name": "optional-provider", "state": "not-detected", "inputs": []}
     ]
     assert packet["declarations"]["groups"] == []
 
