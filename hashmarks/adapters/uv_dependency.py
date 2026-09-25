@@ -30,9 +30,9 @@ def _marker_list(document: Mapping[str, object], field: str) -> list[str]:
         not isinstance(marker, str) or not marker.strip() for marker in raw
     ):
         raise ValueError(f"uv lock {field} must be a list of strings")
-    markers = sorted(marker.strip() for marker in raw)
+    markers = [marker.strip() for marker in raw]
     if len(set(markers)) != len(markers):
-        raise ValueError(f"uv lock contains duplicate {field[:-1]} marker")
+        raise ValueError(f"uv lock contains duplicate values in {field}")
     return markers
 
 
@@ -79,8 +79,8 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     if lock_version != 1:
         raise ValueError(f"unsupported uv lock schema version: {lock_version}")
     resolution_markers = _marker_list(document, "resolution-markers")
-    supported_environments = _marker_list(document, "supported-markers")
-    required_environments = _marker_list(document, "required-markers")
+    supported_environments = sorted(_marker_list(document, "supported-markers"))
+    required_environments = sorted(_marker_list(document, "required-markers"))
     if document.get("conflicts"):
         raise ValueError("uv lock conflicts are not modeled")
 
