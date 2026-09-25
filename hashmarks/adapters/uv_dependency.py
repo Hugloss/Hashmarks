@@ -24,6 +24,18 @@ def _node_id(name: str, version: str, source: str) -> str:
     return f"{name}:{version}@{source_identity}"
 
 
+def _marker_list(document: Mapping[str, object], field: str) -> list[str]:
+    raw = document.get(field, [])
+    if not isinstance(raw, list) or any(
+        not isinstance(marker, str) or not marker.strip() for marker in raw
+    ):
+        raise ValueError(f"uv lock {field} must be a list of strings")
+    markers = sorted(marker.strip() for marker in raw)
+    if len(set(markers)) != len(markers):
+        raise ValueError(f"uv lock contains duplicate {field[:-1]} marker")
+    return markers
+
+
 def _dependency_target(
     dependency: Mapping[str, object],
     packages_by_name: Mapping[str, list[dict[str, object]]],
@@ -66,15 +78,9 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     lock_version = document.get("version")
     if lock_version != 1:
         raise ValueError(f"unsupported uv lock schema version: {lock_version}")
-    raw_resolution_markers = document.get("resolution-markers", [])
-    if not isinstance(raw_resolution_markers, list) or any(
-        not isinstance(marker, str) or not marker.strip()
-        for marker in raw_resolution_markers
-    ):
-        raise ValueError("uv lock resolution-markers must be a list of strings")
-    resolution_markers = [marker.strip() for marker in raw_resolution_markers]
-    if len(set(resolution_markers)) != len(resolution_markers):
-        raise ValueError("uv lock contains duplicate resolution marker")
+    resolution_markers = _marker_list(document, "resolution-markers")
+    supported_environments = _marker_list(document, "supported-markers")
+    required_environments = _marker_list(document, "required-markers")
     if document.get("conflicts"):
         raise ValueError("uv lock conflicts are not modeled")
 
@@ -228,11 +234,23 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "revision": str(document.get("revision") or ""),
             "resolution_markers": resolution_markers,
         },
-        "scope": (
-            {"requires_python": str(document["requires-python"])}
-            if document.get("requires-python")
-            else {}
-        ),
+        "scope": {
+            **(
+                {"requires_python": str(document["requires-python"])}
+                if document.get("requires-python")
+                else {}
+            ),
+            **(
+                {"supported_environments": supported_environments}
+                if supported_environments
+                else {}
+            ),
+            **(
+                {"required_environments": required_environments}
+                if required_environments
+                else {}
+            ),
+        },
         "contexts": [_CONTEXT],
         "roots": sorted(
             (
