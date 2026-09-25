@@ -7,8 +7,10 @@ from .repository_declaration_contract import (
     MAX_DECLARATIONS,
     MAX_EXPECTED_PER_GROUP,
     MAX_GROUPS,
+    MAX_PACKET_BYTES,
     absence,
     comparison,
+    encoded_json_bytes,
     normalize_request,
 )
 from .repository_declaration_delta import declaration_delta
@@ -33,13 +35,14 @@ class RepositoryDeclarationsMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         declaration_id = str(normalized["declaration_id"])
+        binding = binding_rows[str(normalized["binding_id"])]
         definition = {
             "group_id": group_id,
             "concept": concept,
             "scope": scope,
             "declaration_id": declaration_id,
+            "binding_definition_identity": binding["binding_definition_identity"],
         }
-        binding = binding_rows[str(normalized["binding_id"])]
         observation = {
             **definition,
             "value_state": normalized["value_state"],
@@ -98,7 +101,15 @@ class RepositoryDeclarationsMixin:
             "group_id": group_id,
             "concept": concept,
             "scope": scope,
+            "coverage_scope": coverage["scope"],
             "expected_declaration_ids": coverage["expected_declaration_ids"],
+            "declaration_definition_identities": [
+                {
+                    "declaration_id": row["declaration_id"],
+                    "identity": row["declaration_definition_identity"],
+                }
+                for row in declarations
+            ],
         }
         observation_payload = {
             **definition_payload,
@@ -180,6 +191,7 @@ class RepositoryDeclarationsMixin:
                 "max_groups": MAX_GROUPS,
                 "max_declarations": MAX_DECLARATIONS,
                 "max_expected_declarations_per_group": MAX_EXPECTED_PER_GROUP,
+                "max_packet_bytes": MAX_PACKET_BYTES,
             },
             "storage": "derived-not-persisted",
             "authority": "repository-intelligence-only",
@@ -189,11 +201,29 @@ class RepositoryDeclarationsMixin:
             "winner": "not-selected",
         }
         packet["observation_identity"] = self._declaration_packet_identity(packet)
+        if encoded_json_bytes(packet, name="declaration packet") > MAX_PACKET_BYTES:
+            raise ValueError(
+                f"declaration packet exceeds {MAX_PACKET_BYTES} encoded bytes"
+            )
         if previous_observation is not None:
             if not isinstance(previous_observation, Mapping):
                 raise ValueError("previous_observation must be an object")
+            if (
+                encoded_json_bytes(
+                    previous_observation,
+                    name="previous_observation",
+                )
+                > MAX_PACKET_BYTES
+            ):
+                raise ValueError(
+                    f"previous_observation exceeds {MAX_PACKET_BYTES} encoded bytes"
+                )
             self._validate_previous_declarations(previous_observation)
             packet["delta_from_previous"] = declaration_delta(
                 previous_observation, packet
             )
+            if encoded_json_bytes(packet, name="declaration packet") > MAX_PACKET_BYTES:
+                raise ValueError(
+                    f"declaration packet exceeds {MAX_PACKET_BYTES} encoded bytes"
+                )
         return packet
