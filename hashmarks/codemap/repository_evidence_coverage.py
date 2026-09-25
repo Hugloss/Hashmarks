@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
-
 @dataclass
 class _CoverageBindingChanges:
     direct_changed: set[str] = field(default_factory=set)
@@ -42,7 +41,6 @@ class _CoverageBindingChanges:
             | self.member_state_changed
             | self.locator_changed
         )
-
 
 
 class RepositoryEvidenceCoverageMixin:
