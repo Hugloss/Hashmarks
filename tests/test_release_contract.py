@@ -11,7 +11,11 @@ import pytest
 import hashmarks
 import hashmarks_build
 from scripts import release_contract
-from scripts.release_contract import publication_manifest, release_manifest
+from scripts.release_contract import (
+    publication_manifest,
+    release_manifest,
+    standalone_qualification,
+)
 
 
 def _root() -> Path:
@@ -25,30 +29,49 @@ def _dist(tmp_path: Path) -> Path:
     return dist
 
 
-def _standalone(
+def _artifact_payload(platform: str, *, version: str | None = None) -> bytes:
+    reported = version or hashmarks.__version__
+    if platform == "linux":
+        return f"#!/bin/sh\nprintf '%s\\n' 'hashmarks version {reported}'\n".encode()
+    return b"MZ\x00synthetic-windows-standalone"
+
+
+def _standalone_filename(platform: str) -> str:
+    if platform == "linux":
+        return "hashmarks-linux-x86_64"
+    return "hashmarks-windows-x86_64.exe"
+
+
+def _bundle(
     tmp_path: Path,
+    platform: str,
     *,
     version: str | None = None,
-    suffix: str = "",
 ) -> Path:
-    standalone = tmp_path / "hashmarks-linux-x86_64"
-    reported = version or hashmarks.__version__
-    standalone.write_text(
-        f"#!/bin/sh\nprintf '%s\\n' 'hashmarks version {reported}'\n{suffix}",
-        encoding="utf-8",
-    )
-    standalone.chmod(0o755)
-    return standalone
-
-
-def _standalone_checksum(standalone: Path) -> Path:
-    checksum = standalone.with_name(f"{standalone.name}.sha256")
-    digest = hashlib.sha256(standalone.read_bytes()).hexdigest()
+    bundle = tmp_path / f"standalone-{platform}"
+    bundle.mkdir()
+    artifact = bundle / _standalone_filename(platform)
+    artifact.write_bytes(_artifact_payload(platform, version=version))
+    if platform == "linux":
+        artifact.chmod(0o755)
+    checksum = bundle / f"{artifact.name}.sha256"
     checksum.write_text(
-        f"{digest}  {standalone.name}\n",
+        f"{hashlib.sha256(artifact.read_bytes()).hexdigest()}  {artifact.name}\n",
         encoding="utf-8",
     )
-    return checksum
+    qualification = standalone_qualification(
+        _root(),
+        artifact,
+        checksum,
+        platform=platform,
+        architecture="x86_64",
+        smoke=platform == "linux",
+    )
+    (bundle / release_contract.STANDALONE_QUALIFICATION_FILENAME).write_text(
+        json.dumps(qualification, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return bundle
 
 
 def test_release_manifest_binds_exact_distribution_bytes(tmp_path: Path) -> None:
@@ -90,68 +113,117 @@ def test_release_manifest_rejects_any_unexpected_publish_entry(tmp_path: Path) -
         release_manifest(_root(), dist, tag=f"v{hashmarks.__version__}")
 
 
-def test_publication_manifest_binds_source_and_standalone_bytes(
+def test_standalone_qualification_binds_native_smoke_and_checksum(
     tmp_path: Path,
 ) -> None:
-    standalone = _standalone(tmp_path)
-    standalone_checksum = _standalone_checksum(standalone)
-    source_sha = "a" * 40
-    manifest = publication_manifest(
-        _root(),
-        _dist(tmp_path),
-        standalone,
-        standalone_checksum,
-        tag=f"v{hashmarks.__version__}",
-        source_sha=source_sha,
+    bundle = _bundle(tmp_path, "linux")
+    qualification = json.loads(
+        (bundle / release_contract.STANDALONE_QUALIFICATION_FILENAME).read_text(
+            encoding="utf-8"
+        )
     )
 
-    assert manifest["schema"] == "hashmarks.release-publication-manifest.v1"
-    assert manifest["source"] == {"commit_sha": source_sha}
-    assert str(manifest["package_qualification_identity"]).startswith("sha256:")
-    assert manifest["standalone"] == {
-        "kind": "standalone",
-        "filename": "hashmarks-linux-x86_64",
-        "size_bytes": standalone.stat().st_size,
-        "sha256": "sha256:" + hashlib.sha256(standalone.read_bytes()).hexdigest(),
-        "platform": "linux",
-        "architecture": "x86_64",
-        "version": hashmarks.__version__,
+    assert qualification["schema"] == "hashmarks.standalone-qualification.v1"
+    assert qualification["smoke"] == {
+        "command": "--version",
+        "reported_version": hashmarks.__version__,
+        "status": "pass",
     }
-    assert manifest["installer_checksum"] == {
-        "kind": "installer-checksum",
-        "filename": "hashmarks-linux-x86_64.sha256",
-        "size_bytes": standalone_checksum.stat().st_size,
-        "sha256": "sha256:"
-        + hashlib.sha256(standalone_checksum.read_bytes()).hexdigest(),
-        "for": "hashmarks-linux-x86_64",
-    }
-    assert str(manifest["manifest_identity"]).startswith("sha256:")
+    assert qualification["standalone"]["platform"] == "linux"
+    assert qualification["standalone"]["architecture"] == "x86_64"
+    assert str(qualification["qualification_identity"]).startswith("sha256:")
 
 
-def test_publication_manifest_rejects_standalone_version_drift(
+def test_standalone_qualification_rejects_native_version_drift(
     tmp_path: Path,
 ) -> None:
-    standalone = _standalone(tmp_path, version="999.0.0")
+    artifact = tmp_path / "hashmarks-linux-x86_64"
+    artifact.write_bytes(_artifact_payload("linux", version="999.0.0"))
+    artifact.chmod(0o755)
+    checksum = tmp_path / "hashmarks-linux-x86_64.sha256"
+    checksum.write_text(
+        f"{hashlib.sha256(artifact.read_bytes()).hexdigest()}  {artifact.name}\n",
+        encoding="utf-8",
+    )
+
     with pytest.raises(ValueError, match="standalone release version mismatch"):
+        standalone_qualification(
+            _root(),
+            artifact,
+            checksum,
+            platform="linux",
+            architecture="x86_64",
+        )
+
+
+def test_publication_manifest_requires_linux_and_windows_qualifications(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="standalone publication set mismatch"):
         publication_manifest(
             _root(),
             _dist(tmp_path),
-            standalone,
-            _standalone_checksum(standalone),
+            [_bundle(tmp_path, "linux")],
             tag=f"v{hashmarks.__version__}",
             source_sha="a" * 40,
         )
 
 
-def test_publication_manifest_rejects_stale_installer_checksum(
+def test_publication_manifest_binds_both_native_standalone_sets(
     tmp_path: Path,
 ) -> None:
-    standalone = _standalone(tmp_path)
-    checksum = _standalone_checksum(standalone)
-    checksum.write_text(
-        f"{'0' * 64}  {standalone.name}\n",
-        encoding="utf-8",
+    manifest = publication_manifest(
+        _root(),
+        _dist(tmp_path),
+        [_bundle(tmp_path, "windows"), _bundle(tmp_path, "linux")],
+        tag=f"v{hashmarks.__version__}",
+        source_sha="b" * 40,
     )
+
+    assert manifest["schema"] == "hashmarks.release-publication-manifest.v2"
+    assert manifest["source"] == {"commit_sha": "b" * 40}
+    assert [
+        (row["platform"], row["architecture"], row["filename"])
+        for row in manifest["standalones"]
+    ] == [
+        ("linux", "x86_64", "hashmarks-linux-x86_64"),
+        ("windows", "x86_64", "hashmarks-windows-x86_64.exe"),
+    ]
+    assert [row["filename"] for row in manifest["installer_checksums"]] == [
+        "hashmarks-linux-x86_64.sha256",
+        "hashmarks-windows-x86_64.exe.sha256",
+    ]
+    assert all(
+        str(row["qualification_identity"]).startswith("sha256:")
+        for row in manifest["standalones"]
+    )
+    assert str(manifest["manifest_identity"]).startswith("sha256:")
+
+
+def test_publication_manifest_rejects_duplicate_platform_qualification(
+    tmp_path: Path,
+) -> None:
+    first = _bundle(tmp_path / "first", "linux")
+    second = _bundle(tmp_path / "second", "linux")
+    windows = _bundle(tmp_path, "windows")
+
+    with pytest.raises(ValueError, match="duplicate standalone qualification"):
+        publication_manifest(
+            _root(),
+            _dist(tmp_path),
+            [first, second, windows],
+            tag=f"v{hashmarks.__version__}",
+            source_sha="c" * 40,
+        )
+
+
+def test_publication_manifest_rejects_tampered_qualified_windows_bytes(
+    tmp_path: Path,
+) -> None:
+    linux = _bundle(tmp_path, "linux")
+    windows = _bundle(tmp_path, "windows")
+    artifact = windows / "hashmarks-windows-x86_64.exe"
+    artifact.write_bytes(artifact.read_bytes() + b"tampered")
 
     with pytest.raises(
         ValueError,
@@ -160,23 +232,57 @@ def test_publication_manifest_rejects_stale_installer_checksum(
         publication_manifest(
             _root(),
             _dist(tmp_path),
-            standalone,
-            checksum,
+            [linux, windows],
             tag=f"v{hashmarks.__version__}",
-            source_sha="a" * 40,
+            source_sha="d" * 40,
+        )
+
+
+def test_publication_manifest_rejects_tampered_qualification_identity(
+    tmp_path: Path,
+) -> None:
+    linux = _bundle(tmp_path, "linux")
+    windows = _bundle(tmp_path, "windows")
+    receipt = windows / release_contract.STANDALONE_QUALIFICATION_FILENAME
+    value = json.loads(receipt.read_text(encoding="utf-8"))
+    value["qualification_identity"] = "sha256:" + "0" * 64
+    receipt.write_text(json.dumps(value), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="qualification identity mismatch"):
+        publication_manifest(
+            _root(),
+            _dist(tmp_path),
+            [linux, windows],
+            tag=f"v{hashmarks.__version__}",
+            source_sha="e" * 40,
+        )
+
+
+def test_publication_manifest_rejects_extra_file_in_native_bundle(
+    tmp_path: Path,
+) -> None:
+    linux = _bundle(tmp_path, "linux")
+    windows = _bundle(tmp_path, "windows")
+    (windows / "unqualified.exe").write_bytes(b"extra")
+
+    with pytest.raises(ValueError, match="bundle must contain exactly"):
+        publication_manifest(
+            _root(),
+            _dist(tmp_path),
+            [linux, windows],
+            tag=f"v{hashmarks.__version__}",
+            source_sha="f" * 40,
         )
 
 
 def test_publication_manifest_rejects_non_commit_source_identity(
     tmp_path: Path,
 ) -> None:
-    standalone = _standalone(tmp_path)
     with pytest.raises(ValueError, match="source_sha must be an exact"):
         publication_manifest(
             _root(),
             _dist(tmp_path),
-            standalone,
-            _standalone_checksum(standalone),
+            [_bundle(tmp_path, "linux"), _bundle(tmp_path, "windows")],
             tag=f"v{hashmarks.__version__}",
             source_sha="main",
         )
@@ -186,11 +292,10 @@ def test_publication_manifest_cli_writes_checksums_for_every_public_asset(
     tmp_path: Path,
 ) -> None:
     dist = _dist(tmp_path)
-    standalone = _standalone(tmp_path)
-    standalone_checksum = _standalone_checksum(standalone)
+    linux = _bundle(tmp_path, "linux")
+    windows = _bundle(tmp_path, "windows")
     output = tmp_path / "release-manifest.json"
     sums = tmp_path / "SHA256SUMS.txt"
-    source_sha = "b" * 40
 
     assert (
         release_contract.main(
@@ -200,14 +305,14 @@ def test_publication_manifest_cli_writes_checksums_for_every_public_asset(
                 str(_root()),
                 "--dist",
                 str(dist),
-                "--standalone",
-                str(standalone),
-                "--standalone-checksum",
-                str(standalone_checksum),
+                "--standalone-bundle",
+                str(linux),
+                "--standalone-bundle",
+                str(windows),
                 "--tag",
                 f"v{hashmarks.__version__}",
                 "--source-sha",
-                source_sha,
+                "1" * 40,
                 "--output",
                 str(output),
                 "--sha256sums",
@@ -222,70 +327,50 @@ def test_publication_manifest_cli_writes_checksums_for_every_public_asset(
         f"hashmarks-{hashmarks.__version__}-py3-none-any.whl",
         f"hashmarks-{hashmarks.__version__}.tar.gz",
         "hashmarks-linux-x86_64",
+        "hashmarks-windows-x86_64.exe",
         "hashmarks-linux-x86_64.sha256",
+        "hashmarks-windows-x86_64.exe.sha256",
     ]
-    recorded = json.loads(output.read_text(encoding="utf-8"))
-    assert recorded["source"] == {"commit_sha": source_sha}
 
 
-def test_publication_verification_rejects_post_manifest_standalone_mutation(
+def test_publication_verification_rejects_post_manifest_mutation(
     tmp_path: Path,
 ) -> None:
     dist = _dist(tmp_path)
-    standalone = _standalone(tmp_path)
-    standalone_checksum = _standalone_checksum(standalone)
+    linux = _bundle(tmp_path, "linux")
+    windows = _bundle(tmp_path, "windows")
     output = tmp_path / "release-manifest.json"
     sums = tmp_path / "SHA256SUMS.txt"
-    source_sha = "c" * 40
+    source_sha = "2" * 40
+    args = [
+        "--root",
+        str(_root()),
+        "--dist",
+        str(dist),
+        "--standalone-bundle",
+        str(linux),
+        "--standalone-bundle",
+        str(windows),
+        "--tag",
+        f"v{hashmarks.__version__}",
+        "--source-sha",
+        source_sha,
+    ]
     release_contract.main(
-        [
-            "publication-manifest",
-            "--root",
-            str(_root()),
-            "--dist",
-            str(dist),
-            "--standalone",
-            str(standalone),
-            "--standalone-checksum",
-            str(standalone_checksum),
-            "--tag",
-            f"v{hashmarks.__version__}",
-            "--source-sha",
-            source_sha,
-            "--output",
-            str(output),
-            "--sha256sums",
-            str(sums),
-        ]
+        ["publication-manifest", *args, "--output", str(output), "--sha256sums", str(sums)]
     )
-    standalone.write_text(
-        standalone.read_text(encoding="utf-8") + "# changed after qualification\n",
+    windows_checksum = windows / "hashmarks-windows-x86_64.exe.sha256"
+    windows_checksum.write_text(
+        windows_checksum.read_text(encoding="utf-8") + "unexpected\n",
         encoding="utf-8",
     )
-    _standalone_checksum(standalone)
 
     with pytest.raises(
         SystemExit,
-        match="release publication manifest does not match current artifact bytes",
+        match="standalone installer checksum does not match qualified standalone bytes",
     ):
         release_contract.main(
-            [
-                "verify-publication",
-                "--root",
-                str(_root()),
-                "--dist",
-                str(dist),
-                "--standalone",
-                str(standalone),
-                "--standalone-checksum",
-                str(standalone_checksum),
-                "--tag",
-                f"v{hashmarks.__version__}",
-                "--source-sha",
-                source_sha,
-                "--manifest",
-                str(output),
-            ]
+            ["verify-publication", *args, "--manifest", str(output)]
         )
 
 
