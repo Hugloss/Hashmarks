@@ -98,16 +98,12 @@ def normalize_coverage(raw: object) -> dict[str, object]:
     if state not in {"complete", "incomplete", "unknown"}:
         raise ValueError("coverage.state must be complete, incomplete, or unknown")
     if truncation not in {"complete", "truncated", "unknown"}:
-        raise ValueError(
-            "coverage.truncation must be complete, truncated, or unknown"
-        )
+        raise ValueError("coverage.truncation must be complete, truncated, or unknown")
     if state == "complete" and truncation != "complete":
         raise ValueError("complete declaration coverage requires truncation=complete")
 
     expected_raw = row.get("expected_declaration_ids", [])
-    if not isinstance(expected_raw, Sequence) or isinstance(
-        expected_raw, (str, bytes)
-    ):
+    if not isinstance(expected_raw, Sequence) or isinstance(expected_raw, (str, bytes)):
         raise ValueError("coverage.expected_declaration_ids must be a list")
     if len(expected_raw) > MAX_EXPECTED_PER_GROUP:
         raise ValueError(
@@ -136,8 +132,7 @@ def normalize_coverage(raw: object) -> dict[str, object]:
 
 def _binding_id(group_id: str, declaration_id: str) -> str:
     return (
-        f"declaration:{len(group_id)}:{group_id}:"
-        f"{len(declaration_id)}:{declaration_id}"
+        f"declaration:{len(group_id)}:{group_id}:{len(declaration_id)}:{declaration_id}"
     )
 
 
@@ -152,6 +147,23 @@ def _normalized_evidence(row: Mapping[str, object]) -> list[dict[str, object]]:
     return [dict(item) for item in evidence if isinstance(item, Mapping)]
 
 
+def _normalized_ambiguous_value(
+    row: Mapping[str, object],
+) -> dict[str, object]:
+    if "value" in row:
+        raise ValueError("ambiguous declaration must not declare value")
+    candidates = row.get("candidate_values")
+    if not isinstance(candidates, Sequence) or isinstance(candidates, (str, bytes)):
+        raise ValueError("ambiguous declaration requires candidate_values list")
+    if len(candidates) < 2:
+        raise ValueError("ambiguous declaration requires at least two candidate values")
+    return {
+        "candidate_values": [
+            json_value(value, name="candidate value") for value in candidates
+        ]
+    }
+
+
 def _normalized_value_fields(
     row: Mapping[str, object], value_state: str
 ) -> dict[str, object]:
@@ -161,23 +173,8 @@ def _normalized_value_fields(
         if "candidate_values" in row:
             raise ValueError("resolved declaration must not declare candidate_values")
         return {"value": json_value(row["value"], name="declaration value")}
-
     if value_state == "ambiguous":
-        if "value" in row:
-            raise ValueError("ambiguous declaration must not declare value")
-        candidates = row.get("candidate_values")
-        if not isinstance(candidates, Sequence) or isinstance(candidates, (str, bytes)):
-            raise ValueError("ambiguous declaration requires candidate_values list")
-        if len(candidates) < 2:
-            raise ValueError(
-                "ambiguous declaration requires at least two candidate values"
-            )
-        return {
-            "candidate_values": [
-                json_value(value, name="candidate value") for value in candidates
-            ]
-        }
-
+        return _normalized_ambiguous_value(row)
     if "value" in row or "candidate_values" in row:
         raise ValueError(
             "unresolved declaration must not declare value or candidate_values"
@@ -279,10 +276,7 @@ def absence(
             "missing_declaration_ids": [],
             "unseen_expected_declaration_ids": [],
         }
-    if (
-        coverage.get("state") == "complete"
-        and coverage.get("truncation") == "complete"
-    ):
+    if coverage.get("state") == "complete" and coverage.get("truncation") == "complete":
         return {
             "state": "known-absent",
             "missing_declaration_ids": unseen,
@@ -324,9 +318,7 @@ def _normalize_group(
         "group_id": group_id,
         "concept": concept,
         "scope": scope,
-        "correspondence": normalize_correspondence(
-            raw_group.get("correspondence", {})
-        ),
+        "correspondence": normalize_correspondence(raw_group.get("correspondence", {})),
         "coverage": normalize_coverage(raw_group.get("coverage", {})),
         "declarations": declarations,
     }
@@ -356,9 +348,7 @@ def normalize_request(
         raise ValueError("duplicate group_id")
 
     bindings = [
-        binding
-        for _group, group_bindings in pairs
-        for binding in group_bindings
+        binding for _group, group_bindings in pairs for binding in group_bindings
     ]
     if len(bindings) > MAX_DECLARATIONS:
         raise ValueError(f"declaration request exceeds {MAX_DECLARATIONS} declarations")
