@@ -4,6 +4,8 @@ import threading
 import time
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.freshness_map import FreshnessMapOptions
 from hashmarks.codemap.repository_intelligence_query import (
@@ -128,6 +130,41 @@ def test_prior_map_invalidates_only_changed_evidence_identity(tmp_path: Path) ->
         prior[("negative-verification-evidence", "tests/test_other.py")]["state"]
         == "current"
     )
+
+
+def test_prior_map_rejects_tampered_retained_evidence(tmp_path: Path) -> None:
+    task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.evidence_freshness_map(task, ["src/case/engine.py"])
+        before["entries"][0]["state"] = "stale"
+
+        with pytest.raises(ValueError, match="freshness identity mismatch"):
+            codemap.evidence_freshness_map(
+                task,
+                ["src/case/engine.py"],
+                previous_map=before,
+            )
+
+
+def test_prior_map_rejects_foreign_repository(tmp_path: Path) -> None:
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.mkdir()
+    right.mkdir()
+    task = _repo(left)
+    _repo(right)
+    with CodeMap(left) as codemap:
+        codemap.sync()
+        before = codemap.evidence_freshness_map(task, ["src/case/engine.py"])
+    with CodeMap(right) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="repository-mismatch"):
+            codemap.evidence_freshness_map(
+                task,
+                ["src/case/engine.py"],
+                previous_map=before,
+            )
 
 
 def test_selected_member_invalidates_prior_negative_claim(tmp_path: Path) -> None:
