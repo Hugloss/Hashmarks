@@ -4,6 +4,8 @@ import argparse
 import email
 import hashlib
 import json
+import re
+import subprocess
 import sys
 import tarfile
 import tomllib
@@ -16,6 +18,8 @@ def _log_command_output(*values: object) -> None:
 
 
 SCHEMA = "hashmarks.release-artifact-manifest.v2"
+PUBLICATION_SCHEMA = "hashmarks.release-publication-manifest.v1"
+STANDALONE_FILENAME = "hashmarks-linux-x86_64"
 
 
 def _project(root: Path) -> dict[str, object]:
@@ -37,6 +41,15 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return "sha256:" + digest.hexdigest()
+
+
+def _manifest_identity(schema: str, payload: dict[str, object]) -> str:
+    canonical = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode()
+    return "sha256:" + hashlib.sha256(
+        schema.encode() + b"\0" + canonical
+    ).hexdigest()
 
 
 def _wheel_metadata(path: Path) -> tuple[str, str]:
@@ -127,24 +140,116 @@ def release_manifest(root: Path, dist: Path, *, tag: str) -> dict[str, object]:
         },
         "publication_authority": "external",
     }
-    canonical = json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), allow_nan=False
-    ).encode()
-    payload["manifest_identity"] = (
-        "sha256:" + hashlib.sha256(SCHEMA.encode() + b"\0" + canonical).hexdigest()
-    )
+    payload["manifest_identity"] = _manifest_identity(SCHEMA, payload)
+    return payload
+
+
+def _standalone_row(path: Path, *, version: str) -> dict[str, object]:
+    path = path.resolve()
+    if path.name != STANDALONE_FILENAME:
+        raise ValueError(
+            "standalone release filename mismatch: "
+            f"expected {STANDALONE_FILENAME!r}, got {path.name!r}"
+        )
+    if not path.is_file():
+        raise ValueError(f"standalone release artifact is missing: {path}")
+
+    try:
+        completed = subprocess.run(
+            [str(path), "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError("standalone release version smoke test timed out") from exc
+    expected = f"hashmarks version {version}"
+    if completed.returncode != 0:
+        raise ValueError(
+            "standalone release version smoke test failed with "
+            f"exit code {completed.returncode}"
+        )
+    if completed.stdout.strip() != expected:
+        raise ValueError(
+            "standalone release version mismatch: "
+            f"expected {expected!r}, got {completed.stdout.strip()!r}"
+        )
+
+    return {
+        "kind": "standalone",
+        "filename": path.name,
+        "size_bytes": path.stat().st_size,
+        "sha256": _sha256(path),
+        "platform": "linux",
+        "architecture": "x86_64",
+        "version": version,
+    }
+
+
+def publication_manifest(
+    root: Path,
+    dist: Path,
+    standalone: Path,
+    *,
+    tag: str,
+    source_sha: str,
+) -> dict[str, object]:
+    if re.fullmatch(r"[0-9a-f]{40}", source_sha) is None:
+        raise ValueError(
+            "source_sha must be an exact lowercase 40-character commit SHA"
+        )
+
+    package = release_manifest(root, dist, tag=tag)
+    version = str(package["version"])
+    payload: dict[str, object] = {
+        "schema": PUBLICATION_SCHEMA,
+        "project": package["project"],
+        "version": version,
+        "tag": package["tag"],
+        "source": {"commit_sha": source_sha},
+        "distributions": package["distributions"],
+        "standalone": _standalone_row(standalone, version=version),
+        "qualification_dependency_resolution": package[
+            "qualification_dependency_resolution"
+        ],
+        "package_qualification_identity": package["manifest_identity"],
+        "publication_authority": package["publication_authority"],
+    }
+    payload["manifest_identity"] = _manifest_identity(PUBLICATION_SCHEMA, payload)
     return payload
 
 
 def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
     rows = manifest["distributions"]
     assert isinstance(rows, list)
+    checksum_rows = list(rows)
+    standalone = manifest.get("standalone")
+    if standalone is not None:
+        assert isinstance(standalone, dict)
+        checksum_rows.append(standalone)
+
     lines = []
-    for row in rows:
+    for row in checksum_rows:
         assert isinstance(row, dict)
         digest = str(row["sha256"]).removeprefix("sha256:")
         lines.append(f"{digest}  {row['filename']}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_manifest(
+    value: dict[str, object],
+    *,
+    output_path: str,
+    sha256sums_path: str,
+) -> None:
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    _write_sha256sums(value, Path(sha256sums_path))
+    _log_command_output(json.dumps(value, indent=2, sort_keys=True))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -170,6 +275,23 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--tag", required=True)
     verify.add_argument("--manifest", required=True)
 
+    publication = sub.add_parser("publication-manifest")
+    publication.add_argument("--root", default=".")
+    publication.add_argument("--dist", required=True)
+    publication.add_argument("--standalone", required=True)
+    publication.add_argument("--tag", required=True)
+    publication.add_argument("--source-sha", required=True)
+    publication.add_argument("--output", required=True)
+    publication.add_argument("--sha256sums", required=True)
+
+    verify_publication = sub.add_parser("verify-publication")
+    verify_publication.add_argument("--root", default=".")
+    verify_publication.add_argument("--dist", required=True)
+    verify_publication.add_argument("--standalone", required=True)
+    verify_publication.add_argument("--tag", required=True)
+    verify_publication.add_argument("--source-sha", required=True)
+    verify_publication.add_argument("--manifest", required=True)
+
     args = parser.parse_args(argv)
     try:
         return _run_command(args)
@@ -188,15 +310,36 @@ def _run_command(args) -> int:
         _log_command_output(f"Hashmarks release tag: PASS ({expected})")
         return 0
 
+    if args.command in {"publication-manifest", "verify-publication"}:
+        value = publication_manifest(
+            root,
+            Path(args.dist),
+            Path(args.standalone),
+            tag=args.tag,
+            source_sha=args.source_sha,
+        )
+        if args.command == "publication-manifest":
+            _write_manifest(
+                value,
+                output_path=args.output,
+                sha256sums_path=args.sha256sums,
+            )
+            return 0
+        recorded = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
+        if recorded != value:
+            raise SystemExit(
+                "release publication manifest does not match current artifact bytes"
+            )
+        _log_command_output("Hashmarks release publication manifest: PASS")
+        return 0
+
     value = release_manifest(root, Path(args.dist), tag=args.tag)
     if args.command == "manifest":
-        output = Path(args.output)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(
-            json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        _write_manifest(
+            value,
+            output_path=args.output,
+            sha256sums_path=args.sha256sums,
         )
-        _write_sha256sums(value, Path(args.sha256sums))
-        _log_command_output(json.dumps(value, indent=2, sort_keys=True))
         return 0
 
     recorded = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
