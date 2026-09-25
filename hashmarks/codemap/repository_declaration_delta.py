@@ -48,12 +48,8 @@ def declaration_delta(
         definition_changed = sorted(
             declaration_id
             for declaration_id in shared
-            if old_declarations[declaration_id].get(
-                "declaration_definition_identity"
-            )
-            != new_declarations[declaration_id].get(
-                "declaration_definition_identity"
-            )
+            if old_declarations[declaration_id].get("declaration_definition_identity")
+            != new_declarations[declaration_id].get("declaration_definition_identity")
         )
         observation_changed = sorted(
             declaration_id
