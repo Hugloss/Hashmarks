@@ -203,6 +203,21 @@ def test_public_onboarding_leads_with_standalone_install_not_source_checkout() -
     )
 
 
+def test_public_install_and_release_docs_match_github_release_authority() -> None:
+    readme = _text("README.md")
+    releasing = _text("docs/maintainers/RELEASING.md")
+
+    assert 'pip install "hashmarks[mcp]"' not in readme
+    assert "standalone Hashmarks executable from GitHub Releases" in readme
+    assert ".github/release-request.toml" in releasing
+    assert "release-request merge SHA becomes the default release source authority" in releasing
+    assert "GitHub Releases" in releasing
+    assert "does not automatically publish to PyPI" in releasing
+    assert "PyPI Trusted Publishing" not in releasing
+    assert "publication_attempt" in releasing
+    assert "source_sha" in releasing
+
+
 def test_agent_evaluation_executables_are_isolated_from_product_script_root() -> None:
     root_scripts = {path.name for path in (ROOT / "scripts").glob("*.py")}
     forbidden_fragments = (
