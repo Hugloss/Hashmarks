@@ -11,13 +11,13 @@ def _group(
     declarations: list[dict[str, object]],
     *,
     group_id: str = "runtime-python",
-    coverage_state: str = "complete",
-    truncation: str = "complete",
+    coverage: tuple[str, str] = ("complete", "complete"),
     expected: list[str] | None = None,
     correspondence_state: str = "declared",
     scope: dict[str, object] | None = None,
 ) -> dict[str, object]:
     ids = [str(row["declaration_id"]) for row in declarations]
+    coverage_state, truncation = coverage
     return {
         "group_id": group_id,
         "concept": {"kind": "runtime-compatibility", "identity": "python"},
@@ -87,8 +87,7 @@ def test_cross_file_declarations_preserve_exact_evidence_and_equivalence(
     }
     assert group["absence"]["state"] == "none"
     bindings = {
-        row["binding_id"]: row
-        for row in packet["repository_evidence"]["bindings"]
+        row["binding_id"]: row for row in packet["repository_evidence"]["bindings"]
     }
     paths = {
         bindings[row["binding_id"]]["evidence"][0]["path"]
@@ -142,8 +141,7 @@ def test_absence_requires_complete_untruncated_semantic_coverage(
             [
                 _group(
                     declarations,
-                    coverage_state="incomplete",
-                    truncation="unknown",
+                    coverage=("incomplete", "unknown"),
                     expected=expected,
                 )
             ]
@@ -283,15 +281,12 @@ def test_fail_closed_unknown_fields_and_invalid_complete_coverage(
         codemap.sync()
         with pytest.raises(ValueError, match="unknown fields"):
             codemap.repository_declarations([bad])
-        with pytest.raises(
-            ValueError, match="complete declaration coverage requires"
-        ):
+        with pytest.raises(ValueError, match="complete declaration coverage requires"):
             codemap.repository_declarations(
                 [
                     _group(
                         [declaration],
-                        coverage_state="complete",
-                        truncation="unknown",
+                        coverage=("complete", "unknown"),
                     )
                 ]
             )
