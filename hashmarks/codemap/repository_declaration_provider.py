@@ -377,6 +377,10 @@ def _provider_result(
                 "without a non-empty group_id"
             )
         group_ids.append(group_id.strip())
+    if len(set(group_ids)) != len(group_ids):
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} returned duplicate group_id values"
+        )
     return groups, {
         "name": provider_name,
         "state": "collected",
