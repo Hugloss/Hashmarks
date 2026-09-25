@@ -218,6 +218,18 @@ def comparison(
             "reason": "correspondence-not-uniquely-declared",
             "distinct_values": [],
         }
+    unsupported = sorted(
+        str(row["declaration_id"])
+        for row in declarations
+        if row.get("evidence_state") != "known-present"
+    )
+    if unsupported:
+        return {
+            "state": "ambiguous",
+            "reason": "repository-evidence-not-current",
+            "unqualified_declaration_ids": unsupported,
+            "distinct_values": [],
+        }
     nonresolved = sorted(
         str(row["declaration_id"])
         for row in declarations
@@ -261,7 +273,11 @@ def absence(
     coverage: Mapping[str, object],
 ) -> dict[str, object]:
     expected = set(coverage.get("expected_declaration_ids") or [])
-    present = {str(row["declaration_id"]) for row in declarations}
+    present = {
+        str(row["declaration_id"])
+        for row in declarations
+        if row.get("evidence_state") == "known-present"
+    }
     unseen = sorted(expected - present)
     if not expected:
         return {
