@@ -234,7 +234,7 @@ def test_real_producer_dependency_change_dogfood(
         )
 
 
-def test_real_uv_grouped_conditional_edges_are_not_flattened(
+def test_real_uv_grouped_edges_do_not_duplicate_topology_paths(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
@@ -244,22 +244,21 @@ def test_real_uv_grouped_conditional_edges_are_not_flattened(
         )
         root_id = observation["roots"][0]["node_id"]
         selection = _dummy_selection(observation, "dummy-dep")
+        paths = _query(
+            codemap,
+            observation,
+            {
+                "operation": "paths",
+                "node_id": root_id,
+                "target_id": selection["node_id"],
+                "context": "lock",
+                "max_results": 1,
+            },
+        )
 
-        with pytest.raises(
-            ValueError,
-            match="graph query cannot flatten conditional relationships",
-        ):
-            _query(
-                codemap,
-                observation,
-                {
-                    "operation": "paths",
-                    "node_id": root_id,
-                    "target_id": selection["node_id"],
-                    "context": "lock",
-                    "max_results": 1,
-                },
-            )
+    assert paths["result"] == [[root_id, selection["node_id"]]]
+    assert paths["completeness"] == "complete"
+    assert paths["omissions"] == []
 
 
 @pytest.mark.parametrize(
@@ -280,19 +279,15 @@ def test_real_uv_grouped_dependency_dogfood(
         present = before if before_state == "grouped" else after
         absent = after if after_state == "absent" else before
         selection = _dummy_selection(present, "dummy-dep")
-        with pytest.raises(
-            ValueError,
-            match="graph query cannot flatten conditional relationships",
-        ):
-            _query(
-                codemap,
-                present,
-                {
-                    "operation": "dependencies",
-                    "node_id": present["roots"][0]["node_id"],
-                    "context": "lock",
-                },
-            )
+        present_graph = _query(
+            codemap,
+            present,
+            {
+                "operation": "dependencies",
+                "node_id": present["roots"][0]["node_id"],
+                "context": "lock",
+            },
+        )
         absent_graph = _query(
             codemap,
             absent,
@@ -323,6 +318,9 @@ def test_real_uv_grouped_dependency_dogfood(
         "dev:test",
     }
     assert {row["target"] for row in present["relationships"]} == {selection["node_id"]}
+    assert present_graph["result"] == [
+        {"depth": 1, "node_id": selection["node_id"], "selection": selection}
+    ]
     assert absent_graph["result"] == []
     assert absent_graph["negative_evidence"] == "admissible-within-declared-scope"
     assert absent_inventory["result"] == []
