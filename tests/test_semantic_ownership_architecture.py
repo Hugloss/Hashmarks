@@ -149,3 +149,28 @@ def test_declarations_reuse_repository_evidence_authorities() -> None:
     assert violations == []
     assert "self.repository_evidence_bindings(" in source
     assert "self.repository_evidence_binding_delta(" in source
+
+
+
+def test_declaration_provider_context_has_no_raw_workspace_authority() -> None:
+    provider_path = CODEMAP / "repository_declaration_provider.py"
+    discovery_path = CODEMAP / "repository_declaration_discovery.py"
+    provider_tree = _tree(provider_path)
+    protocol = next(
+        node
+        for node in ast.walk(provider_tree)
+        if isinstance(node, ast.ClassDef)
+        and node.name == "RepositoryDeclarationProviderContext"
+    )
+    declared_names = {
+        node.target.id
+        for node in protocol.body
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
+    }
+    assert "workspace" not in declared_names
+
+    discovery = discovery_path.read_text(encoding="utf-8")
+    assert "self.store.paths_under(" in discovery
+    assert "self._path_admitted_for_analysis(" in discovery
+    assert "self.policy.decide(" in discovery
+    assert "collect_repository_declaration_providers(\n            self.workspace" not in discovery
