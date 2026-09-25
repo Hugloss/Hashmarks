@@ -47,9 +47,7 @@ def _manifest_identity(schema: str, payload: dict[str, object]) -> str:
     canonical = json.dumps(
         payload, sort_keys=True, separators=(",", ":"), allow_nan=False
     ).encode()
-    return "sha256:" + hashlib.sha256(
-        schema.encode() + b"\0" + canonical
-    ).hexdigest()
+    return "sha256:" + hashlib.sha256(schema.encode() + b"\0" + canonical).hexdigest()
 
 
 def _wheel_metadata(path: Path) -> tuple[str, str]:
