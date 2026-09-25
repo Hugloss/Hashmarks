@@ -25,6 +25,7 @@ Coding agents repeatedly spend context and tool calls rediscovering the same cod
 - **Observer-aware deltas.** Keep repository change separate from observer-capability change, and compare stable evidence identities instead of treating every newly visible fact as a repository edit.
 - **Repository evidence bindings.** Bind opaque consumer IDs to exact line ranges or whole repository members, then compare direct/member/dependency/relationship evidence without transferring consumer policy into Hashmarks.
 - **Evidence correlation.** Map bounded runtime/derived observations such as tracebacks, CI failures, resolver output, or dependency-tree evidence back to canonical repository truth while preserving ambiguity, completeness, and source equivalence.
+- **Cross-artifact declarations.** Represent explicitly correlated declarations of the same conceptual repository fact across files and formats, preserving exact evidence, freshness, ambiguity, qualified absence, and disagreement without choosing which declaration should win.
 - **Local and read-only for agent consumers.** Hashmarks maintains disposable derived state, while editing, execution, git, planning, and model decisions stay with the caller.
 
 ## Quick start
@@ -59,7 +60,7 @@ Install the optional MCP support:
 pip install "hashmarks[mcp]"
 ```
 
-Hashmarks exposes one local, read-only **stdio MCP server** with six focused tools:
+Hashmarks exposes one local, read-only **stdio MCP server** with a focused repository-intelligence tool catalog:
 
 | MCP tool | What it gives the coding agent |
 | --- | --- |
@@ -67,6 +68,9 @@ Hashmarks exposes one local, read-only **stdio MCP server** with six focused too
 | `find` | bounded codebase search across paths and symbols |
 | `task_evidence` | role-separated retrieval, ownership, ambiguity, verification, freshness and next-read evidence |
 | `change_impact` | structural impact for changed or candidate paths |
+| `correlate_evidence` | bounded external/derived observations correlated to canonical repository evidence |
+| `dependency_codemap` | producer-neutral dependency observations and factual dependency queries |
+| `repository_declarations` | cross-file/format declarations with exact evidence, ambiguity, qualified absence, and disagreement |
 | `post_change` | refreshed evidence and deltas after the caller changes files |
 
 You normally **do not start Hashmarks MCP by hand**. Put the MCP configuration in the **target project** you want the agent to analyze. The agent host starts `hashmarks --workspace . mcp` as a stdio child process.
@@ -157,6 +161,7 @@ For the complete tool schemas, freshness behavior, concurrency guarantees, and h
 | Content identity | Canonical file, directory, manifest, and repository identities |
 | Interchange | Strict producer/consumer contracts, provenance, validation, and conformance surfaces |
 | Evidence bindings | Opaque consumer bindings to exact line/member evidence, declared dependencies, relationship evidence, deltas, and change coverage |\n| Evidence correlation | Request-scoped external/derived anchors correlated to repository paths, symbols, source equivalence, relationships, and before/after deltas |
+| Repository declarations | Explicitly correlated conceptual declarations distributed across files/formats, with exact evidence, normalized equality/difference, ambiguity, coverage-qualified absence, identity, and factual deltas |
 
 Built-in lightweight structural parsing covers Python, JavaScript/TypeScript, Go, and Rust. Optional Tree-sitter range enrichment can add precise symbol ranges for additional languages when available. Native/project evidence can also be imported from supported adapters and SCIP.
 
@@ -255,6 +260,10 @@ with CodeMap(".") as codemap:
 ```
 
 Bindings are read-only repository intelligence: the ID is opaque, exact line/member evidence remains separate from containing-member/dependency/relationship change, and Hashmarks does not decide what the consumer should execute. See [Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md).
+
+### Cross-artifact repository declarations
+
+`CodeMap.repository_declarations(...)` binds provider-normalized declaration claims to exact current repository evidence and reports equivalence, difference, ambiguity, and coverage-qualified absence. Semantic extraction/correspondence remain provider claims; Hashmarks does not choose a winning declaration. See [Repository declarations](docs/reference/REPOSITORY_DECLARATIONS.md).
 
 ### Canonical repository identity with `RepositoryIdentity`
 
@@ -377,6 +386,7 @@ See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs
 - [Architecture](docs/reference/ARCHITECTURE.md)
 - [Observer and delta model](docs/reference/OBSERVER_DELTA.md)
 - [Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md)
+- [Repository declarations](docs/reference/REPOSITORY_DECLARATIONS.md)
 - [Evidence correlation](docs/reference/EVIDENCE_CORRELATION.md)
 - [Structural locality evidence](docs/reference/STRUCTURAL_LOCALITY.md)
 - [Product boundary](docs/reference/PRODUCT_BOUNDARY.md)
