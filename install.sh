@@ -82,3 +82,6 @@ printf 'Hashmarks installed: %s\n' "$target"
 if ! command -v hashmarks >/dev/null 2>&1; then
   printf 'Add %s to PATH, then run: hashmarks --version\n' "$install_dir"
 fi
+if command -v opencode >/dev/null 2>&1; then
+  printf 'OpenCode detected. From the target repository run: %s install --opencode\n' "$target"
+fi
