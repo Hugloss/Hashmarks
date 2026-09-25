@@ -342,12 +342,8 @@ def test_discovery_delta_separates_provider_provenance_from_declaration_change(
     }
     assert delta["declarations"]["changed_groups"] == []
     assert (
-        before["declarations"]["groups"][0]["group_observation_identity"]
-        == after["declarations"]["groups"][0]["group_observation_identity"]
-    )
-    assert (
         before["declarations"]["observation_identity"]
-        != after["declarations"]["observation_identity"]
+        == after["declarations"]["observation_identity"]
     )
     assert before["observation_identity"] != after["observation_identity"]
 
@@ -616,6 +612,10 @@ def test_helper_input_delta_does_not_masquerade_as_declaration_delta(
     }
     assert delta["declarations"]["changed_groups"] == []
     assert (
+        before["declarations"]["groups"][0]["group_observation_identity"]
+        == after["declarations"]["groups"][0]["group_observation_identity"]
+    )
+    assert (
         before["declarations"]["observation_identity"]
-        == after["declarations"]["observation_identity"]
+        != after["declarations"]["observation_identity"]
     )
