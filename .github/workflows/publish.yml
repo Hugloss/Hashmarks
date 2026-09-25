@@ -246,32 +246,29 @@ jobs:
           ./dist/hashmarks version
           .venv/bin/python -I scripts/mcp_installed_artifact_smoke.py \
             --hashmarks "$PWD/dist/hashmarks"
-      - name: Install exact standalone through public installer
-        env:
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          bundle="$PWD/.standalone-install-source"
-          target="$PWD/.standalone-install-target"
-          mkdir -p "$bundle" "$target"
-          cp dist/hashmarks "$bundle/hashmarks-linux-x86_64"
-          (
-            cd "$bundle"
-            sha256sum hashmarks-linux-x86_64 > hashmarks-linux-x86_64.sha256
-          )
-          HASHMARKS_DOWNLOAD_BASE_URL="file://$bundle" \
-          HASHMARKS_INSTALL_DIR="$target" \
-          HASHMARKS_VERSION="$RELEASE_VERSION" \
-            sh install.sh
-          test "$("$target/hashmarks" --version)" = "hashmarks version $RELEASE_VERSION"
-      - name: Bind standalone release bytes
+      - name: Bind standalone release bytes and installer
         run: |
           mkdir -p release/standalone
           cp dist/hashmarks release/standalone/hashmarks-linux-x86_64
           chmod 0755 release/standalone/hashmarks-linux-x86_64
+          install -m 0755 install.sh release/standalone/install.sh
           (
             cd release/standalone
             sha256sum hashmarks-linux-x86_64 > hashmarks-linux-x86_64.sha256
+            sha256sum install.sh > install.sh.sha256
           )
+      - name: Install exact standalone through qualified installer
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          bundle="$PWD/release/standalone"
+          target="$PWD/.standalone-install-target"
+          mkdir -p "$target"
+          HASHMARKS_DOWNLOAD_BASE_URL="file://$bundle" \
+          HASHMARKS_INSTALL_DIR="$target" \
+          HASHMARKS_VERSION="$RELEASE_VERSION" \
+            sh "$bundle/install.sh"
+          test "$("$target/hashmarks" --version)" = "hashmarks version $RELEASE_VERSION"
       - name: Upload standalone qualified bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -325,8 +322,17 @@ jobs:
           (
             cd release/standalone
             sha256sum -c hashmarks-linux-x86_64.sha256
+            sha256sum -c install.sh.sha256
           )
           test "$(release/standalone/hashmarks-linux-x86_64 --version)" = \
+            "hashmarks version $RELEASE_VERSION"
+          final_target="$PWD/.publish-install-target"
+          mkdir -p "$final_target"
+          HASHMARKS_DOWNLOAD_BASE_URL="file://$PWD/release/standalone" \
+          HASHMARKS_INSTALL_DIR="$final_target" \
+          HASHMARKS_VERSION="$RELEASE_VERSION" \
+            sh release/standalone/install.sh
+          test "$("$final_target/hashmarks" --version)" = \
             "hashmarks version $RELEASE_VERSION"
       - name: Materialize reviewed changelog section as release notes
         env:
@@ -397,6 +403,8 @@ jobs:
             release/SHA256SUMS.txt \
             release/standalone/hashmarks-linux-x86_64 \
             release/standalone/hashmarks-linux-x86_64.sha256 \
+            release/standalone/install.sh \
+            release/standalone/install.sh.sha256 \
             --clobber
       - name: Publish reviewed release
         env:
