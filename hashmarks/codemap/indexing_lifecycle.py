@@ -286,6 +286,13 @@ def _module_name(relpath: str, source_roots: Sequence[str] = ()) -> str | None:
 
 
 @dataclass(frozen=True)
+class _AdmittedRepositoryFile:
+    rel: str
+    path: Path
+    visibility: EvidenceVisibility
+
+
+@dataclass(frozen=True)
 class _DiscoveredFile:
     rel: str
     path: Path
@@ -469,36 +476,103 @@ class IndexingLifecycleMixin:
             and not self._internal_path(f"{root_rel}/{name}".strip("/"))
         )
 
+    def _admitted_repository_file(
+        self,
+        path: Path,
+    ) -> _AdmittedRepositoryFile | None:
+        if path.is_symlink() or not path.is_file():
+            return None
+        rel = self._workspace_relative_path(path)
+        if rel is None or not rel or not self._path_admitted_for_analysis(rel):
+            return None
+        decision = self.policy.decide(rel)
+        return _AdmittedRepositoryFile(
+            rel=rel,
+            path=path,
+            visibility=decision.evidence_visibility,
+        )
+
+    def _walk_admitted_repository_files(
+        self,
+        prefix: str = "",
+        *,
+        limit: int | None = None,
+        visible_only: bool = False,
+    ) -> tuple[_AdmittedRepositoryFile, ...]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        rel = normalize_relative_path(prefix, allow_root=True)
+        if limit is not None and limit < 1:
+            raise ValueError("limit must be positive")
+
+        root = self.workspace if not rel else self.workspace / rel
+        if root.is_symlink():
+            return ()
+        if rel and (
+            self._internal_path(rel)
+            or _is_pruned_relative_path(rel)
+            or not self.policy.decide(rel).index
+        ):
+            return ()
+
+        admitted: list[_AdmittedRepositoryFile] = []
+
+        def append(path: Path) -> bool:
+            item = self._admitted_repository_file(path)
+            if item is None:
+                return False
+            if visible_only and item.visibility is EvidenceVisibility.DENY:
+                return False
+            admitted.append(item)
+            return limit is not None and len(admitted) >= limit
+
+        if root.is_file():
+            append(root)
+            return tuple(admitted)
+        if not root.is_dir():
+            return ()
+
+        for current_root, dirs, files in os.walk(
+            root,
+            topdown=True,
+            followlinks=False,
+        ):
+            root_path = Path(current_root)
+            self._prune_discovery_dirs(root_path, dirs)
+            for name in sorted(files):
+                if append(root_path / name):
+                    return tuple(admitted)
+        return tuple(admitted)
+
     def _discovered_file(
         self,
         path: Path,
         *,
         warnings: list[str] | None = None,
     ) -> _DiscoveredFile | None:
-        if path.is_symlink():
+        admitted = self._admitted_repository_file(path)
+        if admitted is None:
             return None
-        rel = self._workspace_relative_path(path)
-        if rel is None:
-            return None
-        decision = self.policy.decide(rel)
         language = _language_for_path(path)
-        if not decision.index or language is None:
+        if language is None:
             return None
         try:
             size = int(path.stat().st_size)
         except OSError as exc:
             if warnings is not None:
-                warnings.append(f"cannot stat {rel}: {exc}")
+                warnings.append(f"cannot stat {admitted.rel}: {exc}")
             return None
         if size > self.max_index_bytes:
             if warnings is not None:
-                warnings.append(f"skipped oversized source {rel} ({size} bytes)")
+                warnings.append(
+                    f"skipped oversized source {admitted.rel} ({size} bytes)"
+                )
             return None
         return _DiscoveredFile(
-            rel,
-            path,
+            admitted.rel,
+            admitted.path,
             language,
-            decision.evidence_visibility,
+            admitted.visibility,
             size,
         )
 
@@ -507,15 +581,10 @@ class IndexingLifecycleMixin:
             self = cast("CodeMap", self)
         result: list[_DiscoveredFile] = []
         warnings: list[str] = []
-        for root, dirs, files in os.walk(
-            self.workspace, topdown=True, followlinks=False
-        ):
-            root_path = Path(root)
-            self._prune_discovery_dirs(root_path, dirs)
-            for name in sorted(files):
-                item = self._discovered_file(root_path / name, warnings=warnings)
-                if item is not None:
-                    result.append(item)
+        for admitted in self._walk_admitted_repository_files():
+            item = self._discovered_file(admitted.path, warnings=warnings)
+            if item is not None:
+                result.append(item)
         return result, warnings
 
     def _parse_or_reuse(self, rel: str, path: Path, language: str, digest_hash: str):
@@ -539,25 +608,11 @@ class IndexingLifecycleMixin:
 
     def _discover_subtree(self, rel: str) -> list[_DiscoveredFile]:
         self = cast("CodeMap", self)
-        if not self._path_admitted_for_analysis(rel):
-            return []
-        path = self.workspace / rel
-        if path.is_symlink():
-            return []
-        if path.is_file():
-            item = self._discovered_file(path)
-            return [] if item is None else [item]
-        if not path.is_dir():
-            return []
-
         result: list[_DiscoveredFile] = []
-        for root, dirs, files in os.walk(path, topdown=True, followlinks=False):
-            root_path = Path(root)
-            self._prune_discovery_dirs(root_path, dirs)
-            for name in sorted(files):
-                item = self._discovered_file(root_path / name)
-                if item is not None:
-                    result.append(item)
+        for admitted in self._walk_admitted_repository_files(rel):
+            item = self._discovered_file(admitted.path)
+            if item is not None:
+                result.append(item)
         return result
 
     @staticmethod
