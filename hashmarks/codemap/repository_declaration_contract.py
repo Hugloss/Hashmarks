@@ -162,21 +162,23 @@ def _normalized_ambiguous_value(
     normalized = [
         json_value(value, name="candidate value") for value in candidates
     ]
-    identities = {
+    by_identity = {
         json.dumps(
             value,
             sort_keys=True,
             separators=(",", ":"),
             ensure_ascii=False,
             allow_nan=False,
-        )
+        ): value
         for value in normalized
     }
-    if len(identities) < 2:
+    if len(by_identity) < 2:
         raise ValueError(
             "ambiguous declaration requires at least two distinct candidate values"
         )
-    return {"candidate_values": normalized}
+    return {
+        "candidate_values": [by_identity[key] for key in sorted(by_identity)]
+    }
 
 
 def _normalized_value_fields(
@@ -294,11 +296,13 @@ def absence(
         if row.get("evidence_state") == "known-present"
     }
     unseen = sorted(expected - present)
+    unexpected = sorted(present - expected) if expected else []
     if not expected:
         return {
             "state": "unknown",
             "missing_declaration_ids": [],
             "unseen_expected_declaration_ids": [],
+            "unexpected_declaration_ids": unexpected,
             "reason": "expected-membership-not-declared",
         }
     if not unseen:
@@ -306,17 +310,20 @@ def absence(
             "state": "known-present",
             "missing_declaration_ids": [],
             "unseen_expected_declaration_ids": [],
+            "unexpected_declaration_ids": unexpected,
         }
     if coverage.get("state") == "complete" and coverage.get("truncation") == "complete":
         return {
             "state": "known-absent",
             "missing_declaration_ids": unseen,
             "unseen_expected_declaration_ids": [],
+            "unexpected_declaration_ids": unexpected,
         }
     return {
         "state": "unknown",
         "missing_declaration_ids": [],
         "unseen_expected_declaration_ids": unseen,
+        "unexpected_declaration_ids": unexpected,
         "reason": "coverage-does-not-authorize-negative-evidence",
     }
 
