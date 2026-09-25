@@ -23,10 +23,11 @@ The Publish workflow:
 3. qualifies that source with the locked test and MCP environment;
 4. builds and smoke-tests the exact wheel and sdist;
 5. builds and smoke-tests the standalone Linux x86_64 CLI/MCP executable;
-6. binds the qualified bytes with manifests and SHA-256 checksums;
-7. verifies the downloaded qualified bundles again;
-8. verifies the release tag resolves to the exact release-source SHA;
-9. creates/uploads a draft GitHub Release and publishes it only after all checks pass.
+6. copies the exact source `install.sh`, hashes it, and uses that copied installer to install the exact standalone artifact;
+7. binds the qualified bytes with manifests and SHA-256 checksums;
+8. downloads the qualified bundles and reruns both standalone-version and installer checks;
+9. verifies the release tag resolves to the exact release-source SHA;
+10. creates/uploads a draft GitHub Release containing the Python artifacts, standalone executable, installer, and checksums, then publishes it only after all checks pass.
 
 Hashmarks publishes these qualified artifacts through GitHub Releases. The release workflow does not automatically publish to PyPI. A failed or cancelled Publish workflow is not a completed release.
 
