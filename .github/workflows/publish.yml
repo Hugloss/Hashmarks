@@ -68,9 +68,64 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  standalone:
+    name: Build verified standalone Linux CLI/MCP
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: false
+      - run: uv python install 3.14
+      - name: Materialize locked Hashmarks + MCP runtime
+        run: uv sync --frozen --extra mcp --python 3.14
+      - name: Add pinned standalone packager
+        run: uv pip install --python .venv/bin/python "pyinstaller==6.22.3"
+      - name: Build self-contained executable
+        run: |
+          .venv/bin/pyinstaller \
+            --clean \
+            --noconfirm \
+            --onefile \
+            --name hashmarks \
+            --collect-all hashmarks \
+            --collect-all mcp \
+            scripts/hashmarks_entrypoint.py
+      - name: Smoke standalone CLI and MCP
+        run: |
+          ./dist/hashmarks --version
+          ./dist/hashmarks version
+          .venv/bin/python -I scripts/mcp_installed_artifact_smoke.py \
+            --hashmarks "$PWD/dist/hashmarks"
+      - name: Bind standalone release bytes
+        run: |
+          mkdir -p release/standalone
+          cp dist/hashmarks release/standalone/hashmarks-linux-x86_64
+          chmod 0755 release/standalone/hashmarks-linux-x86_64
+          (
+            cd release/standalone
+            sha256sum hashmarks-linux-x86_64 > hashmarks-linux-x86_64.sha256
+          )
+      - name: Upload standalone executable to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            release/standalone/hashmarks-linux-x86_64 \
+            release/standalone/hashmarks-linux-x86_64.sha256 \
+            --clobber
+
   publish:
     name: Publish exact qualified bytes to PyPI
-    needs: build
+    needs: [build, standalone]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: pypi
