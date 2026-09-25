@@ -23,6 +23,7 @@ from .project_impact_codec import (
 )
 from .repository_declaration_provider import (
     RepositoryDeclarationProvider,
+    RepositoryDeclarationProviderContext,
     RepositoryDeclarationProviderError,
     RepositoryDeclarationProviderResult,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "PostChangeOptions",
     "RepositoryIntelligenceQueryOptions",
     "RepositoryDeclarationProvider",
+    "RepositoryDeclarationProviderContext",
     "RepositoryDeclarationProviderError",
     "RepositoryDeclarationProviderResult",
     "CodeMapService",
