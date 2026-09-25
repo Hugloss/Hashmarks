@@ -170,7 +170,6 @@ def test_declaration_provider_context_has_no_raw_workspace_authority() -> None:
     assert "workspace" not in declared_names
 
     discovery = discovery_path.read_text(encoding="utf-8")
-    assert "self.store.paths_under(" in discovery
-    assert "self._path_admitted_for_analysis(" in discovery
-    assert "self.policy.decide(" in discovery
+    assert "self.store.visible_paths_under_bounded(" in discovery
+    assert "limit=MAX_PROVIDER_ENUMERATED_PATHS + 1" in discovery
     assert "collect_repository_declaration_providers(\n            self.workspace" not in discovery
