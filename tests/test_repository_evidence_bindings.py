@@ -1007,6 +1007,34 @@ def test_coverage_rejects_tampered_binding_packet(tmp_path: Path) -> None:
             )
 
 
+def test_coverage_rejects_authenticated_foreign_repository_packet(
+    tmp_path: Path,
+) -> None:
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.mkdir()
+    right.mkdir()
+    (left / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (right / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [
+        {
+            "binding_id": "coverage-repository-bound",
+            "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+        }
+    ]
+    with CodeMap(left) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(binding)
+    with CodeMap(right) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="repository-mismatch"):
+            codemap.repository_evidence_coverage(
+                packet,
+                changed_paths=["owner.py"],
+                change_set_complete=True,
+            )
+
+
 def test_coverage_rejects_delta_for_different_binding_packet(tmp_path: Path) -> None:
     source = tmp_path / "a.py"
     source.write_text("a\n", encoding="utf-8")
