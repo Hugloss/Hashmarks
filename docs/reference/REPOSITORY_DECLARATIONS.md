@@ -310,13 +310,12 @@ Hashmarks also exposes a Python-side provider SPI for integrations that need to
 **discover** declaration groups rather than construct them directly:
 
 ~~~python
-from pathlib import Path
-
 from hashmarks import (
     CodeMap,
     RepositoryDeclarationProviderContext,
     RepositoryDeclarationProviderResult,
 )
+
 
 class MyProvider:
     name = "my-repository-metadata"
@@ -334,6 +333,7 @@ class MyProvider:
             groups=groups,
             provenance={"provider": self.name, "version": "1"},
         )
+
 
 with CodeMap(".") as codemap:
     codemap.sync()
@@ -418,6 +418,8 @@ This contract does not:
 - translate descriptions;
 - repair files;
 - infer semantic correspondence with an LLM;
+- ambiently discover/load Python provider plugins;
+- execute arbitrary declaration providers inside MCP;
 - use majority voting;
 - claim absence without qualified coverage;
 - expand repository analysis into external dependency source.
