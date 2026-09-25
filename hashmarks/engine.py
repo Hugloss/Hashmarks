@@ -8,6 +8,7 @@ from .file_store import FileDigestStore
 from .inputs import InputManifest
 from .merkle import MerklePathScope, MerkleTree
 from .observation import ChangeTracker
+from .client import prepare_default_state_dir
 from .paths import canonical_host_path
 from .schema import IDENTITY_SCHEMA
 from .snapshot import Snapshot
@@ -33,13 +34,13 @@ class IdentityEngine:
     ):
         self.workspace = canonical_host_path(workspace)
         if state_dir is None:
-            state = self.workspace / ".hashmarks"
+            self.state_dir = prepare_default_state_dir(self.workspace)
         else:
             state = Path(state_dir)
             if not state.is_absolute():
                 state = self.workspace / state
-        self.state_dir = canonical_host_path(state)
-        self.state_dir.mkdir(parents=True, exist_ok=True)
+            self.state_dir = canonical_host_path(state)
+            self.state_dir.mkdir(parents=True, exist_ok=True)
 
         self.changes = ChangeTracker()
         self.file_store = FileDigestStore(self.state_dir / "identity.sqlite3")
