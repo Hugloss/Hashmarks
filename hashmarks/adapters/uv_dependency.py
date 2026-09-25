@@ -76,8 +76,19 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         raise ValueError("invalid uv lock TOML") from exc
 
     lock_version = document.get("version")
-    if lock_version != 1:
+    if (
+        not isinstance(lock_version, int)
+        or isinstance(lock_version, bool)
+        or lock_version != 1
+    ):
         raise ValueError(f"unsupported uv lock schema version: {lock_version}")
+    revision = document.get("revision")
+    if (
+        not isinstance(revision, int)
+        or isinstance(revision, bool)
+        or revision < 1
+    ):
+        raise ValueError("uv lock revision must be a positive integer")
     resolution_markers = _marker_list(document, "resolution-markers")
     supported_environments = sorted(_marker_list(document, "supported-markers"))
     required_environments = sorted(_marker_list(document, "required-markers"))
@@ -96,10 +107,14 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             raise ValueError("uv lock package must be an object")
         if raw.get("resolution-markers"):
             raise ValueError("uv package resolution forks are not modeled")
-        name = str(raw.get("name") or "").strip()
-        version = str(raw.get("version") or "").strip()
+        raw_name = raw.get("name")
+        raw_version = raw.get("version")
+        if not isinstance(raw_name, str) or not isinstance(raw_version, str):
+            raise ValueError("uv lock package requires string name and version")
+        name = raw_name.strip()
+        version = raw_version.strip()
         if not name or not version:
-            raise ValueError("uv lock package requires name and version")
+            raise ValueError("uv lock package requires string name and version")
         source_raw = raw.get("source")
         source = _source(source_raw)
         if (
@@ -230,8 +245,8 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         "schema": _SCHEMA,
         "producer": {
             "kind": "uv-lock",
-            "schema_version": str(document.get("version") or ""),
-            "revision": str(document.get("revision") or ""),
+            "schema_version": str(lock_version),
+            "revision": str(revision),
             "resolution_markers": resolution_markers,
         },
         "scope": {
