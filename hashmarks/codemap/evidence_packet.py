@@ -989,6 +989,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             selection_generation=selection_generation,
             verification_stale=verification_stale,
         )
+        result["evidence_packet_identity"] = "sha256:" + self._packet_digest(
+            "hashmarks.task-evidence.v2",
+            result,
+        )
         return result
 
     @decision_scoped
