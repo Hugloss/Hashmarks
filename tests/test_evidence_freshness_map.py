@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import threading
 import time
+from typing import TYPE_CHECKING
 
 import pytest
-from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.freshness_map import FreshnessMapOptions
