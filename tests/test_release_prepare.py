@@ -44,16 +44,16 @@ def test_prepare_release_updates_mechanical_version_authorities(
 
     prepare_release(root, "1.3.0")
 
-    project = tomllib.loads(
-        (root / "pyproject.toml").read_text(encoding="utf-8")
-    )["project"]
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]
     assert project["version"] == "1.3.0"
-    assert (
-        root / "hashmarks" / "_version.py"
-    ).read_text(encoding="utf-8") == '__version__ = "1.3.0"\n'
-    assert "Current package version: **1.3.0**." in (
-        root / "README.md"
-    ).read_text(encoding="utf-8")
+    assert (root / "hashmarks" / "_version.py").read_text(
+        encoding="utf-8"
+    ) == '__version__ = "1.3.0"\n'
+    assert "Current package version: **1.3.0**." in (root / "README.md").read_text(
+        encoding="utf-8"
+    )
 
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     assert changelog.startswith(
@@ -87,9 +87,12 @@ def test_prepare_release_rejects_non_release_versions(
     with pytest.raises(ValueError, match="invalid release version"):
         prepare_release(root, version)
 
-    assert tomllib.loads(
-        (root / "pyproject.toml").read_text(encoding="utf-8")
-    )["project"]["version"] == "1.2.3"
+    assert (
+        tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+            "version"
+        ]
+        == "1.2.3"
+    )
 
 
 def test_prepare_release_rejects_existing_release_before_writing(
@@ -107,6 +110,9 @@ def test_prepare_release_rejects_existing_release_before_writing(
     with pytest.raises(ValueError, match="already contains release 1.3.0"):
         prepare_release(root, "1.3.0")
 
-    assert tomllib.loads(
-        (root / "pyproject.toml").read_text(encoding="utf-8")
-    )["project"]["version"] == "1.2.3"
+    assert (
+        tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+            "version"
+        ]
+        == "1.2.3"
+    )
