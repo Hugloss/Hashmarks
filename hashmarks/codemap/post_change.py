@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
-
 @dataclass(frozen=True, slots=True)
 class PostChangeOptions:
     """Previous anchors and bounds for one post-change projection."""
@@ -26,7 +25,6 @@ class PostChangeOptions:
     limit: int = 20
     per_role: int = 3
     token_budget: int = 512
-
 
 
 class PostChangeMixin(ChangeImpactMixin):
