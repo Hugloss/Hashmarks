@@ -95,6 +95,10 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         or revision < 1
     ):
         raise ValueError("uv lock revision must be a positive integer")
+    raw_requires_python = document.get("requires-python")
+    if raw_requires_python is not None and not isinstance(raw_requires_python, str):
+        raise ValueError("uv lock requires-python must be a string")
+    requires_python = (raw_requires_python or "").strip()
     resolution_markers = _marker_list(document, "resolution-markers")
     supported_environments = sorted(_marker_list(document, "supported-markers"))
     required_environments = sorted(_marker_list(document, "required-markers"))
@@ -259,11 +263,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "resolution_markers": resolution_markers,
         },
         "scope": {
-            **(
-                {"requires_python": str(document["requires-python"])}
-                if document.get("requires-python")
-                else {}
-            ),
+            **({"requires_python": requires_python} if requires_python else {}),
             **(
                 {"supported_environments": supported_environments}
                 if supported_environments
