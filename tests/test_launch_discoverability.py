@@ -22,7 +22,7 @@ def test_readme_launch_surface_is_descriptive_before_internal_detail() -> None:
         "model context protocol (mcp) server",
         "codebase search for agents",
         "change impact analysis",
-        "pip install hashmarks",
+        "raw.githubusercontent.com/hugloss/hashmarks/main/install.sh",
     ):
         assert phrase in above_fold
     assert readme.index("## Quick start") < readme.index("## Core architecture")
