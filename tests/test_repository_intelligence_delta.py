@@ -211,6 +211,21 @@ def test_repository_delta_rejects_foreign_repository_other_task_and_wrong_schema
             )
 
 
+def test_repository_delta_rejects_tampered_retained_snapshot(tmp_path: Path) -> None:
+    _source, task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        previous = codemap.repository_intelligence_snapshot(task, ["src/owner.py"])
+        previous["paths"]["src/owner.py"]["member_state"] = "known-absent"
+
+        with pytest.raises(ValueError, match="snapshot identity mismatch"):
+            codemap.repository_intelligence_delta(
+                task,
+                ["src/owner.py"],
+                previous_snapshot=previous,
+            )
+
+
 def _wait(client: CodeMapServiceClient) -> None:
     for _ in range(100):
         try:
@@ -277,7 +292,14 @@ def test_repository_delta_keeps_observer_change_separate_from_repository_change(
             **previous["observer"],
             "identity": "sha256:older-observer",
         }
-        previous["snapshot_identity"] = "sha256:caller-retained-older-observer"
+        previous["snapshot_identity"] = "sha256:" + codemap._packet_digest(
+            "hashmarks.repository-intelligence-snapshot.v1",
+            {
+                key: value
+                for key, value in previous.items()
+                if key != "snapshot_identity"
+            },
+        )
         delta = codemap.repository_intelligence_delta(
             task, ["src/owner.py"], previous_snapshot=previous
         )
@@ -320,7 +342,14 @@ def test_relationship_identity_does_not_turn_provenance_into_semantic_delta(
                 "source": "older-compatible-observer",
                 "path": "src/owner.py",
             }
-        previous["snapshot_identity"] = "sha256:caller-retained-provenance-variant"
+        previous["snapshot_identity"] = "sha256:" + codemap._packet_digest(
+            "hashmarks.repository-intelligence-snapshot.v1",
+            {
+                key: value
+                for key, value in previous.items()
+                if key != "snapshot_identity"
+            },
+        )
         delta = codemap.repository_intelligence_delta(
             task, ["src/owner.py"], previous_snapshot=previous
         )
