@@ -34,9 +34,7 @@ def _standalone(
     standalone = tmp_path / "hashmarks-linux-x86_64"
     reported = version or hashmarks.__version__
     standalone.write_text(
-        "#!/bin/sh\n"
-        f"printf '%s\\n' 'hashmarks version {reported}'\n"
-        f"{suffix}",
+        f"#!/bin/sh\nprintf '%s\\n' 'hashmarks version {reported}'\n{suffix}",
         encoding="utf-8",
     )
     standalone.chmod(0o755)
