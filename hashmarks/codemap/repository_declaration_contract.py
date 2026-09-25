@@ -11,7 +11,14 @@ GROUP_KEYS = frozenset(
     {"group_id", "concept", "scope", "correspondence", "declarations", "coverage"}
 )
 DECLARATION_KEYS = frozenset(
-    {"declaration_id", "value_state", "value", "candidate_values", "producer", "evidence"}
+    {
+        "declaration_id",
+        "value_state",
+        "value",
+        "candidate_values",
+        "producer",
+        "evidence",
+    }
 )
 CORRESPONDENCE_KEYS = frozenset({"state", "basis"})
 COVERAGE_KEYS = frozenset(
@@ -75,12 +82,16 @@ def normalize_coverage(raw: object) -> dict[str, object]:
     if state not in {"complete", "incomplete", "unknown"}:
         raise ValueError("coverage.state must be complete, incomplete, or unknown")
     if truncation not in {"complete", "truncated", "unknown"}:
-        raise ValueError("coverage.truncation must be complete, truncated, or unknown")
+        raise ValueError(
+            "coverage.truncation must be complete, truncated, or unknown"
+        )
     if state == "complete" and truncation != "complete":
         raise ValueError("complete declaration coverage requires truncation=complete")
 
     expected_raw = row.get("expected_declaration_ids", [])
-    if not isinstance(expected_raw, Sequence) or isinstance(expected_raw, (str, bytes)):
+    if not isinstance(expected_raw, Sequence) or isinstance(
+        expected_raw, (str, bytes)
+    ):
         raise ValueError("coverage.expected_declaration_ids must be a list")
     if len(expected_raw) > MAX_EXPECTED_PER_GROUP:
         raise ValueError(
@@ -88,8 +99,7 @@ def normalize_coverage(raw: object) -> dict[str, object]:
             f"{MAX_EXPECTED_PER_GROUP} entries"
         )
     expected = [
-        required_text(value, name="expected declaration id")
-        for value in expected_raw
+        required_text(value, name="expected declaration id") for value in expected_raw
     ]
     if len(set(expected)) != len(expected):
         raise ValueError("coverage.expected_declaration_ids contains duplicates")
@@ -115,6 +125,50 @@ def _binding_id(group_id: str, declaration_id: str) -> str:
     )
 
 
+def _normalized_evidence(row: Mapping[str, object]) -> list[dict[str, object]]:
+    evidence = row.get("evidence")
+    if not isinstance(evidence, Sequence) or isinstance(evidence, (str, bytes)):
+        raise ValueError("declaration evidence must be a list")
+    if not evidence:
+        raise ValueError("each declaration requires exact repository evidence")
+    if any(not isinstance(item, Mapping) for item in evidence):
+        raise ValueError("each declaration evidence item must be an object")
+    return [dict(item) for item in evidence if isinstance(item, Mapping)]
+
+
+def _normalized_value_fields(
+    row: Mapping[str, object], value_state: str
+) -> dict[str, object]:
+    if value_state == "resolved":
+        if "value" not in row:
+            raise ValueError("resolved declaration requires value")
+        if "candidate_values" in row:
+            raise ValueError("resolved declaration must not declare candidate_values")
+        return {"value": json_value(row["value"], name="declaration value")}
+
+    if value_state == "ambiguous":
+        if "value" in row:
+            raise ValueError("ambiguous declaration must not declare value")
+        candidates = row.get("candidate_values")
+        if not isinstance(candidates, Sequence) or isinstance(candidates, (str, bytes)):
+            raise ValueError("ambiguous declaration requires candidate_values list")
+        if len(candidates) < 2:
+            raise ValueError(
+                "ambiguous declaration requires at least two candidate values"
+            )
+        return {
+            "candidate_values": [
+                json_value(value, name="candidate value") for value in candidates
+            ]
+        }
+
+    if "value" in row or "candidate_values" in row:
+        raise ValueError(
+            "unresolved declaration must not declare value or candidate_values"
+        )
+    return {}
+
+
 def normalize_declaration(
     raw: object, *, group_id: str
 ) -> tuple[dict[str, object], dict[str, object]]:
@@ -124,56 +178,21 @@ def normalize_declaration(
     value_state = required_text(row.get("value_state"), name="value_state")
     if value_state not in {"resolved", "ambiguous", "unresolved"}:
         raise ValueError("value_state must be resolved, ambiguous, or unresolved")
-
     producer = json_value(row.get("producer", {}), name="producer")
     if not isinstance(producer, dict):
         raise ValueError("producer must be an object")
-    evidence = row.get("evidence")
-    if not isinstance(evidence, Sequence) or isinstance(evidence, (str, bytes)):
-        raise ValueError("declaration evidence must be a list")
-    if not evidence:
-        raise ValueError("each declaration requires exact repository evidence")
-    normalized_evidence: list[dict[str, object]] = []
-    for item in evidence:
-        if not isinstance(item, Mapping):
-            raise ValueError("each declaration evidence item must be an object")
-        normalized_evidence.append(dict(item))
 
-    result: dict[str, object] = {
+    binding_id = _binding_id(group_id, declaration_id)
+    result = {
         "declaration_id": declaration_id,
         "value_state": value_state,
         "producer": producer,
         "semantic_value_authority": "provider-claimed",
+        "binding_id": binding_id,
+        **_normalized_value_fields(row, value_state),
     }
-    if value_state == "resolved":
-        if "value" not in row:
-            raise ValueError("resolved declaration requires value")
-        if "candidate_values" in row:
-            raise ValueError("resolved declaration must not declare candidate_values")
-        result["value"] = json_value(row["value"], name="declaration value")
-    elif value_state == "ambiguous":
-        if "value" in row:
-            raise ValueError("ambiguous declaration must not declare value")
-        candidates = row.get("candidate_values")
-        if not isinstance(candidates, Sequence) or isinstance(
-            candidates, (str, bytes)
-        ):
-            raise ValueError("ambiguous declaration requires candidate_values list")
-        if len(candidates) < 2:
-            raise ValueError(
-                "ambiguous declaration requires at least two candidate values"
-            )
-        result["candidate_values"] = [
-            json_value(value, name="candidate value") for value in candidates
-        ]
-    elif "value" in row or "candidate_values" in row:
-        raise ValueError(
-            "unresolved declaration must not declare value or candidate_values"
-        )
-
-    binding_id = _binding_id(group_id, declaration_id)
-    result["binding_id"] = binding_id
-    return result, {"binding_id": binding_id, "evidence": normalized_evidence}
+    binding = {"binding_id": binding_id, "evidence": _normalized_evidence(row)}
+    return result, binding
 
 
 def comparison(
@@ -243,7 +262,10 @@ def absence(
             "missing_declaration_ids": [],
             "unseen_expected_declaration_ids": [],
         }
-    if coverage.get("state") == "complete" and coverage.get("truncation") == "complete":
+    if (
+        coverage.get("state") == "complete"
+        and coverage.get("truncation") == "complete"
+    ):
         return {
             "state": "present",
             "missing_declaration_ids": unseen,
@@ -257,6 +279,32 @@ def absence(
     }
 
 
+def _group_bindings(raw_group: Mapping[str, object]) -> list[dict[str, object]]:
+    reject_unknown(raw_group, allowed=GROUP_KEYS, name="declaration group")
+    group_id = required_text(raw_group.get("group_id"), name="group_id")
+    concept = json_value(raw_group.get("concept"), name="concept")
+    scope = json_value(raw_group.get("scope", {}), name="scope")
+    if not isinstance(concept, dict) or not isinstance(scope, dict):
+        raise ValueError("concept and scope must be objects")
+    normalize_correspondence(raw_group.get("correspondence", {}))
+    normalize_coverage(raw_group.get("coverage", {}))
+
+    raw_declarations = raw_group.get("declarations")
+    if not isinstance(raw_declarations, Sequence) or isinstance(
+        raw_declarations, (str, bytes)
+    ):
+        raise ValueError("declarations must be a list")
+
+    normalized = [
+        normalize_declaration(raw_declaration, group_id=group_id)
+        for raw_declaration in raw_declarations
+    ]
+    declaration_ids = [str(row[0]["declaration_id"]) for row in normalized]
+    if len(set(declaration_ids)) != len(declaration_ids):
+        raise ValueError(f"duplicate declaration_id in group {group_id}")
+    return [binding for _declaration, binding in normalized]
+
+
 def normalize_request(
     groups: Sequence[Mapping[str, object]],
 ) -> tuple[list[Mapping[str, object]], list[dict[str, object]]]:
@@ -264,49 +312,25 @@ def normalize_request(
         raise ValueError("groups must be a sequence")
     if len(groups) > MAX_GROUPS:
         raise ValueError(f"groups exceeds {MAX_GROUPS} entries")
+    if any(not isinstance(raw_group, Mapping) for raw_group in groups):
+        raise ValueError("each declaration group must be an object")
 
-    normalized_groups: list[Mapping[str, object]] = []
-    bindings: list[dict[str, object]] = []
-    seen_groups: set[str] = set()
-    declaration_count = 0
-    for raw_group in groups:
-        if not isinstance(raw_group, Mapping):
-            raise ValueError("each declaration group must be an object")
-        reject_unknown(raw_group, allowed=GROUP_KEYS, name="declaration group")
-        group_id = required_text(raw_group.get("group_id"), name="group_id")
-        if group_id in seen_groups:
-            raise ValueError(f"duplicate group_id: {group_id}")
-        seen_groups.add(group_id)
+    normalized_groups = [
+        raw_group for raw_group in groups if isinstance(raw_group, Mapping)
+    ]
+    group_ids = [
+        required_text(raw_group.get("group_id"), name="group_id")
+        for raw_group in normalized_groups
+    ]
+    if len(set(group_ids)) != len(group_ids):
+        raise ValueError("duplicate group_id")
 
-        # Validate group-level semantics before repository evidence is read.
-        concept = json_value(raw_group.get("concept"), name="concept")
-        scope = json_value(raw_group.get("scope", {}), name="scope")
-        if not isinstance(concept, dict) or not isinstance(scope, dict):
-            raise ValueError("concept and scope must be objects")
-        normalize_correspondence(raw_group.get("correspondence", {}))
-        normalize_coverage(raw_group.get("coverage", {}))
-
-        raw_declarations = raw_group.get("declarations")
-        if not isinstance(raw_declarations, Sequence) or isinstance(
-            raw_declarations, (str, bytes)
-        ):
-            raise ValueError("declarations must be a list")
-        group_seen: set[str] = set()
-        for raw_declaration in raw_declarations:
-            normalized, binding = normalize_declaration(
-                raw_declaration, group_id=group_id
-            )
-            declaration_id = str(normalized["declaration_id"])
-            if declaration_id in group_seen:
-                raise ValueError(
-                    f"duplicate declaration_id in group {group_id}: {declaration_id}"
-                )
-            group_seen.add(declaration_id)
-            bindings.append(binding)
-            declaration_count += 1
-        normalized_groups.append(raw_group)
-
-    if declaration_count > MAX_DECLARATIONS:
+    bindings = [
+        binding
+        for raw_group in normalized_groups
+        for binding in _group_bindings(raw_group)
+    ]
+    if len(bindings) > MAX_DECLARATIONS:
         raise ValueError(
             f"declaration request exceeds {MAX_DECLARATIONS} declarations"
         )
