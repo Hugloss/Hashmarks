@@ -45,6 +45,23 @@ def _print(value) -> None:
     log_command_output(logger, json.dumps(value, indent=2, sort_keys=True))
 
 
+def _daemon_serve_command(workspace: Path, state: Path) -> list[str]:
+    command = [sys.executable]
+    if not getattr(sys, "frozen", False):
+        command.extend(["-m", "hashmarks.cli"])
+    command.extend(
+        [
+            "--workspace",
+            str(workspace),
+            "--state-dir",
+            str(state),
+            "daemon",
+            "serve",
+        ]
+    )
+    return command
+
+
 def _daemon_start(args) -> int:
     client = _client(args)
     try:
@@ -69,17 +86,7 @@ def _daemon_start(args) -> int:
     state.mkdir(parents=True, exist_ok=True)
     log_path = state / "identity-daemon.log"
     log = log_path.open("ab", buffering=0)
-    cmd = [
-        sys.executable,
-        "-m",
-        "hashmarks.cli",
-        "--workspace",
-        str(workspace),
-        "--state-dir",
-        str(state),
-        "daemon",
-        "serve",
-    ]
+    cmd = _daemon_serve_command(workspace, state)
     subprocess.Popen(
         cmd,
         stdin=subprocess.DEVNULL,
