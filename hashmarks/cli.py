@@ -198,12 +198,11 @@ def _install(args) -> int:
         ".",
         "mcp",
     ]
-    try:
-        subprocess.run(command, check=True)
-    except subprocess.CalledProcessError as exc:
+    result = subprocess.run(command, check=False)
+    if result.returncode != 0:
         raise UserFacingError(
-            f"OpenCode rejected Hashmarks MCP registration (exit {exc.returncode})"
-        ) from exc
+            f"OpenCode rejected Hashmarks MCP registration (exit {result.returncode})"
+        )
     _print(
         {
             "host": "opencode",
