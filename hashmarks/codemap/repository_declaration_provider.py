@@ -6,7 +6,12 @@ from typing import Protocol
 
 from hashmarks.paths import normalize_relative_path
 
-from .repository_declaration_contract import encoded_json_bytes, json_value
+from .repository_declaration_contract import (
+    MAX_DECLARATIONS,
+    MAX_GROUPS,
+    encoded_json_bytes,
+    json_value,
+)
 
 MAX_DECLARATION_PROVIDERS = 32
 MAX_PROVIDER_INPUTS = 256
@@ -352,10 +357,20 @@ def _provider_result(
             "RepositoryDeclarationProviderResult"
         )
     groups = _provider_groups(result.groups, provider_name=provider_name)
-    if len(groups) > MAX_DECLARATION_PROVIDERS * 4:
+    if len(groups) > MAX_GROUPS:
         raise RepositoryDeclarationProviderError(
             f"declaration provider {provider_name} groups exceed "
-            f"{MAX_DECLARATION_PROVIDERS * 4} entries"
+            f"{MAX_GROUPS} entries"
+        )
+    declaration_count = sum(
+        len(declarations)
+        for group in groups
+        if isinstance((declarations := group.get("declarations")), list)
+    )
+    if declaration_count > MAX_DECLARATIONS:
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} declarations exceed "
+            f"{MAX_DECLARATIONS} entries"
         )
     evidence_paths = _declared_evidence_paths(groups)
     unread = sorted(evidence_paths - set(context.content_paths()))
