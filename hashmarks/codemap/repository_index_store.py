@@ -867,6 +867,36 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             ).fetchall()
         return {str(row[0]) for row in rows}
 
+    def visible_paths_under_bounded(
+        self,
+        prefix: str,
+        *,
+        limit: int,
+    ) -> tuple[str, ...]:
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        clean = prefix.strip("/")
+        self._count_read("visible_paths_under_bounded")
+        with self._lock:
+            if not clean:
+                rows = self._db.execute(
+                    "SELECT path FROM file_map "
+                    "WHERE evidence_visibility != 'deny' "
+                    "ORDER BY path LIMIT ?",
+                    (limit,),
+                ).fetchall()
+            else:
+                lower = clean + "/"
+                upper = clean + "0"
+                rows = self._db.execute(
+                    "SELECT path FROM file_map "
+                    "WHERE evidence_visibility != 'deny' "
+                    "AND (path=? OR (path>=? AND path<?)) "
+                    "ORDER BY path LIMIT ?",
+                    (clean, lower, upper, limit),
+                ).fetchall()
+        return tuple(str(row[0]) for row in rows)
+
     def delete_paths(self, paths: Iterable[str]) -> int:
         values = list(paths)
         if not values:
