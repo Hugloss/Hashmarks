@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+
 def test_repository_evidence_bindings_are_generic_deterministic_repository_facts(
     tmp_path: Path,
 ) -> None:
@@ -43,6 +44,7 @@ def test_repository_evidence_bindings_are_generic_deterministic_repository_facts
     assert len(row["evidence"][0]["member_revision"]) == 64
 
 
+
 def test_span_identity_survives_unrelated_member_edit_while_member_revision_changes(
     tmp_path: Path,
 ) -> None:
@@ -65,6 +67,7 @@ def test_span_identity_survives_unrelated_member_edit_while_member_revision_chan
     new = after["bindings"][0]["evidence"][0]
     assert old["span_identity"] == new["span_identity"]
     assert old["member_revision"] != new["member_revision"]
+
 
 
 def test_binding_reports_deleted_and_unsupported_members_without_policy_decision(
@@ -90,6 +93,7 @@ def test_binding_reports_deleted_and_unsupported_members_without_policy_decision
         nontext = codemap.repository_evidence_bindings(unsupported)
     assert absent["bindings"][0]["evidence"][0]["state"] == "known-absent"
     assert nontext["bindings"][0]["evidence"][0]["state"] == "unsupported"
+
 
 
 def test_binding_rejects_duplicate_identity_and_invalid_range(tmp_path: Path) -> None:
@@ -120,6 +124,7 @@ def test_binding_rejects_duplicate_identity_and_invalid_range(tmp_path: Path) ->
             )
 
 
+
 def test_binding_vocabulary_does_not_encode_consumer_execution_policy(
     tmp_path: Path,
 ) -> None:
@@ -137,6 +142,7 @@ def test_binding_vocabulary_does_not_encode_consumer_execution_policy(
     rendered = repr(packet).lower()
     for forbidden in ("recertif", "capability suspension", "admission", "goon"):
         assert forbidden not in rendered
+
 
 
 def test_span_identity_preserves_newline_bytes(tmp_path: Path) -> None:
@@ -158,6 +164,7 @@ def test_span_identity_preserves_newline_bytes(tmp_path: Path) -> None:
         crlf["bindings"][0]["evidence"][0]["span_identity"]
         != lf["bindings"][0]["evidence"][0]["span_identity"]
     )
+
 
 
 def test_binding_rejects_symlinked_ancestor_evidence(tmp_path: Path) -> None:
@@ -182,6 +189,7 @@ def test_binding_rejects_symlinked_ancestor_evidence(tmp_path: Path) -> None:
     assert row["reason"] == "symlink-evidence-not-observed"
 
 
+
 def test_binding_observation_is_decision_session_scoped(tmp_path: Path) -> None:
     (tmp_path / "a.py").write_text("a\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
@@ -198,6 +206,7 @@ def test_binding_observation_is_decision_session_scoped(tmp_path: Path) -> None:
             assert (
                 packet["repository"]["codemap_generation"] == codemap.store.generation()
             )
+
 
 
 def test_dependency_change_is_separate_from_unchanged_direct_evidence(
@@ -233,6 +242,7 @@ def test_dependency_change_is_separate_from_unchanged_direct_evidence(
     assert observations["changes"][0]["path"] == "dependency.py"
 
 
+
 def test_unrelated_change_does_not_affect_declared_dependency(tmp_path: Path) -> None:
     (tmp_path / "source.py").write_text("stable\n", encoding="utf-8")
     (tmp_path / "dependency.py").write_text("VALUE = 1\n", encoding="utf-8")
@@ -258,6 +268,7 @@ def test_unrelated_change_does_not_affect_declared_dependency(tmp_path: Path) ->
 
     assert delta["bindings"]["preserved"] == ["generic:binding"]
     assert delta["bindings"]["changed"] == []
+
 
 
 def test_indexed_relationship_evidence_is_bounded_and_non_authoritative(
@@ -287,6 +298,7 @@ def test_indexed_relationship_evidence_is_bounded_and_non_authoritative(
     assert any(row.get("target") for row in relationships["relationships"])
 
 
+
 def test_relationship_change_does_not_masquerade_as_direct_content_change(
     tmp_path: Path,
 ) -> None:
@@ -314,6 +326,7 @@ def test_relationship_change_does_not_masquerade_as_direct_content_change(
     assert relationships["comparability"] == "comparable"
     assert relationships["facts"]["state"] == "changed"
     assert relationships["completeness"] == "bounded-not-claimed"
+
 
 
 def test_complete_change_set_can_prove_outside_declared_bindings(
@@ -347,6 +360,7 @@ def test_complete_change_set_can_prove_outside_declared_bindings(
     assert coverage["coverage"]["outside_classification"] == "known"
 
 
+
 def test_incomplete_change_set_never_claims_unmapped_change(tmp_path: Path) -> None:
     (tmp_path / "bound.py").write_text("bound\n", encoding="utf-8")
     (tmp_path / "seen.py").write_text("seen\n", encoding="utf-8")
@@ -370,6 +384,7 @@ def test_incomplete_change_set_never_claims_unmapped_change(tmp_path: Path) -> N
     assert coverage["coverage"]["outside_classification"] == "unknown"
 
 
+
 def test_coverage_is_order_independent_and_identity_stable(tmp_path: Path) -> None:
     (tmp_path / "a.py").write_text("a\n", encoding="utf-8")
     (tmp_path / "b.py").write_text("b\n", encoding="utf-8")
@@ -389,6 +404,7 @@ def test_coverage_is_order_independent_and_identity_stable(tmp_path: Path) -> No
             packet, changed_paths=["a.py", "b.py"], change_set_complete=True
         )
     assert first == second
+
 
 
 def test_coverage_distinguishes_bound_range_from_elsewhere_in_member(
@@ -438,6 +454,7 @@ def test_coverage_distinguishes_bound_range_from_elsewhere_in_member(
     assert inside_range["precision"]["bound_range"] == "known"
 
 
+
 def test_path_only_coverage_refuses_to_infer_range_impact(tmp_path: Path) -> None:
     (tmp_path / "source.py").write_text("a\nb\n", encoding="utf-8")
     bindings = [
@@ -456,6 +473,7 @@ def test_path_only_coverage_refuses_to_infer_range_impact(tmp_path: Path) -> Non
     assert coverage["classification"]["changed_elsewhere_in_bound_member"] == []
     assert coverage["classification"]["bound_member_precision_unknown"] == ["source.py"]
     assert coverage["precision"]["bound_range"] == "unknown"
+
 
 
 def test_relationship_projection_can_be_skipped_without_changing_evidence_authority(
@@ -510,6 +528,7 @@ def test_binding_contract_rejects_malformed_or_escaping_inputs(
             codemap.repository_evidence_bindings(payload)  # type: ignore[arg-type]
 
 
+
 def test_overlapping_and_duplicate_spans_remain_explicit_evidence(
     tmp_path: Path,
 ) -> None:
@@ -534,6 +553,7 @@ def test_overlapping_and_duplicate_spans_remain_explicit_evidence(
     identities = [str(row["span_identity"]) for row in evidence]
     assert len(set(identities)) == 2
     assert sorted(identities.count(identity) for identity in set(identities)) == [1, 2]
+
 
 
 def test_deleted_bound_member_is_first_class_delta(tmp_path: Path) -> None:
@@ -578,6 +598,7 @@ def test_deleted_bound_member_is_first_class_delta(tmp_path: Path) -> None:
     ]
 
 
+
 def test_exact_span_uses_physical_lf_lines_not_unicode_line_separators(
     tmp_path: Path,
 ) -> None:
@@ -600,6 +621,7 @@ def test_exact_span_uses_physical_lf_lines_not_unicode_line_separators(
     assert evidence["byte_length"] == len(first_line)
 
 
+
 def test_exact_span_preserves_utf8_bom_as_repository_bytes(tmp_path: Path) -> None:
     source = tmp_path / "bom.py"
     source.write_bytes(b"\xef\xbb\xbfvalue = 1\n")
@@ -617,6 +639,7 @@ def test_exact_span_preserves_utf8_bom_as_repository_bytes(tmp_path: Path) -> No
     assert packet["bindings"][0]["evidence"][0]["byte_length"] == len(
         b"\xef\xbb\xbfvalue = 1\n"
     )
+
 
 
 def test_binding_obeys_context_policy_source_disclosure(tmp_path: Path) -> None:
@@ -643,6 +666,7 @@ def test_binding_obeys_context_policy_source_disclosure(tmp_path: Path) -> None:
     assert "do-not-disclose" not in repr(packet)
 
 
+
 def test_outline_visibility_does_not_become_raw_source_binding(tmp_path: Path) -> None:
     source = tmp_path / "outline.py"
     source.write_text("VALUE = 1\n", encoding="utf-8")
@@ -667,6 +691,7 @@ def test_outline_visibility_does_not_become_raw_source_binding(tmp_path: Path) -
     assert "span_identity" not in evidence
 
 
+
 def test_unsignaled_member_edit_fails_closed_against_indexed_revision(
     tmp_path: Path,
 ) -> None:
@@ -688,6 +713,7 @@ def test_unsignaled_member_edit_fails_closed_against_indexed_revision(
     assert evidence["state"] == "unknown"
     assert evidence["reason"] == "member-revision-mismatch"
     assert "span_identity" not in evidence
+
 
 
 def test_binding_definition_change_is_not_relationship_content_change(
@@ -727,6 +753,7 @@ def test_binding_definition_change_is_not_relationship_content_change(
     assert relationships["observation"]["changed"] is True
 
 
+
 def test_observer_proven_change_set_keeps_completeness_provenance(
     tmp_path: Path,
 ) -> None:
@@ -755,6 +782,7 @@ def test_observer_proven_change_set_keeps_completeness_provenance(
     assert coverage["coverage"]["state"] == "complete"
     assert coverage["coverage"]["source"] == "repository-observer"
     assert coverage["change_set"]["generation"] == 7
+
 
 
 def test_coverage_reports_binding_ids_and_stable_impact_reasons(tmp_path: Path) -> None:
@@ -790,6 +818,7 @@ def test_coverage_reports_binding_ids_and_stable_impact_reasons(tmp_path: Path) 
     ]
 
 
+
 def test_whole_member_binding_supports_empty_and_binary_repository_members(
     tmp_path: Path,
 ) -> None:
@@ -817,6 +846,7 @@ def test_whole_member_binding_supports_empty_and_binary_repository_members(
     assert all(row["state"] == "known-present" for row in evidence)
     assert all(len(str(row["member_revision"])) == 64 for row in evidence)
     assert all(row["index_state"] == "unindexed" for row in evidence)
+
 
 
 def test_whole_member_change_is_direct_content_and_member_change(
@@ -862,6 +892,7 @@ def test_whole_member_change_is_direct_content_and_member_change(
     ]
 
 
+
 def test_member_scope_rejects_line_bounds(tmp_path: Path) -> None:
     (tmp_path / "a.txt").write_text("a\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
@@ -882,6 +913,7 @@ def test_member_scope_rejects_line_bounds(tmp_path: Path) -> None:
                     }
                 ]
             )
+
 
 
 def test_binding_identity_is_order_independent_but_duplicates_remain_explicit(
@@ -925,6 +957,7 @@ def test_binding_identity_is_order_independent_but_duplicates_remain_explicit(
     assert len(first["bindings"][0]["evidence"]) == 3
 
 
+
 def test_binding_contract_rejects_unknown_dependency_owner_and_unbounded_requests(
     tmp_path: Path,
 ) -> None:
@@ -945,6 +978,7 @@ def test_binding_contract_rejects_unknown_dependency_owner_and_unbounded_request
             codemap.repository_evidence_bindings(
                 [{"binding_id": f"b:{index}", "evidence": []} for index in range(257)]
             )
+
 
 
 def test_binding_delta_preserves_duplicate_evidence_multiplicity(
@@ -986,6 +1020,7 @@ def test_binding_delta_preserves_duplicate_evidence_multiplicity(
     assert changed["member_evidence"]["state"] == "preserved"
 
 
+
 def test_coverage_rejects_tampered_binding_packet(tmp_path: Path) -> None:
     (tmp_path / "a.py").write_text("a\n", encoding="utf-8")
     binding = [
@@ -1005,6 +1040,7 @@ def test_coverage_rejects_tampered_binding_packet(tmp_path: Path) -> None:
                 changed_paths=["a.py"],
                 change_set_complete=True,
             )
+
 
 
 def test_coverage_rejects_authenticated_foreign_repository_packet(
@@ -1033,6 +1069,7 @@ def test_coverage_rejects_authenticated_foreign_repository_packet(
                 changed_paths=["owner.py"],
                 change_set_complete=True,
             )
+
 
 
 def test_coverage_rejects_delta_for_different_binding_packet(tmp_path: Path) -> None:
@@ -1067,6 +1104,7 @@ def test_coverage_rejects_delta_for_different_binding_packet(tmp_path: Path) -> 
             )
 
 
+
 def test_coverage_rejects_tampered_binding_delta(tmp_path: Path) -> None:
     source = tmp_path / "a.py"
     source.write_text("a\n", encoding="utf-8")
@@ -1094,6 +1132,7 @@ def test_coverage_rejects_tampered_binding_delta(tmp_path: Path) -> None:
             )
 
 
+
 def test_whole_member_binding_cannot_bypass_pruned_analysis_scope(
     tmp_path: Path,
 ) -> None:
@@ -1115,6 +1154,7 @@ def test_whole_member_binding_cannot_bypass_pruned_analysis_scope(
     assert evidence["state"] == "unsupported"
     assert evidence["reason"] == "repository-evidence-not-admitted"
     assert "member_revision" not in evidence
+
 
 
 def test_relationship_locator_change_is_separate_from_relationship_fact_change(
@@ -1153,6 +1193,7 @@ def test_relationship_locator_change_is_separate_from_relationship_fact_change(
     assert relationships["facts"]["removed"] == []
     assert relationships["locators"]["state"] == "changed"
     assert len(relationships["locators"]["changes"]) >= 1
+
 
 
 def test_range_definition_change_does_not_masquerade_as_repository_change(
@@ -1198,6 +1239,7 @@ def test_range_definition_change_does_not_masquerade_as_repository_change(
             "reasons": ["binding-definition-changed"],
         }
     ]
+
 
 
 def test_dependency_definition_change_is_not_dependency_observation_change(
@@ -1247,6 +1289,7 @@ def test_dependency_definition_change_is_not_dependency_observation_change(
     ]
 
 
+
 def test_out_of_range_span_separates_member_presence_from_locator_state(
     tmp_path: Path,
 ) -> None:
@@ -1271,6 +1314,7 @@ def test_out_of_range_span_separates_member_presence_from_locator_state(
     assert packet["completeness"]["state"] == "complete"
 
 
+
 def test_cheap_binding_mode_does_not_query_relationship_lane(tmp_path: Path) -> None:
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     binding = [
@@ -1289,6 +1333,7 @@ def test_cheap_binding_mode_does_not_query_relationship_lane(tmp_path: Path) -> 
 
     assert stats.get("store_edges_for_paths_many", 0) == 0
     assert counters.get("edges_for_paths_many", 0) == 0
+
 
 
 def test_bindings_are_language_neutral_for_typescript_and_config(
@@ -1323,6 +1368,7 @@ def test_bindings_are_language_neutral_for_typescript_and_config(
     assert packet["completeness"]["state"] == "complete"
 
 
+
 def test_binding_delta_keeps_observer_change_separate_from_repository_change(
     tmp_path: Path,
 ) -> None:
@@ -1352,6 +1398,7 @@ def test_binding_delta_keeps_observer_change_separate_from_repository_change(
     assert delta["bindings"]["changed"] == []
 
 
+
 def test_binding_delta_rejects_cross_repository_comparison(tmp_path: Path) -> None:
     left = tmp_path / "left"
     right = tmp_path / "right"
@@ -1373,6 +1420,7 @@ def test_binding_delta_rejects_cross_repository_comparison(tmp_path: Path) -> No
         after = codemap.repository_evidence_bindings(binding)
         with pytest.raises(ValueError, match="repository-mismatch"):
             codemap.repository_evidence_binding_delta(before, after)
+
 
 
 def test_binding_delta_reports_added_and_removed_bindings_deterministically(
@@ -1416,6 +1464,7 @@ def test_binding_delta_reports_added_and_removed_bindings_deterministically(
         "preserved": ["stable"],
         "changed": [],
     }
+
 
 
 def test_binding_delta_reports_previously_absent_member_as_added(
@@ -1474,6 +1523,7 @@ def test_binding_delta_rejects_malformed_before_packet(
             codemap.repository_evidence_binding_delta(before, packet)
 
 
+
 def test_binding_delta_rejects_tampered_authenticated_packet(tmp_path: Path) -> None:
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     binding = [
@@ -1490,6 +1540,7 @@ def test_binding_delta_rejects_tampered_authenticated_packet(tmp_path: Path) -> 
 
         with pytest.raises(ValueError, match="before bindings identity mismatch"):
             codemap.repository_evidence_binding_delta(before, packet)
+
 
 
 def test_binding_delta_reports_unsupported_member_becoming_present_as_state_change(
@@ -1525,6 +1576,7 @@ def test_binding_delta_reports_unsupported_member_becoming_present_as_state_chan
     assert change["before_state"] == "unsupported"
     assert change["after_state"] == "known-present"
     assert change["observation_state_changed"] is True
+
 
 def test_coverage_rejects_authenticated_delta_with_foreign_repository_claim(
     tmp_path: Path,
@@ -1564,6 +1616,7 @@ def test_coverage_rejects_authenticated_delta_with_foreign_repository_claim(
                 binding_delta=delta,
             )
 
+
 def test_coverage_rejects_authenticated_delta_with_foreign_before_repository_claim(
     tmp_path: Path,
 ) -> None:
@@ -1601,4 +1654,3 @@ def test_coverage_rejects_authenticated_delta_with_foreign_before_repository_cla
                 change_set_complete=True,
                 binding_delta=delta,
             )
-
