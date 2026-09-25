@@ -210,7 +210,10 @@ def test_public_install_and_release_docs_match_github_release_authority() -> Non
     assert 'pip install "hashmarks[mcp]"' not in readme
     assert "standalone Hashmarks executable from GitHub Releases" in readme
     assert ".github/release-request.toml" in releasing
-    assert "release-request merge SHA becomes the default release source authority" in releasing
+    assert (
+        "release-request merge SHA becomes the default release source authority"
+        in releasing
+    )
     assert "GitHub Releases" in releasing
     assert "does not automatically publish to PyPI" in releasing
     assert "PyPI Trusted Publishing" not in releasing
