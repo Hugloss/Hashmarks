@@ -168,7 +168,7 @@ def test_publication_manifest_cli_writes_checksums_for_every_public_asset(
 
     names = [line.split("  ", 1)[1] for line in sums.read_text().splitlines()]
     assert names == [
-        f"hashmarks_{hashmarks.__version__}-py3-none-any.whl",
+        f"hashmarks-{hashmarks.__version__}-py3-none-any.whl",
         f"hashmarks-{hashmarks.__version__}.tar.gz",
         "hashmarks-linux-x86_64",
     ]
