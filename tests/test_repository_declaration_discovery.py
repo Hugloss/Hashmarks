@@ -782,3 +782,39 @@ def test_provider_path_enumeration_respects_pruned_repository_scope(
     assert packet["providers"][0]["enumerations"] == [
         {"prefix": "", "paths": ["visible.meta"]}
     ]
+
+class _UnstableEnumerationProvider:
+    name = "unstable-enumeration"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        context.paths()
+        return False
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        raise AssertionError("discovery must not run")
+
+
+def test_provider_path_enumeration_requires_deterministic_repository_order(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "z.meta").write_text("z\n", encoding="utf-8")
+    (repo / "a.meta").write_text("a\n", encoding="utf-8")
+    provider = _UnstableEnumerationProvider()
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        original = codemap._declaration_provider_paths
+        codemap._declaration_provider_paths = lambda prefix: tuple(
+            reversed(original(prefix))
+        )
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="deterministically ordered",
+        ):
+            codemap.discover_repository_declarations([provider])
+
