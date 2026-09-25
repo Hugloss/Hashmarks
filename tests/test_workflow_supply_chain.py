@@ -29,22 +29,36 @@ def test_external_github_actions_are_immutable_sha_pinned() -> None:
     assert not offenders, "mutable/unpinned workflow actions:\n" + "\n".join(offenders)
 
 
-def test_publish_workflow_uses_trusted_publishing_without_static_token() -> None:
+def test_publish_workflow_publishes_only_qualified_github_release_assets() -> None:
     text = (_root() / ".github" / "workflows" / "publish.yml").read_text(
         encoding="utf-8"
     )
-    assert "environment: pypi" in text
-    assert "id-token: write" in text
+    assert "Publish exact qualified bytes to GitHub Release" in text
+    assert "gh release upload" in text
+    assert "qualified-python-release-bundle" in text
+    assert "qualified-standalone-release-bundle" in text
+    assert "hashmarks-linux-x86_64.sha256" in text
+    assert "sha256sum -c hashmarks-linux-x86_64.sha256" in text
+    assert "environment: pypi" not in text
+    assert "id-token: write" not in text
     assert "PYPI_TOKEN" not in text
-    assert "pypa/gh-action-pypi-publish@" in text
+    assert "pypa/gh-action-pypi-publish@" not in text
 
 
 def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
+    job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\n")
     for name in ("ci.yml", "publish.yml"):
         text = (_root() / ".github" / "workflows" / name).read_text(encoding="utf-8")
-        assert text.count("    runs-on: ubuntu-latest") == text.count(
-            "    timeout-minutes:"
-        )
+        jobs = text.split("jobs:\n", 1)[1]
+        matches = list(job_heading.finditer(jobs))
+        assert matches
+        for index, match in enumerate(matches):
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(jobs)
+            block = jobs[match.end() : end]
+            assert "    runs-on:" in block, f"{name}:{match.group(1)} has no runner"
+            assert "    timeout-minutes:" in block, (
+                f"{name}:{match.group(1)} has no bounded timeout"
+            )
 
 
 def test_ci_checkout_does_not_persist_git_credentials() -> None:
