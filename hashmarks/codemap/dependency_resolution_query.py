@@ -361,6 +361,10 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
             raise ValueError(
                 f"dependency query node_id not selected in context: {node_id}:{context}"
             )
+        if any(str(row.get("marker") or "") for row in relationships):
+            raise ValueError(
+                "graph query cannot flatten conditional relationships"
+            )
         source_complete = _coverage_complete(observation, context=context)
         outgoing, incoming = _adjacency(relationships)
         if operation in {"dependencies", "dependents"}:
