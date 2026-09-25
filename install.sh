@@ -40,7 +40,14 @@ command -v curl >/dev/null 2>&1 || {
 }
 
 tmp_dir="$(mktemp -d)"
-trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
+candidate=""
+cleanup() {
+  rm -rf "$tmp_dir"
+  if [ -n "$candidate" ]; then
+    rm -f "$candidate"
+  fi
+}
+trap cleanup EXIT HUP INT TERM
 binary="$tmp_dir/$asset"
 checksum="$tmp_dir/$asset.sha256"
 
@@ -75,8 +82,15 @@ fi
 
 mkdir -p "$install_dir"
 target="$install_dir/hashmarks"
-install -m 0755 "$binary" "$target"
-"$target" version >/dev/null
+candidate="$(mktemp "$install_dir/.hashmarks-install.XXXXXX")"
+install -m 0755 "$binary" "$candidate"
+if ! "$candidate" --version >/dev/null 2>&1; then
+  printf '%s\n' 'hashmarks installer: downloaded binary failed version smoke test' >&2
+  exit 1
+fi
+mv -f "$candidate" "$target"
+candidate=""
+"$target" --version >/dev/null
 
 printf 'Hashmarks installed: %s\n' "$target"
 if ! command -v hashmarks >/dev/null 2>&1; then

@@ -50,6 +50,43 @@ def test_installer_downloads_verifies_and_installs_release_binary(
     assert installed.read_bytes() == payload
     assert os.access(installed, os.X_OK)
     assert "Hashmarks installed:" in result.stdout
+    assert list((tmp_path / "bin").glob(".hashmarks-install.*")) == []
+
+
+def test_installer_preserves_working_binary_when_candidate_smoke_fails(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "release"
+    source.mkdir()
+    payload = b"#!/bin/sh\nexit 23\n"
+    asset = source / "hashmarks-linux-x86_64"
+    asset.write_bytes(payload)
+    asset.chmod(0o755)
+    digest = hashlib.sha256(payload).hexdigest()
+    (source / "hashmarks-linux-x86_64.sha256").write_text(
+        f"{digest}  hashmarks-linux-x86_64\n",
+        encoding="utf-8",
+    )
+
+    install_dir = tmp_path / "bin"
+    install_dir.mkdir()
+    installed = install_dir / "hashmarks"
+    previous = b"#!/bin/sh\nexit 0\n"
+    installed.write_bytes(previous)
+    installed.chmod(0o755)
+
+    result = subprocess.run(
+        ["sh", str(_root() / "install.sh")],
+        env=_environment(tmp_path, source),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "downloaded binary failed version smoke test" in result.stderr
+    assert installed.read_bytes() == previous
+    assert list(install_dir.glob(".hashmarks-install.*")) == []
 
 
 def test_installer_rejects_release_binary_with_wrong_checksum(tmp_path: Path) -> None:

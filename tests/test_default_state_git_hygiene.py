@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import os
+import stat
 import subprocess
 from pathlib import Path
 
+import pytest
+
+import hashmarks.cli as cli
+from hashmarks.client import StateDirectoryError
 from hashmarks.codemap import CodeMap
 
 
@@ -43,6 +49,66 @@ def test_default_hashmarks_state_does_not_dirty_git_workspace(tmp_path: Path) ->
 
     assert (repo / ".hashmarks" / ".gitignore").read_text(encoding="utf-8") == "*\n"
     assert _git(repo, "status", "--short").stdout == ""
+
+
+def test_default_state_is_owner_private_on_posix(tmp_path: Path) -> None:
+    if os.name != "posix":
+        pytest.skip("POSIX permission bits are required")
+
+    repo = _tracked_repo(tmp_path)
+    state = repo / ".hashmarks"
+    state.mkdir(mode=0o777)
+    state.chmod(0o777)
+
+    with CodeMap(repo):
+        pass
+
+    assert stat.S_IMODE(state.stat().st_mode) == 0o700
+
+
+def test_default_state_rejects_symlink_escape(tmp_path: Path) -> None:
+    repo = _tracked_repo(tmp_path)
+    outside = tmp_path / "outside-state"
+    outside.mkdir()
+    state = repo / ".hashmarks"
+    try:
+        state.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+
+    with pytest.raises(StateDirectoryError, match="must not be a symlink"):
+        CodeMap(repo)
+
+    assert list(outside.iterdir()) == []
+
+
+def test_daemon_start_rejects_default_state_symlink_before_log_write(
+    tmp_path: Path,
+) -> None:
+    repo = _tracked_repo(tmp_path)
+    outside = tmp_path / "outside-daemon-state"
+    outside.mkdir()
+    state = repo / ".hashmarks"
+    try:
+        state.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+
+    with pytest.raises(SystemExit, match="must not be a symlink"):
+        cli.main(
+            [
+                "--workspace",
+                str(repo),
+                "--timeout",
+                "0.01",
+                "daemon",
+                "start",
+                "--start-timeout",
+                "0.01",
+            ]
+        )
+
+    assert list(outside.iterdir()) == []
 
 
 def test_default_state_preserves_existing_ignore_policy(tmp_path: Path) -> None:

@@ -16,7 +16,8 @@ from .client import (
     DaemonCompatibilityError,
     DaemonUnavailableError,
     IdentityClient,
-    default_state_dir,
+    StateDirectoryError,
+    prepare_default_state_dir,
 )
 from .daemon import IdentityDaemon
 from .errors import UserFacingError
@@ -80,7 +81,7 @@ def _daemon_start(args) -> int:
 
     workspace = canonical_host_path(args.workspace)
     state = (
-        default_state_dir(workspace)
+        prepare_default_state_dir(workspace)
         if args.state_dir is None
         else canonical_host_path(args.state_dir)
     )
@@ -312,7 +313,12 @@ def main(argv: list[str] | None = None) -> int:
                 state = args.workspace / state
             args.state_dir = canonical_host_path(state)
         return int(args.func(args))
-    except (UserFacingError, DaemonUnavailableError, DaemonCompatibilityError) as exc:
+    except (
+        UserFacingError,
+        DaemonUnavailableError,
+        DaemonCompatibilityError,
+        StateDirectoryError,
+    ) as exc:
         raise SystemExit(str(exc)) from exc
 
 

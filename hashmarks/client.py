@@ -59,14 +59,32 @@ class DaemonCompatibilityError(DaemonProtocolError):
     pass
 
 
+class StateDirectoryError(RuntimeError):
+    pass
+
+
 def default_state_dir(workspace: str | Path) -> Path:
     return canonical_host_path(workspace) / ".hashmarks"
 
 
 def prepare_default_state_dir(workspace: str | Path) -> Path:
-    """Create default repository-local state without dirtying Git status."""
+    """Create private default repository-local state without dirtying Git."""
     state = default_state_dir(workspace)
+    if state.is_symlink():
+        raise StateDirectoryError(
+            f"default Hashmarks state directory must not be a symlink: {state}"
+        )
     state.mkdir(parents=True, exist_ok=True)
+    if state.is_symlink():
+        raise StateDirectoryError(
+            f"default Hashmarks state directory became a symlink: {state}"
+        )
+    try:
+        os.chmod(state, 0o700)
+    except OSError:
+        # Some filesystems/platforms do not expose POSIX permission bits.
+        pass
+
     ignore = state / ".gitignore"
     try:
         with ignore.open("x", encoding="utf-8") as stream:
