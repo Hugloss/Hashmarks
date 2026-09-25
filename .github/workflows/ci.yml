@@ -242,30 +242,40 @@ jobs:
           ./dist/hashmarks version
           .venv/bin/python -I scripts/mcp_installed_artifact_smoke.py \
             --hashmarks "$PWD/dist/hashmarks"
-      - name: Install exact standalone through public installer
+      - name: Install exact standalone through qualified installer copy
         run: |
           version="$(uv run --frozen --no-sync python -c 'import hashmarks; print(hashmarks.__version__)')"
           bundle="$PWD/.standalone-install-source"
           target="$PWD/.standalone-install-target"
           mkdir -p "$bundle" "$target"
           cp dist/hashmarks "$bundle/hashmarks-linux-x86_64"
+          install -m 0755 install.sh "$bundle/install.sh"
           (
             cd "$bundle"
             sha256sum hashmarks-linux-x86_64 > hashmarks-linux-x86_64.sha256
+            sha256sum install.sh > install.sh.sha256
           )
           HASHMARKS_DOWNLOAD_BASE_URL="file://$bundle" \
           HASHMARKS_INSTALL_DIR="$target" \
           HASHMARKS_VERSION="$version" \
-            sh install.sh
+            sh "$bundle/install.sh"
           test "$("$target/hashmarks" --version)" = "hashmarks version $version"
-      - name: Record standalone artifact identity
-        run: sha256sum dist/hashmarks > dist/hashmarks-linux-x86_64.sha256
+      - name: Record standalone artifact and installer identity
+        run: |
+          install -m 0755 install.sh dist/install.sh
+          (
+            cd dist
+            sha256sum hashmarks > hashmarks-linux-x86_64.sha256
+            sha256sum install.sh > install.sh.sha256
+          )
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hashmarks-standalone-${{ github.sha }}
           path: |
             dist/hashmarks
             dist/hashmarks-linux-x86_64.sha256
+            dist/install.sh
+            dist/install.sh.sha256
           if-no-files-found: error
 
   precommit:
