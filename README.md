@@ -398,11 +398,11 @@ See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs
 
 ## Project status
 
-Current package version: **0.22.0**.
+Current package version: **0.23.0**.
 
 Hashmarks is under active development. Current repository-intelligence contracts are documented explicitly; new integrations should use the supported CLI, Python API, and MCP surfaces rather than historical development experiments.
 
-The repository-owned release workflow builds wheel/sdist once, qualifies those exact bytes, binds them in a release manifest plus SHA-256 checksums, and publishes the same artifact bundle through PyPI Trusted Publishing. External GitHub/PyPI environment approval and Trusted Publisher registration remain release-owner responsibilities.
+The repository-owned release workflow qualifies the exact reviewed source, builds wheel/sdist and the standalone Linux CLI/MCP executable, binds the resulting bytes with manifests and SHA-256 checksums, and publishes those qualified assets through GitHub Releases. Hashmarks does not automatically publish to PyPI.
 
 ## Security
 
