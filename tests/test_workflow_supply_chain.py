@@ -37,17 +37,31 @@ def test_publish_workflow_is_reviewed_request_driven_and_github_native() -> None
     assert "branches: [main]" in text
     assert '".github/release-request.toml"' in text
     assert "workflow_dispatch:" in text
+    assert "source_sha:" in text
+    assert "Exact reviewed main commit to qualify and publish" in text
+    assert "RELEASE_SOURCE_SHA:" in text
+    assert "source_sha: ${{ steps.release.outputs.source_sha }}" in text
+    assert "ref: ${{ needs.prepare.outputs.source_sha }}" in text
+    assert "git merge-base --is-ancestor" in text
+    assert "Materialize locked lint toolchain" in text
+    assert (
+        "UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --frozen --only-group lint" in text
+    )
     assert "release:\n    types: [published]" not in text
     assert "Validate reviewed release request" in text
     assert "release publication is authorized only from main" in text
-    assert "ref: ${{ github.sha }}" in text
+    assert (
+        "github.event_name == 'workflow_dispatch' && inputs.source_sha || github.sha"
+        in text
+    )
+    assert "ref: ${{ github.sha }}" not in text
     assert "Publish exact qualified bytes to GitHub Release" in text
     assert "gh release create" in text
-    assert '--target "${{ github.sha }}"' in text
+    assert '--target "${{ needs.prepare.outputs.source_sha }}"' in text
     assert "--notes-file release/release-notes.md" in text
     assert "--generate-notes" not in text
     assert 'git rev-list -n 1 "$RELEASE_TAG"' in text
-    assert 'if [ "$tag_commit" != "${{ github.sha }}" ]' in text
+    assert 'if [ "$tag_commit" != "${{ needs.prepare.outputs.source_sha }}" ]' in text
     assert "Materialize reviewed changelog section as release notes" in text
     assert "--draft" in text
     assert 'gh release edit "$RELEASE_TAG" --draft=false' in text

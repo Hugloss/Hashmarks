@@ -6,6 +6,11 @@ on:
     paths:
       - ".github/release-request.toml"
   workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact reviewed main commit to qualify and publish
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -14,29 +19,58 @@ jobs:
   prepare:
     name: Validate reviewed release request
     runs-on: ubuntu-latest
+    env:
+      RELEASE_SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || github.sha }}
     timeout-minutes: 5
     permissions:
       contents: read
     outputs:
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
+      source_sha: ${{ steps.release.outputs.source_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.RELEASE_SOURCE_SHA }}
+          fetch-depth: 0
           persist-credentials: false
+      - name: Verify release source is reachable from current main
+        run: |
+          case "$RELEASE_SOURCE_SHA" in
+            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+            *)
+              echo "::error::source_sha must be an exact lowercase 40-character commit SHA"
+              exit 1
+              ;;
+          esac
+          test "$(git rev-parse HEAD)" = "$RELEASE_SOURCE_SHA"
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$RELEASE_SOURCE_SHA" origin/main; then
+            echo "::error::Release source $RELEASE_SOURCE_SHA is not reachable from main"
+            exit 1
+          fi
       - id: release
         name: Bind request to package version and finalized changelog
         run: |
           python3 - <<'PY'
           import os
           import pathlib
+          import subprocess
           import tomllib
 
           if os.environ["GITHUB_REF"] != "refs/heads/main":
               raise SystemExit("release publication is authorized only from main")
 
           root = pathlib.Path(".")
+          source_sha = os.environ["RELEASE_SOURCE_SHA"]
+          observed_sha = subprocess.check_output(
+              ["git", "rev-parse", "HEAD"],
+              text=True,
+          ).strip()
+          if observed_sha != source_sha:
+              raise SystemExit(
+                  f"release source mismatch: requested={source_sha!r} observed={observed_sha!r}"
+              )
           request = tomllib.loads(
               (root / ".github" / "release-request.toml").read_text(encoding="utf-8")
           )
@@ -61,6 +95,7 @@ jobs:
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"version={version}\n")
               output.write(f"tag=v{version}\n")
+              output.write(f"source_sha={source_sha}\n")
           PY
 
   build:
@@ -73,7 +108,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
@@ -85,6 +120,8 @@ jobs:
       - run: uv sync --frozen --group test --extra mcp --python 3.14
       - name: Validate release tag against package version
         run: uv run --frozen --no-sync python scripts/release_contract.py validate-tag --tag "${{ needs.prepare.outputs.tag }}"
+      - name: Materialize locked lint toolchain
+        run: UV_PROJECT_ENVIRONMENT=.ruff-venv uv sync --frozen --only-group lint --python 3.14
       - name: Enforce configured Ruff and zero complexity debt
         run: make lint
       - name: Run native release tests
@@ -134,7 +171,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
@@ -187,7 +224,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.prepare.outputs.source_sha }}
           persist-credentials: false
       - name: Download exact qualified Python release bundle
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -239,8 +276,8 @@ jobs:
           if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
             git fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
             tag_commit=$(git rev-list -n 1 "$RELEASE_TAG")
-            if [ "$tag_commit" != "${{ github.sha }}" ]; then
-              echo "::error::Existing tag $RELEASE_TAG resolves to $tag_commit, not ${{ github.sha }}"
+            if [ "$tag_commit" != "${{ needs.prepare.outputs.source_sha }}" ]; then
+              echo "::error::Existing tag $RELEASE_TAG resolves to $tag_commit, not ${{ needs.prepare.outputs.source_sha }}"
               exit 1
             fi
           fi
@@ -257,13 +294,13 @@ jobs:
               echo "::error::Release $RELEASE_TAG is already published"
               exit 1
             fi
-            if [ "$target" != "${{ github.sha }}" ]; then
-              echo "::error::Existing draft $RELEASE_TAG targets $target, not ${{ github.sha }}"
+            if [ "$target" != "${{ needs.prepare.outputs.source_sha }}" ]; then
+              echo "::error::Existing draft $RELEASE_TAG targets $target, not ${{ needs.prepare.outputs.source_sha }}"
               exit 1
             fi
           else
             gh release create "$RELEASE_TAG" \
-              --target "${{ github.sha }}" \
+              --target "${{ needs.prepare.outputs.source_sha }}" \
               --title "Hashmarks $RELEASE_VERSION" \
               --notes-file release/release-notes.md \
               --draft
