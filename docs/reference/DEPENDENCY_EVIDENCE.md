@@ -138,6 +138,7 @@ Every dependency adapter must satisfy all of the following:
 8. **No causal inference.** Dependency delta and correlation describe factual change/correspondence, not the cause of a failure.
 9. **No producer-specific core rule.** If core needs a new rule, state and test it using neutral terminology before changing an adapter.
 10. **Cross-producer parity.** Equivalent semantic facts from different adapters must yield equivalent general query/delta behavior even when provenance differs.
+11. **Semantic IDs cannot smuggle provenance.** Adapter-generated `component_id` and `node_id` values may encode package/component identity, selected version/variant, and other producer-neutral selection semantics, but must not include adapter names, evidence `source_id`, source-format `kind`, producer digests, or other provenance merely to make IDs unique. Two adapters that claim to describe the same ecosystem identity semantics must normalize compatible IDs or explicitly document why their observations are not identity-compatible.
 
 ## Current adapters
 
@@ -180,7 +181,7 @@ Before adding a Gradle, npm, Cargo, SBOM, or other adapter:
 8. emit a `relationships` row only for a traversable dependency edge; `kind` may subtype that edge but must not smuggle non-topological producer facts such as constraints, conflicts, recommendations, or diagnostics into graph traversal;
 9. add adapter-specific parsing tests second;
 10. add cross-producer behavior tests where another adapter can express the same fact;
-11. verify that no core dependency module imports the new adapter or branches on its producer/source kind.
+12. verify that no core dependency module imports the new adapter or branches on its producer/source kind.
 
 A new adapter is not complete merely because it parses its native format. It is complete when producer-native detail terminates at the adapter boundary and the resulting observation behaves like any other producer of the same semantic facts.
 
