@@ -5,14 +5,17 @@ import email
 import hashlib
 import json
 import logging
+import sys
 import tarfile
 import tomllib
 import zipfile
 from pathlib import Path
 
-from hashmarks._command_output import log_command_output
-
 logger = logging.getLogger(__name__)
+
+
+def _log_command_output(*values: object) -> None:
+    sys.stdout.write(" ".join(str(value) for value in values) + "\n")
 
 SCHEMA = "hashmarks.release-artifact-manifest.v2"
 
@@ -184,7 +187,7 @@ def _run_command(args) -> int:
             raise SystemExit(
                 f"release tag mismatch: expected {expected!r}, got {args.tag!r}"
             )
-        log_command_output(logger, f"Hashmarks release tag: PASS ({expected})")
+        _log_command_output(f"Hashmarks release tag: PASS ({expected})")
         return 0
 
     value = release_manifest(root, Path(args.dist), tag=args.tag)
@@ -195,7 +198,7 @@ def _run_command(args) -> int:
             json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
         _write_sha256sums(value, Path(args.sha256sums))
-        log_command_output(logger, json.dumps(value, indent=2, sort_keys=True))
+        _log_command_output(json.dumps(value, indent=2, sort_keys=True))
         return 0
 
     recorded = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
@@ -203,7 +206,7 @@ def _run_command(args) -> int:
         raise SystemExit(
             "release artifact manifest does not match current distribution bytes"
         )
-    log_command_output(logger, "Hashmarks release artifact manifest: PASS")
+    _log_command_output("Hashmarks release artifact manifest: PASS")
     return 0
 
 
