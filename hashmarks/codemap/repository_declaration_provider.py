@@ -525,6 +525,30 @@ def _validate_provider_enumerations(
             )
 
 
+def _validate_provider_input(
+    read_member: _MemberReader,
+    provider_name: str,
+    previous: Mapping[str, object],
+) -> None:
+    path = previous.get("path")
+    if not isinstance(path, str) or not path:
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} input path is malformed"
+        )
+    observation_kind = previous.get("observation_kind")
+    if observation_kind not in {"content", "existence"}:
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} input kind is malformed"
+        )
+    current, _raw = read_member(path, observation_kind == "content")
+    current_signature = _RepositoryDeclarationProviderContext._signature(current)
+    current_signature["observation_kind"] = observation_kind
+    if current_signature != dict(previous):
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} input changed during discovery: {path}"
+        )
+
+
 def validate_repository_declaration_provider_inputs(
     read_member: _MemberReader,
     enumerate_paths: _PathEnumerator,
@@ -538,12 +562,13 @@ def validate_repository_declaration_provider_inputs(
             raise RepositoryDeclarationProviderError(
                 f"declaration provider {name} inputs are malformed"
             )
-        input_paths = [
-            str(row.get("path") or "")
-            for row in inputs
-            if isinstance(row, Mapping)
-        ]
-        if len(input_paths) != len(inputs) or len(set(input_paths)) != len(input_paths):
+        if any(not isinstance(row, Mapping) for row in inputs):
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {name} input observation is malformed"
+            )
+        typed_inputs = [row for row in inputs if isinstance(row, Mapping)]
+        input_paths = [str(row.get("path") or "") for row in typed_inputs]
+        if len(set(input_paths)) != len(input_paths):
             raise RepositoryDeclarationProviderError(
                 f"declaration provider {name} input paths are duplicated or malformed"
             )
@@ -552,27 +577,5 @@ def validate_repository_declaration_provider_inputs(
             name,
             provider.get("enumerations"),
         )
-        for previous in inputs:
-            if not isinstance(previous, Mapping):
-                raise RepositoryDeclarationProviderError(
-                    f"declaration provider {name} input observation is malformed"
-                )
-            path = previous.get("path")
-            if not isinstance(path, str) or not path:
-                raise RepositoryDeclarationProviderError(
-                    f"declaration provider {name} input path is malformed"
-                )
-            observation_kind = previous.get("observation_kind")
-            if observation_kind not in {"content", "existence"}:
-                raise RepositoryDeclarationProviderError(
-                    f"declaration provider {name} input kind is malformed"
-                )
-            current, _raw = read_member(path, observation_kind == "content")
-            current_signature = _RepositoryDeclarationProviderContext._signature(
-                current
-            )
-            current_signature["observation_kind"] = observation_kind
-            if current_signature != dict(previous):
-                raise RepositoryDeclarationProviderError(
-                    f"declaration provider {name} input changed during discovery: {path}"
-                )
+        for previous in typed_inputs:
+            _validate_provider_input(read_member, name, previous)
