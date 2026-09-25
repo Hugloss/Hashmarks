@@ -370,17 +370,30 @@ class RepositoryEvidenceCoverageMixin:
         ):
             raise ValueError("binding_delta identity mismatch")
         delta_repository = binding_delta.get("repository")
+        delta_before_repository = (
+            delta_repository.get("before")
+            if isinstance(delta_repository, Mapping)
+            else None
+        )
         delta_after_repository = (
             delta_repository.get("after")
             if isinstance(delta_repository, Mapping)
             else None
+        )
+        delta_before_repository_identity = (
+            str(delta_before_repository.get("repository_identity") or "")
+            if isinstance(delta_before_repository, Mapping)
+            else ""
         )
         delta_after_repository_identity = (
             str(delta_after_repository.get("repository_identity") or "")
             if isinstance(delta_after_repository, Mapping)
             else ""
         )
-        if delta_after_repository_identity != repository_identity:
+        if (
+            delta_before_repository_identity != repository_identity
+            or delta_after_repository_identity != repository_identity
+        ):
             raise ValueError("binding_delta repository-mismatch")
         identities = binding_delta.get("bindings_identity")
         after_identity = (
