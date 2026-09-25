@@ -267,7 +267,11 @@ class RepositoryDeclarationDiscoveryMixin:
             },
             "storage": "derived-not-persisted",
             "authority": "repository-intelligence-only",
-            "execution_effect": "none",
+            "execution_effect": {
+                "hashmarks": "none",
+                "provider_contract": "read-only",
+                "provider_sandboxed": False,
+            },
         }
         packet["observation_identity"] = self._declaration_discovery_identity(packet)
         return packet
