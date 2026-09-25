@@ -198,7 +198,9 @@ def test_public_onboarding_leads_with_standalone_install_not_source_checkout() -
     assert readme.index(installer) < readme.index("make init")
     assert installer in getting_started
     assert getting_started.index(installer) < getting_started.index("make init")
-    assert "Python, Git, and `uv` are development/qualification tools" in getting_started
+    assert (
+        "Python, Git, and `uv` are development/qualification tools" in getting_started
+    )
 
 
 def test_agent_evaluation_executables_are_isolated_from_product_script_root() -> None:
