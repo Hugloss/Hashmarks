@@ -15,11 +15,11 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.file_store import UnstableFileError
 from hashmarks.paths import normalize_relative_path
 
+from . import repository_file_discovery
 from .index_surfaces import index_surface_for_path
 from .model import EvidenceVisibility, SyncResult
 from .parsers import artifact_key_for, parse_source
 from .policy import ContextPolicy
-from . import repository_file_discovery
 from .repository_file_discovery import (
     _AdmittedRepositoryFile,
     _is_pruned_relative_path,
