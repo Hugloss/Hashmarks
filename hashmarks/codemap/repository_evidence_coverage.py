@@ -347,6 +347,20 @@ class RepositoryEvidenceCoverageMixin:
             )
         if binding_delta is None:
             return
+        delta_identity = binding_delta.get("delta_identity")
+        expected_delta_identity = "sha256:" + self._packet_digest(
+            "hashmarks.repository-evidence-binding-delta.v1",
+            {
+                key: value
+                for key, value in binding_delta.items()
+                if key != "delta_identity"
+            },
+        )
+        if (
+            not isinstance(delta_identity, str)
+            or delta_identity != expected_delta_identity
+        ):
+            raise ValueError("binding_delta identity mismatch")
         identities = binding_delta.get("bindings_identity")
         after_identity = (
             identities.get("after") if isinstance(identities, Mapping) else None
