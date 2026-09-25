@@ -1525,3 +1525,42 @@ def test_binding_delta_reports_unsupported_member_becoming_present_as_state_chan
     assert change["before_state"] == "unsupported"
     assert change["after_state"] == "known-present"
     assert change["observation_state_changed"] is True
+
+def test_coverage_rejects_authenticated_delta_with_foreign_repository_claim(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.py"
+    source.write_text("value = 1\n", encoding="utf-8")
+    bindings = [
+        {
+            "binding_id": "value",
+            "evidence": [{"path": "source.py", "start_line": 1, "end_line": 1}],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(
+            bindings, include_relationships=False
+        )
+        source.write_text("value = 2\n", encoding="utf-8")
+        codemap.sync(["source.py"])
+        after = codemap.repository_evidence_bindings(
+            bindings, include_relationships=False
+        )
+        delta = codemap.repository_evidence_binding_delta(before, after)
+        delta["repository"]["after"]["repository_identity"] = "sha256:foreign"
+        payload = {
+            key: value for key, value in delta.items() if key != "delta_identity"
+        }
+        delta["delta_identity"] = "sha256:" + codemap._packet_digest(
+            "hashmarks.repository-evidence-binding-delta.v1", payload
+        )
+
+        with pytest.raises(ValueError, match="binding_delta repository-mismatch"):
+            codemap.repository_evidence_coverage(
+                after,
+                changed_paths=["source.py"],
+                change_set_complete=True,
+                binding_delta=delta,
+            )
+
