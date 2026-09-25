@@ -20,10 +20,7 @@ from .index_surfaces import index_surface_for_path
 from .model import EvidenceVisibility, SyncResult
 from .parsers import artifact_key_for, parse_source
 from .policy import ContextPolicy
-from .repository_file_discovery import (
-    _AdmittedRepositoryFile,
-    _is_pruned_relative_path,
-)
+from .repository_file_discovery import _AdmittedRepositoryFile
 from .repository_index_store import (
     default_base_snapshot,
     git_base_identity,
@@ -1122,27 +1119,20 @@ class IndexingLifecycleMixin:
         full: bool,
         requested_paths: Sequence[str],
     ) -> None:
-        """Refresh packaging-derived import roots without a second full repository walk."""
+        """Refresh packaging-derived import roots from admitted visible manifests."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if full:
             pyprojects = tuple(
-                item.path for item in discovered if item.rel.endswith("pyproject.toml")
+                item.path
+                for item in discovered
+                if item.rel.endswith("pyproject.toml")
+                and item.visibility is not EvidenceVisibility.DENY
             )
-            self._python_import_roots = _python_source_roots_from_pyprojects(
-                self.workspace, pyprojects
-            )
+        elif any(rel.endswith("pyproject.toml") for rel in requested_paths):
+            pyprojects = self._visible_repository_manifests("pyproject.toml")
+        else:
             return
-        if not any(rel.endswith("pyproject.toml") for rel in requested_paths):
-            return
-        # Packaging edits are rare. A targeted configuration sync must also notice
-        # deleted project manifests, so rebuild roots from current repository manifests.
-        pyprojects = tuple(
-            path
-            for path in self.workspace.rglob("pyproject.toml")
-            if not _is_pruned_relative_path(path.relative_to(self.workspace).as_posix())
-            and not self._internal_path(path.relative_to(self.workspace).as_posix())
-        )
         self._python_import_roots = _python_source_roots_from_pyprojects(
             self.workspace, pyprojects
         )

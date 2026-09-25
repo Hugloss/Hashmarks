@@ -25,11 +25,33 @@ def freshness_state(stale: bool | None) -> str:
     return "unknown"
 
 
+def _inadmissible_manifest_count(value: dict[str, object]) -> int | None:
+    raw = value.get("inadmissible_manifest_count", 0)
+    if isinstance(raw, bool):
+        return None
+    try:
+        count = int(cast(Any, raw))
+    except (TypeError, ValueError):
+        return None
+    return count if count >= 0 else None
+
+
 class EvidenceFreshnessMixin:
     """Own evidence snapshot identity, manifest freshness, and freshness status semantics."""
 
     def _evidence_key(self, kind: str, producer: str) -> str:
         return f"native_evidence:{kind}:{producer}"
+
+    def _manifest_admitted(self, relpath: str) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        path = self.workspace / relpath
+        decision = self.policy.decide(relpath)
+        return (
+            self._path_admitted_for_analysis(relpath)
+            and decision.evidence_visibility.value != "deny"
+            and not path.is_symlink()
+        )
 
     def _manifest_digest(self, relpath: str) -> str | None:
         if TYPE_CHECKING:
@@ -58,16 +80,22 @@ class EvidenceFreshnessMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         manifest_rows: dict[str, str | None] = {}
+        inadmissible_manifest_count = 0
         for raw in manifests:
             try:
                 rel = normalize_relative_path(raw, allow_root=False)
             except ValueError:
+                inadmissible_manifest_count += 1
+                continue
+            if not self._manifest_admitted(rel):
+                inadmissible_manifest_count += 1
                 continue
             manifest_rows[rel] = self._manifest_digest(rel)
         value = {
             "generation": self.store.generation(),
             "bind_generation": bool(bind_generation),
             "manifests": manifest_rows,
+            "inadmissible_manifest_count": inadmissible_manifest_count,
             "recorded_unix": time.time(),
         }
         self.store.set_meta(
@@ -97,7 +125,8 @@ class EvidenceFreshnessMixin:
         return tuple(
             str(rel)
             for rel, expected in manifests.items()
-            if self._manifest_digest(str(rel)) != expected
+            if not self._manifest_admitted(str(rel))
+            or self._manifest_digest(str(rel)) != expected
         )
 
     def _declared_project_shared_input(self, relpath: str) -> bool:
@@ -119,7 +148,13 @@ class EvidenceFreshnessMixin:
         if value is None or bool(value.get("bind_generation", False)):
             return False
         manifests = value.get("manifests") or {}
-        if not isinstance(manifests, dict) or not manifests:
+        inadmissible = _inadmissible_manifest_count(value)
+        if (
+            not isinstance(manifests, dict)
+            or not manifests
+            or inadmissible is None
+            or inadmissible > 0
+        ):
             return False
         self._record_evidence_snapshot(
             "project",
@@ -146,6 +181,32 @@ class EvidenceFreshnessMixin:
             )
         return True, None
 
+    def _snapshot_manifests(
+        self,
+        value: dict[str, object],
+    ) -> tuple[dict[object, object] | None, str | None]:
+        inadmissible = _inadmissible_manifest_count(value)
+        if inadmissible is None:
+            return None, "invalid manifest admission snapshot"
+        if inadmissible > 0:
+            return None, "evidence manifest outside repository admission"
+        manifests = value.get("manifests") or {}
+        if not isinstance(manifests, dict):
+            return None, "invalid manifest snapshot"
+        return manifests, None
+
+    def _manifest_snapshot_fresh(
+        self,
+        manifests: dict[object, object],
+    ) -> tuple[bool, str | None]:
+        for rel, expected in manifests.items():
+            path = str(rel)
+            if not self._manifest_admitted(path):
+                return False, "evidence manifest outside repository admission"
+            if self._manifest_digest(path) != expected:
+                return False, f"manifest changed: {rel}"
+        return True, None
+
     def _evidence_fresh(self, kind: str, producer: str) -> tuple[bool, str | None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -156,13 +217,10 @@ class EvidenceFreshnessMixin:
             fresh, reason = self._generation_snapshot_fresh(value)
             if not fresh:
                 return fresh, reason
-        manifests = value.get("manifests") or {}
-        if not isinstance(manifests, dict):
-            return False, "invalid manifest snapshot"
-        for rel, expected in manifests.items():
-            if self._manifest_digest(str(rel)) != expected:
-                return False, f"manifest changed: {rel}"
-        return True, None
+        manifests, reason = self._snapshot_manifests(value)
+        if manifests is None:
+            return False, reason
+        return self._manifest_snapshot_fresh(manifests)
 
     def _fresh_native_file_edges(self) -> list[dict]:
         if TYPE_CHECKING:

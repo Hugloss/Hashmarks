@@ -202,3 +202,24 @@ def test_repository_file_discovery_has_one_semantic_owner() -> None:
     assert "os.walk(" not in declarations
     assert "os.walk(" in owner
     assert "self.policy.decide(" in owner
+
+
+def test_repository_derived_file_evidence_uses_canonical_admission_owner() -> None:
+    indexing = (CODEMAP / "indexing_lifecycle.py").read_text(encoding="utf-8")
+    engine = (CODEMAP / "engine.py").read_text(encoding="utf-8")
+    freshness = (CODEMAP / "evidence_freshness.py").read_text(encoding="utf-8")
+    graph = (CODEMAP / "evidence_graph.py").read_text(encoding="utf-8")
+
+    assert '.rglob("pyproject.toml")' not in indexing
+    assert 'self._visible_repository_manifests("pyproject.toml")' in indexing
+    assert (
+        "default_project_graph_providers(\n            self._visible_repository_manifests"
+        in engine
+    )
+    assert "def _manifest_admitted(" in freshness
+    assert "self._path_admitted_for_analysis(relpath)" in freshness
+    assert "self.policy.decide(relpath)" in freshness
+    assert "self._admit_project_graph(" in graph
+    assert graph.index("self._admit_project_graph(") < graph.index(
+        "self.store.replace_project_graph("
+    )

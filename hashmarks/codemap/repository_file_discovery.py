@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
 
+from .model import EvidenceVisibility
+
 if TYPE_CHECKING:
     from .engine import CodeMap
 
@@ -141,3 +143,41 @@ class RepositoryFileDiscoveryMixin:
             return
         if root.is_dir():
             yield from self._iter_admitted_directory_files(root)
+
+    def _visible_repository_file(
+        self,
+        relpath: str,
+    ) -> _AdmittedRepositoryFile | None:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        try:
+            rel = normalize_relative_path(relpath, allow_root=False)
+        except ValueError:
+            return None
+        item = self._admitted_repository_file(self.workspace / rel)
+        if item is None or item.visibility is EvidenceVisibility.DENY:
+            return None
+        return item
+
+    def _visible_repository_manifests(
+        self,
+        filename: str,
+    ) -> tuple[Path, ...]:
+        name = filename.strip()
+        if not name or "/" in name or "\\" in name:
+            raise ValueError("manifest filename must be a basename")
+        return tuple(
+            item.path
+            for item in self._iter_admitted_repository_files()
+            if item.path.name == name and item.visibility is not EvidenceVisibility.DENY
+        )
+
+    def _repository_scope_has_visible_file(self, prefix: str) -> bool:
+        try:
+            rel = normalize_relative_path(prefix, allow_root=True)
+        except ValueError:
+            return False
+        for item in self._iter_admitted_repository_files(rel):
+            if item.visibility is not EvidenceVisibility.DENY:
+                return True
+        return False

@@ -2,6 +2,7 @@
 
 ## 0.23.0 — Qualified standalone MCP release
 
+- Converge repository-file admission across derived evidence: targeted Python import-root refresh, manifest-based project discovery, native project-node/edge persistence, and manifest freshness now reuse the canonical policy/pruning/symlink/visibility owner. Denied project files cannot survive as current project evidence, and live allow→deny policy changes fail closed until admitted evidence is rebuilt.
 - Publish the first checksum-verified standalone Linux x86_64 Hashmarks CLI/MCP release through GitHub Releases, with the curl installer and `hashmarks install --opencode` end-user flow introduced during the 0.22 release work.
 - Repair the native MCP interoperability contract so the advertised tool catalog includes `repository_declarations`, matching the actual read-only server surface.
 - Make the normal PR release-profile lane install the optional MCP runtime before running the full native suite, so MCP-gated regressions fail before release promotion instead of first appearing inside the Publish workflow.
