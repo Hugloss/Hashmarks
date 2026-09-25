@@ -304,6 +304,81 @@ with CodeMap(".") as codemap:
 
 The same request-scoped primitive is exposed by the read-only MCP \`repository_declarations\` tool.
 
+## Explicit provider discovery
+
+Hashmarks also exposes a Python-side provider SPI for integrations that need to
+**discover** declaration groups rather than construct them directly:
+
+~~~python
+from pathlib import Path
+
+from hashmarks import CodeMap, RepositoryDeclarationProviderResult
+
+class MyProvider:
+    name = "my-repository-metadata"
+
+    def detect(self, workspace: Path) -> bool:
+        return (workspace / "metadata.example").is_file()
+
+    def discover(self, workspace: Path) -> RepositoryDeclarationProviderResult:
+        return RepositoryDeclarationProviderResult(
+            groups=(...),
+            provenance={"provider": self.name, "version": "1"},
+        )
+
+with CodeMap(".") as codemap:
+    codemap.sync()
+    packet = codemap.discover_repository_declarations([MyProvider()])
+~~~
+
+Discovery is deliberately **explicit composition**, not ambient plugin loading.
+Hashmarks does not scan Python entry points, import arbitrary repository code, or
+guess providers from similar filenames or keys. Callers select the provider
+objects that are allowed to run.
+
+Provider discovery has separate wrapper schemas:
+
+- \`hashmarks.repository-declaration-discovery.v1\`
+- \`hashmarks.repository-declaration-discovery-delta.v1\`
+
+The wrapper records deterministic provider observation state and provenance, then
+contains the ordinary \`hashmarks.repository-declarations.v1\` packet. This keeps
+provider execution/discovery provenance separate from declaration semantics and
+canonical repository evidence.
+
+Provider states have narrow meaning:
+
+- \`collected\` means the explicitly selected provider detected the workspace and
+  returned claims that passed the provider-envelope checks;
+- \`not-detected\` means that provider did not apply to this workspace.
+
+\`not-detected\` is **not** proof that a conceptual declaration is absent. Only
+the nested declaration coverage contract can establish negative evidence.
+
+A detected provider exception fails the whole discovery call. Hashmarks does not
+return a partial discovery packet that could make missing provider output look
+like semantic absence.
+
+Provider warnings are observable discovery provenance. If a warning undermines
+the provider's ability to enumerate a declaration group, the provider must
+downgrade that group's \`coverage.state\` / \`coverage.truncation\`; warnings do
+not give Hashmarks permission to invent completeness.
+
+Provider order is canonicalized, provider names must be unique, provider
+metadata is bounded, and the whole discovery packet is bounded. Provider
+provenance changes are reported separately from nested declaration/repository
+change.
+
+The MCP server does **not** execute arbitrary Python declaration providers.
+External producer adapters may run in their own integration boundary and pass
+normalized groups to the existing read-only \`repository_declarations\` MCP tool.
+This preserves the MCP execution boundary while reusing the same qualification
+contract.
+
+Direct declaration requests and packets remain bounded to **1 MiB encoded JSON**.
+Discovery wrappers are separately bounded and fail closed; Hashmarks never
+silently truncates a declaration set into stronger evidence.
+
 ## Non-goals
 
 This contract does not:
