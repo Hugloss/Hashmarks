@@ -104,8 +104,18 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     contexts = sorted(set(trees) | set(inventories))
     if not contexts:
         raise ValueError("at least one Maven dependency context is required")
-    complete_trees = {str(context) for context in complete_tree_contexts}
-    complete_inventories = {str(context) for context in complete_inventory_contexts}
+    if any(
+        not isinstance(context, str) or not context
+        for context in complete_tree_contexts
+    ):
+        raise ValueError("complete Maven tree context must be a string")
+    if any(
+        not isinstance(context, str) or not context
+        for context in complete_inventory_contexts
+    ):
+        raise ValueError("complete Maven inventory context must be a string")
+    complete_trees = set(complete_tree_contexts)
+    complete_inventories = set(complete_inventory_contexts)
     unknown_complete_trees = sorted(complete_trees - set(trees))
     if unknown_complete_trees:
         raise ValueError(
