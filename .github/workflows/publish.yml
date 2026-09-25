@@ -193,13 +193,13 @@ jobs:
           uv venv --python 3.14 .release-sdist
           uv pip install --offline --python .release-sdist/bin/python "$sdist"
           .release-sdist/bin/python -I scripts/installed_artifact_smoke.py
-      - name: Bind exact release bytes
+      - name: Bind exact package qualification bytes
         run: |
           uv run --frozen --no-sync python scripts/release_contract.py manifest \
             --dist release/packages \
             --tag "${{ needs.prepare.outputs.tag }}" \
-            --output release/release-manifest.json \
-            --sha256sums release/SHA256SUMS.txt
+            --output release/package-manifest.json \
+            --sha256sums release/PACKAGE_SHA256SUMS.txt
       - name: Upload exact qualified release bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -311,7 +311,7 @@ jobs:
         with:
           name: qualified-standalone-release-bundle
           path: release/standalone/
-      - name: Verify downloaded release bytes
+      - name: Verify downloaded release bytes and bind publication identity
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
@@ -319,8 +319,8 @@ jobs:
             --root source \
             --dist release/packages \
             --tag "${{ needs.prepare.outputs.tag }}" \
-            --manifest release/release-manifest.json
-          (cd release/packages && sha256sum -c ../SHA256SUMS.txt)
+            --manifest release/package-manifest.json
+          (cd release/packages && sha256sum -c ../PACKAGE_SHA256SUMS.txt)
           chmod 0755 release/standalone/hashmarks-linux-x86_64
           (
             cd release/standalone
@@ -328,6 +328,23 @@ jobs:
           )
           test "$(release/standalone/hashmarks-linux-x86_64 --version)" = \
             "hashmarks version $RELEASE_VERSION"
+          python3 workflow/scripts/release_contract.py publication-manifest \
+            --root source \
+            --dist release/packages \
+            --standalone release/standalone/hashmarks-linux-x86_64 \
+            --standalone-checksum release/standalone/hashmarks-linux-x86_64.sha256 \
+            --tag "${{ needs.prepare.outputs.tag }}" \
+            --source-sha "${{ needs.prepare.outputs.source_sha }}" \
+            --output release/release-manifest.json \
+            --sha256sums release/SHA256SUMS.txt
+          python3 workflow/scripts/release_contract.py verify-publication \
+            --root source \
+            --dist release/packages \
+            --standalone release/standalone/hashmarks-linux-x86_64 \
+            --standalone-checksum release/standalone/hashmarks-linux-x86_64.sha256 \
+            --tag "${{ needs.prepare.outputs.tag }}" \
+            --source-sha "${{ needs.prepare.outputs.source_sha }}" \
+            --manifest release/release-manifest.json
       - name: Materialize reviewed changelog section as release notes
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
