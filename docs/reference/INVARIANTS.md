@@ -154,6 +154,16 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **G45. Task evidence separates retrieval, ownership, verification, and freshness authority.** Bounded retrieval order is relevance evidence only and cannot establish implementation ownership. Exact target/owner evidence may resolve outside the bounded retrieval rows through maintained repository indexes. Freshness is independent: current evidence may remain ambiguous or unresolved, and an ownership result may never be labeled safe merely because its evidence is current.
 
+**G46. Cross-artifact declaration correspondence is explicit and scope-bound.** Core may compare provider-normalized declarations only inside one explicitly scoped conceptual group. Similar names, filenames, values, locality, or model inference cannot manufacture correspondence.
+
+**G47. Declaration comparison never becomes source-of-truth precedence.** Canonical equality may establish equivalence and canonical inequality may establish difference for resolved declarations in one group, but Hashmarks never chooses a winning declaration, treats majority agreement as authority, or invents a global declaration ranking.
+
+**G48. Declaration absence requires qualified semantic coverage.** An unseen expected declaration becomes authoritative absence only when declared coverage is complete and explicitly non-truncated for the relevant scope. Incomplete, truncated, or unknown coverage preserves absence as unknown.
+
+**G49. Declaration semantics and repository evidence retain separate authority.** Producer normalization, semantic values, correspondence, expected membership, and coverage remain provider claims unless a separate Hashmarks authority establishes them. Exact member/span identity, repository freshness, and repository presence remain owned by canonical repository-evidence authorities.
+
+**G50. Declaration deltas are factual and tamper-detecting.** Previous declaration observations must validate their producer-owned identity before comparison. Deltas may report changed definitions, values, evidence/provenance, correspondence, coverage, equivalence/difference, or absence, but never whether a change is correct or desirable.
+
 ## Product-boundary constitution
 
 Hashmarks is a repository observer that exposes repository intelligence, not an autonomous coding agent, policy engine, or execution engine.
