@@ -104,6 +104,8 @@ Increment `publication_attempt` for each subsequent retry.
 
 `source_sha` owns release content identity. `publication_attempt` only creates an auditable new publication attempt. Newer workflow machinery may perform the retry, but it must qualify, tag, and publish the explicitly requested source bytes.
 
+A retry does not trust partial draft state from the failed attempt. Publish reconciles the draft title and notes, removes any existing draft assets, uploads the newly qualified asset set, verifies that the draft contains exactly the expected public filenames, and only then publishes it.
+
 The next normal release should always start with `make release-prepare VERSION=...`, which removes retry-only fields.
 
 ## History policy
