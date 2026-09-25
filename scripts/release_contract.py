@@ -145,9 +145,7 @@ def release_manifest(root: Path, dist: Path, *, tag: str) -> dict[str, object]:
 def _standalone_filename(platform: str, architecture: str) -> str:
     filename = STANDALONE_SPECS.get((platform, architecture))
     if filename is None:
-        raise ValueError(
-            f"unsupported standalone platform: {platform}/{architecture}"
-        )
+        raise ValueError(f"unsupported standalone platform: {platform}/{architecture}")
     return filename
 
 
@@ -311,7 +309,10 @@ def _load_standalone_bundle(root: Path, bundle: Path) -> dict[str, object]:
     platform = str(standalone.get("platform") or "")
     architecture = str(standalone.get("architecture") or "")
     version = str(_project(root)["version"])
-    if value.get("project") != _project(root)["name"] or value.get("version") != version:
+    if (
+        value.get("project") != _project(root)["name"]
+        or value.get("version") != version
+    ):
         raise ValueError("standalone qualification project/version mismatch")
     if smoke.get("reported_version") != version:
         raise ValueError("standalone qualification smoke version mismatch")
@@ -430,7 +431,9 @@ def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
 
 def _write_json(value: dict[str, object], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _write_manifest(
