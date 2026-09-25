@@ -236,7 +236,6 @@ jobs:
             --onefile \
             --name hashmarks \
             --collect-all hashmarks \
-            --collect-all mcp \
             scripts/hashmarks_entrypoint.py
           ./dist/hashmarks --version
           ./dist/hashmarks version
