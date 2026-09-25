@@ -313,7 +313,11 @@ class EvidenceGraphMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         manifest = str(self._project_node_value(node, "manifest") or "")
-        if self._visible_repository_file(manifest) is None:
+        metadata_raw = self._project_node_value(node, "metadata")
+        metadata = metadata_raw if isinstance(metadata_raw, dict) else {}
+        freshness = metadata.get("freshness_manifests") or ()
+        manifests = (manifest, *(str(value) for value in freshness))
+        if any(self._visible_repository_file(value) is None for value in manifests):
             return False
         root = str(self._project_node_value(node, "root") or "").strip("/")
         if root in {"", "."}:
