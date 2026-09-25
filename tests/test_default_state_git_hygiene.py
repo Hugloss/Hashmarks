@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import hashmarks.cli as cli
 from hashmarks.client import StateDirectoryError
 from hashmarks.codemap import CodeMap
 
@@ -77,6 +78,35 @@ def test_default_state_rejects_symlink_escape(tmp_path: Path) -> None:
 
     with pytest.raises(StateDirectoryError, match="must not be a symlink"):
         CodeMap(repo)
+
+    assert list(outside.iterdir()) == []
+
+
+def test_daemon_start_rejects_default_state_symlink_before_log_write(
+    tmp_path: Path,
+) -> None:
+    repo = _tracked_repo(tmp_path)
+    outside = tmp_path / "outside-daemon-state"
+    outside.mkdir()
+    state = repo / ".hashmarks"
+    try:
+        state.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable")
+
+    with pytest.raises(SystemExit, match="must not be a symlink"):
+        cli.main(
+            [
+                "--workspace",
+                str(repo),
+                "--timeout",
+                "0.01",
+                "daemon",
+                "start",
+                "--start-timeout",
+                "0.01",
+            ]
+        )
 
     assert list(outside.iterdir()) == []
 
