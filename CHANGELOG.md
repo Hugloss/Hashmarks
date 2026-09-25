@@ -2,6 +2,7 @@
 
 ## 0.22.0 — Development
 
+- Add producer-neutral cross-artifact repository declarations: explicitly scoped correspondence across files/formats, exact repository-evidence binding, canonical normalized equality/difference, ambiguity preservation, coverage-qualified absence, stable definition/observation identities, factual deltas, and a read-only MCP surface without source-of-truth precedence or winner selection.
 - Fail closed on malformed dependency-v3 observations and requests, stale repository bindings, cross-context graph traversal, and unsupported relationship kinds instead of treating uncertain evidence as authoritative.
 - Preserve uv marker-qualified dependencies as conditional graph evidence without flattening them into unconditional reachability or absence; retain environment-domain scope and reject lock forks or conflicts the shared model cannot represent.
 - Require explicit, context-bound Maven completeness declarations before using tree or list output as negative evidence, and reject warnings or incomplete output that undermine those claims.
