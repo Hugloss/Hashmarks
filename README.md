@@ -344,7 +344,7 @@ Run `hashmarks --help` for the complete command surface.
 
 ### Is Hashmarks an MCP server?
 
-Yes. The standalone Hashmarks executable from GitHub Releases includes the local read-only MCP runtime. Install it with the checksum-verifying `install.sh`; no separate Python or MCP package installation is required for the end-user CLI/MCP path.
+Yes. The standalone Hashmarks executable from GitHub Releases includes the local read-only stdio MCP server and runtime. Install it with the checksum-verifying `install.sh`; no separate Python or MCP package installation is required for the end-user CLI/MCP path.
 
 ### Does Hashmarks work with Claude Code, Codex, OpenCode, and Pi?
 
