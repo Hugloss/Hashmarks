@@ -79,6 +79,10 @@ def _adjacency(
         else:
             outgoing.setdefault(source, set()).add(target)
             incoming.setdefault(target, set()).add(source)
+    for source, targets in outgoing.items():
+        conditional_outgoing.get(source, set()).difference_update(targets)
+    for target, sources in incoming.items():
+        conditional_incoming.get(target, set()).difference_update(sources)
     return (
         {node: sorted(values) for node, values in outgoing.items()},
         {node: sorted(values) for node, values in incoming.items()},
