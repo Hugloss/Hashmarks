@@ -41,6 +41,16 @@ def _standalone(
     return standalone
 
 
+def _standalone_checksum(standalone: Path) -> Path:
+    checksum = standalone.with_name(f"{standalone.name}.sha256")
+    digest = hashlib.sha256(standalone.read_bytes()).hexdigest()
+    checksum.write_text(
+        f"{digest}  {standalone.name}\n",
+        encoding="utf-8",
+    )
+    return checksum
+
+
 def test_release_manifest_binds_exact_distribution_bytes(tmp_path: Path) -> None:
     manifest = release_manifest(
         _root(), _dist(tmp_path), tag=f"v{hashmarks.__version__}"
@@ -84,11 +94,13 @@ def test_publication_manifest_binds_source_and_standalone_bytes(
     tmp_path: Path,
 ) -> None:
     standalone = _standalone(tmp_path)
+    standalone_checksum = _standalone_checksum(standalone)
     source_sha = "a" * 40
     manifest = publication_manifest(
         _root(),
         _dist(tmp_path),
         standalone,
+        standalone_checksum,
         tag=f"v{hashmarks.__version__}",
         source_sha=source_sha,
     )
@@ -105,17 +117,51 @@ def test_publication_manifest_binds_source_and_standalone_bytes(
         "architecture": "x86_64",
         "version": hashmarks.__version__,
     }
+    assert manifest["installer_checksum"] == {
+        "kind": "installer-checksum",
+        "filename": "hashmarks-linux-x86_64.sha256",
+        "size_bytes": standalone_checksum.stat().st_size,
+        "sha256": "sha256:"
+        + hashlib.sha256(standalone_checksum.read_bytes()).hexdigest(),
+        "for": "hashmarks-linux-x86_64",
+    }
     assert str(manifest["manifest_identity"]).startswith("sha256:")
 
 
 def test_publication_manifest_rejects_standalone_version_drift(
     tmp_path: Path,
 ) -> None:
+    standalone = _standalone(tmp_path, version="999.0.0")
     with pytest.raises(ValueError, match="standalone release version mismatch"):
         publication_manifest(
             _root(),
             _dist(tmp_path),
-            _standalone(tmp_path, version="999.0.0"),
+            standalone,
+            _standalone_checksum(standalone),
+            tag=f"v{hashmarks.__version__}",
+            source_sha="a" * 40,
+        )
+
+
+def test_publication_manifest_rejects_stale_installer_checksum(
+    tmp_path: Path,
+) -> None:
+    standalone = _standalone(tmp_path)
+    checksum = _standalone_checksum(standalone)
+    checksum.write_text(
+        f"{'0' * 64}  {standalone.name}\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="standalone installer checksum does not match qualified standalone bytes",
+    ):
+        publication_manifest(
+            _root(),
+            _dist(tmp_path),
+            standalone,
+            checksum,
             tag=f"v{hashmarks.__version__}",
             source_sha="a" * 40,
         )
@@ -124,11 +170,13 @@ def test_publication_manifest_rejects_standalone_version_drift(
 def test_publication_manifest_rejects_non_commit_source_identity(
     tmp_path: Path,
 ) -> None:
+    standalone = _standalone(tmp_path)
     with pytest.raises(ValueError, match="source_sha must be an exact"):
         publication_manifest(
             _root(),
             _dist(tmp_path),
-            _standalone(tmp_path),
+            standalone,
+            _standalone_checksum(standalone),
             tag=f"v{hashmarks.__version__}",
             source_sha="main",
         )
@@ -139,6 +187,7 @@ def test_publication_manifest_cli_writes_checksums_for_every_public_asset(
 ) -> None:
     dist = _dist(tmp_path)
     standalone = _standalone(tmp_path)
+    standalone_checksum = _standalone_checksum(standalone)
     output = tmp_path / "release-manifest.json"
     sums = tmp_path / "SHA256SUMS.txt"
     source_sha = "b" * 40
@@ -153,6 +202,8 @@ def test_publication_manifest_cli_writes_checksums_for_every_public_asset(
                 str(dist),
                 "--standalone",
                 str(standalone),
+                "--standalone-checksum",
+                str(standalone_checksum),
                 "--tag",
                 f"v{hashmarks.__version__}",
                 "--source-sha",
@@ -171,6 +222,7 @@ def test_publication_manifest_cli_writes_checksums_for_every_public_asset(
         f"hashmarks-{hashmarks.__version__}-py3-none-any.whl",
         f"hashmarks-{hashmarks.__version__}.tar.gz",
         "hashmarks-linux-x86_64",
+        "hashmarks-linux-x86_64.sha256",
     ]
     recorded = json.loads(output.read_text(encoding="utf-8"))
     assert recorded["source"] == {"commit_sha": source_sha}
@@ -181,6 +233,7 @@ def test_publication_verification_rejects_post_manifest_standalone_mutation(
 ) -> None:
     dist = _dist(tmp_path)
     standalone = _standalone(tmp_path)
+    standalone_checksum = _standalone_checksum(standalone)
     output = tmp_path / "release-manifest.json"
     sums = tmp_path / "SHA256SUMS.txt"
     source_sha = "c" * 40
@@ -193,6 +246,8 @@ def test_publication_verification_rejects_post_manifest_standalone_mutation(
             str(dist),
             "--standalone",
             str(standalone),
+            "--standalone-checksum",
+            str(standalone_checksum),
             "--tag",
             f"v{hashmarks.__version__}",
             "--source-sha",
@@ -207,6 +262,7 @@ def test_publication_verification_rejects_post_manifest_standalone_mutation(
         standalone.read_text(encoding="utf-8") + "# changed after qualification\n",
         encoding="utf-8",
     )
+    _standalone_checksum(standalone)
 
     with pytest.raises(
         SystemExit,
@@ -221,6 +277,8 @@ def test_publication_verification_rejects_post_manifest_standalone_mutation(
                 str(dist),
                 "--standalone",
                 str(standalone),
+                "--standalone-checksum",
+                str(standalone_checksum),
                 "--tag",
                 f"v{hashmarks.__version__}",
                 "--source-sha",
