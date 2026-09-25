@@ -89,11 +89,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     ):
         raise ValueError(f"unsupported uv lock schema version: {lock_version}")
     revision = document.get("revision")
-    if (
-        not isinstance(revision, int)
-        or isinstance(revision, bool)
-        or revision < 1
-    ):
+    if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
         raise ValueError("uv lock revision must be a positive integer")
     raw_requires_python = document.get("requires-python")
     if raw_requires_python is not None and not isinstance(raw_requires_python, str):
