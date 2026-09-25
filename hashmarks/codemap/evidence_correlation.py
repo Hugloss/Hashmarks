@@ -1421,6 +1421,7 @@ class EvidenceCorrelationMixin:
         )
         if repository_identity != self._repository_packet_identity():
             raise ValueError(f"{label} correlation repository-mismatch")
+        self._validate_binding_delta_input(repository_evidence, name=f"{label} repository")
         supplied_identity = packet.get("correlation_identity")
         if not isinstance(supplied_identity, str) or not _SHA256.fullmatch(
             supplied_identity
