@@ -46,12 +46,8 @@ def declaration_delta(
         evidence_changed = sorted(
             declaration_id
             for declaration_id in shared
-            if old_declarations[declaration_id].get(
-                "declaration_observation_identity"
-            )
-            != new_declarations[declaration_id].get(
-                "declaration_observation_identity"
-            )
+            if old_declarations[declaration_id].get("declaration_observation_identity")
+            != new_declarations[declaration_id].get("declaration_observation_identity")
             and declaration_id not in value_changed
         )
         changed.append(
