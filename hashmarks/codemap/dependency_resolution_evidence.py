@@ -1585,4 +1585,3 @@ class DependencyResolutionEvidenceMixin:
             "producer_authority": "caller-claimed",
             "causation": "not-inferred",
         }
-
