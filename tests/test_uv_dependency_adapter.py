@@ -244,6 +244,92 @@ source = { virtual = "." }
     ]
 
 
+def test_uv_lock_adapter_binds_environment_domain_to_semantic_scope(
+    tmp_path: Path,
+) -> None:
+    base = """version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+    constrained = """version = 1
+revision = 3
+requires-python = ">=3.11"
+supported-markers = ["sys_platform == 'linux'"]
+required-markers = ["platform_machine == 'x86_64' and sys_platform == 'linux'"]
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(
+            uv_lock_dependency_observation(lock=base.encode())
+        )
+        after = codemap.dependency_resolution_evidence(
+            uv_lock_dependency_observation(lock=constrained.encode())
+        )
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert before["scope"] == {"requires_python": ">=3.11"}
+    assert after["scope"] == {
+        "requires_python": ">=3.11",
+        "required_environments": [
+            "platform_machine == 'x86_64' and sys_platform == 'linux'"
+        ],
+        "supported_environments": ["sys_platform == 'linux'"],
+    }
+    assert before["definition_identity"] != after["definition_identity"]
+    assert delta["comparability"] == "not-comparable"
+    assert delta["reason"] == "definition-changed"
+
+
+def test_uv_top_level_resolution_markers_are_observation_only(
+    tmp_path: Path,
+) -> None:
+    before_lock = b"""version = 1
+revision = 3
+requires-python = ">=3.11"
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+    after_lock = b"""version = 1
+revision = 3
+requires-python = ">=3.11"
+resolution-markers = ["python_full_version >= '3.12'"]
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+"""
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(
+            uv_lock_dependency_observation(lock=before_lock)
+        )
+        after = codemap.dependency_resolution_evidence(
+            uv_lock_dependency_observation(lock=after_lock)
+        )
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert before["definition_identity"] == after["definition_identity"]
+    assert before["resolution_identity"] == after["resolution_identity"]
+    assert before["observation_identity"] != after["observation_identity"]
+    assert delta["comparability"] == "comparable"
+
+
 def test_uv_lock_adapter_refuses_package_resolution_forks() -> None:
     lock = b"""version = 1
 revision = 3
