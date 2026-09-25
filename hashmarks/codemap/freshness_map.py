@@ -295,12 +295,14 @@ class EvidenceFreshnessMapMixin:
         self,
         entries: Sequence[Mapping[str, object]],
         previous_map: Mapping[str, object] | None,
+        *,
+        task_identity: str,
     ) -> list[dict[str, object]]:
         current_by_key = {self._prior_key(row): row for row in entries}
         prior: list[dict[str, object]] = []
         for old in self._prior_entries(
             previous_map,
-            expected_task_identity=entries[0]["task_identity"] if entries else "",
+            expected_task_identity=task_identity,
         ):
             key = self._prior_key(old)
             current = current_by_key.get(key)
@@ -411,7 +413,11 @@ class EvidenceFreshnessMapMixin:
         if cross_repository is not None:
             entries.append(cross_repository)
 
-        prior = self._prior_freshness_rows(entries, previous_map)
+        prior = self._prior_freshness_rows(
+            entries,
+            previous_map,
+            task_identity=scope.task_identity,
+        )
         payload: dict[str, object] = {
             "schema": "hashmarks.evidence-freshness-map.v1",
             "repository": {
