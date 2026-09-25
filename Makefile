@@ -35,7 +35,7 @@ DIAGNOSTIC_EXTRA_MARKER ?=
 RUFF_DEBT_PREVIOUS_BASELINE ?=
 RUFF_AUTOFIX_SELECT ?= E4,E7,E9,I,T201
 
-.PHONY: help evaluation-help lock lock-check init setup bootstrap check start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-check metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
+.PHONY: help evaluation-help lock lock-check init setup bootstrap check start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-prepare release-check metrics metrics-fast metrics-scale metrics-500k metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
 
 help:
 	@printf '%s\n' \
@@ -84,7 +84,8 @@ help:
 	  '  make mcp-pi-check  Qualify the installed MCP wheel through Pi + pi-mcp-adapter' \
 	  '  make mcp-host-status  Inspect project-local OpenCode/Claude/Codex/Pi MCP integration state' \
 	  '  make mcp-concurrency-stress  Stress concurrent MCP-style readers during live repository mutation' \
-	  '  make release-check  Local release preflight; does not replace canonical artifact/readback proof' \
+	  '  make release-prepare VERSION=X.Y.Z  Prepare normal release version/request files and refresh uv.lock' \
+	  '  make release-check  Local release preflight; native Linux/WSL + Windows qualification runs in CI' \
 	  '  make metrics-fast   Quick baseline without daemon benchmarks' \
 	  '  make metrics-500k   Explicit heavy 500k repository-intelligence baseline' \
 	  '  make metrics        Quick 10k repository-intelligence baseline including daemon + impact metrics' \
@@ -403,12 +404,21 @@ mcp-pi-check:
 	  --python "$(PI_HOST_PYTHON)" \
 	  --receipt "$(PI_HOST_RECEIPT)"
 
+release-prepare:
+	@test -n "$(VERSION)" || (echo "VERSION is required, e.g. make release-prepare VERSION=0.24.0" >&2; exit 2)
+	@$(UV_RUN) --offline --no-sync python scripts/release_prepare.py --version "$(VERSION)"
+	@$(UV) lock
+	@$(UV) lock --check
+	@printf '%s\n' \
+	  'Release mechanics prepared and uv.lock refreshed.' \
+	  'Next: replace the Development placeholder in CHANGELOG.md, review the diff, then run make release-check.'
+
 release-check: dev-check artifact-check
 	@printf '\n%s\n' \
 	  '========================================' \
 	  ' HASHMARKS RELEASE CHECK: LOCAL PREFLIGHT PASS' \
-	  ' Canonical promotion still requires deterministic artifact,' \
-	  ' exact-parent replay/package proof, persistence, and readback.' \
+	  ' Pull-request CI owns native Linux/WSL + Windows standalone qualification.' \
+	  ' Publish owns exact-source release aggregation and GitHub Release publication.' \
 	  '========================================'
 
 metrics: bootstrap
