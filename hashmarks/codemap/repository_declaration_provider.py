@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from hashmarks.paths import normalize_relative_path
+
 from .repository_declaration_contract import encoded_json_bytes, json_value
 
 MAX_DECLARATION_PROVIDERS = 32
@@ -231,7 +233,17 @@ def _declared_evidence_paths(groups: Sequence[Mapping[str, object]]) -> set[str]
                 continue
             for item in evidence:
                 if isinstance(item, Mapping) and isinstance(item.get("path"), str):
-                    paths.add(str(item["path"]))
+                    try:
+                        paths.add(
+                            normalize_relative_path(
+                                str(item["path"]),
+                                allow_root=False,
+                            )
+                        )
+                    except ValueError as exc:
+                        raise RepositoryDeclarationProviderError(
+                            "declaration provider evidence path is invalid"
+                        ) from exc
     return paths
 
 
