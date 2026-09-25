@@ -176,3 +176,31 @@ def test_declaration_provider_context_has_no_raw_workspace_authority() -> None:
         "collect_repository_declaration_providers(\n            self.workspace"
         not in discovery
     )
+
+
+
+def test_repository_file_discovery_has_one_semantic_owner() -> None:
+    owned = {
+        "_path_admitted_for_analysis",
+        "_iter_admitted_repository_files",
+        "_walk_admitted_repository_files",
+    }
+    definitions: dict[str, list[str]] = {name: [] for name in owned}
+    for path in sorted(CODEMAP.glob("*.py")):
+        for node in ast.walk(_tree(path)):
+            if isinstance(node, ast.FunctionDef) and node.name in definitions:
+                definitions[node.name].append(f"{path.name}:{node.lineno}")
+
+    for name in sorted(owned):
+        assert len(definitions[name]) == 1
+        assert definitions[name][0].startswith("repository_file_discovery.py:")
+
+    indexing = (CODEMAP / "indexing_lifecycle.py").read_text(encoding="utf-8")
+    declarations = (CODEMAP / "repository_declaration_discovery.py").read_text(
+        encoding="utf-8"
+    )
+    owner = (CODEMAP / "repository_file_discovery.py").read_text(encoding="utf-8")
+    assert "os.walk(" not in indexing
+    assert "os.walk(" not in declarations
+    assert "os.walk(" in owner
+    assert "self.policy.decide(" in owner
