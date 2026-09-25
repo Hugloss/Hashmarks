@@ -319,13 +319,24 @@ class RepositoryEvidenceCoverageMixin:
             },
         )
 
-    @staticmethod
     def _validate_coverage_packets(
+        self,
         bindings_packet: Mapping[str, object],
         binding_delta: Mapping[str, object] | None,
     ) -> None:
         if bindings_packet.get("schema") != "hashmarks.repository-evidence-bindings.v1":
             raise ValueError("bindings_packet must be repository evidence bindings")
+        identity = bindings_packet.get("bindings_identity")
+        expected_identity = "sha256:" + self._packet_digest(
+            "hashmarks.repository-evidence-bindings.v1",
+            {
+                key: value
+                for key, value in bindings_packet.items()
+                if key != "bindings_identity"
+            },
+        )
+        if not isinstance(identity, str) or identity != expected_identity:
+            raise ValueError("bindings_packet bindings identity mismatch")
         if (
             binding_delta is not None
             and binding_delta.get("schema")
