@@ -177,8 +177,7 @@ class RepositoryDeclarationsMixin:
             str(row["binding_id"]): row for row in evidence_packet["bindings"]
         }
         projected = [
-            self._declaration_group(group, binding_rows)
-            for group in normalized_groups
+            self._declaration_group(group, binding_rows) for group in normalized_groups
         ]
         projected.sort(key=lambda row: str(row["group_id"]))
 
