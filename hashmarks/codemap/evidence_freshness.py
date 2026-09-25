@@ -25,6 +25,17 @@ def freshness_state(stale: bool | None) -> str:
     return "unknown"
 
 
+def _inadmissible_manifest_count(value: dict[str, object]) -> int | None:
+    raw = value.get("inadmissible_manifest_count", 0)
+    if isinstance(raw, bool):
+        return None
+    try:
+        count = int(cast(Any, raw))
+    except (TypeError, ValueError):
+        return None
+    return count if count >= 0 else None
+
+
 class EvidenceFreshnessMixin:
     """Own evidence snapshot identity, manifest freshness, and freshness status semantics."""
 
@@ -138,10 +149,12 @@ class EvidenceFreshnessMixin:
         if value is None or bool(value.get("bind_generation", False)):
             return False
         manifests = value.get("manifests") or {}
+        inadmissible = _inadmissible_manifest_count(value)
         if (
             not isinstance(manifests, dict)
             or not manifests
-            or int(value.get("inadmissible_manifest_count") or 0) > 0
+            or inadmissible is None
+            or inadmissible > 0
         ):
             return False
         self._record_evidence_snapshot(
@@ -175,7 +188,10 @@ class EvidenceFreshnessMixin:
         value = self._evidence_snapshot(kind, producer)
         if value is None:
             return False, "no freshness snapshot"
-        if int(value.get("inadmissible_manifest_count") or 0) > 0:
+        inadmissible = _inadmissible_manifest_count(value)
+        if inadmissible is None:
+            return False, "invalid manifest admission snapshot"
+        if inadmissible > 0:
             return False, "evidence manifest outside repository admission"
         if bool(value.get("bind_generation", False)):
             fresh, reason = self._generation_snapshot_fresh(value)
