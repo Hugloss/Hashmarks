@@ -337,6 +337,14 @@ class RepositoryEvidenceCoverageMixin:
         )
         if not isinstance(identity, str) or identity != expected_identity:
             raise ValueError("bindings_packet bindings identity mismatch")
+        repository = bindings_packet.get("repository")
+        repository_identity = (
+            str(repository.get("repository_identity") or "")
+            if isinstance(repository, Mapping)
+            else ""
+        )
+        if repository_identity != self._repository_packet_identity():
+            raise ValueError("bindings_packet repository-mismatch")
         if (
             binding_delta is not None
             and binding_delta.get("schema")
