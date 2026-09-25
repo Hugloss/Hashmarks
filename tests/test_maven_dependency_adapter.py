@@ -161,6 +161,34 @@ def test_maven_selection_coverage_requires_all_supplied_sources_complete(
     assert missing["negative_evidence"] == "not-admissible"
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("groupId", 123),
+        ("artifactId", True),
+        ("version", 1),
+        ("type", 42),
+        ("classifier", False),
+        ("scope", 7),
+    ],
+)
+def test_maven_tree_refuses_non_string_coordinate_fields(
+    field: str,
+    value: object,
+) -> None:
+    tree = json.loads(_tree())
+    tree[field] = value
+
+    with pytest.raises(
+        ValueError,
+        match=f"Maven tree node {field} must be a string",
+    ):
+        maven_dependency_observation(
+            trees={"compile": json.dumps(tree).encode()},
+            inventories={},
+        )
+
+
 def test_maven_adapter_preserves_inventory_topology_and_module_ambiguity(
     tmp_path: Path,
 ) -> None:
