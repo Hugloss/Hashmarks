@@ -22,6 +22,7 @@ _MAX_TOKEN_BUDGET = 8_192
 _MAX_PREVIOUS_EVIDENCE_BYTES = 262_144
 _MAX_DEPENDENCY_CODEMAP_BYTES = 1_048_576
 _MAX_DEPENDENCY_QUERIES = 32
+_MAX_REPOSITORY_DECLARATIONS_BYTES = 1_048_576
 
 _T = TypeVar("_T")
 
@@ -270,6 +271,41 @@ class HashmarksMcpSurface:
                         observation, bounded_queries
                     )
                 return result
+            except ValueError as exc:
+                raise McpSurfaceError(str(exc)) from exc
+
+        return self._read(project)
+
+    def repository_declarations(
+        self,
+        groups: list[dict[str, Any]],
+        *,
+        previous_observation: dict[str, Any] | None = None,
+    ) -> dict[str, object]:
+        """Qualify request-scoped cross-artifact repository declarations."""
+        bounded_groups = _bounded_json(
+            groups,
+            name="groups",
+            maximum=_MAX_REPOSITORY_DECLARATIONS_BYTES,
+            expected_type=list,
+        )
+        previous = (
+            None
+            if previous_observation is None
+            else _bounded_json(
+                previous_observation,
+                name="previous_observation",
+                maximum=_MAX_REPOSITORY_DECLARATIONS_BYTES,
+                expected_type=dict,
+            )
+        )
+
+        def project() -> dict[str, object]:
+            try:
+                return self._map.repository_declarations(
+                    bounded_groups,
+                    previous_observation=previous,
+                )
             except ValueError as exc:
                 raise McpSurfaceError(str(exc)) from exc
 
