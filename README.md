@@ -11,7 +11,13 @@ Use Hashmarks with **Claude Code, Codex, OpenCode, Pi**, other stdio MCP clients
 **Works with:** Claude Code · Codex · OpenCode · Pi · stdio MCP clients
 **Use it as:** CLI · Python library · local MCP server
 
-Install from PyPI: `pip install hashmarks`
+Install the standalone CLI + MCP server on Linux x86_64 (including WSL2):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh | sh
+```
+
+The installer downloads checksum-verified, self-contained release bytes from GitHub Releases. The target machine does not need Python, uv, pip, or PyPI access.
 
 ## Why Hashmarks
 
@@ -54,11 +60,14 @@ Hashmarks has no required third-party runtime dependencies. Its CodeMap is deriv
 
 ## MCP server for coding agents
 
-Install the optional MCP support:
+Install the standalone Hashmarks CLI + MCP runtime:
 
 ```bash
-pip install "hashmarks[mcp]"
+curl -fsSL https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh | sh
+hashmarks --version
 ```
+
+This is the end-user MCP path. Source contributors keep using the repository's locked uv environment described below.
 
 Hashmarks exposes one local, read-only **stdio MCP server** with a focused repository-intelligence tool catalog:
 
@@ -108,23 +117,14 @@ Then start Codex from that project directory.
 
 ### OpenCode MCP server
 
-Add Hashmarks to `opencode.json` in the target project:
+From the target project, let Hashmarks register its exact installed executable through OpenCode's own CLI:
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "hashmarks": {
-      "type": "local",
-      "command": ["hashmarks", "--workspace", ".", "mcp"],
-      "cwd": ".",
-      "enabled": true
-    }
-  }
-}
+```bash
+hashmarks install --opencode
+opencode mcp list
 ```
 
-Then start OpenCode from that project directory.
+The registration runs Hashmarks as `hashmarks --workspace . mcp`, so each OpenCode project binds the server to that project instead of to the Hashmarks source checkout. Then start OpenCode from that project directory.
 
 ### Pi MCP server
 
