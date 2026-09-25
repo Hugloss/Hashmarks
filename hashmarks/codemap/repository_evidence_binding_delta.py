@@ -430,8 +430,17 @@ class RepositoryEvidenceBindingDeltaMixin:
                 raise ValueError(
                     f"{name} must be a repository evidence bindings packet"
                 )
-            if not packet.get("bindings_identity"):
-                raise ValueError(f"{name} must contain bindings_identity")
+            identity = packet.get("bindings_identity")
+            expected_identity = "sha256:" + self._packet_digest(
+                "hashmarks.repository-evidence-bindings.v1",
+                {
+                    key: value
+                    for key, value in packet.items()
+                    if key != "bindings_identity"
+                },
+            )
+            if not isinstance(identity, str) or identity != expected_identity:
+                raise ValueError(f"{name} bindings identity mismatch")
         before_repository = self._repository_identity(before)
         after_repository = self._repository_identity(after)
         if not before_repository or before_repository != after_repository:
