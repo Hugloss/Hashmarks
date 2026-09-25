@@ -90,18 +90,7 @@ def normalize_correspondence(raw: object) -> dict[str, object]:
     return {"state": state, "basis": basis}
 
 
-def normalize_coverage(raw: object) -> dict[str, object]:
-    row = mapping(raw, name="coverage")
-    reject_unknown(row, allowed=COVERAGE_KEYS, name="coverage")
-    state = required_text(row.get("state"), name="coverage.state")
-    truncation = required_text(row.get("truncation"), name="coverage.truncation")
-    if state not in {"complete", "incomplete", "unknown"}:
-        raise ValueError("coverage.state must be complete, incomplete, or unknown")
-    if truncation not in {"complete", "truncated", "unknown"}:
-        raise ValueError("coverage.truncation must be complete, truncated, or unknown")
-    if state == "complete" and truncation != "complete":
-        raise ValueError("complete declaration coverage requires truncation=complete")
-
+def _normalized_expected_ids(row: Mapping[str, object]) -> list[str]:
     expected_raw = row.get("expected_declaration_ids", [])
     if not isinstance(expected_raw, Sequence) or isinstance(expected_raw, (str, bytes)):
         raise ValueError("coverage.expected_declaration_ids must be a list")
@@ -115,6 +104,22 @@ def normalize_coverage(raw: object) -> dict[str, object]:
     ]
     if len(set(expected)) != len(expected):
         raise ValueError("coverage.expected_declaration_ids contains duplicates")
+    return sorted(expected)
+
+
+def normalize_coverage(raw: object) -> dict[str, object]:
+    row = mapping(raw, name="coverage")
+    reject_unknown(row, allowed=COVERAGE_KEYS, name="coverage")
+    state = required_text(row.get("state"), name="coverage.state")
+    truncation = required_text(row.get("truncation"), name="coverage.truncation")
+    if state not in {"complete", "incomplete", "unknown"}:
+        raise ValueError("coverage.state must be complete, incomplete, or unknown")
+    if truncation not in {"complete", "truncated", "unknown"}:
+        raise ValueError("coverage.truncation must be complete, truncated, or unknown")
+    if state == "complete" and truncation != "complete":
+        raise ValueError("complete declaration coverage requires truncation=complete")
+
+    expected = _normalized_expected_ids(row)
 
     scope = json_value(row.get("scope", {}), name="coverage.scope")
     provenance = json_value(row.get("provenance", {}), name="coverage.provenance")
@@ -159,9 +164,7 @@ def _normalized_ambiguous_value(
         raise ValueError("ambiguous declaration requires candidate_values list")
     if len(candidates) < 2:
         raise ValueError("ambiguous declaration requires at least two candidate values")
-    normalized = [
-        json_value(value, name="candidate value") for value in candidates
-    ]
+    normalized = [json_value(value, name="candidate value") for value in candidates]
     by_identity = {
         json.dumps(
             value,
@@ -176,9 +179,7 @@ def _normalized_ambiguous_value(
         raise ValueError(
             "ambiguous declaration requires at least two distinct candidate values"
         )
-    return {
-        "candidate_values": [by_identity[key] for key in sorted(by_identity)]
-    }
+    return {"candidate_values": [by_identity[key] for key in sorted(by_identity)]}
 
 
 def _normalized_value_fields(
