@@ -96,8 +96,23 @@ def test_publish_workflow_publishes_only_verified_github_release_assets() -> Non
     assert 'if [ "$tag_commit" != "${{ needs.prepare.outputs.source_sha }}" ]' in text
     assert "Materialize reviewed changelog section as release notes" in text
     assert "--draft" in text
+    assert 'gh release edit "$RELEASE_TAG" \\' in text
+    assert "--notes-file release/release-notes.md" in text
     assert 'gh release edit "$RELEASE_TAG" --draft=false' in text
     assert "gh release upload" in text
+    assert "Prepare exact reviewed draft release" in text
+    assert "Remove stale assets from reviewed draft" in text
+    assert 'gh release delete-asset "$RELEASE_TAG" "$asset" --yes' in text
+    assert "Verify exact reviewed draft asset set" in text
+    assert "release/expected-assets.txt" in text
+    assert "release/actual-assets.txt" in text
+    assert "diff -u release/expected-assets.txt release/actual-assets.txt" in text
+    assert text.index("Remove stale assets from reviewed draft") < text.index(
+        "Upload qualified assets to reviewed draft"
+    )
+    assert text.index("Verify exact reviewed draft asset set") < text.index(
+        "Publish reviewed release"
+    )
     assert "qualified-python-release-bundle" in text
     assert "qualified-standalone-linux-release-bundle" in text
     assert "qualified-standalone-windows-release-bundle" in text
