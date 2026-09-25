@@ -19,8 +19,8 @@ from .index_surfaces import index_surface_for_path
 from .model import EvidenceVisibility, SyncResult
 from .parsers import artifact_key_for, parse_source
 from .policy import ContextPolicy
+from . import repository_file_discovery
 from .repository_file_discovery import (
-    _PRUNE_DIRS,
     _AdmittedRepositoryFile,
     _is_pruned_relative_path,
 )
@@ -368,7 +368,7 @@ class IndexingLifecycleMixin:
             self = cast("CodeMap", self)
         payload = {
             "schema": _ANALYSIS_SCOPE_CONFORMANCE_SCHEMA,
-            "pruned_segments": sorted(_PRUNE_DIRS),
+            "pruned_segments": sorted(repository_file_discovery._PRUNE_DIRS),
             "policy_fingerprint": self.policy.fingerprint(),
             "internal_state_path": self._state_rel or "",
         }
