@@ -1052,6 +1052,27 @@ def test_v3_query_exposes_depth_omission_instead_of_silent_partial_result(
     assert result["omissions"] == [{"reason": "depth-limit", "node_id": "library@1"}]
 
 
+def test_v3_repository_input_revision_requires_string_sha256(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v3()
+    snapshot["repository_inputs"] = [
+        {
+            "path": "dependency.lock",
+            "member_revision": int("1" * 64),
+        }
+    ]
+    (tmp_path / "dependency.lock").write_text("content\n")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="repository input member_revision must be lowercase sha256 hex",
+        ):
+            codemap.dependency_resolution_evidence(snapshot)
+
+
 def test_v3_repository_input_change_is_observation_only(tmp_path: Path) -> None:
     dependency_input = tmp_path / "dependency.lock"
     dependency_input.write_text("before\n")
