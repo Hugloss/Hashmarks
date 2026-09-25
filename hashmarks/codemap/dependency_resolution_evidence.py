@@ -33,9 +33,7 @@ def _canonical(value: object) -> bytes:
             value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            "dependency resolution snapshot must contain JSON-compatible values"
-        ) from exc
+        raise ValueError("dependency snapshot must be JSON-compatible") from exc
 
 
 def _identity(domain: str, value: object) -> str:
@@ -90,7 +88,9 @@ def _dependency_identities_v3(packet: Mapping[str, object]) -> tuple[str, str, s
 
 
 def _identifier(value: object, *, label: str) -> str:
-    text = str(value or "").strip()
+    if not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    text = value.strip()
     if not text:
         raise ValueError(f"{label} must not be empty")
     if len(text) > _MAX_ID_CHARS:
@@ -99,7 +99,9 @@ def _identifier(value: object, *, label: str) -> str:
 
 
 def _text(value: object, *, label: str, required: bool = False) -> str:
-    text = str(value or "").strip()
+    if value is not None and not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    text = (value or "").strip()
     if required and not text:
         raise ValueError(f"{label} must not be empty")
     if len(text) > _MAX_TEXT_CHARS:
