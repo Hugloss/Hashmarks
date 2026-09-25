@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
 
-from .model import EvidenceVisibility
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -144,20 +143,3 @@ class RepositoryFileDiscoveryMixin:
         if root.is_dir():
             yield from self._iter_admitted_directory_files(root)
 
-    def _walk_admitted_repository_files(
-        self,
-        prefix: str = "",
-        *,
-        limit: int | None = None,
-        visible_only: bool = False,
-    ) -> tuple[_AdmittedRepositoryFile, ...]:
-        if limit is not None and limit < 1:
-            raise ValueError("limit must be positive")
-        admitted: list[_AdmittedRepositoryFile] = []
-        for item in self._iter_admitted_repository_files(prefix):
-            if visible_only and item.visibility is EvidenceVisibility.DENY:
-                continue
-            admitted.append(item)
-            if limit is not None and len(admitted) >= limit:
-                break
-        return tuple(admitted)
