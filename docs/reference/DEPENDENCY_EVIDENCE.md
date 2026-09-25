@@ -181,7 +181,7 @@ Before adding a Gradle, npm, Cargo, SBOM, or other adapter:
 8. emit a `relationships` row only for a traversable dependency edge; `kind` may subtype that edge but must not smuggle non-topological producer facts such as constraints, conflicts, recommendations, or diagnostics into graph traversal;
 9. add adapter-specific parsing tests second;
 10. add cross-producer behavior tests where another adapter can express the same fact;
-12. verify that no core dependency module imports the new adapter or branches on its producer/source kind.
+11. verify that no core dependency module imports the new adapter or branches on its producer/source kind.
 
 A new adapter is not complete merely because it parses its native format. It is complete when producer-native detail terminates at the adapter boundary and the resulting observation behaves like any other producer of the same semantic facts.
 
