@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_repository_cli_registers_structural_locality_commands() -> None:
     import argparse
 
@@ -55,3 +58,12 @@ def test_top_level_cli_delegates_repository_command_family(
 
     assert cli.main(["--workspace", str(tmp_path), "symbol", "Widget.run"]) == 0
     assert seen == {"query": "Widget.run", "workspace": tmp_path.resolve()}
+
+
+@pytest.mark.parametrize("command", ["root", "map"])
+def test_removed_cli_shortcuts_are_not_callable(command: str) -> None:
+    from hashmarks.cli import main
+
+    with pytest.raises(SystemExit) as exc:
+        main([command])
+    assert exc.value.code == 2

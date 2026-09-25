@@ -215,7 +215,6 @@ def test_agent_evaluation_executables_are_isolated_from_product_script_root() ->
     assert (evaluation_root / "metrics_agent.py").is_file()
     assert (evaluation_root / "codex_agent_economics.py").is_file()
     assert (evaluation_root / "score_agent_work.py").is_file()
-    assert (evaluation_root / "ruff_debt_agent_economics_parity.py").is_file()
     readme = (evaluation_root / "README.md").read_text(encoding="utf-8")
     assert "development and measurement infrastructure" in readme
     assert "not installed as part of the `hashmarks` Python package" in readme

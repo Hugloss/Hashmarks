@@ -148,7 +148,12 @@ jobs:
       - run: uv python install 3.14
       - run: uv sync --frozen --group test --python 3.14
       - run: make test-profile
-      - run: make artifact-check ARTIFACT_PYTHON=3.14
+      - name: Smoke artifacts without changing existing dist
+        run: |
+          mkdir -p dist
+          printf '%s\n' 'artifact-check must preserve this' > dist/artifact-check-preservation-sentinel
+          make artifact-check ARTIFACT_PYTHON=3.14
+          test "$(cat dist/artifact-check-preservation-sentinel)" = 'artifact-check must preserve this'
 
   python-support:
     name: Tests / Python ${{ matrix.python }}
