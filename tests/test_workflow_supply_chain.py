@@ -30,10 +30,14 @@ def test_external_github_actions_are_immutable_sha_pinned() -> None:
     assert not offenders, "mutable/unpinned workflow actions:\n" + "\n".join(offenders)
 
 
-def test_publish_workflow_is_reviewed_request_driven_and_github_native() -> None:
-    text = (_root() / ".github" / "workflows" / "publish.yml").read_text(
+def _publish_workflow_text() -> str:
+    return (_root() / ".github" / "workflows" / "publish.yml").read_text(
         encoding="utf-8"
     )
+
+
+def test_publish_workflow_binds_reviewed_request_to_exact_source() -> None:
+    text = _publish_workflow_text()
     assert "branches: [main]" in text
     assert '".github/release-request.toml"' in text
     assert "workflow_dispatch:" in text
@@ -57,6 +61,10 @@ def test_publish_workflow_is_reviewed_request_driven_and_github_native() -> None
     )
     assert "release:\n    types: [published]" not in text
     assert "release publication is authorized only from main" in text
+
+
+def test_publish_workflow_publishes_only_verified_github_release_assets() -> None:
+    text = _publish_workflow_text()
     assert "Publish exact qualified bytes to GitHub Release" in text
     assert "gh release create" in text
     assert '--target "${{ needs.prepare.outputs.source_sha }}"' in text
