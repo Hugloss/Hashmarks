@@ -6,6 +6,8 @@ from collections.abc import Mapping
 def declaration_delta(
     previous: Mapping[str, object],
     current: Mapping[str, object],
+    *,
+    repository_evidence_delta: Mapping[str, object],
 ) -> dict[str, object]:
     before = {
         str(row["group_id"]): row
@@ -43,12 +45,23 @@ def declaration_delta(
             if _value_signature(old_declarations[declaration_id])
             != _value_signature(new_declarations[declaration_id])
         )
-        evidence_changed = sorted(
+        definition_changed = sorted(
+            declaration_id
+            for declaration_id in shared
+            if old_declarations[declaration_id].get(
+                "declaration_definition_identity"
+            )
+            != new_declarations[declaration_id].get(
+                "declaration_definition_identity"
+            )
+        )
+        observation_changed = sorted(
             declaration_id
             for declaration_id in shared
             if old_declarations[declaration_id].get("declaration_observation_identity")
             != new_declarations[declaration_id].get("declaration_observation_identity")
             and declaration_id not in value_changed
+            and declaration_id not in definition_changed
         )
         changed.append(
             {
@@ -61,8 +74,9 @@ def declaration_delta(
                 "removed_declaration_ids": sorted(
                     set(old_declarations) - set(new_declarations)
                 ),
+                "definition_changed_declaration_ids": definition_changed,
                 "value_changed_declaration_ids": value_changed,
-                "evidence_or_provenance_changed_declaration_ids": evidence_changed,
+                "observation_changed_declaration_ids": observation_changed,
                 "comparison_changed": old.get("comparison") != new.get("comparison"),
                 "absence_changed": old.get("absence") != new.get("absence"),
                 "correspondence_changed": old.get("correspondence")
@@ -75,8 +89,7 @@ def declaration_delta(
         "added_group_ids": sorted(set(after) - set(before)),
         "removed_group_ids": sorted(set(before) - set(after)),
         "changed_groups": changed,
-        "repository_changed": previous.get("repository") != current.get("repository"),
-        "observer_changed": previous.get("observer") != current.get("observer"),
+        "repository_evidence": repository_evidence_delta,
         "interpretation": "factual-only",
     }
 
