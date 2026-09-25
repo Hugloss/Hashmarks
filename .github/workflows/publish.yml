@@ -332,6 +332,7 @@ jobs:
             --root source \
             --dist release/packages \
             --standalone release/standalone/hashmarks-linux-x86_64 \
+            --standalone-checksum release/standalone/hashmarks-linux-x86_64.sha256 \
             --tag "${{ needs.prepare.outputs.tag }}" \
             --source-sha "${{ needs.prepare.outputs.source_sha }}" \
             --output release/release-manifest.json \
@@ -340,6 +341,7 @@ jobs:
             --root source \
             --dist release/packages \
             --standalone release/standalone/hashmarks-linux-x86_64 \
+            --standalone-checksum release/standalone/hashmarks-linux-x86_64.sha256 \
             --tag "${{ needs.prepare.outputs.tag }}" \
             --source-sha "${{ needs.prepare.outputs.source_sha }}" \
             --manifest release/release-manifest.json
