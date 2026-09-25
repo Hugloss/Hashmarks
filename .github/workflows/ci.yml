@@ -213,7 +213,7 @@ jobs:
         run: .mcp-venv/bin/python -I scripts/mcp_installed_artifact_smoke.py --hashmarks "$PWD/.mcp-venv/bin/hashmarks"
 
   standalone-artifact:
-    name: Standalone CLI/MCP artifact
+    name: Standalone Linux/WSL CLI/MCP artifact
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
@@ -242,7 +242,7 @@ jobs:
           ./dist/hashmarks version
           .venv/bin/python -I scripts/mcp_installed_artifact_smoke.py \
             --hashmarks "$PWD/dist/hashmarks"
-      - name: Install exact standalone through public installer
+      - name: Install exact standalone through Linux/WSL installer
         run: |
           version="$(uv run --frozen --no-sync python -c 'import hashmarks; print(hashmarks.__version__)')"
           bundle="$PWD/.standalone-install-source"
@@ -258,14 +258,87 @@ jobs:
           HASHMARKS_VERSION="$version" \
             sh install.sh
           test "$("$target/hashmarks" --version)" = "hashmarks version $version"
-      - name: Record standalone artifact identity
-        run: sha256sum dist/hashmarks > dist/hashmarks-linux-x86_64.sha256
+      - name: Bind native Linux/WSL standalone qualification
+        run: |
+          mkdir -p dist/qualified-linux
+          cp dist/hashmarks dist/qualified-linux/hashmarks-linux-x86_64
+          chmod 0755 dist/qualified-linux/hashmarks-linux-x86_64
+          (
+            cd dist/qualified-linux
+            sha256sum hashmarks-linux-x86_64 > hashmarks-linux-x86_64.sha256
+          )
+          uv run --frozen --no-sync python scripts/release_contract.py standalone-qualification \
+            --artifact dist/qualified-linux/hashmarks-linux-x86_64 \
+            --checksum dist/qualified-linux/hashmarks-linux-x86_64.sha256 \
+            --platform linux \
+            --architecture x86_64 \
+            --output dist/qualified-linux/standalone-qualification.json
+          uv run --frozen --no-sync python scripts/release_contract.py verify-standalone-qualification \
+            --bundle dist/qualified-linux
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hashmarks-standalone-${{ github.sha }}
-          path: |
-            dist/hashmarks
-            dist/hashmarks-linux-x86_64.sha256
+          name: hashmarks-standalone-linux-${{ github.sha }}
+          path: dist/qualified-linux/
+          if-no-files-found: error
+
+  standalone-windows-artifact:
+    name: Standalone Windows CLI/MCP artifact
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.14
+      - name: Materialize locked Hashmarks + MCP runtime
+        run: uv sync --frozen --extra mcp --python 3.14
+      - name: Add pinned standalone packager
+        shell: pwsh
+        run: uv pip install --python .venv\Scripts\python.exe "pyinstaller==6.22.3"
+      - name: Build and smoke native Windows executable
+        shell: pwsh
+        run: |
+          & .venv\Scripts\pyinstaller.exe `
+            --clean `
+            --noconfirm `
+            --onefile `
+            --name hashmarks `
+            --collect-all hashmarks `
+            scripts/hashmarks_entrypoint.py
+          $version = (& .venv\Scripts\python.exe -c "import hashmarks; print(hashmarks.__version__)").Trim()
+          $reported = (& .\dist\hashmarks.exe --version).Trim()
+          if ($reported -ne "hashmarks version $version") {
+            throw "Windows standalone version mismatch: $reported"
+          }
+          & .venv\Scripts\python.exe -I scripts/mcp_installed_artifact_smoke.py `
+            --hashmarks "$PWD\dist\hashmarks.exe"
+          & scripts\windows_installer_smoke.ps1 `
+            -Hashmarks "$PWD\dist\hashmarks.exe" `
+            -Version $version
+      - name: Bind native Windows standalone qualification
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\qualified-windows | Out-Null
+          Copy-Item dist\hashmarks.exe dist\qualified-windows\hashmarks-windows-x86_64.exe
+          $asset = "dist\qualified-windows\hashmarks-windows-x86_64.exe"
+          $checksum = "$asset.sha256"
+          $digest = (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -LiteralPath $checksum -Value "$digest  hashmarks-windows-x86_64.exe" -Encoding ascii
+          & .venv\Scripts\python.exe scripts\release_contract.py standalone-qualification `
+            --artifact $asset `
+            --checksum $checksum `
+            --platform windows `
+            --architecture x86_64 `
+            --output dist\qualified-windows\standalone-qualification.json
+          & .venv\Scripts\python.exe scripts\release_contract.py verify-standalone-qualification `
+            --bundle dist\qualified-windows
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hashmarks-standalone-windows-${{ github.sha }}
+          path: dist/qualified-windows/
           if-no-files-found: error
 
   precommit:
@@ -298,6 +371,7 @@ jobs:
       - python-support
       - mcp-interop
       - standalone-artifact
+      - standalone-windows-artifact
       - precommit
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -314,11 +388,12 @@ jobs:
           PYTHON_SUPPORT: ${{ needs.python-support.result }}
           MCP_INTEROP: ${{ needs.mcp-interop.result }}
           STANDALONE_ARTIFACT: ${{ needs.standalone-artifact.result }}
+          WINDOWS_STANDALONE: ${{ needs.standalone-windows-artifact.result }}
           PRECOMMIT: ${{ needs.precommit.result }}
         run: |
           failed=0
           printf '%-24s %s (diagnostic only)\n' "FORMATTING" "$FORMATTING"
-          for lane in             RUFF_DEBT             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             STANDALONE_ARTIFACT             PRECOMMIT
+          for lane in             RUFF_DEBT             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             STANDALONE_ARTIFACT             WINDOWS_STANDALONE             PRECOMMIT
           do
             result="${!lane}"
             printf '%-24s %s\n' "$lane" "$result"
