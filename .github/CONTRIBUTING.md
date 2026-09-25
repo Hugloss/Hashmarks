@@ -119,6 +119,22 @@ A focused pull request should explain:
 
 Avoid unrelated refactors in the same change unless they are required to make ownership clearer.
 
+## Releases
+
+Hashmarks keeps one long-lived source authority: `main`. Do not introduce a permanent `production` or release mirror branch merely to promote the same bytes.
+
+A public release is an explicit reviewed promotion from `main`:
+
+1. finalize the intended package version and changelog on `main`;
+2. open a focused release pull request that changes `.github/release-request.toml` to that version;
+3. review and merge that pull request;
+4. the merge commit is the release source identity;
+5. the Publish workflow validates the request against that exact merge commit, runs release qualification, creates a draft GitHub Release for `v<version>`, uploads and re-verifies the qualified artifacts, then publishes the release.
+
+The release request is an auditable trigger record, not a second version authority. After a release, it may continue to name the last released version while normal development advances `pyproject.toml`; publication happens only when a later reviewed pull request changes the request record again. A manual workflow rerun must still satisfy the exact request/package/changelog checks and must not replace an already published tag.
+
+The workflow must fail closed if the request version does not match the package version at the release merge SHA, if the changelog is not finalized, or if the release/tag already represents different authority.
+
 ## Development-tool policy
 
 `pyproject.toml` owns development-tool dependency intent, allowed ranges, groups, and configuration. The committed `uv.lock` owns the exact resolved repository development/qualification dependency set. Normal setup and qualification consume that lock with frozen uv operations; they do not resolve a parallel dependency graph or rewrite the lock. Use `make lock-check` to detect `pyproject.toml` ↔ `uv.lock` drift and `make lock` only for an intentional dependency update that will be reviewed and committed with its lock diff.

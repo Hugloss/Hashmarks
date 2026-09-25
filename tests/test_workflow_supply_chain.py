@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from pathlib import Path
 
 _SHA_PIN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@[0-9a-f]{40}(?:\s+#.*)?$")
@@ -29,11 +30,27 @@ def test_external_github_actions_are_immutable_sha_pinned() -> None:
     assert not offenders, "mutable/unpinned workflow actions:\n" + "\n".join(offenders)
 
 
-def test_publish_workflow_publishes_only_qualified_github_release_assets() -> None:
+def test_publish_workflow_is_reviewed_request_driven_and_github_native() -> None:
     text = (_root() / ".github" / "workflows" / "publish.yml").read_text(
         encoding="utf-8"
     )
+    assert "branches: [main]" in text
+    assert '".github/release-request.toml"' in text
+    assert "workflow_dispatch:" in text
+    assert "release:\n    types: [published]" not in text
+    assert "Validate reviewed release request" in text
+    assert "release publication is authorized only from main" in text
+    assert "ref: ${{ github.sha }}" in text
     assert "Publish exact qualified bytes to GitHub Release" in text
+    assert "gh release create" in text
+    assert '--target "${{ github.sha }}"' in text
+    assert "--notes-file release/release-notes.md" in text
+    assert "--generate-notes" not in text
+    assert 'git rev-list -n 1 "$RELEASE_TAG"' in text
+    assert 'if [ "$tag_commit" != "${{ github.sha }}" ]' in text
+    assert "Materialize reviewed changelog section as release notes" in text
+    assert "--draft" in text
+    assert 'gh release edit "$RELEASE_TAG" --draft=false' in text
     assert "gh release upload" in text
     assert "qualified-python-release-bundle" in text
     assert "qualified-standalone-release-bundle" in text
@@ -43,6 +60,17 @@ def test_publish_workflow_publishes_only_qualified_github_release_assets() -> No
     assert "id-token: write" not in text
     assert "PYPI_TOKEN" not in text
     assert "pypa/gh-action-pypi-publish@" not in text
+
+
+def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
+    request = tomllib.loads(
+        (_root() / ".github" / "release-request.toml").read_text(encoding="utf-8")
+    )
+
+    assert set(request) == {"version"}
+    version = request["version"]
+    assert isinstance(version, str)
+    assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)
 
 
 def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
