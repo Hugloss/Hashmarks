@@ -3,12 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .client import prepare_default_state_dir
 from .directory_store import DirectoryDigestStore
 from .file_store import FileDigestStore
 from .inputs import InputManifest
 from .merkle import MerklePathScope, MerkleTree
 from .observation import ChangeTracker
-from .client import prepare_default_state_dir
 from .paths import canonical_host_path
 from .schema import IDENTITY_SCHEMA
 from .snapshot import Snapshot
