@@ -229,11 +229,30 @@ jobs:
             --collect-all hashmarks \
             scripts/hashmarks_entrypoint.py
       - name: Smoke standalone CLI and MCP
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          ./dist/hashmarks --version
+          test "$(./dist/hashmarks --version)" = "hashmarks version $RELEASE_VERSION"
           ./dist/hashmarks version
           .venv/bin/python -I scripts/mcp_installed_artifact_smoke.py \
             --hashmarks "$PWD/dist/hashmarks"
+      - name: Install exact standalone through public installer
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          bundle="$PWD/.standalone-install-source"
+          target="$PWD/.standalone-install-target"
+          mkdir -p "$bundle" "$target"
+          cp dist/hashmarks "$bundle/hashmarks-linux-x86_64"
+          (
+            cd "$bundle"
+            sha256sum hashmarks-linux-x86_64 > hashmarks-linux-x86_64.sha256
+          )
+          HASHMARKS_DOWNLOAD_BASE_URL="file://$bundle" \
+          HASHMARKS_INSTALL_DIR="$target" \
+          HASHMARKS_VERSION="$RELEASE_VERSION" \
+            sh install.sh
+          test "$("$target/hashmarks" --version)" = "hashmarks version $RELEASE_VERSION"
       - name: Bind standalone release bytes
         run: |
           mkdir -p release/standalone
@@ -283,6 +302,8 @@ jobs:
           name: qualified-standalone-release-bundle
           path: release/standalone/
       - name: Verify downloaded release bytes
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           python3 workflow/scripts/release_contract.py verify \
             --root source \
@@ -295,7 +316,8 @@ jobs:
             cd release/standalone
             sha256sum -c hashmarks-linux-x86_64.sha256
           )
-          release/standalone/hashmarks-linux-x86_64 --version
+          test "$(release/standalone/hashmarks-linux-x86_64 --version)" = \
+            "hashmarks version $RELEASE_VERSION"
       - name: Materialize reviewed changelog section as release notes
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}

@@ -120,6 +120,44 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
         assert re.fullmatch(r"[0-9a-f]{40}", source_sha)
 
 
+def test_ci_standalone_installs_exact_frozen_artifact_through_public_installer() -> (
+    None
+):
+    text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    standalone = text.split("  standalone-artifact:\n", 1)[1].split(
+        "\n  precommit:\n",
+        1,
+    )[0]
+
+    assert "Install exact standalone through public installer" in standalone
+    assert 'HASHMARKS_DOWNLOAD_BASE_URL="file://$bundle"' in standalone
+    assert 'HASHMARKS_INSTALL_DIR="$target"' in standalone
+    assert 'HASHMARKS_VERSION="$version"' in standalone
+    assert (
+        'test "$("$target/hashmarks" --version)" = "hashmarks version $version"'
+        in standalone
+    )
+
+
+def test_publish_standalone_binds_installer_and_asset_to_release_version() -> None:
+    text = _publish_workflow_text()
+    standalone = text.split("  standalone:\n", 1)[1].split("\n  publish:\n", 1)[0]
+    publish = text.split("  publish:\n", 1)[1]
+
+    assert "Install exact standalone through public installer" in standalone
+    assert 'HASHMARKS_VERSION="$RELEASE_VERSION"' in standalone
+    assert (
+        'test "$(./dist/hashmarks --version)" = "hashmarks version $RELEASE_VERSION"'
+        in standalone
+    )
+    assert (
+        'test "$("$target/hashmarks" --version)" = '
+        '"hashmarks version $RELEASE_VERSION"' in standalone
+    )
+    assert 'test "$(release/standalone/hashmarks-linux-x86_64 --version)" =' in publish
+    assert '"hashmarks version $RELEASE_VERSION"' in publish
+
+
 def test_release_profile_installs_mcp_before_full_native_qualification() -> None:
     text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     release_job = text.split("  release-environment:\n", 1)[1].split(

@@ -11,7 +11,7 @@ def _root() -> Path:
 
 
 def _asset(directory: Path) -> tuple[Path, bytes]:
-    payload = b"#!/bin/sh\nprintf '%s\\n' '{\"version\": \"test\"}'\n"
+    payload = b"#!/bin/sh\nprintf '%s\\n' 'hashmarks version 9.9.9'\n"
     asset = directory / "hashmarks-linux-x86_64"
     asset.write_bytes(payload)
     asset.chmod(0o755)
@@ -38,9 +38,11 @@ def test_installer_downloads_verifies_and_installs_release_binary(
     source.mkdir()
     _, payload = _asset(source)
 
+    env = _environment(tmp_path, source)
+    env["HASHMARKS_VERSION"] = "9.9.9"
     result = subprocess.run(
         ["sh", str(_root() / "install.sh")],
-        env=_environment(tmp_path, source),
+        env=env,
         check=True,
         capture_output=True,
         text=True,
@@ -51,6 +53,38 @@ def test_installer_downloads_verifies_and_installs_release_binary(
     assert os.access(installed, os.X_OK)
     assert "Hashmarks installed:" in result.stdout
     assert list((tmp_path / "bin").glob(".hashmarks-install.*")) == []
+
+
+def test_installer_preserves_working_binary_on_requested_version_mismatch(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "release"
+    source.mkdir()
+    _asset(source)
+
+    install_dir = tmp_path / "bin"
+    install_dir.mkdir()
+    installed = install_dir / "hashmarks"
+    previous = b"#!/bin/sh\nprintf '%s\\n' 'hashmarks version 1.0.0'\n"
+    installed.write_bytes(previous)
+    installed.chmod(0o755)
+
+    env = _environment(tmp_path, source)
+    env["HASHMARKS_VERSION"] = "1.2.3"
+    result = subprocess.run(
+        ["sh", str(_root() / "install.sh")],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "requested version 1.2.3 but downloaded binary reports 9.9.9" in result.stderr
+    )
+    assert installed.read_bytes() == previous
+    assert list(install_dir.glob(".hashmarks-install.*")) == []
 
 
 def test_installer_preserves_working_binary_when_candidate_smoke_fails(

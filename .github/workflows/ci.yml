@@ -237,10 +237,27 @@ jobs:
             --name hashmarks \
             --collect-all hashmarks \
             scripts/hashmarks_entrypoint.py
-          ./dist/hashmarks --version
+          version="$(uv run --frozen --no-sync python -c 'import hashmarks; print(hashmarks.__version__)')"
+          test "$(./dist/hashmarks --version)" = "hashmarks version $version"
           ./dist/hashmarks version
           .venv/bin/python -I scripts/mcp_installed_artifact_smoke.py \
             --hashmarks "$PWD/dist/hashmarks"
+      - name: Install exact standalone through public installer
+        run: |
+          version="$(uv run --frozen --no-sync python -c 'import hashmarks; print(hashmarks.__version__)')"
+          bundle="$PWD/.standalone-install-source"
+          target="$PWD/.standalone-install-target"
+          mkdir -p "$bundle" "$target"
+          cp dist/hashmarks "$bundle/hashmarks-linux-x86_64"
+          (
+            cd "$bundle"
+            sha256sum hashmarks-linux-x86_64 > hashmarks-linux-x86_64.sha256
+          )
+          HASHMARKS_DOWNLOAD_BASE_URL="file://$bundle" \
+          HASHMARKS_INSTALL_DIR="$target" \
+          HASHMARKS_VERSION="$version" \
+            sh install.sh
+          test "$("$target/hashmarks" --version)" = "hashmarks version $version"
       - name: Record standalone artifact identity
         run: sha256sum dist/hashmarks > dist/hashmarks-linux-x86_64.sha256
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
