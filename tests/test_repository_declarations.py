@@ -1,0 +1,297 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from hashmarks import CodeMap
+
+
+def _group(
+    declarations: list[dict[str, object]],
+    *,
+    group_id: str = "runtime-python",
+    coverage_state: str = "complete",
+    truncation: str = "complete",
+    expected: list[str] | None = None,
+    correspondence_state: str = "declared",
+    scope: dict[str, object] | None = None,
+) -> dict[str, object]:
+    ids = [str(row["declaration_id"]) for row in declarations]
+    return {
+        "group_id": group_id,
+        "concept": {"kind": "runtime-compatibility", "identity": "python"},
+        "scope": {} if scope is None else scope,
+        "correspondence": {
+            "state": correspondence_state,
+            "basis": {"provider": "fixture", "rule": "explicit-semantic-mapping"},
+        },
+        "declarations": declarations,
+        "coverage": {
+            "state": coverage_state,
+            "truncation": truncation,
+            "expected_declaration_ids": ids if expected is None else expected,
+            "scope": {"repository": "fixture"},
+            "provenance": {"provider": "fixture"},
+        },
+    }
+
+
+def _declaration(
+    declaration_id: str,
+    path: str,
+    value: object,
+    *,
+    line: int = 1,
+) -> dict[str, object]:
+    return {
+        "declaration_id": declaration_id,
+        "value_state": "resolved",
+        "value": value,
+        "producer": {"kind": "fixture-config"},
+        "evidence": [
+            {
+                "path": path,
+                "start_line": line,
+                "end_line": line,
+            }
+        ],
+    }
+
+
+def test_cross_file_declarations_preserve_exact_evidence_and_equivalence(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "pyproject.toml").write_text(
+        'requires-python = ">=3.12"\n', encoding="utf-8"
+    )
+    (repo / "Dockerfile").write_text("FROM python:3.12\n", encoding="utf-8")
+    declarations = [
+        _declaration("python-intent", "pyproject.toml", ">=3.12"),
+        _declaration("python-container", "Dockerfile", ">=3.12"),
+    ]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations([_group(declarations)])
+
+    group = packet["groups"][0]
+    assert packet["schema"] == "hashmarks.repository-declarations.v1"
+    assert packet["winner"] == "not-selected"
+    assert packet["correspondence_authority"] == "provider-claimed"
+    assert group["comparison"] == {
+        "state": "equivalent",
+        "distinct_values": [">=3.12"],
+    }
+    assert group["absence"]["state"] == "none"
+    bindings = {
+        row["binding_id"]: row
+        for row in packet["repository_evidence"]["bindings"]
+    }
+    paths = {
+        bindings[row["binding_id"]]["evidence"][0]["path"]
+        for row in group["declarations"]
+    }
+    assert paths == {"pyproject.toml", "Dockerfile"}
+    assert all(
+        bindings[row["binding_id"]]["evidence"][0]["span_identity"].startswith(
+            "sha256:"
+        )
+        for row in group["declarations"]
+    )
+
+
+def test_differing_declarations_are_reported_without_precedence(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    (repo / "b.yaml").write_text("python: 3.13\n", encoding="utf-8")
+    declarations = [
+        _declaration("runtime-a", "a.yaml", "3.12"),
+        _declaration("runtime-b", "b.yaml", "3.13"),
+    ]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations([_group(declarations)])
+
+    comparison = packet["groups"][0]["comparison"]
+    assert comparison["state"] == "differing"
+    assert comparison["distinct_values"] == ["3.12", "3.13"]
+    assert packet["winner"] == "not-selected"
+    assert "preferred" not in comparison
+    assert "authoritative_value" not in comparison
+
+
+def test_absence_requires_complete_untruncated_semantic_coverage(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.yaml").write_text("owner: team-a\n", encoding="utf-8")
+    declarations = [_declaration("owner-a", "a.yaml", "team-a")]
+    expected = ["owner-a", "owner-b"]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        unknown = codemap.repository_declarations(
+            [
+                _group(
+                    declarations,
+                    coverage_state="incomplete",
+                    truncation="unknown",
+                    expected=expected,
+                )
+            ]
+        )
+        absent = codemap.repository_declarations(
+            [_group(declarations, expected=expected)]
+        )
+
+    assert unknown["groups"][0]["absence"] == {
+        "state": "unknown",
+        "missing_declaration_ids": [],
+        "unseen_expected_declaration_ids": ["owner-b"],
+        "reason": "coverage-does-not-authorize-negative-evidence",
+    }
+    assert absent["groups"][0]["absence"] == {
+        "state": "present",
+        "missing_declaration_ids": ["owner-b"],
+        "unseen_expected_declaration_ids": [],
+    }
+
+
+def test_ambiguous_correspondence_never_becomes_a_conflict_or_equivalence(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.json").write_text('{"name":"alpha"}\n', encoding="utf-8")
+    (repo / "b.json").write_text('{"name":"beta"}\n', encoding="utf-8")
+    declarations = [
+        _declaration("a", "a.json", "alpha"),
+        _declaration("b", "b.json", "beta"),
+    ]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations(
+            [_group(declarations, correspondence_state="ambiguous")]
+        )
+
+    assert packet["groups"][0]["comparison"] == {
+        "state": "ambiguous",
+        "reason": "correspondence-not-uniquely-declared",
+        "distinct_values": [],
+    }
+
+
+def test_scope_is_part_of_definition_identity_and_prevents_cross_context_merging(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    declaration = [_declaration("runtime", "runtime.yaml", "3.12")]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        linux = codemap.repository_declarations(
+            [_group(declaration, scope={"platform": "linux"})]
+        )
+        windows = codemap.repository_declarations(
+            [_group(declaration, scope={"platform": "windows"})]
+        )
+
+    assert (
+        linux["groups"][0]["group_definition_identity"]
+        != windows["groups"][0]["group_definition_identity"]
+    )
+    assert linux["groups"][0]["comparison"]["state"] == "insufficient"
+    assert windows["groups"][0]["comparison"]["state"] == "insufficient"
+
+
+def test_declaration_delta_separates_value_change_from_group_definition(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.toml").write_text('version = "1"\n', encoding="utf-8")
+    (repo / "b.toml").write_text('version = "1"\n', encoding="utf-8")
+    before_declarations = [
+        _declaration("a", "a.toml", "1"),
+        _declaration("b", "b.toml", "1"),
+    ]
+    after_declarations = [
+        _declaration("a", "a.toml", "1"),
+        _declaration("b", "b.toml", "2"),
+    ]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([_group(before_declarations)])
+        after = codemap.repository_declarations(
+            [_group(after_declarations)],
+            previous_observation=before,
+        )
+
+    delta = after["delta_from_previous"]
+    assert delta["schema"] == "hashmarks.repository-declarations-delta.v1"
+    assert len(delta["changed_groups"]) == 1
+    changed = delta["changed_groups"][0]
+    assert changed["definition_changed"] is False
+    assert changed["value_changed_declaration_ids"] == ["b"]
+    assert changed["comparison_changed"] is True
+
+
+def test_previous_declaration_packet_is_revalidated_before_delta(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.toml").write_text('version = "1"\n', encoding="utf-8")
+    declarations = [_declaration("a", "a.toml", "1")]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([_group(declarations)])
+        before["groups"][0]["concept"]["identity"] = "tampered"
+        with pytest.raises(
+            ValueError, match="previous declaration observation identity mismatch"
+        ):
+            codemap.repository_declarations(
+                [_group(declarations)],
+                previous_observation=before,
+            )
+
+
+def test_fail_closed_unknown_fields_and_invalid_complete_coverage(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.toml").write_text('version = "1"\n', encoding="utf-8")
+    declaration = _declaration("a", "a.toml", "1")
+    bad = _group([declaration])
+    bad["invented_policy"] = "prefer-first"
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="unknown fields"):
+            codemap.repository_declarations([bad])
+        with pytest.raises(
+            ValueError, match="complete declaration coverage requires"
+        ):
+            codemap.repository_declarations(
+                [
+                    _group(
+                        [declaration],
+                        coverage_state="complete",
+                        truncation="unknown",
+                    )
+                ]
+            )
