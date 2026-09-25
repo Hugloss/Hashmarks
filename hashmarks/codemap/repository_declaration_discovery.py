@@ -200,10 +200,12 @@ class RepositoryDeclarationDiscoveryMixin:
     def _declaration_provider_paths(self, prefix: str) -> tuple[str, ...]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        return self.store.visible_paths_under_bounded(
+        admitted = self._walk_admitted_repository_files(
             prefix,
             limit=MAX_PROVIDER_ENUMERATED_PATHS + 1,
+            visible_only=True,
         )
+        return tuple(item.rel for item in admitted)
 
     def _declaration_discovery_identity(
         self,
