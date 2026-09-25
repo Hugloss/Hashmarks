@@ -181,6 +181,43 @@ source = {{ virtual = "." }}
         uv_lock_dependency_observation(lock=lock)
 
 
+@pytest.mark.parametrize(
+    ("dependency", "message"),
+    [
+        ('{ name = 123 }', "uv lock dependency name must be a string"),
+        (
+            '{ name = "dep", version = 1 }',
+            "uv lock dependency version must be a string",
+        ),
+        (
+            '{ name = "dep", marker = 123 }',
+            "uv lock dependency marker must be a string",
+        ),
+    ],
+)
+def test_uv_lock_adapter_refuses_malformed_dependency_identity(
+    dependency: str,
+    message: str,
+) -> None:
+    lock = f"""version = 1
+revision = 3
+
+[[package]]
+name = "app"
+version = "1"
+source = {{ virtual = "." }}
+dependencies = [{dependency}]
+
+[[package]]
+name = "dep"
+version = "1"
+source = {{ registry = "https://example.invalid/simple" }}
+""".encode()
+
+    with pytest.raises(ValueError, match=message):
+        uv_lock_dependency_observation(lock=lock)
+
+
 def test_uv_lock_adapter_refuses_ambiguous_name_only_dependency() -> None:
     lock = b"""version = 1
 revision = 3
