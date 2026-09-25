@@ -8,6 +8,7 @@ from .repository_declaration_contract import encoded_json_bytes
 from .repository_declaration_provider import (
     MAX_DECLARATION_PROVIDERS,
     MAX_DISCOVERY_PACKET_BYTES,
+    MAX_PROVIDER_INPUTS,
     RepositoryDeclarationProvider,
     collect_repository_declaration_providers,
     validate_repository_declaration_provider_inputs,
@@ -261,6 +262,7 @@ class RepositoryDeclarationDiscoveryMixin:
             "declarations": declarations,
             "bounds": {
                 "max_providers": MAX_DECLARATION_PROVIDERS,
+                "max_inputs_per_provider": MAX_PROVIDER_INPUTS,
                 "max_packet_bytes": MAX_DISCOVERY_PACKET_BYTES,
             },
             "storage": "derived-not-persisted",
