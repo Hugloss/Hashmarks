@@ -254,6 +254,17 @@ class RepositoryDeclarationDiscoveryMixin:
         if repository_identity != self._repository_packet_identity():
             raise ValueError("previous declaration discovery repository-mismatch")
         _provider_rows(previous.get("providers"))
+        declarations = _previous_declarations(previous)
+        declaration_repository = declarations.get("repository")
+        declaration_repository_identity = (
+            str(declaration_repository.get("repository_identity") or "")
+            if isinstance(declaration_repository, Mapping)
+            else ""
+        )
+        if declaration_repository_identity != repository_identity:
+            raise ValueError(
+                "previous declaration discovery nested repository-mismatch"
+            )
 
     def _previous_declaration_packet(
         self,
