@@ -33,6 +33,9 @@ __all__ = [
     "Digest",
     "RepositoryIdentity",
     "RepositoryIdentityMode",
+    "RepositoryDeclarationProvider",
+    "RepositoryDeclarationProviderError",
+    "RepositoryDeclarationProviderResult",
     "IdentityCycleError",
     "IdentityGraph",
     "InputManifest",
@@ -56,9 +59,25 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    """Lazily expose CodeMap without loading its larger analysis graph on identity imports."""
+    """Lazily expose CodeMap APIs without loading the analysis graph eagerly."""
     if name == "CodeMap":
         from .codemap import CodeMap
 
         return CodeMap
+    if name in {
+        "RepositoryDeclarationProvider",
+        "RepositoryDeclarationProviderError",
+        "RepositoryDeclarationProviderResult",
+    }:
+        from .codemap import (
+            RepositoryDeclarationProvider,
+            RepositoryDeclarationProviderError,
+            RepositoryDeclarationProviderResult,
+        )
+
+        return {
+            "RepositoryDeclarationProvider": RepositoryDeclarationProvider,
+            "RepositoryDeclarationProviderError": RepositoryDeclarationProviderError,
+            "RepositoryDeclarationProviderResult": RepositoryDeclarationProviderResult,
+        }[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
