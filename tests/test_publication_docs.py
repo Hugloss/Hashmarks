@@ -140,8 +140,13 @@ def test_public_readme_tracks_release_version_and_markdown_boundaries() -> None:
     assert "REPOSITORY_EVIDENCE_BINDINGS.md)\\n" not in readme
     assert "REPOSITORY_DECLARATIONS.md)\\n" not in readme
     assert "Hashmarks.\n- **Evidence correlation.**" in readme
-    assert "[Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md)" in readme
-    assert "[Repository declarations](docs/reference/REPOSITORY_DECLARATIONS.md)" in readme
+    assert (
+        "[Repository evidence bindings](docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md)"
+        in readme
+    )
+    assert (
+        "[Repository declarations](docs/reference/REPOSITORY_DECLARATIONS.md)" in readme
+    )
     assert "[Evidence correlation](docs/reference/EVIDENCE_CORRELATION.md)" in readme
 
 
