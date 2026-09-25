@@ -177,9 +177,10 @@ Before adding a Gradle, npm, Cargo, SBOM, or other adapter:
 5. treat completeness as an authority claim, not a parser side effect: if the producer can emit filtered/subset artifacts whose filters are not encoded in the bytes, require explicit completeness evidence instead of inferring exhaustiveness from syntax;
 6. translate into the existing general facts;
 7. add producer-neutral contract tests first when a genuinely new semantic fact is required;
-8. add adapter-specific parsing tests second;
-9. add cross-producer behavior tests where another adapter can express the same fact;
-10. verify that no core dependency module imports the new adapter or branches on its producer/source kind.
+8. emit a `relationships` row only for a traversable dependency edge; `kind` may subtype that edge but must not smuggle non-topological producer facts such as constraints, conflicts, recommendations, or diagnostics into graph traversal;
+9. add adapter-specific parsing tests second;
+10. add cross-producer behavior tests where another adapter can express the same fact;
+11. verify that no core dependency module imports the new adapter or branches on its producer/source kind.
 
 A new adapter is not complete merely because it parses its native format. It is complete when producer-native detail terminates at the adapter boundary and the resulting observation behaves like any other producer of the same semantic facts.
 
