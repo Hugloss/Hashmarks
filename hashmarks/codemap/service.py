@@ -28,9 +28,18 @@ def default_codemap_socket(workspace: str | Path) -> Path:
     return default_runtime_dir(workspace) / "codemap.sock"
 
 
-class _Server(socketserver.UnixStreamServer):
-    allow_reuse_address = False
-    request_queue_size = 128
+_UNIX_STREAM_SERVER = getattr(socketserver, "UnixStreamServer", None)
+
+if _UNIX_STREAM_SERVER is not None:
+
+    class _Server(_UNIX_STREAM_SERVER):
+        allow_reuse_address = False
+        request_queue_size = 128
+
+else:
+
+    class _Server:
+        """Import-safe placeholder when the platform has no Unix socket server."""
 
 
 class _Handler(socketserver.StreamRequestHandler):
@@ -505,6 +514,10 @@ class CodeMapService:
     def serve_forever(self) -> None:
         import time
 
+        if _UNIX_STREAM_SERVER is None:
+            raise RuntimeError(
+                "Hashmarks CodeMap service requires Unix-domain socket server support"
+            )
         self._prepare_socket()
         with CodeMap(self.workspace) as codemap:
             self._codemap = codemap
