@@ -136,7 +136,8 @@ def test_completeness_is_not_mixed_with_availability_or_freshness() -> None:
     assert "exactly `complete`, `incomplete`, or `unknown`" in state_doc
 
 
-def test_declaration_projection_reuses_existing_repository_evidence_authorities() -> None:
+def test_declaration_projection_reuses_existing_repository_evidence_authorities(
+) -> None:
     path = CODEMAP / "repository_declarations.py"
     source = path.read_text(encoding="utf-8")
     violations: list[str] = []
