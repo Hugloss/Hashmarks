@@ -1060,3 +1060,34 @@ def test_provider_revalidation_rejects_duplicate_enumeration_prefixes(
                 packet["providers"],
             )
 
+def test_previous_discovery_rejects_authenticated_nested_repository_divergence(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value: same\n", encoding="utf-8")
+    provider = _SingleProvider("fixture-provider", "value.txt")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        previous = codemap.discover_repository_declarations([provider])
+        previous["declarations"]["repository"]["repository_identity"] = "sha256:foreign"
+        previous["declarations"]["observation_identity"] = "sha256:" + codemap._packet_digest(
+            "hashmarks.repository-declarations.v1",
+            {
+                key: value
+                for key, value in previous["declarations"].items()
+                if key not in {"observation_identity", "delta_from_previous"}
+            },
+        )
+        previous["observation_identity"] = codemap._declaration_discovery_identity(previous)
+
+        with pytest.raises(
+            ValueError,
+            match="nested repository-mismatch",
+        ):
+            codemap.discover_repository_declarations(
+                [provider],
+                previous_observation=previous,
+            )
+
