@@ -279,35 +279,46 @@ def absence(
     }
 
 
-def _group_bindings(raw_group: Mapping[str, object]) -> list[dict[str, object]]:
+def _normalize_group(
+    raw_group: Mapping[str, object],
+) -> tuple[dict[str, object], list[dict[str, object]]]:
     reject_unknown(raw_group, allowed=GROUP_KEYS, name="declaration group")
     group_id = required_text(raw_group.get("group_id"), name="group_id")
     concept = json_value(raw_group.get("concept"), name="concept")
     scope = json_value(raw_group.get("scope", {}), name="scope")
     if not isinstance(concept, dict) or not isinstance(scope, dict):
         raise ValueError("concept and scope must be objects")
-    normalize_correspondence(raw_group.get("correspondence", {}))
-    normalize_coverage(raw_group.get("coverage", {}))
 
     raw_declarations = raw_group.get("declarations")
     if not isinstance(raw_declarations, Sequence) or isinstance(
         raw_declarations, (str, bytes)
     ):
         raise ValueError("declarations must be a list")
-
-    normalized = [
+    pairs = [
         normalize_declaration(raw_declaration, group_id=group_id)
         for raw_declaration in raw_declarations
     ]
-    declaration_ids = [str(row[0]["declaration_id"]) for row in normalized]
+    declarations = [declaration for declaration, _binding in pairs]
+    declaration_ids = [str(row["declaration_id"]) for row in declarations]
     if len(set(declaration_ids)) != len(declaration_ids):
         raise ValueError(f"duplicate declaration_id in group {group_id}")
-    return [binding for _declaration, binding in normalized]
+
+    group = {
+        "group_id": group_id,
+        "concept": concept,
+        "scope": scope,
+        "correspondence": normalize_correspondence(
+            raw_group.get("correspondence", {})
+        ),
+        "coverage": normalize_coverage(raw_group.get("coverage", {})),
+        "declarations": declarations,
+    }
+    return group, [binding for _declaration, binding in pairs]
 
 
 def normalize_request(
     groups: Sequence[Mapping[str, object]],
-) -> tuple[list[Mapping[str, object]], list[dict[str, object]]]:
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     if not isinstance(groups, Sequence) or isinstance(groups, (str, bytes)):
         raise ValueError("groups must be a sequence")
     if len(groups) > MAX_GROUPS:
@@ -315,20 +326,20 @@ def normalize_request(
     if any(not isinstance(raw_group, Mapping) for raw_group in groups):
         raise ValueError("each declaration group must be an object")
 
-    normalized_groups = [
-        raw_group for raw_group in groups if isinstance(raw_group, Mapping)
+    pairs = [
+        _normalize_group(raw_group)
+        for raw_group in groups
+        if isinstance(raw_group, Mapping)
     ]
-    group_ids = [
-        required_text(raw_group.get("group_id"), name="group_id")
-        for raw_group in normalized_groups
-    ]
+    normalized_groups = [group for group, _bindings in pairs]
+    group_ids = [str(group["group_id"]) for group in normalized_groups]
     if len(set(group_ids)) != len(group_ids):
         raise ValueError("duplicate group_id")
 
     bindings = [
         binding
-        for raw_group in normalized_groups
-        for binding in _group_bindings(raw_group)
+        for _group, group_bindings in pairs
+        for binding in group_bindings
     ]
     if len(bindings) > MAX_DECLARATIONS:
         raise ValueError(
