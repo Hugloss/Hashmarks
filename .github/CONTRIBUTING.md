@@ -137,14 +137,17 @@ The workflow must fail closed if the request version does not match the package 
 
 If publication fails because the workflow implementation itself is defective, repair the workflow through a normal reviewed pull request. Do not promote the repair commit as the release source and do not merely rerun the broken historical workflow definition.
 
-Retry through another focused release pull request by adding the original reviewed release-source commit to `.github/release-request.toml`:
+Retry through another focused release pull request by recording the original reviewed release-source commit and incrementing the publication attempt in `.github/release-request.toml`:
 
 ```toml
 version = "<release-version>"
 source_sha = "<reviewed-release-merge-sha>"
+publication_attempt = 2
 ```
 
-Merging that retry pull request triggers Publish from the repaired workflow on current `main`, but the workflow first reads the reviewed request and then separately checks out, qualifies, tags, and publishes `source_sha`. It must verify that the SHA is exact and reachable from current `main`. The retry pull request is publication intent only; it does not become the release source.
+`publication_attempt` is an auditable retry trigger only; it does not participate in release identity.
+
+Merging that retry pull request triggers Publish from the repaired workflow on current `main`. Source qualification jobs separately check out and qualify `source_sha`, materialize the reviewed release notes from that exact source, and upload qualified bundles. The final publication job uses the reviewed publication machinery from the retry merge commit to verify and publish those downloaded bundles without treating the newer source tree as release content. The source SHA must be exact and reachable from current `main`. The retry pull request is publication intent and publication machinery only; it does not become the release source.
 
 For exceptional operator recovery, the GitHub Actions **Run workflow** UI may supply the same exact `source_sha` manually. The reviewed pull-request path is preferred because the retry intent remains in repository history.
 
