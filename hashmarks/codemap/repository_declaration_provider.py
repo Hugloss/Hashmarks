@@ -61,7 +61,6 @@ class _RepositoryDeclarationProviderContext:
         self.workspace = workspace
         self._read_member = read_member
         self._inputs: dict[str, dict[str, object]] = {}
-        self._content_paths: set[str] = set()
 
     @staticmethod
     def _signature(observation: Mapping[str, object]) -> dict[str, object]:
@@ -86,17 +85,25 @@ class _RepositoryDeclarationProviderContext:
     ) -> None:
         signature = self._signature(observation)
         previous = self._inputs.get(path)
-        if previous is not None and previous != signature:
-            raise RepositoryDeclarationProviderError(
-                f"declaration provider input changed while reading: {path}"
-            )
+        if previous is not None:
+            previous_signature = {
+                key: value
+                for key, value in previous.items()
+                if key != "observation_kind"
+            }
+            if previous_signature != signature:
+                raise RepositoryDeclarationProviderError(
+                    f"declaration provider input changed while reading: {path}"
+                )
+            content = content or previous.get("observation_kind") == "content"
         if path not in self._inputs and len(self._inputs) >= MAX_PROVIDER_INPUTS:
             raise RepositoryDeclarationProviderError(
                 f"declaration provider inputs exceed {MAX_PROVIDER_INPUTS} paths"
             )
-        self._inputs[path] = signature
-        if content:
-            self._content_paths.add(path)
+        self._inputs[path] = {
+            **signature,
+            "observation_kind": "content" if content else "existence",
+        }
 
     def exists(self, path: str) -> bool:
         observation, _raw = self._read_member(path, False)
@@ -135,7 +142,11 @@ class _RepositoryDeclarationProviderContext:
         return [self._inputs[path] for path in sorted(self._inputs)]
 
     def content_paths(self) -> frozenset[str]:
-        return frozenset(self._content_paths)
+        return frozenset(
+            path
+            for path, observation in self._inputs.items()
+            if observation.get("observation_kind") == "content"
+        )
 
 
 class RepositoryDeclarationProvider(Protocol):
@@ -258,9 +269,7 @@ def _declaration_evidence_paths(declaration: object) -> set[str]:
     if not isinstance(evidence, list):
         return set()
     return {
-        path
-        for item in evidence
-        if (path := _provider_evidence_path(item)) is not None
+        path for item in evidence if (path := _provider_evidence_path(item)) is not None
     }
 
 
@@ -413,10 +422,17 @@ def validate_repository_declaration_provider_inputs(
                 raise RepositoryDeclarationProviderError(
                     f"declaration provider {name} input path is malformed"
                 )
-            current, _raw = read_member(path, False)
-            if _RepositoryDeclarationProviderContext._signature(current) != dict(
-                previous
-            ):
+            observation_kind = previous.get("observation_kind")
+            if observation_kind not in {"content", "existence"}:
+                raise RepositoryDeclarationProviderError(
+                    f"declaration provider {name} input kind is malformed"
+                )
+            current, _raw = read_member(path, observation_kind == "content")
+            current_signature = _RepositoryDeclarationProviderContext._signature(
+                current
+            )
+            current_signature["observation_kind"] = observation_kind
+            if current_signature != dict(previous):
                 raise RepositoryDeclarationProviderError(
                     f"declaration provider {name} input changed during discovery: {path}"
                 )
