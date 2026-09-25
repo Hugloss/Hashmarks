@@ -20,8 +20,8 @@ from .model import EvidenceVisibility, SyncResult
 from .parsers import artifact_key_for, parse_source
 from .policy import ContextPolicy
 from .repository_file_discovery import (
-    _AdmittedRepositoryFile,
     _PRUNE_DIRS,
+    _AdmittedRepositoryFile,
     _is_pruned_relative_path,
 )
 from .repository_index_store import (
@@ -82,6 +82,7 @@ _NOISY_TEXT_NAMES = {
     ".hashmarks-context.toml",
     ".hashmarks-project-links.toml",
 }
+_ANALYSIS_SCOPE_CONFORMANCE_SCHEMA = "hashmarks.analysis-scope-conformance.v1"
 _MAX_INDEX_BYTES = 2 * 1024 * 1024
 
 
