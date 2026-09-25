@@ -95,7 +95,7 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 - `repository_declarations.py` — projection owner that binds declaration/provider claims to existing exact repository-evidence bindings, issues definition/observation identities, and preserves provider authority separately from repository authority.
 - `repository_declaration_delta.py` — factual before/after declaration packet comparison only; it does not decide whether a changed value or correspondence is correct.
 - `repository_declaration_provider.py` — explicit provider SPI plus bounded revision-bound reads and tracked admitted path enumeration; no raw workspace handle, ambient plugin loading, or repository evidence ownership.
-- `repository_declaration_discovery.py` — deterministic caller-selected provider composition, admitted indexed-path enumeration, and provider-run delta around the canonical declaration packet; no second declaration or repository-evidence authority.
+- `repository_declaration_discovery.py` — deterministic caller-selected provider composition and bounded admitted repository-file enumeration through the shared indexing-lifecycle discovery owner, plus provider-run delta around the canonical declaration packet; no parser-format requirement and no second declaration or repository-evidence authority.
 - `repository_intelligence_query.py` — thin query facade over those producers; it is not a second source of truth.
 
 ### Task evidence packets
