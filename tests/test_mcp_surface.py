@@ -668,7 +668,7 @@ def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
     assert packet["winner"] == "not-selected"
     assert packet["interpretation_authority"] == "consumer-owned"
 
-def test_mcp_correlation_preserves_core_authority_and_completeness(tmp_path: Path) -> None:
+def test_mcp_correlation_preserves_core_authority_and_completeness(\n    tmp_path: Path,\n) -> None:
     repo = _repo(tmp_path)
     bundles = [
         {
@@ -750,4 +750,3 @@ def test_mcp_correlation_rejects_recomputed_outer_identity_over_tampered_nested_
             )
     finally:
         surface.close()
-
