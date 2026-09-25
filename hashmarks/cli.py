@@ -228,6 +228,11 @@ def _add_identity_cli(sub) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="hashmarks")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"hashmarks version {__version__}",
+    )
     _add_common_arguments(parser)
     sub = parser.add_subparsers(dest="command", required=True)
     _add_daemon_cli(sub)
