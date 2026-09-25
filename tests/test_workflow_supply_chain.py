@@ -43,6 +43,12 @@ def test_publish_workflow_is_reviewed_request_driven_and_github_native() -> None
     assert "ref: ${{ github.sha }}" in text
     assert "Publish exact qualified bytes to GitHub Release" in text
     assert "gh release create" in text
+    assert '--target "${{ github.sha }}"' in text
+    assert "--notes-file release/release-notes.md" in text
+    assert "--generate-notes" not in text
+    assert 'git rev-list -n 1 "$RELEASE_TAG"' in text
+    assert 'if [ "$tag_commit" != "${{ github.sha }}" ]' in text
+    assert "Materialize reviewed changelog section as release notes" in text
     assert "--draft" in text
     assert 'gh release edit "$RELEASE_TAG" --draft=false' in text
     assert "gh release upload" in text
