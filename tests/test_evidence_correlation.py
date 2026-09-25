@@ -1358,3 +1358,53 @@ def test_external_evidence_conflict_is_retained_without_mutating_owner(
     anchor = correlated["bundles"][0]["anchors"][0]
     assert anchor["resolution"]["state"] == "claim-conflict"
     assert before["ownership_authority"] == after["ownership_authority"]
+
+def test_correlation_delta_rejects_foreign_repository_packet(tmp_path: Path) -> None:
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.mkdir()
+    right.mkdir()
+    for repo in (left, right):
+        (repo / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    with CodeMap(left) as codemap:
+        codemap.sync()
+        before = codemap.correlate_evidence(
+            _bundle({"anchor_id": "member", "path": "owner.py"}),
+            include_relationships=False,
+        )
+    with CodeMap(right) as codemap:
+        codemap.sync()
+        after = codemap.correlate_evidence(
+            _bundle({"anchor_id": "member", "path": "owner.py"}),
+            include_relationships=False,
+        )
+        with pytest.raises(ValueError, match="before correlation repository-mismatch"):
+            codemap.evidence_correlation_delta(before, after)
+
+
+def test_previous_correlation_from_foreign_repository_fails_closed(
+    tmp_path: Path,
+) -> None:
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.mkdir()
+    right.mkdir()
+    for repo in (left, right):
+        (repo / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    with CodeMap(left) as codemap:
+        codemap.sync()
+        previous = codemap.correlate_evidence(
+            _bundle({"anchor_id": "member", "path": "owner.py"}),
+            include_relationships=False,
+        )
+    with CodeMap(right) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="before correlation repository-mismatch"):
+            codemap.correlate_evidence(
+                _bundle({"anchor_id": "member", "path": "owner.py"}),
+                include_relationships=False,
+                previous_correlation=previous,
+            )
+
