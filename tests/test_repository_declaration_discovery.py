@@ -1071,6 +1071,9 @@ def test_previous_discovery_rejects_authenticated_nested_repository_divergence(
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.sync()
         previous = codemap.discover_repository_declarations([provider])
+        previous["declarations"]["repository"] = dict(
+            previous["declarations"]["repository"]
+        )
         previous["declarations"]["repository"]["repository_identity"] = "sha256:foreign"
         previous["declarations"]["observation_identity"] = "sha256:" + codemap._packet_digest(
             "hashmarks.repository-declarations.v1",
