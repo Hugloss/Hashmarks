@@ -21,6 +21,11 @@ from .project_impact_codec import (
     compact_project_impact,
     expand_project_impact,
 )
+from .repository_declaration_provider import (
+    RepositoryDeclarationProvider,
+    RepositoryDeclarationProviderError,
+    RepositoryDeclarationProviderResult,
+)
 from .repository_intelligence_query import RepositoryIntelligenceQueryOptions
 from .service import CodeMapService, CodeMapServiceClient, default_codemap_socket
 from .structural_locality import structural_locality_delta
@@ -31,6 +36,9 @@ __all__ = [
     "ChangeImpactOptions",
     "PostChangeOptions",
     "RepositoryIntelligenceQueryOptions",
+    "RepositoryDeclarationProvider",
+    "RepositoryDeclarationProviderError",
+    "RepositoryDeclarationProviderResult",
     "CodeMapService",
     "CodeMapServiceClient",
     "default_codemap_socket",
