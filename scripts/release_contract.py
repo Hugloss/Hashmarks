@@ -284,20 +284,23 @@ def _validate_qualification_identity(value: dict[str, object]) -> None:
         raise ValueError("standalone qualification identity mismatch")
 
 
-def _load_standalone_bundle(root: Path, bundle: Path) -> dict[str, object]:
-    root = root.resolve()
-    bundle = bundle.resolve()
+def _read_standalone_qualification(bundle: Path) -> dict[str, object]:
     receipt_path = bundle / STANDALONE_QUALIFICATION_FILENAME
     if not receipt_path.is_file():
         raise ValueError(f"standalone qualification receipt is missing: {receipt_path}")
-
     value = json.loads(receipt_path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise ValueError("standalone qualification receipt must be an object")
     if value.get("schema") != STANDALONE_QUALIFICATION_SCHEMA:
         raise ValueError("standalone qualification schema mismatch")
     _validate_qualification_identity(value)
+    return value
 
+
+def _qualification_parts(
+    root: Path,
+    value: dict[str, object],
+) -> tuple[dict[str, object], dict[str, object], str, str, str]:
     standalone = value.get("standalone")
     checksum = value.get("installer_checksum")
     smoke = value.get("smoke")
@@ -306,18 +309,22 @@ def _load_standalone_bundle(root: Path, bundle: Path) -> dict[str, object]:
     if not isinstance(smoke, dict) or smoke.get("status") != "pass":
         raise ValueError("standalone qualification smoke evidence is missing")
 
-    platform = str(standalone.get("platform") or "")
-    architecture = str(standalone.get("architecture") or "")
-    version = str(_project(root)["version"])
-    if (
-        value.get("project") != _project(root)["name"]
-        or value.get("version") != version
-    ):
+    project = _project(root)
+    version = str(project["version"])
+    if value.get("project") != project["name"] or value.get("version") != version:
         raise ValueError("standalone qualification project/version mismatch")
     if smoke.get("reported_version") != version:
         raise ValueError("standalone qualification smoke version mismatch")
 
-    artifact_name = _standalone_filename(platform, architecture)
+    platform = str(standalone.get("platform") or "")
+    architecture = str(standalone.get("architecture") or "")
+    return standalone, checksum, platform, architecture, version
+
+
+def _validate_standalone_bundle_members(
+    bundle: Path,
+    artifact_name: str,
+) -> None:
     expected_entries = sorted(
         (
             artifact_name,
@@ -332,6 +339,16 @@ def _load_standalone_bundle(root: Path, bundle: Path) -> dict[str, object]:
             f"qualification receipt; expected {expected_entries!r}, got {entries!r}"
         )
 
+
+def _load_standalone_bundle(root: Path, bundle: Path) -> dict[str, object]:
+    root = root.resolve()
+    bundle = bundle.resolve()
+    value = _read_standalone_qualification(bundle)
+    standalone, checksum, platform, architecture, version = _qualification_parts(
+        root, value
+    )
+    artifact_name = _standalone_filename(platform, architecture)
+    _validate_standalone_bundle_members(bundle, artifact_name)
     observed_standalone = _standalone_row(
         bundle / artifact_name,
         version=version,
