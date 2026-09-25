@@ -9,8 +9,10 @@ from .codemap.evidence_correlation import (
     CORRELATION_PACKET_MAX_BYTES,
     CORRELATION_REQUEST_MAX_BYTES,
 )
-from .codemap.repository_declaration_contract import MAX_PACKET_BYTES
-from .codemap.repository_declaration_contract import MAX_REQUEST_BYTES
+from .codemap.repository_declaration_contract import (
+    MAX_PACKET_BYTES,
+    MAX_REQUEST_BYTES,
+)
 from .repository_retry import retry_transient_repository_race
 
 if TYPE_CHECKING:
