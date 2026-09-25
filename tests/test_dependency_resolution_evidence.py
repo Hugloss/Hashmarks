@@ -3101,6 +3101,7 @@ def test_v3_mixed_selection_sources_do_not_borrow_authority(tmp_path: Path) -> N
         ):
             codemap.dependency_resolution_evidence(snapshot)
 
+
 def test_v3_delta_rejects_cross_repository_observations(tmp_path: Path) -> None:
     left = tmp_path / "left"
     right = tmp_path / "right"
@@ -3116,4 +3117,3 @@ def test_v3_delta_rejects_cross_repository_observations(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="dependency observations repository-mismatch"):
         CodeMap.dependency_resolution_delta(before, after)
-
