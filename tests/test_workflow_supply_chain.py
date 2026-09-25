@@ -50,9 +50,9 @@ def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
             end = matches[index + 1].start() if index + 1 < len(matches) else len(jobs)
             block = jobs[match.end() : end]
             assert "    runs-on:" in block, f"{name}:{match.group(1)} has no runner"
-            assert (
-                "    timeout-minutes:" in block
-            ), f"{name}:{match.group(1)} has no bounded timeout"
+            assert "    timeout-minutes:" in block, (
+                f"{name}:{match.group(1)} has no bounded timeout"
+            )
 
 
 def test_ci_checkout_does_not_persist_git_credentials() -> None:
