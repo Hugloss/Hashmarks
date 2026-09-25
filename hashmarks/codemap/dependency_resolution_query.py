@@ -106,12 +106,12 @@ def _walk(
     visited = 0
     while queue:
         current, depth = queue.pop(0)
-        if conditional.get(current):
-            omissions.append({"reason": "conditional-edge", "node_id": current})
         if depth >= max_depth:
-            if adjacency.get(current):
+            if adjacency.get(current) or conditional.get(current):
                 omissions.append({"reason": "depth-limit", "node_id": current})
             continue
+        if conditional.get(current):
+            omissions.append({"reason": "conditional-edge", "node_id": current})
         for candidate in adjacency.get(current, ()):
             if visited >= max_visits:
                 omissions.append({"reason": "visit-limit"})
@@ -155,12 +155,12 @@ def _reachability(  # noqa: C901
         return True, visited, omissions
     while queue:
         current, depth = queue.pop(0)
-        if conditional.get(current):
-            omissions.append({"reason": "conditional-edge", "node_id": current})
         if depth >= max_depth:
-            if outgoing.get(current):
+            if outgoing.get(current) or conditional.get(current):
                 omissions.append({"reason": "depth-limit", "node_id": current})
             continue
+        if conditional.get(current):
+            omissions.append({"reason": "conditional-edge", "node_id": current})
         for candidate in outgoing.get(current, ()):
             if visited >= max_visits:
                 omissions.append({"reason": "visit-limit"})
@@ -197,12 +197,12 @@ def _paths(  # noqa: C901, PLR0912
                 break
             paths.append(path)
             continue
-        if conditional.get(current):
-            omissions.append({"reason": "conditional-edge", "node_id": current})
         if len(path) - 1 >= max_depth:
-            if outgoing.get(current):
+            if outgoing.get(current) or conditional.get(current):
                 omissions.append({"reason": "depth-limit", "node_id": current})
             continue
+        if conditional.get(current):
+            omissions.append({"reason": "conditional-edge", "node_id": current})
         for candidate in outgoing.get(current, ()):
             if visited >= max_visits:
                 omissions.append({"reason": "visit-limit"})
