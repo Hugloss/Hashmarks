@@ -9,7 +9,7 @@ import time
 import tomllib
 from bisect import bisect_left
 from dataclasses import dataclass, field
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.file_store import UnstableFileError
@@ -19,6 +19,11 @@ from .index_surfaces import index_surface_for_path
 from .model import EvidenceVisibility, SyncResult
 from .parsers import artifact_key_for, parse_source
 from .policy import ContextPolicy
+from .repository_file_discovery import (
+    _AdmittedRepositoryFile,
+    _PRUNE_DIRS,
+    _is_pruned_relative_path,
+)
 from .repository_index_store import (
     default_base_snapshot,
     git_base_identity,
@@ -27,7 +32,7 @@ from .repository_index_store import (
 from .source_languages import SOURCE_LANGUAGES
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator, Sequence
+    from collections.abc import Iterable, Sequence
 
     from hashmarks.client import RepositoryObservation
 
@@ -77,37 +82,6 @@ _NOISY_TEXT_NAMES = {
     ".hashmarks-context.toml",
     ".hashmarks-project-links.toml",
 }
-_PRUNE_DIRS = {
-    ".git",
-    ".hashmarks",
-    ".fastidentity",
-    ".venv",
-    "venv",
-    "node_modules",
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    "dist",
-    "build",
-    ".next",
-    "target",
-    ".tox",
-    ".nox",
-    "coverage",
-    ".coverage",
-}
-_ANALYSIS_SCOPE_CONFORMANCE_SCHEMA = "hashmarks.analysis-scope-conformance.v1"
-
-
-def _is_pruned_relative_path(rel: str) -> bool:
-    """Return whether repository discovery must stop at any path segment."""
-    normalized = rel.replace("\\", "/").strip("/")
-    if not normalized:
-        return False
-    return any(part in _PRUNE_DIRS for part in PurePosixPath(normalized).parts)
-
-
 _MAX_INDEX_BYTES = 2 * 1024 * 1024
 
 
@@ -286,13 +260,6 @@ def _module_name(relpath: str, source_roots: Sequence[str] = ()) -> str | None:
 
 
 @dataclass(frozen=True)
-class _AdmittedRepositoryFile:
-    rel: str
-    path: Path
-    visibility: EvidenceVisibility
-
-
-@dataclass(frozen=True)
 class _DiscoveredFile:
     rel: str
     path: Path
@@ -394,16 +361,6 @@ class IndexingLifecycleMixin:
         if self._refresh_context_policy():
             self.sync()
 
-    def _path_admitted_for_analysis(self, rel: str) -> bool:
-        """Return whether an explicit repository path may feed analysis surfaces."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        return (
-            not self._internal_path(rel)
-            and not _is_pruned_relative_path(rel)
-            and self.policy.decide(rel).index
-        )
-
     def _analysis_scope_conformance_identity(self) -> str:
         """Bind the inputs that decide whether persisted repository rows are admissible."""
         if TYPE_CHECKING:
@@ -459,63 +416,6 @@ class IndexingLifecycleMixin:
             )
         self.store.set_meta("analysis_scope_conformance_identity", identity)
         return removed
-
-    def _workspace_relative_path(self, path: Path) -> str | None:
-        try:
-            value = path.relative_to(self.workspace).as_posix()
-        except ValueError:
-            return None
-        return "" if value == "." else value
-
-    def _prune_discovery_dirs(self, root_path: Path, dirs: list[str]) -> None:
-        root_rel = self._workspace_relative_path(root_path) or ""
-        dirs[:] = sorted(
-            name
-            for name in dirs
-            if name not in _PRUNE_DIRS
-            and not self._internal_path(f"{root_rel}/{name}".strip("/"))
-        )
-
-    def _admitted_repository_file(
-        self,
-        path: Path,
-    ) -> _AdmittedRepositoryFile | None:
-        if path.is_symlink() or not path.is_file():
-            return None
-        rel = self._workspace_relative_path(path)
-        if rel is None or not rel or not self._path_admitted_for_analysis(rel):
-            return None
-        decision = self.policy.decide(rel)
-        return _AdmittedRepositoryFile(
-            rel=rel,
-            path=path,
-            visibility=decision.evidence_visibility,
-        )
-
-    def _iter_admitted_repository_files(
-        self,
-        prefix: str = "",
-    ) -> Iterator[_AdmittedRepositoryFile]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        rel = normalize_relative_path(prefix, allow_root=True)
-        root = self.workspace if not rel else self.workspace / rel
-        if root.is_symlink() or (rel and not self._path_admitted_for_analysis(rel)):
-            return
-        if root.is_file():
-            item = self._admitted_repository_file(root)
-            if item is not None:
-                yield item
-            return
-        if not root.is_dir():
-            return
-        for current_root, dirs, files in os.walk(root, topdown=True, followlinks=False):
-            root_path = Path(current_root)
-            self._prune_discovery_dirs(root_path, dirs)
-            for name in sorted(files):
-                item = self._admitted_repository_file(root_path / name)
-                if item is not None:
-                    yield item
 
     def _indexable_discovered_file(
         self,
