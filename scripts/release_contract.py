@@ -18,9 +18,14 @@ def _log_command_output(*values: object) -> None:
 
 
 SCHEMA = "hashmarks.release-artifact-manifest.v2"
-PUBLICATION_SCHEMA = "hashmarks.release-publication-manifest.v1"
-STANDALONE_FILENAME = "hashmarks-linux-x86_64"
-STANDALONE_CHECKSUM_FILENAME = f"{STANDALONE_FILENAME}.sha256"
+PUBLICATION_SCHEMA = "hashmarks.release-publication-manifest.v2"
+STANDALONE_QUALIFICATION_SCHEMA = "hashmarks.standalone-qualification.v1"
+STANDALONE_QUALIFICATION_FILENAME = "standalone-qualification.json"
+STANDALONE_SPECS = {
+    ("linux", "x86_64"): "hashmarks-linux-x86_64",
+    ("windows", "x86_64"): "hashmarks-windows-x86_64.exe",
+}
+REQUIRED_STANDALONES = frozenset(STANDALONE_SPECS)
 
 
 def _project(root: Path) -> dict[str, object]:
@@ -110,16 +115,10 @@ def release_manifest(root: Path, dist: Path, *, tag: str) -> dict[str, object]:
             f"expected {expected_entries!r}, got {entries!r}"
         )
 
-    wheels = [dist / expected_wheel]
-    sdists = [dist / expected_sdist]
     rows = [
-        _distribution_row(wheels[0], kind="wheel"),
-        _distribution_row(sdists[0], kind="sdist"),
+        _distribution_row(dist / expected_wheel, kind="wheel"),
+        _distribution_row(dist / expected_sdist, kind="sdist"),
     ]
-    if rows[0]["filename"] != expected_wheel:
-        raise ValueError(f"unexpected wheel filename: {rows[0]['filename']!r}")
-    if rows[1]["filename"] != expected_sdist:
-        raise ValueError(f"unexpected sdist filename: {rows[1]['filename']!r}")
     for row in rows:
         if row["project"] != name or row["version"] != version:
             raise ValueError(f"distribution metadata mismatch: {row['filename']}")
@@ -143,26 +142,85 @@ def release_manifest(root: Path, dist: Path, *, tag: str) -> dict[str, object]:
     return payload
 
 
-def _standalone_row(path: Path, *, version: str) -> dict[str, object]:
+def _standalone_filename(platform: str, architecture: str) -> str:
+    filename = STANDALONE_SPECS.get((platform, architecture))
+    if filename is None:
+        raise ValueError(
+            f"unsupported standalone platform: {platform}/{architecture}"
+        )
+    return filename
+
+
+def _standalone_row(
+    path: Path,
+    *,
+    version: str,
+    platform: str,
+    architecture: str,
+) -> dict[str, object]:
     path = path.resolve()
-    if path.name != STANDALONE_FILENAME:
+    expected_filename = _standalone_filename(platform, architecture)
+    if path.name != expected_filename:
         raise ValueError(
             "standalone release filename mismatch: "
-            f"expected {STANDALONE_FILENAME!r}, got {path.name!r}"
+            f"expected {expected_filename!r}, got {path.name!r}"
         )
     if not path.is_file():
         raise ValueError(f"standalone release artifact is missing: {path}")
+    return {
+        "kind": "standalone",
+        "filename": path.name,
+        "size_bytes": path.stat().st_size,
+        "sha256": _sha256(path),
+        "platform": platform,
+        "architecture": architecture,
+        "version": version,
+    }
 
+
+def _standalone_checksum_row(
+    path: Path,
+    standalone: dict[str, object],
+) -> dict[str, object]:
+    path = path.resolve()
+    artifact_name = str(standalone["filename"])
+    expected_filename = f"{artifact_name}.sha256"
+    if path.name != expected_filename:
+        raise ValueError(
+            "standalone checksum filename mismatch: "
+            f"expected {expected_filename!r}, got {path.name!r}"
+        )
+    if not path.is_file():
+        raise ValueError(f"standalone checksum artifact is missing: {path}")
+
+    digest = str(standalone["sha256"]).removeprefix("sha256:")
+    expected = f"{digest}  {artifact_name}\n"
+    if path.read_text(encoding="utf-8").replace("\r\n", "\n") != expected:
+        raise ValueError(
+            "standalone installer checksum does not match qualified standalone bytes"
+        )
+    return {
+        "kind": "installer-checksum",
+        "filename": path.name,
+        "size_bytes": path.stat().st_size,
+        "sha256": _sha256(path),
+        "for": artifact_name,
+        "platform": standalone["platform"],
+        "architecture": standalone["architecture"],
+    }
+
+
+def _smoke_standalone(path: Path, *, version: str) -> None:
     try:
         completed = subprocess.run(
-            [str(path), "--version"],
+            [str(path.resolve()), "--version"],
             check=False,
             capture_output=True,
             text=True,
             timeout=30,
         )
-    except subprocess.TimeoutExpired as exc:
-        raise ValueError("standalone release version smoke test timed out") from exc
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ValueError("standalone release version smoke test failed") from exc
     expected = f"hashmarks version {version}"
     if completed.returncode != 0:
         raise ValueError(
@@ -175,50 +233,155 @@ def _standalone_row(path: Path, *, version: str) -> dict[str, object]:
             f"expected {expected!r}, got {completed.stdout.strip()!r}"
         )
 
-    return {
-        "kind": "standalone",
-        "filename": path.name,
-        "size_bytes": path.stat().st_size,
-        "sha256": _sha256(path),
-        "platform": "linux",
-        "architecture": "x86_64",
-        "version": version,
-    }
 
-
-def _standalone_checksum_row(
-    path: Path,
-    standalone: dict[str, object],
+def standalone_qualification(
+    root: Path,
+    artifact: Path,
+    checksum: Path,
+    *,
+    platform: str,
+    architecture: str,
+    smoke: bool = True,
 ) -> dict[str, object]:
-    path = path.resolve()
-    if path.name != STANDALONE_CHECKSUM_FILENAME:
-        raise ValueError(
-            "standalone checksum filename mismatch: "
-            f"expected {STANDALONE_CHECKSUM_FILENAME!r}, got {path.name!r}"
-        )
-    if not path.is_file():
-        raise ValueError(f"standalone checksum artifact is missing: {path}")
+    root = root.resolve()
+    project = _project(root)
+    name = str(project["name"])
+    version = str(project["version"])
+    standalone = _standalone_row(
+        artifact,
+        version=version,
+        platform=platform,
+        architecture=architecture,
+    )
+    installer_checksum = _standalone_checksum_row(checksum, standalone)
+    if smoke:
+        _smoke_standalone(artifact, version=version)
 
-    digest = str(standalone["sha256"]).removeprefix("sha256:")
-    expected = f"{digest}  {STANDALONE_FILENAME}\n"
-    if path.read_text(encoding="utf-8") != expected:
-        raise ValueError(
-            "standalone installer checksum does not match qualified standalone bytes"
-        )
-    return {
-        "kind": "installer-checksum",
-        "filename": path.name,
-        "size_bytes": path.stat().st_size,
-        "sha256": _sha256(path),
-        "for": STANDALONE_FILENAME,
+    payload: dict[str, object] = {
+        "schema": STANDALONE_QUALIFICATION_SCHEMA,
+        "project": name,
+        "version": version,
+        "standalone": standalone,
+        "installer_checksum": installer_checksum,
+        "smoke": {
+            "command": "--version",
+            "reported_version": version,
+            "status": "pass",
+        },
     }
+    payload["qualification_identity"] = _manifest_identity(
+        STANDALONE_QUALIFICATION_SCHEMA,
+        payload,
+    )
+    return payload
+
+
+def _validate_qualification_identity(value: dict[str, object]) -> None:
+    recorded = str(value.get("qualification_identity") or "")
+    payload = {
+        key: item for key, item in value.items() if key != "qualification_identity"
+    }
+    expected = _manifest_identity(STANDALONE_QUALIFICATION_SCHEMA, payload)
+    if recorded != expected:
+        raise ValueError("standalone qualification identity mismatch")
+
+
+def _load_standalone_bundle(root: Path, bundle: Path) -> dict[str, object]:
+    root = root.resolve()
+    bundle = bundle.resolve()
+    receipt_path = bundle / STANDALONE_QUALIFICATION_FILENAME
+    if not receipt_path.is_file():
+        raise ValueError(f"standalone qualification receipt is missing: {receipt_path}")
+
+    value = json.loads(receipt_path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("standalone qualification receipt must be an object")
+    if value.get("schema") != STANDALONE_QUALIFICATION_SCHEMA:
+        raise ValueError("standalone qualification schema mismatch")
+    _validate_qualification_identity(value)
+
+    standalone = value.get("standalone")
+    checksum = value.get("installer_checksum")
+    smoke = value.get("smoke")
+    if not isinstance(standalone, dict) or not isinstance(checksum, dict):
+        raise ValueError("standalone qualification receipt is malformed")
+    if not isinstance(smoke, dict) or smoke.get("status") != "pass":
+        raise ValueError("standalone qualification smoke evidence is missing")
+
+    platform = str(standalone.get("platform") or "")
+    architecture = str(standalone.get("architecture") or "")
+    version = str(_project(root)["version"])
+    if value.get("project") != _project(root)["name"] or value.get("version") != version:
+        raise ValueError("standalone qualification project/version mismatch")
+    if smoke.get("reported_version") != version:
+        raise ValueError("standalone qualification smoke version mismatch")
+
+    artifact_name = _standalone_filename(platform, architecture)
+    expected_entries = sorted(
+        (
+            artifact_name,
+            f"{artifact_name}.sha256",
+            STANDALONE_QUALIFICATION_FILENAME,
+        )
+    )
+    entries = sorted(path.name for path in bundle.iterdir())
+    if entries != expected_entries:
+        raise ValueError(
+            "standalone bundle must contain exactly artifact, checksum, and "
+            f"qualification receipt; expected {expected_entries!r}, got {entries!r}"
+        )
+
+    observed_standalone = _standalone_row(
+        bundle / artifact_name,
+        version=version,
+        platform=platform,
+        architecture=architecture,
+    )
+    observed_checksum = _standalone_checksum_row(
+        bundle / f"{artifact_name}.sha256",
+        observed_standalone,
+    )
+    if standalone != observed_standalone or checksum != observed_checksum:
+        raise ValueError("standalone qualification does not match current bundle bytes")
+    return value
+
+
+def _qualified_standalones(
+    root: Path,
+    bundles: list[Path],
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    qualifications = [_load_standalone_bundle(root, bundle) for bundle in bundles]
+    standalones: list[dict[str, object]] = []
+    checksums: list[dict[str, object]] = []
+    observed: set[tuple[str, str]] = set()
+    for qualification in qualifications:
+        standalone = dict(qualification["standalone"])
+        checksum = dict(qualification["installer_checksum"])
+        key = (str(standalone["platform"]), str(standalone["architecture"]))
+        if key in observed:
+            raise ValueError(f"duplicate standalone qualification: {key[0]}/{key[1]}")
+        observed.add(key)
+        identity = qualification["qualification_identity"]
+        standalone["qualification_identity"] = identity
+        checksum["qualification_identity"] = identity
+        standalones.append(standalone)
+        checksums.append(checksum)
+
+    if observed != REQUIRED_STANDALONES:
+        missing = sorted(REQUIRED_STANDALONES - observed)
+        extra = sorted(observed - REQUIRED_STANDALONES)
+        raise ValueError(
+            f"standalone publication set mismatch: missing={missing!r} extra={extra!r}"
+        )
+    standalones.sort(key=lambda row: (str(row["platform"]), str(row["architecture"])))
+    checksums.sort(key=lambda row: (str(row["platform"]), str(row["architecture"])))
+    return standalones, checksums
 
 
 def publication_manifest(
     root: Path,
     dist: Path,
-    standalone: Path,
-    standalone_checksum: Path,
+    standalone_bundles: list[Path],
     *,
     tag: str,
     source_sha: str,
@@ -229,19 +392,19 @@ def publication_manifest(
         )
 
     package = release_manifest(root, dist, tag=tag)
-    version = str(package["version"])
-    standalone_row = _standalone_row(standalone, version=version)
+    standalones, installer_checksums = _qualified_standalones(
+        root,
+        standalone_bundles,
+    )
     payload: dict[str, object] = {
         "schema": PUBLICATION_SCHEMA,
         "project": package["project"],
-        "version": version,
+        "version": package["version"],
         "tag": package["tag"],
         "source": {"commit_sha": source_sha},
         "distributions": package["distributions"],
-        "standalone": standalone_row,
-        "installer_checksum": _standalone_checksum_row(
-            standalone_checksum, standalone_row
-        ),
+        "standalones": standalones,
+        "installer_checksums": installer_checksums,
         "qualification_dependency_resolution": package[
             "qualification_dependency_resolution"
         ],
@@ -253,17 +416,9 @@ def publication_manifest(
 
 
 def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
-    rows = manifest["distributions"]
-    assert isinstance(rows, list)
-    checksum_rows = list(rows)
-    standalone = manifest.get("standalone")
-    if standalone is not None:
-        assert isinstance(standalone, dict)
-        checksum_rows.append(standalone)
-    installer_checksum = manifest.get("installer_checksum")
-    if installer_checksum is not None:
-        assert isinstance(installer_checksum, dict)
-        checksum_rows.append(installer_checksum)
+    checksum_rows = list(manifest["distributions"])
+    checksum_rows.extend(manifest.get("standalones", []))
+    checksum_rows.extend(manifest.get("installer_checksums", []))
 
     lines = []
     for row in checksum_rows:
@@ -273,19 +428,33 @@ def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _write_json(value: dict[str, object], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def _write_manifest(
     value: dict[str, object],
     *,
     output_path: str,
     sha256sums_path: str,
 ) -> None:
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(
-        json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    _write_json(value, Path(output_path))
     _write_sha256sums(value, Path(sha256sums_path))
     _log_command_output(json.dumps(value, indent=2, sort_keys=True))
+
+
+def _add_publication_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--root", default=".")
+    parser.add_argument("--dist", required=True)
+    parser.add_argument(
+        "--standalone-bundle",
+        action="append",
+        required=True,
+        dest="standalone_bundles",
+    )
+    parser.add_argument("--tag", required=True)
+    parser.add_argument("--source-sha", required=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -311,23 +480,25 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--tag", required=True)
     verify.add_argument("--manifest", required=True)
 
+    standalone = sub.add_parser("standalone-qualification")
+    standalone.add_argument("--root", default=".")
+    standalone.add_argument("--artifact", required=True)
+    standalone.add_argument("--checksum", required=True)
+    standalone.add_argument("--platform", choices=("linux", "windows"), required=True)
+    standalone.add_argument("--architecture", choices=("x86_64",), required=True)
+    standalone.add_argument("--output", required=True)
+
+    verify_standalone = sub.add_parser("verify-standalone-qualification")
+    verify_standalone.add_argument("--root", default=".")
+    verify_standalone.add_argument("--bundle", required=True)
+
     publication = sub.add_parser("publication-manifest")
-    publication.add_argument("--root", default=".")
-    publication.add_argument("--dist", required=True)
-    publication.add_argument("--standalone", required=True)
-    publication.add_argument("--standalone-checksum", required=True)
-    publication.add_argument("--tag", required=True)
-    publication.add_argument("--source-sha", required=True)
+    _add_publication_arguments(publication)
     publication.add_argument("--output", required=True)
     publication.add_argument("--sha256sums", required=True)
 
     verify_publication = sub.add_parser("verify-publication")
-    verify_publication.add_argument("--root", default=".")
-    verify_publication.add_argument("--dist", required=True)
-    verify_publication.add_argument("--standalone", required=True)
-    verify_publication.add_argument("--standalone-checksum", required=True)
-    verify_publication.add_argument("--tag", required=True)
-    verify_publication.add_argument("--source-sha", required=True)
+    _add_publication_arguments(verify_publication)
     verify_publication.add_argument("--manifest", required=True)
 
     args = parser.parse_args(argv)
@@ -348,12 +519,28 @@ def _run_command(args) -> int:
         _log_command_output(f"Hashmarks release tag: PASS ({expected})")
         return 0
 
+    if args.command == "standalone-qualification":
+        value = standalone_qualification(
+            root,
+            Path(args.artifact),
+            Path(args.checksum),
+            platform=args.platform,
+            architecture=args.architecture,
+        )
+        _write_json(value, Path(args.output))
+        _log_command_output(json.dumps(value, indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "verify-standalone-qualification":
+        _load_standalone_bundle(root, Path(args.bundle))
+        _log_command_output("Hashmarks standalone qualification: PASS")
+        return 0
+
     if args.command in {"publication-manifest", "verify-publication"}:
         value = publication_manifest(
             root,
             Path(args.dist),
-            Path(args.standalone),
-            Path(args.standalone_checksum),
+            [Path(item) for item in args.standalone_bundles],
             tag=args.tag,
             source_sha=args.source_sha,
         )
