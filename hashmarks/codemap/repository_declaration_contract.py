@@ -6,6 +6,8 @@ from collections.abc import Mapping, Sequence
 MAX_GROUPS = 128
 MAX_DECLARATIONS = 256
 MAX_EXPECTED_PER_GROUP = 256
+MAX_REQUEST_BYTES = 1_048_576
+MAX_PACKET_BYTES = 1_048_576
 
 GROUP_KEYS = frozenset(
     {"group_id", "concept", "scope", "correspondence", "declarations", "coverage"}
@@ -38,6 +40,20 @@ def json_value(value: object, *, name: str) -> object:
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{name} must contain JSON-compatible values") from exc
     return json.loads(encoded)
+
+
+def encoded_json_bytes(value: object, *, name: str) -> int:
+    try:
+        payload = json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must contain JSON-compatible values") from exc
+    return len(payload)
 
 
 def mapping(value: object, *, name: str) -> Mapping[str, object]:
@@ -252,13 +268,14 @@ def absence(
     unseen = sorted(expected - present)
     if not expected:
         return {
-            "state": "not-assessed",
+            "state": "unknown",
             "missing_declaration_ids": [],
             "unseen_expected_declaration_ids": [],
+            "reason": "expected-membership-not-declared",
         }
     if not unseen:
         return {
-            "state": "none",
+            "state": "known-present",
             "missing_declaration_ids": [],
             "unseen_expected_declaration_ids": [],
         }
@@ -267,7 +284,7 @@ def absence(
         and coverage.get("truncation") == "complete"
     ):
         return {
-            "state": "present",
+            "state": "known-absent",
             "missing_declaration_ids": unseen,
             "unseen_expected_declaration_ids": [],
         }
@@ -323,6 +340,8 @@ def normalize_request(
         raise ValueError("groups must be a sequence")
     if len(groups) > MAX_GROUPS:
         raise ValueError(f"groups exceeds {MAX_GROUPS} entries")
+    if encoded_json_bytes(groups, name="groups") > MAX_REQUEST_BYTES:
+        raise ValueError(f"groups exceeds {MAX_REQUEST_BYTES} encoded bytes")
     if any(not isinstance(raw_group, Mapping) for raw_group in groups):
         raise ValueError("each declaration group must be an object")
 
