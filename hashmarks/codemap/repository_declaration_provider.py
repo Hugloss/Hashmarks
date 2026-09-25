@@ -492,6 +492,7 @@ def _validate_provider_enumerations(
         raise RepositoryDeclarationProviderError(
             f"declaration provider {provider_name} enumerations are malformed"
         )
+    seen_prefixes: set[str] = set()
     for previous in raw:
         if not isinstance(previous, Mapping):
             raise RepositoryDeclarationProviderError(
@@ -506,6 +507,15 @@ def _validate_provider_enumerations(
         ):
             raise RepositoryDeclarationProviderError(
                 f"declaration provider {provider_name} enumeration is malformed"
+            )
+        if prefix in seen_prefixes:
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {provider_name} enumeration prefixes are duplicated"
+            )
+        seen_prefixes.add(prefix)
+        if paths != sorted(paths) or len(set(paths)) != len(paths):
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {provider_name} enumeration paths are ambiguous"
             )
         current = list(enumerate_paths(prefix))
         if current != paths:
