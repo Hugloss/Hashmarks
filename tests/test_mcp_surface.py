@@ -363,6 +363,7 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             "change_impact",
             "correlate_evidence",
             "dependency_codemap",
+            "repository_declarations",
             "post_change",
         ]
         for row in registered:
@@ -442,6 +443,7 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             "change_impact",
             "correlate_evidence",
             "dependency_codemap",
+            "repository_declarations",
             "post_change",
         ]
         # Construction may initialize empty SQLite files, but it must not build a generation.
@@ -599,3 +601,69 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
     assert packet["queries"]["producer_authority"] == "caller-claimed"
     assert packet["queries"]["results"][0]["producer_authority"] == "caller-claimed"
     assert packet["causation"] == "not-inferred"
+
+
+def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    (repo / "runtime-a.yaml").write_text("runtime: 3.12\n", encoding="utf-8")
+    (repo / "runtime-b.yaml").write_text("runtime: 3.13\n", encoding="utf-8")
+    groups = [
+        {
+            "group_id": "python-runtime",
+            "concept": {"kind": "runtime", "identity": "python"},
+            "scope": {"environment": "application"},
+            "correspondence": {
+                "state": "declared",
+                "basis": {"provider": "fixture"},
+            },
+            "declarations": [
+                {
+                    "declaration_id": "a",
+                    "value_state": "resolved",
+                    "value": "3.12",
+                    "producer": {"kind": "fixture-yaml"},
+                    "evidence": [
+                        {
+                            "path": "runtime-a.yaml",
+                            "start_line": 1,
+                            "end_line": 1,
+                        }
+                    ],
+                },
+                {
+                    "declaration_id": "b",
+                    "value_state": "resolved",
+                    "value": "3.13",
+                    "producer": {"kind": "fixture-yaml"},
+                    "evidence": [
+                        {
+                            "path": "runtime-b.yaml",
+                            "start_line": 1,
+                            "end_line": 1,
+                        }
+                    ],
+                },
+            ],
+            "coverage": {
+                "state": "complete",
+                "truncation": "complete",
+                "expected_declaration_ids": ["a", "b"],
+                "scope": {},
+                "provenance": {"provider": "fixture"},
+            },
+        }
+    ]
+    surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
+    try:
+        packet = surface.repository_declarations(groups)
+        with pytest.raises(McpSurfaceError, match="groups must be a list"):
+            surface.repository_declarations({})  # type: ignore[arg-type]
+    finally:
+        surface.close()
+
+    assert packet["schema"] == "hashmarks.repository-declarations.v1"
+    assert packet["groups"][0]["comparison"]["state"] == "differing"
+    assert packet["winner"] == "not-selected"
+    assert packet["interpretation_authority"] == "consumer-owned"

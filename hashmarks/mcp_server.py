@@ -43,6 +43,32 @@ def _call_surface(
         raise tool_error(str(exc)) from exc
 
 
+def _register_repository_declarations_tool(
+    server: Any,
+    surface: HashmarksMcpSurface,
+    annotations: Any,
+    tool_error: type[Exception],
+) -> None:
+    @server.tool(
+        name="repository_declarations",
+        description=(
+            "Compare explicitly correlated repository declarations across files and "
+            "formats while preserving provenance, ambiguity, coverage, and freshness."
+        ),
+        annotations=annotations,
+    )
+    def repository_declarations(
+        groups: list[dict[str, Any]],
+        previous_observation: dict[str, Any] | None = None,
+    ) -> dict[str, object]:
+        return _call_surface(
+            tool_error,
+            surface.repository_declarations,
+            groups,
+            previous_observation=previous_observation,
+        )
+
+
 def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = None):
     MCPServer, ToolAnnotations, ToolError = _sdk()
     surface = HashmarksMcpSurface(
@@ -141,6 +167,8 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
             snapshot,
             queries,
         )
+
+    _register_repository_declarations_tool(server, surface, annotations, ToolError)
 
     @server.tool(
         name="post_change",

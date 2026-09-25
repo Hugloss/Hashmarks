@@ -83,6 +83,14 @@ Preferred Hashmarks authority sources are repository bytes, repository topology,
 
 If the result is made true primarily by consumer workflow history, model reasoning, runtime outcomes, task execution state, orchestration state, or a previous decision made by an agent, it is not repository authority.
 
+### Cross-artifact declaration boundary
+
+Repositories may contain several declarations of the same conceptual fact across files, formats, generated metadata, and repository areas. Hashmarks may bind explicitly scoped/provider-normalized declarations to exact repository evidence and report canonical equality/difference, ambiguity, qualified absence, provenance, freshness, identity, and factual deltas.
+
+Hashmarks core must not invent a universal metadata ontology, infer semantic correspondence from similar names or values, rank sources of truth, choose a winning declaration, or turn majority agreement into authority. Producer-specific extraction and normalization terminate at a provider/adapter boundary; context that makes declarations non-comparable must remain in semantic scope rather than being flattened into a false conflict.
+
+The normative contract is [Repository declarations](REPOSITORY_DECLARATIONS.md).
+
 ### Dependency-adapter translation boundary
 
 Package-manager and resolver syntax is an edge concern. Maven, uv, Gradle, npm, SBOM, and future producer formats may be parsed by dedicated adapters, but shared dependency qualification must reason only about producer-neutral facts and semantic evidence authorities. A source-format `kind` is provenance, not authority; one physical source may support several semantic authorities, and a complete physical artifact does not by itself establish complete semantic coverage. New adapters must translate into the general dependency evidence contract rather than teach core Hashmarks the producer's native shape.
@@ -195,6 +203,7 @@ The following categories fit the product profile when they remain repository-der
 - repository discovery and topology;
 - ownership, qualified identity, re-export/alias relationships, and structural provenance;
 - impact and dependency relationships;
+- producer-neutral cross-artifact declaration correspondence, exact evidence, ambiguity, coverage-qualified absence, and factual declaration deltas;
 - task-local repository retrieval and bounded progressive disclosure;
 - ambiguity, competing repository candidates, and discriminating repository evidence;
 - candidate repository-surface nomination derived from repository evidence;

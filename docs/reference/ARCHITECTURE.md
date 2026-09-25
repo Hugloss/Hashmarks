@@ -41,6 +41,7 @@ CodeMap indexes repository structure and relationships such as:
 - ownership and qualified identity;
 - reverse impact and related tests;
 - repository ambiguity and competing candidates;
+- cross-artifact declaration correspondence, exact evidence, qualified absence, and disagreement;
 - verification relevance.
 
 CodeMap is reconstructible derived state. It may be cached and incrementally maintained, but its semantic result may not exceed a fresh reconciled view of the same repository.
@@ -120,6 +121,8 @@ consumer/model interpretation stays outside repository authority
 ```
 
 The diagram is not a total ordering across unrelated evidence kinds. Each evidence family keeps its existing qualification semantics. The invariant is that a downstream layer cannot silently make its inputs stronger: stale cannot become fresh, unknown cannot become proven, ambiguity cannot become unique, and a summary cannot override the repository evidence it summarizes. Where no kind-specific authority rule resolves disagreement, Hashmarks exposes the disagreement or remains unresolved.
+
+Cross-artifact declaration correspondence follows the same rule. Providers may normalize producer-native syntax into scoped declaration claims, but provider provenance, correspondence, normalized values, and coverage do not become a global precedence system. Hashmarks binds those claims to exact repository evidence and may report equivalence, difference, ambiguity, or coverage-qualified absence; it never selects the declaration that should win. See [`REPOSITORY_DECLARATIONS.md`](REPOSITORY_DECLARATIONS.md).
 
 ## Cache model
 

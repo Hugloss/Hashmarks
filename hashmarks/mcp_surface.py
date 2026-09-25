@@ -9,6 +9,10 @@ from .codemap.evidence_correlation import (
     CORRELATION_PACKET_MAX_BYTES,
     CORRELATION_REQUEST_MAX_BYTES,
 )
+from .codemap.repository_declaration_contract import (
+    MAX_PACKET_BYTES,
+    MAX_REQUEST_BYTES,
+)
 from .repository_retry import retry_transient_repository_race
 
 if TYPE_CHECKING:
@@ -270,6 +274,41 @@ class HashmarksMcpSurface:
                         observation, bounded_queries
                     )
                 return result
+            except ValueError as exc:
+                raise McpSurfaceError(str(exc)) from exc
+
+        return self._read(project)
+
+    def repository_declarations(
+        self,
+        groups: list[dict[str, Any]],
+        *,
+        previous_observation: dict[str, Any] | None = None,
+    ) -> dict[str, object]:
+        """Qualify request-scoped cross-artifact repository declarations."""
+        bounded_groups = _bounded_json(
+            groups,
+            name="groups",
+            maximum=MAX_REQUEST_BYTES,
+            expected_type=list,
+        )
+        previous = (
+            None
+            if previous_observation is None
+            else _bounded_json(
+                previous_observation,
+                name="previous_observation",
+                maximum=MAX_PACKET_BYTES,
+                expected_type=dict,
+            )
+        )
+
+        def project() -> dict[str, object]:
+            try:
+                return self._map.repository_declarations(
+                    bounded_groups,
+                    previous_observation=previous,
+                )
             except ValueError as exc:
                 raise McpSurfaceError(str(exc)) from exc
 

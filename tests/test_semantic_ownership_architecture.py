@@ -134,3 +134,18 @@ def test_completeness_is_not_mixed_with_availability_or_freshness() -> None:
     assert '"state": "complete"' in delta
     assert '"state": "complete"' in bindings
     assert "exactly `complete`, `incomplete`, or `unknown`" in state_doc
+
+
+def test_declarations_reuse_repository_evidence_authorities() -> None:
+    path = CODEMAP / "repository_declarations.py"
+    source = path.read_text(encoding="utf-8")
+    violations: list[str] = []
+    for node in ast.walk(_tree(path)):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr in {"read_bytes", "read_text"}:
+            violations.append(f"{path.name}:{node.lineno}:{node.func.attr}")
+
+    assert violations == []
+    assert "self.repository_evidence_bindings(" in source
+    assert "self.repository_evidence_binding_delta(" in source
