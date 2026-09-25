@@ -45,12 +45,17 @@ def test_publish_workflow_binds_reviewed_request_to_exact_source() -> None:
     assert "Optional exact reviewed source SHA" in text
     assert "Checkout reviewed release request" in text
     assert "Resolve reviewed release request" in text
-    assert 'set(request) - {"version", "source_sha"}' in text
+    assert (
+        'set(request) - {"version", "source_sha", "publication_attempt"}' in text
+    )
+    assert 'request.get("publication_attempt", 1)' in text
     assert 'request.get("source_sha", "")' in text
     assert "DISPATCH_SOURCE_SHA:" in text
     assert "TRIGGER_SOURCE_SHA:" in text
     assert "dispatch_source or request_source or trigger_source" in text
     assert "Checkout exact release source" in text
+    assert "Checkout reviewed publication machinery" in text
+    assert "ref: ${{ github.sha }}" in text
     assert "source_sha: ${{ steps.release.outputs.source_sha }}" in text
     assert "ref: ${{ steps.request.outputs.source_sha }}" in text
     assert "ref: ${{ needs.prepare.outputs.source_sha }}" in text
@@ -72,7 +77,9 @@ def test_publish_workflow_publishes_only_verified_github_release_assets() -> Non
     assert "--generate-notes" not in text
     assert 'git rev-list -n 1 "$RELEASE_TAG"' in text
     assert 'if [ "$tag_commit" != "${{ needs.prepare.outputs.source_sha }}" ]' in text
-    assert "Materialize reviewed changelog section as release notes" in text
+    assert "Bind reviewed source release notes" in text
+    assert "Materialize reviewed changelog section as release notes" not in text
+    assert "test -s release/release-notes.md" in text
     assert "--draft" in text
     assert 'gh release edit "$RELEASE_TAG" --draft=false' in text
     assert "gh release upload" in text
@@ -92,7 +99,7 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
     )
 
     assert "version" in request
-    assert set(request) <= {"version", "source_sha"}
+    assert set(request) <= {"version", "source_sha", "publication_attempt"}
     version = request["version"]
     assert isinstance(version, str)
     assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)
@@ -101,6 +108,12 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
     if source_sha is not None:
         assert isinstance(source_sha, str)
         assert re.fullmatch(r"[0-9a-f]{40}", source_sha)
+
+    publication_attempt = request.get("publication_attempt")
+    if publication_attempt is not None:
+        assert isinstance(publication_attempt, int)
+        assert not isinstance(publication_attempt, bool)
+        assert publication_attempt >= 1
 
 
 def test_release_profile_installs_mcp_before_full_native_qualification() -> None:
