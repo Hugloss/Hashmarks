@@ -50,7 +50,11 @@ def test_publish_workflow_is_reviewed_request_driven_and_github_native() -> None
     assert "release:\n    types: [published]" not in text
     assert "Validate reviewed release request" in text
     assert "release publication is authorized only from main" in text
-    assert "ref: ${{ github.sha }}" in text
+    assert (
+        "github.event_name == 'workflow_dispatch' && inputs.source_sha || github.sha"
+        in text
+    )
+    assert "ref: ${{ github.sha }}" not in text
     assert "Publish exact qualified bytes to GitHub Release" in text
     assert "gh release create" in text
     assert '--target "${{ github.sha }}"' in text
