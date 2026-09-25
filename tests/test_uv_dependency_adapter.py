@@ -206,6 +206,59 @@ source = { directory = "vendor/shared" }
         uv_lock_dependency_observation(lock=lock)
 
 
+@pytest.mark.parametrize(
+    ("lock", "message"),
+    [
+        (
+            b"""version = true
+revision = 3
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+""",
+            "unsupported uv lock schema version",
+        ),
+        (
+            b"""version = 1
+revision = true
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+""",
+            "uv lock revision must be a positive integer",
+        ),
+        (
+            b"""version = 1
+revision = 3
+[[package]]
+name = 123
+version = "0.1.0"
+source = { virtual = "." }
+""",
+            "uv lock package requires string name and version",
+        ),
+        (
+            b"""version = 1
+revision = 3
+[[package]]
+name = "demo"
+version = 1
+source = { virtual = "." }
+""",
+            "uv lock package requires string name and version",
+        ),
+    ],
+)
+def test_uv_lock_adapter_refuses_malformed_identity_fields(
+    lock: bytes,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        uv_lock_dependency_observation(lock=lock)
+
+
 def test_uv_lock_adapter_refuses_unknown_lock_schema_version() -> None:
     lock = b"""version = 2
 revision = 0
