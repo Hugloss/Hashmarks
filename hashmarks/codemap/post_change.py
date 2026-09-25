@@ -188,6 +188,13 @@ class PostChangeMixin(ChangeImpactMixin):
         context = validate_evidence_context(receipt, provenance)
         if not context["valid"]:
             reasons.extend(str(reason) for reason in context["reasons"])
+        current = self.task_evidence(task)
+        current_receipt = current.get("evidence_receipt")
+        if (
+            not isinstance(current_receipt, Mapping)
+            or current_receipt.get("evidence_identity") != receipt.get("evidence_identity")
+        ):
+            reasons.append("evidence-identity-mismatch")
         if reasons:
             raise ValueError(
                 "previous_evidence continuity mismatch: "
