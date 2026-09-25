@@ -303,6 +303,58 @@ class EvidenceGraphMixin:
             "warnings": list(warnings),
         }
 
+    @staticmethod
+    def _project_node_value(node: object, name: str) -> object:
+        if isinstance(node, dict):
+            return node.get(name)
+        return getattr(node, name, None)
+
+    def _project_node_admitted(self, node: object) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        manifest = str(self._project_node_value(node, "manifest") or "")
+        if self._visible_repository_file(manifest) is None:
+            return False
+        root = str(self._project_node_value(node, "root") or "").strip("/")
+        if root in {"", "."}:
+            return True
+        return self._repository_scope_has_visible_file(root)
+
+    def _admitted_external_project_ids(self, producer: str) -> set[str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        return {
+            str(row.get("project_id") or "")
+            for row in self._fresh_project_nodes()
+            if str(row.get("producer") or "") != producer
+            and self._project_node_admitted(row)
+        }
+
+    def _admit_project_graph(
+        self,
+        provider_name: str,
+        nodes: tuple[object, ...],
+        edges: tuple[object, ...],
+    ) -> tuple[tuple[object, ...], tuple[object, ...], int, int]:
+        admitted_nodes = tuple(node for node in nodes if self._project_node_admitted(node))
+        admitted_ids = {
+            str(self._project_node_value(node, "project_id") or "")
+            for node in admitted_nodes
+        }
+        known_ids = admitted_ids | self._admitted_external_project_ids(provider_name)
+        admitted_edges = tuple(
+            edge
+            for edge in edges
+            if str(self._project_node_value(edge, "source") or "") in known_ids
+            and str(self._project_node_value(edge, "target") or "") in known_ids
+        )
+        return (
+            admitted_nodes,
+            admitted_edges,
+            len(nodes) - len(admitted_nodes),
+            len(edges) - len(admitted_edges),
+        )
+
     def _enrich_project_graphs(
         self,
         selected: set[str] | None,
@@ -317,20 +369,31 @@ class EvidenceGraphMixin:
             if not provider.detect(self.workspace):
                 continue
             evidence = provider.collect(self.workspace)
-            self.store.replace_project_graph(
-                provider.name, evidence.nodes, evidence.edges
+            nodes, edges, filtered_nodes, filtered_edges = self._admit_project_graph(
+                provider.name,
+                evidence.nodes,
+                evidence.edges,
             )
+            if (
+                provider.name == "declared-project-links"
+                and self._visible_repository_file(".hashmarks-project-links.toml")
+                is None
+            ):
+                nodes = ()
+                edges = ()
+                filtered_nodes = len(evidence.nodes)
+                filtered_edges = len(evidence.edges)
+            self.store.replace_project_graph(provider.name, nodes, edges)
             project_manifests = [
                 manifest
-                for node in evidence.nodes
+                for node in nodes
                 for manifest in (
                     node.manifest,
                     *(node.metadata.get("freshness_manifests") or ()),
                 )
             ]
             # Declared links can contain only edges and therefore no provider-
-            # owned nodes.  The declaration file still owns that topology and
-            # must always participate in freshness even for links-only graphs.
+            # owned nodes. The declaration file still owns that topology.
             if provider.name == "declared-project-links":
                 project_manifests.insert(0, ".hashmarks-project-links.toml")
             self._record_evidence_snapshot(
@@ -345,11 +408,16 @@ class EvidenceGraphMixin:
             results.append(
                 {
                     "producer": evidence.producer,
-                    "projects": len(evidence.nodes),
-                    "edges": len(evidence.edges),
+                    "projects": len(nodes),
+                    "edges": len(edges),
                 }
             )
             warnings.extend(evidence.warnings)
+            if filtered_nodes or filtered_edges:
+                warnings.append(
+                    f"{provider.name}: filtered project evidence outside repository admission "
+                    f"(projects={filtered_nodes}, edges={filtered_edges})"
+                )
 
     def _enrich_typescript_graph(
         self,
