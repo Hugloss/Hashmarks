@@ -135,6 +135,14 @@ The release request is an auditable trigger record, not a second version authori
 
 The workflow must fail closed if the request version does not match the package version at the release merge SHA, if the changelog is not finalized, or if the release/tag already represents different authority.
 
+If publication fails because the workflow implementation itself is defective, repair the workflow through a normal reviewed pull request. Do not promote the repair commit as the release source and do not merely rerun the broken historical workflow definition. Retry from current `main` with the exact original reviewed release-source commit:
+
+```bash
+gh workflow run Publish --ref main -f source_sha=<reviewed-release-merge-sha>
+```
+
+The retry workflow must verify that `source_sha` is an exact commit reachable from current `main`, then checkout, qualify, tag, and publish those source bytes. The workflow implementation may be newer; release source authority remains the explicit reviewed commit supplied to the retry.
+
 ## Development-tool policy
 
 `pyproject.toml` owns development-tool dependency intent, allowed ranges, groups, and configuration. The committed `uv.lock` owns the exact resolved repository development/qualification dependency set. Normal setup and qualification consume that lock with frozen uv operations; they do not resolve a parallel dependency graph or rewrite the lock. Use `make lock-check` to detect `pyproject.toml` ↔ `uv.lock` drift and `make lock` only for an intentional dependency update that will be reviewed and committed with its lock diff.
