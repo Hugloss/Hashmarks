@@ -23,7 +23,7 @@ Then replace the `Development` changelog heading and placeholder bullet with con
 make release-check
 ```
 
-Open the release pull request. Merge only after qualification convergence is green.
+Open the release pull request. Merge only after qualification convergence is green. The release-request merge SHA becomes the default release source authority.
 
 ## What pull-request CI proves
 
