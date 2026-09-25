@@ -547,20 +547,17 @@ class IndexingLifecycleMixin:
                 break
         return tuple(admitted)
 
-    def _discovered_file(
+    def _indexable_discovered_file(
         self,
-        path: Path,
+        admitted: _AdmittedRepositoryFile,
         *,
         warnings: list[str] | None = None,
     ) -> _DiscoveredFile | None:
-        admitted = self._admitted_repository_file(path)
-        if admitted is None:
-            return None
-        language = _language_for_path(path)
+        language = _language_for_path(admitted.path)
         if language is None:
             return None
         try:
-            size = int(path.stat().st_size)
+            size = int(admitted.path.stat().st_size)
         except OSError as exc:
             if warnings is not None:
                 warnings.append(f"cannot stat {admitted.rel}: {exc}")
@@ -585,7 +582,7 @@ class IndexingLifecycleMixin:
         result: list[_DiscoveredFile] = []
         warnings: list[str] = []
         for admitted in self._iter_admitted_repository_files():
-            item = self._discovered_file(admitted.path, warnings=warnings)
+            item = self._indexable_discovered_file(admitted, warnings=warnings)
             if item is not None:
                 result.append(item)
         return result, warnings
@@ -613,7 +610,7 @@ class IndexingLifecycleMixin:
         self = cast("CodeMap", self)
         result: list[_DiscoveredFile] = []
         for admitted in self._iter_admitted_repository_files(rel):
-            item = self._discovered_file(admitted.path)
+            item = self._indexable_discovered_file(admitted)
             if item is not None:
                 result.append(item)
         return result
