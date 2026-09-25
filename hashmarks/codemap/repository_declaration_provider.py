@@ -524,15 +524,24 @@ def validate_repository_declaration_provider_inputs(
     for provider in provider_observations:
         name = str(provider.get("name") or "")
         inputs = provider.get("inputs")
+        if not isinstance(inputs, list):
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {name} inputs are malformed"
+            )
+        input_paths = [
+            str(row.get("path") or "")
+            for row in inputs
+            if isinstance(row, Mapping)
+        ]
+        if len(input_paths) != len(inputs) or len(set(input_paths)) != len(input_paths):
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {name} input paths are duplicated or malformed"
+            )
         _validate_provider_enumerations(
             enumerate_paths,
             name,
             provider.get("enumerations"),
         )
-        if not isinstance(inputs, list):
-            raise RepositoryDeclarationProviderError(
-                f"declaration provider {name} inputs are malformed"
-            )
         for previous in inputs:
             if not isinstance(previous, Mapping):
                 raise RepositoryDeclarationProviderError(
