@@ -9,15 +9,7 @@ from .repository_declaration_contract import (
     MAX_GROUPS,
     absence,
     comparison,
-    json_value,
-    mapping,
-    normalize_correspondence,
-    normalize_coverage,
-    normalize_declaration,
     normalize_request,
-    reject_unknown,
-    required_text,
-    GROUP_KEYS,
 )
 from .repository_declaration_delta import declaration_delta
 
@@ -30,79 +22,78 @@ _SCHEMA = "hashmarks.repository-declarations.v1"
 class RepositoryDeclarationsMixin:
     """Project cross-artifact declarations without choosing a winning value."""
 
-    def _declaration_group(
+    def _project_declaration(
         self,
-        raw: object,
+        normalized: Mapping[str, object],
+        group_id: str,
+        concept: Mapping[str, object],
+        scope: Mapping[str, object],
         binding_rows: Mapping[str, Mapping[str, object]],
     ) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        group = mapping(raw, name="declaration group")
-        reject_unknown(group, allowed=GROUP_KEYS, name="declaration group")
-        group_id = required_text(group.get("group_id"), name="group_id")
-        concept = json_value(group.get("concept"), name="concept")
-        scope = json_value(group.get("scope", {}), name="scope")
-        if not isinstance(concept, dict) or not isinstance(scope, dict):
-            raise ValueError("concept and scope must be objects")
-        correspondence = normalize_correspondence(group.get("correspondence", {}))
-        coverage = normalize_coverage(group.get("coverage", {}))
+        declaration_id = str(normalized["declaration_id"])
+        definition = {
+            "group_id": group_id,
+            "concept": concept,
+            "scope": scope,
+            "declaration_id": declaration_id,
+        }
+        binding = binding_rows[str(normalized["binding_id"])]
+        observation = {
+            **definition,
+            "value_state": normalized["value_state"],
+            **({"value": normalized["value"]} if "value" in normalized else {}),
+            **(
+                {"candidate_values": normalized["candidate_values"]}
+                if "candidate_values" in normalized
+                else {}
+            ),
+            "producer": normalized["producer"],
+            "binding_observation_identity": binding["binding_observation_identity"],
+        }
+        return {
+            **normalized,
+            "declaration_definition_identity": "sha256:"
+            + self._packet_digest(
+                "hashmarks.repository-declaration-definition.v1",
+                definition,
+            ),
+            "declaration_observation_identity": "sha256:"
+            + self._packet_digest(
+                "hashmarks.repository-declaration-observation.v1",
+                observation,
+            ),
+        }
 
-        raw_declarations = group.get("declarations")
-        if not isinstance(raw_declarations, Sequence) or isinstance(
-            raw_declarations, (str, bytes)
-        ):
-            raise ValueError("declarations must be a list")
-
-        declarations: list[dict[str, object]] = []
-        seen: set[str] = set()
-        for raw_declaration in raw_declarations:
-            normalized, _binding = normalize_declaration(
-                raw_declaration, group_id=group_id
+    def _declaration_group(
+        self,
+        group: Mapping[str, object],
+        binding_rows: Mapping[str, Mapping[str, object]],
+    ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        group_id = str(group["group_id"])
+        concept = cast("Mapping[str, object]", group["concept"])
+        scope = cast("Mapping[str, object]", group["scope"])
+        correspondence = cast("Mapping[str, object]", group["correspondence"])
+        coverage = cast("Mapping[str, object]", group["coverage"])
+        raw_declarations = cast(
+            "Sequence[Mapping[str, object]]",
+            group["declarations"],
+        )
+        declarations = [
+            self._project_declaration(
+                normalized,
+                group_id,
+                concept,
+                scope,
+                binding_rows,
             )
-            declaration_id = str(normalized["declaration_id"])
-            if declaration_id in seen:
-                raise ValueError(
-                    f"duplicate declaration_id in group {group_id}: {declaration_id}"
-                )
-            seen.add(declaration_id)
-            binding = binding_rows[str(normalized["binding_id"])]
-            definition = {
-                "group_id": group_id,
-                "concept": concept,
-                "scope": scope,
-                "declaration_id": declaration_id,
-            }
-            observation = {
-                **definition,
-                "value_state": normalized["value_state"],
-                **({"value": normalized["value"]} if "value" in normalized else {}),
-                **(
-                    {"candidate_values": normalized["candidate_values"]}
-                    if "candidate_values" in normalized
-                    else {}
-                ),
-                "producer": normalized["producer"],
-                "binding_observation_identity": binding[
-                    "binding_observation_identity"
-                ],
-            }
-            declarations.append(
-                {
-                    **normalized,
-                    "declaration_definition_identity": "sha256:"
-                    + self._packet_digest(
-                        "hashmarks.repository-declaration-definition.v1",
-                        definition,
-                    ),
-                    "declaration_observation_identity": "sha256:"
-                    + self._packet_digest(
-                        "hashmarks.repository-declaration-observation.v1",
-                        observation,
-                    ),
-                }
-            )
-
+            for normalized in raw_declarations
+        ]
         declarations.sort(key=lambda row: str(row["declaration_id"]))
+
         definition_payload = {
             "group_id": group_id,
             "concept": concept,
@@ -141,15 +132,13 @@ class RepositoryDeclarationsMixin:
         }
         return "sha256:" + self._packet_digest(_SCHEMA, payload)
 
-    def _validate_previous_declarations(
-        self, previous: Mapping[str, object]
-    ) -> None:
+    def _validate_previous_declarations(self, previous: Mapping[str, object]) -> None:
         if previous.get("schema") != _SCHEMA:
             raise ValueError(f"previous observation must use schema {_SCHEMA}")
         identity = previous.get("observation_identity")
-        if not isinstance(identity, str) or identity != self._declaration_packet_identity(
-            previous
-        ):
+        if not isinstance(
+            identity, str
+        ) or identity != self._declaration_packet_identity(previous):
             raise ValueError("previous declaration observation identity mismatch")
 
     def repository_declarations(
@@ -176,7 +165,8 @@ class RepositoryDeclarationsMixin:
             str(row["binding_id"]): row for row in evidence_packet["bindings"]
         }
         projected = [
-            self._declaration_group(raw, binding_rows) for raw in normalized_groups
+            self._declaration_group(group, binding_rows)
+            for group in normalized_groups
         ]
         projected.sort(key=lambda row: str(row["group_id"]))
 
