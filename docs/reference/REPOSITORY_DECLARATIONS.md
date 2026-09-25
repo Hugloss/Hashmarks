@@ -360,14 +360,15 @@ declaration qualification. If a provider input changes during discovery, the
 call fails closed instead of pairing a stale normalized value with newer
 repository evidence.
 
-Dynamic file discovery uses `context.paths(prefix)`, which enumerates the
-current admitted, indexed repository generation. The public provider context
-does **not** expose the raw repository filesystem path. Enumeration queries and
-their exact result sets are recorded in provider observation state and
-revalidated around declaration qualification, so a completeness decision cannot
-quietly depend on an untracked directory snapshot. Enumeration is fail-closed
-and bounded: at most 32 distinct prefix queries and 256 distinct enumerated
-paths per provider.
+Dynamic file discovery uses `context.paths(prefix)`, which enumerates admitted
+repository files through the same policy/pruning/symlink-safe discovery owner
+used by CodeMap indexing, **without requiring the file format itself to be
+indexable by CodeMap**. The public provider context does **not** expose the raw
+repository filesystem path. Enumeration queries and their exact result sets are
+recorded in provider observation state and revalidated around declaration
+qualification, so a completeness decision cannot quietly depend on an
+untracked directory snapshot. Enumeration is fail-closed and bounded: at most
+32 distinct prefix queries and 256 distinct enumerated paths per provider.
 
 Provider discovery has separate wrapper schemas:
 
