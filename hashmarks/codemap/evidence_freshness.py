@@ -38,11 +38,11 @@ class EvidenceFreshnessMixin:
             rel = normalize_relative_path(relpath, allow_root=False)
         except ValueError:
             return None
-        path = self.workspace / rel
-        if path.is_symlink() or not path.is_file():
+        item = self._visible_repository_file(rel)
+        if item is None:
             return None
         try:
-            data = path.read_bytes()
+            data = item.path.read_bytes()
         except OSError:
             return None
         return hashlib.sha256(data).hexdigest()
@@ -57,17 +57,24 @@ class EvidenceFreshnessMixin:
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        manifest_rows: dict[str, str | None] = {}
+        manifest_rows: dict[str, str] = {}
+        inadmissible_manifest_count = 0
         for raw in manifests:
             try:
                 rel = normalize_relative_path(raw, allow_root=False)
             except ValueError:
+                inadmissible_manifest_count += 1
                 continue
-            manifest_rows[rel] = self._manifest_digest(rel)
+            digest = self._manifest_digest(rel)
+            if digest is None:
+                inadmissible_manifest_count += 1
+                continue
+            manifest_rows[rel] = digest
         value = {
             "generation": self.store.generation(),
             "bind_generation": bool(bind_generation),
             "manifests": manifest_rows,
+            "inadmissible_manifest_count": inadmissible_manifest_count,
             "recorded_unix": time.time(),
         }
         self.store.set_meta(
@@ -119,7 +126,11 @@ class EvidenceFreshnessMixin:
         if value is None or bool(value.get("bind_generation", False)):
             return False
         manifests = value.get("manifests") or {}
-        if not isinstance(manifests, dict) or not manifests:
+        if (
+            not isinstance(manifests, dict)
+            or not manifests
+            or int(value.get("inadmissible_manifest_count") or 0) > 0
+        ):
             return False
         self._record_evidence_snapshot(
             "project",
@@ -152,6 +163,8 @@ class EvidenceFreshnessMixin:
         value = self._evidence_snapshot(kind, producer)
         if value is None:
             return False, "no freshness snapshot"
+        if int(value.get("inadmissible_manifest_count") or 0) > 0:
+            return False, "evidence manifest outside repository admission"
         if bool(value.get("bind_generation", False)):
             fresh, reason = self._generation_snapshot_fresh(value)
             if not fresh:
