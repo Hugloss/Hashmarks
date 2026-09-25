@@ -986,6 +986,27 @@ def test_binding_delta_preserves_duplicate_evidence_multiplicity(
     assert changed["member_evidence"]["state"] == "preserved"
 
 
+def test_coverage_rejects_tampered_binding_packet(tmp_path: Path) -> None:
+    (tmp_path / "a.py").write_text("a\n", encoding="utf-8")
+    binding = [
+        {
+            "binding_id": "coverage-authenticated",
+            "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(binding)
+        packet["bindings"][0]["evidence"][0]["state"] = "known-absent"
+
+        with pytest.raises(ValueError, match="bindings identity mismatch"):
+            codemap.repository_evidence_coverage(
+                packet,
+                changed_paths=["a.py"],
+                change_set_complete=True,
+            )
+
+
 def test_coverage_rejects_delta_for_different_binding_packet(tmp_path: Path) -> None:
     source = tmp_path / "a.py"
     source.write_text("a\n", encoding="utf-8")
@@ -1012,6 +1033,33 @@ def test_coverage_rejects_delta_for_different_binding_packet(tmp_path: Path) -> 
         with pytest.raises(ValueError, match="after identity"):
             codemap.repository_evidence_coverage(
                 unrelated,
+                changed_paths=["a.py"],
+                change_set_complete=True,
+                binding_delta=delta,
+            )
+
+
+def test_coverage_rejects_tampered_binding_delta(tmp_path: Path) -> None:
+    source = tmp_path / "a.py"
+    source.write_text("a\n", encoding="utf-8")
+    binding = [
+        {
+            "binding_id": "delta-authenticated",
+            "evidence": [{"path": "a.py", "start_line": 1, "end_line": 1}],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(binding)
+        source.write_text("b\n", encoding="utf-8")
+        codemap.sync(["a.py"])
+        after = codemap.repository_evidence_bindings(binding)
+        delta = codemap.repository_evidence_binding_delta(before, after)
+        delta["bindings"]["changed"].clear()
+
+        with pytest.raises(ValueError, match="binding_delta identity mismatch"):
+            codemap.repository_evidence_coverage(
+                after,
                 changed_paths=["a.py"],
                 change_set_complete=True,
                 binding_delta=delta,
@@ -1265,7 +1313,10 @@ def test_binding_delta_keeps_observer_change_separate_from_repository_change(
             **after["observer"],
             "identity": "sha256:" + "a" * 64,
         }
-        after["bindings_identity"] = "sha256:" + "b" * 64
+        after["bindings_identity"] = "sha256:" + codemap._packet_digest(
+            "hashmarks.repository-evidence-bindings.v1",
+            {key: value for key, value in after.items() if key != "bindings_identity"},
+        )
         delta = codemap.repository_evidence_binding_delta(before, after)
 
     assert delta["observer"]["changed"] is True
@@ -1372,7 +1423,7 @@ def test_binding_delta_reports_previously_absent_member_as_added(
     ("mutation", "match"),
     [
         ({"schema": "wrong"}, "before must be a repository evidence bindings packet"),
-        ({"bindings_identity": None}, "before must contain bindings_identity"),
+        ({"bindings_identity": None}, "before bindings identity mismatch"),
     ],
 )
 def test_binding_delta_rejects_malformed_before_packet(
@@ -1392,6 +1443,24 @@ def test_binding_delta_rejects_malformed_before_packet(
         packet = codemap.repository_evidence_bindings(binding)
         before = {**packet, **mutation}
         with pytest.raises(ValueError, match=match):
+            codemap.repository_evidence_binding_delta(before, packet)
+
+
+def test_binding_delta_rejects_tampered_authenticated_packet(tmp_path: Path) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [
+        {
+            "binding_id": "authenticated",
+            "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(binding)
+        before = deepcopy(packet)
+        before["bindings"][0]["evidence"][0]["state"] = "known-absent"
+
+        with pytest.raises(ValueError, match="before bindings identity mismatch"):
             codemap.repository_evidence_binding_delta(before, packet)
 
 

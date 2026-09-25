@@ -147,6 +147,20 @@ def test_prior_map_rejects_tampered_retained_evidence(tmp_path: Path) -> None:
             )
 
 
+def test_prior_map_rejects_same_repository_different_task(tmp_path: Path) -> None:
+    task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.evidence_freshness_map(task, ["src/case/engine.py"])
+
+        with pytest.raises(ValueError, match="task-mismatch"):
+            codemap.evidence_freshness_map(
+                "different task",
+                ["src/case/engine.py"],
+                previous_map=before,
+            )
+
+
 def test_prior_map_rejects_foreign_repository(tmp_path: Path) -> None:
     left = tmp_path / "left"
     right = tmp_path / "right"
