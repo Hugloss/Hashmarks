@@ -64,6 +64,7 @@ from .repository_index_store import (
     default_artifact_db,
 )
 from .repository_intelligence_query import RepositoryIntelligenceQueryMixin
+from .repository_declarations import RepositoryDeclarationsMixin
 from .repository_task_action import TaskActionMixin
 from .singleflight import SingleFlight
 from .structural_locality import StructuralLocalityMixin
@@ -95,6 +96,7 @@ class CodeMap(
     EvidenceProfilesMixin,
     CrossRepositoryEvidenceMixin,
     RepositoryIntelligenceQueryMixin,
+    RepositoryDeclarationsMixin,
     IntelligenceEconomicsMixin,
     VerificationExplanationMixin,
     PostChangeMixin,
