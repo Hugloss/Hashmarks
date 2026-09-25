@@ -200,15 +200,10 @@ class RepositoryDeclarationDiscoveryMixin:
     def _declaration_provider_paths(self, prefix: str) -> tuple[str, ...]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        admitted: list[str] = []
-        for path in sorted(self.store.paths_under(prefix)):
-            if self._internal_path(path) or not self._path_admitted_for_analysis(path):
-                continue
-            decision = self.policy.decide(path)
-            if not decision.index or decision.evidence_visibility.value == "deny":
-                continue
-            admitted.append(path)
-        return tuple(admitted)
+        return self.store.visible_paths_under_bounded(
+            prefix,
+            limit=MAX_PROVIDER_ENUMERATED_PATHS + 1,
+        )
 
     def _declaration_discovery_identity(
         self,
