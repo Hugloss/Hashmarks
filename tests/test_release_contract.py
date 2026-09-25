@@ -49,7 +49,7 @@ def _bundle(
     version: str | None = None,
 ) -> Path:
     bundle = tmp_path / f"standalone-{platform}"
-    bundle.mkdir()
+    bundle.mkdir(parents=True)
     artifact = bundle / _standalone_filename(platform)
     artifact.write_bytes(_artifact_payload(platform, version=version))
     if platform == "linux":
