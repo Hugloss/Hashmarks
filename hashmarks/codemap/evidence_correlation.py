@@ -1410,8 +1410,17 @@ class EvidenceCorrelationMixin:
             raise ValueError(
                 f"{label} must be a hashmarks.evidence-correlation.v1 packet"
             )
-        if not isinstance(packet.get("repository_evidence"), Mapping):
+        repository_evidence = packet.get("repository_evidence")
+        if not isinstance(repository_evidence, Mapping):
             raise ValueError("correlation packets must contain repository_evidence")
+        repository = repository_evidence.get("repository")
+        repository_identity = (
+            str(repository.get("repository_identity") or "")
+            if isinstance(repository, Mapping)
+            else ""
+        )
+        if repository_identity != self._repository_packet_identity():
+            raise ValueError(f"{label} correlation repository-mismatch")
         supplied_identity = packet.get("correlation_identity")
         if not isinstance(supplied_identity, str) or not _SHA256.fullmatch(
             supplied_identity
