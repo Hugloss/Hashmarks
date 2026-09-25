@@ -2,7 +2,7 @@
 
 ## 0.22.0 — Development
 
-- Add an explicit producer-side repository declaration discovery SPI and deterministic discovery wrapper: caller-selected providers may detect/normalize producer syntax, while Hashmarks keeps provider provenance/detection separate from declaration semantics, fails closed on provider errors, performs no ambient plugin loading, and keeps arbitrary provider execution outside MCP.
+- Add an explicit producer-side repository declaration discovery SPI and deterministic discovery wrapper: caller-selected providers may detect/normalize producer syntax, while Hashmarks keeps provider provenance/detection separate from declaration semantics, requires declaration evidence to be read through a revision-binding provider context, fails closed on provider input races/errors, performs no ambient plugin loading, and keeps arbitrary provider execution outside MCP.
 - Add producer-neutral cross-artifact repository declarations: explicitly scoped correspondence across files/formats, exact repository-evidence binding, canonical normalized equality/difference, ambiguity preservation, coverage-qualified absence, stable definition/observation identities, factual deltas, and a read-only MCP surface without source-of-truth precedence or winner selection.
 - Fail closed on malformed dependency-v3 observations and requests, stale repository bindings, cross-context graph traversal, and unsupported relationship kinds instead of treating uncertain evidence as authoritative.
 - Preserve uv marker-qualified dependencies as conditional graph evidence without flattening them into unconditional reachability or absence; retain environment-domain scope and reject lock forks or conflicts the shared model cannot represent.
