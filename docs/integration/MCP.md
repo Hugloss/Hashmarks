@@ -43,6 +43,8 @@ The tools are read-only from the repository consumer's perspective. Hashmarks ma
 
 `repository_declarations` accepts producer-normalized declaration groups. Semantic extraction, grouping, normalized values, correspondence, and coverage remain provider claims; Hashmarks binds them to current exact repository evidence and reports canonical equality/difference, ambiguity, coverage-qualified absence, identity, freshness, and factual deltas without selecting a winning declaration. See [Repository declarations](../reference/REPOSITORY_DECLARATIONS.md).
 
+Python integrations may use the public declaration-provider SPI and `CodeMap.discover_repository_declarations(...)` before transport. MCP intentionally does not dynamically import or execute those Python providers; external adapters pass their normalized groups into `repository_declarations`. A provider detection miss or provider execution failure therefore cannot be hidden inside MCP as declaration absence.
+
 ## Freshness and concurrency
 
 The adapter serializes refresh and tool execution inside one MCP server process. Multiple hosts may still spawn independent Hashmarks processes against the same workspace and derived state, so the MCP boundary also boundedly retries only the known transient races that are safe to recompute from scratch: an incomplete `BUILDING` generation, a generation changing during a decision session, or a file changing while it is hashed. Validation failures and unrelated runtime errors are never retried.
