@@ -106,6 +106,8 @@ def test_publish_workflow_publishes_only_verified_github_release_assets() -> Non
     assert "Verify exact reviewed draft asset set" in text
     assert "release/expected-assets.txt" in text
     assert "release/actual-assets.txt" in text
+    assert "publication-assets" in text
+    assert "cat > release/expected-assets.txt" not in text
     assert "diff -u release/expected-assets.txt release/actual-assets.txt" in text
     assert text.index("Remove stale assets from reviewed draft") < text.index(
         "Upload qualified assets to reviewed draft"
@@ -210,6 +212,27 @@ def test_publish_requires_native_linux_wsl_and_windows_release_identity() -> Non
         in publish
     )
     assert '"hashmarks version $RELEASE_VERSION"' in publish
+
+
+def test_ci_rehearses_cross_job_publication_aggregation() -> None:
+    text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    rehearsal = text.split("  publication-rehearsal:\n", 1)[1].split(
+        "\n  precommit:\n",
+        1,
+    )[0]
+
+    assert (
+        "needs: [release-environment, standalone-artifact, "
+        "standalone-windows-artifact]" in rehearsal
+    )
+    assert "hashmarks-qualified-python-${{ github.sha }}" in rehearsal
+    assert "hashmarks-standalone-linux-${{ github.sha }}" in rehearsal
+    assert "hashmarks-standalone-windows-${{ github.sha }}" in rehearsal
+    assert "verify-standalone-qualification" in rehearsal
+    assert "publication-manifest" in rehearsal
+    assert "verify-publication" in rehearsal
+    assert "publication-assets" in rehearsal
+    assert "diff -u rehearsal/expected-assets.txt rehearsal/actual-assets.txt" in rehearsal
 
 
 def test_release_profile_installs_mcp_before_full_native_qualification() -> None:
