@@ -1,14 +1,14 @@
-import json
 from __future__ import annotations
 
+import json
 import sys
 import types
 from pathlib import Path
 
 import pytest
 
-from hashmarks.codemap import CodeMap
 from hashmarks import mcp_server, mcp_surface, repository_retry
+from hashmarks.codemap import CodeMap
 from hashmarks.file_store import UnstableFileError
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
 
@@ -669,6 +669,7 @@ def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
     assert packet["groups"][0]["comparison"]["state"] == "differing"
     assert packet["winner"] == "not-selected"
     assert packet["interpretation_authority"] == "consumer-owned"
+
 
 def test_mcp_correlation_preserves_core_authority_and_completeness(
     tmp_path: Path,
