@@ -1612,7 +1612,7 @@ def test_binding_delta_rejects_resigned_malformed_definition_identity(
             "hashmarks.repository-evidence-bindings.v1", payload
         )
 
-        with pytest.raises(ValueError, match="binding definition identity malformed"):
+        with pytest.raises(ValueError, match="binding definition identity mismatch"):
             codemap.repository_evidence_binding_delta(before, packet)
 
 
