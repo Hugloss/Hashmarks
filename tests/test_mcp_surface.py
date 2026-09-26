@@ -597,6 +597,8 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
 
     assert packet["schema"] == "hashmarks.mcp-dependency-codemap.v1"
     assert packet["observation"]["schema"] == "hashmarks.dependency-resolution.v3"
+    direct = surface._map.dependency_resolution_evidence(snapshot)
+    assert packet["observation"] == direct
     assert packet["producer_authority"] == "caller-claimed"
     assert packet["observation"]["producer_authority"] == "caller-claimed"
     assert packet["queries"]["results"][0]["result"][0]["node_id"] == "lib@1"
