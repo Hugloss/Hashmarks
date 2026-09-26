@@ -69,6 +69,8 @@ The public GitHub Release contains:
 - `hashmarks-linux-x86_64.sha256`;
 - `hashmarks-windows-x86_64.exe`;
 - `hashmarks-windows-x86_64.exe.sha256`;
+- `install.sh`;
+- `install.ps1`;
 - `release-manifest.json`;
 - `SHA256SUMS.txt`.
 
@@ -79,18 +81,18 @@ After a Windows-capable release is published, verify the public install paths fr
 Linux or WSL2:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh | sh
+curl -fsSL https://github.com/Hugloss/Hashmarks/releases/latest/download/install.sh | sh
 hashmarks --version
 ```
 
 Native Windows PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.ps1 | iex
+irm https://github.com/Hugloss/Hashmarks/releases/latest/download/install.ps1 | iex
 hashmarks --version
 ```
 
-Both installers download the matching release executable and checksum sidecar, verify the candidate, run the candidate version smoke, and only then replace an existing installation.
+Both installer scripts are themselves manifest-bound release assets. They download the matching release executable and checksum sidecar, verify the candidate, run the candidate version smoke, and only then replace an existing installation.
 
 Do not advertise a platform in public onboarding until a published release actually contains that platform's qualified assets.
 
