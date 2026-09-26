@@ -270,6 +270,28 @@ def test_previous_declaration_packet_is_revalidated_before_delta(
             )
 
 
+def test_previous_declaration_rejects_resigned_nested_repository_evidence_tamper(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.toml").write_text('version = "1"\n', encoding="utf-8")
+    declarations = [_declaration("a", "a.toml", "1")]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([_group(declarations)])
+        evidence = before["repository_evidence"]
+        evidence["bindings"][0]["evidence"][0]["state"] = "known-absent"
+        before["observation_identity"] = codemap._declaration_packet_identity(before)
+
+        with pytest.raises(ValueError, match="bindings identity mismatch"):
+            codemap.repository_declarations(
+                [_group(declarations)],
+                previous_observation=before,
+            )
+
+
 def test_fail_closed_unknown_fields_and_invalid_complete_coverage(
     tmp_path: Path,
 ) -> None:
