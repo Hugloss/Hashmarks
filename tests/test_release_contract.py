@@ -200,6 +200,81 @@ def test_publication_manifest_binds_both_native_standalone_sets(
     assert str(manifest["manifest_identity"]).startswith("sha256:")
 
 
+def test_publication_asset_names_are_derived_from_manifest(
+    tmp_path: Path,
+) -> None:
+    manifest = publication_manifest(
+        _root(),
+        _dist(tmp_path),
+        [_bundle(tmp_path, "linux"), _bundle(tmp_path, "windows")],
+        tag=f"v{hashmarks.__version__}",
+        source_sha="9" * 40,
+    )
+
+    assert release_contract.publication_asset_names(manifest) == sorted(
+        [
+            "SHA256SUMS.txt",
+            f"hashmarks-{hashmarks.__version__}-py3-none-any.whl",
+            f"hashmarks-{hashmarks.__version__}.tar.gz",
+            "hashmarks-linux-x86_64",
+            "hashmarks-linux-x86_64.sha256",
+            "hashmarks-windows-x86_64.exe",
+            "hashmarks-windows-x86_64.exe.sha256",
+            "release-manifest.json",
+        ]
+    )
+
+
+def test_publication_asset_names_reject_duplicate_public_name(
+    tmp_path: Path,
+) -> None:
+    manifest = publication_manifest(
+        _root(),
+        _dist(tmp_path),
+        [_bundle(tmp_path, "linux"), _bundle(tmp_path, "windows")],
+        tag=f"v{hashmarks.__version__}",
+        source_sha="8" * 40,
+    )
+    manifest["standalones"].append(dict(manifest["standalones"][0]))
+
+    with pytest.raises(ValueError, match="duplicate public asset names"):
+        release_contract.publication_asset_names(manifest)
+
+
+def test_publication_assets_cli_writes_exact_manifest_derived_names(
+    tmp_path: Path,
+) -> None:
+    manifest = publication_manifest(
+        _root(),
+        _dist(tmp_path),
+        [_bundle(tmp_path, "linux"), _bundle(tmp_path, "windows")],
+        tag=f"v{hashmarks.__version__}",
+        source_sha="7" * 40,
+    )
+    manifest_path = tmp_path / "release-manifest.json"
+    output = tmp_path / "assets.txt"
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        release_contract.main(
+            [
+                "publication-assets",
+                "--manifest",
+                str(manifest_path),
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+    assert output.read_text(encoding="utf-8").splitlines() == (
+        release_contract.publication_asset_names(manifest)
+    )
+
+
 def test_publication_manifest_rejects_duplicate_platform_qualification(
     tmp_path: Path,
 ) -> None:
