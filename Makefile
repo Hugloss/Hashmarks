@@ -98,10 +98,10 @@ help:
 	  'Override FILES/HOT_REQUESTS, e.g. make metrics FILES=50000 HOT_REQUESTS=50'
 
 benchmark: bootstrap
-	@$(UV_RUN) --offline --no-sync python -m scripts.agent_evaluation.benchmark "$(BENCHMARK)"
+	@$(UV_RUN) --offline --no-sync hashmarks-benchmark "$(BENCHMARK)"
 
 benchmark-show:
-	@$(UV_RUN) --offline --no-sync python -m scripts.agent_evaluation.benchmark "$(BENCHMARK)" --show
+	@$(UV_RUN) --offline --no-sync hashmarks-benchmark "$(BENCHMARK)" --show
 
 evaluation-help:
 	@printf '%s\n' \
