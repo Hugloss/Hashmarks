@@ -1435,14 +1435,12 @@ class DependencyResolutionEvidenceMixin:
             "causation": "not-inferred",
         }
 
-    @staticmethod
     def dependency_resolution_queries(
+        self,
         observation: Mapping[str, object],
         requests: Sequence[Mapping[str, object]],
     ) -> dict[str, object]:
-        DependencyResolutionEvidenceMixin._require_qualified_dependency_observation_v3(
-            observation
-        )
+        self._require_current_dependency_observation_v3(observation)
         return dependency_queries(observation, requests)
 
     @staticmethod

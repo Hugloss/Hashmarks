@@ -295,6 +295,35 @@ def test_v3_public_consumers_revalidate_qualified_observation(
                 consume()
 
 
+def test_v3_queries_reject_foreign_repository_observation(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    consumer = tmp_path / "consumer"
+    source.mkdir()
+    consumer.mkdir()
+    with CodeMap(source) as source_map:
+        source_map.sync()
+        observation = source_map.dependency_resolution_evidence(_snapshot_v3())
+
+    with CodeMap(consumer) as consumer_map:
+        consumer_map.sync()
+        with pytest.raises(ValueError, match="repository binding mismatch"):
+            consumer_map.dependency_resolution_queries(
+                observation, [{"operation": "inventory"}]
+            )
+
+
+def test_v3_queries_reject_stale_repository_generation(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        (tmp_path / "new.py").write_text("VALUE = 1\n", encoding="utf-8")
+        codemap.sync(["new.py"])
+        with pytest.raises(ValueError, match="repository binding mismatch"):
+            codemap.dependency_resolution_queries(
+                observation, [{"operation": "inventory"}]
+            )
+
+
 def test_v3_revalidation_rejects_unqualified_coverage_claim(
     tmp_path: Path,
 ) -> None:
