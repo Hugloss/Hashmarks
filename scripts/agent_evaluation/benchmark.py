@@ -42,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     ns = parser.parse_args(argv)
     command, profile_env = _load(ns.config, ns.profile)
     if ns.show:
-        print(" ".join(command))
+        sys.stdout.write(" ".join(command) + "\\n")
         return 0
     env = dict(os.environ)
     env.update(profile_env)
