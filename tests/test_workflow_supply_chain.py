@@ -95,6 +95,8 @@ def test_publish_workflow_publishes_only_verified_github_release_assets() -> Non
     assert 'git -C source rev-list -n 1 "$RELEASE_TAG"' in text
     assert 'if [ "$tag_commit" != "${{ needs.prepare.outputs.source_sha }}" ]' in text
     assert "Materialize reviewed changelog section as release notes" in text
+    assert "replace this development placeholder" in text
+    assert "has no public release notes for" in text
     assert "--draft" in text
     assert 'gh release edit "$RELEASE_TAG" \\' in text
     assert "--notes-file release/release-notes.md" in text
@@ -232,7 +234,9 @@ def test_ci_rehearses_cross_job_publication_aggregation() -> None:
     assert "publication-manifest" in rehearsal
     assert "verify-publication" in rehearsal
     assert "publication-assets" in rehearsal
-    assert "diff -u rehearsal/expected-assets.txt rehearsal/actual-assets.txt" in rehearsal
+    assert (
+        "diff -u rehearsal/expected-assets.txt rehearsal/actual-assets.txt" in rehearsal
+    )
 
 
 def test_release_profile_installs_mcp_before_full_native_qualification() -> None:
