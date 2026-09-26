@@ -414,6 +414,7 @@ def test_coverage_distinguishes_bound_range_from_elsewhere_in_member(
             changed_paths=["source.py"],
             change_set_complete=True,
             binding_delta=delta,
+            binding_delta_before=before,
         )
         source.write_text("OUTSIDE\nBOUND\n", encoding="utf-8")
         codemap.sync(["source.py"])
@@ -424,6 +425,7 @@ def test_coverage_distinguishes_bound_range_from_elsewhere_in_member(
             changed_paths=["source.py"],
             change_set_complete=True,
             binding_delta=direct_delta,
+            binding_delta_before=after,
         )
 
     assert outside_range["classification"]["changed_inside_bound_evidence"] == []
@@ -561,6 +563,7 @@ def test_deleted_bound_member_is_first_class_delta(tmp_path: Path) -> None:
             changed_paths=["a.py"],
             change_set_complete=True,
             binding_delta=delta,
+            binding_delta_before=before,
         )
     changed = delta["bindings"]["changed"][0]
     assert changed["direct_evidence"]["state"] == "preserved"
@@ -778,6 +781,7 @@ def test_coverage_reports_binding_ids_and_stable_impact_reasons(tmp_path: Path) 
             changed_paths=["owner.py"],
             change_set_complete=True,
             binding_delta=delta,
+            binding_delta_before=before,
         )
     assert coverage["binding_impacts"] == [
         {
@@ -845,6 +849,7 @@ def test_whole_member_change_is_direct_content_and_member_change(
             changed_paths=["artifact.lock"],
             change_set_complete=True,
             binding_delta=delta,
+            binding_delta_before=before,
         )
 
     changed = delta["bindings"]["changed"][0]
@@ -1064,6 +1069,7 @@ def test_coverage_rejects_delta_for_different_binding_packet(tmp_path: Path) -> 
                 changed_paths=["a.py"],
                 change_set_complete=True,
                 binding_delta=delta,
+            binding_delta_before=before,
             )
 
 
@@ -1091,6 +1097,7 @@ def test_coverage_rejects_tampered_binding_delta(tmp_path: Path) -> None:
                 changed_paths=["a.py"],
                 change_set_complete=True,
                 binding_delta=delta,
+            binding_delta_before=before,
             )
 
 
@@ -1185,6 +1192,7 @@ def test_range_definition_change_does_not_masquerade_as_repository_change(
             changed_paths=[],
             change_set_complete=True,
             binding_delta=delta,
+            binding_delta_before=before,
         )
 
     changed = delta["bindings"]["changed"][0]
@@ -1227,6 +1235,7 @@ def test_dependency_definition_change_is_not_dependency_observation_change(
             changed_paths=[],
             change_set_complete=True,
             binding_delta=delta,
+            binding_delta_before=before,
         )
 
     changed = delta["bindings"]["changed"][0]
@@ -1661,6 +1670,41 @@ def test_coverage_rejects_resigned_contradictory_binding_delta(tmp_path: Path) -
                 changed_paths=["source.py"],
                 change_set_complete=True,
                 binding_delta=delta,
+            binding_delta_before=before,
+            )
+
+
+def test_coverage_rejects_resigned_forged_binding_delta_detail(tmp_path: Path) -> None:
+    source = tmp_path / "source.py"
+    source.write_text("value = 1\n", encoding="utf-8")
+    bindings = [
+        {
+            "binding_id": "value",
+            "evidence": [{"path": "source.py", "start_line": 1, "end_line": 1}],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(bindings)
+        source.write_text("value = 2\n", encoding="utf-8")
+        codemap.sync(["source.py"])
+        after = codemap.repository_evidence_bindings(bindings)
+        delta = codemap.repository_evidence_binding_delta(before, after)
+        delta["bindings"]["changed"][0]["direct_evidence"]["state"] = "preserved"
+        payload = {
+            key: value for key, value in delta.items() if key != "delta_identity"
+        }
+        delta["delta_identity"] = "sha256:" + codemap._packet_digest(
+            "hashmarks.repository-evidence-binding-delta.v1", payload
+        )
+
+        with pytest.raises(ValueError, match="semantic replay mismatch"):
+            codemap.repository_evidence_coverage(
+                after,
+                changed_paths=["source.py"],
+                change_set_complete=True,
+                binding_delta=delta,
+                binding_delta_before=before,
             )
 
 
@@ -1700,6 +1744,7 @@ def test_coverage_rejects_authenticated_delta_with_foreign_repository_claim(
                 changed_paths=["source.py"],
                 change_set_complete=True,
                 binding_delta=delta,
+            binding_delta_before=before,
             )
 
 
@@ -1739,4 +1784,5 @@ def test_coverage_rejects_authenticated_delta_with_foreign_before_repository_cla
                 changed_paths=["source.py"],
                 change_set_complete=True,
                 binding_delta=delta,
+            binding_delta_before=before,
             )
