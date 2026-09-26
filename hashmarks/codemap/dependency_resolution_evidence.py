@@ -6,6 +6,8 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.paths import normalize_relative_path
+
 from . import dependency_resolution_contract as _contract
 from .dependency_resolution_query import dependency_queries
 
@@ -1294,7 +1296,10 @@ class DependencyResolutionEvidenceMixin:
         seen: set[str] = set()
         for raw in rows:
             _contract.reject_unknown_fields(raw, label="repository input")
-            path = _identifier(raw.get("path"), label="repository input path")
+            path = normalize_relative_path(
+                _identifier(raw.get("path"), label="repository input path"),
+                allow_root=False,
+            )
             if path in seen:
                 raise ValueError(f"duplicate repository input path: {path}")
             seen.add(path)
@@ -1430,14 +1435,12 @@ class DependencyResolutionEvidenceMixin:
             "causation": "not-inferred",
         }
 
-    @staticmethod
     def dependency_resolution_queries(
+        self,
         observation: Mapping[str, object],
         requests: Sequence[Mapping[str, object]],
     ) -> dict[str, object]:
-        DependencyResolutionEvidenceMixin._require_qualified_dependency_observation_v3(
-            observation
-        )
+        self._require_current_dependency_observation_v3(observation)
         return dependency_queries(observation, requests)
 
     @staticmethod

@@ -433,6 +433,27 @@ class RepositoryEvidenceBindingDeltaMixin:
         )
         if not isinstance(identity, str) or identity != expected_identity:
             raise ValueError(f"{name} bindings identity mismatch")
+        rows = packet.get("bindings")
+        if not isinstance(rows, list) or any(
+            not isinstance(row, Mapping) for row in rows
+        ):
+            raise ValueError(f"{name} bindings must be a list of objects")
+        binding_ids = [str(row.get("binding_id") or "") for row in rows]
+        if any(not binding_id for binding_id in binding_ids):
+            raise ValueError(f"{name} binding_id must not be empty")
+        if len(set(binding_ids)) != len(binding_ids):
+            raise ValueError(f"{name} contains duplicate binding_id")
+        for row in rows:
+            binding_payload = {
+                key: row.get(key)
+                for key in ("binding_id", "evidence", "dependencies", "relationships")
+            }
+            expected_observation_identity = "sha256:" + self._packet_digest(
+                "hashmarks.repository-evidence-binding-observation.v1",
+                binding_payload,
+            )
+            if row.get("binding_observation_identity") != expected_observation_identity:
+                raise ValueError(f"{name} binding observation identity mismatch")
 
     def repository_evidence_binding_delta(
         self,
@@ -445,7 +466,11 @@ class RepositoryEvidenceBindingDeltaMixin:
             self._validate_binding_delta_input(packet, name=name)
         before_repository = self._repository_identity(before)
         after_repository = self._repository_identity(after)
-        if not before_repository or before_repository != after_repository:
+        if (
+            not before_repository
+            or before_repository != after_repository
+            or before_repository != self._repository_packet_identity()
+        ):
             raise ValueError("repository evidence bindings repository-mismatch")
         before_observer = self._observer_identity(before)
         after_observer = self._observer_identity(after)

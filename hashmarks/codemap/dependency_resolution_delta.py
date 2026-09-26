@@ -22,6 +22,8 @@ class DependencyResolutionDeltaMixin:
         after_binding = cast("Mapping[str, object]", after["repository_binding"])
         if before_binding.get("repository_identity") != after_binding.get(
             "repository_identity"
+        ) or before_binding.get("codemap_generation") != after_binding.get(
+            "codemap_generation"
         ):
             raise ValueError("dependency observations repository-mismatch")
         return DependencyResolutionEvidenceMixin._dependency_resolution_delta_v3(

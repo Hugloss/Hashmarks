@@ -319,6 +319,55 @@ class RepositoryEvidenceCoverageMixin:
             },
         )
 
+    @staticmethod
+    def _validated_binding_delta_ids(
+        bindings: Mapping[str, object],
+        field: str,
+    ) -> set[str]:
+        values = bindings.get(field)
+        if not isinstance(values, list) or any(
+            not isinstance(value, str) for value in values
+        ):
+            raise ValueError(f"binding_delta {field} must be a list of binding ids")
+        if len(set(values)) != len(values):
+            raise ValueError(f"binding_delta {field} contains duplicate binding id")
+        return set(values)
+
+    @staticmethod
+    def _validated_changed_binding_ids(
+        bindings: Mapping[str, object],
+    ) -> set[str]:
+        changed = bindings.get("changed")
+        if not isinstance(changed, list) or any(
+            not isinstance(row, Mapping) for row in changed
+        ):
+            raise ValueError("binding_delta changed must be a list of objects")
+        changed_ids = [str(row.get("binding_id") or "") for row in changed]
+        if any(not binding_id for binding_id in changed_ids) or len(
+            set(changed_ids)
+        ) != len(changed_ids):
+            raise ValueError(
+                "binding_delta changed contains duplicate or empty binding id"
+            )
+        return set(changed_ids)
+
+    @classmethod
+    def _validate_binding_delta_classifications(
+        cls,
+        binding_delta: Mapping[str, object],
+    ) -> None:
+        bindings = binding_delta.get("bindings")
+        if not isinstance(bindings, Mapping):
+            raise ValueError("binding_delta bindings must be an object")
+        id_sets = {
+            field: cls._validated_binding_delta_ids(bindings, field)
+            for field in ("added", "removed", "preserved")
+        }
+        id_sets["changed"] = cls._validated_changed_binding_ids(bindings)
+        classified_ids = [binding_id for ids in id_sets.values() for binding_id in ids]
+        if len(classified_ids) != len(set(classified_ids)):
+            raise ValueError("binding_delta binding classifications overlap")
+
     def _validate_coverage_binding_delta(
         self,
         binding_delta: Mapping[str, object],
@@ -360,6 +409,7 @@ class RepositoryEvidenceCoverageMixin:
             identity != repository_identity for identity in delta_repository_identities
         ):
             raise ValueError("binding_delta repository-mismatch")
+        self._validate_binding_delta_classifications(binding_delta)
         identities = binding_delta.get("bindings_identity")
         after_identity = (
             identities.get("after") if isinstance(identities, Mapping) else None
@@ -371,20 +421,13 @@ class RepositoryEvidenceCoverageMixin:
         self,
         bindings_packet: Mapping[str, object],
         binding_delta: Mapping[str, object] | None,
+        binding_delta_before: Mapping[str, object] | None,
     ) -> None:
-        if bindings_packet.get("schema") != "hashmarks.repository-evidence-bindings.v1":
-            raise ValueError("bindings_packet must be repository evidence bindings")
-        identity = bindings_packet.get("bindings_identity")
-        expected_identity = "sha256:" + self._packet_digest(
-            "hashmarks.repository-evidence-bindings.v1",
-            {
-                key: value
-                for key, value in bindings_packet.items()
-                if key != "bindings_identity"
-            },
+        self._validate_binding_delta_input(
+            bindings_packet,
+            name="bindings_packet",
         )
-        if identity != expected_identity:
-            raise ValueError("bindings_packet bindings identity mismatch")
+        identity = bindings_packet.get("bindings_identity")
         repository = bindings_packet.get("repository")
         repository_identity = (
             str(repository.get("repository_identity") or "")
@@ -399,6 +442,16 @@ class RepositoryEvidenceCoverageMixin:
                 repository_identity=repository_identity,
                 bindings_identity=identity,
             )
+            if binding_delta_before is None:
+                raise ValueError(
+                    "binding_delta_before is required to authenticate binding_delta"
+                )
+            replayed_delta = self.repository_evidence_binding_delta(
+                binding_delta_before,
+                bindings_packet,
+            )
+            if replayed_delta["delta_identity"] != binding_delta.get("delta_identity"):
+                raise ValueError("binding_delta semantic replay mismatch")
 
     @staticmethod
     def _delta_evidence_paths(
@@ -493,11 +546,16 @@ class RepositoryEvidenceCoverageMixin:
         change_set_complete: bool | None = None,
         repository_observation: RepositoryObservation | None = None,
         binding_delta: Mapping[str, object] | None = None,
+        binding_delta_before: Mapping[str, object] | None = None,
     ) -> dict[str, object]:
         """Classify changes while preserving change-set authority and precision."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._validate_coverage_packets(bindings_packet, binding_delta)
+        self._validate_coverage_packets(
+            bindings_packet,
+            binding_delta,
+            binding_delta_before,
+        )
         changed, complete, change_set = self._change_set(
             changed_paths, change_set_complete, repository_observation
         )
