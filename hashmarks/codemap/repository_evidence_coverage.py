@@ -372,19 +372,11 @@ class RepositoryEvidenceCoverageMixin:
         bindings_packet: Mapping[str, object],
         binding_delta: Mapping[str, object] | None,
     ) -> None:
-        if bindings_packet.get("schema") != "hashmarks.repository-evidence-bindings.v1":
-            raise ValueError("bindings_packet must be repository evidence bindings")
-        identity = bindings_packet.get("bindings_identity")
-        expected_identity = "sha256:" + self._packet_digest(
-            "hashmarks.repository-evidence-bindings.v1",
-            {
-                key: value
-                for key, value in bindings_packet.items()
-                if key != "bindings_identity"
-            },
+        self._validate_binding_delta_input(
+            bindings_packet,
+            name="bindings_packet",
         )
-        if identity != expected_identity:
-            raise ValueError("bindings_packet bindings identity mismatch")
+        identity = bindings_packet.get("bindings_identity")
         repository = bindings_packet.get("repository")
         repository_identity = (
             str(repository.get("repository_identity") or "")
