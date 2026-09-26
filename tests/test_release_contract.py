@@ -242,7 +242,7 @@ def test_publication_manifest_binds_both_native_standalone_sets(
         source_sha="b" * 40,
     )
 
-    assert manifest["schema"] == "hashmarks.release-publication-manifest.v2"
+    assert manifest["schema"] == "hashmarks.release-publication-manifest.v3"
     assert manifest["source"] == {"commit_sha": "b" * 40}
     assert [
         (row["platform"], row["architecture"], row["filename"])
@@ -254,7 +254,19 @@ def test_publication_manifest_binds_both_native_standalone_sets(
     assert [row["filename"] for row in manifest["installer_checksums"]] == [
         "hashmarks-linux-x86_64.sha256",
         "hashmarks-windows-x86_64.exe.sha256",
+        "install.sh",
+        "install.ps1",
     ]
+    assert [
+        (row["platform"], row["filename"]) for row in manifest["bootstrap_installers"]
+    ] == [
+        ("linux-wsl", "install.sh"),
+        ("windows", "install.ps1"),
+    ]
+    assert all(
+        str(row["sha256"]).startswith("sha256:")
+        for row in manifest["bootstrap_installers"]
+    )
     assert all(
         str(row["qualification_identity"]).startswith("sha256:")
         for row in manifest["standalones"]
@@ -282,6 +294,8 @@ def test_publication_asset_names_are_derived_from_manifest(
             "hashmarks-linux-x86_64.sha256",
             "hashmarks-windows-x86_64.exe",
             "hashmarks-windows-x86_64.exe.sha256",
+            "install.ps1",
+            "install.sh",
             "release-manifest.json",
         ]
     )
@@ -371,6 +385,8 @@ def test_materialize_publication_bundle_contains_only_manifest_owned_assets(
     release_contract.main(
         [
             "materialize-publication",
+                "--root",
+                str(_root()),
             "--manifest",
             str(manifest_path),
             "--sha256sums",
@@ -431,6 +447,8 @@ def test_materialize_publication_bundle_rejects_post_manifest_byte_drift(
         release_contract.main(
             [
                 "materialize-publication",
+                "--root",
+                str(_root()),
                 "--manifest",
                 str(manifest_path),
                 "--sha256sums",
@@ -485,6 +503,8 @@ def test_materialize_publication_bundle_rejects_stale_output_directory(
         release_contract.main(
             [
                 "materialize-publication",
+                "--root",
+                str(_root()),
                 "--manifest",
                 str(manifest_path),
                 "--sha256sums",
