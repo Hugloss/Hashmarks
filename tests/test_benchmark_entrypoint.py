@@ -28,3 +28,9 @@ def test_benchmark_profile_rejects_unknown_name(tmp_path: Path):
 
     with pytest.raises(SystemExit, match="choose: local"):
         _load(config, "missing")
+
+
+def test_project_exposes_benchmark_console_entrypoint():
+    pyproject = (Path(__file__).parents[1] / "pyproject.toml").read_text()
+
+    assert 'hashmarks-benchmark = "scripts.agent_evaluation.benchmark:main"' in pyproject
