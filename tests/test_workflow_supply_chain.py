@@ -132,10 +132,10 @@ def test_publish_workflow_uses_only_qualified_cross_platform_assets() -> None:
     assert "qualified-python-release-bundle" in text
     assert "qualified-standalone-linux-release-bundle" in text
     assert "qualified-standalone-windows-release-bundle" in text
-    assert "release/standalone/linux/hashmarks-linux-x86_64" in text
-    assert "release/standalone/linux/hashmarks-linux-x86_64.sha256" in text
-    assert "release/standalone/windows/hashmarks-windows-x86_64.exe" in text
-    assert "release/standalone/windows/hashmarks-windows-x86_64.exe.sha256" in text
+    assert "--standalone-bundle release/standalone/linux" in text
+    assert "--standalone-bundle release/standalone/windows" in text
+    assert "materialize-publication" in text
+    assert "release/public/*" in text
     assert text.count("verify-standalone-qualification") >= 4
     assert "environment: pypi" not in text
     assert "id-token: write" not in text
