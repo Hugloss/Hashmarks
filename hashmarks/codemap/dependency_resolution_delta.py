@@ -25,6 +25,8 @@ class DependencyResolutionDeltaMixin:
             != after_binding.get("repository_identity")
             or before_binding.get("repository_identity")
             != self._repository_packet_identity()
+            or before_binding.get("codemap_generation")
+            != after_binding.get("codemap_generation")
         ):
             raise ValueError("dependency observations repository-mismatch")
         return DependencyResolutionEvidenceMixin._dependency_resolution_delta_v3(
