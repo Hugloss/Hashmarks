@@ -109,12 +109,20 @@ def test_publish_workflow_publishes_only_verified_github_release_assets() -> Non
     assert "release/expected-assets.txt" in text
     assert "release/actual-assets.txt" in text
     assert "publication-assets" in text
+    assert "materialize-publication" in text
+    assert "release/public/*" in text
+    assert "Read back exact draft release bytes" in text
+    assert 'gh release download "$RELEASE_TAG" --dir release/readback' in text
+    assert 'cmp -s "release/public/$asset" "release/readback/$asset"' in text
     assert "cat > release/expected-assets.txt" not in text
     assert "diff -u release/expected-assets.txt release/actual-assets.txt" in text
     assert text.index("Remove stale assets from reviewed draft") < text.index(
         "Upload qualified assets to reviewed draft"
     )
     assert text.index("Verify exact reviewed draft asset set") < text.index(
+        "Read back exact draft release bytes"
+    )
+    assert text.index("Read back exact draft release bytes") < text.index(
         "Publish reviewed release"
     )
     assert "qualified-python-release-bundle" in text
@@ -161,7 +169,7 @@ def test_ci_qualifies_native_linux_wsl_and_windows_install_paths() -> None:
         1,
     )[0]
     windows = text.split("  standalone-windows-artifact:\n", 1)[1].split(
-        "\n  precommit:\n",
+        "\n  publication-rehearsal:\n",
         1,
     )[0]
 
@@ -233,6 +241,7 @@ def test_ci_rehearses_cross_job_publication_aggregation() -> None:
     assert "verify-standalone-qualification" in rehearsal
     assert "publication-manifest" in rehearsal
     assert "verify-publication" in rehearsal
+    assert "materialize-publication" in rehearsal
     assert "publication-assets" in rehearsal
     assert (
         "diff -u rehearsal/expected-assets.txt rehearsal/actual-assets.txt" in rehearsal
