@@ -1409,6 +1409,7 @@ def test_previous_correlation_from_foreign_repository_fails_closed(
                 previous_correlation=previous,
             )
 
+
 def test_correlation_delta_rejects_nested_repository_evidence_tampering(
     tmp_path: Path,
 ) -> None:
@@ -1434,6 +1435,7 @@ def test_correlation_delta_rejects_nested_repository_evidence_tampering(
 
         with pytest.raises(ValueError, match="bindings identity mismatch"):
             codemap.evidence_correlation_delta(tampered, packet)
+
 
 def test_correlation_definition_identity_is_bundle_order_invariant(
     tmp_path: Path,
