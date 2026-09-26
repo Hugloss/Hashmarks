@@ -525,6 +525,24 @@ def test_v3_rejects_dangling_evidence_source_reference(tmp_path: Path) -> None:
             codemap.dependency_resolution_evidence(changed)
 
 
+def test_v3_delta_rejects_matching_foreign_repository_observations(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    consumer = tmp_path / "consumer"
+    source.mkdir()
+    consumer.mkdir()
+    with CodeMap(source) as source_map:
+        source_map.sync()
+        before = source_map.dependency_resolution_evidence(_snapshot_v3())
+        after = source_map.dependency_resolution_evidence(_snapshot_v3())
+
+    with CodeMap(consumer) as consumer_map:
+        consumer_map.sync()
+        with pytest.raises(ValueError, match="repository-mismatch"):
+            consumer_map.dependency_resolution_delta(before, after)
+
+
 def test_v3_delta_reports_selection_inventory_and_relationship_change(
     tmp_path: Path,
 ) -> None:
