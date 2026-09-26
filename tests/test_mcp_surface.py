@@ -17,16 +17,10 @@ def _repo(tmp_path: Path) -> Path:
     (repo / "src").mkdir()
     (repo / "tests").mkdir()
     (repo / "src" / "feature.py").write_text(
-        "def flare041(value: int) -> int:
-    return value + 1
-", encoding="utf-8"
+        "def flare041(value: int) -> int:\n    return value + 1\n", encoding="utf-8"
     )
     (repo / "tests" / "test_feature.py").write_text(
-        "from src.feature import flare041
-
-def test_flare041():
-    assert flare041(1) == 2
-",
+        "from src.feature import flare041\n\ndef test_flare041():\n    assert flare041(1) == 2\n",
         encoding="utf-8",
     )
     return repo
@@ -164,9 +158,7 @@ def test_mcp_correlation_round_trips_max_repeated_anchor_set(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "worker.py").write_text(
-        "def process_output_data(value: int) -> int:
-    return value + 1
-",
+        "def process_output_data(value: int) -> int:\n    return value + 1\n",
         encoding="utf-8",
     )
     anchors = [
@@ -211,9 +203,7 @@ def test_mcp_correlation_round_trips_max_repeated_anchor_set(
 def test_mcp_find_truncated_only_when_an_extra_hit_exists(tmp_path: Path) -> None:
     repo = _repo(tmp_path)
     (repo / "src" / "feature_two.py").write_text(
-        "def flare041_second(value: int) -> int:
-    return value + 2
-",
+        "def flare041_second(value: int) -> int:\n    return value + 2\n",
         encoding="utf-8",
     )
     surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
@@ -403,9 +393,7 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
     for index in range(500):
         path = repo / f"src/p{index:04d}.py"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f"def f{index}():
-    return {index}
-", encoding="utf-8")
+        path.write_text(f"def f{index}():\n    return {index}\n", encoding="utf-8")
 
     registered: list[str] = []
 
@@ -619,10 +607,8 @@ def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
     tmp_path: Path,
 ) -> None:
     repo = _repo(tmp_path)
-    (repo / "runtime-a.yaml").write_text("runtime: 3.12
-", encoding="utf-8")
-    (repo / "runtime-b.yaml").write_text("runtime: 3.13
-", encoding="utf-8")
+    (repo / "runtime-a.yaml").write_text("runtime: 3.12\n", encoding="utf-8")
+    (repo / "runtime-b.yaml").write_text("runtime: 3.13\n", encoding="utf-8")
     groups = [
         {
             "group_id": "python-runtime",
@@ -766,3 +752,4 @@ def test_mcp_correlation_rejects_recomputed_outer_identity_over_tampered_nested_
             )
     finally:
         surface.close()
+
