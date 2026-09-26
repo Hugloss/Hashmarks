@@ -466,6 +466,11 @@ class RepositoryEvidenceBindingDeltaMixin:
             )
             if row.get("binding_observation_identity") != expected_observation_identity:
                 raise ValueError(f"{name} binding observation identity mismatch")
+            definition_identity = row.get("binding_definition_identity")
+            if not isinstance(definition_identity, str) or not definition_identity.startswith(
+                "sha256:"
+            ):
+                raise ValueError(f"{name} binding definition identity malformed")
 
     def repository_evidence_binding_delta(
         self,
