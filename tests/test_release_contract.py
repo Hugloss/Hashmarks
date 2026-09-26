@@ -468,8 +468,8 @@ def test_materialize_publication_bundle_rejects_post_manifest_byte_drift(
         release_contract.main(
             [
                 "materialize-publication",
-            "--root",
-            str(_root()),
+                "--root",
+                str(_root()),
                 "--manifest",
                 str(manifest_path),
                 "--sha256sums",
