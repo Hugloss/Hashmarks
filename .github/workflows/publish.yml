@@ -442,6 +442,22 @@ jobs:
             --tag "${{ needs.prepare.outputs.tag }}" \
             --source-sha "${{ needs.prepare.outputs.source_sha }}" \
             --manifest release/release-manifest.json
+      - name: Materialize exact public release bundle
+        run: |
+          rm -rf release/public release/readback
+          python3 workflow/scripts/release_contract.py materialize-publication \
+            --manifest release/release-manifest.json \
+            --sha256sums release/SHA256SUMS.txt \
+            --dist release/packages \
+            --standalone-bundle release/standalone/linux \
+            --standalone-bundle release/standalone/windows \
+            --output-dir release/public
+          python3 workflow/scripts/release_contract.py publication-assets \
+            --manifest release/release-manifest.json \
+            --output release/expected-assets.txt
+          find release/public -maxdepth 1 -type f -printf '%f\n' |
+            sort > release/materialized-assets.txt
+          diff -u release/expected-assets.txt release/materialized-assets.txt
       - name: Materialize reviewed changelog section as release notes
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
@@ -522,15 +538,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
         run: |
-          gh release upload "$RELEASE_TAG" \
-            release/packages/* \
-            release/release-manifest.json \
-            release/SHA256SUMS.txt \
-            release/standalone/linux/hashmarks-linux-x86_64 \
-            release/standalone/linux/hashmarks-linux-x86_64.sha256 \
-            release/standalone/windows/hashmarks-windows-x86_64.exe \
-            release/standalone/windows/hashmarks-windows-x86_64.exe.sha256 \
-            --clobber
+          gh release upload "$RELEASE_TAG" release/public/* --clobber
       - name: Verify exact reviewed draft asset set
         env:
           GH_TOKEN: ${{ github.token }}
@@ -546,6 +554,27 @@ jobs:
             echo "::error::Draft release asset set does not exactly match qualified publication assets"
             exit 1
           fi
+      - name: Read back exact draft release bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          rm -rf release/readback
+          mkdir -p release/readback
+          gh release download "$RELEASE_TAG" --dir release/readback
+          find release/readback -maxdepth 1 -type f -printf '%f\n' |
+            sort > release/readback-assets.txt
+          if ! diff -u release/expected-assets.txt release/readback-assets.txt; then
+            echo "::error::Draft release readback asset set differs from qualified publication assets"
+            exit 1
+          fi
+          while IFS= read -r asset; do
+            if ! cmp -s "release/public/$asset" "release/readback/$asset"; then
+              echo "::error::Draft release readback bytes differ for $asset"
+              exit 1
+            fi
+          done < release/expected-assets.txt
       - name: Publish reviewed release
         env:
           GH_TOKEN: ${{ github.token }}
