@@ -250,6 +250,10 @@ def test_ci_rehearses_cross_job_publication_aggregation() -> None:
     assert (
         "diff -u rehearsal/expected-assets.txt rehearsal/actual-assets.txt" in rehearsal
     )
+    assert "PUBLICATION_REHEARSAL: ${{ needs.publication-rehearsal.result }}" in text
+    assert "- publication-rehearsal" in text
+    assert "path: publication-rehearsal/" in text
+    assert "path: .publication-rehearsal/" not in text
 
 
 def test_release_profile_installs_mcp_before_full_native_qualification() -> None:
