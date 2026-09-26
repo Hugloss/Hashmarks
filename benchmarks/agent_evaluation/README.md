@@ -20,8 +20,9 @@ make benchmark
 
 Use `make benchmark BENCHMARK=quick` for a one-task smoke run and
 `make benchmark BENCHMARK=chatgpt` in constrained hosted environments that
-cannot assume a nested Codex executable. The shell-independent equivalent is
-`uv run --frozen python -m scripts.agent_evaluation.benchmark <profile>`.
+cannot assume a nested Codex executable. The direct equivalent is `uv run hashmarks-benchmark <profile>`. Both entrypoints
+select the same checked-in profile and benchmark implementation; neither owns
+benchmark defaults.
 
 Use `make benchmark-show BENCHMARK=<profile>` to inspect the exact stored
 command without executing it. Profiles only own launch configuration; benchmark
