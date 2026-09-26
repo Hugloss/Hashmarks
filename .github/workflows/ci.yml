@@ -415,19 +415,19 @@ jobs:
             --tag "v$version" \
             --source-sha "$source_sha" \
             --manifest rehearsal/release-manifest.json
+          rm -rf rehearsal/public
+          python3 scripts/release_contract.py materialize-publication \
+            --manifest rehearsal/release-manifest.json \
+            --sha256sums rehearsal/SHA256SUMS.txt \
+            --dist rehearsal/packages \
+            --standalone-bundle rehearsal/standalone/linux \
+            --standalone-bundle rehearsal/standalone/windows \
+            --output-dir rehearsal/public
           python3 scripts/release_contract.py publication-assets \
             --manifest rehearsal/release-manifest.json \
             --output rehearsal/expected-assets.txt
-          {
-            find rehearsal/packages -maxdepth 1 -type f -printf '%f\n'
-            printf '%s\n' \
-              hashmarks-linux-x86_64 \
-              hashmarks-linux-x86_64.sha256 \
-              hashmarks-windows-x86_64.exe \
-              hashmarks-windows-x86_64.exe.sha256 \
-              release-manifest.json \
-              SHA256SUMS.txt
-          } | sort > rehearsal/actual-assets.txt
+          find rehearsal/public -maxdepth 1 -type f -printf '%f\n' |
+            sort > rehearsal/actual-assets.txt
           diff -u rehearsal/expected-assets.txt rehearsal/actual-assets.txt
 
   precommit:
