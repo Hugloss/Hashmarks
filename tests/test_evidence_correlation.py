@@ -601,7 +601,7 @@ def test_previous_correlation_rejects_tampered_nested_repository_evidence(
         bindings[0]["evidence"][0]["state"] = "known-absent"
         with pytest.raises(
             ValueError,
-            match="correlation_identity does not match packet content",
+            match="bindings identity mismatch",
         ):
             codemap.correlate_evidence(
                 _bundle({"anchor_id": "owner", "path": "owner.py"}),
@@ -1358,3 +1358,119 @@ def test_external_evidence_conflict_is_retained_without_mutating_owner(
     anchor = correlated["bundles"][0]["anchors"][0]
     assert anchor["resolution"]["state"] == "claim-conflict"
     assert before["ownership_authority"] == after["ownership_authority"]
+
+
+def test_correlation_delta_rejects_foreign_repository_packet(tmp_path: Path) -> None:
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.mkdir()
+    right.mkdir()
+    for repo in (left, right):
+        (repo / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    with CodeMap(left) as codemap:
+        codemap.sync()
+        before = codemap.correlate_evidence(
+            _bundle({"anchor_id": "member", "path": "owner.py"}),
+            include_relationships=False,
+        )
+    with CodeMap(right) as codemap:
+        codemap.sync()
+        after = codemap.correlate_evidence(
+            _bundle({"anchor_id": "member", "path": "owner.py"}),
+            include_relationships=False,
+        )
+        with pytest.raises(ValueError, match="before correlation repository-mismatch"):
+            codemap.evidence_correlation_delta(before, after)
+
+
+def test_previous_correlation_from_foreign_repository_fails_closed(
+    tmp_path: Path,
+) -> None:
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.mkdir()
+    right.mkdir()
+    for repo in (left, right):
+        (repo / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    with CodeMap(left) as codemap:
+        codemap.sync()
+        previous = codemap.correlate_evidence(
+            _bundle({"anchor_id": "member", "path": "owner.py"}),
+            include_relationships=False,
+        )
+    with CodeMap(right) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="before correlation repository-mismatch"):
+            codemap.correlate_evidence(
+                _bundle({"anchor_id": "member", "path": "owner.py"}),
+                include_relationships=False,
+                previous_correlation=previous,
+            )
+
+
+def test_correlation_delta_rejects_nested_repository_evidence_tampering(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence(
+            _bundle({"anchor_id": "member", "path": "owner.py"}),
+            include_relationships=False,
+        )
+        tampered = json.loads(json.dumps(packet))
+        tampered["repository_evidence"]["bindings"][0]["binding_id"] = (
+            "repository-evidence:forged"
+        )
+        tampered["correlation_identity"] = "sha256:" + codemap._packet_digest(
+            "hashmarks.evidence-correlation.v1",
+            {
+                key: value
+                for key, value in tampered.items()
+                if key not in {"correlation_identity", "delta_from_previous"}
+            },
+        )
+
+        with pytest.raises(ValueError, match="bindings identity mismatch"):
+            codemap.evidence_correlation_delta(tampered, packet)
+
+
+def test_correlation_definition_identity_is_bundle_order_invariant(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.py").write_text("A = 1\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("B = 1\n", encoding="utf-8")
+    first = _bundle({"anchor_id": "a", "path": "a.py"})[0]
+    second = _bundle({"anchor_id": "b", "path": "b.py"})[0]
+    second["bundle_id"] = "observation:2"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        forward = codemap.correlate_evidence(
+            [first, second], include_relationships=False
+        )
+        reverse = codemap.correlate_evidence(
+            [second, first], include_relationships=False
+        )
+
+    assert (
+        forward["evidence_definition_identity"]
+        == reverse["evidence_definition_identity"]
+    )
+
+
+def test_incomplete_correlation_never_admits_negative_evidence(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence(
+            _bundle(
+                {"anchor_id": "missing", "path": "missing.py"},
+                completeness="incomplete",
+            ),
+            include_relationships=False,
+        )
+
+    assert packet["completeness"]["state"] == "incomplete"
+    assert packet["completeness"]["negative_evidence"] == "not-admissible"

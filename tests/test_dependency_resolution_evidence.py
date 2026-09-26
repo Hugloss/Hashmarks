@@ -3100,3 +3100,20 @@ def test_v3_mixed_selection_sources_do_not_borrow_authority(tmp_path: Path) -> N
             ValueError, match="selection requires selection evidence authority"
         ):
             codemap.dependency_resolution_evidence(snapshot)
+
+
+def test_v3_delta_rejects_cross_repository_observations(tmp_path: Path) -> None:
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    left.mkdir()
+    right.mkdir()
+
+    with CodeMap(left) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(_snapshot_v3())
+    with CodeMap(right) as codemap:
+        codemap.sync()
+        after = codemap.dependency_resolution_evidence(_snapshot_v3())
+
+    with pytest.raises(ValueError, match="dependency observations repository-mismatch"):
+        CodeMap.dependency_resolution_delta(before, after)

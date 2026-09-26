@@ -91,6 +91,99 @@ Canonical content identity is separate from CodeMap. CodeMap state is derived an
 - `evidence_correlation.py` — request-scoped correlation of bounded external/derived claims to existing repository member, symbol, binding, relationship, completeness, freshness, and delta authorities. It owns only claim/correspondence/source-equivalence projection semantics; interpretation, causation, persistence, execution, and recovery remain external.
 - `dependency_resolution_contract.py` — owns the v3 schema identity, semantic-authority vocabulary, and fail-closed dependency field allowlists, including the adjacent dependency-correlation request vocabulary; it contains no qualification or query behavior.
 - `dependency_resolution_evidence.py` — owns typed producer-neutral external dependency-resolution observations. V3 separates logical components from concrete selections, resolved inventory from graph reachability, physical source format from semantic evidence authority, and resolution identity from the full qualified observation. One physical source may support several semantic authorities; core qualification must never infer authority from a Maven/uv/other producer kind or require a package-manager-specific source shape. It preserves multi-context relationships, contextual module/distribution ownership, compact producer-evidence references, scoped completeness/truncation, repository-generation binding, factual delta, and bounded traversal with explicit omissions. Distribution names never prove import ownership; ownership must be supplied independently and ambiguity is preserved. Package-manager syntax and parsing terminate in `hashmarks/adapters/*`; see `docs/reference/DEPENDENCY_EVIDENCE.md`. It does not run package managers, inspect dependency implementations, own repository-declared dependency intent, or duplicate `project_graph.py`, `import_resolution.py`, repository freshness/delta, or `evidence_correlation.py`.
+odeMap maintainer guide
+
+This guide is for developers who need to change Hashmarks implementation code, especially developers who understand the public product but do not yet know where a behavior is owned.
+
+It is deliberately **not** another product contract. Normative behavior remains in `docs/reference/`, `docs/integration/`, tests, and public API documentation. This file is a navigation map for the implementation.
+
+## Why the code can feel hard to enter
+
+`CodeMap` is composed from many responsibility-specific mixins. That keeps ownership boundaries explicit, but reading `engine.py` top-to-bottom does not reveal a request flow. A new maintainer therefore needs two maps before reading implementation bodies:
+
+1. **Which module owns which fact or decision?**
+2. **What path does a common request take through those owners?**
+
+Do not infer ownership from import order or file size. Use the responsibility map below.
+
+## The shortest mental model
+
+```text
+repository bytes / metadata
+        │
+        ▼
+indexing_lifecycle.py ──► repository_index_store.py
+        │                       │
+        │                       ├─ files / symbols / refs / edges
+        │                       └─ derived, rebuildable CodeMap state
+        ▼
+query / delta producers
+        │
+        ├─ retrieval and context
+        ├─ import and graph delta
+        ├─ ownership / impact / verification
+        └─ freshness / repository-intelligence projections
+        │
+        ▼
+consumer-facing bounded delta
+```
+
+Canonical content identity is separate from CodeMap. CodeMap state is derived and reconstructible. Execution/certification is external.
+
+## Responsibility map
+
+### Construction and shared state
+
+- `engine.py` — assembles `CodeMap`, owns long-lived object wiring and generation-bound caches. It should not become the home for feature logic.
+- `repository_index_store.py` — persistent derived CodeMap storage and bulk query primitives.
+- `decision_session.py` — read-only, generation-bound reuse of immutable delta inside one decision scope, including exact repository-intelligence snapshots when task, changed paths, and all bounds match.
+
+### Indexing and repository ingestion
+
+- `indexing_lifecycle.py` — discovery, incremental/full sync lifecycle, stale-row removal, preflight economics, base snapshot reuse, build-state publication.
+- `index_watch.py` — foreground CodeMap watcher orchestration over the existing sync and observation authorities; it starts/stops the observer, publishes watcher state, and forces full reconciliation when observation continuity becomes UNKNOWN.
+  - Discovery owns the admission-time file-size observation in an immutable internal record; preflight consumes that observation instead of re-reading file metadata. Later digest/freshness checks remain authoritative for indexing bytes.
+- `parsers.py` — source parsing dispatch and parse-artifact keys.
+- `index_surfaces.py` — classifies indexed paths into source/test/docs/config-like surfaces.
+- `policy.py` — repository context/index visibility policy.
+
+### Retrieval and context
+
+- `find_engine.py` — core indexed search execution.
+- `task_retrieval.py` — task-oriented retrieval/ranking and bounded result reuse.
+- `query_router.py`, `query_primitives.py`, `query_surface.py` — query intent/formulation and public query projections.
+- `repository_context.py`, `work_context.py`, `context_cache.py` — bounded context planning and context materialization.
+
+### Repository relationships
+
+- `import_resolution.py` — repository import identity/re-export resolution. **Produces import identity; does not rank ownership.**
+- `delta_graph.py` — file/reverse graph traversal, SCIP import, project enrichment.
+- `relationships.py`, `project_graph.py`, `typescript_resolver.py` — relationship/project/language-specific enrichment.
+- `structural_locality.py` — fresh exact-symbol call/caller/navigation locality and forwarding-shape delta; observes repository structure only and never decides whether a refactor is desirable.
+
+### Ownership
+
+- `import_ownership.py` — static diagnostics for dynamic-loader/module-cache ownership hazards; not normal import resolution.
+- `cache_ownership.py`, `cache_invalidation.py`, `concurrency_risk.py` — specialized repository ownership delta.
+- `ownership_analysis.py` — composes import/cache/invalidation/concurrency delta into repository ownership findings.
+- `ownership_graph.py` — consumes resolved repository identity and applies ownership visibility, expansion, ranking, and bounded graph selection.
+
+### Change impact and verification
+
+- `change_impact.py`, `post_change.py` — impact delta around repository changes.
+- `delta_verification.py` — repository-derived verification relevance, ownership links, and selection delta.
+- `verification_plan.py` — bounded runner/argv projection for an already-known verification surface; it does not execute verification or choose repository work.
+- `verification_explanation.py` — explanation projection over verification selection.
+
+### Freshness and higher-level repository intelligence
+
+- `delta_freshness.py` — low-level fact-local freshness delta used by graph/intelligence producers.
+- `freshness_map.py` — consumer-facing freshness-map projection.
+- `change_intelligence.py`, `repository_delta.py`, `delta_profiles.py`, `cross_repository_delta.py`, `intelligence_economics.py` — derived repository-intelligence projections. `repository_delta.py` owns snapshot composition and repository/observer delta vocabulary; inside one explicit decision session, an exact snapshot request may be reused by profile/economics/delta consumers without creating a second truth source.
+- `repository_delta_bindings.py`, `repository_delta_binding_delta.py`, `repository_delta_coverage.py` — opaque consumer binding projections over existing repository observation, member revision, relationship, freshness, completeness, and delta authorities. They may own binding declaration/projection shape but must not create a second repository change/freshness model.
+- `delta_correlation.py` — request-scoped correlation of bounded external/derived claims to existing repository member, symbol, binding, relationship, completeness, freshness, and delta authorities. It owns only claim/correspondence/source-equivalence projection semantics; interpretation, causation, persistence, execution, and recovery remain external.
+- `dependency_resolution_contract.py` — owns the v3 schema identity, semantic-authority vocabulary, and fail-closed dependency field allowlists, including the adjacent dependency-correlation request vocabulary; it contains no qualification or query behavior.
+- `dependency_resolution_delta.py` — owns typed producer-neutral external dependency-resolution observations. V3 separates logical components from concrete selections, resolved inventory from graph reachability, physical source format from semantic delta authority, and resolution identity from the full qualified observation. One physical source may support several semantic authorities; core qualification must never infer authority from a Maven/uv/other producer kind or require a package-manager-specific source shape. It preserves multi-context relationships, contextual module/distribution ownership, compact producer-delta references, scoped completeness/truncation, repository-generation binding, factual delta, and bounded traversal with explicit omissions. Distribution names never prove import ownership; ownership must be supplied independently and ambiguity is preserved. Package-manager syntax and parsing terminate in `hashmarks/adapters/*`; see `docs/reference/DEPENDENCY_delta.md`. It does not run package managers, inspect dependency implementations, own repository-declared dependency intent, or duplicate `project_graph.py`, `import_resolution.py`, repository freshness/delta, or `delta_correlation.py`.
 - `repository_declaration_contract.py` — producer-neutral cross-artifact declaration request contract: scoped correspondence/value-state validation, exact normalized equality/difference, and coverage-qualified absence. It owns no repository reads and no source precedence.
 - `repository_declarations.py` — projection owner that binds declaration/provider claims to existing exact repository-evidence bindings, issues definition/observation identities, and preserves provider authority separately from repository authority.
 - `repository_declaration_delta.py` — factual before/after declaration packet comparison only; it does not decide whether a changed value or correspondence is correct.
