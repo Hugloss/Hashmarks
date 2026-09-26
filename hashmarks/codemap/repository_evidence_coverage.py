@@ -364,11 +364,9 @@ class RepositoryEvidenceCoverageMixin:
             for field in ("added", "removed", "preserved")
         }
         id_sets["changed"] = cls._validated_changed_binding_ids(bindings)
-        fields = tuple(id_sets)
-        for index, left in enumerate(fields):
-            for right in fields[index + 1 :]:
-                if id_sets[left] & id_sets[right]:
-                    raise ValueError("binding_delta binding classifications overlap")
+        classified_ids = [binding_id for ids in id_sets.values() for binding_id in ids]
+        if len(classified_ids) != len(set(classified_ids)):
+            raise ValueError("binding_delta binding classifications overlap")
 
     def _validate_coverage_binding_delta(
         self,
