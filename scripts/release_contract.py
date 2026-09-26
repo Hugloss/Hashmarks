@@ -614,27 +614,6 @@ def _copy_publication_sources(
         raise ValueError("materialized publication asset set mismatch")
 
 
-def materialize_publication_bundle(
-    manifest: dict[str, object],
-    *,
-    root: Path,
-    manifest_path: Path,
-    sha256sums_path: Path,
-    dist: Path,
-    standalone_bundles: list[Path],
-    output_dir: Path,
-) -> None:
-    sources = _publication_source_map(
-        manifest,
-        root=root,
-        manifest_path=manifest_path,
-        sha256sums_path=sha256sums_path,
-        dist=dist,
-        standalone_bundles=standalone_bundles,
-    )
-    _copy_publication_sources(manifest, sources, output_dir)
-
-
 def _sha256sums_text(manifest: dict[str, object]) -> str:
     checksum_rows = list(manifest["distributions"])
     checksum_rows.extend(manifest.get("standalones", []))
@@ -813,15 +792,15 @@ def _run_materialize_publication(args) -> int:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(manifest, dict):
         raise ValueError("publication manifest must be an object")
-    materialize_publication_bundle(
+    sources = _publication_source_map(
         manifest,
         root=Path(args.root),
         manifest_path=manifest_path,
         sha256sums_path=Path(args.sha256sums),
         dist=Path(args.dist),
         standalone_bundles=[Path(item) for item in args.standalone_bundles],
-        output_dir=Path(args.output_dir),
     )
+    _copy_publication_sources(manifest, sources, Path(args.output_dir))
     _log_command_output("Hashmarks publication bundle materialization: PASS")
     return 0
 
@@ -880,7 +859,10 @@ def _run_command(args) -> int:
         result = _run_publication_assets(args)
     elif args.command == "materialize-publication":
         result = _run_materialize_publication(args)
-    elif args.command in {"standalone-qualification", "verify-standalone-qualification"}:
+    elif args.command in {
+        "standalone-qualification",
+        "verify-standalone-qualification",
+    }:
         result = _run_standalone_command(args, root)
     elif args.command in {"publication-manifest", "verify-publication"}:
         result = _run_publication_command(args, root)
