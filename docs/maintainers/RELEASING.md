@@ -34,7 +34,8 @@ Normal PR CI qualifies the release-relevant product surfaces before merge:
 - the standalone Windows x86_64 executable and the public PowerShell installer;
 - CLI and MCP startup from each native standalone;
 - install/upgrade behavior and version identity;
-- native standalone qualification receipts binding executable bytes, checksum sidecars, platform, architecture, and reported version.
+- native standalone qualification receipts binding executable bytes, checksum sidecars, platform, architecture, and reported version;
+- a publication aggregation rehearsal that downloads the independently qualified Python, Linux/WSL, and Windows workflow artifacts, reconstructs the final publication manifest, materializes the exact public bundle, and verifies its manifest-derived asset membership.
 
 WSL intentionally uses the Linux executable and installer. It is not a third mirrored build.
 
@@ -52,8 +53,11 @@ For a normal release, the reviewed release-request merge SHA becomes the release
 6. produces a native qualification receipt for each standalone;
 7. downloads the qualified bundles into the publication job and revalidates their bytes and receipts;
 8. creates one final publication manifest binding the exact source SHA, wheel, sdist, both standalone executables, both installer checksum sidecars, and both native qualification identities;
-9. verifies any existing release tag still resolves to the exact release-source SHA;
-10. creates a draft GitHub Release, uploads only the qualified public assets, and publishes the draft after all checks pass.
+9. materializes the exact public bundle from that manifest and verifies its filename set;
+10. verifies any existing release tag still resolves to the exact release-source SHA;
+11. creates or reconciles a draft GitHub Release, uploads only the materialized qualified bundle, and verifies the draft asset names;
+12. downloads every draft asset back from GitHub and compares it byte-for-byte with the qualified local public bundle;
+13. publishes the draft only after the readback is identical.
 
 Hashmarks publishes these qualified artifacts through GitHub Releases. The release workflow does not automatically publish to PyPI. A failed or cancelled Publish run is not a completed release.
 
@@ -104,7 +108,7 @@ Increment `publication_attempt` for each subsequent retry.
 
 `source_sha` owns release content identity. `publication_attempt` only creates an auditable new publication attempt. Newer workflow machinery may perform the retry, but it must qualify, tag, and publish the explicitly requested source bytes.
 
-A retry does not trust partial draft state from the failed attempt. Publish reconciles the draft title and notes, removes any existing draft assets, uploads the newly qualified asset set, verifies that the draft contains exactly the expected public filenames, and only then publishes it.
+A retry does not trust partial draft state from the failed attempt. Publish reconciles the draft title and notes, removes any existing draft assets, uploads the newly qualified asset set, verifies that the draft contains exactly the expected public filenames, downloads every draft asset back from GitHub, compares those bytes with the qualified local bundle, and only then publishes it.
 
 The next normal release should always start with `make release-prepare VERSION=...`, which removes retry-only fields.
 
