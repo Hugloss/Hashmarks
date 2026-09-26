@@ -1590,6 +1590,32 @@ def test_binding_delta_rejects_resigned_forged_packet_contract_claim(
             codemap.repository_evidence_binding_delta(before, packet)
 
 
+def test_binding_delta_rejects_resigned_malformed_definition_identity(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [
+        {
+            "binding_id": "definition-bound",
+            "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(binding)
+        before = deepcopy(packet)
+        before["bindings"][0]["binding_definition_identity"] = "forged"
+        payload = {
+            key: value for key, value in before.items() if key != "bindings_identity"
+        }
+        before["bindings_identity"] = "sha256:" + codemap._packet_digest(
+            "hashmarks.repository-evidence-bindings.v1", payload
+        )
+
+        with pytest.raises(ValueError, match="binding definition identity malformed"):
+            codemap.repository_evidence_binding_delta(before, packet)
+
+
 def test_binding_delta_rejects_resigned_duplicate_binding_ids(tmp_path: Path) -> None:
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     binding = [
