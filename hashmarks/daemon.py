@@ -39,18 +39,22 @@ _MAX_TOTAL_REGISTERED_MANIFEST_PATHS = 4_000_000
 _MAX_REGISTERED_MANIFESTS = 1024
 
 
-class _UnixServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
-    """Thread-per-request socket owner with explicit daemon-state locking.
+_UNIX_STREAM_SERVER = getattr(socketserver, "UnixStreamServer", None)
 
-    IdentityEngine and its stores own their own internal concurrency.  The
-    daemon lock therefore protects only daemon-local registries/counters rather
-    than serializing Merkle work for every client.
-    """
+if _UNIX_STREAM_SERVER is not None:
 
-    allow_reuse_address = False
-    request_queue_size = 128
-    daemon_threads = False
-    block_on_close = True
+    class _UnixServer(socketserver.ThreadingMixIn, _UNIX_STREAM_SERVER):
+        """Thread-per-request Unix socket owner with explicit state locking."""
+
+        allow_reuse_address = False
+        request_queue_size = 128
+        daemon_threads = False
+        block_on_close = True
+
+else:
+
+    class _UnixServer:
+        """Import-safe placeholder when the platform has no Unix socket server."""
 
 
 class _RequestHandler(socketserver.StreamRequestHandler):
@@ -378,6 +382,10 @@ class IdentityDaemon:
                 probe.close()
 
     def serve_forever(self) -> None:
+        if _UNIX_STREAM_SERVER is None:
+            raise RuntimeError(
+                "Hashmarks identity daemon requires Unix-domain socket server support"
+            )
         self._prepare_socket()
         watcher = self._watcher_factory(self.engine)
         # Watcher starts before the socket becomes available. The initial

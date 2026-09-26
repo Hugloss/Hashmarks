@@ -96,12 +96,31 @@ def test_publish_workflow_publishes_only_verified_github_release_assets() -> Non
     assert 'if [ "$tag_commit" != "${{ needs.prepare.outputs.source_sha }}" ]' in text
     assert "Materialize reviewed changelog section as release notes" in text
     assert "--draft" in text
+    assert 'gh release edit "$RELEASE_TAG" \\' in text
+    assert "--notes-file release/release-notes.md" in text
     assert 'gh release edit "$RELEASE_TAG" --draft=false' in text
     assert "gh release upload" in text
+    assert "Prepare exact reviewed draft release" in text
+    assert "Remove stale assets from reviewed draft" in text
+    assert 'gh release delete-asset "$RELEASE_TAG" "$asset" --yes' in text
+    assert "Verify exact reviewed draft asset set" in text
+    assert "release/expected-assets.txt" in text
+    assert "release/actual-assets.txt" in text
+    assert "diff -u release/expected-assets.txt release/actual-assets.txt" in text
+    assert text.index("Remove stale assets from reviewed draft") < text.index(
+        "Upload qualified assets to reviewed draft"
+    )
+    assert text.index("Verify exact reviewed draft asset set") < text.index(
+        "Publish reviewed release"
+    )
     assert "qualified-python-release-bundle" in text
-    assert "qualified-standalone-release-bundle" in text
-    assert "hashmarks-linux-x86_64.sha256" in text
-    assert "sha256sum -c hashmarks-linux-x86_64.sha256" in text
+    assert "qualified-standalone-linux-release-bundle" in text
+    assert "qualified-standalone-windows-release-bundle" in text
+    assert "release/standalone/linux/hashmarks-linux-x86_64" in text
+    assert "release/standalone/linux/hashmarks-linux-x86_64.sha256" in text
+    assert "release/standalone/windows/hashmarks-windows-x86_64.exe" in text
+    assert "release/standalone/windows/hashmarks-windows-x86_64.exe.sha256" in text
+    assert text.count("verify-standalone-qualification") >= 4
     assert "environment: pypi" not in text
     assert "id-token: write" not in text
     assert "PYPI_TOKEN" not in text
@@ -131,41 +150,65 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
         assert publication_attempt >= 1
 
 
-def test_ci_standalone_installs_exact_frozen_artifact_through_public_installer() -> (
-    None
-):
+def test_ci_qualifies_native_linux_wsl_and_windows_install_paths() -> None:
     text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    standalone = text.split("  standalone-artifact:\n", 1)[1].split(
+    linux = text.split("  standalone-artifact:\n", 1)[1].split(
+        "\n  standalone-windows-artifact:\n",
+        1,
+    )[0]
+    windows = text.split("  standalone-windows-artifact:\n", 1)[1].split(
         "\n  precommit:\n",
         1,
     )[0]
 
-    assert "Install exact standalone through public installer" in standalone
-    assert 'HASHMARKS_DOWNLOAD_BASE_URL="file://$bundle"' in standalone
-    assert 'HASHMARKS_INSTALL_DIR="$target"' in standalone
-    assert 'HASHMARKS_VERSION="$version"' in standalone
-    assert (
-        'test "$("$target/hashmarks" --version)" = "hashmarks version $version"'
-        in standalone
-    )
+    assert "Install exact standalone through Linux/WSL installer" in linux
+    assert 'HASHMARKS_DOWNLOAD_BASE_URL="file://$bundle"' in linux
+    assert 'HASHMARKS_INSTALL_DIR="$target"' in linux
+    assert 'HASHMARKS_VERSION="$version"' in linux
+    assert "hashmarks-linux-x86_64.sha256" in linux
+    assert "standalone-qualification" in linux
+    assert "--platform linux" in linux
+
+    assert "windows-latest" in windows
+    assert "windows_installer_smoke.ps1" in windows
+    assert "hashmarks-windows-x86_64.exe" in windows
+    assert '$checksum = "$asset.sha256"' in windows
+    assert "standalone-qualification" in windows
+    assert "--platform windows" in windows
 
 
-def test_publish_standalone_binds_installer_and_asset_to_release_version() -> None:
+def test_publish_requires_native_linux_wsl_and_windows_release_identity() -> None:
     text = _publish_workflow_text()
-    standalone = text.split("  standalone:\n", 1)[1].split("\n  publish:\n", 1)[0]
+    linux = text.split("  standalone-linux:\n", 1)[1].split(
+        "\n  standalone-windows:\n",
+        1,
+    )[0]
+    windows = text.split("  standalone-windows:\n", 1)[1].split(
+        "\n  publish:\n",
+        1,
+    )[0]
     publish = text.split("  publish:\n", 1)[1]
 
-    assert "Install exact standalone through public installer" in standalone
-    assert 'HASHMARKS_VERSION="$RELEASE_VERSION"' in standalone
+    assert "Build verified standalone Linux/WSL CLI/MCP" in linux
+    assert 'HASHMARKS_VERSION="$RELEASE_VERSION"' in linux
+    assert "hashmarks-linux-x86_64.sha256" in linux
+    assert "--platform linux" in linux
+
+    assert "Build verified standalone Windows CLI/MCP" in windows
+    assert "windows-latest" in windows
+    assert "windows_installer_smoke.ps1" in windows
+    assert "RELEASE_VERSION: ${{ needs.prepare.outputs.version }}" in windows
+    assert "hashmarks-windows-x86_64.exe" in windows
+    assert '$checksum = "$asset.sha256"' in windows
+    assert "--platform windows" in windows
+
+    assert "needs: [prepare, build, standalone-linux, standalone-windows]" in publish
+    assert "--standalone-bundle release/standalone/linux" in publish
+    assert "--standalone-bundle release/standalone/windows" in publish
     assert (
-        'test "$(./dist/hashmarks --version)" = "hashmarks version $RELEASE_VERSION"'
-        in standalone
+        'test "$(release/standalone/linux/hashmarks-linux-x86_64 --version)" ='
+        in publish
     )
-    assert (
-        'test "$("$target/hashmarks" --version)" = '
-        '"hashmarks version $RELEASE_VERSION"' in standalone
-    )
-    assert 'test "$(release/standalone/hashmarks-linux-x86_64 --version)" =' in publish
     assert '"hashmarks version $RELEASE_VERSION"' in publish
 
 

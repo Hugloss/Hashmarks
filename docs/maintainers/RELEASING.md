@@ -1,47 +1,113 @@
 # Releasing Hashmarks
 
-Release preparation and promotion are reviewed pull requests. CI owns qualification; `main` remains the single long-lived source authority.
+Hashmarks uses one reviewed release pull request and one automatic Publish workflow. CI owns qualification; `main` remains the single long-lived source authority.
 
-## Release pull request
+## Normal release
 
-1. Update the version in `pyproject.toml`, `hashmarks/_version.py`, the README project status, and the project entry in `uv.lock`. Add a concise, substantive public entry to `CHANGELOG.md`. If dependency intent also changed, refresh the lock intentionally and review that diff.
-2. Set `.github/release-request.toml` to the intended version:
-   ```toml
-   version = "X.Y.Z"
-   ```
-3. Open the release pull request and let CI (`.github/workflows/ci.yml`) run the configured checks, including the MCP-enabled release-profile lane and standalone CLI/MCP qualification.
-4. Merge only after qualification convergence is green. The release-request merge SHA becomes the default release source authority.
+Prepare the mechanical release edits with one command:
 
-## Publish
+```bash
+make release-prepare VERSION=X.Y.Z
+```
 
-Merging a pull request that changes `.github/release-request.toml` triggers `.github/workflows/publish.yml` on `main`.
+That command:
 
-The Publish workflow:
+- updates `pyproject.toml`, `hashmarks/_version.py`, and the README package version;
+- resets `.github/release-request.toml` to a normal release request containing only the new version, so an old retry `source_sha` or `publication_attempt` cannot leak into a new release;
+- inserts a deliberately non-publishable `Development` section at the top of `CHANGELOG.md`;
+- refreshes and checks the committed `uv.lock`.
 
-1. reads the reviewed release request;
-2. resolves and verifies the exact release-source SHA;
-3. qualifies that source with the locked test and MCP environment;
-4. builds and smoke-tests the exact wheel and sdist;
-5. builds and smoke-tests the standalone Linux x86_64 CLI/MCP executable;
-6. binds the qualified bytes with manifests and SHA-256 checksums;
-7. verifies the downloaded qualified bundles again;
-8. verifies the release tag resolves to the exact release-source SHA;
-9. creates/uploads a draft GitHub Release and publishes it only after all checks pass.
+Then replace the `Development` changelog heading and placeholder bullet with concise public release notes. Review the diff and run:
 
-Hashmarks publishes these qualified artifacts through GitHub Releases. The release workflow does not automatically publish to PyPI. A failed or cancelled Publish workflow is not a completed release.
+```bash
+make release-check
+```
+
+Open the release pull request. Merge only after qualification convergence is green. The release-request merge SHA becomes the default release source authority.
+
+## What pull-request CI proves
+
+Normal PR CI qualifies the release-relevant product surfaces before merge:
+
+- supported Python and package artifacts;
+- the standalone Linux x86_64 executable and the public shell installer used by Linux and WSL2;
+- the standalone Windows x86_64 executable and the public PowerShell installer;
+- CLI and MCP startup from each native standalone;
+- install/upgrade behavior and version identity;
+- native standalone qualification receipts binding executable bytes, checksum sidecars, platform, architecture, and reported version.
+
+WSL intentionally uses the Linux executable and installer. It is not a third mirrored build.
+
+## Automatic publication
+
+Changing `.github/release-request.toml` on `main` triggers `.github/workflows/publish.yml`.
+
+For a normal release, the reviewed release-request merge SHA becomes the release-source authority. Publish then:
+
+1. verifies that exact source is reachable from current `main`;
+2. re-runs locked release qualification;
+3. builds and smoke-tests the exact wheel and sdist;
+4. builds and natively smoke-tests the Linux/WSL standalone;
+5. builds and natively smoke-tests the Windows standalone;
+6. produces a native qualification receipt for each standalone;
+7. downloads the qualified bundles into the publication job and revalidates their bytes and receipts;
+8. creates one final publication manifest binding the exact source SHA, wheel, sdist, both standalone executables, both installer checksum sidecars, and both native qualification identities;
+9. verifies any existing release tag still resolves to the exact release-source SHA;
+10. creates a draft GitHub Release, uploads only the qualified public assets, and publishes the draft after all checks pass.
+
+Hashmarks publishes these qualified artifacts through GitHub Releases. The release workflow does not automatically publish to PyPI. A failed or cancelled Publish run is not a completed release.
+
+The public GitHub Release contains:
+
+- `hashmarks-X.Y.Z-py3-none-any.whl`;
+- `hashmarks-X.Y.Z.tar.gz`;
+- `hashmarks-linux-x86_64`;
+- `hashmarks-linux-x86_64.sha256`;
+- `hashmarks-windows-x86_64.exe`;
+- `hashmarks-windows-x86_64.exe.sha256`;
+- `release-manifest.json`;
+- `SHA256SUMS.txt`.
+
+## Post-publish end-user smoke
+
+After a Windows-capable release is published, verify the public install paths from clean shells.
+
+Linux or WSL2:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh | sh
+hashmarks --version
+```
+
+Native Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.ps1 | iex
+hashmarks --version
+```
+
+Both installers download the matching release executable and checksum sidecar, verify the candidate, run the candidate version smoke, and only then replace an existing installation.
+
+Do not advertise a platform in public onboarding until a published release actually contains that platform's qualified assets.
 
 ## Publication retry
 
-If publication infrastructure fails after the release source has already been approved, repair the publication machinery through a normal pull request. Preserve the original release source by adding its exact SHA to the reviewed release request and incrementing an auditable retry counter:
+If publication infrastructure fails after the release source was approved, repair the publication machinery through a normal pull request. Keep the original release content immutable by changing the reviewed release request to:
 
 ```toml
 version = "X.Y.Z"
-source_sha = "<reviewed-release-source-sha>"
+source_sha = "<exact-reviewed-release-source-sha>"
 publication_attempt = 2
 ```
 
-`source_sha` owns release content identity. `publication_attempt` only retriggers publication and does not participate in release identity. The repaired workflow may come from newer `main`, but it must qualify, tag, and publish the explicitly requested source bytes.
+Increment `publication_attempt` for each subsequent retry.
+
+`source_sha` owns release content identity. `publication_attempt` only creates an auditable new publication attempt. Newer workflow machinery may perform the retry, but it must qualify, tag, and publish the explicitly requested source bytes.
+
+A retry does not trust partial draft state from the failed attempt. Publish reconciles the draft title and notes, removes any existing draft assets, uploads the newly qualified asset set, verifies that the draft contains exactly the expected public filenames, and only then publishes it.
+
+The next normal release should always start with `make release-prepare VERSION=...`, which removes retry-only fields.
 
 ## History policy
 
-The changelog contains public release history, not internal phase chronology. Development handoffs, investigation notes, qualification receipts, and superseded plans are recoverable from Git and pull requests and should not be added as permanent documentation.
+The changelog contains public release history, not internal phase chronology. Development handoffs, investigation notes, qualification receipts, and superseded plans remain in Git and pull requests rather than the maintained product documentation.
