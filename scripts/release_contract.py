@@ -41,6 +41,28 @@ def _expected_tag(root: Path) -> str:
     return f"v{_project(root)['version']}"
 
 
+def validate_release_notes(root: Path, version: str) -> None:
+    if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) is None:
+        raise ValueError(f"invalid release version: {version!r}")
+
+    changelog = (root.resolve() / "CHANGELOG.md").read_text(encoding="utf-8")
+    marker = f"## {version} — "
+    if changelog.count(marker) != 1:
+        raise ValueError(f"CHANGELOG.md must contain exactly one {version} heading")
+
+    section = changelog.split(marker, 1)[1].split("\n## ", 1)[0]
+    lines = section.splitlines()
+    heading_label = lines[0].strip() if lines else ""
+    if not heading_label or "development" in heading_label.lower():
+        raise ValueError(f"CHANGELOG.md still marks {version} as Development")
+
+    body = "\n".join(lines[1:]).strip()
+    if not body:
+        raise ValueError(f"CHANGELOG.md has no public release notes for {version}")
+    if "replace this development placeholder" in body.lower():
+        raise ValueError(f"CHANGELOG.md still contains the {version} release placeholder")
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -506,6 +528,10 @@ def main(argv: list[str] | None = None) -> int:
     tag.add_argument("--root", default=".")
     tag.add_argument("--tag", required=True)
 
+    release_notes = sub.add_parser("validate-release-notes")
+    release_notes.add_argument("--root", default=".")
+    release_notes.add_argument("--version", required=True)
+
     manifest = sub.add_parser("manifest")
     manifest.add_argument("--root", default=".")
     manifest.add_argument("--dist", required=True)
@@ -634,6 +660,10 @@ def _run_command(args) -> int:
     root = Path(args.root).resolve()
     if args.command == "validate-tag":
         return _run_validate_tag(args, root)
+    if args.command == "validate-release-notes":
+        validate_release_notes(root, args.version)
+        _log_command_output(f"Hashmarks release notes: PASS ({args.version})")
+        return 0
     if args.command == "publication-assets":
         return _run_publication_assets(args)
     if args.command in {"standalone-qualification", "verify-standalone-qualification"}:
