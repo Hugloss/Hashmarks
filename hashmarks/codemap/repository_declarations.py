@@ -196,6 +196,14 @@ class RepositoryDeclarationsMixin:
             raise ValueError(
                 "previous declaration observation evidence repository-mismatch"
             )
+        if not isinstance(repository_evidence, Mapping):
+            raise ValueError(
+                "previous declaration observation repository_evidence must be an object"
+            )
+        self._validate_binding_delta_input(
+            repository_evidence,
+            name="previous declaration repository evidence",
+        )
 
     def repository_declarations(
         self,
