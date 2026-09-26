@@ -157,8 +157,10 @@ jobs:
       - name: Build publication rehearsal package bundle
         run: |
           rm -rf .publication-rehearsal
-          mkdir -p .publication-rehearsal/packages
-          uv build --out-dir .publication-rehearsal/packages
+          mkdir -p .publication-rehearsal/build .publication-rehearsal/packages
+          uv build --out-dir .publication-rehearsal/build
+          cp .publication-rehearsal/build/*.whl .publication-rehearsal/packages/
+          cp .publication-rehearsal/build/*.tar.gz .publication-rehearsal/packages/
           version="$(uv run --frozen --no-sync python -c 'import hashmarks; print(hashmarks.__version__)')"
           uv run --frozen --no-sync python scripts/release_contract.py manifest \
             --dist .publication-rehearsal/packages \
