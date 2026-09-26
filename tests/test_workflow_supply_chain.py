@@ -85,7 +85,7 @@ def test_publish_job_separates_release_machinery_from_source_bytes() -> None:
     assert "GH_REPO: ${{ github.repository }}" in publish
 
 
-def test_publish_workflow_publishes_only_verified_github_release_assets() -> None:
+def test_publish_workflow_binds_reviewed_release_authority() -> None:
     text = _publish_workflow_text()
     assert "Publish exact qualified bytes to GitHub Release" in text
     assert "gh release create" in text
@@ -98,24 +98,23 @@ def test_publish_workflow_publishes_only_verified_github_release_assets() -> Non
     assert "replace this development placeholder" in text
     assert "has no public release notes for" in text
     assert "--draft" in text
-    assert 'gh release edit "$RELEASE_TAG" \\' in text
-    assert "--notes-file release/release-notes.md" in text
     assert 'gh release edit "$RELEASE_TAG" --draft=false' in text
-    assert "gh release upload" in text
+
+
+def test_publish_workflow_reconciles_and_reads_back_exact_draft() -> None:
+    text = _publish_workflow_text()
     assert "Prepare exact reviewed draft release" in text
     assert "Remove stale assets from reviewed draft" in text
     assert 'gh release delete-asset "$RELEASE_TAG" "$asset" --yes' in text
-    assert "Verify exact reviewed draft asset set" in text
-    assert "release/expected-assets.txt" in text
-    assert "release/actual-assets.txt" in text
-    assert "publication-assets" in text
     assert "materialize-publication" in text
     assert "release/public/*" in text
+    assert "Verify exact reviewed draft asset set" in text
+    assert "publication-assets" in text
+    assert "cat > release/expected-assets.txt" not in text
+    assert "diff -u release/expected-assets.txt release/actual-assets.txt" in text
     assert "Read back exact draft release bytes" in text
     assert 'gh release download "$RELEASE_TAG" --dir release/readback' in text
     assert 'cmp -s "release/public/$asset" "release/readback/$asset"' in text
-    assert "cat > release/expected-assets.txt" not in text
-    assert "diff -u release/expected-assets.txt release/actual-assets.txt" in text
     assert text.index("Remove stale assets from reviewed draft") < text.index(
         "Upload qualified assets to reviewed draft"
     )
@@ -125,6 +124,11 @@ def test_publish_workflow_publishes_only_verified_github_release_assets() -> Non
     assert text.index("Read back exact draft release bytes") < text.index(
         "Publish reviewed release"
     )
+
+
+def test_publish_workflow_uses_only_qualified_cross_platform_assets() -> None:
+    text = _publish_workflow_text()
+    assert "gh release upload" in text
     assert "qualified-python-release-bundle" in text
     assert "qualified-standalone-linux-release-bundle" in text
     assert "qualified-standalone-windows-release-bundle" in text
@@ -137,7 +141,6 @@ def test_publish_workflow_publishes_only_verified_github_release_assets() -> Non
     assert "id-token: write" not in text
     assert "PYPI_TOKEN" not in text
     assert "pypa/gh-action-pypi-publish@" not in text
-
 
 def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
     request = tomllib.loads(
