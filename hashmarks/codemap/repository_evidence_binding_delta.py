@@ -443,6 +443,18 @@ class RepositoryEvidenceBindingDeltaMixin:
             raise ValueError(f"{name} binding_id must not be empty")
         if len(set(binding_ids)) != len(binding_ids):
             raise ValueError(f"{name} contains duplicate binding_id")
+        expected_contract = {
+            "completeness": {
+                "state": "complete",
+                "scope": "explicit-declared-evidence",
+            },
+            "storage": "derived-not-persisted",
+            "authority": "repository-intelligence-only",
+            "execution_effect": "none",
+        }
+        for field, expected in expected_contract.items():
+            if packet.get(field) != expected:
+                raise ValueError(f"{name} {field} contract mismatch")
         for row in rows:
             binding_payload = {
                 key: row.get(key)
