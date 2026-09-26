@@ -572,6 +572,17 @@ def test_v3_delta_rejects_matching_foreign_repository_observations(
             consumer_map.dependency_resolution_delta(before, after)
 
 
+def test_v3_delta_rejects_cross_generation_observations(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(_snapshot_v3())
+        (tmp_path / "new.py").write_text("VALUE = 1\n", encoding="utf-8")
+        codemap.sync(["new.py"])
+        after = codemap.dependency_resolution_evidence(_snapshot_v3())
+        with pytest.raises(ValueError, match="repository-mismatch"):
+            codemap.dependency_resolution_delta(before, after)
+
+
 def test_v3_delta_reports_selection_inventory_and_relationship_change(
     tmp_path: Path,
 ) -> None:
