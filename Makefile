@@ -414,6 +414,8 @@ release-prepare:
 	  'Next: replace the Development placeholder in CHANGELOG.md, review the diff, then run make release-check.'
 
 release-check: dev-check artifact-check
+	@version="$( $(UV_RUN) --offline --no-sync python -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])' )"; \
+	  $(UV_RUN) --offline --no-sync python scripts/release_contract.py validate-release-notes --version "$version"
 	@printf '\n%s\n' \
 	  '========================================' \
 	  ' HASHMARKS RELEASE CHECK: LOCAL PREFLIGHT PASS' \
