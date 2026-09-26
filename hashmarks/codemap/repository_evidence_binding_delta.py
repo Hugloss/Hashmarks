@@ -466,11 +466,50 @@ class RepositoryEvidenceBindingDeltaMixin:
             )
             if row.get("binding_observation_identity") != expected_observation_identity:
                 raise ValueError(f"{name} binding observation identity mismatch")
-            definition_identity = row.get("binding_definition_identity")
-            if not isinstance(definition_identity, str) or not definition_identity.startswith(
-                "sha256:"
-            ):
-                raise ValueError(f"{name} binding definition identity malformed")
+            evidence = row.get("evidence")
+            dependencies = row.get("dependencies")
+            relationships = row.get("relationships")
+            assert isinstance(evidence, list)
+            assert isinstance(dependencies, list)
+            relationship_state = (
+                relationships.get("state") if isinstance(relationships, Mapping) else None
+            )
+            relationship_bounds = (
+                relationships.get("bounds")
+                if isinstance(relationships, Mapping)
+                else None
+            )
+            include_relationships = relationship_state != "not-requested"
+            definition_payload = {
+                "binding_id": row.get("binding_id"),
+                "evidence": [
+                    {
+                        key: item.get(key)
+                        for key in ("scope", "path", "start_line", "end_line")
+                        if key in item
+                    }
+                    for item in evidence
+                    if isinstance(item, Mapping)
+                ],
+                "dependencies": [
+                    str(item.get("path") or "")
+                    for item in dependencies
+                    if isinstance(item, Mapping)
+                ],
+                "include_relationships": include_relationships,
+                "relationship_limit_per_path": (
+                    relationship_bounds.get("limit_per_path")
+                    if include_relationships
+                    and isinstance(relationship_bounds, Mapping)
+                    else None
+                ),
+            }
+            expected_definition_identity = "sha256:" + self._packet_digest(
+                "hashmarks.repository-evidence-binding-definition.v1",
+                definition_payload,
+            )
+            if row.get("binding_definition_identity") != expected_definition_identity:
+                raise ValueError(f"{name} binding definition identity mismatch")
 
     def repository_evidence_binding_delta(
         self,
