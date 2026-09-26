@@ -23,4 +23,5 @@ args = [
   "--workspace", ".",
   "--corpus", "benchmarks/agent_tasks.json",
   "--budget", "1200",
+  "--output", ".hashmarks/metrics/chatgpt-benchmark-latest.json",
 ]
