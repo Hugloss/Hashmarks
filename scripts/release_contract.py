@@ -481,9 +481,20 @@ def publication_manifest(
     return payload
 
 
+def _validate_publication_identity(manifest: dict[str, object]) -> None:
+    recorded = str(manifest.get("manifest_identity") or "")
+    payload = {
+        key: value for key, value in manifest.items() if key != "manifest_identity"
+    }
+    expected = _manifest_identity(PUBLICATION_SCHEMA, payload)
+    if recorded != expected:
+        raise ValueError("publication manifest identity mismatch")
+
+
 def publication_asset_names(manifest: dict[str, object]) -> list[str]:
     if manifest.get("schema") != PUBLICATION_SCHEMA:
         raise ValueError("publication asset list requires a publication manifest")
+    _validate_publication_identity(manifest)
 
     names = ["release-manifest.json", "SHA256SUMS.txt"]
     for key in (
@@ -531,6 +542,10 @@ def _publication_source_map(
     dist: Path,
     standalone_bundles: list[Path],
 ) -> dict[str, Path]:
+    if sha256sums_path.read_text(encoding="utf-8").replace("\r\n", "\n") != (
+        _sha256sums_text(manifest)
+    ):
+        raise ValueError("SHA256SUMS.txt does not match publication manifest")
     sources = {
         "release-manifest.json": manifest_path.resolve(),
         "SHA256SUMS.txt": sha256sums_path.resolve(),
@@ -620,7 +635,7 @@ def materialize_publication_bundle(
     _copy_publication_sources(manifest, sources, output_dir)
 
 
-def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
+def _sha256sums_text(manifest: dict[str, object]) -> str:
     checksum_rows = list(manifest["distributions"])
     checksum_rows.extend(manifest.get("standalones", []))
     checksum_rows.extend(manifest.get("installer_checksums", []))
@@ -631,7 +646,11 @@ def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
         assert isinstance(row, dict)
         digest = str(row["sha256"]).removeprefix("sha256:")
         lines.append(f"{digest}  {row['filename']}")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return "\n".join(lines) + "\n"
+
+
+def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
+    path.write_text(_sha256sums_text(manifest), encoding="utf-8")
 
 
 def _write_json(value: dict[str, object], path: Path) -> None:
