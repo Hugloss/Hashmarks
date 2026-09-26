@@ -1,3 +1,4 @@
+import json
 from __future__ import annotations
 
 import sys
@@ -6,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from hashmarks.codemap import CodeMap
 from hashmarks import mcp_server, mcp_surface, repository_retry
 from hashmarks.file_store import UnstableFileError
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
@@ -752,4 +754,3 @@ def test_mcp_correlation_rejects_recomputed_outer_identity_over_tampered_nested_
             )
     finally:
         surface.close()
-
