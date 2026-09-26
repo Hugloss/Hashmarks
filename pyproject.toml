@@ -71,6 +71,7 @@ required-version = ">=0.10.0"
 
 [project.scripts]
 hashmarks = "hashmarks.cli:main"
+hashmarks-benchmark = "scripts.agent_evaluation.benchmark:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
