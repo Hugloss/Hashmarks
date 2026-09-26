@@ -74,6 +74,69 @@ def _bundle(
     return bundle
 
 
+def _release_notes_root(tmp_path: Path, body: str) -> Path:
+    root = tmp_path / "notes"
+    root.mkdir()
+    (root / "CHANGELOG.md").write_text(
+        "# Changelog\n\n" + body,
+        encoding="utf-8",
+    )
+    return root
+
+
+def test_validate_release_notes_accepts_finalized_public_section(
+    tmp_path: Path,
+) -> None:
+    root = _release_notes_root(
+        tmp_path,
+        "## 1.2.3 — 2026-09-26\n\n- Added Windows standalone support.\n",
+    )
+
+    release_contract.validate_release_notes(root, "1.2.3")
+
+
+@pytest.mark.parametrize(
+    ("section", "message"),
+    [
+        (
+            "## 1.2.3 — Development\n\n- Real notes.\n",
+            "still marks 1.2.3 as Development",
+        ),
+        (
+            "## 1.2.3 — 2026-09-26\n\n"
+            "- Replace this development placeholder with substantive public release notes.\n",
+            "still contains the 1.2.3 release placeholder",
+        ),
+        (
+            "## 1.2.3 — 2026-09-26\n\n",
+            "has no public release notes for 1.2.3",
+        ),
+    ],
+)
+def test_validate_release_notes_rejects_unfinished_section(
+    tmp_path: Path,
+    section: str,
+    message: str,
+) -> None:
+    root = _release_notes_root(tmp_path, section)
+
+    with pytest.raises(ValueError, match=message):
+        release_contract.validate_release_notes(root, "1.2.3")
+
+
+def test_validate_release_notes_rejects_duplicate_release_heading(
+    tmp_path: Path,
+) -> None:
+    root = _release_notes_root(
+        tmp_path,
+        "## 1.2.3 — First\n\n- A.\n\n"
+        "## 1.2.3 — Second\n\n- B.\n",
+    )
+
+    with pytest.raises(ValueError, match="must contain exactly one 1.2.3 heading"):
+        release_contract.validate_release_notes(root, "1.2.3")
+
+
 def test_release_manifest_binds_exact_distribution_bytes(tmp_path: Path) -> None:
     manifest = release_manifest(
         _root(), _dist(tmp_path), tag=f"v{hashmarks.__version__}"
