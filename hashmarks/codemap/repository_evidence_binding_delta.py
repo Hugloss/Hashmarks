@@ -445,11 +445,10 @@ class RepositoryEvidenceBindingDeltaMixin:
             self._validate_binding_delta_input(packet, name=name)
         before_repository = self._repository_identity(before)
         after_repository = self._repository_identity(after)
-        current_repository = self._repository_packet_identity()
         if (
             not before_repository
             or before_repository != after_repository
-            or before_repository != current_repository
+            or before_repository != self._repository_packet_identity()
         ):
             raise ValueError("repository evidence bindings repository-mismatch")
         before_observer = self._observer_identity(before)
