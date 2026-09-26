@@ -577,7 +577,7 @@ def test_previous_correlation_rejects_tampered_top_level_packet(
         tampered["causation"] = "producer-claimed"
         with pytest.raises(
             ValueError,
-            match="bindings identity mismatch",
+            match="correlation_identity does not match packet content",
         ):
             codemap.correlate_evidence(
                 _bundle({"anchor_id": "owner", "path": "owner.py"}),
@@ -601,7 +601,7 @@ def test_previous_correlation_rejects_tampered_nested_repository_evidence(
         bindings[0]["evidence"][0]["state"] = "known-absent"
         with pytest.raises(
             ValueError,
-            match="correlation_identity does not match packet content",
+            match="bindings identity mismatch",
         ):
             codemap.correlate_evidence(
                 _bundle({"anchor_id": "owner", "path": "owner.py"}),
