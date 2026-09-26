@@ -1606,6 +1606,32 @@ def test_coverage_rejects_resigned_duplicate_binding_packet(tmp_path: Path) -> N
             )
 
 
+def test_coverage_rejects_resigned_contradictory_binding_delta(tmp_path: Path) -> None:
+    source = tmp_path / "source.py"
+    source.write_text("value = 1\n", encoding="utf-8")
+    bindings = [{"binding_id": "value", "evidence": [{"path": "source.py", "start_line": 1, "end_line": 1}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_evidence_bindings(bindings, include_relationships=False)
+        source.write_text("value = 2\n", encoding="utf-8")
+        codemap.sync(["source.py"])
+        after = codemap.repository_evidence_bindings(bindings, include_relationships=False)
+        delta = codemap.repository_evidence_binding_delta(before, after)
+        delta["bindings"]["preserved"].append("value")
+        payload = {key: value for key, value in delta.items() if key != "delta_identity"}
+        delta["delta_identity"] = "sha256:" + codemap._packet_digest(
+            "hashmarks.repository-evidence-binding-delta.v1", payload
+        )
+
+        with pytest.raises(ValueError, match="classifications overlap"):
+            codemap.repository_evidence_coverage(
+                after,
+                changed_paths=["source.py"],
+                change_set_complete=True,
+                binding_delta=delta,
+            )
+
+
 def test_coverage_rejects_authenticated_delta_with_foreign_repository_claim(
     tmp_path: Path,
 ) -> None:
