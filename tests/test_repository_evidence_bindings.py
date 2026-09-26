@@ -1531,9 +1531,7 @@ def test_binding_delta_rejects_resigned_nested_binding_tamper(tmp_path: Path) ->
         before = deepcopy(packet)
         before["bindings"][0]["evidence"][0]["state"] = "known-absent"
         payload = {
-            key: value
-            for key, value in before.items()
-            if key != "bindings_identity"
+            key: value for key, value in before.items() if key != "bindings_identity"
         }
         before["bindings_identity"] = "sha256:" + codemap._packet_digest(
             "hashmarks.repository-evidence-bindings.v1", payload
@@ -1541,6 +1539,7 @@ def test_binding_delta_rejects_resigned_nested_binding_tamper(tmp_path: Path) ->
 
         with pytest.raises(ValueError, match="binding observation identity mismatch"):
             codemap.repository_evidence_binding_delta(before, packet)
+
 
 def test_binding_delta_rejects_resigned_duplicate_binding_ids(tmp_path: Path) -> None:
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
@@ -1556,9 +1555,7 @@ def test_binding_delta_rejects_resigned_duplicate_binding_ids(tmp_path: Path) ->
         before = deepcopy(packet)
         before["bindings"].append(deepcopy(before["bindings"][0]))
         payload = {
-            key: value
-            for key, value in before.items()
-            if key != "bindings_identity"
+            key: value for key, value in before.items() if key != "bindings_identity"
         }
         before["bindings_identity"] = "sha256:" + codemap._packet_digest(
             "hashmarks.repository-evidence-bindings.v1", payload
@@ -1566,6 +1563,7 @@ def test_binding_delta_rejects_resigned_duplicate_binding_ids(tmp_path: Path) ->
 
         with pytest.raises(ValueError, match="duplicate binding_id"):
             codemap.repository_evidence_binding_delta(before, packet)
+
 
 def test_binding_delta_reports_unsupported_member_becoming_present_as_state_change(
     tmp_path: Path,
@@ -1615,9 +1613,7 @@ def test_coverage_rejects_resigned_duplicate_binding_packet(tmp_path: Path) -> N
         packet = codemap.repository_evidence_bindings(binding)
         packet["bindings"].append(deepcopy(packet["bindings"][0]))
         payload = {
-            key: value
-            for key, value in packet.items()
-            if key != "bindings_identity"
+            key: value for key, value in packet.items() if key != "bindings_identity"
         }
         packet["bindings_identity"] = "sha256:" + codemap._packet_digest(
             "hashmarks.repository-evidence-bindings.v1", payload
@@ -1629,6 +1625,7 @@ def test_coverage_rejects_resigned_duplicate_binding_packet(tmp_path: Path) -> N
                 changed_paths=["owner.py"],
                 change_set_complete=True,
             )
+
 
 def test_coverage_rejects_resigned_contradictory_binding_delta(tmp_path: Path) -> None:
     source = tmp_path / "source.py"
@@ -1652,9 +1649,7 @@ def test_coverage_rejects_resigned_contradictory_binding_delta(tmp_path: Path) -
         delta = codemap.repository_evidence_binding_delta(before, after)
         delta["bindings"]["preserved"].append("value")
         payload = {
-            key: value
-            for key, value in delta.items()
-            if key != "delta_identity"
+            key: value for key, value in delta.items() if key != "delta_identity"
         }
         delta["delta_identity"] = "sha256:" + codemap._packet_digest(
             "hashmarks.repository-evidence-binding-delta.v1", payload
@@ -1667,6 +1662,7 @@ def test_coverage_rejects_resigned_contradictory_binding_delta(tmp_path: Path) -
                 change_set_complete=True,
                 binding_delta=delta,
             )
+
 
 def test_coverage_rejects_authenticated_delta_with_foreign_repository_claim(
     tmp_path: Path,
