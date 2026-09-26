@@ -1375,6 +1375,31 @@ def test_binding_delta_rejects_cross_repository_comparison(tmp_path: Path) -> No
             codemap.repository_evidence_binding_delta(before, after)
 
 
+def test_binding_delta_rejects_foreign_packets_even_when_they_match_each_other(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    consumer = tmp_path / "consumer"
+    source.mkdir()
+    consumer.mkdir()
+    (source / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (consumer / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [
+        {
+            "binding_id": "repository-bound",
+            "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}],
+        }
+    ]
+    with CodeMap(source) as source_map:
+        source_map.sync()
+        packet = source_map.repository_evidence_bindings(binding)
+
+    with CodeMap(consumer) as consumer_map:
+        consumer_map.sync()
+        with pytest.raises(ValueError, match="repository-mismatch"):
+            consumer_map.repository_evidence_binding_delta(packet, deepcopy(packet))
+
+
 def test_binding_delta_reports_added_and_removed_bindings_deterministically(
     tmp_path: Path,
 ) -> None:
