@@ -74,6 +74,68 @@ def _bundle(
     return bundle
 
 
+def _release_notes_root(tmp_path: Path, body: str) -> Path:
+    root = tmp_path / "notes"
+    root.mkdir()
+    (root / "CHANGELOG.md").write_text(
+        "# Changelog\n\n" + body,
+        encoding="utf-8",
+    )
+    return root
+
+
+def test_validate_release_notes_accepts_finalized_public_section(
+    tmp_path: Path,
+) -> None:
+    root = _release_notes_root(
+        tmp_path,
+        "## 1.2.3 — 2026-09-26\n\n- Added Windows standalone support.\n",
+    )
+
+    release_contract.validate_release_notes(root, "1.2.3")
+
+
+@pytest.mark.parametrize(
+    ("section", "message"),
+    [
+        (
+            "## 1.2.3 — Development\n\n- Real notes.\n",
+            "still marks 1.2.3 as Development",
+        ),
+        (
+            "## 1.2.3 — 2026-09-26\n\n"
+            "- Replace this development placeholder with substantive public release notes.\n",
+            "still contains the 1.2.3 release placeholder",
+        ),
+        (
+            "## 1.2.3 — 2026-09-26\n\n",
+            "has no public release notes for 1.2.3",
+        ),
+    ],
+)
+def test_validate_release_notes_rejects_unfinished_section(
+    tmp_path: Path,
+    section: str,
+    message: str,
+) -> None:
+    root = _release_notes_root(tmp_path, section)
+
+    with pytest.raises(ValueError, match=message):
+        release_contract.validate_release_notes(root, "1.2.3")
+
+
+def test_validate_release_notes_rejects_duplicate_release_heading(
+    tmp_path: Path,
+) -> None:
+    root = _release_notes_root(
+        tmp_path,
+        "## 1.2.3 — First\n\n- A.\n\n## 1.2.3 — Second\n\n- B.\n",
+    )
+
+    with pytest.raises(ValueError, match="must contain exactly one 1.2.3 heading"):
+        release_contract.validate_release_notes(root, "1.2.3")
+
+
 def test_release_manifest_binds_exact_distribution_bytes(tmp_path: Path) -> None:
     manifest = release_manifest(
         _root(), _dist(tmp_path), tag=f"v{hashmarks.__version__}"
@@ -180,7 +242,7 @@ def test_publication_manifest_binds_both_native_standalone_sets(
         source_sha="b" * 40,
     )
 
-    assert manifest["schema"] == "hashmarks.release-publication-manifest.v2"
+    assert manifest["schema"] == "hashmarks.release-publication-manifest.v3"
     assert manifest["source"] == {"commit_sha": "b" * 40}
     assert [
         (row["platform"], row["architecture"], row["filename"])
@@ -193,11 +255,351 @@ def test_publication_manifest_binds_both_native_standalone_sets(
         "hashmarks-linux-x86_64.sha256",
         "hashmarks-windows-x86_64.exe.sha256",
     ]
+    assert [
+        (row["platform"], row["filename"]) for row in manifest["bootstrap_installers"]
+    ] == [
+        ("linux-wsl", "install.sh"),
+        ("windows", "install.ps1"),
+    ]
+    assert all(
+        str(row["sha256"]).startswith("sha256:")
+        for row in manifest["bootstrap_installers"]
+    )
     assert all(
         str(row["qualification_identity"]).startswith("sha256:")
         for row in manifest["standalones"]
     )
     assert str(manifest["manifest_identity"]).startswith("sha256:")
+
+
+def test_publication_asset_names_are_derived_from_manifest(
+    tmp_path: Path,
+) -> None:
+    manifest = publication_manifest(
+        _root(),
+        _dist(tmp_path),
+        [_bundle(tmp_path, "linux"), _bundle(tmp_path, "windows")],
+        tag=f"v{hashmarks.__version__}",
+        source_sha="9" * 40,
+    )
+
+    assert release_contract.publication_asset_names(manifest) == sorted(
+        [
+            "SHA256SUMS.txt",
+            f"hashmarks-{hashmarks.__version__}-py3-none-any.whl",
+            f"hashmarks-{hashmarks.__version__}.tar.gz",
+            "hashmarks-linux-x86_64",
+            "hashmarks-linux-x86_64.sha256",
+            "hashmarks-windows-x86_64.exe",
+            "hashmarks-windows-x86_64.exe.sha256",
+            "install.ps1",
+            "install.sh",
+            "release-manifest.json",
+        ]
+    )
+
+
+def test_publication_asset_names_reject_duplicate_public_name(
+    tmp_path: Path,
+) -> None:
+    manifest = publication_manifest(
+        _root(),
+        _dist(tmp_path),
+        [_bundle(tmp_path, "linux"), _bundle(tmp_path, "windows")],
+        tag=f"v{hashmarks.__version__}",
+        source_sha="8" * 40,
+    )
+    manifest["standalones"].append(dict(manifest["standalones"][0]))
+    payload = {
+        key: value for key, value in manifest.items() if key != "manifest_identity"
+    }
+    manifest["manifest_identity"] = release_contract._manifest_identity(
+        release_contract.PUBLICATION_SCHEMA,
+        payload,
+    )
+
+    with pytest.raises(ValueError, match="duplicate public asset names"):
+        release_contract.publication_asset_names(manifest)
+
+
+def test_publication_asset_names_reject_tampered_manifest_identity(
+    tmp_path: Path,
+) -> None:
+    manifest = publication_manifest(
+        _root(),
+        _dist(tmp_path),
+        [_bundle(tmp_path, "linux"), _bundle(tmp_path, "windows")],
+        tag=f"v{hashmarks.__version__}",
+        source_sha="3" * 40,
+    )
+    manifest["source"]["commit_sha"] = "0" * 40
+
+    with pytest.raises(ValueError, match="publication manifest identity mismatch"):
+        release_contract.publication_asset_names(manifest)
+
+
+def test_publication_assets_cli_writes_exact_manifest_derived_names(
+    tmp_path: Path,
+) -> None:
+    manifest = publication_manifest(
+        _root(),
+        _dist(tmp_path),
+        [_bundle(tmp_path, "linux"), _bundle(tmp_path, "windows")],
+        tag=f"v{hashmarks.__version__}",
+        source_sha="7" * 40,
+    )
+    manifest_path = tmp_path / "release-manifest.json"
+    output = tmp_path / "assets.txt"
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        release_contract.main(
+            [
+                "publication-assets",
+                "--manifest",
+                str(manifest_path),
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+    assert output.read_text(encoding="utf-8").splitlines() == (
+        release_contract.publication_asset_names(manifest)
+    )
+
+
+def test_materialize_publication_bundle_contains_only_manifest_owned_assets(
+    tmp_path: Path,
+) -> None:
+    dist = _dist(tmp_path)
+    linux = _bundle(tmp_path, "linux")
+    windows = _bundle(tmp_path, "windows")
+    manifest_path = tmp_path / "release-manifest.json"
+    sums = tmp_path / "SHA256SUMS.txt"
+    output = tmp_path / "public"
+
+    release_contract.main(
+        [
+            "publication-manifest",
+            "--root",
+            str(_root()),
+            "--dist",
+            str(dist),
+            "--standalone-bundle",
+            str(linux),
+            "--standalone-bundle",
+            str(windows),
+            "--tag",
+            f"v{hashmarks.__version__}",
+            "--source-sha",
+            "6" * 40,
+            "--output",
+            str(manifest_path),
+            "--sha256sums",
+            str(sums),
+        ]
+    )
+    release_contract.main(
+        [
+            "materialize-publication",
+            "--root",
+            str(_root()),
+            "--manifest",
+            str(manifest_path),
+            "--sha256sums",
+            str(sums),
+            "--dist",
+            str(dist),
+            "--standalone-bundle",
+            str(linux),
+            "--standalone-bundle",
+            str(windows),
+            "--output-dir",
+            str(output),
+        ]
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert sorted(path.name for path in output.iterdir()) == (
+        release_contract.publication_asset_names(manifest)
+    )
+    assert release_contract.STANDALONE_QUALIFICATION_FILENAME not in {
+        path.name for path in output.iterdir()
+    }
+
+
+def test_materialize_publication_bundle_rejects_post_manifest_byte_drift(
+    tmp_path: Path,
+) -> None:
+    dist = _dist(tmp_path)
+    linux = _bundle(tmp_path, "linux")
+    windows = _bundle(tmp_path, "windows")
+    manifest_path = tmp_path / "release-manifest.json"
+    sums = tmp_path / "SHA256SUMS.txt"
+
+    release_contract.main(
+        [
+            "publication-manifest",
+            "--root",
+            str(_root()),
+            "--dist",
+            str(dist),
+            "--standalone-bundle",
+            str(linux),
+            "--standalone-bundle",
+            str(windows),
+            "--tag",
+            f"v{hashmarks.__version__}",
+            "--source-sha",
+            "5" * 40,
+            "--output",
+            str(manifest_path),
+            "--sha256sums",
+            str(sums),
+        ]
+    )
+    (windows / "hashmarks-windows-x86_64.exe").write_bytes(b"drift")
+
+    with pytest.raises(SystemExit, match="qualified public asset digest mismatch"):
+        release_contract.main(
+            [
+                "materialize-publication",
+                "--root",
+                str(_root()),
+                "--manifest",
+                str(manifest_path),
+                "--sha256sums",
+                str(sums),
+                "--dist",
+                str(dist),
+                "--standalone-bundle",
+                str(linux),
+                "--standalone-bundle",
+                str(windows),
+                "--output-dir",
+                str(tmp_path / "public"),
+            ]
+        )
+
+
+def test_materialize_publication_bundle_rejects_stale_output_directory(
+    tmp_path: Path,
+) -> None:
+    dist = _dist(tmp_path)
+    linux = _bundle(tmp_path, "linux")
+    windows = _bundle(tmp_path, "windows")
+    manifest_path = tmp_path / "release-manifest.json"
+    sums = tmp_path / "SHA256SUMS.txt"
+    output = tmp_path / "public"
+    output.mkdir()
+    (output / "stale.bin").write_bytes(b"stale")
+
+    release_contract.main(
+        [
+            "publication-manifest",
+            "--root",
+            str(_root()),
+            "--dist",
+            str(dist),
+            "--standalone-bundle",
+            str(linux),
+            "--standalone-bundle",
+            str(windows),
+            "--tag",
+            f"v{hashmarks.__version__}",
+            "--source-sha",
+            "4" * 40,
+            "--output",
+            str(manifest_path),
+            "--sha256sums",
+            str(sums),
+        ]
+    )
+
+    with pytest.raises(SystemExit, match="publication output directory must be empty"):
+        release_contract.main(
+            [
+                "materialize-publication",
+                "--root",
+                str(_root()),
+                "--manifest",
+                str(manifest_path),
+                "--sha256sums",
+                str(sums),
+                "--dist",
+                str(dist),
+                "--standalone-bundle",
+                str(linux),
+                "--standalone-bundle",
+                str(windows),
+                "--output-dir",
+                str(output),
+            ]
+        )
+
+
+def test_materialize_publication_bundle_rejects_stale_combined_checksums(
+    tmp_path: Path,
+) -> None:
+    dist = _dist(tmp_path)
+    linux = _bundle(tmp_path, "linux")
+    windows = _bundle(tmp_path, "windows")
+    manifest_path = tmp_path / "release-manifest.json"
+    sums = tmp_path / "SHA256SUMS.txt"
+
+    release_contract.main(
+        [
+            "publication-manifest",
+            "--root",
+            str(_root()),
+            "--dist",
+            str(dist),
+            "--standalone-bundle",
+            str(linux),
+            "--standalone-bundle",
+            str(windows),
+            "--tag",
+            f"v{hashmarks.__version__}",
+            "--source-sha",
+            "a" * 40,
+            "--output",
+            str(manifest_path),
+            "--sha256sums",
+            str(sums),
+        ]
+    )
+    sums.write_text(
+        sums.read_text(encoding="utf-8") + f"{'0' * 64}  stale.bin\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        SystemExit,
+        match="SHA256SUMS.txt does not match publication manifest",
+    ):
+        release_contract.main(
+            [
+                "materialize-publication",
+                "--root",
+                str(_root()),
+                "--manifest",
+                str(manifest_path),
+                "--sha256sums",
+                str(sums),
+                "--dist",
+                str(dist),
+                "--standalone-bundle",
+                str(linux),
+                "--standalone-bundle",
+                str(windows),
+                "--output-dir",
+                str(tmp_path / "public"),
+            ]
+        )
 
 
 def test_publication_manifest_rejects_duplicate_platform_qualification(
@@ -330,6 +732,8 @@ def test_publication_manifest_cli_writes_checksums_for_every_public_asset(
         "hashmarks-windows-x86_64.exe",
         "hashmarks-linux-x86_64.sha256",
         "hashmarks-windows-x86_64.exe.sha256",
+        "install.sh",
+        "install.ps1",
     ]
 
 

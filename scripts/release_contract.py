@@ -5,6 +5,7 @@ import email
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -18,7 +19,7 @@ def _log_command_output(*values: object) -> None:
 
 
 SCHEMA = "hashmarks.release-artifact-manifest.v2"
-PUBLICATION_SCHEMA = "hashmarks.release-publication-manifest.v2"
+PUBLICATION_SCHEMA = "hashmarks.release-publication-manifest.v3"
 STANDALONE_QUALIFICATION_SCHEMA = "hashmarks.standalone-qualification.v1"
 STANDALONE_QUALIFICATION_FILENAME = "standalone-qualification.json"
 STANDALONE_SPECS = {
@@ -26,6 +27,10 @@ STANDALONE_SPECS = {
     ("windows", "x86_64"): "hashmarks-windows-x86_64.exe",
 }
 REQUIRED_STANDALONES = frozenset(STANDALONE_SPECS)
+BOOTSTRAP_INSTALLERS = {
+    "linux-wsl": "install.sh",
+    "windows": "install.ps1",
+}
 
 
 def _project(root: Path) -> dict[str, object]:
@@ -39,6 +44,30 @@ def _project(root: Path) -> dict[str, object]:
 
 def _expected_tag(root: Path) -> str:
     return f"v{_project(root)['version']}"
+
+
+def validate_release_notes(root: Path, version: str) -> None:
+    if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) is None:
+        raise ValueError(f"invalid release version: {version!r}")
+
+    changelog = (root.resolve() / "CHANGELOG.md").read_text(encoding="utf-8")
+    marker = f"## {version} — "
+    if changelog.count(marker) != 1:
+        raise ValueError(f"CHANGELOG.md must contain exactly one {version} heading")
+
+    section = changelog.split(marker, 1)[1].split("\n## ", 1)[0]
+    lines = section.splitlines()
+    heading_label = lines[0].strip() if lines else ""
+    if not heading_label or "development" in heading_label.lower():
+        raise ValueError(f"CHANGELOG.md still marks {version} as Development")
+
+    body = "\n".join(lines[1:]).strip()
+    if not body:
+        raise ValueError(f"CHANGELOG.md has no public release notes for {version}")
+    if "replace this development placeholder" in body.lower():
+        raise ValueError(
+            f"CHANGELOG.md still contains the {version} release placeholder"
+        )
 
 
 def _sha256(path: Path) -> str:
@@ -396,6 +425,24 @@ def _qualified_standalones(
     return standalones, checksums
 
 
+def _bootstrap_installer_rows(root: Path) -> list[dict[str, object]]:
+    rows = []
+    for platform, filename in BOOTSTRAP_INSTALLERS.items():
+        path = root.resolve() / filename
+        if not path.is_file():
+            raise ValueError(f"bootstrap installer is missing: {path}")
+        rows.append(
+            {
+                "kind": "bootstrap-installer",
+                "filename": filename,
+                "size_bytes": path.stat().st_size,
+                "sha256": _sha256(path),
+                "platform": platform,
+            }
+        )
+    return rows
+
+
 def publication_manifest(
     root: Path,
     dist: Path,
@@ -423,6 +470,7 @@ def publication_manifest(
         "distributions": package["distributions"],
         "standalones": standalones,
         "installer_checksums": installer_checksums,
+        "bootstrap_installers": _bootstrap_installer_rows(root),
         "qualification_dependency_resolution": package[
             "qualification_dependency_resolution"
         ],
@@ -433,17 +481,155 @@ def publication_manifest(
     return payload
 
 
-def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
+def _validate_publication_identity(manifest: dict[str, object]) -> None:
+    recorded = str(manifest.get("manifest_identity") or "")
+    payload = {
+        key: value for key, value in manifest.items() if key != "manifest_identity"
+    }
+    expected = _manifest_identity(PUBLICATION_SCHEMA, payload)
+    if recorded != expected:
+        raise ValueError("publication manifest identity mismatch")
+
+
+def publication_asset_names(manifest: dict[str, object]) -> list[str]:
+    if manifest.get("schema") != PUBLICATION_SCHEMA:
+        raise ValueError("publication asset list requires a publication manifest")
+    _validate_publication_identity(manifest)
+
+    names = ["release-manifest.json", "SHA256SUMS.txt"]
+    for key in (
+        "distributions",
+        "standalones",
+        "installer_checksums",
+        "bootstrap_installers",
+    ):
+        rows = manifest.get(key)
+        if not isinstance(rows, list):
+            raise ValueError(f"publication manifest {key} must be a list")
+        for row in rows:
+            if not isinstance(row, dict) or not isinstance(row.get("filename"), str):
+                raise ValueError(f"publication manifest {key} contains an invalid row")
+            names.append(str(row["filename"]))
+
+    if len(names) != len(set(names)):
+        raise ValueError("publication manifest contains duplicate public asset names")
+    return sorted(names)
+
+
+def _standalone_publication_source(
+    filename: str,
+    standalone_bundles: list[Path],
+) -> Path:
+    matches = [
+        bundle.resolve() / filename
+        for bundle in standalone_bundles
+        if (bundle.resolve() / filename).is_file()
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"qualified public asset {filename!r} must resolve in exactly one "
+            "standalone bundle"
+        )
+    return matches[0]
+
+
+def _publication_source_map(
+    manifest: dict[str, object],
+    *,
+    root: Path,
+    manifest_path: Path,
+    sha256sums_path: Path,
+    dist: Path,
+    standalone_bundles: list[Path],
+) -> dict[str, Path]:
+    if sha256sums_path.read_text(encoding="utf-8").replace("\r\n", "\n") != (
+        _sha256sums_text(manifest)
+    ):
+        raise ValueError("SHA256SUMS.txt does not match publication manifest")
+    sources = {
+        "release-manifest.json": manifest_path.resolve(),
+        "SHA256SUMS.txt": sha256sums_path.resolve(),
+    }
+    for row in manifest["distributions"]:
+        assert isinstance(row, dict)
+        filename = str(row["filename"])
+        sources[filename] = dist.resolve() / filename
+    for key in ("standalones", "installer_checksums"):
+        for row in manifest[key]:
+            assert isinstance(row, dict)
+            filename = str(row["filename"])
+            sources[filename] = _standalone_publication_source(
+                filename,
+                standalone_bundles,
+            )
+    for row in manifest["bootstrap_installers"]:
+        assert isinstance(row, dict)
+        filename = str(row["filename"])
+        sources[filename] = root.resolve() / filename
+    return sources
+
+
+def _publication_rows_by_name(
+    manifest: dict[str, object],
+) -> dict[str, dict[str, object]]:
+    return {
+        str(row["filename"]): row
+        for key in (
+            "distributions",
+            "standalones",
+            "installer_checksums",
+            "bootstrap_installers",
+        )
+        for row in manifest[key]
+        if isinstance(row, dict)
+    }
+
+
+def _copy_publication_sources(
+    manifest: dict[str, object],
+    sources: dict[str, Path],
+    output_dir: Path,
+) -> None:
+    names = publication_asset_names(manifest)
+    if set(sources) != set(names):
+        raise ValueError("publication source set does not match manifest asset names")
+
+    output_dir = output_dir.resolve()
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise ValueError("publication output directory must be empty")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    rows = _publication_rows_by_name(manifest)
+    for name in names:
+        source = sources[name]
+        if not source.is_file():
+            raise ValueError(f"qualified public asset is missing: {source}")
+        row = rows.get(name)
+        if row is not None and _sha256(source) != row["sha256"]:
+            raise ValueError(f"qualified public asset digest mismatch: {name}")
+        shutil.copyfile(source, output_dir / name)
+
+    observed = sorted(path.name for path in output_dir.iterdir() if path.is_file())
+    if observed != names:
+        raise ValueError("materialized publication asset set mismatch")
+
+
+def _sha256sums_text(manifest: dict[str, object]) -> str:
     checksum_rows = list(manifest["distributions"])
     checksum_rows.extend(manifest.get("standalones", []))
     checksum_rows.extend(manifest.get("installer_checksums", []))
+    checksum_rows.extend(manifest.get("bootstrap_installers", []))
 
     lines = []
     for row in checksum_rows:
         assert isinstance(row, dict)
         digest = str(row["sha256"]).removeprefix("sha256:")
         lines.append(f"{digest}  {row['filename']}")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return "\n".join(lines) + "\n"
+
+
+def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
+    path.write_text(_sha256sums_text(manifest), encoding="utf-8")
 
 
 def _write_json(value: dict[str, object], path: Path) -> None:
@@ -477,16 +663,17 @@ def _add_publication_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--source-sha", required=True)
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Validate and bind Hashmarks release artifacts."
-    )
-    sub = parser.add_subparsers(dest="command", required=True)
-
+def _add_validation_commands(sub) -> None:
     tag = sub.add_parser("validate-tag")
     tag.add_argument("--root", default=".")
     tag.add_argument("--tag", required=True)
 
+    release_notes = sub.add_parser("validate-release-notes")
+    release_notes.add_argument("--root", default=".")
+    release_notes.add_argument("--version", required=True)
+
+
+def _add_package_commands(sub) -> None:
     manifest = sub.add_parser("manifest")
     manifest.add_argument("--root", default=".")
     manifest.add_argument("--dist", required=True)
@@ -500,6 +687,8 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--tag", required=True)
     verify.add_argument("--manifest", required=True)
 
+
+def _add_standalone_commands(sub) -> None:
     standalone = sub.add_parser("standalone-qualification")
     standalone.add_argument("--root", default=".")
     standalone.add_argument("--artifact", required=True)
@@ -508,20 +697,53 @@ def main(argv: list[str] | None = None) -> int:
     standalone.add_argument("--architecture", choices=("x86_64",), required=True)
     standalone.add_argument("--output", required=True)
 
-    verify_standalone = sub.add_parser("verify-standalone-qualification")
-    verify_standalone.add_argument("--root", default=".")
-    verify_standalone.add_argument("--bundle", required=True)
+    verify = sub.add_parser("verify-standalone-qualification")
+    verify.add_argument("--root", default=".")
+    verify.add_argument("--bundle", required=True)
 
+
+def _add_publication_commands(sub) -> None:
     publication = sub.add_parser("publication-manifest")
     _add_publication_arguments(publication)
     publication.add_argument("--output", required=True)
     publication.add_argument("--sha256sums", required=True)
 
-    verify_publication = sub.add_parser("verify-publication")
-    _add_publication_arguments(verify_publication)
-    verify_publication.add_argument("--manifest", required=True)
+    verify = sub.add_parser("verify-publication")
+    _add_publication_arguments(verify)
+    verify.add_argument("--manifest", required=True)
 
-    args = parser.parse_args(argv)
+    assets = sub.add_parser("publication-assets")
+    assets.add_argument("--manifest", required=True)
+    assets.add_argument("--output", required=True)
+
+    materialize = sub.add_parser("materialize-publication")
+    materialize.add_argument("--root", default=".")
+    materialize.add_argument("--manifest", required=True)
+    materialize.add_argument("--sha256sums", required=True)
+    materialize.add_argument("--dist", required=True)
+    materialize.add_argument(
+        "--standalone-bundle",
+        action="append",
+        required=True,
+        dest="standalone_bundles",
+    )
+    materialize.add_argument("--output-dir", required=True)
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Validate and bind Hashmarks release artifacts."
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+    _add_validation_commands(sub)
+    _add_package_commands(sub)
+    _add_standalone_commands(sub)
+    _add_publication_commands(sub)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
     try:
         return _run_command(args)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -552,6 +774,34 @@ def _run_standalone_command(args, root: Path) -> int:
         return 0
     _load_standalone_bundle(root, Path(args.bundle))
     _log_command_output("Hashmarks standalone qualification: PASS")
+    return 0
+
+
+def _run_publication_assets(args) -> int:
+    manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise ValueError("publication manifest must be an object")
+    names = publication_asset_names(manifest)
+    Path(args.output).write_text("\n".join(names) + "\n", encoding="utf-8")
+    _log_command_output("Hashmarks publication asset set: PASS")
+    return 0
+
+
+def _run_materialize_publication(args) -> int:
+    manifest_path = Path(args.manifest)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise ValueError("publication manifest must be an object")
+    sources = _publication_source_map(
+        manifest,
+        root=Path(args.root),
+        manifest_path=manifest_path,
+        sha256sums_path=Path(args.sha256sums),
+        dist=Path(args.dist),
+        standalone_bundles=[Path(item) for item in args.standalone_bundles],
+    )
+    _copy_publication_sources(manifest, sources, Path(args.output_dir))
+    _log_command_output("Hashmarks publication bundle materialization: PASS")
     return 0
 
 
@@ -598,14 +848,27 @@ def _run_package_command(args, root: Path) -> int:
 
 
 def _run_command(args) -> int:
-    root = Path(args.root).resolve()
+    root = Path(getattr(args, "root", ".")).resolve()
     if args.command == "validate-tag":
-        return _run_validate_tag(args, root)
-    if args.command in {"standalone-qualification", "verify-standalone-qualification"}:
-        return _run_standalone_command(args, root)
-    if args.command in {"publication-manifest", "verify-publication"}:
-        return _run_publication_command(args, root)
-    return _run_package_command(args, root)
+        result = _run_validate_tag(args, root)
+    elif args.command == "validate-release-notes":
+        validate_release_notes(root, args.version)
+        _log_command_output(f"Hashmarks release notes: PASS ({args.version})")
+        result = 0
+    elif args.command == "publication-assets":
+        result = _run_publication_assets(args)
+    elif args.command == "materialize-publication":
+        result = _run_materialize_publication(args)
+    elif args.command in {
+        "standalone-qualification",
+        "verify-standalone-qualification",
+    }:
+        result = _run_standalone_command(args, root)
+    elif args.command in {"publication-manifest", "verify-publication"}:
+        result = _run_publication_command(args, root)
+    else:
+        result = _run_package_command(args, root)
+    return result
 
 
 if __name__ == "__main__":

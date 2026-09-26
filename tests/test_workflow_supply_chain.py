@@ -85,7 +85,7 @@ def test_publish_job_separates_release_machinery_from_source_bytes() -> None:
     assert "GH_REPO: ${{ github.repository }}" in publish
 
 
-def test_publish_workflow_publishes_only_verified_github_release_assets() -> None:
+def test_publish_workflow_binds_reviewed_release_authority() -> None:
     text = _publish_workflow_text()
     assert "Publish exact qualified bytes to GitHub Release" in text
     assert "gh release create" in text
@@ -95,31 +95,47 @@ def test_publish_workflow_publishes_only_verified_github_release_assets() -> Non
     assert 'git -C source rev-list -n 1 "$RELEASE_TAG"' in text
     assert 'if [ "$tag_commit" != "${{ needs.prepare.outputs.source_sha }}" ]' in text
     assert "Materialize reviewed changelog section as release notes" in text
+    assert "replace this development placeholder" in text
+    assert "has no public release notes for" in text
     assert "--draft" in text
-    assert 'gh release edit "$RELEASE_TAG" \\' in text
-    assert "--notes-file release/release-notes.md" in text
     assert 'gh release edit "$RELEASE_TAG" --draft=false' in text
-    assert "gh release upload" in text
+
+
+def test_publish_workflow_reconciles_and_reads_back_exact_draft() -> None:
+    text = _publish_workflow_text()
     assert "Prepare exact reviewed draft release" in text
     assert "Remove stale assets from reviewed draft" in text
     assert 'gh release delete-asset "$RELEASE_TAG" "$asset" --yes' in text
+    assert "materialize-publication" in text
+    assert "release/public/*" in text
     assert "Verify exact reviewed draft asset set" in text
-    assert "release/expected-assets.txt" in text
-    assert "release/actual-assets.txt" in text
+    assert "publication-assets" in text
+    assert "cat > release/expected-assets.txt" not in text
     assert "diff -u release/expected-assets.txt release/actual-assets.txt" in text
+    assert "Read back exact draft release bytes" in text
+    assert 'gh release download "$RELEASE_TAG" --dir release/readback' in text
+    assert 'cmp -s "release/public/$asset" "release/readback/$asset"' in text
     assert text.index("Remove stale assets from reviewed draft") < text.index(
         "Upload qualified assets to reviewed draft"
     )
     assert text.index("Verify exact reviewed draft asset set") < text.index(
+        "Read back exact draft release bytes"
+    )
+    assert text.index("Read back exact draft release bytes") < text.index(
         "Publish reviewed release"
     )
+
+
+def test_publish_workflow_uses_only_qualified_cross_platform_assets() -> None:
+    text = _publish_workflow_text()
+    assert "gh release upload" in text
     assert "qualified-python-release-bundle" in text
     assert "qualified-standalone-linux-release-bundle" in text
     assert "qualified-standalone-windows-release-bundle" in text
-    assert "release/standalone/linux/hashmarks-linux-x86_64" in text
-    assert "release/standalone/linux/hashmarks-linux-x86_64.sha256" in text
-    assert "release/standalone/windows/hashmarks-windows-x86_64.exe" in text
-    assert "release/standalone/windows/hashmarks-windows-x86_64.exe.sha256" in text
+    assert "--standalone-bundle release/standalone/linux" in text
+    assert "--standalone-bundle release/standalone/windows" in text
+    assert "materialize-publication" in text
+    assert "release/public/*" in text
     assert text.count("verify-standalone-qualification") >= 4
     assert "environment: pypi" not in text
     assert "id-token: write" not in text
@@ -157,7 +173,7 @@ def test_ci_qualifies_native_linux_wsl_and_windows_install_paths() -> None:
         1,
     )[0]
     windows = text.split("  standalone-windows-artifact:\n", 1)[1].split(
-        "\n  precommit:\n",
+        "\n  publication-rehearsal:\n",
         1,
     )[0]
 
@@ -210,6 +226,34 @@ def test_publish_requires_native_linux_wsl_and_windows_release_identity() -> Non
         in publish
     )
     assert '"hashmarks version $RELEASE_VERSION"' in publish
+
+
+def test_ci_rehearses_cross_job_publication_aggregation() -> None:
+    text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    rehearsal = text.split("  publication-rehearsal:\n", 1)[1].split(
+        "\n  precommit:\n",
+        1,
+    )[0]
+
+    assert (
+        "needs: [release-environment, standalone-artifact, "
+        "standalone-windows-artifact]" in rehearsal
+    )
+    assert "hashmarks-qualified-python-${{ github.sha }}" in rehearsal
+    assert "hashmarks-standalone-linux-${{ github.sha }}" in rehearsal
+    assert "hashmarks-standalone-windows-${{ github.sha }}" in rehearsal
+    assert "verify-standalone-qualification" in rehearsal
+    assert "publication-manifest" in rehearsal
+    assert "verify-publication" in rehearsal
+    assert "materialize-publication" in rehearsal
+    assert "publication-assets" in rehearsal
+    assert (
+        "diff -u rehearsal/expected-assets.txt rehearsal/actual-assets.txt" in rehearsal
+    )
+    assert "PUBLICATION_REHEARSAL: ${{ needs.publication-rehearsal.result }}" in text
+    assert "- publication-rehearsal" in text
+    assert "path: publication-rehearsal/" in text
+    assert "path: .publication-rehearsal/" not in text
 
 
 def test_release_profile_installs_mcp_before_full_native_qualification() -> None:
