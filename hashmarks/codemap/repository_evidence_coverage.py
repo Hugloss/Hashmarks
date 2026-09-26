@@ -421,6 +421,7 @@ class RepositoryEvidenceCoverageMixin:
         self,
         bindings_packet: Mapping[str, object],
         binding_delta: Mapping[str, object] | None,
+        binding_delta_before: Mapping[str, object] | None,
     ) -> None:
         self._validate_binding_delta_input(
             bindings_packet,
@@ -441,6 +442,16 @@ class RepositoryEvidenceCoverageMixin:
                 repository_identity=repository_identity,
                 bindings_identity=identity,
             )
+            if binding_delta_before is None:
+                raise ValueError(
+                    "binding_delta_before is required to authenticate binding_delta"
+                )
+            replayed_delta = self.repository_evidence_binding_delta(
+                binding_delta_before,
+                bindings_packet,
+            )
+            if replayed_delta["delta_identity"] != binding_delta.get("delta_identity"):
+                raise ValueError("binding_delta semantic replay mismatch")
 
     @staticmethod
     def _delta_evidence_paths(
@@ -535,11 +546,16 @@ class RepositoryEvidenceCoverageMixin:
         change_set_complete: bool | None = None,
         repository_observation: RepositoryObservation | None = None,
         binding_delta: Mapping[str, object] | None = None,
+        binding_delta_before: Mapping[str, object] | None = None,
     ) -> dict[str, object]:
         """Classify changes while preserving change-set authority and precision."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._validate_coverage_packets(bindings_packet, binding_delta)
+        self._validate_coverage_packets(
+            bindings_packet,
+            binding_delta,
+            binding_delta_before,
+        )
         changed, complete, change_set = self._change_set(
             changed_paths, change_set_complete, repository_observation
         )
