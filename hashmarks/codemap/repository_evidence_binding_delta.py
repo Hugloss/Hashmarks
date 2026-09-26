@@ -434,7 +434,9 @@ class RepositoryEvidenceBindingDeltaMixin:
         if not isinstance(identity, str) or identity != expected_identity:
             raise ValueError(f"{name} bindings identity mismatch")
         rows = packet.get("bindings")
-        if not isinstance(rows, list) or any(\n            not isinstance(row, Mapping) for row in rows\n        ):
+        if not isinstance(rows, list) or any(
+            not isinstance(row, Mapping) for row in rows
+        ):
             raise ValueError(f"{name} bindings must be a list of objects")
         binding_ids = [str(row.get("binding_id") or "") for row in rows]
         if any(not binding_id for binding_id in binding_ids):
