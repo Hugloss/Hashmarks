@@ -446,6 +446,7 @@ jobs:
         run: |
           rm -rf release/public release/readback
           python3 workflow/scripts/release_contract.py materialize-publication \
+            --root source \
             --manifest release/release-manifest.json \
             --sha256sums release/SHA256SUMS.txt \
             --dist release/packages \
