@@ -156,21 +156,22 @@ jobs:
           test "$(cat dist/artifact-check-preservation-sentinel)" = 'artifact-check must preserve this'
       - name: Build publication rehearsal package bundle
         run: |
-          rm -rf .publication-rehearsal
-          mkdir -p .publication-rehearsal/build .publication-rehearsal/packages
-          uv build --out-dir .publication-rehearsal/build
-          cp .publication-rehearsal/build/*.whl .publication-rehearsal/packages/
-          cp .publication-rehearsal/build/*.tar.gz .publication-rehearsal/packages/
+          rm -rf publication-rehearsal
+          mkdir -p publication-rehearsal/build publication-rehearsal/packages
+          uv build --out-dir publication-rehearsal/build
+          cp publication-rehearsal/build/*.whl publication-rehearsal/packages/
+          cp publication-rehearsal/build/*.tar.gz publication-rehearsal/packages/
           version="$(uv run --frozen --no-sync python -c 'import hashmarks; print(hashmarks.__version__)')"
           uv run --frozen --no-sync python scripts/release_contract.py manifest \
-            --dist .publication-rehearsal/packages \
+            --dist publication-rehearsal/packages \
             --tag "v$version" \
-            --output .publication-rehearsal/package-manifest.json \
-            --sha256sums .publication-rehearsal/PACKAGE_SHA256SUMS.txt
+            --output publication-rehearsal/package-manifest.json \
+            --sha256sums publication-rehearsal/PACKAGE_SHA256SUMS.txt
+          rm -rf publication-rehearsal/build
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hashmarks-qualified-python-${{ github.sha }}
-          path: .publication-rehearsal/
+          path: publication-rehearsal/
           if-no-files-found: error
 
   python-support:
@@ -482,7 +483,7 @@ jobs:
           MCP_INTEROP: ${{ needs.mcp-interop.result }}
           STANDALONE_ARTIFACT: ${{ needs.standalone-artifact.result }}
           WINDOWS_STANDALONE: ${{ needs.standalone-windows-artifact.result }}
-          PUBLICATION_REHEARSAL: ${{ needs.publication-rehearsal.result }}
+          PUBLICATION_REHEARSAL: ${{ needspublication-rehearsal.result }}
           PRECOMMIT: ${{ needs.precommit.result }}
         run: |
           failed=0
