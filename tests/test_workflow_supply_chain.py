@@ -142,6 +142,7 @@ def test_publish_workflow_uses_only_qualified_cross_platform_assets() -> None:
     assert "PYPI_TOKEN" not in text
     assert "pypa/gh-action-pypi-publish@" not in text
 
+
 def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
     request = tomllib.loads(
         (_root() / ".github" / "release-request.toml").read_text(encoding="utf-8")
