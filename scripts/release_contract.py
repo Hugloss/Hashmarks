@@ -5,6 +5,7 @@ import email
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -474,6 +475,68 @@ def publication_asset_names(manifest: dict[str, object]) -> list[str]:
     return sorted(names)
 
 
+def materialize_publication_bundle(
+    manifest: dict[str, object],
+    *,
+    manifest_path: Path,
+    sha256sums_path: Path,
+    dist: Path,
+    standalone_bundles: list[Path],
+    output_dir: Path,
+) -> None:
+    names = publication_asset_names(manifest)
+    output_dir = output_dir.resolve()
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise ValueError("publication output directory must be empty")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    sources: dict[str, Path] = {
+        "release-manifest.json": manifest_path.resolve(),
+        "SHA256SUMS.txt": sha256sums_path.resolve(),
+    }
+    for row in manifest["distributions"]:
+        assert isinstance(row, dict)
+        sources[str(row["filename"])] = dist.resolve() / str(row["filename"])
+
+    for key in ("standalones", "installer_checksums"):
+        for row in manifest[key]:
+            assert isinstance(row, dict)
+            filename = str(row["filename"])
+            matches = [
+                bundle.resolve() / filename
+                for bundle in standalone_bundles
+                if (bundle.resolve() / filename).is_file()
+            ]
+            if len(matches) != 1:
+                raise ValueError(
+                    f"qualified public asset {filename!r} must resolve in exactly one "
+                    "standalone bundle"
+                )
+            sources[filename] = matches[0]
+
+    if set(sources) != set(names):
+        raise ValueError("publication source set does not match manifest asset names")
+
+    row_by_name = {
+        str(row["filename"]): row
+        for key in ("distributions", "standalones", "installer_checksums")
+        for row in manifest[key]
+        if isinstance(row, dict)
+    }
+    for name in names:
+        source = sources[name]
+        if not source.is_file():
+            raise ValueError(f"qualified public asset is missing: {source}")
+        row = row_by_name.get(name)
+        if row is not None and _sha256(source) != row["sha256"]:
+            raise ValueError(f"qualified public asset digest mismatch: {name}")
+        shutil.copyfile(source, output_dir / name)
+
+    observed = sorted(path.name for path in output_dir.iterdir() if path.is_file())
+    if observed != names:
+        raise ValueError("materialized publication asset set mismatch")
+
+
 def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
     checksum_rows = list(manifest["distributions"])
     checksum_rows.extend(manifest.get("standalones", []))
@@ -570,6 +633,18 @@ def main(argv: list[str] | None = None) -> int:
     publication_assets.add_argument("--manifest", required=True)
     publication_assets.add_argument("--output", required=True)
 
+    materialize_publication = sub.add_parser("materialize-publication")
+    materialize_publication.add_argument("--manifest", required=True)
+    materialize_publication.add_argument("--sha256sums", required=True)
+    materialize_publication.add_argument("--dist", required=True)
+    materialize_publication.add_argument(
+        "--standalone-bundle",
+        action="append",
+        required=True,
+        dest="standalone_bundles",
+    )
+    materialize_publication.add_argument("--output-dir", required=True)
+
     args = parser.parse_args(argv)
     try:
         return _run_command(args)
@@ -611,6 +686,23 @@ def _run_publication_assets(args) -> int:
     names = publication_asset_names(manifest)
     Path(args.output).write_text("\n".join(names) + "\n", encoding="utf-8")
     _log_command_output("Hashmarks publication asset set: PASS")
+    return 0
+
+
+def _run_materialize_publication(args) -> int:
+    manifest_path = Path(args.manifest)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise ValueError("publication manifest must be an object")
+    materialize_publication_bundle(
+        manifest,
+        manifest_path=manifest_path,
+        sha256sums_path=Path(args.sha256sums),
+        dist=Path(args.dist),
+        standalone_bundles=[Path(item) for item in args.standalone_bundles],
+        output_dir=Path(args.output_dir),
+    )
+    _log_command_output("Hashmarks publication bundle materialization: PASS")
     return 0
 
 
@@ -666,6 +758,8 @@ def _run_command(args) -> int:
         return 0
     if args.command == "publication-assets":
         return _run_publication_assets(args)
+    if args.command == "materialize-publication":
+        return _run_materialize_publication(args)
     if args.command in {"standalone-qualification", "verify-standalone-qualification"}:
         return _run_standalone_command(args, root)
     if args.command in {"publication-manifest", "verify-publication"}:
