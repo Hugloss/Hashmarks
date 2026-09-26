@@ -1586,6 +1586,26 @@ def test_binding_delta_reports_unsupported_member_becoming_present_as_state_chan
     assert change["observation_state_changed"] is True
 
 
+def test_coverage_rejects_resigned_duplicate_binding_packet(tmp_path: Path) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    binding = [{"binding_id": "duplicate", "evidence": [{"path": "owner.py", "start_line": 1, "end_line": 1}]}]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.repository_evidence_bindings(binding)
+        packet["bindings"].append(deepcopy(packet["bindings"][0]))
+        payload = {key: value for key, value in packet.items() if key != "bindings_identity"}
+        packet["bindings_identity"] = "sha256:" + codemap._packet_digest(
+            "hashmarks.repository-evidence-bindings.v1", payload
+        )
+
+        with pytest.raises(ValueError, match="duplicate binding_id"):
+            codemap.repository_evidence_coverage(
+                packet,
+                changed_paths=["owner.py"],
+                change_set_complete=True,
+            )
+
+
 def test_coverage_rejects_authenticated_delta_with_foreign_repository_claim(
     tmp_path: Path,
 ) -> None:
