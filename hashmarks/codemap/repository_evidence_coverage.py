@@ -319,6 +319,34 @@ class RepositoryEvidenceCoverageMixin:
             },
         )
 
+    @staticmethod
+    def _validate_binding_delta_classifications(
+        binding_delta: Mapping[str, object],
+    ) -> None:
+            bindings = binding_delta.get("bindings")
+            if not isinstance(bindings, Mapping):
+                raise ValueError("binding_delta bindings must be an object")
+            id_sets: dict[str, set[str]] = {}
+            for field in ("added", "removed", "preserved"):
+                values = bindings.get(field)
+                if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+                    raise ValueError(f"binding_delta {field} must be a list of binding ids")
+                if len(set(values)) != len(values):
+                    raise ValueError(f"binding_delta {field} contains duplicate binding id")
+                id_sets[field] = set(values)
+            changed = bindings.get("changed")
+            if not isinstance(changed, list) or any(not isinstance(row, Mapping) for row in changed):
+                raise ValueError("binding_delta changed must be a list of objects")
+            changed_ids = [str(row.get("binding_id") or "") for row in changed]
+            if any(not binding_id for binding_id in changed_ids) or len(set(changed_ids)) != len(changed_ids):
+                raise ValueError("binding_delta changed contains duplicate or empty binding id")
+            id_sets["changed"] = set(changed_ids)
+            fields = tuple(id_sets)
+            for index, left in enumerate(fields):
+                for right in fields[index + 1 :]:
+                    if id_sets[left] & id_sets[right]:
+                        raise ValueError("binding_delta binding classifications overlap")
+
     def _validate_coverage_binding_delta(
         self,
         binding_delta: Mapping[str, object],
@@ -360,29 +388,7 @@ class RepositoryEvidenceCoverageMixin:
             identity != repository_identity for identity in delta_repository_identities
         ):
             raise ValueError("binding_delta repository-mismatch")
-        bindings = binding_delta.get("bindings")
-        if not isinstance(bindings, Mapping):
-            raise ValueError("binding_delta bindings must be an object")
-        id_sets: dict[str, set[str]] = {}
-        for field in ("added", "removed", "preserved"):
-            values = bindings.get(field)
-            if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
-                raise ValueError(f"binding_delta {field} must be a list of binding ids")
-            if len(set(values)) != len(values):
-                raise ValueError(f"binding_delta {field} contains duplicate binding id")
-            id_sets[field] = set(values)
-        changed = bindings.get("changed")
-        if not isinstance(changed, list) or any(not isinstance(row, Mapping) for row in changed):
-            raise ValueError("binding_delta changed must be a list of objects")
-        changed_ids = [str(row.get("binding_id") or "") for row in changed]
-        if any(not binding_id for binding_id in changed_ids) or len(set(changed_ids)) != len(changed_ids):
-            raise ValueError("binding_delta changed contains duplicate or empty binding id")
-        id_sets["changed"] = set(changed_ids)
-        fields = tuple(id_sets)
-        for index, left in enumerate(fields):
-            for right in fields[index + 1 :]:
-                if id_sets[left] & id_sets[right]:
-                    raise ValueError("binding_delta binding classifications overlap")
+        self._validate_binding_delta_classifications(binding_delta)
         identities = binding_delta.get("bindings_identity")
         after_identity = (
             identities.get("after") if isinstance(identities, Mapping) else None
