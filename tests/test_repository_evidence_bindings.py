@@ -1069,7 +1069,7 @@ def test_coverage_rejects_delta_for_different_binding_packet(tmp_path: Path) -> 
                 changed_paths=["a.py"],
                 change_set_complete=True,
                 binding_delta=delta,
-            binding_delta_before=before,
+                binding_delta_before=before,
             )
 
 
@@ -1097,7 +1097,7 @@ def test_coverage_rejects_tampered_binding_delta(tmp_path: Path) -> None:
                 changed_paths=["a.py"],
                 change_set_complete=True,
                 binding_delta=delta,
-            binding_delta_before=before,
+                binding_delta_before=before,
             )
 
 
@@ -1670,7 +1670,7 @@ def test_coverage_rejects_resigned_contradictory_binding_delta(tmp_path: Path) -
                 changed_paths=["source.py"],
                 change_set_complete=True,
                 binding_delta=delta,
-            binding_delta_before=before,
+                binding_delta_before=before,
             )
 
 
@@ -1744,7 +1744,7 @@ def test_coverage_rejects_authenticated_delta_with_foreign_repository_claim(
                 changed_paths=["source.py"],
                 change_set_complete=True,
                 binding_delta=delta,
-            binding_delta_before=before,
+                binding_delta_before=before,
             )
 
 
@@ -1784,5 +1784,5 @@ def test_coverage_rejects_authenticated_delta_with_foreign_before_repository_cla
                 changed_paths=["source.py"],
                 change_set_complete=True,
                 binding_delta=delta,
-            binding_delta_before=before,
+                binding_delta_before=before,
             )
