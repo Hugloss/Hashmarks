@@ -9,8 +9,8 @@ from .dependency_resolution_evidence import DependencyResolutionEvidenceMixin
 class DependencyResolutionDeltaMixin:
     """Compare qualified dependency observations within one repository authority."""
 
+    @staticmethod
     def dependency_resolution_delta(
-        self,
         before: Mapping[str, object],
         after: Mapping[str, object],
     ) -> dict[str, object]:
@@ -23,8 +23,6 @@ class DependencyResolutionDeltaMixin:
         if (
             before_binding.get("repository_identity")
             != after_binding.get("repository_identity")
-            or before_binding.get("repository_identity")
-            != self._repository_packet_identity()
             or before_binding.get("codemap_generation")
             != after_binding.get("codemap_generation")
         ):
