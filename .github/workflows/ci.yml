@@ -417,6 +417,7 @@ jobs:
             --manifest rehearsal/release-manifest.json
           rm -rf rehearsal/public
           python3 scripts/release_contract.py materialize-publication \
+            --root . \
             --manifest rehearsal/release-manifest.json \
             --sha256sums rehearsal/SHA256SUMS.txt \
             --dist rehearsal/packages \
