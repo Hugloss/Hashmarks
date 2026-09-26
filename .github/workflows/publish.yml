@@ -525,19 +525,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          cat > release/expected-assets.txt <<EOF
-          SHA256SUMS.txt
-          hashmarks-$RELEASE_VERSION-py3-none-any.whl
-          hashmarks-$RELEASE_VERSION.tar.gz
-          hashmarks-linux-x86_64
-          hashmarks-linux-x86_64.sha256
-          hashmarks-windows-x86_64.exe
-          hashmarks-windows-x86_64.exe.sha256
-          release-manifest.json
-          EOF
-          sort -o release/expected-assets.txt release/expected-assets.txt
+          python3 workflow/scripts/release_contract.py publication-assets \
+            --manifest release/release-manifest.json \
+            --output release/expected-assets.txt
           gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' |
             sort > release/actual-assets.txt
           if ! diff -u release/expected-assets.txt release/actual-assets.txt; then
