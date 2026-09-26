@@ -19,7 +19,7 @@ def _log_command_output(*values: object) -> None:
 
 
 SCHEMA = "hashmarks.release-artifact-manifest.v2"
-PUBLICATION_SCHEMA = "hashmarks.release-publication-manifest.v2"
+PUBLICATION_SCHEMA = "hashmarks.release-publication-manifest.v3"
 STANDALONE_QUALIFICATION_SCHEMA = "hashmarks.standalone-qualification.v1"
 STANDALONE_QUALIFICATION_FILENAME = "standalone-qualification.json"
 STANDALONE_SPECS = {
@@ -27,6 +27,10 @@ STANDALONE_SPECS = {
     ("windows", "x86_64"): "hashmarks-windows-x86_64.exe",
 }
 REQUIRED_STANDALONES = frozenset(STANDALONE_SPECS)
+BOOTSTRAP_INSTALLERS = {
+    "linux-wsl": "install.sh",
+    "windows": "install.ps1",
+}
 
 
 def _project(root: Path) -> dict[str, object]:
@@ -421,6 +425,24 @@ def _qualified_standalones(
     return standalones, checksums
 
 
+def _bootstrap_installer_rows(root: Path) -> list[dict[str, object]]:
+    rows = []
+    for platform, filename in BOOTSTRAP_INSTALLERS.items():
+        path = root.resolve() / filename
+        if not path.is_file():
+            raise ValueError(f"bootstrap installer is missing: {path}")
+        rows.append(
+            {
+                "kind": "bootstrap-installer",
+                "filename": filename,
+                "size_bytes": path.stat().st_size,
+                "sha256": _sha256(path),
+                "platform": platform,
+            }
+        )
+    return rows
+
+
 def publication_manifest(
     root: Path,
     dist: Path,
@@ -448,6 +470,7 @@ def publication_manifest(
         "distributions": package["distributions"],
         "standalones": standalones,
         "installer_checksums": installer_checksums,
+        "bootstrap_installers": _bootstrap_installer_rows(root),
         "qualification_dependency_resolution": package[
             "qualification_dependency_resolution"
         ],
@@ -463,7 +486,12 @@ def publication_asset_names(manifest: dict[str, object]) -> list[str]:
         raise ValueError("publication asset list requires a publication manifest")
 
     names = ["release-manifest.json", "SHA256SUMS.txt"]
-    for key in ("distributions", "standalones", "installer_checksums"):
+    for key in (
+        "distributions",
+        "standalones",
+        "installer_checksums",
+        "bootstrap_installers",
+    ):
         rows = manifest.get(key)
         if not isinstance(rows, list):
             raise ValueError(f"publication manifest {key} must be a list")
@@ -497,6 +525,7 @@ def _standalone_publication_source(
 def _publication_source_map(
     manifest: dict[str, object],
     *,
+    root: Path,
     manifest_path: Path,
     sha256sums_path: Path,
     dist: Path,
@@ -518,6 +547,10 @@ def _publication_source_map(
                 filename,
                 standalone_bundles,
             )
+    for row in manifest["bootstrap_installers"]:
+        assert isinstance(row, dict)
+        filename = str(row["filename"])
+        sources[filename] = root.resolve() / filename
     return sources
 
 
@@ -526,7 +559,12 @@ def _publication_rows_by_name(
 ) -> dict[str, dict[str, object]]:
     return {
         str(row["filename"]): row
-        for key in ("distributions", "standalones", "installer_checksums")
+        for key in (
+            "distributions",
+            "standalones",
+            "installer_checksums",
+            "bootstrap_installers",
+        )
         for row in manifest[key]
         if isinstance(row, dict)
     }
@@ -564,6 +602,7 @@ def _copy_publication_sources(
 def materialize_publication_bundle(
     manifest: dict[str, object],
     *,
+    root: Path,
     manifest_path: Path,
     sha256sums_path: Path,
     dist: Path,
@@ -572,6 +611,7 @@ def materialize_publication_bundle(
 ) -> None:
     sources = _publication_source_map(
         manifest,
+        root=root,
         manifest_path=manifest_path,
         sha256sums_path=sha256sums_path,
         dist=dist,
@@ -584,6 +624,7 @@ def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
     checksum_rows = list(manifest["distributions"])
     checksum_rows.extend(manifest.get("standalones", []))
     checksum_rows.extend(manifest.get("installer_checksums", []))
+    checksum_rows.extend(manifest.get("bootstrap_installers", []))
 
     lines = []
     for row in checksum_rows:
@@ -678,6 +719,7 @@ def _add_publication_commands(sub) -> None:
     assets.add_argument("--output", required=True)
 
     materialize = sub.add_parser("materialize-publication")
+    materialize.add_argument("--root", default=".")
     materialize.add_argument("--manifest", required=True)
     materialize.add_argument("--sha256sums", required=True)
     materialize.add_argument("--dist", required=True)
@@ -754,6 +796,7 @@ def _run_materialize_publication(args) -> int:
         raise ValueError("publication manifest must be an object")
     materialize_publication_bundle(
         manifest,
+        root=Path(args.root),
         manifest_path=manifest_path,
         sha256sums_path=Path(args.sha256sums),
         dist=Path(args.dist),
