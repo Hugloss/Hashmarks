@@ -577,7 +577,7 @@ def test_previous_correlation_rejects_tampered_top_level_packet(
         tampered["causation"] = "producer-claimed"
         with pytest.raises(
             ValueError,
-            match="correlation_identity does not match packet content",
+            match="bindings identity mismatch",
         ):
             codemap.correlate_evidence(
                 _bundle({"anchor_id": "owner", "path": "owner.py"}),
@@ -1470,6 +1470,5 @@ def test_incomplete_correlation_never_admits_negative_evidence(tmp_path: Path) -
             include_relationships=False,
         )
 
-    assert packet["completeness"]["state"] == "unknown"
+    assert packet["completeness"]["state"] == "incomplete"
     assert packet["completeness"]["negative_evidence"] == "not-admissible"
-
