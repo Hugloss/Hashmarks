@@ -1540,6 +1540,7 @@ def test_binding_delta_rejects_resigned_nested_binding_tamper(tmp_path: Path) ->
         with pytest.raises(ValueError, match="binding observation identity mismatch"):
             codemap.repository_evidence_binding_delta(before, packet)
 
+
 def test_binding_delta_rejects_resigned_duplicate_binding_ids(tmp_path: Path) -> None:
     (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
     binding = [
@@ -1562,6 +1563,7 @@ def test_binding_delta_rejects_resigned_duplicate_binding_ids(tmp_path: Path) ->
 
         with pytest.raises(ValueError, match="duplicate binding_id"):
             codemap.repository_evidence_binding_delta(before, packet)
+
 
 def test_binding_delta_reports_unsupported_member_becoming_present_as_state_change(
     tmp_path: Path,
@@ -1624,6 +1626,7 @@ def test_coverage_rejects_resigned_duplicate_binding_packet(tmp_path: Path) -> N
                 change_set_complete=True,
             )
 
+
 def test_coverage_rejects_resigned_contradictory_binding_delta(tmp_path: Path) -> None:
     source = tmp_path / "source.py"
     source.write_text("value = 1\n", encoding="utf-8")
@@ -1659,6 +1662,7 @@ def test_coverage_rejects_resigned_contradictory_binding_delta(tmp_path: Path) -
                 change_set_complete=True,
                 binding_delta=delta,
             )
+
 
 def test_coverage_rejects_authenticated_delta_with_foreign_repository_claim(
     tmp_path: Path,
