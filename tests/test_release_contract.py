@@ -129,8 +129,7 @@ def test_validate_release_notes_rejects_duplicate_release_heading(
 ) -> None:
     root = _release_notes_root(
         tmp_path,
-        "## 1.2.3 — First\n\n- A.\n\n"
-        "## 1.2.3 — Second\n\n- B.\n",
+        "## 1.2.3 — First\n\n- A.\n\n## 1.2.3 — Second\n\n- B.\n",
     )
 
     with pytest.raises(ValueError, match="must contain exactly one 1.2.3 heading"):
