@@ -433,6 +433,25 @@ def publication_manifest(
     return payload
 
 
+def publication_asset_names(manifest: dict[str, object]) -> list[str]:
+    if manifest.get("schema") != PUBLICATION_SCHEMA:
+        raise ValueError("publication asset list requires a publication manifest")
+
+    names = ["release-manifest.json", "SHA256SUMS.txt"]
+    for key in ("distributions", "standalones", "installer_checksums"):
+        rows = manifest.get(key)
+        if not isinstance(rows, list):
+            raise ValueError(f"publication manifest {key} must be a list")
+        for row in rows:
+            if not isinstance(row, dict) or not isinstance(row.get("filename"), str):
+                raise ValueError(f"publication manifest {key} contains an invalid row")
+            names.append(str(row["filename"]))
+
+    if len(names) != len(set(names)):
+        raise ValueError("publication manifest contains duplicate public asset names")
+    return sorted(names)
+
+
 def _write_sha256sums(manifest: dict[str, object], path: Path) -> None:
     checksum_rows = list(manifest["distributions"])
     checksum_rows.extend(manifest.get("standalones", []))
@@ -521,6 +540,10 @@ def main(argv: list[str] | None = None) -> int:
     _add_publication_arguments(verify_publication)
     verify_publication.add_argument("--manifest", required=True)
 
+    publication_assets = sub.add_parser("publication-assets")
+    publication_assets.add_argument("--manifest", required=True)
+    publication_assets.add_argument("--output", required=True)
+
     args = parser.parse_args(argv)
     try:
         return _run_command(args)
@@ -552,6 +575,16 @@ def _run_standalone_command(args, root: Path) -> int:
         return 0
     _load_standalone_bundle(root, Path(args.bundle))
     _log_command_output("Hashmarks standalone qualification: PASS")
+    return 0
+
+
+def _run_publication_assets(args) -> int:
+    manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise ValueError("publication manifest must be an object")
+    names = publication_asset_names(manifest)
+    Path(args.output).write_text("\n".join(names) + "\n", encoding="utf-8")
+    _log_command_output("Hashmarks publication asset set: PASS")
     return 0
 
 
@@ -601,6 +634,8 @@ def _run_command(args) -> int:
     root = Path(args.root).resolve()
     if args.command == "validate-tag":
         return _run_validate_tag(args, root)
+    if args.command == "publication-assets":
+        return _run_publication_assets(args)
     if args.command in {"standalone-qualification", "verify-standalone-qualification"}:
         return _run_standalone_command(args, root)
     if args.command in {"publication-manifest", "verify-publication"}:
