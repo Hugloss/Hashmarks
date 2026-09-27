@@ -449,6 +449,23 @@ def test_v3_derivation_authority_is_traceable_without_history_store(
     ]
 
 
+def test_v3_derivation_authority_accepts_caller_retained_old_endpoint(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        original_binding = copy.deepcopy(observation["repository_binding"])
+
+        (tmp_path / "later.py").write_text("VALUE = 1\n", encoding="utf-8")
+        codemap.sync(["later.py"])
+
+        derivation = codemap.dependency_resolution_derivation_authority(observation)
+
+    assert derivation["repository_binding"] == original_binding
+    assert derivation["observation_identity"] == observation["observation_identity"]
+
+
 def test_v3_derivation_identity_changes_with_adapter_semantics_only(
     tmp_path: Path,
 ) -> None:
