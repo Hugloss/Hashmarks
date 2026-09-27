@@ -111,7 +111,10 @@ class DependencyResolutionDerivationMixin:
         self,
         observation: Mapping[str, object],
     ) -> dict[str, object]:
-        """Explain one qualified dependency observation without requiring current state."""
+        """Explain one qualified dependency observation.
+
+        The supplied endpoint need not match current repository state.
+        """
         derivation = self.dependency_resolution_derivation_authority(observation)
         counts = {
             field: len(cast("Sequence[object]", observation[field]))
