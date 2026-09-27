@@ -29,7 +29,10 @@ class RepositoryDeclarationDerivationMixin:
             "Mapping[str, object]",
             observation["repository_evidence"],
         )
-        raw_bindings = cast("list[Mapping[str, object]]", repository_evidence["bindings"])
+        raw_bindings = cast(
+            "list[Mapping[str, object]]",
+            repository_evidence["bindings"],
+        )
         binding_rows = {str(row["binding_id"]): row for row in raw_bindings}
 
         group_authorities: list[dict[str, object]] = []
