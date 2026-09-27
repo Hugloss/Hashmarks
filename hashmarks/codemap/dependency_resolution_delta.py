@@ -73,11 +73,10 @@ def _source_content(
 
 def _source_qualification(
     observation: Mapping[str, object],
-) -> tuple[tuple[str, str, str], ...]:
+) -> tuple[tuple[str, str], ...]:
     return tuple(
         sorted(
             (
-                str(row.get("source_id") or ""),
                 str(row.get("completeness") or ""),
                 str(row.get("truncation") or ""),
             )
