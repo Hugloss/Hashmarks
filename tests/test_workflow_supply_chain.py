@@ -285,8 +285,16 @@ def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
     assert r"grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'" in text
     assert "Set-StrictMode -Version Latest" in text
     assert "$version = $env:RELEASE_TAG -replace '^v', ''" in text
-    assert "releases/download/${RELEASE_TAG}/install.sh" in text
-    assert "releases/download/$env:RELEASE_TAG/install.ps1" in text
+    assert (
+        'base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}"'
+        in text
+    )
+    assert 'curl -fsSL "$base/install.sh"' in text
+    assert (
+        '$base = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/'
+        '$env:RELEASE_TAG"' in text
+    )
+    assert 'Invoke-WebRequest -Uri "$base/install.ps1"' in text
     assert "SHA256SUMS.txt" in text
     assert 'HASHMARKS_VERSION="$version"' in text
     assert "$env:HASHMARKS_VERSION = $version" in text
@@ -295,7 +303,6 @@ def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
     assert "raw.githubusercontent.com" not in text
     assert "/releases/latest/" not in text
     assert "actions/checkout@" not in text
-
 
 def test_every_release_workflow_job_has_a_bounded_timeout() -> None:
     job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\n")
