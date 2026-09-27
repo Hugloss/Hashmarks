@@ -96,9 +96,10 @@ def test_dependency_delta_compares_explicit_endpoints_across_generations(
 
         delta = codemap.dependency_resolution_delta(before, after)
 
-    assert before["repository_binding"]["codemap_generation"] != after[
-        "repository_binding"
-    ]["codemap_generation"]
+    assert (
+        before["repository_binding"]["codemap_generation"]
+        != after["repository_binding"]["codemap_generation"]
+    )
     assert delta["comparability"] == "comparable"
     assert delta["change_axes"]["repository_generation"] == "changed"
     assert delta["change_axes"]["semantic_definition"] == "unchanged"
@@ -260,9 +261,10 @@ def test_dependency_delta_reports_repository_identity_as_independent_axis(
         after = _qualify(right_map, _snapshot())
         delta = right_map.dependency_resolution_delta(before, after)
 
-    assert before["repository_binding"]["repository_identity"] != after[
-        "repository_binding"
-    ]["repository_identity"]
+    assert (
+        before["repository_binding"]["repository_identity"]
+        != after["repository_binding"]["repository_identity"]
+    )
     assert delta["comparability"] == "comparable"
     assert delta["change_axes"]["repository_identity"] == "changed"
     assert delta["change_axes"]["semantic_resolution"] == "unchanged"
