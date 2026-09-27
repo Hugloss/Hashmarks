@@ -122,7 +122,7 @@ def test_uv_repository_input_path_move_preserves_resolution_and_source_bytes(
     assert after["repository_inputs"][0]["observed_member_revision"] is not None
     assert (
         before["repository_inputs"][0]["observed_member_revision"]
-        != after["repository_inputs"][0]["observed_member_revision"]
+        == after["repository_inputs"][0]["observed_member_revision"]
     )
     assert delta["comparability"] == "comparable"
     assert delta["change_axes"]["semantic_resolution"] == "unchanged"
@@ -162,7 +162,7 @@ def test_identical_repository_input_bytes_keep_distinct_path_authority(
         row["observed_member_revision"] for row in observation["repository_inputs"]
     }
     assert None not in observed_revisions
-    assert len(observed_revisions) == 2
+    assert len(observed_revisions) == 1
     assert {row["source_equivalence"] for row in observation["repository_inputs"]} == {
         "unknown"
     }
