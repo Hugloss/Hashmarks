@@ -127,10 +127,11 @@ Explanation is endpoint-local. It does not require the observation to match the 
 
 ### Endpoint delta and independent change axes
 
-`CodeMap.dependency_resolution_delta(before, after)` compares two structurally valid qualified packets when they share the same repository identity. The packets may come from different CodeMap generations. Hashmarks does not reconstruct either endpoint: the caller supplies both explicit observations.
+`CodeMap.dependency_resolution_delta(before, after)` compares two structurally valid qualified packets supplied explicitly by the caller. Repository identity and CodeMap generation are both comparison axes, not a request for Hashmarks to reconstruct either endpoint.
 
 The existing semantic component/selection/inventory/relationship delta remains factual. In addition, `change_axes` keeps independent dimensions separate:
 
+- `repository_identity`;
 - `repository_generation`;
 - `semantic_definition`;
 - `semantic_resolution`;
@@ -148,7 +149,7 @@ Most axes are `changed | unchanged`. `adapter_semantics` and `physical_evidence_
 
 Physical evidence topology and content are deliberately independent. Moving from one physical source identity to another with equal bytes reports topology change while content remains unchanged. Changing a producer digest under the same source topology reports content change without manufacturing a semantic dependency change.
 
-A different repository identity remains non-comparable and is rejected. Different generations of the same repository identity are expected endpoint comparison, not historical storage.
+Repository identity may itself differ between endpoints and is reported factually in `change_axes`. Hashmarks does not infer that the endpoints belong to one Git branch, one worktree lineage, or one causal history; the caller selected the endpoints. Different generations and repository identities are therefore explicit endpoint evidence, not historical storage.
 
 The v3 snapshot surface is fail-closed: unknown top-level and typed fact/source/coverage fields are rejected rather than silently normalized away. A v3 relationship has `kind: dependency`; other kinds are rejected, including when a supplied observation is replayed through queries or delta. Dependency-correlation request and row mappings are fail-closed for the same reason; caller metadata that is not part of the correlation contract is not silently discarded. `producer` metadata and semantic `scope` remain intentionally opaque JSON maps. Pure observation queries/deltas may be replayed from a structurally valid packet, but correspondence/correlation that combines dependency evidence with live repository intelligence requires the packet's repository identity and CodeMap generation to match the current CodeMap.
 
