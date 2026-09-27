@@ -428,14 +428,10 @@ class RepositoryEvidenceBindingDeltaMixin:
         if not isinstance(evidence, list) or not isinstance(dependencies, list):
             raise ValueError("retained binding definition inputs malformed")
         relationship_state = (
-            relationships.get("state")
-            if isinstance(relationships, Mapping)
-            else None
+            relationships.get("state") if isinstance(relationships, Mapping) else None
         )
         relationship_bounds = (
-            relationships.get("bounds")
-            if isinstance(relationships, Mapping)
-            else None
+            relationships.get("bounds") if isinstance(relationships, Mapping) else None
         )
         include_relationships = relationship_state != "not-requested"
         definition_payload = {
@@ -457,8 +453,7 @@ class RepositoryEvidenceBindingDeltaMixin:
             "include_relationships": include_relationships,
             "relationship_limit_per_path": (
                 relationship_bounds.get("limit_per_path")
-                if include_relationships
-                and isinstance(relationship_bounds, Mapping)
+                if include_relationships and isinstance(relationship_bounds, Mapping)
                 else None
             ),
         }
