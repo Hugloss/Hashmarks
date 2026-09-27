@@ -217,8 +217,9 @@ class RepositoryDeclarationsMixin:
         if packet.get("schema") != _SCHEMA:
             raise ValueError(f"{name} must use schema {_SCHEMA}")
         identity = packet.get("observation_identity")
-        if not isinstance(identity, str) or identity != self._declaration_packet_identity(
-            packet
+        if (
+            not isinstance(identity, str)
+            or identity != self._declaration_packet_identity(packet)
         ):
             raise ValueError(f"{name} identity mismatch")
 
@@ -325,7 +326,9 @@ class RepositoryDeclarationsMixin:
                 binding_id = str(declaration.get("binding_id") or "")
                 binding = binding_rows.get(binding_id)
                 if binding is None:
-                    raise ValueError(f"{name} declaration binding missing: {binding_id}")
+                    raise ValueError(
+                        f"{name} declaration binding missing: {binding_id}"
+                    )
                 referenced_binding_ids.add(binding_id)
                 evidence_state = self._binding_evidence_state(binding)
                 if declaration.get("evidence_state") != evidence_state:
@@ -354,7 +357,9 @@ class RepositoryDeclarationsMixin:
                     declaration.get("declaration_observation_identity")
                     != expected_observation
                 ):
-                    raise ValueError(f"{name} declaration observation identity mismatch")
+                    raise ValueError(
+                        f"{name} declaration observation identity mismatch"
+                    )
 
             definition_payload, observation_payload = self._group_identity_payloads(
                 group_id=group_id,
