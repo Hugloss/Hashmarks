@@ -147,6 +147,7 @@ def test_dependency_delta_separates_evidence_topology_from_equal_bytes(
     assert delta["change_axes"]["semantic_resolution"] == "unchanged"
     assert delta["change_axes"]["physical_evidence_topology"] == "changed"
     assert delta["change_axes"]["physical_evidence_content"] == "unchanged"
+    assert delta["change_axes"]["evidence_qualification"] == "unchanged"
 
 
 def test_dependency_delta_reports_source_content_change_without_semantic_change(
