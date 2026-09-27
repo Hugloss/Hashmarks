@@ -81,10 +81,7 @@ def test_uv_lock_adapter_preserves_relationship_and_inventory_change(
 def test_uv_lock_adapter_uses_one_multi_authority_physical_source() -> None:
     raw = uv_lock_dependency_observation(lock=_lock())
 
-    assert (
-        raw["producer"]["adapter_semantics"]
-        == "hashmarks.uv-dependency-adapter.v1"
-    )
+    assert raw["producer"]["adapter_semantics"] == "hashmarks.uv-dependency-adapter.v1"
     assert raw["evidence_sources"] == [
         {
             "source_id": "uv:lock",
