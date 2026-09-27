@@ -108,8 +108,7 @@ def test_maven_adapter_does_not_infer_complete_coverage_from_bytes(
         inventories={"compile": _inventory()},
     )
     assert (
-        raw["producer"]["adapter_semantics"]
-        == "hashmarks.maven-dependency-adapter.v1"
+        raw["producer"]["adapter_semantics"] == "hashmarks.maven-dependency-adapter.v1"
     )
 
     with CodeMap(tmp_path) as codemap:
