@@ -405,15 +405,25 @@ class RepositoryDeclarationsMixin:
     def _validate_projected_group_result(
         self,
         raw_group: Mapping[str, object],
+        contract: tuple[
+            str,
+            Mapping[str, object],
+            Mapping[str, object],
+            Mapping[str, object],
+            Mapping[str, object],
+            list[Mapping[str, object]],
+        ],
         *,
-        group_id: str,
-        concept: Mapping[str, object],
-        scope: Mapping[str, object],
-        correspondence: Mapping[str, object],
-        coverage: Mapping[str, object],
-        declarations: list[Mapping[str, object]],
         name: str,
     ) -> None:
+        (
+            group_id,
+            concept,
+            scope,
+            correspondence,
+            coverage,
+            declarations,
+        ) = contract
         definition_payload, observation_payload = self._group_identity_payloads(
             group_id=group_id,
             concept=concept,
@@ -469,12 +479,14 @@ class RepositoryDeclarationsMixin:
         }
         self._validate_projected_group_result(
             raw_group,
-            group_id=group_id,
-            concept=concept,
-            scope=scope,
-            correspondence=correspondence,
-            coverage=coverage,
-            declarations=projected_rows,
+            (
+                group_id,
+                concept,
+                scope,
+                correspondence,
+                coverage,
+                projected_rows,
+            ),
             name=name,
         )
         return referenced
