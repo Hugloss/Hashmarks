@@ -57,6 +57,7 @@ from .python_ast import estimate_tokens
 from .query_surface import QuerySurfaceMixin
 from .relationships import RelationshipsMixin
 from .repository_context import ContextPlanningMixin
+from .repository_declaration_derivation import RepositoryDeclarationDerivationMixin
 from .repository_declaration_discovery import RepositoryDeclarationDiscoveryMixin
 from .repository_declarations import RepositoryDeclarationsMixin
 from .repository_delta import RepositoryDeltaMixin
@@ -103,6 +104,7 @@ class CodeMap(
     EvidenceProfilesMixin,
     CrossRepositoryEvidenceMixin,
     RepositoryIntelligenceQueryMixin,
+    RepositoryDeclarationDerivationMixin,
     RepositoryDeclarationDiscoveryMixin,
     RepositoryDeclarationsMixin,
     IntelligenceEconomicsMixin,

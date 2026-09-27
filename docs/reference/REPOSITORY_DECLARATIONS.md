@@ -242,6 +242,63 @@ repository evidence and observer-capability change distinct.
 
 A delta does not say whether any change is correct or desirable.
 
+## Derivation authority and explanation
+
+`CodeMap.repository_declaration_derivation_authority(observation)` is a pure
+read-only projection over one already-qualified declaration packet. It returns
+schema `hashmarks.repository-declaration-derivation.v1` and reuses, rather than
+redefines:
+
+- the packet observation identity;
+- group and declaration definition/observation identities;
+- exact repository-evidence binding definition/observation identities;
+- the canonical repository-evidence binding packet identity;
+- provider provenance and evidence qualification state;
+- repository and observer authority already present in the declaration packet.
+
+The derivation projection includes exact bound repository evidence for each
+declaration so a consumer can trace a declaration observation back to the member
+or span evidence that supported it. Its deterministic `derivation_identity`
+binds that existing authority graph; it does not create a new repository
+generation, declaration identity family, evidence store, or provenance graph.
+
+`CodeMap.repository_declaration_explain(observation)` returns schema
+`hashmarks.repository-declaration-explain.v1`. It provides a compact semantic
+summary of group comparison/absence outcomes and declaration counts together
+with the full declaration derivation projection.
+
+Both operations are endpoint-local. They validate the supplied packet and its
+nested declaration/group/binding identities without requiring the packet to
+match current repository state. A caller may therefore retain an explicit
+observation during a bounded agent work window and explain it after the live
+repository advances. Hashmarks does not search Git, reconstruct old repository
+state, or retain a historical timeline.
+
+### Why this remains typed
+
+Dependency evidence and repository declarations now both prove the same general
+architectural pattern:
+
+```text
+explicit observation
+  -> domain definition/observation identities
+  -> exact supporting evidence authority
+  -> deterministic derivation projection
+  -> pure explanation
+```
+
+The domain semantics are materially different. Dependency derivation has adapter
+semantic contracts and external physical-source authorities. Declaration
+derivation has provider-claimed semantic values/correspondence plus canonical
+repository-evidence bindings. Hashmarks therefore does **not** introduce a
+universal provenance schema or require declaration providers to manufacture
+dependency concepts such as `adapter_semantics`.
+
+The shared rule is architectural rather than polymorphic:
+
+> **Derived results must be traceable to their existing domain authority without
+> erasing or inventing domain semantics.**
+
 ## Python API
 
 ~~~python

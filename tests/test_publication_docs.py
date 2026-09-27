@@ -136,6 +136,26 @@ def test_public_docs_expose_dependency_derivation_and_endpoint_delta() -> None:
     assert "dependency_resolution_delta.py" in guide
 
 
+def test_public_docs_expose_typed_declaration_derivation() -> None:
+    stability = _text("docs/reference/API_STABILITY.md")
+    declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")
+    state = _text("docs/reference/STATE_AND_SEMANTIC_OWNERS.md")
+    guide = _text("docs/maintainers/CODEMAP.md")
+    plan = _text("docs/maintainers/DERIVED_AUTHORITY_AND_BOUNDED_COMPARISON_PLAN.md")
+
+    for schema in (
+        "hashmarks.repository-declaration-derivation.v1",
+        "hashmarks.repository-declaration-explain.v1",
+    ):
+        assert schema in stability
+        assert schema in declarations
+
+    assert "Why this remains typed" in declarations
+    assert "repository_declaration_derivation.py" in guide
+    assert "no universal provenance ontology admitted" in plan
+    assert "New semantic owner introduced: NO" in state
+
+
 def test_github_entry_points_exist() -> None:
     for path in (
         ".github/CONTRIBUTING.md",
