@@ -125,7 +125,10 @@ def test_public_docs_expose_dependency_derivation_and_endpoint_delta() -> None:
         assert schema in stability
         assert schema in dependency
 
-    assert "Repository identity and CodeMap generation are both comparison axes" in dependency
+    assert (
+        "Repository identity and CodeMap generation are both comparison axes"
+        in dependency
+    )
     assert "physical_evidence_topology" in dependency
     assert "physical_evidence_content" in dependency
     assert "Dependency derivation/explain and endpoint-delta admission record" in state
