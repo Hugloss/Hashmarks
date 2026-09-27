@@ -276,6 +276,13 @@ class RepositoryDeclarationsMixin:
 
         raw_bindings = repository_evidence.get("bindings")
         assert isinstance(raw_bindings, list)
+        binding_ids = [
+            str(row["binding_id"])
+            for row in raw_bindings
+            if isinstance(row, Mapping)
+        ]
+        if binding_ids != sorted(binding_ids):
+            raise ValueError(f"{name} repository evidence bindings are not canonical")
         binding_rows = {
             str(row["binding_id"]): row
             for row in raw_bindings
@@ -287,6 +294,13 @@ class RepositoryDeclarationsMixin:
         ):
             raise ValueError(f"{name} groups must be a list of objects")
 
+        packet_group_ids = [
+            str(group.get("group_id") or "")
+            for group in groups
+            if isinstance(group, Mapping)
+        ]
+        if packet_group_ids != sorted(packet_group_ids):
+            raise ValueError(f"{name} groups are not canonical")
         group_ids: set[str] = set()
         referenced_binding_ids: set[str] = set()
         for raw_group in groups:
@@ -313,6 +327,11 @@ class RepositoryDeclarationsMixin:
                 raise ValueError(f"{name} declarations must be a list of objects")
 
             projected_rows = cast("list[Mapping[str, object]]", declarations)
+            packet_declaration_ids = [
+                str(row.get("declaration_id") or "") for row in projected_rows
+            ]
+            if packet_declaration_ids != sorted(packet_declaration_ids):
+                raise ValueError(f"{name} declarations are not canonical")
             declaration_ids: set[str] = set()
             for declaration in projected_rows:
                 declaration_id = str(declaration.get("declaration_id") or "")
