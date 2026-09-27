@@ -258,6 +258,20 @@ class RepositoryDeclarationsMixin:
         )
         if evidence_repository_identity != repository_identity:
             raise ValueError(f"{name} evidence repository-mismatch")
+        if packet.get("repository") != repository_evidence.get("repository"):
+            raise ValueError(f"{name} repository projection mismatch")
+        if packet.get("observer") != repository_evidence.get("observer"):
+            raise ValueError(f"{name} observer projection mismatch")
+
+        expected_bounds = {
+            "max_groups": MAX_GROUPS,
+            "max_declarations": MAX_DECLARATIONS,
+            "max_expected_declarations_per_group": MAX_EXPECTED_PER_GROUP,
+            "max_request_bytes": MAX_REQUEST_BYTES,
+            "max_packet_bytes": MAX_PACKET_BYTES,
+        }
+        if packet.get("bounds") != expected_bounds:
+            raise ValueError(f"{name} bounds contract mismatch")
 
         raw_bindings = repository_evidence.get("bindings")
         assert isinstance(raw_bindings, list)
@@ -272,6 +286,8 @@ class RepositoryDeclarationsMixin:
         ):
             raise ValueError(f"{name} groups must be a list of objects")
 
+        group_ids: set[str] = set()
+        referenced_binding_ids: set[str] = set()
         for raw_group in groups:
             assert isinstance(raw_group, Mapping)
             group_id = str(raw_group.get("group_id") or "")
@@ -282,6 +298,9 @@ class RepositoryDeclarationsMixin:
             declarations = raw_group.get("declarations")
             if not group_id:
                 raise ValueError(f"{name} group_id must not be empty")
+            if group_id in group_ids:
+                raise ValueError(f"{name} contains duplicate group_id: {group_id}")
+            group_ids.add(group_id)
             if not all(
                 isinstance(value, Mapping)
                 for value in (concept, scope, correspondence, coverage)
@@ -293,11 +312,21 @@ class RepositoryDeclarationsMixin:
                 raise ValueError(f"{name} declarations must be a list of objects")
 
             projected_rows = cast("list[Mapping[str, object]]", declarations)
+            declaration_ids: set[str] = set()
             for declaration in projected_rows:
+                declaration_id = str(declaration.get("declaration_id") or "")
+                if not declaration_id:
+                    raise ValueError(f"{name} declaration_id must not be empty")
+                if declaration_id in declaration_ids:
+                    raise ValueError(
+                        f"{name} contains duplicate declaration_id: {declaration_id}"
+                    )
+                declaration_ids.add(declaration_id)
                 binding_id = str(declaration.get("binding_id") or "")
                 binding = binding_rows.get(binding_id)
                 if binding is None:
                     raise ValueError(f"{name} declaration binding missing: {binding_id}")
+                referenced_binding_ids.add(binding_id)
                 evidence_state = self._binding_evidence_state(binding)
                 if declaration.get("evidence_state") != evidence_state:
                     raise ValueError(f"{name} declaration evidence state mismatch")
@@ -354,6 +383,9 @@ class RepositoryDeclarationsMixin:
                 != expected_group_observation
             ):
                 raise ValueError(f"{name} group observation identity mismatch")
+
+        if referenced_binding_ids != set(binding_rows):
+            raise ValueError(f"{name} repository evidence binding set mismatch")
 
     def _validate_previous_declarations(self, previous: Mapping[str, object]) -> None:
         self._validate_declaration_observation(
