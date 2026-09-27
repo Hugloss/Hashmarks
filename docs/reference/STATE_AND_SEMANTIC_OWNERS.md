@@ -161,6 +161,8 @@ Changing the definition, query limit, or optional projection setting is configur
 
 A public Python, CLI, MCP, or interchange schema may make existing repository evidence easier to consume. It must name its source owner and preserve that owner's authority, state, bounds, completeness, freshness, and uncertainty.
 
+MCP `result_mode` is transport vocabulary only. It selects among already-admitted typed projections; it does not create a semantic state family, observation identity, cache, or history owner. Default modes must preserve the established response shape, and any compare mode must require explicit caller-supplied endpoint authority rather than server-retained history.
+
 When a projection needs a fact that an existing owner already knows, add a reusable primitive to that owner or call its existing primitive. Do not recompute the fact from raw files merely because the projection has convenient access to the workspace.
 
 ## Maintainer extension checklist
@@ -256,7 +258,9 @@ Public Python surface:
   CodeMap.dependency_resolution_derivation_authority(),
   CodeMap.dependency_resolution_explain(), CodeMap.dependency_resolution_delta()
 MCP surface:
-  NONE
+  existing read-only dependency_codemap tool;
+  result_mode=explain projects dependency_resolution_explain();
+  result_mode=compare projects dependency_resolution_delta() over a caller-supplied previous endpoint
 Explicit non-goals:
   history retention, Git traversal, branch/merge/rollback, causal diagnosis,
   package-manager execution, second repository generation, universal provenance graph
@@ -295,4 +299,4 @@ This is a new semantic projection owner for **declaration correspondence**, not 
 
 Repository fact being exposed: traceability of one qualified declaration observation to its existing declaration/group identities and exact repository-evidence bindings. Existing semantic owner: `repository_declarations.py` + repository-evidence bindings. Existing state family reused: repository identity/generation, evidence availability, freshness, completeness, declaration definition/observation identity. Existing identity/provenance reused: declaration/group identities, binding definition/observation identities, bindings packet identity, provider provenance. Freshness owner: canonical repository evidence binding. Completeness owner: declaration coverage + repository evidence binding. Why a new projection/schema is needed: compact derivation/explainability without re-parsing provider formats or requiring current repository state. New state vocabulary introduced: NONE. New semantic owner introduced: NO.
 
-Persistence class: **qualified external observation / derived-not-persisted**. Public Python surfaces: `CodeMap.repository_declarations(...)`, `CodeMap.repository_declaration_derivation_authority(...)`, `CodeMap.repository_declaration_explain(...)`, `CodeMap.discover_repository_declarations(...)`, and the explicit declaration-provider SPI. MCP surface: read-only `repository_declarations`; derivation/explain are Python-side only in this phase. Explicit non-goals: universal metadata/provenance ontology, source-of-truth precedence, majority voting, fuzzy/model correspondence, edits, generated metadata repair, execution, retained history, Git traversal, and consumer workflow policy.
+Persistence class: **qualified external observation / derived-not-persisted**. Public Python surfaces: `CodeMap.repository_declarations(...)`, `CodeMap.repository_declaration_derivation_authority(...)`, `CodeMap.repository_declaration_explain(...)`, `CodeMap.discover_repository_declarations(...)`, and the explicit declaration-provider SPI. MCP surface: the existing read-only `repository_declarations` tool exposes observation mode by default and an opt-in explain mode that delegates to `repository_declaration_explain()`; declaration compare is not promoted beyond the current repository-evidence binding delta contract. Explicit non-goals: universal metadata/provenance ontology, source-of-truth precedence, majority voting, fuzzy/model correspondence, edits, generated metadata repair, execution, retained history, Git traversal, and consumer workflow policy.
