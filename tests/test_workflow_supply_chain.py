@@ -36,6 +36,12 @@ def _publish_workflow_text() -> str:
     )
 
 
+def _post_publish_workflow_text() -> str:
+    return (_root() / ".github" / "workflows" / "post-publish-smoke.yml").read_text(
+        encoding="utf-8"
+    )
+
+
 def test_publish_workflow_binds_reviewed_request_to_exact_source() -> None:
     text = _publish_workflow_text()
     assert "branches: [main]" in text
@@ -267,9 +273,30 @@ def test_release_profile_installs_mcp_before_full_native_qualification() -> None
     assert release_job.index("--extra mcp") < release_job.index("make test-profile")
 
 
+def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
+    text = _post_publish_workflow_text()
+
+    assert "release:\n    types: [published]" in text
+    assert "Published Linux/WSL install smoke" in text
+    assert "Published Windows install smoke" in text
+    assert "runs-on: ubuntu-latest" in text
+    assert "runs-on: windows-latest" in text
+    assert "github.event.release.tag_name" in text
+    assert "releases/download/\${RELEASE_TAG}/install.sh" in text
+    assert "releases/download/$env:RELEASE_TAG/install.ps1" in text
+    assert "SHA256SUMS.txt" in text
+    assert "HASHMARKS_VERSION=\"$version\"" in text
+    assert "$env:HASHMARKS_VERSION = $version" in text
+    assert "map sync" in text
+    assert "map status" in text
+    assert "raw.githubusercontent.com" not in text
+    assert "/releases/latest/" not in text
+    assert "actions/checkout@" not in text
+
+
 def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
     job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\n")
-    for name in ("ci.yml", "publish.yml"):
+    for name in ("ci.yml", "publish.yml", "post-publish-smoke.yml"):
         text = (_root() / ".github" / "workflows" / name).read_text(encoding="utf-8")
         jobs = text.split("jobs:\n", 1)[1]
         matches = list(job_heading.finditer(jobs))
