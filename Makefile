@@ -96,7 +96,7 @@ help:
 	  '  make release-check  Local release preflight; native Linux/WSL + Windows qualification runs in CI' \
 	  '  make metrics-fast   Quick baseline without daemon benchmarks' \
 	  '  make metrics-500k   Explicit heavy 500k repository-intelligence baseline' \
-	  '  make metrics-derived-authority  Measure explicit-packet explain/delta economics before retention' \
+	  '  make metrics-derived-authority  Measure controlled + uv/Maven explicit-packet economics before retention' \
 	  '  make metrics        Quick 10k repository-intelligence baseline including daemon + impact metrics' \
 	  '  make metrics-scale  100k repository-intelligence baseline' \
 	  '  make benchmark      Native Codex/OpenCode paired smoke (BENCHMARK=matrix or cycle for full suites)' \
@@ -515,6 +515,8 @@ metrics-500k:
 metrics-derived-authority: bootstrap
 	@$(UV_RUN) --offline python -m benchmarks.derived_authority_economics \
 	  --iterations 100 --scale 64 \
+	  --real-iterations 25 \
+	  --fixture-root tests/fixtures/dependency_dogfood \
 	  --output .hashmarks/metrics/derived-authority-economics-latest.json
 
 metrics-agent: bootstrap
