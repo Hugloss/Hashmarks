@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.24.0 — Cross-platform standalone release
+
+- Add a checksum-verified native Windows x86_64 standalone CLI/MCP release alongside the existing Linux x86_64 artifact used by Linux and WSL2, with a native PowerShell installer and independently qualified platform receipts.
+- Bind `install.sh` and `install.ps1` into publication-manifest v3 and `SHA256SUMS.txt`, materialize the public asset set from the manifest, rebuild retry drafts deterministically, and read every draft asset back from GitHub byte-for-byte before publication.
+- Add pre-merge cross-job publication rehearsal plus exact-tag post-publish install smoke on Ubuntu and native Windows, while keeping one real WSL2 smoke as the first-release host/filesystem check before Windows/WSL onboarding is advertised.
+- Harden standalone install and upgrade lifecycle behavior so checksum/version/smoke failures preserve the existing executable, default repository-local state stays Git-invisible and owner-private where supported, and unsafe default-state symlinks are rejected.
+- Strengthen retained repository/dependency evidence authority across freshness maps, deltas, declaration discovery, dependency consumers, nested evidence, and retained packets so stale, tampered, cross-scope, or unauthenticated evidence fails closed while ambiguity and qualified absence remain explicit.
+- Add simple checked-in benchmark entrypoints through `make benchmark` and `uv run hashmarks-benchmark` so local and agent-hosted benchmark runs share the same repository-owned profile.
+
 ## 0.23.0 — Qualified standalone MCP release
 
 - Converge repository-file admission across derived evidence: targeted Python import-root refresh, manifest-based project discovery, native project-node/edge persistence, and manifest freshness now reuse the canonical policy/pruning/symlink/visibility owner. Denied project files cannot survive as current project evidence, and live allow→deny policy changes fail closed until admitted evidence is rebuilt.
