@@ -30,16 +30,17 @@ The permanent ownership split is:
 - **Consumer / coding agent / IDE / human:** reasoning, planning, choices, memory of its own work, edits, hypotheses, interaction strategy, and final solution behavior.
 - **Execution / certification system:** process execution, admission, isolation, scheduling, timeouts, retries, resume, environment recovery, result authority, and certification.
 
-## Two permanent non-goals
+## Three permanent non-goals
 
-Hashmarks must never be turned into either of the adjacent systems it serves.
+Hashmarks must never be turned into any of the adjacent systems or authorities it serves.
 
 1. **Not the agent.** Hashmarks must not absorb the consumer's reasoning, planning, attempt history, memory, edits, delegation, model or tool choices, workflow sequencing, recovery decisions, or final-solution authority. An agent may consume Hashmarks evidence, but Hashmarks must not become the agent's solution loop.
 2. **Not the execution/certification motor.** Hashmarks must not absorb Oh-Goon-style admission, sandboxing, process launch or supervision, cancellation, timeout/retry/resume, worker placement, runtime-environment control, execution-result authority, certification, release promotion, or Game Tape/execution-history ownership. Oh-Goon or another execution layer may consume Hashmarks evidence, but Hashmarks must not become its execution engine.
+3. **Not a repository version-control or mutation engine.** Hashmarks may observe caller-selected repository authorities, preserve immutable observations, and compare or diff repository meaning and evidence across those authorities. It must not create or manage branches, implement merge/rebase/cherry-pick or conflict-resolution semantics, roll back/revert/reset/checkout repository state, mutate refs or worktrees, or otherwise become an alternative Git/repository-lifecycle owner. Git and the external consumer/harness own those operations. Historical observation and semantic diff are read-only repository intelligence; they never grant repository-mutation authority.
 
-These are ownership rules, not wording rules. Renaming orchestration as "intelligence", execution policy as "evidence", or agent memory as "context" does not make it Hashmarks functionality. Interoperability transfers evidence, never authority.
+These are ownership rules, not wording rules. Renaming orchestration as "intelligence", execution policy as "evidence", agent memory as "context", or Git lifecycle as "history management" does not make it Hashmarks functionality. Interoperability transfers evidence, never authority.
 
-Every proposal must therefore answer two negative questions before admission: **does this make Hashmarks more like the agent, or more like the execution/certification system?** If yes, reject it or split out only the repository-derived primitive.
+Every proposal must therefore answer three negative questions before admission: **does this make Hashmarks more like the agent, more like the execution/certification system, or more like a repository version-control/mutation engine?** If yes, reject it or split out only the repository-derived primitive.
 
 ## Repository scope boundary: do not chase external libraries
 
