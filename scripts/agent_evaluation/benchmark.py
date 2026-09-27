@@ -38,11 +38,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("profile", nargs="?", default="local")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument(\n        "--show", action="store_true", help="print the resolved command only"\n    )
+    parser.add_argument(
+        "--show", action="store_true", help="print the resolved command only"
+    )
     ns = parser.parse_args(argv)
     command, profile_env = _load(ns.config, ns.profile)
     if ns.show:
-        sys.stdout.write(" ".join(command) + "\\n")
+        sys.stdout.write(" ".join(command) + "\n")
         return 0
     env = dict(os.environ)
     env.update(profile_env)
