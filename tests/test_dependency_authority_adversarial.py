@@ -1,17 +1,12 @@
 from __future__ import annotations
 
 import copy
-import hashlib
 from pathlib import Path
 
 from hashmarks.adapters import uv_lock_dependency_observation
 from hashmarks.codemap.engine import CodeMap
 
 _FIXTURES = Path(__file__).parent / "fixtures" / "dependency_dogfood"
-
-
-def _member_revision(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
 
 
 def _source_loss_snapshot() -> dict[str, object]:
@@ -93,7 +88,6 @@ def test_uv_repository_input_path_move_preserves_resolution_and_source_bytes(
     tmp_path: Path,
 ) -> None:
     lock = (_FIXTURES / "uv" / "v1" / "uv.lock").read_bytes()
-    revision = _member_revision(lock)
     old_path = tmp_path / "before" / "uv.lock"
     new_path = tmp_path / "after" / "uv.lock"
     old_path.parent.mkdir()
@@ -102,15 +96,11 @@ def test_uv_repository_input_path_move_preserves_resolution_and_source_bytes(
 
     before_raw = uv_lock_dependency_observation(
         lock=lock,
-        repository_inputs=[
-            {"path": "before/uv.lock", "member_revision": revision},
-        ],
+        repository_inputs=[{"path": "before/uv.lock"}],
     )
     after_raw = uv_lock_dependency_observation(
         lock=lock,
-        repository_inputs=[
-            {"path": "after/uv.lock", "member_revision": revision},
-        ],
+        repository_inputs=[{"path": "after/uv.lock"}],
     )
 
     with CodeMap(tmp_path) as codemap:
@@ -126,12 +116,13 @@ def test_uv_repository_input_path_move_preserves_resolution_and_source_bytes(
     assert before["definition_identity"] == after["definition_identity"]
     assert before["resolution_identity"] == after["resolution_identity"]
     assert before["observation_identity"] != after["observation_identity"]
-    assert before["repository_inputs"][0]["source_equivalence"] == "proven"
-    assert after["repository_inputs"][0]["source_equivalence"] == "proven"
+    assert before["repository_inputs"][0]["source_equivalence"] == "unknown"
+    assert after["repository_inputs"][0]["source_equivalence"] == "unknown"
+    assert before["repository_inputs"][0]["observed_member_revision"] is not None
+    assert after["repository_inputs"][0]["observed_member_revision"] is not None
     assert (
         before["repository_inputs"][0]["observed_member_revision"]
-        == after["repository_inputs"][0]["observed_member_revision"]
-        == revision
+        != after["repository_inputs"][0]["observed_member_revision"]
     )
     assert delta["comparability"] == "comparable"
     assert delta["change_axes"]["semantic_resolution"] == "unchanged"
@@ -145,7 +136,6 @@ def test_identical_repository_input_bytes_keep_distinct_path_authority(
     tmp_path: Path,
 ) -> None:
     lock = (_FIXTURES / "uv" / "v1" / "uv.lock").read_bytes()
-    revision = _member_revision(lock)
     for relpath in ("one/uv.lock", "two/uv.lock"):
         path = tmp_path / relpath
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -154,8 +144,8 @@ def test_identical_repository_input_bytes_keep_distinct_path_authority(
     raw = uv_lock_dependency_observation(
         lock=lock,
         repository_inputs=[
-            {"path": "one/uv.lock", "member_revision": revision},
-            {"path": "two/uv.lock", "member_revision": revision},
+            {"path": "one/uv.lock"},
+            {"path": "two/uv.lock"},
         ],
     )
 
@@ -168,11 +158,13 @@ def test_identical_repository_input_bytes_keep_distinct_path_authority(
         "one/uv.lock",
         "two/uv.lock",
     ]
-    assert {
+    observed_revisions = {
         row["observed_member_revision"] for row in observation["repository_inputs"]
-    } == {revision}
+    }
+    assert None not in observed_revisions
+    assert len(observed_revisions) == 2
     assert {row["source_equivalence"] for row in observation["repository_inputs"]} == {
-        "proven"
+        "unknown"
     }
     assert derivation["repository_inputs"] == observation["repository_inputs"]
 
