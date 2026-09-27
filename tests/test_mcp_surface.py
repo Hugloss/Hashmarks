@@ -645,9 +645,7 @@ def test_mcp_dependency_codemap_explain_and_compare_reuse_core_authority(
                 "producer_digest": "sha256:" + "a" * 64,
             }
         ],
-        "components": [
-            {"component_id": "lib", "name": "lib", "ecosystem": "test"}
-        ],
+        "components": [{"component_id": "lib", "name": "lib", "ecosystem": "test"}],
         "selections": [
             {
                 "node_id": "lib@1",
