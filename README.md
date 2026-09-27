@@ -402,7 +402,7 @@ Current package version: **0.23.0**.
 
 Hashmarks is under active development. Current repository-intelligence contracts are documented explicitly; new integrations should use the supported CLI, Python API, and MCP surfaces rather than historical development experiments.
 
-The repository-owned release workflow qualifies the exact reviewed source, builds wheel/sdist and the standalone Linux CLI/MCP executable, binds the resulting bytes with manifests and SHA-256 checksums, and publishes those qualified assets through GitHub Releases. Hashmarks does not automatically publish to PyPI.
+The repository-owned release workflow qualifies the exact reviewed source, builds wheel/sdist plus native Linux/WSL and Windows standalone CLI/MCP artifacts, binds the candidate bytes and bootstrap installers with manifests and SHA-256 checksums, and publishes only the qualified assets through GitHub Releases. End-user platform availability remains defined by the latest published release. Hashmarks does not automatically publish to PyPI.
 
 ## Security
 
