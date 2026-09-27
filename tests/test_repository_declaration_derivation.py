@@ -80,20 +80,20 @@ def test_declaration_derivation_traces_exact_repository_evidence(
 
     assert derivation["schema"] == "hashmarks.repository-declaration-derivation.v1"
     assert derivation["observation_identity"] == packet["observation_identity"]
-    assert derivation["repository_evidence_identity"] == packet[
-        "repository_evidence"
-    ]["bindings_identity"]
+    assert (
+        derivation["repository_evidence_identity"]
+        == packet["repository_evidence"]["bindings_identity"]
+    )
     assert derivation["semantic_value_authority"] == "provider-claimed"
     assert derivation["interpretation_authority"] == "consumer-owned"
 
     group_authority = derivation["groups"][0]
     assert group_authority["group_id"] == "runtime-python"
-    by_id = {
-        row["declaration_id"]: row for row in group_authority["declarations"]
+    by_id = {row["declaration_id"]: row for row in group_authority["declarations"]}
+    assert {row["repository_evidence"][0]["path"] for row in by_id.values()} == {
+        "pyproject.toml",
+        "Dockerfile",
     }
-    assert {
-        row["repository_evidence"][0]["path"] for row in by_id.values()
-    } == {"pyproject.toml", "Dockerfile"}
     assert all(
         row["binding_observation_identity"].startswith("sha256:")
         for row in by_id.values()
@@ -120,9 +120,10 @@ def test_declaration_explain_is_endpoint_local_after_repository_advances(
         explanation = codemap.repository_declaration_explain(packet)
 
     assert explanation["schema"] == "hashmarks.repository-declaration-explain.v1"
-    assert explanation["semantic_result"]["observation_identity"] == packet[
-        "observation_identity"
-    ]
+    assert (
+        explanation["semantic_result"]["observation_identity"]
+        == packet["observation_identity"]
+    )
     assert explanation["semantic_result"]["group_count"] == 1
     assert explanation["semantic_result"]["declaration_count"] == 1
     assert explanation["derivation"]["repository"] == original_repository
@@ -260,12 +261,8 @@ def test_declaration_producer_change_preserves_definition_but_changes_derivation
                 )
             ]
         )
-        before_derivation = codemap.repository_declaration_derivation_authority(
-            before
-        )
-        after_derivation = codemap.repository_declaration_derivation_authority(
-            after
-        )
+        before_derivation = codemap.repository_declaration_derivation_authority(before)
+        after_derivation = codemap.repository_declaration_derivation_authority(after)
 
     before_row = before["groups"][0]["declarations"][0]
     after_row = after["groups"][0]["declarations"][0]
