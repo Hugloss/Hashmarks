@@ -282,6 +282,51 @@ def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
     assert "runs-on: ubuntu-latest" in text
     assert "runs-on: windows-latest" in text
     assert "github.event.release.tag_name" in text
+    assert "grep -Eq '^v[0-9]+\\.[0-9]+\\.[0-9]+    assert "releases/download/$env:RELEASE_TAG/install.ps1" in text
+    assert "SHA256SUMS.txt" in text
+    assert 'HASHMARKS_VERSION="$version"' in text
+    assert "$env:HASHMARKS_VERSION = $version" in text
+    assert "map sync" in text
+    assert "map status" in text
+    assert "raw.githubusercontent.com" not in text
+    assert "/releases/latest/" not in text
+    assert "actions/checkout@" not in text
+
+
+def test_every_ci_and_publish_job_has_a_bounded_timeout() -> None:
+    job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\n")
+    for name in ("ci.yml", "publish.yml", "post-publish-smoke.yml"):
+        text = (_root() / ".github" / "workflows" / name).read_text(encoding="utf-8")
+        jobs = text.split("jobs:\n", 1)[1]
+        matches = list(job_heading.finditer(jobs))
+        assert matches
+        for index, match in enumerate(matches):
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(jobs)
+            block = jobs[match.end() : end]
+            assert "    runs-on:" in block, f"{name}:{match.group(1)} has no runner"
+            assert "    timeout-minutes:" in block, (
+                f"{name}:{match.group(1)} has no bounded timeout"
+            )
+
+
+def test_ci_checkout_does_not_persist_git_credentials() -> None:
+    lines = (
+        (_root() / ".github" / "workflows" / "ci.yml")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
+    checkout_indexes = [
+        index for index, line in enumerate(lines) if "actions/checkout@" in line
+    ]
+    assert checkout_indexes
+    for index in checkout_indexes:
+        assert any(
+            "persist-credentials: false" in line
+            for line in lines[index + 1 : index + 5]
+        )
+" in text
+    assert "Set-StrictMode -Version Latest" in text
+    assert "$version = $env:RELEASE_TAG -replace '^v', ''" in text
     assert "releases/download/\${RELEASE_TAG}/install.sh" in text
     assert "releases/download/$env:RELEASE_TAG/install.ps1" in text
     assert "SHA256SUMS.txt" in text
