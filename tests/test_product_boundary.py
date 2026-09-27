@@ -21,7 +21,9 @@ def test_agents_file_declares_repository_intelligence_boundary() -> None:
     )
 
 
-def test_product_profile_explicitly_rejects_agent_and_execution_motor_drift() -> None:
+def test_product_profile_explicitly_rejects_agent_execution_and_repository_lifecycle_drift() -> (
+    None
+):
     agents = _text("AGENTS.md")
     boundary = _text("docs/reference/PRODUCT_BOUNDARY.md")
     invariants = _text("docs/reference/INVARIANTS.md")
@@ -29,9 +31,18 @@ def test_product_profile_explicitly_rejects_agent_and_execution_motor_drift() ->
         "Hashmarks must never be turned into either the coding agent's solution loop or Oh-Goon's execution/certification motor."
         in agents
     )
-    assert "## Two permanent non-goals" in boundary
+    assert "## Three permanent non-goals" in boundary
     assert "Not the agent." in boundary
     assert "Not the execution/certification motor." in boundary
+    assert (
+        "Not a repository version-control, mutation, or historical-archive engine."
+        in boundary
+    )
+    assert (
+        "Historical support is a **bounded working-set capability**, not time travel over the repository's lifetime."
+        in boundary
+    )
+    assert "must not scan backwards through repository history" in boundary
     assert "Interoperability transfers evidence, never authority." in boundary
     assert (
         "PB6. Hashmarks must never become the agent or the execution motor."
@@ -138,6 +149,8 @@ def test_agent_boundary_keeps_solution_authority_external() -> None:
         "recovery strategy after a failed attempt",
         "task scheduling or multi-agent orchestration",
         "worktree/git lifecycle or final solution behavior",
+        "branch creation or management, merge/rebase/cherry-pick or conflict-resolution semantics",
+        "Historical observations are a bounded working set for the active agent/session",
     ):
         assert authority in text
 
@@ -146,7 +159,12 @@ def test_architecture_invariant_and_readme_repeat_boundary() -> None:
     invariants = _text("docs/reference/INVARIANTS.md")
     readme = _text("README.md")
     assert (
-        "G25. Hashmarks is repository intelligence, not the coding-agent solution loop."
+        "G25. Hashmarks is repository intelligence, not the coding-agent solution loop, repository mutation engine, or historical archive."
+        in invariants
+    )
+    assert "must not crawl/pre-index Git history" in invariants
+    assert (
+        "bounded historical observations are evictable working-set evidence"
         in invariants
     )
     assert (
