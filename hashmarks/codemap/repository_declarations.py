@@ -352,31 +352,38 @@ class RepositoryDeclarationsMixin:
             raise ValueError(f"{name} declaration observation identity mismatch")
         return binding_id
 
-    def _validate_projected_group(
-        self,
+    @staticmethod
+    def _projected_group_contract(
         raw_group: Mapping[str, object],
         *,
-        binding_rows: Mapping[str, Mapping[str, object]],
         name: str,
-    ) -> set[str]:
+    ) -> tuple[
+        str,
+        Mapping[str, object],
+        Mapping[str, object],
+        Mapping[str, object],
+        Mapping[str, object],
+        list[Mapping[str, object]],
+    ]:
         group_id = str(raw_group.get("group_id") or "")
+        if not group_id:
+            raise ValueError(f"{name} group_id must not be empty")
+
         concept = raw_group.get("concept")
         scope = raw_group.get("scope")
         correspondence = raw_group.get("correspondence")
         coverage = raw_group.get("coverage")
-        declarations = raw_group.get("declarations")
-        if not group_id:
-            raise ValueError(f"{name} group_id must not be empty")
         if not all(
             isinstance(value, Mapping)
             for value in (concept, scope, correspondence, coverage)
         ):
             raise ValueError(f"{name} group contract malformed")
+
+        declarations = raw_group.get("declarations")
         if not isinstance(declarations, list) or any(
             not isinstance(row, Mapping) for row in declarations
         ):
             raise ValueError(f"{name} declarations must be a list of objects")
-
         projected_rows = cast("list[Mapping[str, object]]", declarations)
         declaration_ids = [
             str(row.get("declaration_id") or "") for row in projected_rows
@@ -386,24 +393,34 @@ class RepositoryDeclarationsMixin:
         if len(set(declaration_ids)) != len(declaration_ids):
             raise ValueError(f"{name} contains duplicate declaration_id")
 
-        referenced = {
-            self._validate_projected_declaration(
-                declaration,
-                group_id=group_id,
-                concept=cast("Mapping[str, object]", concept),
-                scope=cast("Mapping[str, object]", scope),
-                binding_rows=binding_rows,
-                name=name,
-            )
-            for declaration in projected_rows
-        }
+        return (
+            group_id,
+            cast("Mapping[str, object]", concept),
+            cast("Mapping[str, object]", scope),
+            cast("Mapping[str, object]", correspondence),
+            cast("Mapping[str, object]", coverage),
+            projected_rows,
+        )
+
+    def _validate_projected_group_result(
+        self,
+        raw_group: Mapping[str, object],
+        *,
+        group_id: str,
+        concept: Mapping[str, object],
+        scope: Mapping[str, object],
+        correspondence: Mapping[str, object],
+        coverage: Mapping[str, object],
+        declarations: list[Mapping[str, object]],
+        name: str,
+    ) -> None:
         definition_payload, observation_payload = self._group_identity_payloads(
             group_id=group_id,
-            concept=cast("Mapping[str, object]", concept),
-            scope=cast("Mapping[str, object]", scope),
-            correspondence=cast("Mapping[str, object]", correspondence),
-            coverage=cast("Mapping[str, object]", coverage),
-            declarations=projected_rows,
+            concept=concept,
+            scope=scope,
+            correspondence=correspondence,
+            coverage=coverage,
+            declarations=declarations,
         )
         if raw_group.get("comparison") != observation_payload["comparison"]:
             raise ValueError(f"{name} declaration comparison mismatch")
@@ -422,6 +439,44 @@ class RepositoryDeclarationsMixin:
             raise ValueError(f"{name} group definition identity mismatch")
         if raw_group.get("group_observation_identity") != expected_observation:
             raise ValueError(f"{name} group observation identity mismatch")
+
+    def _validate_projected_group(
+        self,
+        raw_group: Mapping[str, object],
+        *,
+        binding_rows: Mapping[str, Mapping[str, object]],
+        name: str,
+    ) -> set[str]:
+        (
+            group_id,
+            concept,
+            scope,
+            correspondence,
+            coverage,
+            projected_rows,
+        ) = self._projected_group_contract(raw_group, name=name)
+
+        referenced = {
+            self._validate_projected_declaration(
+                declaration,
+                group_id=group_id,
+                concept=concept,
+                scope=scope,
+                binding_rows=binding_rows,
+                name=name,
+            )
+            for declaration in projected_rows
+        }
+        self._validate_projected_group_result(
+            raw_group,
+            group_id=group_id,
+            concept=concept,
+            scope=scope,
+            correspondence=correspondence,
+            coverage=coverage,
+            declarations=projected_rows,
+            name=name,
+        )
         return referenced
 
     def _validate_declaration_observation(
