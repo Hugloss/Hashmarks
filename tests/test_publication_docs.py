@@ -337,7 +337,7 @@ def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None
     assert 'result_mode="observation" | "explain" | "compare"' in mcp
     assert 'result_mode="observation" | "explain"' in mcp
     assert "The catalog stays small" in mcp
-    assert "never stores a \"previous\" dependency or declaration observation" in mcp
+    assert 'never stores a "previous" dependency or declaration observation' in mcp
     assert "`opencode.json`" in mcp
     assert ".mcp.json" in mcp
     assert ".codex/config.toml" in mcp
