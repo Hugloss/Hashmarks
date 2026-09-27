@@ -353,7 +353,7 @@ The real-producer fixture pass does not turn timing into a universal threshold. 
 
 Feed every reproduced defect back into the same branch and repeat until two clean passes, following the existing attack/dogfood discipline.
 
-**Current outcome:** real uv/Maven economics and no-retention invariants are implemented; exit remains gated on two clean qualification/dogfood passes.
+**Current outcome:** real uv/Maven economics and no-retention invariants are implemented. Clean pass #1 qualified on branch head `0eb276c39360f9a3affbb00304c1f1e74faa5e74` via CI run `1831`, including Python 3.11/3.14, release qualification, Linux/WSL + Windows standalone artifacts, publication rehearsal, and qualification convergence. Clean pass #2 remains required before saturation exit.
 
 **Exit:** cross-producer semantics remain neutral, provenance remains complete, endpoint delta remains correctly classified, and two consecutive real-producer passes expose no new defect.
 
