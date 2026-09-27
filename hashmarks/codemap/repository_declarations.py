@@ -208,7 +208,7 @@ class RepositoryDeclarationsMixin:
         }
         return "sha256:" + self._packet_digest(_SCHEMA, payload)
 
-    def _validate_declaration_observation(
+    def _validate_declaration_packet_contract(
         self,
         packet: Mapping[str, object],
         *,
@@ -217,10 +217,9 @@ class RepositoryDeclarationsMixin:
         if packet.get("schema") != _SCHEMA:
             raise ValueError(f"{name} must use schema {_SCHEMA}")
         identity = packet.get("observation_identity")
-        if (
-            not isinstance(identity, str)
-            or identity != self._declaration_packet_identity(packet)
-        ):
+        if not isinstance(
+            identity, str
+        ) or identity != self._declaration_packet_identity(packet):
             raise ValueError(f"{name} identity mismatch")
 
         expected_contract = {
@@ -231,38 +230,13 @@ class RepositoryDeclarationsMixin:
             "interpretation_authority": "consumer-owned",
             "winner": "not-selected",
         }
-        for field, expected in expected_contract.items():
-            if packet.get(field) != expected:
-                raise ValueError(f"{name} {field} contract mismatch")
-
-        repository = packet.get("repository")
-        repository_identity = (
-            str(repository.get("repository_identity") or "")
-            if isinstance(repository, Mapping)
-            else ""
-        )
-        if not repository_identity:
-            raise ValueError(f"{name} repository identity missing")
-
-        repository_evidence = packet.get("repository_evidence")
-        if not isinstance(repository_evidence, Mapping):
-            raise ValueError(f"{name} repository_evidence must be an object")
-        self._validate_binding_delta_input(
-            repository_evidence,
-            name=f"{name} repository evidence",
-        )
-        evidence_repository = repository_evidence.get("repository")
-        evidence_repository_identity = (
-            str(evidence_repository.get("repository_identity") or "")
-            if isinstance(evidence_repository, Mapping)
-            else ""
-        )
-        if evidence_repository_identity != repository_identity:
-            raise ValueError(f"{name} evidence repository-mismatch")
-        if packet.get("repository") != repository_evidence.get("repository"):
-            raise ValueError(f"{name} repository projection mismatch")
-        if packet.get("observer") != repository_evidence.get("observer"):
-            raise ValueError(f"{name} observer projection mismatch")
+        mismatched = [
+            field
+            for field, expected in expected_contract.items()
+            if packet.get(field) != expected
+        ]
+        if mismatched:
+            raise ValueError(f"{name} {mismatched[0]} contract mismatch")
 
         expected_bounds = {
             "max_groups": MAX_GROUPS,
@@ -274,140 +248,211 @@ class RepositoryDeclarationsMixin:
         if packet.get("bounds") != expected_bounds:
             raise ValueError(f"{name} bounds contract mismatch")
 
+    def _declaration_repository_evidence(
+        self,
+        packet: Mapping[str, object],
+        *,
+        name: str,
+    ) -> Mapping[str, object]:
+        repository = packet.get("repository")
+        if not isinstance(repository, Mapping):
+            raise ValueError(f"{name} repository must be an object")
+        repository_identity = str(repository.get("repository_identity") or "")
+        if not repository_identity:
+            raise ValueError(f"{name} repository identity missing")
+
+        repository_evidence = packet.get("repository_evidence")
+        if not isinstance(repository_evidence, Mapping):
+            raise ValueError(f"{name} repository_evidence must be an object")
+        self._validate_binding_delta_input(
+            repository_evidence,
+            name=f"{name} repository evidence",
+        )
+
+        evidence_repository = repository_evidence.get("repository")
+        if not isinstance(evidence_repository, Mapping):
+            raise ValueError(f"{name} evidence repository must be an object")
+        if str(evidence_repository.get("repository_identity") or "") != (
+            repository_identity
+        ):
+            raise ValueError(f"{name} evidence repository-mismatch")
+        if repository != evidence_repository:
+            raise ValueError(f"{name} repository projection mismatch")
+        if packet.get("observer") != repository_evidence.get("observer"):
+            raise ValueError(f"{name} observer projection mismatch")
+        return repository_evidence
+
+    @staticmethod
+    def _declaration_packet_collections(
+        packet: Mapping[str, object],
+        repository_evidence: Mapping[str, object],
+        *,
+        name: str,
+    ) -> tuple[dict[str, Mapping[str, object]], list[Mapping[str, object]]]:
         raw_bindings = repository_evidence.get("bindings")
-        assert isinstance(raw_bindings, list)
-        binding_ids = [
-            str(row["binding_id"])
-            for row in raw_bindings
-            if isinstance(row, Mapping)
-        ]
+        if not isinstance(raw_bindings, list) or any(
+            not isinstance(row, Mapping) for row in raw_bindings
+        ):
+            raise ValueError(f"{name} repository evidence bindings malformed")
+        binding_ids = [str(row["binding_id"]) for row in raw_bindings]
         if binding_ids != sorted(binding_ids):
             raise ValueError(f"{name} repository evidence bindings are not canonical")
         binding_rows = {
-            str(row["binding_id"]): row
+            str(row["binding_id"]): cast("Mapping[str, object]", row)
             for row in raw_bindings
-            if isinstance(row, Mapping)
         }
-        groups = packet.get("groups")
-        if not isinstance(groups, list) or any(
-            not isinstance(group, Mapping) for group in groups
+
+        raw_groups = packet.get("groups")
+        if not isinstance(raw_groups, list) or any(
+            not isinstance(group, Mapping) for group in raw_groups
         ):
             raise ValueError(f"{name} groups must be a list of objects")
-
-        packet_group_ids = [
-            str(group.get("group_id") or "")
-            for group in groups
-            if isinstance(group, Mapping)
-        ]
-        if packet_group_ids != sorted(packet_group_ids):
+        groups = cast("list[Mapping[str, object]]", raw_groups)
+        group_ids = [str(group.get("group_id") or "") for group in groups]
+        if group_ids != sorted(group_ids):
             raise ValueError(f"{name} groups are not canonical")
-        group_ids: set[str] = set()
-        referenced_binding_ids: set[str] = set()
-        for raw_group in groups:
-            assert isinstance(raw_group, Mapping)
-            group_id = str(raw_group.get("group_id") or "")
-            concept = raw_group.get("concept")
-            scope = raw_group.get("scope")
-            correspondence = raw_group.get("correspondence")
-            coverage = raw_group.get("coverage")
-            declarations = raw_group.get("declarations")
-            if not group_id:
-                raise ValueError(f"{name} group_id must not be empty")
-            if group_id in group_ids:
-                raise ValueError(f"{name} contains duplicate group_id: {group_id}")
-            group_ids.add(group_id)
-            if not all(
-                isinstance(value, Mapping)
-                for value in (concept, scope, correspondence, coverage)
-            ):
-                raise ValueError(f"{name} group contract malformed")
-            if not isinstance(declarations, list) or any(
-                not isinstance(row, Mapping) for row in declarations
-            ):
-                raise ValueError(f"{name} declarations must be a list of objects")
+        if len(set(group_ids)) != len(group_ids):
+            raise ValueError(f"{name} contains duplicate group_id")
+        return binding_rows, groups
 
-            projected_rows = cast("list[Mapping[str, object]]", declarations)
-            packet_declaration_ids = [
-                str(row.get("declaration_id") or "") for row in projected_rows
-            ]
-            if packet_declaration_ids != sorted(packet_declaration_ids):
-                raise ValueError(f"{name} declarations are not canonical")
-            declaration_ids: set[str] = set()
-            for declaration in projected_rows:
-                declaration_id = str(declaration.get("declaration_id") or "")
-                if not declaration_id:
-                    raise ValueError(f"{name} declaration_id must not be empty")
-                if declaration_id in declaration_ids:
-                    raise ValueError(
-                        f"{name} contains duplicate declaration_id: {declaration_id}"
-                    )
-                declaration_ids.add(declaration_id)
-                binding_id = str(declaration.get("binding_id") or "")
-                binding = binding_rows.get(binding_id)
-                if binding is None:
-                    raise ValueError(
-                        f"{name} declaration binding missing: {binding_id}"
-                    )
-                referenced_binding_ids.add(binding_id)
-                evidence_state = self._binding_evidence_state(binding)
-                if declaration.get("evidence_state") != evidence_state:
-                    raise ValueError(f"{name} declaration evidence state mismatch")
-                definition, observation = self._declaration_identity_payloads(
-                    declaration,
-                    group_id=group_id,
-                    concept=cast("Mapping[str, object]", concept),
-                    scope=cast("Mapping[str, object]", scope),
-                    binding=binding,
-                )
-                expected_definition = "sha256:" + self._packet_digest(
-                    "hashmarks.repository-declaration-definition.v1",
-                    definition,
-                )
-                expected_observation = "sha256:" + self._packet_digest(
-                    "hashmarks.repository-declaration-observation.v1",
-                    observation,
-                )
-                if (
-                    declaration.get("declaration_definition_identity")
-                    != expected_definition
-                ):
-                    raise ValueError(f"{name} declaration definition identity mismatch")
-                if (
-                    declaration.get("declaration_observation_identity")
-                    != expected_observation
-                ):
-                    raise ValueError(
-                        f"{name} declaration observation identity mismatch"
-                    )
+    def _validate_projected_declaration(
+        self,
+        declaration: Mapping[str, object],
+        *,
+        group_id: str,
+        concept: Mapping[str, object],
+        scope: Mapping[str, object],
+        binding_rows: Mapping[str, Mapping[str, object]],
+        name: str,
+    ) -> str:
+        declaration_id = str(declaration.get("declaration_id") or "")
+        if not declaration_id:
+            raise ValueError(f"{name} declaration_id must not be empty")
+        binding_id = str(declaration.get("binding_id") or "")
+        binding = binding_rows.get(binding_id)
+        if binding is None:
+            raise ValueError(f"{name} declaration binding missing: {binding_id}")
+        if declaration.get("evidence_state") != self._binding_evidence_state(binding):
+            raise ValueError(f"{name} declaration evidence state mismatch")
 
-            definition_payload, observation_payload = self._group_identity_payloads(
+        definition, observation = self._declaration_identity_payloads(
+            declaration,
+            group_id=group_id,
+            concept=concept,
+            scope=scope,
+            binding=binding,
+        )
+        expected_definition = "sha256:" + self._packet_digest(
+            "hashmarks.repository-declaration-definition.v1",
+            definition,
+        )
+        expected_observation = "sha256:" + self._packet_digest(
+            "hashmarks.repository-declaration-observation.v1",
+            observation,
+        )
+        if declaration.get("declaration_definition_identity") != expected_definition:
+            raise ValueError(f"{name} declaration definition identity mismatch")
+        if declaration.get("declaration_observation_identity") != expected_observation:
+            raise ValueError(f"{name} declaration observation identity mismatch")
+        return binding_id
+
+    def _validate_projected_group(
+        self,
+        raw_group: Mapping[str, object],
+        *,
+        binding_rows: Mapping[str, Mapping[str, object]],
+        name: str,
+    ) -> set[str]:
+        group_id = str(raw_group.get("group_id") or "")
+        concept = raw_group.get("concept")
+        scope = raw_group.get("scope")
+        correspondence = raw_group.get("correspondence")
+        coverage = raw_group.get("coverage")
+        declarations = raw_group.get("declarations")
+        if not group_id:
+            raise ValueError(f"{name} group_id must not be empty")
+        if not all(
+            isinstance(value, Mapping)
+            for value in (concept, scope, correspondence, coverage)
+        ):
+            raise ValueError(f"{name} group contract malformed")
+        if not isinstance(declarations, list) or any(
+            not isinstance(row, Mapping) for row in declarations
+        ):
+            raise ValueError(f"{name} declarations must be a list of objects")
+
+        projected_rows = cast("list[Mapping[str, object]]", declarations)
+        declaration_ids = [
+            str(row.get("declaration_id") or "") for row in projected_rows
+        ]
+        if declaration_ids != sorted(declaration_ids):
+            raise ValueError(f"{name} declarations are not canonical")
+        if len(set(declaration_ids)) != len(declaration_ids):
+            raise ValueError(f"{name} contains duplicate declaration_id")
+
+        referenced = {
+            self._validate_projected_declaration(
+                declaration,
                 group_id=group_id,
                 concept=cast("Mapping[str, object]", concept),
                 scope=cast("Mapping[str, object]", scope),
-                correspondence=cast("Mapping[str, object]", correspondence),
-                coverage=cast("Mapping[str, object]", coverage),
-                declarations=projected_rows,
+                binding_rows=binding_rows,
+                name=name,
             )
-            if raw_group.get("comparison") != observation_payload["comparison"]:
-                raise ValueError(f"{name} declaration comparison mismatch")
-            if raw_group.get("absence") != observation_payload["absence"]:
-                raise ValueError(f"{name} declaration absence mismatch")
-            expected_group_definition = "sha256:" + self._packet_digest(
-                "hashmarks.repository-declaration-group-definition.v1",
-                definition_payload,
-            )
-            expected_group_observation = "sha256:" + self._packet_digest(
-                "hashmarks.repository-declaration-group-observation.v1",
-                observation_payload,
-            )
-            if raw_group.get("group_definition_identity") != expected_group_definition:
-                raise ValueError(f"{name} group definition identity mismatch")
-            if (
-                raw_group.get("group_observation_identity")
-                != expected_group_observation
-            ):
-                raise ValueError(f"{name} group observation identity mismatch")
+            for declaration in projected_rows
+        }
+        definition_payload, observation_payload = self._group_identity_payloads(
+            group_id=group_id,
+            concept=cast("Mapping[str, object]", concept),
+            scope=cast("Mapping[str, object]", scope),
+            correspondence=cast("Mapping[str, object]", correspondence),
+            coverage=cast("Mapping[str, object]", coverage),
+            declarations=projected_rows,
+        )
+        if raw_group.get("comparison") != observation_payload["comparison"]:
+            raise ValueError(f"{name} declaration comparison mismatch")
+        if raw_group.get("absence") != observation_payload["absence"]:
+            raise ValueError(f"{name} declaration absence mismatch")
 
+        expected_definition = "sha256:" + self._packet_digest(
+            "hashmarks.repository-declaration-group-definition.v1",
+            definition_payload,
+        )
+        expected_observation = "sha256:" + self._packet_digest(
+            "hashmarks.repository-declaration-group-observation.v1",
+            observation_payload,
+        )
+        if raw_group.get("group_definition_identity") != expected_definition:
+            raise ValueError(f"{name} group definition identity mismatch")
+        if raw_group.get("group_observation_identity") != expected_observation:
+            raise ValueError(f"{name} group observation identity mismatch")
+        return referenced
+
+    def _validate_declaration_observation(
+        self,
+        packet: Mapping[str, object],
+        *,
+        name: str,
+    ) -> None:
+        self._validate_declaration_packet_contract(packet, name=name)
+        repository_evidence = self._declaration_repository_evidence(
+            packet,
+            name=name,
+        )
+        binding_rows, groups = self._declaration_packet_collections(
+            packet,
+            repository_evidence,
+            name=name,
+        )
+        referenced_binding_ids: set[str] = set()
+        for group in groups:
+            referenced_binding_ids.update(
+                self._validate_projected_group(
+                    group,
+                    binding_rows=binding_rows,
+                    name=name,
+                )
+            )
         if referenced_binding_ids != set(binding_rows):
             raise ValueError(f"{name} repository evidence binding set mismatch")
 
