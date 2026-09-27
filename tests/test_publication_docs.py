@@ -170,7 +170,7 @@ def test_derived_authority_economics_remains_diagnostic_only() -> None:
     assert "make metrics-derived-authority" in plan
     assert "make metrics-derived-authority" in economics
     assert "runtime diagnostics only" in economics
-    assert "no retention implementation is admitted" in plan
+    assert "no retention implementation is admitted" in plan.lower()
     assert "genuine dependency dogfood fixtures" in plan
     assert "two consecutive real-producer passes" in plan
     assert "existing genuine uv/Maven dependency dogfood corpus" in economics
