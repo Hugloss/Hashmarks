@@ -9,7 +9,15 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_documented_make_commands_are_real_phony_targets() -> None:
     text = (ROOT / "Makefile").read_text(encoding="utf-8")
     documented = set(re.findall(r"'  make ([A-Za-z0-9_.-]+)", text))
-    targets = set(re.findall(r"^([A-Za-z0-9_.-]+):(?:\s|$)", text, flags=re.MULTILINE))
+    targets = {
+        target
+        for match in re.finditer(
+            r"^([A-Za-z0-9_.-]+(?:[ \t]+[A-Za-z0-9_.-]+)*):(?:[ \t]|$)",
+            text,
+            flags=re.MULTILINE,
+        )
+        for target in match.group(1).split()
+    }
     phony = {
         target
         for line in text.splitlines()
