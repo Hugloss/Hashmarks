@@ -7,7 +7,6 @@ from pathlib import Path
 from hashmarks.adapters import uv_lock_dependency_observation
 from hashmarks.codemap.engine import CodeMap
 
-
 _FIXTURES = Path(__file__).parent / "fixtures" / "dependency_dogfood"
 
 
