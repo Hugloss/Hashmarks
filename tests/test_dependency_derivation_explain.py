@@ -121,9 +121,10 @@ def test_dependency_explain_remains_endpoint_local_after_repository_advances(
 
     derivation = explanation["derivation"]
     assert derivation["repository_binding"] == original_binding
-    assert explanation["semantic_result"]["observation_identity"] == observation[
-        "observation_identity"
-    ]
+    assert (
+        explanation["semantic_result"]["observation_identity"]
+        == observation["observation_identity"]
+    )
 
 
 def test_dependency_explain_revalidates_before_projecting(tmp_path: Path) -> None:
