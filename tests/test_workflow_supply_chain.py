@@ -304,6 +304,7 @@ def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
     assert "/releases/latest/" not in text
     assert "actions/checkout@" not in text
 
+
 def test_every_release_workflow_job_has_a_bounded_timeout() -> None:
     job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\n")
     for name in ("ci.yml", "publish.yml", "post-publish-smoke.yml"):
