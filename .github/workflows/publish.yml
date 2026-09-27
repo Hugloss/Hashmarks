@@ -133,11 +133,22 @@ jobs:
 
           changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
           heading = f"## {version} — "
-          if heading not in changelog:
-              raise SystemExit(f"CHANGELOG.md has no finalized {version} heading")
+          if changelog.count(heading) != 1:
+              raise SystemExit(
+                  f"CHANGELOG.md must contain exactly one {version} heading"
+              )
           section = changelog.split(heading, 1)[1].split("\n## ", 1)[0]
-          if "Development" in section.splitlines()[0]:
+          lines = section.splitlines()
+          heading_label = lines[0].strip() if lines else ""
+          if not heading_label or "development" in heading_label.lower():
               raise SystemExit(f"CHANGELOG.md still marks {version} as Development")
+          body = "\n".join(lines[1:]).strip()
+          if not body:
+              raise SystemExit(f"CHANGELOG.md has no public release notes for {version}")
+          if "replace this development placeholder" in body.lower():
+              raise SystemExit(
+                  f"CHANGELOG.md still contains the {version} release placeholder"
+              )
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"version={version}\n")
@@ -431,6 +442,23 @@ jobs:
             --tag "${{ needs.prepare.outputs.tag }}" \
             --source-sha "${{ needs.prepare.outputs.source_sha }}" \
             --manifest release/release-manifest.json
+      - name: Materialize exact public release bundle
+        run: |
+          rm -rf release/public release/readback
+          python3 workflow/scripts/release_contract.py materialize-publication \
+            --root source \
+            --manifest release/release-manifest.json \
+            --sha256sums release/SHA256SUMS.txt \
+            --dist release/packages \
+            --standalone-bundle release/standalone/linux \
+            --standalone-bundle release/standalone/windows \
+            --output-dir release/public
+          python3 workflow/scripts/release_contract.py publication-assets \
+            --manifest release/release-manifest.json \
+            --output release/expected-assets.txt
+          find release/public -maxdepth 1 -type f -printf '%f\n' |
+            sort > release/materialized-assets.txt
+          diff -u release/expected-assets.txt release/materialized-assets.txt
       - name: Materialize reviewed changelog section as release notes
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
@@ -511,39 +539,43 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
         run: |
-          gh release upload "$RELEASE_TAG" \
-            release/packages/* \
-            release/release-manifest.json \
-            release/SHA256SUMS.txt \
-            release/standalone/linux/hashmarks-linux-x86_64 \
-            release/standalone/linux/hashmarks-linux-x86_64.sha256 \
-            release/standalone/windows/hashmarks-windows-x86_64.exe \
-            release/standalone/windows/hashmarks-windows-x86_64.exe.sha256 \
-            --clobber
+          gh release upload "$RELEASE_TAG" release/public/* --clobber
       - name: Verify exact reviewed draft asset set
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          cat > release/expected-assets.txt <<EOF
-          SHA256SUMS.txt
-          hashmarks-$RELEASE_VERSION-py3-none-any.whl
-          hashmarks-$RELEASE_VERSION.tar.gz
-          hashmarks-linux-x86_64
-          hashmarks-linux-x86_64.sha256
-          hashmarks-windows-x86_64.exe
-          hashmarks-windows-x86_64.exe.sha256
-          release-manifest.json
-          EOF
-          sort -o release/expected-assets.txt release/expected-assets.txt
+          python3 workflow/scripts/release_contract.py publication-assets \
+            --manifest release/release-manifest.json \
+            --output release/expected-assets.txt
           gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' |
             sort > release/actual-assets.txt
           if ! diff -u release/expected-assets.txt release/actual-assets.txt; then
             echo "::error::Draft release asset set does not exactly match qualified publication assets"
             exit 1
           fi
+      - name: Read back exact draft release bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          rm -rf release/readback
+          mkdir -p release/readback
+          gh release download "$RELEASE_TAG" --dir release/readback
+          find release/readback -maxdepth 1 -type f -printf '%f\n' |
+            sort > release/readback-assets.txt
+          if ! diff -u release/expected-assets.txt release/readback-assets.txt; then
+            echo "::error::Draft release readback asset set differs from qualified publication assets"
+            exit 1
+          fi
+          while IFS= read -r asset; do
+            if ! cmp -s "release/public/$asset" "release/readback/$asset"; then
+              echo "::error::Draft release readback bytes differ for $asset"
+              exit 1
+            fi
+          done < release/expected-assets.txt
       - name: Publish reviewed release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -154,6 +154,25 @@ jobs:
           printf '%s\n' 'artifact-check must preserve this' > dist/artifact-check-preservation-sentinel
           make artifact-check ARTIFACT_PYTHON=3.14
           test "$(cat dist/artifact-check-preservation-sentinel)" = 'artifact-check must preserve this'
+      - name: Build publication rehearsal package bundle
+        run: |
+          rm -rf publication-rehearsal
+          mkdir -p publication-rehearsal/build publication-rehearsal/packages
+          uv build --out-dir publication-rehearsal/build
+          cp publication-rehearsal/build/*.whl publication-rehearsal/packages/
+          cp publication-rehearsal/build/*.tar.gz publication-rehearsal/packages/
+          version="$(uv run --frozen --no-sync python -c 'import hashmarks; print(hashmarks.__version__)')"
+          uv run --frozen --no-sync python scripts/release_contract.py manifest \
+            --dist publication-rehearsal/packages \
+            --tag "v$version" \
+            --output publication-rehearsal/package-manifest.json \
+            --sha256sums publication-rehearsal/PACKAGE_SHA256SUMS.txt
+          rm -rf publication-rehearsal/build
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hashmarks-qualified-python-${{ github.sha }}
+          path: publication-rehearsal/
+          if-no-files-found: error
 
   python-support:
     name: Tests / Python ${{ matrix.python }}
@@ -341,6 +360,80 @@ jobs:
           path: dist/qualified-windows/
           if-no-files-found: error
 
+  publication-rehearsal:
+    name: Publication aggregation rehearsal
+    needs: [release-environment, standalone-artifact, standalone-windows-artifact]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download qualified Python bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hashmarks-qualified-python-${{ github.sha }}
+          path: rehearsal/
+      - name: Download qualified Linux/WSL bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hashmarks-standalone-linux-${{ github.sha }}
+          path: rehearsal/standalone/linux/
+      - name: Download qualified Windows bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hashmarks-standalone-windows-${{ github.sha }}
+          path: rehearsal/standalone/windows/
+      - name: Rehearse exact publication aggregation
+        run: |
+          version="$(python3 -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          source_sha="$(git rev-parse HEAD)"
+          python3 scripts/release_contract.py verify \
+            --root . \
+            --dist rehearsal/packages \
+            --tag "v$version" \
+            --manifest rehearsal/package-manifest.json
+          (cd rehearsal/packages && sha256sum -c ../PACKAGE_SHA256SUMS.txt)
+          chmod 0755 rehearsal/standalone/linux/hashmarks-linux-x86_64
+          python3 scripts/release_contract.py verify-standalone-qualification \
+            --bundle rehearsal/standalone/linux
+          python3 scripts/release_contract.py verify-standalone-qualification \
+            --bundle rehearsal/standalone/windows
+          test "$(rehearsal/standalone/linux/hashmarks-linux-x86_64 --version)" = \
+            "hashmarks version $version"
+          python3 scripts/release_contract.py publication-manifest \
+            --root . \
+            --dist rehearsal/packages \
+            --standalone-bundle rehearsal/standalone/linux \
+            --standalone-bundle rehearsal/standalone/windows \
+            --tag "v$version" \
+            --source-sha "$source_sha" \
+            --output rehearsal/release-manifest.json \
+            --sha256sums rehearsal/SHA256SUMS.txt
+          python3 scripts/release_contract.py verify-publication \
+            --root . \
+            --dist rehearsal/packages \
+            --standalone-bundle rehearsal/standalone/linux \
+            --standalone-bundle rehearsal/standalone/windows \
+            --tag "v$version" \
+            --source-sha "$source_sha" \
+            --manifest rehearsal/release-manifest.json
+          rm -rf rehearsal/public
+          python3 scripts/release_contract.py materialize-publication \
+            --root . \
+            --manifest rehearsal/release-manifest.json \
+            --sha256sums rehearsal/SHA256SUMS.txt \
+            --dist rehearsal/packages \
+            --standalone-bundle rehearsal/standalone/linux \
+            --standalone-bundle rehearsal/standalone/windows \
+            --output-dir rehearsal/public
+          python3 scripts/release_contract.py publication-assets \
+            --manifest rehearsal/release-manifest.json \
+            --output rehearsal/expected-assets.txt
+          find rehearsal/public -maxdepth 1 -type f -printf '%f\n' |
+            sort > rehearsal/actual-assets.txt
+          diff -u rehearsal/expected-assets.txt rehearsal/actual-assets.txt
+
   precommit:
     name: Pre-commit checks
     runs-on: ubuntu-latest
@@ -372,6 +465,7 @@ jobs:
       - mcp-interop
       - standalone-artifact
       - standalone-windows-artifact
+      - publication-rehearsal
       - precommit
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -389,11 +483,12 @@ jobs:
           MCP_INTEROP: ${{ needs.mcp-interop.result }}
           STANDALONE_ARTIFACT: ${{ needs.standalone-artifact.result }}
           WINDOWS_STANDALONE: ${{ needs.standalone-windows-artifact.result }}
+          PUBLICATION_REHEARSAL: ${{ needs.publication-rehearsal.result }}
           PRECOMMIT: ${{ needs.precommit.result }}
         run: |
           failed=0
           printf '%-24s %s (diagnostic only)\n' "FORMATTING" "$FORMATTING"
-          for lane in             RUFF_DEBT             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             STANDALONE_ARTIFACT             WINDOWS_STANDALONE             PRECOMMIT
+          for lane in             RUFF_DEBT             FAST_GATE             WORKSPACE_AUTHORITY             EVIDENCE_BINDINGS             CONSUMER_WHEEL             RELEASE_ENVIRONMENT             PYTHON_SUPPORT             MCP_INTEROP             STANDALONE_ARTIFACT             WINDOWS_STANDALONE             PUBLICATION_REHEARSAL             PRECOMMIT
           do
             result="${!lane}"
             printf '%-24s %s\n' "$lane" "$result"
