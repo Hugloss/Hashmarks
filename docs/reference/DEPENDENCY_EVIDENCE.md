@@ -98,6 +98,22 @@ Producer-native coordinates, lockfile source tables, Maven scopes/classifiers, w
 
 Qualified observations expose `root_evidence` separately from semantic `roots`, so consumers can revalidate the evidence references bound by `observation_identity`. Public dependency queries, deltas, correspondence, and correlation revalidate normalized structure and content identities before using a supplied packet. This detects alteration or inconsistent reuse; because the hashes are not signatures, it does not authenticate the external producer or turn caller-declared authority into repository truth.
 
+### Derivation authority
+
+Built-in adapters declare a stable `producer.adapter_semantics` token that identifies the semantic interpretation contract used to translate producer-native bytes. This token is not the package version, implementation commit, or producer artifact schema version. Refactors that preserve interpretation keep the same token; a semantic interpretation change requires a new token.
+
+`CodeMap.dependency_resolution_derivation_authority(observation)` is a pure read-only projection over an already-qualified v3 observation. It revalidates the supplied packet and returns schema `hashmarks.dependency-resolution-derivation.v1` with:
+
+- the existing definition, resolution, and observation identities;
+- exact repository binding and repository-input equivalence;
+- the producer metadata and explicit adapter semantic-contract token;
+- Hashmarks qualification semantics `hashmarks.dependency-resolution-qualification.v3`;
+- every observation evidence source plus the exact contributing source IDs;
+- the producer-neutral semantic authorities supported by those contributing sources;
+- a deterministic `derivation_identity` over that authority.
+
+The derivation projection is intentionally not a history store or another repository identity. It can be computed from any explicit, structurally valid qualified packet, including a caller-retained before/after endpoint that is no longer current. It never scans Git history, executes the producer, or persists an observation. If adapter semantics are not explicit, derivation authority fails closed rather than guessing from producer kind or schema version.
+
 The v3 snapshot surface is fail-closed: unknown top-level and typed fact/source/coverage fields are rejected rather than silently normalized away. A v3 relationship has `kind: dependency`; other kinds are rejected, including when a supplied observation is replayed through queries or delta. Dependency-correlation request and row mappings are fail-closed for the same reason; caller metadata that is not part of the correlation contract is not silently discarded. `producer` metadata and semantic `scope` remain intentionally opaque JSON maps. Pure observation queries/deltas may be replayed from a structurally valid packet, but correspondence/correlation that combines dependency evidence with live repository intelligence requires the packet's repository identity and CodeMap generation to match the current CodeMap.
 
 ## Coverage and negative evidence
