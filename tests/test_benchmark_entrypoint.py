@@ -33,4 +33,6 @@ def test_benchmark_profile_rejects_unknown_name(tmp_path: Path):
 def test_project_exposes_benchmark_console_entrypoint():
     pyproject = (Path(__file__).parents[1] / "pyproject.toml").read_text()
 
-    assert (\n        'hashmarks-benchmark = "scripts.agent_evaluation.benchmark:main"' in pyproject\n    )
+    assert (
+        'hashmarks-benchmark = "scripts.agent_evaluation.benchmark:main"' in pyproject
+    )
