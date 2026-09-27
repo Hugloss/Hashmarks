@@ -114,9 +114,7 @@ class RepositoryDeclarationDerivationMixin:
                 "group_observation_identity": group["group_observation_identity"],
                 "comparison": deepcopy(group["comparison"]),
                 "absence": deepcopy(group["absence"]),
-                "declaration_count": len(
-                    cast("list[object]", group["declarations"])
-                ),
+                "declaration_count": len(cast("list[object]", group["declarations"])),
             }
             for group in groups
         ]
