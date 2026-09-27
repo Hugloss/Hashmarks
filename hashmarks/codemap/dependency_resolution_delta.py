@@ -132,6 +132,10 @@ def _change_axes(
         else _changed(before_content, after_content)
     )
     return {
+        "repository_identity": _changed(
+            before_binding["repository_identity"],
+            after_binding["repository_identity"],
+        ),
         "repository_generation": _changed(
             before_binding["codemap_generation"],
             after_binding["codemap_generation"],
@@ -172,7 +176,7 @@ def _change_axes(
 
 
 class DependencyResolutionDeltaMixin:
-    """Compare qualified dependency observations within one repository identity."""
+    """Compare two explicit qualified dependency observation endpoints."""
 
     @staticmethod
     def dependency_resolution_delta(
@@ -186,11 +190,6 @@ class DependencyResolutionDeltaMixin:
             )
         before_binding = cast("Mapping[str, object]", before["repository_binding"])
         after_binding = cast("Mapping[str, object]", after["repository_binding"])
-        if before_binding.get("repository_identity") != after_binding.get(
-            "repository_identity"
-        ):
-            raise ValueError("dependency observations repository-mismatch")
-
         delta = DependencyResolutionEvidenceMixin._dependency_resolution_delta_v3(
             before, after
         )
