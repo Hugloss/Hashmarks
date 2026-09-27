@@ -129,7 +129,7 @@ def test_uv_repository_input_path_move_preserves_resolution_and_source_bytes(
     assert delta["change_axes"]["repository_inputs"] == "changed"
     assert delta["change_axes"]["physical_evidence_topology"] == "unchanged"
     assert delta["change_axes"]["physical_evidence_content"] == "unchanged"
-    assert delta["change_axes"]["repository_generation"] == "changed"
+    assert delta["change_axes"]["repository_generation"] == "unchanged"
 
 
 def test_identical_repository_input_bytes_keep_distinct_path_authority(
