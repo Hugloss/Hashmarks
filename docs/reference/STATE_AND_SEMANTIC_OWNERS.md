@@ -199,8 +199,8 @@ It owns:
 - compact producer-evidence references and context/semantic-authority coverage;
 - resolution definition, resolution graph, and full qualified-observation identities;
 - comparability and factual component/selection/inventory/relationship delta for equivalent definitions;
-- endpoint comparison across explicit packets from different CodeMap generations when repository identity is unchanged;
-- independent repository-generation, semantic, adapter, producer, physical-evidence, coverage, and ownership change axes;
+- endpoint comparison across explicit caller-supplied packets without reconstructing repository history;
+- independent repository-identity, repository-generation, semantic, adapter, producer, physical-evidence, coverage, and ownership change axes;
 - derivation and explain projections over existing qualified observation authority, without a history store or second provenance graph;
 - bounded dependency traversal with explicit omission accounting;
 - explicit repository-input correspondence using canonical repository member observation;
@@ -229,7 +229,7 @@ Repository fact being represented:
   two caller-supplied dependency observation endpoints
 Concrete repository-intelligence use case / defect:
   explain which repository/evidence/adapter authority produced a result and distinguish
-  semantic change from repository-generation, interpretation, or evidence-only change
+  semantic change from repository-identity/generation, interpretation, or evidence-only change
 Existing semantic owner(s):
   dependency_resolution_evidence.py; canonical repository identity/generation;
   dependency source authority/coverage; repository delta state families
@@ -249,7 +249,7 @@ Completeness owner:
 Identity owner:
   existing definition/resolution/observation identities plus deterministic derivation identity
 Delta / comparability owner:
-  dependency_resolution_delta.py projecting existing repository-generation and dependency facts
+  dependency_resolution_delta.py projecting existing repository-identity/generation and dependency facts
 Sensitivity / redaction handling:
   unchanged; projection contains only already-admitted dependency/repository evidence
 Public Python surface:
