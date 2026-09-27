@@ -3,8 +3,6 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 
-import pytest
-
 from hashmarks.codemap.engine import CodeMap
 
 
@@ -206,13 +204,15 @@ def test_dependency_delta_marks_definition_change_non_comparable(
     assert delta["change_axes"]["semantic_resolution"] == "not-comparable"
 
 
-def test_dependency_delta_still_refuses_different_repository_identity(
+def test_dependency_delta_reports_repository_identity_as_independent_axis(
     tmp_path: Path,
 ) -> None:
     left = tmp_path / "left"
     right = tmp_path / "right"
     left.mkdir()
     right.mkdir()
+    (left / "repo.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (right / "repo.py").write_text("VALUE = 2\n", encoding="utf-8")
 
     with CodeMap(left) as left_map:
         left_map.sync()
@@ -220,5 +220,11 @@ def test_dependency_delta_still_refuses_different_repository_identity(
     with CodeMap(right) as right_map:
         right_map.sync()
         after = _qualify(right_map, _snapshot())
-        with pytest.raises(ValueError, match="repository-mismatch"):
-            right_map.dependency_resolution_delta(before, after)
+        delta = right_map.dependency_resolution_delta(before, after)
+
+    assert before["repository_binding"]["repository_identity"] != after[
+        "repository_binding"
+    ]["repository_identity"]
+    assert delta["comparability"] == "comparable"
+    assert delta["change_axes"]["repository_identity"] == "changed"
+    assert delta["change_axes"]["semantic_resolution"] == "unchanged"
