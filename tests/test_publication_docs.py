@@ -161,6 +161,19 @@ def test_public_docs_expose_typed_declaration_derivation() -> None:
     assert "MCP `result_mode` is transport vocabulary only" in state
 
 
+def test_derived_authority_economics_remains_diagnostic_only() -> None:
+    makefile = _text("Makefile")
+    plan = _text("docs/maintainers/DERIVED_AUTHORITY_AND_BOUNDED_COMPARISON_PLAN.md")
+    economics = _text("docs/qualification/TEST_RUNTIME_ECONOMICS.md")
+
+    assert "metrics-derived-authority:" in makefile
+    assert "make metrics-derived-authority" in plan
+    assert "make metrics-derived-authority" in economics
+    assert "runtime diagnostics only" in economics
+    assert "no retention implementation is admitted" in plan
+    assert "pending real-workload dogfood" in plan
+
+
 def test_github_entry_points_exist() -> None:
     for path in (
         ".github/CONTRIBUTING.md",
