@@ -325,28 +325,37 @@ Only if retained measurements show a clear economic benefit may a bounded workin
 
 If admitted, choose conservative limits from measurement rather than architecture folklore. Eviction must be ordinary and semantics-preserving.
 
-**Current outcome:** measurement infrastructure exists; no retention implementation is admitted. The controlled regression requires zero repository re-observation and zero persistent-state growth for repeated explicit-packet explain/delta.
+**Current outcome:** measurement infrastructure exists and now composes the controlled fixture with the existing real uv/Maven dogfood corpus. No retention implementation is admitted. Controlled and real-producer regressions require zero repository re-observation and zero persistent-state growth for repeated explicit-packet explain/delta.
 
-**Exit:** pending real-workload dogfood. Either no retention is needed, or measured evidence justifies a small cache with explicit budgets.
+**Exit:** satisfied for the measurement-infrastructure phase. Any future retention proposal still requires measured real-workload evidence of material latency or read amplification plus explicit budgets; correctness does not depend on retained server history.
 
 ### Phase 7 — Dogfood across real producer pairs
 
 Use existing dependency fixtures/corpora and agent benchmark workflows.
 
-Important attacks:
+`make metrics-derived-authority` now runs both the controlled measurement and the repository's genuine dependency dogfood fixtures. The real-producer section reuses the existing adapters and fixture bytes rather than introducing benchmark-only parser paths:
 
-- uv before/after lock evidence;
-- Maven before/after evidence;
+- uv: `absent -> v1`, `v1 -> v2`, `v2 -> absent`, `absent -> grouped`, and `grouped -> absent`;
+- Maven: `absent -> v1`, `v1 -> v2`, and `v2 -> absent`.
+
+Adapter translation is measured separately from qualified explicit-packet operations. This keeps ownership clear: producer-byte parsing belongs at the producer/caller edge, while retained observation explain/delta remains caller-working-set authority. Each real transition records adapter semantic identity, source-artifact bytes, adapter parse latency/allocation, qualification latency, endpoint/explain/delta sizes, change axes, and pure-operation latency. Repeated explain/delta fails if it re-observes repository members, grows persistent Hashmarks state, or becomes nondeterministic.
+
+Important attacks that remain in the saturation loop:
+
 - equivalent semantic dependency result from different producers;
 - same bytes at different physical paths;
 - path move with unchanged semantic fact;
 - adapter semantic-contract change without repository-byte change;
 - source disappearance creating ambiguity/unknown;
-- bounded packet eviction/reconstruction if Phase 6 is ever admitted.
+- bounded packet eviction/reconstruction only if a future Phase 6 measurement ever admits retention.
+
+The real-producer fixture pass does not turn timing into a universal threshold. A slow adapter parse is evidence about producer/caller work, not permission to add Hashmarks server history. A cache proposal must show material repeated cost in genuine workflows after explicit packets are reused.
 
 Feed every reproduced defect back into the same branch and repeat until two clean passes, following the existing attack/dogfood discipline.
 
-**Exit:** cross-producer semantics remain neutral, provenance remains complete, and endpoint delta remains correctly classified under adversarial cases.
+**Current outcome:** real uv/Maven economics and no-retention invariants are implemented. Clean pass #1 qualified on branch head `0eb276c39360f9a3affbb00304c1f1e74faa5e74` via CI run `1831`, including Python 3.11/3.14, release qualification, Linux/WSL + Windows standalone artifacts, publication rehearsal, and qualification convergence. Clean pass #2 remains required before saturation exit.
+
+**Exit:** cross-producer semantics remain neutral, provenance remains complete, endpoint delta remains correctly classified, and two consecutive real-producer passes expose no new defect.
 
 ## Performance design
 
