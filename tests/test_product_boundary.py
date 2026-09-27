@@ -21,7 +21,8 @@ def test_agents_file_declares_repository_intelligence_boundary() -> None:
     )
 
 
-def test_product_profile_explicitly_rejects_agent_execution_and_repository_lifecycle_drift() -> None:
+def test_product_profile_explicitly_rejects_agent_execution_and_repository_lifecycle_drift(
+) -> None:
     agents = _text("AGENTS.md")
     boundary = _text("docs/reference/PRODUCT_BOUNDARY.md")
     invariants = _text("docs/reference/INVARIANTS.md")
@@ -32,7 +33,10 @@ def test_product_profile_explicitly_rejects_agent_execution_and_repository_lifec
     assert "## Three permanent non-goals" in boundary
     assert "Not the agent." in boundary
     assert "Not the execution/certification motor." in boundary
-    assert "Not a repository version-control, mutation, or historical-archive engine." in boundary
+    assert (
+        "Not a repository version-control, mutation, or historical-archive engine."
+        in boundary
+    )
     assert (
         "Historical support is a **bounded working-set capability**, not time travel over the repository's lifetime."
         in boundary
@@ -158,7 +162,9 @@ def test_architecture_invariant_and_readme_repeat_boundary() -> None:
         in invariants
     )
     assert "must not crawl/pre-index Git history" in invariants
-    assert "bounded historical observations are evictable working-set evidence" in invariants
+    assert (
+        "bounded historical observations are evictable working-set evidence" in invariants
+    )
     assert (
         "Agent-facing features that would transfer those authorities into Hashmarks are architecture regressions."
         in invariants
