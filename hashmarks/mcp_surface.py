@@ -88,6 +88,14 @@ def _bounded_json(value: Any, *, name: str, maximum: int, expected_type: type) -
     return value
 
 
+def _result_mode(value: str, *, allowed: tuple[str, ...]) -> str:
+    mode = _bounded_text(value, name="result_mode", maximum=32)
+    if mode not in allowed:
+        options = ", ".join(allowed)
+        raise McpSurfaceError(f"result_mode must be one of: {options}")
+    return mode
+
+
 def _changed_paths(values: list[str]) -> list[str]:
     if not isinstance(values, list) or not values:
         raise McpSurfaceError(
@@ -238,8 +246,11 @@ class HashmarksMcpSurface:
         self,
         snapshot: dict[str, Any],
         queries: list[dict[str, Any]] | None = None,
+        *,
+        previous_observation: dict[str, Any] | None = None,
+        result_mode: str = "observation",
     ) -> dict[str, object]:
-        """Qualify and query one request-scoped dependency-resolution observation."""
+        """Project one dependency observation as observation, explain, or compare."""
         raw_snapshot = _bounded_json(
             snapshot,
             name="snapshot",
@@ -257,10 +268,43 @@ class HashmarksMcpSurface:
             maximum=_MAX_DEPENDENCY_CODEMAP_BYTES,
             expected_type=list,
         )
+        previous = (
+            None
+            if previous_observation is None
+            else _bounded_json(
+                previous_observation,
+                name="previous_observation",
+                maximum=_MAX_DEPENDENCY_CODEMAP_BYTES,
+                expected_type=dict,
+            )
+        )
+        mode = _result_mode(
+            result_mode,
+            allowed=("observation", "explain", "compare"),
+        )
+        if mode != "observation" and bounded_queries:
+            raise McpSurfaceError("queries require result_mode=observation")
+        if mode == "compare" and previous is None:
+            raise McpSurfaceError(
+                "previous_observation is required for result_mode=compare"
+            )
+        if mode != "compare" and previous is not None:
+            raise McpSurfaceError(
+                "previous_observation is only valid for result_mode=compare"
+            )
 
         def project() -> dict[str, object]:
             try:
                 observation = self._map.dependency_resolution_evidence(raw_snapshot)
+                if mode == "explain":
+                    return self._map.dependency_resolution_explain(observation)
+                if mode == "compare":
+                    assert previous is not None
+                    return self._map.dependency_resolution_delta(
+                        previous,
+                        observation,
+                    )
+
                 result: dict[str, object] = {
                     "schema": "hashmarks.mcp-dependency-codemap.v1",
                     "observation": observation,
@@ -284,8 +328,9 @@ class HashmarksMcpSurface:
         groups: list[dict[str, Any]],
         *,
         previous_observation: dict[str, Any] | None = None,
+        result_mode: str = "observation",
     ) -> dict[str, object]:
-        """Qualify request-scoped cross-artifact repository declarations."""
+        """Project repository declarations as an observation or explanation."""
         bounded_groups = _bounded_json(
             groups,
             name="groups",
@@ -302,13 +347,24 @@ class HashmarksMcpSurface:
                 expected_type=dict,
             )
         )
+        mode = _result_mode(
+            result_mode,
+            allowed=("observation", "explain"),
+        )
+        if mode == "explain" and previous is not None:
+            raise McpSurfaceError(
+                "previous_observation requires result_mode=observation"
+            )
 
         def project() -> dict[str, object]:
             try:
-                return self._map.repository_declarations(
+                packet = self._map.repository_declarations(
                     bounded_groups,
                     previous_observation=previous,
                 )
+                if mode == "explain":
+                    return self._map.repository_declaration_explain(packet)
+                return packet
             except ValueError as exc:
                 raise McpSurfaceError(str(exc)) from exc
 
