@@ -127,7 +127,7 @@ Explanation is endpoint-local. It does not require the observation to match the 
 
 ### Endpoint delta and independent change axes
 
-`CodeMap.dependency_resolution_delta(before, after)` compares two structurally valid qualified packets supplied explicitly by the caller. Repository identity and CodeMap generation are both comparison axes, not a request for Hashmarks to reconstruct either endpoint.
+`CodeMap.dependency_resolution_delta(before, after)` returns schema `hashmarks.dependency-resolution-delta.v3` and compares two structurally valid qualified packets supplied explicitly by the caller. Repository identity and CodeMap generation are both comparison axes, not a request for Hashmarks to reconstruct either endpoint.
 
 The existing semantic component/selection/inventory/relationship delta remains factual. In addition, `change_axes` keeps independent dimensions separate:
 
