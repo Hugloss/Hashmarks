@@ -96,6 +96,56 @@ def _result_mode(value: str, *, allowed: tuple[str, ...]) -> str:
     return mode
 
 
+def _dependency_codemap_request(
+    snapshot: dict[str, Any],
+    queries: list[dict[str, Any]] | None,
+    previous_observation: dict[str, Any] | None,
+    result_mode: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any] | None, str]:
+    raw_snapshot = _bounded_json(
+        snapshot,
+        name="snapshot",
+        maximum=_MAX_DEPENDENCY_CODEMAP_BYTES,
+        expected_type=dict,
+    )
+    raw_queries = [] if queries is None else queries
+    if not isinstance(raw_queries, list):
+        raise McpSurfaceError("queries must be a list")
+    if len(raw_queries) > _MAX_DEPENDENCY_QUERIES:
+        raise McpSurfaceError(f"queries exceeds {_MAX_DEPENDENCY_QUERIES} entries")
+    bounded_queries = _bounded_json(
+        raw_queries,
+        name="queries",
+        maximum=_MAX_DEPENDENCY_CODEMAP_BYTES,
+        expected_type=list,
+    )
+    previous = (
+        None
+        if previous_observation is None
+        else _bounded_json(
+            previous_observation,
+            name="previous_observation",
+            maximum=_MAX_DEPENDENCY_CODEMAP_BYTES,
+            expected_type=dict,
+        )
+    )
+    mode = _result_mode(
+        result_mode,
+        allowed=("observation", "explain", "compare"),
+    )
+    if mode != "observation" and bounded_queries:
+        raise McpSurfaceError("queries require result_mode=observation")
+    if mode == "compare" and previous is None:
+        raise McpSurfaceError(
+            "previous_observation is required for result_mode=compare"
+        )
+    if mode != "compare" and previous is not None:
+        raise McpSurfaceError(
+            "previous_observation is only valid for result_mode=compare"
+        )
+    return raw_snapshot, bounded_queries, previous, mode
+
+
 def _changed_paths(values: list[str]) -> list[str]:
     if not isinstance(values, list) or not values:
         raise McpSurfaceError(
@@ -251,47 +301,17 @@ class HashmarksMcpSurface:
         result_mode: str = "observation",
     ) -> dict[str, object]:
         """Project one dependency observation as observation, explain, or compare."""
-        raw_snapshot = _bounded_json(
+        (
+            raw_snapshot,
+            bounded_queries,
+            previous,
+            mode,
+        ) = _dependency_codemap_request(
             snapshot,
-            name="snapshot",
-            maximum=_MAX_DEPENDENCY_CODEMAP_BYTES,
-            expected_type=dict,
-        )
-        raw_queries = [] if queries is None else queries
-        if not isinstance(raw_queries, list):
-            raise McpSurfaceError("queries must be a list")
-        if len(raw_queries) > _MAX_DEPENDENCY_QUERIES:
-            raise McpSurfaceError(f"queries exceeds {_MAX_DEPENDENCY_QUERIES} entries")
-        bounded_queries = _bounded_json(
-            raw_queries,
-            name="queries",
-            maximum=_MAX_DEPENDENCY_CODEMAP_BYTES,
-            expected_type=list,
-        )
-        previous = (
-            None
-            if previous_observation is None
-            else _bounded_json(
-                previous_observation,
-                name="previous_observation",
-                maximum=_MAX_DEPENDENCY_CODEMAP_BYTES,
-                expected_type=dict,
-            )
-        )
-        mode = _result_mode(
+            queries,
+            previous_observation,
             result_mode,
-            allowed=("observation", "explain", "compare"),
         )
-        if mode != "observation" and bounded_queries:
-            raise McpSurfaceError("queries require result_mode=observation")
-        if mode == "compare" and previous is None:
-            raise McpSurfaceError(
-                "previous_observation is required for result_mode=compare"
-            )
-        if mode != "compare" and previous is not None:
-            raise McpSurfaceError(
-                "previous_observation is only valid for result_mode=compare"
-            )
 
         def project() -> dict[str, object]:
             try:
