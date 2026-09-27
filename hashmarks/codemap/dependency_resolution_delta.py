@@ -37,11 +37,7 @@ def _evidence_sources(
     observation: Mapping[str, object],
 ) -> list[Mapping[str, object]]:
     rows = observation["evidence_sources"]
-    return [
-        row
-        for row in cast("Sequence[object]", rows)
-        if isinstance(row, Mapping)
-    ]
+    return [row for row in cast("Sequence[object]", rows) if isinstance(row, Mapping)]
 
 
 def _source_topology(observation: Mapping[str, object]) -> tuple[object, ...]:
