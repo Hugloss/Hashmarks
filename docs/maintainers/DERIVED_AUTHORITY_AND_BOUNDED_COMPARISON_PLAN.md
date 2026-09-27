@@ -1,6 +1,6 @@
 # Derived authority and bounded comparison plan
 
-**Status: implementation plan.** This plan translates useful ideas from versioned-data systems into Hashmarks' existing repository-observer architecture without turning Hashmarks into a history database, version-control engine, or execution system.
+**Status: implemented baseline; saturation complete.** The derived-authority, endpoint-comparison, typed explanation, native MCP projection, economics, and real-producer dogfood phases are complete. No Hashmarks history store or bounded retention cache is admitted by this program. Any future retention proposal must reopen the economics and product-boundary gates with new measured evidence.
 
 The governing product boundary remains `PRODUCT_BOUNDARY.md`: Hashmarks observes repository state and evidence. Git owns repository history and mutation. Consumers own the work loop. Historical support, where useful, is a bounded working set rather than repository-lifetime time travel.
 
@@ -353,9 +353,9 @@ The real-producer fixture pass does not turn timing into a universal threshold. 
 
 Feed every reproduced defect back into the same branch and repeat until two clean passes, following the existing attack/dogfood discipline.
 
-**Current outcome:** real uv/Maven economics and no-retention invariants are implemented. Clean pass #1 qualified on branch head `0eb276c39360f9a3affbb00304c1f1e74faa5e74` via CI run `1831`, including Python 3.11/3.14, release qualification, Linux/WSL + Windows standalone artifacts, publication rehearsal, and qualification convergence. Clean pass #2 remains required before saturation exit.
+**Current outcome:** real uv/Maven economics and no-retention invariants are implemented and saturated. Clean pass #1 qualified on branch head `0eb276c39360f9a3affbb00304c1f1e74faa5e74` via CI run `1831`. Clean pass #2 qualified on branch head `db00d47f75e9309f90b5f54244e66ca9c360cd9e` via CI run `1832`. Both passes covered Python 3.11/3.14, release qualification, Linux/WSL + Windows standalone artifacts, publication rehearsal, and qualification convergence, with no reproduced defect in the second pass.
 
-**Exit:** cross-producer semantics remain neutral, provenance remains complete, endpoint delta remains correctly classified, and two consecutive real-producer passes expose no new defect.
+**Exit:** satisfied. Cross-producer semantics remain neutral, provenance remains complete, endpoint delta remains correctly classified, and two consecutive real-producer passes exposed no new defect.
 
 ## Performance design
 
@@ -413,17 +413,19 @@ Any "no" blocks the phase until the design is narrowed.
 
 ## Recommended implementation order
 
-The recommended sequence is deliberately conservative:
+The implemented sequence was deliberately conservative:
 
 ```text
 dependency derivation proof
     -> pure explain projection
     -> endpoint delta cause classification
-    -> second-surface reuse proof
-    -> compact CLI/MCP projection
-    -> measure
-    -> bounded retention only if proven necessary
-    -> cross-producer dogfood to saturation
+    -> second-surface typed reuse proof
+    -> compact native MCP projection
+    -> controlled economics
+    -> real uv/Maven economics
+    -> two-clean-pass cross-producer saturation
 ```
+
+No retention layer was admitted. The explicit-packet design remains the default: callers hold bounded before/after authority, while Hashmarks validates, explains, and compares those endpoints without repository-lifetime history. A future cache proposal is a new decision, not unfinished work from this program.
 
 This captures the useful idea—derived facts are reproducible, explainable, and cheaply comparable—without making Hashmarks responsible for repository history.
