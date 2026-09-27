@@ -52,20 +52,22 @@ def _register_repository_declarations_tool(
     @server.tool(
         name="repository_declarations",
         description=(
-            "Compare explicitly correlated repository declarations across files and "
-            "formats while preserving provenance, ambiguity, coverage, and freshness."
+            "Project correlated repository declarations as observation or explanation "
+            "while preserving provenance, ambiguity, coverage, and freshness."
         ),
         annotations=annotations,
     )
     def repository_declarations(
         groups: list[dict[str, Any]],
         previous_observation: dict[str, Any] | None = None,
+        result_mode: str = "observation",
     ) -> dict[str, object]:
         return _call_surface(
             tool_error,
             surface.repository_declarations,
             groups,
             previous_observation=previous_observation,
+            result_mode=result_mode,
         )
 
 
@@ -152,20 +154,24 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="dependency_codemap",
         description=(
-            "Qualify a producer-neutral dependency-resolution observation and run "
-            "bounded factual dependency queries without executing a package manager."
+            "Project dependency evidence as observation, explanation, or explicit "
+            "endpoint comparison without executing a package manager."
         ),
         annotations=annotations,
     )
     def dependency_codemap(
         snapshot: dict[str, object],
         queries: list[dict[str, object]] | None = None,
+        previous_observation: dict[str, object] | None = None,
+        result_mode: str = "observation",
     ) -> dict[str, object]:
         return _call_surface(
             ToolError,
             surface.dependency_codemap,
             snapshot,
             queries,
+            previous_observation=previous_observation,
+            result_mode=result_mode,
         )
 
     _register_repository_declarations_tool(server, surface, annotations, ToolError)

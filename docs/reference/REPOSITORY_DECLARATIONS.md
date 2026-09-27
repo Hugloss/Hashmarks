@@ -361,6 +361,8 @@ with CodeMap(".") as codemap:
 
 The same request-scoped primitive is exposed by the read-only MCP \`repository_declarations\` tool.
 
+The MCP tool keeps \`result_mode="observation"\` as the default, returning the existing \`hashmarks.repository-declarations.v1\` packet. Opt-in \`result_mode="explain"\` returns \`hashmarks.repository-declaration-explain.v1\` by delegating to the typed declaration explanation owner. \`previous_observation\` remains valid only with observation mode, preserving the existing declaration-delta contract. MCP does not promote declaration compare beyond the repository-evidence binding authority that currently governs it, and it retains no historical declaration timeline.
+
 ## Explicit provider discovery
 
 Hashmarks also exposes a Python-side provider SPI for integrations that need to

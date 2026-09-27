@@ -151,6 +151,17 @@ Physical evidence topology and content are deliberately independent. Moving from
 
 Repository identity may itself differ between endpoints and is reported factually in `change_axes`. Hashmarks does not infer that the endpoints belong to one Git branch, one worktree lineage, or one causal history; the caller selected the endpoints. Different generations and repository identities are therefore explicit endpoint evidence, not historical storage.
 
+### MCP projection modes
+
+The existing read-only `dependency_codemap` MCP tool keeps `result_mode="observation"` as the default and preserves its existing `hashmarks.mcp-dependency-codemap.v1` response shape.
+
+Two opt-in transport projections reuse the Python/domain owners directly:
+
+- `result_mode="explain"` returns `hashmarks.dependency-resolution-explain.v1`;
+- `result_mode="compare"` requires a bounded caller-supplied qualified `previous_observation` and returns `hashmarks.dependency-resolution-delta.v3`.
+
+Queries are valid only in observation mode. A previous observation is valid only in compare mode. The MCP process does not retain endpoint history, search Git, reconstruct a previous repository, or invent a separate comparison schema.
+
 The v3 snapshot surface is fail-closed: unknown top-level and typed fact/source/coverage fields are rejected rather than silently normalized away. A v3 relationship has `kind: dependency`; other kinds are rejected, including when a supplied observation is replayed through queries or delta. Dependency-correlation request and row mappings are fail-closed for the same reason; caller metadata that is not part of the correlation contract is not silently discarded. `producer` metadata and semantic `scope` remain intentionally opaque JSON maps. Pure observation queries/deltas may be replayed from a structurally valid packet, but correspondence/correlation that combines dependency evidence with live repository intelligence requires the packet's repository identity and CodeMap generation to match the current CodeMap.
 
 ## Coverage and negative evidence

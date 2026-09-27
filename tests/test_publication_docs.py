@@ -134,6 +134,8 @@ def test_public_docs_expose_dependency_derivation_and_endpoint_delta() -> None:
     assert "Dependency derivation/explain and endpoint-delta admission record" in state
     assert "dependency_resolution_derivation.py" in guide
     assert "dependency_resolution_delta.py" in guide
+    assert 'result_mode="compare"' in dependency
+    assert "dependency_codemap" in dependency
 
 
 def test_public_docs_expose_typed_declaration_derivation() -> None:
@@ -154,6 +156,9 @@ def test_public_docs_expose_typed_declaration_derivation() -> None:
     assert "repository_declaration_derivation.py" in guide
     assert "no universal provenance ontology admitted" in plan
     assert "New semantic owner introduced: NO" in state
+    assert 'result_mode="explain"' in declarations
+    assert "repository_declarations" in declarations
+    assert "MCP `result_mode` is transport vocabulary only" in state
 
 
 def test_github_entry_points_exist() -> None:
@@ -329,6 +334,10 @@ def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None
     ):
         assert f"`{tool}`" in mcp
     assert "does not add planning, editing, shell execution" in mcp
+    assert 'result_mode="observation" | "explain" | "compare"' in mcp
+    assert 'result_mode="observation" | "explain"' in mcp
+    assert "The catalog stays small" in mcp
+    assert 'never stores a "previous" dependency or declaration observation' in mcp
     assert "`opencode.json`" in mcp
     assert ".mcp.json" in mcp
     assert ".codex/config.toml" in mcp
