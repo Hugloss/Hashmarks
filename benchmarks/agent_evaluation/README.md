@@ -11,18 +11,37 @@ New product behavior must still pass the product-admission contract in `docs/ref
 
 ## Native Codex and OpenCode benchmark
 
+Start from this Hashmarks checkout with the adjacent `agentsCookbook` checkout:
+
+```sh
+make init
+make benchmark-show
+make benchmark-check
+make benchmark
+make benchmark-report
+```
+
 `make benchmark` runs one pinned localization task through six conditions: native
 OpenCode and native Codex, each with bare, Hashmarks MCP, and Enola MCP access.
 `make benchmark BENCHMARK=matrix` runs all three matrix tasks (18 trials).
 `make benchmark BENCHMARK=cycle` runs an adapted TypeScript cycle task three
 times per condition (18 trials). `make benchmark-show` lists definitions without
-running agents; `make benchmark-report` reads verified results. Set
-`BENCH_AGENT=opencode-native` or `BENCH_AGENT=codex-native` to run one native CLI.
-The experiments and runner live in the adjacent `agentsCookbook` checkout;
-set `AGENTS_COOKBOOK=/path/to/checkout` if it is elsewhere. Set `BENCH_ROOT`
-to change the local result/cache/work directory. `BENCH_PYTHON` selects the
-Python interpreter for agentsCookbook; use one outside Hashmarks' `.venv` if
-that environment is active.
+running agents. `make benchmark-check` prepares every selected native arm and
+stops before any model call if source, subject, model, MCP binding, or oracle
+setup is unavailable. It cannot prove remote model authentication; first confirm
+each native CLI works interactively. Set `BENCH_AGENT=opencode-native` or
+`BENCH_AGENT=codex-native` to select one native CLI.
+
+The experiments and runner live in the adjacent `agentsCookbook` checkout; set
+`AGENTS_COOKBOOK=/path/to/checkout` if it is elsewhere. Each `make benchmark`
+invocation creates a fresh local run under `BENCH_ROOT` and prints its path.
+`make benchmark-report` reads the latest run for the selected `BENCHMARK` mode,
+including its original agent selection. Use `BENCH_RUN=<printed-run-id>` to
+resume or report a specific run; resume only with the same model, MCP, and
+harness setup. Start a new run after changing them. `BENCH_PARTIAL=1` explicitly
+reports verified receipts available so far; a normal report requires every
+selected definition. `BENCH_PYTHON` selects the agentsCookbook interpreter,
+including when Hashmarks' `.venv` is active.
 
 The run uses your installed native CLI model/provider/auth settings. Check that
 `codex` and `opencode` already work interactively. Native Codex requires a
@@ -47,12 +66,32 @@ args = []
 cwd = "."
 ```
 
-Keep your existing Codex model and authentication fields; this is only an MCP
-example. Configure the same command/args/cwd in your native OpenCode MCP config.
-The runner verifies workspace binding and the selected executable, and marks a
-trial `INCOMPLETE` if a registration is stale or absent. `codex mcp list --json`
-and `opencode mcp list` are useful host checks. Enola hooks are excluded; only
-MCP access varies between subject arms.
+Keep your existing Codex model and authentication fields. Native OpenCode uses
+command arrays in its JSON/JSONC configuration:
+
+```jsonc
+{
+  "mcp": {
+    "hashmarks": {
+      "type": "local",
+      "command": ["hashmarks", "--workspace", ".", "mcp"],
+      "enabled": true
+    },
+    "enola": {
+      "type": "local",
+      "command": ["enola"],
+      "enabled": true
+    }
+  }
+}
+```
+
+Keep the OpenCode model/provider/auth settings already configured on the host.
+Avoid an absolute Hashmarks command from another installation; the benchmark
+puts this checkout's `.venv/bin` first on `PATH` and checks the executable. The
+runner verifies workspace binding and marks a trial `INCOMPLETE` if a registration
+is stale or absent. `codex mcp list --json` and `opencode mcp list` are useful
+host checks. Enola hooks are excluded; only MCP access varies between arms.
 
 The earlier `codex-agent-economics` evaluation remains available through its
 separate Make targets. The native matrix compares subject assistance within each
