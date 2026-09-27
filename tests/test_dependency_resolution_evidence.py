@@ -3243,7 +3243,7 @@ def test_v3_mixed_selection_sources_do_not_borrow_authority(tmp_path: Path) -> N
             codemap.dependency_resolution_evidence(snapshot)
 
 
-def test_v3_delta_rejects_cross_repository_observations(tmp_path: Path) -> None:
+def test_v3_delta_reports_cross_repository_identity_change(tmp_path: Path) -> None:
     left = tmp_path / "left"
     right = tmp_path / "right"
     left.mkdir()
@@ -3256,5 +3256,8 @@ def test_v3_delta_rejects_cross_repository_observations(tmp_path: Path) -> None:
         codemap.sync()
         after = codemap.dependency_resolution_evidence(_snapshot_v3())
 
-    with pytest.raises(ValueError, match="dependency observations repository-mismatch"):
-        CodeMap.dependency_resolution_delta(before, after)
+    delta = CodeMap.dependency_resolution_delta(before, after)
+
+    assert delta["comparability"] == "comparable"
+    assert delta["change_axes"]["repository_identity"] == "changed"
+    assert delta["change_axes"]["semantic_resolution"] == "unchanged"
