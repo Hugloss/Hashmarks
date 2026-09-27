@@ -267,7 +267,9 @@ Prove that the same derivation semantics can be reused without importing depende
 
 If the second surface needs materially different semantics, keep separate typed projections rather than forcing a universal provenance ontology.
 
-**Exit:** either a genuinely producer-neutral derivation projection emerges, or the design explicitly remains typed per evidence family.
+**Outcome:** repository declarations prove the architectural pattern but not a universal schema. Both dependency evidence and declarations support endpoint-local derivation authority plus pure explanation, yet their semantic authority differs materially: dependency evidence uses adapter semantic contracts and external physical-source authority; declarations use provider-claimed values/correspondence plus canonical repository-evidence bindings. Hashmarks therefore keeps typed derivation projections and shares only the invariant that every derived result remains traceable to existing domain authority.
+
+**Exit:** satisfied with typed per-evidence-family projections; no universal provenance ontology admitted.
 
 ### Phase 5 — Expose compact consumer surfaces
 
