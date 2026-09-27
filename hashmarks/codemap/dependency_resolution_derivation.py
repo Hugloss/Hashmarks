@@ -106,3 +106,35 @@ class DependencyResolutionDerivationMixin:
             "contributing_source_ids": sorted(contributing_source_ids),
             "evidence_sources": evidence_sources,
         }
+
+    def dependency_resolution_explain(
+        self,
+        observation: Mapping[str, object],
+    ) -> dict[str, object]:
+        """Explain one qualified dependency observation without requiring current state."""
+        derivation = self.dependency_resolution_derivation_authority(observation)
+        counts = {
+            field: len(cast("Sequence[object]", observation[field]))
+            for field in (
+                "components",
+                "selections",
+                "inventory",
+                "relationships",
+                "module_ownership",
+            )
+        }
+        semantic_result = {
+            "definition_identity": observation["definition_identity"],
+            "resolution_identity": observation["resolution_identity"],
+            "observation_identity": observation["observation_identity"],
+            "contexts": json.loads(_canonical(observation["contexts"])),
+            "roots": json.loads(_canonical(observation["roots"])),
+            "counts": counts,
+        }
+        return {
+            "schema": _contract.EXPLAIN_SCHEMA_V1,
+            "authority": observation["authority"],
+            "producer_authority": observation["producer_authority"],
+            "semantic_result": semantic_result,
+            "derivation": derivation,
+        }
