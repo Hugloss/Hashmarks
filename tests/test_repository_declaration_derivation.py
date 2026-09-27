@@ -196,6 +196,33 @@ def test_declaration_derivation_rejects_resigned_duplicate_group(
             codemap.repository_declaration_derivation_authority(tampered)
 
 
+def test_declaration_derivation_rejects_resigned_noncanonical_order(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.yaml").write_text("owner: team-a\n", encoding="utf-8")
+    (repo / "b.yaml").write_text("owner: team-a\n", encoding="utf-8")
+    group = _group(
+        [
+            _declaration("a", "a.yaml", "team-a"),
+            _declaration("b", "b.yaml", "team-a"),
+        ]
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations([group])
+        tampered = copy.deepcopy(packet)
+        tampered["groups"][0]["declarations"].reverse()
+        tampered["observation_identity"] = codemap._declaration_packet_identity(
+            tampered
+        )
+
+        with pytest.raises(ValueError, match="declarations are not canonical"):
+            codemap.repository_declaration_derivation_authority(tampered)
+
+
 def test_declaration_producer_change_preserves_definition_but_changes_derivation(
     tmp_path: Path,
 ) -> None:
