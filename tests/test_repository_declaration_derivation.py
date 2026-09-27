@@ -298,12 +298,8 @@ def test_declaration_evidence_definition_change_is_explicit_authority_change(
         after = codemap.repository_declarations(
             [_group([_declaration("owner", "owner.yaml", "team-a", line=2)])]
         )
-        before_derivation = codemap.repository_declaration_derivation_authority(
-            before
-        )
-        after_derivation = codemap.repository_declaration_derivation_authority(
-            after
-        )
+        before_derivation = codemap.repository_declaration_derivation_authority(before)
+        after_derivation = codemap.repository_declaration_derivation_authority(after)
 
     before_row = before["groups"][0]["declarations"][0]
     after_row = after["groups"][0]["declarations"][0]
