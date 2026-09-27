@@ -4,6 +4,8 @@ from collections.abc import Mapping
 
 SCHEMA_V3 = "hashmarks.dependency-resolution.v3"
 DERIVATION_SCHEMA_V1 = "hashmarks.dependency-resolution-derivation.v1"
+EXPLAIN_SCHEMA_V1 = "hashmarks.dependency-resolution-explain.v1"
+DELTA_SCHEMA_V3 = "hashmarks.dependency-resolution-delta.v3"
 QUALIFICATION_SEMANTICS_V3 = "hashmarks.dependency-resolution-qualification.v3"
 EVIDENCE_AUTHORITIES = {
     "selection",

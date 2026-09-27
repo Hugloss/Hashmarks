@@ -111,6 +111,31 @@ def test_public_docs_expose_repository_evidence_binding_contract() -> None:
         assert state in binding
 
 
+def test_public_docs_expose_dependency_derivation_and_endpoint_delta() -> None:
+    stability = _text("docs/reference/API_STABILITY.md")
+    dependency = _text("docs/reference/DEPENDENCY_EVIDENCE.md")
+    state = _text("docs/reference/STATE_AND_SEMANTIC_OWNERS.md")
+    guide = _text("docs/maintainers/CODEMAP.md")
+
+    for schema in (
+        "hashmarks.dependency-resolution-derivation.v1",
+        "hashmarks.dependency-resolution-explain.v1",
+        "hashmarks.dependency-resolution-delta.v3",
+    ):
+        assert schema in stability
+        assert schema in dependency
+
+    assert (
+        "Repository identity and CodeMap generation are both comparison axes"
+        in dependency
+    )
+    assert "physical_evidence_topology" in dependency
+    assert "physical_evidence_content" in dependency
+    assert "Dependency derivation/explain and endpoint-delta admission record" in state
+    assert "dependency_resolution_derivation.py" in guide
+    assert "dependency_resolution_delta.py" in guide
+
+
 def test_github_entry_points_exist() -> None:
     for path in (
         ".github/CONTRIBUTING.md",

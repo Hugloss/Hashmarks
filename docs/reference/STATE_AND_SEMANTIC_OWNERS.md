@@ -199,6 +199,9 @@ It owns:
 - compact producer-evidence references and context/semantic-authority coverage;
 - resolution definition, resolution graph, and full qualified-observation identities;
 - comparability and factual component/selection/inventory/relationship delta for equivalent definitions;
+- endpoint comparison across explicit caller-supplied packets without reconstructing repository history;
+- independent repository-identity, repository-generation, semantic, adapter, producer, physical-evidence, coverage, and ownership change axes;
+- derivation and explain projections over existing qualified observation authority, without a history store or second provenance graph;
 - bounded dependency traversal with explicit omission accounting;
 - explicit repository-input correspondence using canonical repository member observation;
 - repository-generation binding by reusing the existing repository identity/generation owner;
@@ -217,6 +220,53 @@ It does not own:
 Inventory membership does not prove graph reachability, and absence from a graph or inventory is admissible within the caller-declared scope only when the corresponding context/semantic-authority coverage is explicitly complete and non-truncated. Producer evidence may support individual selections, inventory memberships, and relationships without becoming repository authority. Semantic scope and roots define resolution comparability; producer identity is bound to the full observation, not the semantic definition. Complete graph coverage can describe an empty or rootless graph.
 
 A producer claim that a resolution came from a repository input is not source-equivalence proof. Without an independently comparable member revision, source equivalence remains `unknown`; matching and mismatching revisions produce `proven` and `mismatch` respectively.
+
+### Dependency derivation/explain and endpoint-delta admission record
+
+```text
+Repository fact being represented:
+  provenance of one qualified dependency observation and factual differences between
+  two caller-supplied dependency observation endpoints
+Concrete repository-intelligence use case / defect:
+  explain which repository/evidence/adapter authority produced a result and distinguish
+  semantic change from repository-identity/generation, interpretation, or evidence-only change
+Existing semantic owner(s):
+  dependency_resolution_evidence.py; canonical repository identity/generation;
+  dependency source authority/coverage; repository delta state families
+Missing fact:
+  compact derivation/explain projection plus orthogonal endpoint change classification
+Canonical owner after this change:
+  dependency_resolution_derivation.py for projection shape;
+  dependency_resolution_delta.py for factual dependency endpoint comparison
+Repository-derived or external observation:
+  qualified external observation bound to explicit repository authority
+Persistence class:
+  qualified external observation + reconstructible request-local projection; not persisted
+Freshness owner:
+  existing repository binding / repository observation authority
+Completeness owner:
+  existing dependency evidence-source and semantic coverage contracts
+Identity owner:
+  existing definition/resolution/observation identities plus deterministic derivation identity
+Delta / comparability owner:
+  dependency_resolution_delta.py projecting existing repository-identity/generation and dependency facts
+Sensitivity / redaction handling:
+  unchanged; projection contains only already-admitted dependency/repository evidence
+Public Python surface:
+  CodeMap.dependency_resolution_derivation_authority(),
+  CodeMap.dependency_resolution_explain(), CodeMap.dependency_resolution_delta()
+MCP surface:
+  NONE
+Explicit non-goals:
+  history retention, Git traversal, branch/merge/rollback, causal diagnosis,
+  package-manager execution, second repository generation, universal provenance graph
+```
+
+No new persistence authority or repository state family is introduced. The serialized
+`change_axes` values are comparison vocabulary local to the dependency delta projection:
+`changed | unchanged`, with `unknown` only where explicit provenance is absent and
+`not-comparable` only for semantic resolution under a changed definition. They do not
+replace repository freshness, completeness, continuity, or semantic-delta owners.
 
 ## Evidence correlation work
 
