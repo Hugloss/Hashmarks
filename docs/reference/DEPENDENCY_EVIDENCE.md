@@ -114,6 +114,42 @@ Built-in adapters declare a stable `producer.adapter_semantics` token that ident
 
 The derivation projection is intentionally not a history store or another repository identity. It can be computed from any explicit, structurally valid qualified packet, including a caller-retained before/after endpoint that is no longer current. It never scans Git history, executes the producer, or persists an observation. If adapter semantics are not explicit, derivation authority fails closed rather than guessing from producer kind or schema version.
 
+### Explain projection
+
+`CodeMap.dependency_resolution_explain(observation)` is a pure read-only explanation of one already-qualified dependency endpoint. It returns schema `hashmarks.dependency-resolution-explain.v1` and contains:
+
+- a compact semantic-result summary using the existing definition, resolution, and observation identities;
+- the declared contexts and roots;
+- bounded counts for components, selections, inventory rows, relationships, and module-ownership rows;
+- the complete `hashmarks.dependency-resolution-derivation.v1` projection.
+
+Explanation is endpoint-local. It does not require the observation to match the current CodeMap generation, does not look up an older generation, and does not search Git. A caller can therefore retain one explicit packet during an agent work window and explain it later without Hashmarks retaining a historical timeline.
+
+### Endpoint delta and independent change axes
+
+`CodeMap.dependency_resolution_delta(before, after)` compares two structurally valid qualified packets when they share the same repository identity. The packets may come from different CodeMap generations. Hashmarks does not reconstruct either endpoint: the caller supplies both explicit observations.
+
+The existing semantic component/selection/inventory/relationship delta remains factual. In addition, `change_axes` keeps independent dimensions separate:
+
+- `repository_generation`;
+- `semantic_definition`;
+- `semantic_resolution`;
+- `observation`;
+- `adapter_semantics`;
+- `producer_provenance`;
+- `repository_inputs`;
+- `physical_evidence_topology`;
+- `physical_evidence_content`;
+- `evidence_qualification`;
+- `coverage`;
+- `module_ownership`.
+
+Most axes are `changed | unchanged`. `adapter_semantics` and `physical_evidence_content` may be `unknown` when the endpoint does not provide enough explicit provenance, and `semantic_resolution` is `not-comparable` when the semantic definition changes. These are factual comparison axes, not causal claims.
+
+Physical evidence topology and content are deliberately independent. Moving from one physical source identity to another with equal bytes reports topology change while content remains unchanged. Changing a producer digest under the same source topology reports content change without manufacturing a semantic dependency change.
+
+A different repository identity remains non-comparable and is rejected. Different generations of the same repository identity are expected endpoint comparison, not historical storage.
+
 The v3 snapshot surface is fail-closed: unknown top-level and typed fact/source/coverage fields are rejected rather than silently normalized away. A v3 relationship has `kind: dependency`; other kinds are rejected, including when a supplied observation is replayed through queries or delta. Dependency-correlation request and row mappings are fail-closed for the same reason; caller metadata that is not part of the correlation contract is not silently discarded. `producer` metadata and semantic `scope` remain intentionally opaque JSON maps. Pure observation queries/deltas may be replayed from a structurally valid packet, but correspondence/correlation that combines dependency evidence with live repository intelligence requires the packet's repository identity and CodeMap generation to match the current CodeMap.
 
 ## Coverage and negative evidence
