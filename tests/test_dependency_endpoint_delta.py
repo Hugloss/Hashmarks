@@ -166,6 +166,44 @@ def test_dependency_delta_reports_source_content_change_without_semantic_change(
     assert delta["change_axes"]["physical_evidence_content"] == "changed"
 
 
+def test_dependency_delta_reports_unknown_adapter_semantics_without_rejecting(
+    tmp_path: Path,
+) -> None:
+    before_raw = _snapshot()
+    after_raw = copy.deepcopy(before_raw)
+    before_raw["producer"].pop("adapter_semantics")
+    after_raw["producer"].pop("adapter_semantics")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = _qualify(codemap, before_raw)
+        after = _qualify(codemap, after_raw)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert delta["comparability"] == "comparable"
+    assert delta["before_adapter_semantics"] is None
+    assert delta["after_adapter_semantics"] is None
+    assert delta["change_axes"]["adapter_semantics"] == "unknown"
+
+
+def test_dependency_delta_reports_unknown_physical_content_without_digest(
+    tmp_path: Path,
+) -> None:
+    before_raw = _snapshot()
+    after_raw = copy.deepcopy(before_raw)
+    before_raw["evidence_sources"][0].pop("producer_digest")
+    after_raw["evidence_sources"][0].pop("producer_digest")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = _qualify(codemap, before_raw)
+        after = _qualify(codemap, after_raw)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert delta["comparability"] == "comparable"
+    assert delta["change_axes"]["physical_evidence_content"] == "unknown"
+
+
 def test_dependency_delta_keeps_coverage_change_separate_from_resolution(
     tmp_path: Path,
 ) -> None:
