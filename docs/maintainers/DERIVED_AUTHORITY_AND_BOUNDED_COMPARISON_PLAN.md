@@ -340,14 +340,17 @@ Use existing dependency fixtures/corpora and agent benchmark workflows.
 
 Adapter translation is measured separately from qualified explicit-packet operations. This keeps ownership clear: producer-byte parsing belongs at the producer/caller edge, while retained observation explain/delta remains caller-working-set authority. Each real transition records adapter semantic identity, source-artifact bytes, adapter parse latency/allocation, qualification latency, endpoint/explain/delta sizes, change axes, and pure-operation latency. Repeated explain/delta fails if it re-observes repository members, grows persistent Hashmarks state, or becomes nondeterministic.
 
-Important attacks that remain in the saturation loop:
+Post-saturation adversarial coverage is now complete:
 
-- equivalent semantic dependency result from different producers;
-- same bytes at different physical paths;
-- path move with unchanged semantic fact;
-- adapter semantic-contract change without repository-byte change;
-- source disappearance creating ambiguity/unknown;
-- bounded packet eviction/reconstruction only if a future Phase 6 measurement ever admits retention.
+- equivalent semantic dependency results from different producers are covered by cross-producer query/delta parity and real uv/Maven delta tests;
+- same bytes under different physical evidence identities are covered by endpoint topology/content separation;
+- repository-input path moves with unchanged dependency meaning are covered against the real uv adapter;
+- adapter semantic-contract changes without dependency semantic change are covered independently from producer provenance;
+- evidence-source disappearance is covered as topology/qualification/coverage change without false semantic-resolution churn.
+
+The post-saturation authority attack on PR #199 qualified on head `3e7da07d6437c080e09070e2b22a34fc18ed9045`, CI run `1842`, through the full Python 3.11/3.14, release, standalone, publication, and convergence matrix.
+
+Bounded packet eviction/reconstruction is **not an open attack** in this program because no retention layer is admitted. It becomes applicable only if a future, separately approved retention proposal survives the product-boundary and economics gates.
 
 The real-producer fixture pass does not turn timing into a universal threshold. A slow adapter parse is evidence about producer/caller work, not permission to add Hashmarks server history. A cache proposal must show material repeated cost in genuine workflows after explicit packets are reused.
 
