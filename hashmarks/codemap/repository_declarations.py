@@ -62,11 +62,7 @@ class RepositoryDeclarationsMixin:
         observation = {
             **definition,
             "value_state": declaration["value_state"],
-            **(
-                {"value": declaration["value"]}
-                if "value" in declaration
-                else {}
-            ),
+            **({"value": declaration["value"]} if "value" in declaration else {}),
             **(
                 {"candidate_values": declaration["candidate_values"]}
                 if "candidate_values" in declaration
