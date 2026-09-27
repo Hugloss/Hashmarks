@@ -227,11 +227,7 @@ def _real_state_receipt(
     states: dict[str, dict[str, object]],
 ) -> dict[str, dict[str, object]]:
     return {
-        state: {
-            key: value
-            for key, value in row.items()
-            if key != "snapshot"
-        }
+        state: {key: value for key, value in row.items() if key != "snapshot"}
         for state, row in states.items()
     }
 
