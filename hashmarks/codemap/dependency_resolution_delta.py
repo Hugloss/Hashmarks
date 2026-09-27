@@ -85,6 +85,36 @@ def _source_qualification(
     )
 
 
+def _source_qualification_by_id(
+    observation: Mapping[str, object],
+) -> tuple[tuple[str, str, str], ...]:
+    return tuple(
+        sorted(
+            (
+                str(row.get("source_id") or ""),
+                str(row.get("completeness") or ""),
+                str(row.get("truncation") or ""),
+            )
+            for row in _evidence_sources(observation)
+        )
+    )
+
+
+def _qualification_axis(
+    before: Mapping[str, object],
+    after: Mapping[str, object],
+) -> str:
+    if _source_topology(before) == _source_topology(after):
+        return _changed(
+            _source_qualification_by_id(before),
+            _source_qualification_by_id(after),
+        )
+    return _changed(
+        _source_qualification(before),
+        _source_qualification(after),
+    )
+
+
 def _semantic_rows(value: object) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for row in cast("Sequence[object]", value):
@@ -160,10 +190,7 @@ def _change_axes(
             _source_topology(after),
         ),
         "physical_evidence_content": content_axis,
-        "evidence_qualification": _changed(
-            _source_qualification(before),
-            _source_qualification(after),
-        ),
+        "evidence_qualification": _qualification_axis(before, after),
         "coverage": _changed(
             _semantic_rows(before["coverage"]),
             _semantic_rows(after["coverage"]),
