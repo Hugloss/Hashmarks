@@ -172,9 +172,9 @@ def test_identical_repository_input_bytes_keep_distinct_path_authority(
     assert {
         row["observed_member_revision"] for row in observation["repository_inputs"]
     } == {revision}
-    assert {
-        row["source_equivalence"] for row in observation["repository_inputs"]
-    } == {"proven"}
+    assert {row["source_equivalence"] for row in observation["repository_inputs"]} == {
+        "proven"
+    }
     assert derivation["repository_inputs"] == observation["repository_inputs"]
 
 
