@@ -7,6 +7,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 
 _SCHEMA = "hashmarks.dependency-resolution.v3"
+_ADAPTER_SEMANTICS = "hashmarks.maven-dependency-adapter.v1"
 _LIST_LINE = re.compile(
     r"^[ \t]*(?P<coordinate>[^ \t:]+:[^ \t:]+:[^ \t:]+"
     r"(?::[^ \t:]+){2,3})(?:[ \t]+--[ \t]+module[ \t]+"
@@ -425,7 +426,11 @@ def maven_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     return {
         "schema": _SCHEMA,
-        "producer": {"kind": "maven-dependency-artifacts", "schema_version": "1"},
+        "producer": {
+            "kind": "maven-dependency-artifacts",
+            "schema_version": "1",
+            "adapter_semantics": _ADAPTER_SEMANTICS,
+        },
         "scope": {},
         "contexts": contexts,
         "roots": sorted(roots, key=lambda row: (row["context"], row["node_id"])),

@@ -24,7 +24,11 @@ def _without_source_refs(value: object) -> object:
 def _snapshot_v3() -> dict[str, object]:
     return {
         "schema": "hashmarks.dependency-resolution.v3",
-        "producer": {"kind": "neutral-resolver", "schema_version": "1"},
+        "producer": {
+            "kind": "neutral-resolver",
+            "schema_version": "1",
+            "adapter_semantics": "test.neutral-dependency-adapter.v1",
+        },
         "scope": {"environment": "test"},
         "contexts": ["compile", "runtime"],
         "roots": [
@@ -397,6 +401,114 @@ def test_v3_identity_separates_semantics_from_producer_provenance(
     assert original["resolution_identity"] != other_resolution["resolution_identity"]
     assert original["resolution_identity"] == other_coverage["resolution_identity"]
     assert original["observation_identity"] != other_coverage["observation_identity"]
+
+
+def test_v3_derivation_authority_is_traceable_without_history_store(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v3()
+    for source in snapshot["evidence_sources"]:
+        source["producer_digest"] = "sha256:" + "a" * 64
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        derivation = codemap.dependency_resolution_derivation_authority(observation)
+
+    assert derivation["schema"] == "hashmarks.dependency-resolution-derivation.v1"
+    assert derivation["definition_identity"] == observation["definition_identity"]
+    assert derivation["resolution_identity"] == observation["resolution_identity"]
+    assert derivation["observation_identity"] == observation["observation_identity"]
+    assert derivation["repository_binding"] == observation["repository_binding"]
+    assert derivation["repository_inputs"] == observation["repository_inputs"]
+    assert derivation["adapter_semantics"] == "test.neutral-dependency-adapter.v1"
+    assert (
+        derivation["qualification_semantics"]
+        == "hashmarks.dependency-resolution-qualification.v3"
+    )
+    assert derivation["contributing_source_ids"] == [
+        "list:compile",
+        "tree:compile",
+        "tree:runtime",
+    ]
+    assert {row["source_id"] for row in derivation["evidence_sources"]} == {
+        "list:compile",
+        "tree:compile",
+        "tree:runtime",
+    }
+    assert len({row["producer_digest"] for row in derivation["evidence_sources"]}) == 1
+    assert derivation["semantic_authorities"] == [
+        "module-ownership",
+        "resolution-graph",
+        "resolved-inventory",
+        "selection",
+    ]
+
+
+def test_v3_derivation_authority_accepts_caller_retained_old_endpoint(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        original_binding = copy.deepcopy(observation["repository_binding"])
+
+        (tmp_path / "later.py").write_text("VALUE = 1\n", encoding="utf-8")
+        codemap.sync(["later.py"])
+
+        derivation = codemap.dependency_resolution_derivation_authority(observation)
+
+    assert derivation["repository_binding"] == original_binding
+    assert derivation["observation_identity"] == observation["observation_identity"]
+
+
+def test_v3_derivation_identity_changes_with_adapter_semantics_only(
+    tmp_path: Path,
+) -> None:
+    before_raw = _snapshot_v3()
+    after_raw = copy.deepcopy(before_raw)
+    after_raw["producer"]["adapter_semantics"] = "test.neutral-dependency-adapter.v2"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(before_raw)
+        after = codemap.dependency_resolution_evidence(after_raw)
+        before_derivation = codemap.dependency_resolution_derivation_authority(before)
+        after_derivation = codemap.dependency_resolution_derivation_authority(after)
+
+    assert before["definition_identity"] == after["definition_identity"]
+    assert before["resolution_identity"] == after["resolution_identity"]
+    assert before["observation_identity"] != after["observation_identity"]
+    assert (
+        before_derivation["derivation_identity"]
+        != after_derivation["derivation_identity"]
+    )
+
+
+def test_v3_derivation_authority_requires_explicit_adapter_semantics(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v3()
+    snapshot["producer"].pop("adapter_semantics")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        with pytest.raises(ValueError, match="adapter semantics must be a string"):
+            codemap.dependency_resolution_derivation_authority(observation)
+
+
+def test_v3_derivation_authority_revalidates_observation_before_projection(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(_snapshot_v3())
+        tampered = copy.deepcopy(observation)
+        tampered["evidence_sources"][0]["source_id"] = "forged-source"
+
+        with pytest.raises(ValueError):
+            codemap.dependency_resolution_derivation_authority(tampered)
 
 
 def test_v3_opaque_empty_semantic_scope_is_valid(tmp_path: Path) -> None:

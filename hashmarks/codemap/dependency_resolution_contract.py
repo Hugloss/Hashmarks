@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 SCHEMA_V3 = "hashmarks.dependency-resolution.v3"
+DERIVATION_SCHEMA_V1 = "hashmarks.dependency-resolution-derivation.v1"
+QUALIFICATION_SEMANTICS_V3 = "hashmarks.dependency-resolution-qualification.v3"
 EVIDENCE_AUTHORITIES = {
     "selection",
     "resolution-graph",
