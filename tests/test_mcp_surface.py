@@ -383,6 +383,17 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             find_tool(" ", limit=5)
         with pytest.raises(McpSurfaceError, match="query must not be empty"):
             server._hashmarks_surface.find(" ", limit=5)
+
+        dependency_tool = next(
+            row["fn"] for row in registered if row["name"] == "dependency_codemap"
+        )
+        declaration_tool = next(
+            row["fn"] for row in registered if row["name"] == "repository_declarations"
+        )
+        with pytest.raises(FakeToolError, match="result_mode must be one of"):
+            dependency_tool({}, result_mode="history")
+        with pytest.raises(FakeToolError, match="result_mode must be one of"):
+            declaration_tool([], result_mode="compare")
     finally:
         server._hashmarks_surface.close()
 
@@ -485,7 +496,11 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
     )
     snapshot = {
         "schema": "hashmarks.dependency-resolution.v3",
-        "producer": {"kind": "test-resolver", "schema_version": "1"},
+        "producer": {
+            "kind": "test-resolver",
+            "schema_version": "1",
+            "adapter_semantics": "test.dependency-adapter.v1",
+        },
         "scope": {"environment": "test"},
         "contexts": ["runtime"],
         "roots": [
@@ -605,6 +620,118 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
     assert packet["causation"] == "not-inferred"
 
 
+def test_mcp_dependency_codemap_explain_and_compare_reuse_core_authority(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    snapshot = {
+        "schema": "hashmarks.dependency-resolution.v3",
+        "producer": {
+            "kind": "test-resolver",
+            "schema_version": "1",
+            "adapter_semantics": "test.dependency-adapter.v1",
+        },
+        "scope": {"environment": "test"},
+        "contexts": ["runtime"],
+        "roots": [],
+        "evidence_sources": [
+            {
+                "source_id": "tree:runtime",
+                "kind": "test-resolution-source",
+                "authorities": ["resolution-graph", "selection"],
+                "context": "runtime",
+                "completeness": "complete",
+                "truncation": "complete",
+                "producer_digest": "sha256:" + "a" * 64,
+            }
+        ],
+        "components": [
+            {"component_id": "lib", "name": "lib", "ecosystem": "test"}
+        ],
+        "selections": [
+            {
+                "node_id": "lib@1",
+                "component_id": "lib",
+                "version": "1",
+                "source": "registry",
+                "contexts": ["runtime"],
+                "evidence_sources": ["tree:runtime"],
+            }
+        ],
+        "inventory": [],
+        "relationships": [],
+        "coverage": [
+            {
+                "context": "runtime",
+                "kind": "resolution-graph",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["tree:runtime"],
+            },
+            {
+                "context": "runtime",
+                "kind": "selection",
+                "completeness": "complete",
+                "truncation": "complete",
+                "evidence_sources": ["tree:runtime"],
+            },
+        ],
+        "repository_inputs": [],
+        "module_ownership": [],
+    }
+    changed = json.loads(json.dumps(snapshot))
+    changed["selections"][0]["node_id"] = "lib@2"
+    changed["selections"][0]["version"] = "2"
+
+    surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
+    try:
+        observed = surface.dependency_codemap(snapshot)
+        explained = surface.dependency_codemap(snapshot, result_mode="explain")
+        compared = surface.dependency_codemap(
+            changed,
+            previous_observation=observed["observation"],
+            result_mode="compare",
+        )
+
+        with pytest.raises(
+            McpSurfaceError,
+            match="queries require result_mode=observation",
+        ):
+            surface.dependency_codemap(
+                snapshot,
+                [{"operation": "components"}],
+                result_mode="explain",
+            )
+        with pytest.raises(
+            McpSurfaceError,
+            match="previous_observation is required",
+        ):
+            surface.dependency_codemap(snapshot, result_mode="compare")
+        with pytest.raises(
+            McpSurfaceError,
+            match="previous_observation is only valid",
+        ):
+            surface.dependency_codemap(
+                snapshot,
+                previous_observation=observed["observation"],
+            )
+        with pytest.raises(McpSurfaceError, match="result_mode must be one of"):
+            surface.dependency_codemap(snapshot, result_mode="history")
+    finally:
+        surface.close()
+
+    assert observed["schema"] == "hashmarks.mcp-dependency-codemap.v1"
+    assert explained["schema"] == "hashmarks.dependency-resolution-explain.v1"
+    assert (
+        explained["semantic_result"]["observation_identity"]
+        == observed["observation"]["observation_identity"]
+    )
+    assert compared["schema"] == "hashmarks.dependency-resolution-delta.v3"
+    assert compared["comparability"] == "comparable"
+    assert compared["change_axes"]["semantic_definition"] == "unchanged"
+    assert compared["change_axes"]["semantic_resolution"] == "changed"
+
+
 def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
     tmp_path: Path,
 ) -> None:
@@ -669,6 +796,76 @@ def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
     assert packet["groups"][0]["comparison"]["state"] == "differing"
     assert packet["winner"] == "not-selected"
     assert packet["interpretation_authority"] == "consumer-owned"
+
+
+def test_mcp_repository_declarations_explain_reuses_typed_projection(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    (repo / "owner.yaml").write_text("owner: team-a\n", encoding="utf-8")
+    groups = [
+        {
+            "group_id": "owner",
+            "concept": {"kind": "ownership", "identity": "component"},
+            "scope": {},
+            "correspondence": {
+                "state": "declared",
+                "basis": {"provider": "fixture"},
+            },
+            "declarations": [
+                {
+                    "declaration_id": "owner",
+                    "value_state": "resolved",
+                    "value": "team-a",
+                    "producer": {"kind": "fixture-yaml"},
+                    "evidence": [
+                        {
+                            "path": "owner.yaml",
+                            "start_line": 1,
+                            "end_line": 1,
+                        }
+                    ],
+                }
+            ],
+            "coverage": {
+                "state": "complete",
+                "truncation": "complete",
+                "expected_declaration_ids": ["owner"],
+                "scope": {},
+                "provenance": {"provider": "fixture"},
+            },
+        }
+    ]
+
+    surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
+    try:
+        observation = surface.repository_declarations(groups)
+        explanation = surface.repository_declarations(
+            groups,
+            result_mode="explain",
+        )
+        with pytest.raises(
+            McpSurfaceError,
+            match="previous_observation requires result_mode=observation",
+        ):
+            surface.repository_declarations(
+                groups,
+                previous_observation=observation,
+                result_mode="explain",
+            )
+        with pytest.raises(McpSurfaceError, match="result_mode must be one of"):
+            surface.repository_declarations(groups, result_mode="compare")
+    finally:
+        surface.close()
+
+    assert observation["schema"] == "hashmarks.repository-declarations.v1"
+    assert explanation["schema"] == "hashmarks.repository-declaration-explain.v1"
+    assert (
+        explanation["semantic_result"]["observation_identity"]
+        == observation["observation_identity"]
+    )
+    assert explanation["semantic_value_authority"] == "provider-claimed"
+    assert explanation["interpretation_authority"] == "consumer-owned"
 
 
 def test_mcp_correlation_preserves_core_authority_and_completeness(
