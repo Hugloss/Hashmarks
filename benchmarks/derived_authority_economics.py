@@ -19,9 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def _json_bytes(value: object) -> int:
-    return len(
-        json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    )
+    return len(json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8"))
 
 
 def _directory_bytes(root: Path) -> int:
