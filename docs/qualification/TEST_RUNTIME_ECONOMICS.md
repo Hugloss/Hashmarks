@@ -33,4 +33,3 @@ Use `make metrics-derived-authority` when evaluating whether explain/endpoint-co
 The receipt is **runtime diagnostics only**. It is not repository evidence, release authority, or a performance threshold. It records packet sizes, explain/delta timings, transient allocation peaks, repository re-observation calls, and persistent-state byte growth. The controlled diagnostic fails if repeated explicit-packet explain/delta touches repository-member observation again or changes persistent-state size.
 
 Do not infer that a cache is useful merely because an explain packet is larger than its observation or because one machine reports a particular latency. Retention requires real producer/workload evidence of material repeated cost after the explicit-packet path is measured. A future cache must remain bounded, evictable, reconstructible, and irrelevant to semantic correctness.
-
