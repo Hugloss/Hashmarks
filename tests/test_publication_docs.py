@@ -172,8 +172,11 @@ def test_derived_authority_economics_remains_diagnostic_only() -> None:
     assert "runtime diagnostics only" in economics
     assert "no retention implementation is admitted" in plan.lower()
     assert "genuine dependency dogfood fixtures" in plan
-    assert "two consecutive real-producer passes" in plan
+    assert "implemented baseline; saturation complete" in plan
+    assert "Clean pass #2 qualified" in plan
+    assert "No retention layer was admitted" in plan
     assert "existing genuine uv/Maven dependency dogfood corpus" in economics
+    assert "explicit-packet design is therefore the current baseline" in economics
 
 
 def test_github_entry_points_exist() -> None:
