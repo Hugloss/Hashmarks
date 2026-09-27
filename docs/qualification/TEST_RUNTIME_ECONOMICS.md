@@ -28,8 +28,10 @@ Runtime measurements should identify enough environment and execution mode to ma
 
 ## Derived-authority explicit-packet economics
 
-Use `make metrics-derived-authority` when evaluating whether explain/endpoint-comparison work needs any bounded retention. The command exercises already-qualified dependency and declaration packets and writes a diagnostic receipt under `.hashmarks/metrics/`.
+Use `make metrics-derived-authority` when evaluating whether explain/endpoint-comparison work needs any bounded retention. The command writes one diagnostic receipt under `.hashmarks/metrics/` containing both a controlled fixture and the existing genuine uv/Maven dependency dogfood corpus.
 
-The receipt is **runtime diagnostics only**. It is not repository evidence, release authority, or a performance threshold. It records packet sizes, explain/delta timings, transient allocation peaks, repository re-observation calls, and persistent-state byte growth. The controlled diagnostic fails if repeated explicit-packet explain/delta touches repository-member observation again or changes persistent-state size.
+The receipt is **runtime diagnostics only**. It is not repository evidence, release authority, or a performance threshold. The controlled section records packet sizes, explain/delta timings, transient allocation peaks, repository re-observation calls, and persistent-state byte growth. The real-producer section separately records adapter artifact bytes and parse cost, qualification cost, explicit endpoint/explain/delta sizes and timings, adapter semantic identity, and dependency change axes.
 
-Do not infer that a cache is useful merely because an explain packet is larger than its observation or because one machine reports a particular latency. Retention requires real producer/workload evidence of material repeated cost after the explicit-packet path is measured. A future cache must remain bounded, evictable, reconstructible, and irrelevant to semantic correctness.
+Repeated explicit-packet explain/delta fails if it touches repository-member observation again, changes persistent-state size, or becomes nondeterministic. Adapter parsing is measured separately because it belongs at the producer/caller edge. A slow producer adapter does not justify a Hashmarks history layer.
+
+Do not infer that a cache is useful merely because an explain packet is larger than its observation or because one machine reports a particular latency. Retention requires material repeated cost in genuine workflows after explicit packets are reused. A future cache must remain bounded, evictable, reconstructible, and irrelevant to semantic correctness.
