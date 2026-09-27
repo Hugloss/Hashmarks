@@ -35,3 +35,5 @@ The receipt is **runtime diagnostics only**. It is not repository evidence, rele
 Repeated explicit-packet explain/delta fails if it touches repository-member observation again, changes persistent-state size, or becomes nondeterministic. Adapter parsing is measured separately because it belongs at the producer/caller edge. A slow producer adapter does not justify a Hashmarks history layer.
 
 Do not infer that a cache is useful merely because an explain packet is larger than its observation or because one machine reports a particular latency. Retention requires material repeated cost in genuine workflows after explicit packets are reused. A future cache must remain bounded, evictable, reconstructible, and irrelevant to semantic correctness.
+
+Current derived-authority qualification completed with two consecutive real uv/Maven passes and did not admit a retention layer. The explicit-packet design is therefore the current baseline. This does not claim that every future workload will have negligible cost; it means no measured evidence in this program justified making server-side history part of Hashmarks.
