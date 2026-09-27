@@ -46,8 +46,8 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 | `task_evidence` | role-separated retrieval, explicit-target, ownership, verification, freshness, ambiguity, and next-read repository evidence |
 | `change_impact` | bounded structural impact for caller-reported changed paths |
 | `correlate_evidence` | correlate bounded external/derived observations to canonical repository evidence without inferring causation |
-| `dependency_codemap` | qualify producer-neutral dependency observations and run bounded factual dependency queries |
-| `repository_declarations` | bind explicitly correlated declarations across files/formats to exact repository evidence and report equality/difference, ambiguity, qualified absence, and factual deltas |
+| `dependency_codemap` | qualify dependency observations, explain their authority, compare explicit endpoints, or run bounded factual queries |
+| `repository_declarations` | bind declarations to exact repository evidence and return the qualified observation or typed explanation |
 | `post_change` | refresh changed paths against a previous `task_evidence` packet and return evidence deltas |
 
 The tools are read-only from the repository consumer's perspective. Hashmarks may update its own disposable derived cache while answering them.
@@ -55,6 +55,20 @@ The tools are read-only from the repository consumer's perspective. Hashmarks ma
 `task_evidence` uses `hashmarks.task-evidence.v2`. Retrieval order is relevance evidence only and carries no ownership authority. Ownership resolution, ambiguity, verification, and freshness are separate fields; current freshness never implies a uniquely resolved owner. The consumer remains responsible for deciding whether and how to act on the evidence.
 
 `correlate_evidence` accepts structured evidence bundles, not raw log streams. Producer-specific parsing/ingestion remains outside the MCP adapter. The tool preserves external claims, ambiguity, completeness, source equivalence, and repository deltas; interpretation and action remain consumer-owned. See [Evidence correlation](../reference/EVIDENCE_CORRELATION.md).
+
+### Explain and compare modes
+
+The catalog stays small: explainability and endpoint comparison are modes on existing tools, not extra MCP tools.
+
+`dependency_codemap` accepts `result_mode="observation" | "explain" | "compare"`:
+
+- `observation` is the default and preserves the existing `hashmarks.mcp-dependency-codemap.v1` response; bounded dependency queries are available only in this mode;
+- `explain` returns the existing typed `hashmarks.dependency-resolution-explain.v1` projection;
+- `compare` requires a bounded caller-supplied qualified `previous_observation` and returns `hashmarks.dependency-resolution-delta.v3`.
+
+`repository_declarations` accepts `result_mode="observation" | "explain"`. Observation is the unchanged default response; explain returns `hashmarks.repository-declaration-explain.v1`. Existing `previous_observation` declaration delta behavior remains observation-mode only.
+
+The MCP server never stores a "previous" dependency or declaration observation on behalf of the caller. Compare/explain modes are request-scoped projections over explicit authority supplied or produced in that request. They do not scan Git history, add a session-history cache, or create a new freshness owner.
 
 `repository_declarations` accepts producer-normalized declaration groups. Semantic extraction, grouping, normalized values, correspondence, and coverage remain provider claims; Hashmarks binds them to current exact repository evidence and reports canonical equality/difference, ambiguity, coverage-qualified absence, identity, freshness, and factual deltas without selecting a winning declaration. See [Repository declarations](../reference/REPOSITORY_DECLARATIONS.md).
 
