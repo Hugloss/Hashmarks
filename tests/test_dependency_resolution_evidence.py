@@ -421,9 +421,7 @@ def test_v3_derivation_authority_is_traceable_without_history_store(
     assert derivation["observation_identity"] == observation["observation_identity"]
     assert derivation["repository_binding"] == observation["repository_binding"]
     assert derivation["repository_inputs"] == observation["repository_inputs"]
-    assert (
-        derivation["adapter_semantics"] == "test.neutral-dependency-adapter.v1"
-    )
+    assert derivation["adapter_semantics"] == "test.neutral-dependency-adapter.v1"
     assert (
         derivation["qualification_semantics"]
         == "hashmarks.dependency-resolution-qualification.v3"
@@ -438,9 +436,7 @@ def test_v3_derivation_authority_is_traceable_without_history_store(
         "tree:compile",
         "tree:runtime",
     }
-    assert len(
-        {row["producer_digest"] for row in derivation["evidence_sources"]}
-    ) == 1
+    assert len({row["producer_digest"] for row in derivation["evidence_sources"]}) == 1
     assert derivation["semantic_authorities"] == [
         "module-ownership",
         "resolution-graph",
@@ -483,9 +479,10 @@ def test_v3_derivation_identity_changes_with_adapter_semantics_only(
     assert before["definition_identity"] == after["definition_identity"]
     assert before["resolution_identity"] == after["resolution_identity"]
     assert before["observation_identity"] != after["observation_identity"]
-    assert before_derivation["derivation_identity"] != after_derivation[
-        "derivation_identity"
-    ]
+    assert (
+        before_derivation["derivation_identity"]
+        != after_derivation["derivation_identity"]
+    )
 
 
 def test_v3_derivation_authority_requires_explicit_adapter_semantics(
