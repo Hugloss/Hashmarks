@@ -104,7 +104,7 @@ Hashmarks must not take ownership of:
 
 Existing standalone commands such as Impact execution helpers do not transfer coding-agent solution-loop authority to Hashmarks. Agent-facing repository-intelligence APIs may return typed verification commands/evidence, but the external agent or harness decides whether and how to execute them.
 
-Hashmarks may observe caller-selected commits, trees, worktrees, or other repository authorities and may expose immutable observations or semantic diffs between them. That read-only observer capability must never grow branch/merge/rollback machinery: Git and the external consumer/harness remain the sole owners of repository mutation and lifecycle transitions.
+Hashmarks may observe caller-selected commits, trees, worktrees, or other repository authorities and may expose immutable observations or semantic diffs between them. That read-only observer capability must never grow branch/merge/rollback machinery: Git and the external consumer/harness remain the sole owners of repository mutation and lifecycle transitions. Historical observations are a bounded working set for the active agent/session or similarly scoped task, not a permanent repository timeline. Do not crawl or pre-index Git history, keep every observed generation forever, or make historical retention a correctness dependency. Bound retention by practical count/time/bytes limits and permit eviction; if an older authority is needed later, require the caller/Git to supply it again.
 
 ### Execution-layer boundary
 
