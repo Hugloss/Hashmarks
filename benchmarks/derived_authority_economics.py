@@ -14,8 +14,27 @@ from unittest.mock import patch
 
 from hashmarks import CodeMap
 from hashmarks._command_output import log_command_output
+from hashmarks.adapters import (
+    maven_dependency_observation,
+    uv_lock_dependency_observation,
+)
 
 logger = logging.getLogger(__name__)
+
+_REAL_TRANSITIONS: dict[str, tuple[tuple[str, str], ...]] = {
+    "uv": (
+        ("absent", "v1"),
+        ("v1", "v2"),
+        ("v2", "absent"),
+        ("absent", "grouped"),
+        ("grouped", "absent"),
+    ),
+    "maven": (
+        ("absent", "v1"),
+        ("v1", "v2"),
+        ("v2", "absent"),
+    ),
+}
 
 
 def _json_bytes(value: object) -> int:
@@ -56,6 +75,231 @@ def _measure_calls(
     finally:
         tracemalloc.stop()
     return _latency_summary(samples), peak, last
+
+
+def _producer_material(
+    fixture_root: Path,
+    producer: str,
+    state: str,
+) -> dict[str, bytes]:
+    base = fixture_root / producer / state
+    if producer == "uv":
+        return {"lock": (base / "uv.lock").read_bytes()}
+    return {
+        "tree": (base / "tree.json").read_bytes(),
+        "inventory": (base / "list.txt").read_bytes(),
+    }
+
+
+def _adapt_material(
+    producer: str,
+    material: dict[str, bytes],
+) -> dict[str, object]:
+    if producer == "uv":
+        return uv_lock_dependency_observation(lock=material["lock"])
+    return maven_dependency_observation(
+        trees={"compile": material["tree"]},
+        inventories={"compile": material["inventory"]},
+        complete_tree_contexts=("compile",),
+        complete_inventory_contexts=("compile",),
+    )
+
+
+def _real_state_data(
+    fixture_root: Path,
+    producer: str,
+    state: str,
+    *,
+    iterations: int,
+) -> dict[str, object]:
+    material = _producer_material(fixture_root, producer, state)
+    expected = _adapt_material(producer, material)
+    latency, peak, last = _measure_calls(
+        lambda: _adapt_material(producer, material),
+        iterations=iterations,
+    )
+    if last != expected:
+        raise RuntimeError("real producer adapter output changed across repeated calls")
+    producer_metadata = expected["producer"]
+    return {
+        "snapshot": expected,
+        "artifact_bytes": sum(len(value) for value in material.values()),
+        "snapshot_bytes": _json_bytes(expected),
+        "adapter_semantics": producer_metadata["adapter_semantics"],
+        "adapter_latency": latency,
+        "adapter_peak_tracemalloc_bytes": peak,
+    }
+
+
+def _qualify_timed(
+    codemap: CodeMap,
+    snapshot: dict[str, object],
+) -> tuple[dict[str, object], int]:
+    started = time.perf_counter_ns()
+    packet = codemap.dependency_resolution_evidence(snapshot)
+    return packet, time.perf_counter_ns() - started
+
+
+def _real_transition_sizes(
+    before: dict[str, object],
+    after: dict[str, object],
+    delta: dict[str, object],
+    explanation: dict[str, object],
+) -> dict[str, int]:
+    before_bytes = _json_bytes(before)
+    after_bytes = _json_bytes(after)
+    pair_bytes = before_bytes + after_bytes
+    delta_bytes = _json_bytes(delta)
+    return {
+        "before_observation_bytes": before_bytes,
+        "after_observation_bytes": after_bytes,
+        "caller_endpoint_pair_bytes": pair_bytes,
+        "delta_bytes": delta_bytes,
+        "delta_saved_vs_pair_bytes": pair_bytes - delta_bytes,
+        "after_explanation_bytes": _json_bytes(explanation),
+    }
+
+
+def _measure_real_transition(
+    codemap: CodeMap,
+    state_dir: Path,
+    producer: str,
+    states: dict[str, dict[str, object]],
+    transition: tuple[str, str],
+    iterations: int,
+) -> dict[str, object]:
+    before_state, after_state = transition
+    before, before_qualification_ns = _qualify_timed(
+        codemap,
+        states[before_state]["snapshot"],
+    )
+    after, after_qualification_ns = _qualify_timed(
+        codemap,
+        states[after_state]["snapshot"],
+    )
+    explanation = codemap.dependency_resolution_explain(after)
+    delta = codemap.dependency_resolution_delta(before, after)
+    state_bytes_before = _directory_bytes(state_dir)
+    operations = {
+        "explain_after": _explicit_operation_metrics(
+            codemap,
+            lambda: codemap.dependency_resolution_explain(after),
+            expected=explanation,
+            iterations=iterations,
+        ),
+        "delta": _explicit_operation_metrics(
+            codemap,
+            lambda: codemap.dependency_resolution_delta(before, after),
+            expected=delta,
+            iterations=iterations,
+        ),
+    }
+    state_bytes_after = _directory_bytes(state_dir)
+    if state_bytes_after != state_bytes_before:
+        raise RuntimeError(
+            "real producer explicit-packet operations changed persistent state size"
+        )
+    return {
+        "before_state": before_state,
+        "after_state": after_state,
+        "comparability": delta["comparability"],
+        "change_axes": delta["change_axes"],
+        "qualification_ns": {
+            "before": before_qualification_ns,
+            "after": after_qualification_ns,
+        },
+        "serialized_size": _real_transition_sizes(
+            before,
+            after,
+            delta,
+            explanation,
+        ),
+        "operations": operations,
+        "repository_reobservation_calls": sum(
+            int(row["repository_reobservation_calls"]) for row in operations.values()
+        ),
+        "persistent_state_growth_bytes": state_bytes_after - state_bytes_before,
+        "producer": producer,
+    }
+
+
+def _real_state_receipt(
+    states: dict[str, dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    return {
+        state: {
+            key: value
+            for key, value in row.items()
+            if key != "snapshot"
+        }
+        for state, row in states.items()
+    }
+
+
+def measure_real_producer_economics(
+    fixture_root: Path,
+    *,
+    iterations: int = 25,
+) -> dict[str, object]:
+    if iterations < 1:
+        raise ValueError("iterations must be positive")
+    if not fixture_root.is_dir():
+        raise ValueError(f"fixture_root is not a directory: {fixture_root}")
+
+    producers: dict[str, object] = {}
+    with tempfile.TemporaryDirectory(
+        prefix="hashmarks-derived-authority-real-"
+    ) as raw_root:
+        root = Path(raw_root)
+        workspace = root / "repo"
+        state_dir = root / "state"
+        workspace.mkdir()
+        with CodeMap(workspace, state_dir=state_dir) as codemap:
+            codemap.sync()
+            for producer, transitions in _REAL_TRANSITIONS.items():
+                state_names = sorted({state for pair in transitions for state in pair})
+                states = {
+                    state: _real_state_data(
+                        fixture_root,
+                        producer,
+                        state,
+                        iterations=iterations,
+                    )
+                    for state in state_names
+                }
+                transition_receipts = {
+                    f"{before}-to-{after}": _measure_real_transition(
+                        codemap,
+                        state_dir,
+                        producer,
+                        states,
+                        (before, after),
+                        iterations,
+                    )
+                    for before, after in transitions
+                }
+                producers[producer] = {
+                    "states": _real_state_receipt(states),
+                    "transitions": transition_receipts,
+                }
+
+    return {
+        "schema": "hashmarks.derived-authority-real-producer-economics-diagnostic.v1",
+        "fixture_root": fixture_root.as_posix(),
+        "iterations": iterations,
+        "producers": producers,
+        "retention": {
+            "server_history_required_for_correctness": False,
+            "adapter_parse_owner": "producer-caller-edge",
+            "explicit_packet_owner": "caller-working-set",
+            "decision": "measure-real-latency-without-adding-server-history",
+        },
+        "measurement": {
+            "authority": "runtime-diagnostics-only",
+            "storage": "derived-not-persisted",
+            "timing": "hardware-dependent-diagnostic",
+        },
+    }
 
 
 def _dependency_snapshot(scale: int, *, changed: bool) -> dict[str, object]:
@@ -390,12 +634,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--iterations", type=int, default=100)
     parser.add_argument("--scale", type=int, default=64)
+    parser.add_argument("--real-iterations", type=int, default=25)
+    parser.add_argument(
+        "--fixture-root",
+        type=Path,
+        default=Path("tests/fixtures/dependency_dogfood"),
+    )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
 
     receipt = measure_derived_authority_economics(
         iterations=args.iterations,
         scale=args.scale,
+    )
+    receipt["real_producers"] = measure_real_producer_economics(
+        args.fixture_root,
+        iterations=args.real_iterations,
     )
     encoded = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
     if args.output is not None:
