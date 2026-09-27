@@ -6,6 +6,7 @@ import tomllib
 from collections.abc import Mapping, Sequence
 
 _SCHEMA = "hashmarks.dependency-resolution.v3"
+_ADAPTER_SEMANTICS = "hashmarks.uv-dependency-adapter.v1"
 _CONTEXT = "lock"
 
 
@@ -255,6 +256,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         "producer": {
             "kind": "uv-lock",
             "schema_version": str(lock_version),
+            "adapter_semantics": _ADAPTER_SEMANTICS,
             "revision": str(revision),
             "resolution_markers": resolution_markers,
         },
