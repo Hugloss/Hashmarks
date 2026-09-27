@@ -285,7 +285,7 @@ def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
     assert "releases/download/\${RELEASE_TAG}/install.sh" in text
     assert "releases/download/$env:RELEASE_TAG/install.ps1" in text
     assert "SHA256SUMS.txt" in text
-    assert "HASHMARKS_VERSION=\"$version\"" in text
+    assert 'HASHMARKS_VERSION="$version"' in text
     assert "$env:HASHMARKS_VERSION = $version" in text
     assert "map sync" in text
     assert "map status" in text
