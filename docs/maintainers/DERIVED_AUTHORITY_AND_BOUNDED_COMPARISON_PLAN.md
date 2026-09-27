@@ -311,11 +311,23 @@ Dogfood the explicit-packet design first. Measure:
 - cache hit value;
 - memory/storage amplification.
 
+The first measurement surface is deliberately diagnostic rather than product API:
+
+```bash
+make metrics-derived-authority
+```
+
+It writes `.hashmarks/metrics/derived-authority-economics-latest.json` from a bounded controlled fixture. The receipt records serialized endpoint/explain/delta sizes, repeated explain/delta latency, transient `tracemalloc` peaks, repository-member re-observation calls, and persistent state-directory growth. Repeated operations are run over already-qualified explicit packets. The diagnostic fails if those pure operations re-observe repository members, mutate persistent-state size, or produce nondeterministic results.
+
+This controlled fixture can disprove a correctness need for retention and expose obvious read/storage amplification. It is **not** sufficient evidence to add a cache. A retention proposal still requires Phase 7 real producer/workload receipts showing material latency or read amplification that cannot be addressed by the existing explicit-packet design.
+
 Only if retained measurements show a clear economic benefit may a bounded working-set cache be proposed.
 
 If admitted, choose conservative limits from measurement rather than architecture folklore. Eviction must be ordinary and semantics-preserving.
 
-**Exit:** either no retention is needed, or measured evidence justifies a small cache with explicit budgets.
+**Current outcome:** measurement infrastructure exists; no retention implementation is admitted. The controlled regression requires zero repository re-observation and zero persistent-state growth for repeated explicit-packet explain/delta.
+
+**Exit:** pending real-workload dogfood. Either no retention is needed, or measured evidence justifies a small cache with explicit budgets.
 
 ### Phase 7 — Dogfood across real producer pairs
 
