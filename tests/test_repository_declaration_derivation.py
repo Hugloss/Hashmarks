@@ -154,6 +154,48 @@ def test_declaration_derivation_rejects_resigned_nested_identity_tamper(
             codemap.repository_declaration_derivation_authority(tampered)
 
 
+def test_declaration_derivation_rejects_resigned_projection_mismatch(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "owner.yaml").write_text("owner: team-a\n", encoding="utf-8")
+    group = _group([_declaration("owner", "owner.yaml", "team-a")])
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations([group])
+        tampered = copy.deepcopy(packet)
+        tampered["observer"] = {"state": "forged"}
+        tampered["observation_identity"] = codemap._declaration_packet_identity(
+            tampered
+        )
+
+        with pytest.raises(ValueError, match="observer projection mismatch"):
+            codemap.repository_declaration_derivation_authority(tampered)
+
+
+def test_declaration_derivation_rejects_resigned_duplicate_group(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "owner.yaml").write_text("owner: team-a\n", encoding="utf-8")
+    group = _group([_declaration("owner", "owner.yaml", "team-a")])
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations([group])
+        tampered = copy.deepcopy(packet)
+        tampered["groups"].append(copy.deepcopy(tampered["groups"][0]))
+        tampered["observation_identity"] = codemap._declaration_packet_identity(
+            tampered
+        )
+
+        with pytest.raises(ValueError, match="duplicate group_id"):
+            codemap.repository_declaration_derivation_authority(tampered)
+
+
 def test_declaration_producer_change_preserves_definition_but_changes_derivation(
     tmp_path: Path,
 ) -> None:
