@@ -175,6 +175,8 @@ def test_derived_authority_economics_remains_diagnostic_only() -> None:
     assert "implemented baseline; saturation complete" in plan
     assert "Clean pass #2 qualified" in plan
     assert "No retention layer was admitted" in plan
+    assert "Post-saturation adversarial coverage is now complete" in plan
+    assert "Bounded packet eviction/reconstruction is **not an open attack**" in plan
     assert "existing genuine uv/Maven dependency dogfood corpus" in economics
     assert "explicit-packet design is therefore the current baseline" in economics
 
