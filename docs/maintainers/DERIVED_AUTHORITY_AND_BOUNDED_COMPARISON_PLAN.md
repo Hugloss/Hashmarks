@@ -293,7 +293,9 @@ Avoid product language such as:
 
 MCP remains read-only and workspace-bound.
 
-**Exit:** consumers receive compact facts plus stable provenance handles, without a new agent workflow.
+**Outcome:** the existing MCP tools are extended rather than expanding the tool catalog. `dependency_codemap` supports `result_mode=observation | explain | compare`; compare requires a caller-supplied qualified previous dependency observation and delegates to the existing endpoint-local dependency delta. `repository_declarations` supports `result_mode=observation | explain`; declaration compare is deliberately not promoted because repository-evidence binding delta still owns a stricter current-repository comparison contract. Default `observation` responses remain unchanged. No parallel CLI command is added.
+
+**Exit:** satisfied with bounded native MCP modes over existing typed domain authority; no new tool, schema, CLI alias, history store, or agent workflow.
 
 ### Phase 6 — Measure whether bounded retention is needed
 
