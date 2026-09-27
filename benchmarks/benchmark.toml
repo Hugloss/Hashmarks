@@ -1,0 +1,27 @@
+# Canonical benchmark launch profiles.
+# Keep measurement semantics in the benchmark modules themselves; this file owns
+# only reproducible launch settings and output locations.
+
+[profile.local]
+module = "scripts.agent_evaluation.codex_agent_economics"
+args = [
+  "--root", ".hashmarks/benchmarks/codex-agent-economics",
+  "--output", ".hashmarks/metrics/codex-agent-economics-latest.json",
+]
+
+[profile.quick]
+module = "scripts.agent_evaluation.codex_agent_economics"
+args = [
+  "--root", ".hashmarks/benchmarks/codex-agent-economics-quick",
+  "--max-tasks", "1",
+  "--output", ".hashmarks/metrics/codex-agent-economics-quick-latest.json",
+]
+
+[profile.chatgpt]
+module = "scripts.agent_evaluation.metrics_agent_corpus"
+args = [
+  "--workspace", ".",
+  "--corpus", "benchmarks/agent_tasks.json",
+  "--budget", "1200",
+  "--output", ".hashmarks/metrics/chatgpt-benchmark-latest.json",
+]
