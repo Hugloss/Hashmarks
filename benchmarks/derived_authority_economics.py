@@ -7,6 +7,7 @@ import statistics
 import tempfile
 import time
 import tracemalloc
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -40,7 +41,11 @@ def _latency_summary(values_ns: list[int]) -> dict[str, int]:
     }
 
 
-def _measure_calls(operation, *, iterations: int) -> tuple[dict[str, int], int, object]:
+def _measure_calls(
+    operation: Callable[[], object],
+    *,
+    iterations: int,
+) -> tuple[dict[str, int], int, object]:
     samples: list[int] = []
     last: object = None
     tracemalloc.start()
@@ -191,111 +196,101 @@ def _fixture(root: Path, scale: int) -> tuple[Path, Path]:
     return workspace, state_dir
 
 
-def _storage_economics(
-    before: dict[str, object],
-    after: dict[str, object],
-    delta: dict[str, object],
-    explanation: dict[str, object],
-) -> dict[str, int]:
-    before_bytes = _json_bytes(before)
-    after_bytes = _json_bytes(after)
-    pair_bytes = before_bytes + after_bytes
-    delta_bytes = _json_bytes(delta)
+def _qualify_packets(codemap: CodeMap, scale: int) -> dict[str, dict[str, object]]:
     return {
-        "before_observation_bytes": before_bytes,
-        "after_observation_bytes": after_bytes,
-        "caller_endpoint_pair_bytes": pair_bytes,
-        "delta_bytes": delta_bytes,
-        "delta_saved_vs_pair_bytes": pair_bytes - delta_bytes,
-        "explanation_bytes": _json_bytes(explanation),
+        "dependency_before": codemap.dependency_resolution_evidence(
+            _dependency_snapshot(scale, changed=False)
+        ),
+        "dependency_after": codemap.dependency_resolution_evidence(
+            _dependency_snapshot(scale, changed=True)
+        ),
+        "declaration": codemap.repository_declarations(_declaration_groups(scale)),
     }
 
 
-def measure_derived_authority_economics(
+def _baseline_outputs(
+    codemap: CodeMap,
+    packets: dict[str, dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    before = packets["dependency_before"]
+    after = packets["dependency_after"]
+    declaration = packets["declaration"]
+    return {
+        "dependency_explain": codemap.dependency_resolution_explain(before),
+        "dependency_delta": codemap.dependency_resolution_delta(before, after),
+        "declaration_explain": codemap.repository_declaration_explain(declaration),
+    }
+
+
+def _explicit_operation_metrics(
+    codemap: CodeMap,
+    operation: Callable[[], object],
     *,
-    iterations: int = 100,
-    scale: int = 64,
+    expected: object,
+    iterations: int,
 ) -> dict[str, object]:
-    if iterations < 1:
-        raise ValueError("iterations must be positive")
-    if scale < 2 or scale > 128:
-        raise ValueError("scale must be between 2 and 128")
+    repository_observation_calls = 0
+    original_observer = getattr(codemap, "_repository_member_observation")
 
-    with tempfile.TemporaryDirectory(prefix="hashmarks-derived-authority-") as raw_root:
-        workspace, state_dir = _fixture(Path(raw_root), scale)
-        with CodeMap(workspace, state_dir=state_dir) as codemap:
-            codemap.sync()
-            before = codemap.dependency_resolution_evidence(
-                _dependency_snapshot(scale, changed=False)
-            )
-            after = codemap.dependency_resolution_evidence(
-                _dependency_snapshot(scale, changed=True)
-            )
-            declaration = codemap.repository_declarations(_declaration_groups(scale))
-            initial_dependency_explain = codemap.dependency_resolution_explain(before)
-            initial_dependency_delta = codemap.dependency_resolution_delta(before, after)
-            initial_declaration_explain = codemap.repository_declaration_explain(
-                declaration
-            )
+    def counted_observer(*args: Any, **kwargs: Any):
+        nonlocal repository_observation_calls
+        repository_observation_calls += 1
+        return original_observer(*args, **kwargs)
 
-            state_bytes_before = _directory_bytes(state_dir)
-            repository_observation_calls = 0
-            original_observer = getattr(codemap, "_repository_member_observation")
-
-            def counted_observer(*args: Any, **kwargs: Any):
-                nonlocal repository_observation_calls
-                repository_observation_calls += 1
-                return original_observer(*args, **kwargs)
-
-            with patch.object(
-                codemap,
-                "_repository_member_observation",
-                side_effect=counted_observer,
-            ):
-                dependency_explain_timing, dependency_explain_peak, last_explain = (
-                    _measure_calls(
-                        lambda: codemap.dependency_resolution_explain(before),
-                        iterations=iterations,
-                    )
-                )
-                dependency_delta_timing, dependency_delta_peak, last_delta = (
-                    _measure_calls(
-                        lambda: codemap.dependency_resolution_delta(before, after),
-                        iterations=iterations,
-                    )
-                )
-                declaration_explain_timing, declaration_explain_peak, last_declaration = (
-                    _measure_calls(
-                        lambda: codemap.repository_declaration_explain(declaration),
-                        iterations=iterations,
-                    )
-                )
-
-            state_bytes_after = _directory_bytes(state_dir)
+    with patch.object(
+        codemap,
+        "_repository_member_observation",
+        side_effect=counted_observer,
+    ):
+        latency, peak, last = _measure_calls(operation, iterations=iterations)
 
     if repository_observation_calls:
         raise RuntimeError(
             "explicit-packet explain/delta unexpectedly re-observed repository members"
         )
-    if state_bytes_after != state_bytes_before:
-        raise RuntimeError(
-            "explicit-packet explain/delta unexpectedly changed persistent state size"
-        )
-    if last_explain != initial_dependency_explain:
-        raise RuntimeError("dependency explanation changed across repeated calls")
-    if last_delta != initial_dependency_delta:
-        raise RuntimeError("dependency delta changed across repeated calls")
-    if last_declaration != initial_declaration_explain:
-        raise RuntimeError("declaration explanation changed across repeated calls")
+    if last != expected:
+        raise RuntimeError("explicit-packet result changed across repeated calls")
+    return {
+        "latency": latency,
+        "peak_tracemalloc_bytes": peak,
+        "repository_reobservation_calls": repository_observation_calls,
+    }
 
-    dependency_storage = _storage_economics(
-        before,
-        after,
-        initial_dependency_delta,
-        initial_dependency_explain,
-    )
-    declaration_bytes = _json_bytes(declaration)
-    declaration_explain_bytes = _json_bytes(initial_declaration_explain)
+
+def _storage_economics(
+    packets: dict[str, dict[str, object]],
+    baselines: dict[str, dict[str, object]],
+) -> dict[str, object]:
+    before_bytes = _json_bytes(packets["dependency_before"])
+    after_bytes = _json_bytes(packets["dependency_after"])
+    pair_bytes = before_bytes + after_bytes
+    delta_bytes = _json_bytes(baselines["dependency_delta"])
+    declaration_bytes = _json_bytes(packets["declaration"])
+    return {
+        "dependency": {
+            "before_observation_bytes": before_bytes,
+            "after_observation_bytes": after_bytes,
+            "caller_endpoint_pair_bytes": pair_bytes,
+            "delta_bytes": delta_bytes,
+            "delta_saved_vs_pair_bytes": pair_bytes - delta_bytes,
+            "explanation_bytes": _json_bytes(baselines["dependency_explain"]),
+        },
+        "declarations": {
+            "observation_bytes": declaration_bytes,
+            "explanation_bytes": _json_bytes(baselines["declaration_explain"]),
+        },
+    }
+
+
+def _receipt(
+    scale: int,
+    iterations: int,
+    packets: dict[str, dict[str, object]],
+    baselines: dict[str, dict[str, object]],
+    operations: dict[str, dict[str, object]],
+    state_bytes: tuple[int, int],
+) -> dict[str, object]:
+    before_state_bytes, after_state_bytes = state_bytes
     return {
         "schema": "hashmarks.derived-authority-economics-diagnostic.v1",
         "fixture": {
@@ -303,24 +298,15 @@ def measure_derived_authority_economics(
             "declarations": scale,
             "iterations": iterations,
         },
-        "dependency": {
-            "storage": dependency_storage,
-            "explain_latency": dependency_explain_timing,
-            "delta_latency": dependency_delta_timing,
-            "explain_peak_tracemalloc_bytes": dependency_explain_peak,
-            "delta_peak_tracemalloc_bytes": dependency_delta_peak,
-        },
-        "declarations": {
-            "observation_bytes": declaration_bytes,
-            "explanation_bytes": declaration_explain_bytes,
-            "explain_latency": declaration_explain_timing,
-            "explain_peak_tracemalloc_bytes": declaration_explain_peak,
-        },
-        "repository_reobservation_calls": repository_observation_calls,
+        "serialized_size": _storage_economics(packets, baselines),
+        "operations": operations,
+        "repository_reobservation_calls": sum(
+            int(row["repository_reobservation_calls"]) for row in operations.values()
+        ),
         "persistent_state_bytes": {
-            "before": state_bytes_before,
-            "after": state_bytes_after,
-            "growth": state_bytes_after - state_bytes_before,
+            "before": before_state_bytes,
+            "after": after_state_bytes,
+            "growth": after_state_bytes - before_state_bytes,
         },
         "retention": {
             "required_for_correctness": False,
@@ -338,6 +324,66 @@ def measure_derived_authority_economics(
             "persistent_state_check": "exact-state-directory-byte-count",
         },
     }
+
+
+def measure_derived_authority_economics(
+    *,
+    iterations: int = 100,
+    scale: int = 64,
+) -> dict[str, object]:
+    if iterations < 1:
+        raise ValueError("iterations must be positive")
+    if scale < 2 or scale > 128:
+        raise ValueError("scale must be between 2 and 128")
+
+    with tempfile.TemporaryDirectory(prefix="hashmarks-derived-authority-") as raw_root:
+        workspace, state_dir = _fixture(Path(raw_root), scale)
+        with CodeMap(workspace, state_dir=state_dir) as codemap:
+            codemap.sync()
+            packets = _qualify_packets(codemap, scale)
+            baselines = _baseline_outputs(codemap, packets)
+            state_bytes_before = _directory_bytes(state_dir)
+            operations = {
+                "dependency_explain": _explicit_operation_metrics(
+                    codemap,
+                    lambda: codemap.dependency_resolution_explain(
+                        packets["dependency_before"]
+                    ),
+                    expected=baselines["dependency_explain"],
+                    iterations=iterations,
+                ),
+                "dependency_delta": _explicit_operation_metrics(
+                    codemap,
+                    lambda: codemap.dependency_resolution_delta(
+                        packets["dependency_before"],
+                        packets["dependency_after"],
+                    ),
+                    expected=baselines["dependency_delta"],
+                    iterations=iterations,
+                ),
+                "declaration_explain": _explicit_operation_metrics(
+                    codemap,
+                    lambda: codemap.repository_declaration_explain(
+                        packets["declaration"]
+                    ),
+                    expected=baselines["declaration_explain"],
+                    iterations=iterations,
+                ),
+            }
+            state_bytes_after = _directory_bytes(state_dir)
+
+    if state_bytes_after != state_bytes_before:
+        raise RuntimeError(
+            "explicit-packet explain/delta unexpectedly changed persistent state size"
+        )
+    return _receipt(
+        scale,
+        iterations,
+        packets,
+        baselines,
+        operations,
+        (state_bytes_before, state_bytes_after),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
