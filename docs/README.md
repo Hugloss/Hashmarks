@@ -28,6 +28,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 ## Maintainers
 
 - [`maintainers/CODEMAP.md`](maintainers/CODEMAP.md) — module ownership and request-flow guide.
+- [`maintainers/DERIVED_AUTHORITY_AND_BOUNDED_COMPARISON_PLAN.md`](maintainers/DERIVED_AUTHORITY_AND_BOUNDED_COMPARISON_PLAN.md) — implementation plan for traceable derived authority and cheap endpoint comparison without historical-archive or Git-lifecycle ownership.
 - [`maintainers/RELEASING.md`](maintainers/RELEASING.md) — current release procedure.
 - [`maintainers/RESPONSIBILITY_REFACTORING.md`](maintainers/RESPONSIBILITY_REFACTORING.md) — responsibility-first refactoring policy.
 
