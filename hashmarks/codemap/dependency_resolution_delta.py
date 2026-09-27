@@ -180,8 +180,9 @@ class DependencyResolutionDeltaMixin:
         after: Mapping[str, object],
     ) -> dict[str, object]:
         for observation in (before, after):
-            DependencyResolutionEvidenceMixin._require_qualified_dependency_observation_v3(
-                observation
+            (
+                DependencyResolutionEvidenceMixin
+                ._require_qualified_dependency_observation_v3(observation)
             )
         before_binding = cast("Mapping[str, object]", before["repository_binding"])
         after_binding = cast("Mapping[str, object]", after["repository_binding"])
