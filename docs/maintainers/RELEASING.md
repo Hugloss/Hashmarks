@@ -76,7 +76,12 @@ The public GitHub Release contains:
 
 ## Post-publish end-user smoke
 
-After a Windows-capable release is published, verify the public install paths from clean shells.
+Publishing a GitHub Release automatically triggers `.github/workflows/post-publish-smoke.yml`. The workflow uses the exact published tag rather than mutable `main` or `releases/latest`, verifies each bootstrap installer against the published `SHA256SUMS.txt`, installs that exact version from public GitHub Release assets, and exercises repository map sync/status on:
+
+- `ubuntu-latest`, covering the Linux executable/installer path also consumed by WSL2;
+- `windows-latest`, covering the native Windows executable/PowerShell installer path.
+
+For the first Windows-capable release, also perform one clean-shell smoke inside an actual WSL2 environment before changing public onboarding. GitHub's Ubuntu runner proves the shared Linux release bytes but does not prove WSL-specific host/filesystem behavior.
 
 Linux or WSL2:
 
@@ -94,7 +99,7 @@ hashmarks --version
 
 Both installer scripts are themselves manifest-bound release assets. They download the matching release executable and checksum sidecar, verify the candidate, run the candidate version smoke, and only then replace an existing installation.
 
-Do not advertise a platform in public onboarding until a published release actually contains that platform's qualified assets.
+Do not advertise a platform in public onboarding until a published release actually contains that platform's qualified assets and the corresponding post-publish smoke has passed.
 
 ## Publication retry
 
