@@ -785,9 +785,7 @@ def _assert_ownership_uncertainty_binding_separation(
     baseline_roles = _role_rows(baseline)
     stressed_roles = _role_rows(stressed)
     bindings = _nested_delta(stressed)["repository_evidence"]["bindings"]
-    assert bindings["removed"] == [
-        baseline_roles["repository-policy"]["binding_id"]
-    ]
+    assert bindings["removed"] == [baseline_roles["repository-policy"]["binding_id"]]
     assert bindings["added"] == []
     assert stressed_roles["source-metadata"]["binding_id"] in bindings["preserved"]
     assert (
