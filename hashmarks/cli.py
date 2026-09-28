@@ -171,6 +171,7 @@ def _maybe_offer_periodic_upgrade(command: str) -> None:
         return
     _delegate_selected_upgrade(release)
 
+
 def _daemon_serve_command(workspace: Path, state: Path) -> list[str]:
     command = [sys.executable]
     if not getattr(sys, "frozen", False):
