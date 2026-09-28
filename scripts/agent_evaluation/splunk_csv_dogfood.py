@@ -65,9 +65,7 @@ class _TimeBounds:
             else min(self.lexical_start, timestamp)
         )
         self.lexical_end = (
-            timestamp
-            if self.lexical_end is None
-            else max(self.lexical_end, timestamp)
+            timestamp if self.lexical_end is None else max(self.lexical_end, timestamp)
         )
         try:
             parsed = datetime.fromisoformat(timestamp)
