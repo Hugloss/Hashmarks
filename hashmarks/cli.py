@@ -30,7 +30,6 @@ from .release_update import (
     automatic_check_allowed,
     delegate_standalone_upgrade,
     fetch_latest_release,
-    is_standalone_installation,
     periodic_release_check,
     standalone_upgrade_command,
 )
@@ -92,13 +91,13 @@ def _render_external_upgrade_guidance() -> None:
     )
 
 
-def _render_standalone_upgrade(release: ReleaseInfo, *, announce: bool) -> str:
+def _render_standalone_upgrade(
+    release: ReleaseInfo,
+    command: str,
+    *,
+    announce: bool,
+) -> None:
     _render_release(release, announce=announce)
-    command = standalone_upgrade_command(release.latest_version)
-    if command is None:
-        raise StandaloneUpgradeError(
-            "this installation is not managed by the Hashmarks standalone installer"
-        )
     _text(
         "",
         "This installation uses the Hashmarks standalone installer.",
@@ -107,7 +106,6 @@ def _render_standalone_upgrade(release: ReleaseInfo, *, announce: bool) -> str:
         "",
         f"    {command}",
     )
-    return command
 
 
 def _prompt_upgrade() -> bool:
@@ -139,12 +137,13 @@ def _upgrade(args) -> int:
             )
         return 0
 
-    if not is_standalone_installation():
+    command = standalone_upgrade_command(release.latest_version)
+    if command is None:
         _render_release(release, announce=False)
         _render_external_upgrade_guidance()
         return 0
 
-    command = _render_standalone_upgrade(release, announce=False)
+    _render_standalone_upgrade(release, command, announce=False)
     if not _interactive_terminal():
         _text("", "No changes were made.")
         return 0
@@ -166,12 +165,13 @@ def _maybe_offer_periodic_upgrade(command: str) -> None:
     )
     if release is None:
         return
-    if not is_standalone_installation():
+    upgrade_command = standalone_upgrade_command(release.latest_version)
+    if upgrade_command is None:
         _render_release(release, announce=True)
         _render_external_upgrade_guidance()
         return
 
-    upgrade_command = _render_standalone_upgrade(release, announce=True)
+    _render_standalone_upgrade(release, upgrade_command, announce=True)
     if not _prompt_upgrade():
         _text("Upgrade skipped for now.")
         return
