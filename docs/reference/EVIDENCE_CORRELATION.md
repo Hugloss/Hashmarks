@@ -194,6 +194,8 @@ The same primitive is exposed through the read-only `correlate_evidence` MCP too
 
 For large logs or exports, the external parser should recover/validate the producer format, preserve parser diagnostics in its own provenance, mark incomplete or recovered samples accordingly, and submit bounded structured anchors. Hashmarks correlates those anchors; it does not become the CSV/log parser or retain the source stream.
 
+Parser validity must name the layer actually validated. For example, a Splunk CSV adapter may prove that the CSV envelope is strict-valid or recovered while leaving `_raw` as an opaque producer payload. `csv_strict_valid` therefore says nothing about whether embedded JSON, application messages, stack fragments, or other `_raw` content are syntactically or semantically valid. Unless a separate typed producer contract explicitly validates such payloads, their validation state is `not-assessed`. Transport/parser recovery must not silently become application-payload authority.
+
 For high-volume streams, consumers should aggregate repeated events into **unique repository locators** before correlation when event identity itself is not needed for repository truth. Occurrence counts, time windows, representative event IDs, and similar summary fields remain opaque consumer metadata. Hashmarks may also reuse repeated locators within one request, but its anchor/count bounds remain a repository-intelligence economics guard rather than a log-retention mechanism. Consumers should split independent locator sets only after aggregation; separate correlation packets do not imply that Hashmarks owns cross-chunk incident state.
 
 Producer adapters must keep identity layers explicit rather than letting one digest silently own several meanings:
