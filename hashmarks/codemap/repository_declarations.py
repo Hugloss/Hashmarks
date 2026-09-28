@@ -28,6 +28,7 @@ class RepositoryDeclarationsMixin:
     def _semantic_subject_identity(
         self,
         *,
+        semantic_namespace: str,
         concept: Mapping[str, object],
         scope: Mapping[str, object],
     ) -> str:
@@ -36,7 +37,11 @@ class RepositoryDeclarationsMixin:
             self = cast("CodeMap", self)
         return "sha256:" + self._packet_digest(
             "hashmarks.repository-declaration-semantic-subject.v1",
-            {"concept": concept, "scope": scope},
+            {
+                "semantic_namespace": semantic_namespace,
+                "concept": concept,
+                "scope": scope,
+            },
         )
 
     @staticmethod
@@ -62,12 +67,14 @@ class RepositoryDeclarationsMixin:
         declaration: Mapping[str, object],
         *,
         group_id: str,
+        semantic_namespace: str,
         concept: Mapping[str, object],
         scope: Mapping[str, object],
         binding: Mapping[str, object],
     ) -> tuple[dict[str, object], dict[str, object]]:
         definition = {
             "group_id": group_id,
+            "semantic_namespace": semantic_namespace,
             "concept": concept,
             "scope": scope,
             "declaration_id": declaration["declaration_id"],
@@ -92,6 +99,7 @@ class RepositoryDeclarationsMixin:
         self,
         normalized: Mapping[str, object],
         group_id: str,
+        semantic_namespace: str,
         concept: Mapping[str, object],
         scope: Mapping[str, object],
         semantic_subject_identity: str,
@@ -108,6 +116,7 @@ class RepositoryDeclarationsMixin:
         definition, observation = self._declaration_identity_payloads(
             projected,
             group_id=group_id,
+            semantic_namespace=semantic_namespace,
             concept=concept,
             scope=scope,
             binding=binding,
@@ -130,6 +139,7 @@ class RepositoryDeclarationsMixin:
     def _group_identity_payloads(
         *,
         group_id: str,
+        semantic_namespace: str,
         concept: Mapping[str, object],
         scope: Mapping[str, object],
         correspondence: Mapping[str, object],
@@ -138,6 +148,7 @@ class RepositoryDeclarationsMixin:
     ) -> tuple[dict[str, object], dict[str, object]]:
         definition_payload = {
             "group_id": group_id,
+            "semantic_namespace": semantic_namespace,
             "concept": concept,
             "scope": scope,
             "coverage_scope": coverage["scope"],
@@ -168,11 +179,13 @@ class RepositoryDeclarationsMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         group_id = str(group["group_id"])
+        semantic_namespace = str(group["semantic_namespace"])
         concept = cast("Mapping[str, object]", group["concept"])
         scope = cast("Mapping[str, object]", group["scope"])
         correspondence = cast("Mapping[str, object]", group["correspondence"])
         coverage = cast("Mapping[str, object]", group["coverage"])
         semantic_subject_identity = self._semantic_subject_identity(
+            semantic_namespace=semantic_namespace,
             concept=concept,
             scope=scope,
         )
@@ -184,6 +197,7 @@ class RepositoryDeclarationsMixin:
             self._project_declaration(
                 normalized,
                 group_id,
+                semantic_namespace,
                 concept,
                 scope,
                 semantic_subject_identity,
@@ -195,6 +209,7 @@ class RepositoryDeclarationsMixin:
 
         definition_payload, observation_payload = self._group_identity_payloads(
             group_id=group_id,
+            semantic_namespace=semantic_namespace,
             concept=concept,
             scope=scope,
             correspondence=correspondence,
@@ -338,6 +353,7 @@ class RepositoryDeclarationsMixin:
         declaration: Mapping[str, object],
         *,
         group_id: str,
+        semantic_namespace: str,
         concept: Mapping[str, object],
         scope: Mapping[str, object],
         binding_rows: Mapping[str, Mapping[str, object]],
@@ -356,6 +372,7 @@ class RepositoryDeclarationsMixin:
         definition, observation = self._declaration_identity_payloads(
             declaration,
             group_id=group_id,
+            semantic_namespace=semantic_namespace,
             concept=concept,
             scope=scope,
             binding=binding,
@@ -381,6 +398,7 @@ class RepositoryDeclarationsMixin:
         name: str,
     ) -> tuple[
         str,
+        str,
         Mapping[str, object],
         Mapping[str, object],
         Mapping[str, object],
@@ -390,6 +408,9 @@ class RepositoryDeclarationsMixin:
         group_id = str(raw_group.get("group_id") or "")
         if not group_id:
             raise ValueError(f"{name} group_id must not be empty")
+        semantic_namespace = str(raw_group.get("semantic_namespace") or "")
+        if not semantic_namespace:
+            raise ValueError(f"{name} semantic_namespace must not be empty")
 
         concept = raw_group.get("concept")
         scope = raw_group.get("scope")
@@ -417,6 +438,7 @@ class RepositoryDeclarationsMixin:
 
         return (
             group_id,
+            semantic_namespace,
             cast("Mapping[str, object]", concept),
             cast("Mapping[str, object]", scope),
             cast("Mapping[str, object]", correspondence),
@@ -429,6 +451,7 @@ class RepositoryDeclarationsMixin:
         raw_group: Mapping[str, object],
         contract: tuple[
             str,
+            str,
             Mapping[str, object],
             Mapping[str, object],
             Mapping[str, object],
@@ -440,6 +463,7 @@ class RepositoryDeclarationsMixin:
     ) -> None:
         (
             group_id,
+            semantic_namespace,
             concept,
             scope,
             correspondence,
@@ -448,6 +472,7 @@ class RepositoryDeclarationsMixin:
         ) = contract
         definition_payload, observation_payload = self._group_identity_payloads(
             group_id=group_id,
+            semantic_namespace=semantic_namespace,
             concept=concept,
             scope=scope,
             correspondence=correspondence,
@@ -481,6 +506,7 @@ class RepositoryDeclarationsMixin:
     ) -> set[str]:
         (
             group_id,
+            semantic_namespace,
             concept,
             scope,
             correspondence,
@@ -489,6 +515,7 @@ class RepositoryDeclarationsMixin:
         ) = self._projected_group_contract(raw_group, name=name)
 
         semantic_subject_identity = self._semantic_subject_identity(
+            semantic_namespace=semantic_namespace,
             concept=concept,
             scope=scope,
         )
@@ -507,6 +534,7 @@ class RepositoryDeclarationsMixin:
             self._validate_projected_declaration(
                 declaration,
                 group_id=group_id,
+                semantic_namespace=semantic_namespace,
                 concept=concept,
                 scope=scope,
                 binding_rows=binding_rows,
@@ -518,6 +546,7 @@ class RepositoryDeclarationsMixin:
             raw_group,
             (
                 group_id,
+                semantic_namespace,
                 concept,
                 scope,
                 correspondence,
