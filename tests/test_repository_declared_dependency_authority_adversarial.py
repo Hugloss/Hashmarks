@@ -58,10 +58,7 @@ def test_equal_dependency_bytes_at_new_path_are_definition_change_not_observatio
 
     assert before_dependency["path"] == "dep-a.lock"
     assert after_dependency["path"] == "dep-b.lock"
-    assert (
-        before_dependency["member_revision"]
-        == after_dependency["member_revision"]
-    )
+    assert before_dependency["member_revision"] == after_dependency["member_revision"]
     assert (
         before_binding["binding_definition_identity"]
         != after_binding["binding_definition_identity"]
