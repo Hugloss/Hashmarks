@@ -157,11 +157,7 @@ def _normalize_evidence_locator_claim(
     claimed_module = _bounded_module(module)
     if claimed_path is None and claimed_symbol is None and claimed_module is None:
         raise ValueError("each anchor requires path, symbol, and/or module")
-    if (
-        claimed_line is not None
-        and claimed_path is None
-        and claimed_module is None
-    ):
+    if claimed_line is not None and claimed_path is None and claimed_module is None:
         raise ValueError("line requires path or module")
     return {
         **({"path": claimed_path} if claimed_path is not None else {}),
