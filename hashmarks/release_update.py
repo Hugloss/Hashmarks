@@ -104,7 +104,9 @@ def fetch_latest_release(
     try:
         _version_key(current_version)
     except ValueError as exc:
-        raise ReleaseCheckError("current Hashmarks version is not a stable release") from exc
+        raise ReleaseCheckError(
+            "current Hashmarks version is not a stable release"
+        ) from exc
     payload = _fetch_json(
         _RELEASE_API,
         timeout=timeout,
@@ -263,7 +265,9 @@ def detect_installation_owner() -> InstallationOwner:
     if getattr(sys, "frozen", False):
         installed_name = "hashmarks.exe" if os.name == "nt" else "hashmarks"
         if Path(sys.executable).name.casefold() == installed_name:
-            return InstallationOwner("standalone", "Hashmarks standalone installer", None)
+            return InstallationOwner(
+                "standalone", "Hashmarks standalone installer", None
+            )
         return InstallationOwner(
             "frozen-unmanaged",
             "an unmanaged standalone executable",
