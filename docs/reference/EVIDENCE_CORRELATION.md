@@ -218,6 +218,8 @@ Producer adapters must keep identity layers explicit rather than letting one dig
 
 When a producer adapter reports source-artifact identity, the digest and every observation derived from that artifact must come from the same captured byte stream. Hashing a live path and then reopening that path for parsing is insufficient because concurrent replacement or mutation can bind provenance to different bytes than the emitted evidence. A request-local immutable snapshot is transport only: it may be discarded immediately after collection and does not create retained source history.
 
+Producer-generated anchor IDs must be bounded, collision-resistant identifiers of the canonical locator claim rather than delimiter-joined copies of opaque locator strings. Readable module/path/line/symbol evidence remains in its typed fields; the anchor ID only supplies stable within-bundle identity and must satisfy the consumer contract independently of locator length or punctuation.
+
 - **source artifact identity** names the exact producer bytes and belongs in provenance;
 - **source occurrence identity** is an artifact-local reference to one occurrence and may legitimately depend on source ordering or serialization;
 - **normalized observation identity** names the producer-normalized observation value and must not use transport-only row ordinals, CSV quoting, or equivalent serialization as semantic input;
