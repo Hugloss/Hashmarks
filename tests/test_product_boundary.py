@@ -31,13 +31,16 @@ def test_product_profile_explicitly_rejects_agent_execution_and_repository_lifec
         "Hashmarks must never be turned into either the coding agent's solution loop or Oh-Goon's execution/certification motor."
         in agents
     )
-    assert "## Three permanent non-goals" in boundary
+    assert "## Four permanent non-goals" in boundary
     assert "Not the agent." in boundary
     assert "Not the execution/certification motor." in boundary
     assert (
         "Not a repository version-control, mutation, or historical-archive engine."
         in boundary
     )
+    assert "Not a semantic knowledge graph." in boundary
+    assert "Hashmarks must not drift into a semantic knowledge graph." in agents
+    assert "Explicit A↔B plus B↔C does **not** create A↔C." in agents
     assert (
         "Historical support is a **bounded working-set capability**, not time travel over the repository's lifetime."
         in boundary
