@@ -33,7 +33,7 @@ EXPECTED_HEADER = (
 _TIMESTAMP_START = re.compile(r"^\d{4}-\d{2}-\d{2}T")
 _MODULE = re.compile(r"\bname=([A-Za-z_][A-Za-z0-9_.]*)")
 _TRACEBACK = re.compile(
-    r'File\s+"?([^",]+)"?,\s+line\s+(\d+),\s+in\s+([A-Za-z_][A-Za-z0-9_]*)'
+    r'File\s+(?:"([^"]+)"|([^,\r\n]+)),\s+line\s+(\d+),\s+in\s+([^\r\n]+)'
 )
 _HANDLING_IDENT = re.compile(r"\bhandling_ident=([^\s]+)")
 _COMMIT_VALUE = re.compile(r"\bcommit=([^\s]+)")
@@ -507,7 +507,9 @@ class _CollectionState:
     ) -> int:
         occurrences = 0
         for match in _TRACEBACK.finditer(parsed.raw):
-            key = (match.group(1), int(match.group(2)), match.group(3))
+            path = (match.group(1) or match.group(2)).strip()
+            symbol = match.group(4).strip()
+            key = (path, int(match.group(3)), symbol)
             stats = self.tracebacks.setdefault(key, _ModuleStats())
             stats.observe(
                 timestamp=timestamp,
