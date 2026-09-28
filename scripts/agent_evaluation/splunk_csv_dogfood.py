@@ -43,8 +43,8 @@ _TRACEBACK = re.compile(
     r'\s+line\s+(\d+)(?:,\s+in\s+([^"\r\n]+))?'
     r'(?="?(?:\r?\n|$))'
 )
-_HANDLING_IDENT = re.compile(r"\bhandling_ident=([^\s]+)")
-_COMMIT_VALUE = re.compile(r"\bcommit=([^\s]+)")
+_HANDLING_IDENT = re.compile(r'\bhandling_ident=([^"\s]+)')
+_COMMIT_VALUE = re.compile(r'\bcommit=([^"\s]+)')
 _MAX_SCOPE_VALUES = 32
 _MAX_ANCHOR_CONTEXT_VALUES = 8
 _MAX_IDENTITY_SAMPLES = 3

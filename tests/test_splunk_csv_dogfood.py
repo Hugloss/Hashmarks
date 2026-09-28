@@ -1271,6 +1271,27 @@ def test_splunk_csv_dogfood_counts_final_physical_line_without_newline(
     assert report["summary"]["physical_lines"] == 2
 
 
+def test_splunk_csv_dogfood_recovery_quote_does_not_enter_opaque_context(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","INFO GET [url] "HTTP/1.1 200 OK" '
+        'name=httpx handling_ident=[DOC] commit=[REV]"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["recovered"] == 1
+    anchor = report["bundle"]["anchors"][0]
+    context = anchor["metadata"]["runtime_context"]
+    assert context["handling_ident_values"] == ["[DOC]"]
+    assert context["commit_values"] == ["[REV]"]
+    assert '"' not in context["handling_ident_values"][0]
+    assert '"' not in context["commit_values"][0]
+
+
 def test_splunk_csv_dogfood_recovers_traceback_after_quote_damage(
     tmp_path,
 ) -> None:
