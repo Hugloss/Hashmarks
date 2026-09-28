@@ -95,6 +95,18 @@ Repository evidence keeps physical locator authority separate from content-deriv
 
 The invariant is: **content equality may prove equivalence of observed bytes, never equivalence of repository location authority.**
 
+### Repository generation and binding locality
+
+Repository packet authority and binding semantic observation are separate:
+
+- an unrelated repository change may advance `codemap_generation`, `source_identity`, and the enclosing `bindings_identity`;
+- that repository-level authority transition does not by itself change a binding's `binding_definition_identity` or `binding_observation_identity`;
+- binding delta preserves the unchanged binding while retaining the before/after repository metadata;
+- coverage may classify the unrelated changed path outside declared bindings when change-set completeness is proven, without manufacturing any binding impact;
+- repository freshness/generation metadata must never be reinterpreted as direct evidence, member, dependency, relationship, or semantic-value change.
+
+The invariant is: **repository authority may advance globally while unchanged binding evidence remains locally preserved.**
+
 ## Declared dependencies
 
 The optional **dependency_paths** mapping declares explicit repository members associated with a binding. Hashmarks reports their member observations and revisions.
