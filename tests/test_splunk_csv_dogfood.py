@@ -5,6 +5,7 @@ import hashlib
 
 import pytest
 
+import scripts.agent_evaluation.splunk_csv_dogfood as splunk_csv_dogfood
 from scripts.agent_evaluation.splunk_csv_dogfood import collect, correlate
 
 HEADER = (
@@ -14,6 +15,51 @@ HEADER = (
 
 def _write(path, body: str) -> None:
     path.write_text(HEADER + body, encoding="utf-8")
+
+
+def test_splunk_csv_dogfood_binds_artifact_hash_and_parse_to_same_snapshot(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    original_body = (
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.before"\n'
+    )
+    replacement_body = (
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.after"\n'
+    )
+    _write(source, original_body)
+    original_bytes = source.read_bytes()
+    expected_sha = "sha256:" + hashlib.sha256(original_bytes).hexdigest()
+
+    real_collect_stream = splunk_csv_dogfood._collect_stream
+    snapshots = []
+
+    def mutate_source_then_collect(snapshot):
+        snapshots.append(snapshot)
+        _write(source, replacement_body)
+        return real_collect_stream(snapshot)
+
+    monkeypatch.setattr(
+        splunk_csv_dogfood,
+        "_collect_stream",
+        mutate_source_then_collect,
+    )
+
+    report = collect(source)
+
+    assert report["source"]["artifact_identity"] == expected_sha
+    assert report["bundle"]["provenance"]["source_artifact_identity"] == expected_sha
+    assert report["bundle"]["anchors"][0]["module"] == "tasks.before"
+    assert "tasks.after" not in {
+        anchor.get("module")
+        for anchor in report["bundle"]["anchors"]
+    }
+    assert snapshots
+    assert snapshots[0] != source
+    assert not snapshots[0].exists()
 
 
 def test_splunk_csv_dogfood_accepts_strict_valid_raw_above_runtime_csv_limit(
