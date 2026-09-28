@@ -152,7 +152,7 @@ def _maybe_offer_periodic_upgrade(command: str) -> None:
     if not automatic_check_allowed(command=command, interactive=interactive):
         return
     owner = detect_installation_owner()
-    if owner.kind not in {"standalone", "uv", "pipx"}:
+    if owner.kind not in {"standalone", "uv", "pipx", "pipx-global"}:
         return
     release = periodic_release_check(
         __version__,
