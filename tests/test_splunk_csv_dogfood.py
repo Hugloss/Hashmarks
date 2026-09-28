@@ -314,6 +314,8 @@ def test_splunk_csv_dogfood_orders_scope_by_instant_across_offsets(
     assert scope["time_end"] == "2026-10-25T02:15:00.000+0100"
     assert scope["time_ordering_state"] == "instant-aware"
     assert scope["timestamp_parse_failure_count"] == 0
+    assert report["summary"]["time_ordering_state"] == "instant-aware"
+    assert report["summary"]["timestamp_parse_failure_count"] == 0
 
     metadata = report["bundle"]["anchors"][0]["metadata"]
     assert metadata["first_time"] == "2026-10-25T02:30:00.000+0200"
@@ -338,6 +340,8 @@ def test_splunk_csv_dogfood_marks_unparseable_timestamp_ordering_fallback(
     scope = report["bundle"]["scope"]
     assert scope["time_ordering_state"] == "lexical-fallback"
     assert scope["timestamp_parse_failure_count"] == 1
+    assert report["summary"]["time_ordering_state"] == "lexical-fallback"
+    assert report["summary"]["timestamp_parse_failure_count"] == 1
     metadata = report["bundle"]["anchors"][0]["metadata"]
     assert metadata["time_ordering_state"] == "lexical-fallback"
     assert metadata["timestamp_parse_failure_count"] == 1
