@@ -148,6 +148,7 @@ In particular, Hashmarks must not introduce:
 
 - a global semantic node/edge registry spanning unrelated providers or domains;
 - persistent semantic edges that outlive the explicit producer-owned claim that created them;
+- replay/hydration of semantic declarations or correspondence from caller-supplied previous observations or durable CodeMap state;
 - inferred, transitive, symmetric, inverse, or reachability-derived semantic relationships;
 - graph traversal, path search, shortest-path, neighborhood expansion, or transitive-closure APIs over semantic declarations;
 - ontology/schema unification that makes opaque provider vocabulary globally meaningful;
