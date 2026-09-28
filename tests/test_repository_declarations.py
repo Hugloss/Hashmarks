@@ -777,7 +777,10 @@ def test_semantic_role_requires_non_empty_object(
 
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.sync()
-        with pytest.raises(ValueError, match="semantic_role must be a non-empty object"):
+        with pytest.raises(
+            ValueError,
+            match="semantic_role must be a non-empty object",
+        ):
             codemap.repository_declarations([_group([declaration])])
 
 
