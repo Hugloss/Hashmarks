@@ -381,6 +381,38 @@ def test_splunk_csv_dogfood_rejects_invalid_traceback_locator_without_repair(
     assert report["bundle"]["anchors"] == []
 
 
+def test_splunk_csv_dogfood_does_not_strip_invalid_module_suffix(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","INFO name=tasks.worker..."\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["module_locator_occurrences"] == 0
+    assert report["summary"]["events_without_extracted_locator"] == 1
+    assert report["bundle"]["anchors"] == []
+
+
+def test_splunk_csv_dogfood_does_not_salvage_module_prefix_before_slash(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","INFO name=tasks/worker"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["module_locator_occurrences"] == 0
+    assert report["summary"]["events_without_extracted_locator"] == 1
+    assert report["bundle"]["anchors"] == []
+
+
 def test_splunk_csv_dogfood_counts_multiple_locator_types_once_per_event(
     tmp_path,
 ) -> None:

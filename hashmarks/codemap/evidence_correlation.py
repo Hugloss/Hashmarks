@@ -132,7 +132,7 @@ def _bounded_symbol(value: object) -> str | None:
 def _bounded_module(value: object) -> str | None:
     if value is None:
         return None
-    text = str(value).strip().strip(".")
+    text = str(value).strip()
     if not text:
         return None
     if len(text) > _MAX_SYMBOL_CHARS:
