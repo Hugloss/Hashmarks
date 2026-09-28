@@ -212,6 +212,8 @@ The contract separates **semantic subject**, **declaration definition**, and **o
 
 The namespace is identity scoping, not ontology. Two independent providers that emit byte-for-byte equal opaque concept/scope objects still receive different subject identities because discovery binds each group to its own provider namespace. A provider cannot spoof another discovery namespace.
 
+A semantic namespace names a semantic contract, not a provider build. Provider implementation/provenance/version may change without changing subject identity when the provider is still making the same namespaced concept/scope claim. If an integration changes what that claim means, it must change the namespace, concept, or scope rather than silently reusing the old subject identity.
+
 This identity is correlation evidence, not ontology authority. Hashmarks does not interpret the opaque concept, infer correspondence, select a winner, or promote the identity into a universal metadata schema. Every projected declaration carries its group's `semantic_subject_identity` so consumers can correlate subject identity separately from exact declaration provenance.
 
 The remaining identities keep their existing, narrower jobs:
