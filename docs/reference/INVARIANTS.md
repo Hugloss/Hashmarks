@@ -174,6 +174,22 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **G55. Repository-derived file evidence has one admission authority.** Producer-specific parsers, native tools, project graphs, import-root discovery, and freshness projections may own their semantic interpretation, but they must not create a second filesystem-admission model. Repository files that support derived CodeMap evidence must pass the canonical repository-file admission/visibility owner before they can be parsed into project evidence, persisted as project nodes/edges, or used as manifest freshness authority. A live allow→deny policy change must stop denied derived evidence from participating before a producer refresh can re-establish the remaining admitted graph.
 
+## Product release and update lifecycle
+
+**U1. Update awareness is not repository authority.** Public release metadata, check timestamps, and update prompts are product-lifecycle state only. They must not participate in repository identity, CodeMap generations, semantic observations, evidence history, freshness, or `.hashmarks/` state.
+
+**U2. Automatic release checks are strictly bounded and suppressible.** They may occur only for eligible interactive CLI invocations, at most once per configured check interval. MCP, daemon, CI, and non-interactive invocations perform no automatic release check. `HASHMARKS_NO_UPDATE_CHECK=1` hard-disables automatic update-related network traffic.
+
+**U3. Release checks disclose no repository-derived information.** The public latest-release request must not include workspace paths, repository names/remotes, source, content hashes, observations, semantic identities, MCP payloads, or ambient GitHub credentials. Release discovery must not depend on repository state.
+
+**U4. Automatic update failure is semantically inert.** Offline operation, DNS/TLS failure, GitHub unavailability, rate limiting, malformed release data, cache corruption, or concurrent check suppression cannot fail or alter the requested repository-intelligence command.
+
+**U5. Installation mutation is explicit.** Hashmarks never silently chooses an upgrade. An installation-changing handoff requires an interactive **Upgrade now** selection for that invocation. Non-interactive `hashmarks upgrade` may report the native command but must not mutate the installation.
+
+**U6. Hashmarks never owns updating itself.** Hashmarks may discover that a newer stable release exists and identify an already-authoritative native installation owner. After explicit consent it replaces the running Hashmarks process with that owner; it does not implement a package resolver, installer backend framework, hidden downloader/updater authority, or continue repository work with mixed old/new code. Unknown/source-managed installations remain caller-owned rather than guessed.
+
+**U7. Native installation authority stays native.** uv-owned installs delegate to uv, pipx-owned installs delegate to pipx, and standalone installs delegate to the release's existing checksum-verifying installer. The exact native operation is visible before consent. Release promotion/publication remains external to the running Hashmarks product.
+
 ## Product-boundary constitution
 
 Hashmarks is a repository observer that exposes repository intelligence, not an autonomous coding agent, policy engine, or execution engine.
