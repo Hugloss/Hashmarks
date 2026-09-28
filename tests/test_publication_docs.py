@@ -594,8 +594,10 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
     assert "Global pipx ownership remains distinct" in invariants
     assert "unsupported on the current platform" in invariants
     assert "admitted only on platforms where pipx supports `--global`" in invariants
-    assert "native manager\'s own on-disk receipt proving Hashmarks" in invariants
-    assert "ambient path configuration alone is not installation authority" in invariants
+    assert "native manager's own on-disk receipt proving Hashmarks" in invariants
+    assert (
+        "ambient path configuration alone is not installation authority" in invariants
+    )
     assert "manager receipts fail closed" in invariants
     assert "Narrow product-distribution lifecycle exception" in boundary
     assert "package resolver" in boundary
