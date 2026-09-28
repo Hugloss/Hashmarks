@@ -25,6 +25,14 @@ Semantic declaration identity is opt-in and subject-scoped. It excludes request-
 
 Repository-declaration delta may report `semantic_subject_changed` when a stable request-local group ID changes namespace/concept/scope. It also exposes an ambiguity-preserving `semantic_subjects` projection: unique subject identities may be correlated across request-local group-label changes, while duplicate subject identities remain explicitly ambiguous. Inside one uniquely correlated subject, explicitly role-tagged declarations may likewise correlate by unique `semantic_declaration_identity` even when request-local declaration labels change. Untagged children remain request-local. This is factual endpoint comparison only.
 
+## Child-role admission evidence
+
+The motivating repository-intelligence case is a bounded endpoint comparison where the same semantic subject survives caller/provider request-label churn but its distinct semantic sources still need attribution. For example, a runtime-compatibility subject may contain a provider-declared `project-intent` role and `container-runtime` role. A later explicit endpoint may rename both the request-local group and declaration IDs, move one source file, and change only the container value. Subject identity alone proves that the group concerns the same conceptual subject, but request-local declaration IDs cannot safely identify which child changed.
+
+Hashmarks must not solve that gap by treating `declaration_id`, path, value equality, producer names, or similarity as stable identity. The admitted primitive is therefore narrower: the producer may explicitly declare a non-empty opaque `semantic_role`; Hashmarks hashes it under the already-issued subject identity and correlates it only when unique at both endpoints. Without that explicit role, the conservative #212 behavior remains unchanged.
+
+This is useful even when a native tool separately owns domain validation. Hashmarks only preserves repository-intelligence correlation and provenance; it does not become the validator, resolver, source-of-truth selector, or executor for that native domain.
+
 ## Authority boundary
 
 The borrowed identity model does **not** introduce:
