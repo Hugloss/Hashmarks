@@ -144,7 +144,7 @@ def _bounded_module(value: object) -> str | None:
     return text
 
 
-def normalize_evidence_locator_claim(
+def _normalize_evidence_locator_claim(
     *,
     path: object | None = None,
     line: object | None = None,
@@ -169,6 +169,21 @@ def normalize_evidence_locator_claim(
         **({"symbol": claimed_symbol} if claimed_symbol is not None else {}),
         **({"module": claimed_module} if claimed_module is not None else {}),
     }
+
+
+def validate_evidence_locator_claim(
+    *,
+    path: object | None = None,
+    line: object | None = None,
+    symbol: object | None = None,
+    module: object | None = None,
+) -> None:
+    _normalize_evidence_locator_claim(
+        path=path,
+        line=line,
+        symbol=symbol,
+        module=module,
+    )
 
 
 def _positive_line(value: object) -> int | None:
@@ -343,7 +358,7 @@ class EvidenceCorrelationMixin:
 
     @staticmethod
     def _anchor_claims(raw_anchor: Mapping[str, object]) -> _AnchorClaims:
-        locator = normalize_evidence_locator_claim(
+        locator = _normalize_evidence_locator_claim(
             path=raw_anchor.get("path"),
             line=raw_anchor.get("line"),
             symbol=raw_anchor.get("symbol"),
