@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 import sys
 import time
@@ -260,7 +261,14 @@ def periodic_release_check(
 
 def detect_installation_owner() -> InstallationOwner:
     if getattr(sys, "frozen", False):
-        return InstallationOwner("standalone", "Hashmarks standalone installer", None)
+        installed_name = "hashmarks.exe" if os.name == "nt" else "hashmarks"
+        if Path(sys.executable).name.casefold() == installed_name:
+            return InstallationOwner("standalone", "Hashmarks standalone installer", None)
+        return InstallationOwner(
+            "frozen-unmanaged",
+            "an unmanaged standalone executable",
+            None,
+        )
     prefix = str(Path(sys.prefix).resolve()).replace("\\", "/").casefold()
     if "/uv/tools/hashmarks" in prefix:
         return InstallationOwner("uv", "uv", ("uv", "tool", "upgrade", "hashmarks"))
@@ -278,13 +286,19 @@ def manual_upgrade_command(owner: InstallationOwner, latest_version: str) -> str
     tag = f"v{latest_version}"
     if owner.kind == "standalone" and os.name == "nt":
         url = f"{_RELEASE_DOWNLOAD}/{tag}/install.ps1"
+        install_dir = str(Path(sys.executable).resolve().parent).replace("'", "''")
         return (
             f"$env:HASHMARKS_VERSION='{latest_version}'; "
+            f"$env:HASHMARKS_INSTALL_DIR='{install_dir}'; "
             f"Invoke-RestMethod {url} | Invoke-Expression"
         )
     if owner.kind == "standalone":
         url = f"{_RELEASE_DOWNLOAD}/{tag}/install.sh"
-        return f"curl -fsSL {url} | HASHMARKS_VERSION={latest_version} sh"
+        install_dir = shlex.quote(str(Path(sys.executable).resolve().parent))
+        return (
+            f"curl -fsSL {url} | HASHMARKS_VERSION={latest_version} "
+            f"HASHMARKS_INSTALL_DIR={install_dir} sh"
+        )
     return None
 
 
