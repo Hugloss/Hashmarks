@@ -258,7 +258,9 @@ def test_declaration_uncertainty_axes_remain_orthogonal() -> None:
 
     assert "G73. Declaration uncertainty axes remain orthogonal" in invariants
     assert "## Uncertainty axes remain independent" in declarations
-    assert "candidate values are not promoted into a factual disagreement" in declarations
+    assert (
+        "candidate values are not promoted into a factual disagreement" in declarations
+    )
     assert "does not manufacture known absence" in declarations
     assert 'synthetic "overall confidence" authority' in declarations
     assert "No combined confidence object" in decision
