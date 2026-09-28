@@ -190,6 +190,53 @@ def test_ambiguous_correspondence_never_becomes_a_conflict_or_equivalence(
     }
 
 
+def test_semantic_subject_identity_is_independent_of_group_label_and_locator(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.txt").write_text("3.12\n3.12\n", encoding="utf-8")
+
+    first_group = _group(
+        [_declaration("runtime", "runtime.txt", "3.12", line=1)],
+        group_id="request-a",
+    )
+    second_group = _group(
+        [_declaration("runtime", "runtime.txt", "3.12", line=2)],
+        group_id="request-b",
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        first = codemap.repository_declarations([first_group])
+        second = codemap.repository_declarations([second_group])
+
+    first_group_result = first["groups"][0]
+    second_group_result = second["groups"][0]
+    assert (
+        first_group_result["semantic_subject_identity"]
+        == second_group_result["semantic_subject_identity"]
+    )
+    assert (
+        first_group_result["group_definition_identity"]
+        != second_group_result["group_definition_identity"]
+    )
+    first_declaration = first_group_result["declarations"][0]
+    second_declaration = second_group_result["declarations"][0]
+    assert (
+        first_declaration["semantic_subject_identity"]
+        == first_group_result["semantic_subject_identity"]
+    )
+    assert (
+        second_declaration["semantic_subject_identity"]
+        == second_group_result["semantic_subject_identity"]
+    )
+    assert (
+        first_declaration["declaration_definition_identity"]
+        != second_declaration["declaration_definition_identity"]
+    )
+
+
 def test_scope_is_part_of_definition_identity_and_prevents_cross_context_merging(
     tmp_path: Path,
 ) -> None:
@@ -210,6 +257,10 @@ def test_scope_is_part_of_definition_identity_and_prevents_cross_context_merging
     assert (
         linux["groups"][0]["group_definition_identity"]
         != windows["groups"][0]["group_definition_identity"]
+    )
+    assert (
+        linux["groups"][0]["semantic_subject_identity"]
+        != windows["groups"][0]["semantic_subject_identity"]
     )
     assert linux["groups"][0]["comparison"]["state"] == "insufficient"
     assert windows["groups"][0]["comparison"]["state"] == "insufficient"
@@ -339,8 +390,35 @@ def test_definition_identity_binds_exact_evidence_definition(tmp_path: Path) -> 
         != current["declaration_definition_identity"]
     )
     changed = after["delta_from_previous"]["changed_groups"][0]
+    assert changed["semantic_subject_changed"] is False
     assert changed["definition_changed"] is True
     assert changed["definition_changed_declaration_ids"] == ["runtime"]
+
+
+def test_semantic_subject_change_is_explicit_in_delta(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    declaration = [_declaration("runtime", "runtime.yaml", "3.12")]
+    before_group = _group(declaration)
+    after_group = _group(declaration)
+    after_group["concept"] = {"kind": "runtime-compatibility", "identity": "pypy"}
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([before_group])
+        after = codemap.repository_declarations(
+            [after_group],
+            previous_observation=before,
+        )
+
+    assert (
+        before["groups"][0]["semantic_subject_identity"]
+        != after["groups"][0]["semantic_subject_identity"]
+    )
+    changed = after["delta_from_previous"]["changed_groups"][0]
+    assert changed["semantic_subject_changed"] is True
+    assert changed["definition_changed"] is True
 
 
 def test_group_definition_identity_binds_coverage_scope(tmp_path: Path) -> None:

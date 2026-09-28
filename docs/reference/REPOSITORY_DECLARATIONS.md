@@ -201,7 +201,13 @@ A physical source may support several semantic declarations without acquiring se
 
 ## Identity and delta
 
-The contract separates definition from observation.
+The contract separates **semantic subject**, **declaration definition**, and **observation** identity.
+
+`semantic_subject_identity` identifies the provider-declared conceptual subject from the opaque `concept + scope` pair only. It deliberately does **not** bind `group_id`, declaration membership, file path, line/range location, normalized value, coverage, or current repository evidence. Therefore the same provider-declared subject keeps the same subject identity when a declaration moves or when a caller uses a different request-local group label. A scope or concept change produces a different subject identity.
+
+This identity is correlation evidence, not ontology authority. Hashmarks does not interpret the opaque concept, infer correspondence, select a winner, or promote the identity into a universal metadata schema. Every projected declaration carries its group's `semantic_subject_identity` so consumers can correlate subject identity separately from exact declaration provenance.
+
+The remaining identities keep their existing, narrower jobs:
 
 \`group_definition_identity\` binds:
 
@@ -228,6 +234,7 @@ A previous packet is revalidated before delta. Mutation under an old identity is
 The factual delta reports:
 
 - added/removed groups;
+- whether the provider-declared semantic subject changed for a stable group ID (`semantic_subject_changed`);
 - added/removed declarations;
 - declaration/group definition changes;
 - normalized value changes;
@@ -241,6 +248,8 @@ composes the existing repository-evidence-binding delta authority, which keeps
 repository evidence and observer-capability change distinct.
 
 A delta does not say whether any change is correct or desirable.
+
+A subject identity is intentionally **not** a branch, commit, ref, snapshot lineage, or retained history node. Hashmarks compares caller-supplied/current observations; Git and the caller remain the owners of repository history and mutation.
 
 ### Authority-transition separation
 

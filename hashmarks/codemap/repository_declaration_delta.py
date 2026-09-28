@@ -62,6 +62,8 @@ def declaration_delta(
         changed.append(
             {
                 "group_id": group_id,
+                "semantic_subject_changed": old.get("semantic_subject_identity")
+                != new.get("semantic_subject_identity"),
                 "definition_changed": old.get("group_definition_identity")
                 != new.get("group_definition_identity"),
                 "added_declaration_ids": sorted(

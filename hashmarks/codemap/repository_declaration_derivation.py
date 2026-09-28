@@ -47,6 +47,9 @@ class RepositoryDeclarationDerivationMixin:
                 declaration_authorities.append(
                     {
                         "declaration_id": declaration["declaration_id"],
+                        "semantic_subject_identity": declaration[
+                            "semantic_subject_identity"
+                        ],
                         "declaration_definition_identity": declaration[
                             "declaration_definition_identity"
                         ],
@@ -68,6 +71,7 @@ class RepositoryDeclarationDerivationMixin:
             group_authorities.append(
                 {
                     "group_id": group["group_id"],
+                    "semantic_subject_identity": group["semantic_subject_identity"],
                     "group_definition_identity": group["group_definition_identity"],
                     "group_observation_identity": group["group_observation_identity"],
                     "correspondence": deepcopy(group["correspondence"]),
@@ -110,6 +114,7 @@ class RepositoryDeclarationDerivationMixin:
         semantic_groups = [
             {
                 "group_id": group["group_id"],
+                "semantic_subject_identity": group["semantic_subject_identity"],
                 "group_definition_identity": group["group_definition_identity"],
                 "group_observation_identity": group["group_observation_identity"],
                 "comparison": deepcopy(group["comparison"]),
