@@ -154,7 +154,9 @@ def test_public_docs_expose_typed_declaration_derivation() -> None:
 
     assert "Why this remains typed" in declarations
     assert "Authority-transition separation" in declarations
+    assert "Provider-transition separation" in declarations
     assert "correspondence_changed" in declarations
+    assert "not-detected -> collected" in declarations
     assert "repository_declaration_derivation.py" in guide
     assert "no universal provenance ontology admitted" in plan
     assert "New semantic owner introduced: NO" in state
