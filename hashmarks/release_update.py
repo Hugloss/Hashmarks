@@ -446,7 +446,8 @@ def _detect_python_installation_owner(
             "pipx (global)",
             ("pipx", "upgrade", "--global", "hashmarks"),
         )
-    if prefix != base_prefix:
+    managed_base_prefix = _normalized_managed_path(base_prefix, windows=windows)
+    if managed_prefix != managed_base_prefix:
         return InstallationOwner("environment", "the current Python environment", None)
     return InstallationOwner("unknown", "an unknown installation owner", None)
 
