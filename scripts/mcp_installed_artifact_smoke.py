@@ -141,9 +141,7 @@ async def _exercise(executable: Path, repo: Path, state_dir: Path) -> None:
             )
             assert all(
                 row["semantic_declaration_identity"].startswith("sha256:")
-                for row in declarations.structured_content["groups"][0][
-                    "declarations"
-                ]
+                for row in declarations.structured_content["groups"][0]["declarations"]
             )
 
             invalid = await session.call_tool(
