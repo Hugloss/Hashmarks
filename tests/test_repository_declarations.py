@@ -521,9 +521,16 @@ def test_semantic_subject_change_is_explicit_in_delta(tmp_path: Path) -> None:
         before["groups"][0]["semantic_subject_identity"]
         != after["groups"][0]["semantic_subject_identity"]
     )
-    changed = after["delta_from_previous"]["changed_groups"][0]
+    delta = after["delta_from_previous"]
+    changed = delta["changed_groups"][0]
     assert changed["semantic_subject_changed"] is True
     assert changed["definition_changed"] is True
+    before_subject = before["groups"][0]["semantic_subject_identity"]
+    after_subject = after["groups"][0]["semantic_subject_identity"]
+    assert delta["semantic_subjects"]["removed"] == [before_subject]
+    assert delta["semantic_subjects"]["added"] == [after_subject]
+    assert delta["semantic_subjects"]["changed"] == []
+    assert delta["semantic_subjects"]["ambiguous"] == []
 
 
 def test_group_definition_identity_binds_coverage_scope(tmp_path: Path) -> None:
