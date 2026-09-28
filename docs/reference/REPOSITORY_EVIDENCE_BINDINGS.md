@@ -248,6 +248,18 @@ The exact bounds are part of the current pre-1.0 Python contract and may evolve 
 
 Where declaration order has no semantic meaning, Hashmarks canonicalizes ordering before identity construction. Duplicate and overlapping evidence declarations remain explicit evidence; they are not silently deduplicated.
 
+### Evidence declaration topology
+
+Canonical ordering does not erase multiplicity or scope:
+
+- adding or removing a duplicate exact evidence declaration changes `binding_definition_identity` even when every duplicate resolves to the same content identity;
+- duplicate occurrence count is consumer-declared evidence topology, not repository content change;
+- changing the same path from line evidence to whole-member evidence, or back again, changes the binding definition because the declared evidence scope changed;
+- when repository bytes are unchanged, multiplicity/scope transitions do not manufacture direct-content, locator-state, or containing-member changes;
+- coverage reports such transitions through `binding-definition-changed` unless an independent repository fact also changed.
+
+The invariant is: **canonicalization may normalize order, but it must never collapse declared multiplicity or scope.**
+
 ## Authority boundary
 
 Repository evidence bindings are read-only repository intelligence.
