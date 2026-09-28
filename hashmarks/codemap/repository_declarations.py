@@ -386,7 +386,7 @@ class RepositoryDeclarationsMixin:
         role = declaration.get("semantic_role")
         identity = declaration.get("semantic_declaration_identity")
         if role is None:
-            if identity is not None:
+            if "semantic_declaration_identity" in declaration:
                 raise ValueError(
                     f"{name} semantic declaration identity without semantic_role"
                 )
