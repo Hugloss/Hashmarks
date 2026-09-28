@@ -1058,7 +1058,7 @@ def test_splunk_csv_dogfood_preserves_syntaxerror_path_line_without_symbol(
         '"[host]","idx","[host]","Traceback:\n'
         '  File ""/app/src/bad.py"", line 17\n'
         '    if True print(""bad"")\n'
-        '            ^^^^^\n'
+        "            ^^^^^\n"
         'SyntaxError: invalid syntax"\n',
     )
 
