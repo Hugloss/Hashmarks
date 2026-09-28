@@ -8,6 +8,7 @@ import shlex
 import shutil
 import sys
 import time
+import tomllib
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -432,6 +433,62 @@ def _managed_python_tool_roots(
     }
 
 
+def _normalized_package_name(value: str) -> str:
+    return re.sub(r"[-_.]+", "-", value).casefold()
+
+
+def _requirement_name(requirement: object) -> str | None:
+    if isinstance(requirement, dict):
+        name = requirement.get("name")
+        return name if isinstance(name, str) else None
+    if not isinstance(requirement, str):
+        return None
+    match = re.match(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)", requirement)
+    return None if match is None else match.group(1)
+
+
+def _uv_receipt_proves_hashmarks(prefix: Path) -> bool:
+    receipt = prefix / "uv-receipt.toml"
+    try:
+        payload = tomllib.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return False
+    tool = payload.get("tool")
+    if not isinstance(tool, dict):
+        return False
+    requirements = tool.get("requirements")
+    if not isinstance(requirements, list):
+        return False
+    return any(
+        _normalized_package_name(name) == "hashmarks"
+        for requirement in requirements
+        if (name := _requirement_name(requirement)) is not None
+    )
+
+
+def _pipx_metadata_proves_hashmarks(prefix: Path) -> bool:
+    metadata = prefix / "pipx_metadata.json"
+    try:
+        payload = json.loads(metadata.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    main_package = payload.get("main_package")
+    if not isinstance(main_package, dict):
+        return False
+    package = main_package.get("package")
+    return isinstance(package, str) and _normalized_package_name(package) == "hashmarks"
+
+
+def _manager_receipt_proves_owner(owner: InstallationOwner, prefix: Path) -> bool:
+    if owner.kind == "uv":
+        return _uv_receipt_proves_hashmarks(prefix)
+    if owner.kind in {"pipx", "pipx-global"}:
+        return _pipx_metadata_proves_hashmarks(prefix)
+    return True
+
+
 def _detect_python_installation_owner(
     *,
     prefix: str,
@@ -477,14 +534,19 @@ def detect_installation_owner() -> InstallationOwner:
             "an unmanaged standalone executable",
             None,
         )
-    return _detect_python_installation_owner(
-        prefix=str(Path(sys.prefix).resolve()),
+
+    prefix = Path(sys.prefix).resolve()
+    owner = _detect_python_installation_owner(
+        prefix=str(prefix),
         base_prefix=str(Path(sys.base_prefix).resolve()),
         environ=os.environ,
         home=str(Path.home()),
         os_name=os.name,
         platform=sys.platform,
     )
+    if not _manager_receipt_proves_owner(owner, prefix):
+        return InstallationOwner("environment", "the current Python environment", None)
+    return owner
 
 
 def manual_upgrade_command(owner: InstallationOwner, latest_version: str) -> str | None:
