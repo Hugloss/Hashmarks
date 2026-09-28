@@ -208,6 +208,8 @@ For high-volume streams, consumers should aggregate repeated events into **uniqu
 
 Any bounded producer-side set that participates in evidence projection identity must retain values deterministically independent of observation arrival order. Truncation may reduce cardinality, but it must not turn container order into hidden semantic input. A deterministic bounded subset plus an explicit truncation marker is acceptable; “first N seen” is not when list order itself is not evidence.
 
+Deliberate producer-side truncation must also propagate to the enclosing evidence projection. Anchor-count truncation, bounded scope truncation, or bounded non-sample anchor context truncation makes the bundle `truncation=truncated`; local field flags are diagnostics, not a substitute for the bundle contract. Fields explicitly named as representative samples may remain bounded samples without claiming projection completeness.
+
 Producer adapters must keep identity layers explicit rather than letting one digest silently own several meanings:
 
 - **source artifact identity** names the exact producer bytes and belongs in provenance;
