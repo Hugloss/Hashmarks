@@ -272,51 +272,51 @@ def _join_managed_path(
     return _normalized_managed_path(combined, windows=windows)
 
 
-def _managed_python_tool_roots(
+def _uv_tool_roots(
     *,
     environ: Mapping[str, str],
     home: str,
-    os_name: str,
-    platform: str,
-) -> dict[str, tuple[str, ...]]:
-    windows = os_name == "nt"
-
+    windows: bool,
+) -> tuple[str, ...]:
     uv_tool_dir = environ.get("UV_TOOL_DIR")
     if uv_tool_dir:
-        uv_roots = (
-            _join_managed_path(uv_tool_dir, "hashmarks", windows=windows),
-        )
-    elif windows:
+        return (_join_managed_path(uv_tool_dir, "hashmarks", windows=windows),)
+    if windows:
         appdata = environ.get("APPDATA")
-        uv_roots = (
-            ()
-            if appdata is None
-            else (
-                _join_managed_path(
-                    appdata,
-                    "uv",
-                    "data",
-                    "tools",
-                    "hashmarks",
-                    windows=True,
-                ),
-            )
-        )
-    else:
-        data_home = environ.get("XDG_DATA_HOME") or f"{home}/.local/share"
-        uv_roots = (
+        if appdata is None:
+            return ()
+        return (
             _join_managed_path(
-                data_home,
+                appdata,
                 "uv",
+                "data",
                 "tools",
                 "hashmarks",
-                windows=False,
+                windows=True,
             ),
         )
+    data_home = environ.get("XDG_DATA_HOME") or f"{home}/.local/share"
+    return (
+        _join_managed_path(
+            data_home,
+            "uv",
+            "tools",
+            "hashmarks",
+            windows=False,
+        ),
+    )
 
+
+def _pipx_tool_roots(
+    *,
+    environ: Mapping[str, str],
+    home: str,
+    windows: bool,
+    platform: str,
+) -> tuple[str, ...]:
     pipx_home = environ.get("PIPX_HOME")
     if pipx_home:
-        pipx_roots = (
+        return (
             _join_managed_path(
                 pipx_home,
                 "venvs",
@@ -324,9 +324,9 @@ def _managed_python_tool_roots(
                 windows=windows,
             ),
         )
-    elif windows:
+    if windows:
         local_appdata = environ.get("LOCALAPPDATA")
-        default_roots = (
+        defaults = (
             ()
             if local_appdata is None
             else (
@@ -340,59 +340,52 @@ def _managed_python_tool_roots(
                 ),
             )
         )
-        pipx_roots = (
-            *default_roots,
-            _join_managed_path(
-                home,
-                "pipx",
-                "venvs",
-                "hashmarks",
-                windows=True,
-            ),
+        legacy = _join_managed_path(
+            home,
+            "pipx",
+            "venvs",
+            "hashmarks",
+            windows=True,
         )
-    elif platform == "darwin":
-        pipx_roots = (
-            _join_managed_path(
-                home,
-                "Library",
-                "Application Support",
-                "pipx",
-                "venvs",
-                "hashmarks",
-                windows=False,
-            ),
-            _join_managed_path(
-                home,
-                ".local",
-                "pipx",
-                "venvs",
-                "hashmarks",
-                windows=False,
-            ),
+        return (*defaults, legacy)
+    if platform == "darwin":
+        default = _join_managed_path(
+            home,
+            "Library",
+            "Application Support",
+            "pipx",
+            "venvs",
+            "hashmarks",
+            windows=False,
         )
     else:
         data_home = environ.get("XDG_DATA_HOME") or f"{home}/.local/share"
-        pipx_roots = (
-            _join_managed_path(
-                data_home,
-                "pipx",
-                "venvs",
-                "hashmarks",
-                windows=False,
-            ),
-            _join_managed_path(
-                home,
-                ".local",
-                "pipx",
-                "venvs",
-                "hashmarks",
-                windows=False,
-            ),
+        default = _join_managed_path(
+            data_home,
+            "pipx",
+            "venvs",
+            "hashmarks",
+            windows=False,
         )
+    legacy = _join_managed_path(
+        home,
+        ".local",
+        "pipx",
+        "venvs",
+        "hashmarks",
+        windows=False,
+    )
+    return default, legacy
 
+
+def _pipx_global_tool_roots(
+    *,
+    environ: Mapping[str, str],
+    windows: bool,
+) -> tuple[str, ...]:
     pipx_global_home = environ.get("PIPX_GLOBAL_HOME")
     if pipx_global_home:
-        pipx_global_roots = (
+        return (
             _join_managed_path(
                 pipx_global_home,
                 "venvs",
@@ -400,24 +393,43 @@ def _managed_python_tool_roots(
                 windows=windows,
             ),
         )
-    elif windows:
-        pipx_global_roots = ()
-    else:
-        pipx_global_roots = (
-            _join_managed_path(
-                "/opt/pipx",
-                "venvs",
-                "hashmarks",
-                windows=False,
-            ),
-        )
+    if windows:
+        return ()
+    return (
+        _join_managed_path(
+            "/opt/pipx",
+            "venvs",
+            "hashmarks",
+            windows=False,
+        ),
+    )
 
+
+def _managed_python_tool_roots(
+    *,
+    environ: Mapping[str, str],
+    home: str,
+    os_name: str,
+    platform: str,
+) -> dict[str, tuple[str, ...]]:
+    windows = os_name == "nt"
     return {
-        "uv": tuple(uv_roots),
-        "pipx": tuple(pipx_roots),
-        "pipx-global": tuple(pipx_global_roots),
+        "uv": _uv_tool_roots(
+            environ=environ,
+            home=home,
+            windows=windows,
+        ),
+        "pipx": _pipx_tool_roots(
+            environ=environ,
+            home=home,
+            windows=windows,
+            platform=platform,
+        ),
+        "pipx-global": _pipx_global_tool_roots(
+            environ=environ,
+            windows=windows,
+        ),
     }
-
 
 def _detect_python_installation_owner(
     *,
