@@ -431,6 +431,7 @@ def _managed_python_tool_roots(
         ),
     }
 
+
 def _detect_python_installation_owner(
     *,
     prefix: str,
