@@ -40,6 +40,18 @@ Hashmarks must never be turned into any of the adjacent systems or authorities i
 
 Historical support is a **bounded working-set capability**, not time travel over the repository's lifetime. Hashmarks may retain the small set of explicit authorities useful to an active agent/session or similarly bounded task window, subject to bounded count/time/bytes retention and ordinary eviction. Eviction changes availability/cost, never repository meaning. If an older authority is needed after eviction, the caller or Git must supply/reconstruct that authority again; Hashmarks must not scan backwards through repository history to recover it.
 
+### Semantic identity without repository-history ownership
+
+Hashmarks may borrow identity and semantic-comparison primitives from versioned-data systems when those primitives remain read-only repository intelligence. In particular, Hashmarks may expose separate identities for a provider-declared semantic subject, an exact declaration/evidence definition, and an immutable observed result; it may preserve provenance and compare those observations factually.
+
+Those identities do not create a Hashmarks-owned commit graph. A semantic subject identity is not a branch or ref; a declaration identity is not a commit; an observation identity is not a checkout target. No identity primitive grants branch, merge, rebase, cherry-pick, rollback, reset, checkout, push/pull, conflict-resolution, worktree/ref mutation, or permanent history-retention authority.
+
+The preferred implementation rule is:
+
+> **Identity without ownership; compare without mutation; bounded evidence without repository-lifetime history.**
+
+If a proposed identity/history feature requires Hashmarks to manage an evolving line of history rather than compare explicit observations, it crosses this boundary and must be reduced to the read-only semantic primitive or remain with Git/the caller.
+
 These are ownership rules, not wording rules. Renaming orchestration as "intelligence", execution policy as "evidence", agent memory as "context", or Git lifecycle as "history management" does not make it Hashmarks functionality. Interoperability transfers evidence, never authority.
 
 Every proposal must therefore answer three negative questions before admission: **does this make Hashmarks more like the agent, more like the execution/certification system, or more like a repository version-control/mutation engine?** If yes, reject it or split out only the repository-derived primitive.
