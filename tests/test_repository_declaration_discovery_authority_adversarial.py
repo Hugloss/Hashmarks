@@ -417,6 +417,69 @@ class _PolicyMultiplicityProvider:
         )
 
 
+@dataclass
+class _NamespacedOwnershipProvider:
+    name: str
+    semantic_scope: str = "all"
+    provenance_version: str = "1"
+    path: str = "owner.txt"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return True
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        value = context.read_text(self.path).strip().split(":", 1)[1].strip()
+        return RepositoryDeclarationProviderResult(
+            groups=(
+                {
+                    "group_id": "ownership-request",
+                    "concept": {
+                        "kind": "ownership",
+                        "identity": "component-a",
+                    },
+                    "scope": {"environment": self.semantic_scope},
+                    "correspondence": {
+                        "state": "declared",
+                        "basis": {
+                            "provider": self.name,
+                            "rule": "explicit-ownership-correspondence",
+                        },
+                    },
+                    "declarations": [
+                        {
+                            "declaration_id": "owner",
+                            "semantic_role": {"kind": "repository-owner"},
+                            "value_state": "resolved",
+                            "value": value,
+                            "producer": {"provider": self.name},
+                            "evidence": [
+                                {
+                                    "path": self.path,
+                                    "start_line": 1,
+                                    "end_line": 1,
+                                }
+                            ],
+                        }
+                    ],
+                    "coverage": {
+                        "state": "complete",
+                        "truncation": "complete",
+                        "expected_declaration_ids": ["owner"],
+                        "scope": {"environment": self.semantic_scope},
+                        "provenance": {"provider": self.name},
+                    },
+                },
+            ),
+            provenance={
+                "provider": self.name,
+                "version": self.provenance_version,
+            },
+        )
+
+
 def _provider(packet: dict[str, object]) -> dict[str, object]:
     return packet["providers"][0]
 
@@ -1044,3 +1107,198 @@ def test_provider_duplicate_policy_role_preserves_multiplicity_without_precedenc
     )
     _assert_policy_multiplicity_semantic_delta(stressed, policy_identity)
     _assert_policy_multiplicity_binding_separation(baseline, stressed)
+
+
+def _namespace_isolation_packets(
+    tmp_path: Path,
+) -> tuple[
+    dict[str, object],
+    dict[str, object],
+    dict[str, object],
+    dict[str, object],
+]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "owner.txt").write_text("owner: team-a\n", encoding="utf-8")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        provider_a = codemap.discover_repository_declarations(
+            [_NamespacedOwnershipProvider("provider-a")]
+        )
+        provider_b = codemap.discover_repository_declarations(
+            [_NamespacedOwnershipProvider("provider-b")],
+            previous_observation=provider_a,
+        )
+        provider_b_version = codemap.discover_repository_declarations(
+            [
+                _NamespacedOwnershipProvider(
+                    "provider-b",
+                    provenance_version="2",
+                )
+            ],
+            previous_observation=provider_b,
+        )
+        provider_b_scope = codemap.discover_repository_declarations(
+            [
+                _NamespacedOwnershipProvider(
+                    "provider-b",
+                    semantic_scope="production",
+                    provenance_version="2",
+                )
+            ],
+            previous_observation=provider_b_version,
+        )
+
+    return provider_a, provider_b, provider_b_version, provider_b_scope
+
+
+def _single_role_declaration(packet: dict[str, object]) -> dict[str, object]:
+    return _nested_group(packet)["declarations"][0]
+
+
+def _assert_cross_provider_namespace_isolation(
+    provider_a: dict[str, object],
+    provider_b: dict[str, object],
+) -> None:
+    group_a = _nested_group(provider_a)
+    group_b = _nested_group(provider_b)
+    declaration_a = _single_role_declaration(provider_a)
+    declaration_b = _single_role_declaration(provider_b)
+
+    assert group_a["concept"] == group_b["concept"]
+    assert group_a["scope"] == group_b["scope"]
+    assert declaration_a["semantic_role"] == declaration_b["semantic_role"]
+    assert declaration_a["value"] == declaration_b["value"] == "team-a"
+    assert declaration_a["binding_id"] == declaration_b["binding_id"]
+    assert group_a["semantic_namespace"] == "provider-a"
+    assert group_b["semantic_namespace"] == "provider-b"
+    assert group_a["semantic_subject_identity"] != group_b["semantic_subject_identity"]
+    assert (
+        declaration_a["semantic_declaration_identity"]
+        != declaration_b["semantic_declaration_identity"]
+    )
+
+    delta = provider_b["delta_from_previous"]
+    assert delta["providers"] == {
+        "added": ["provider-b"],
+        "removed": ["provider-a"],
+        "changed": [],
+    }
+    subjects = _nested_delta(provider_b)["semantic_subjects"]
+    assert subjects["added"] == [group_b["semantic_subject_identity"]]
+    assert subjects["removed"] == [group_a["semantic_subject_identity"]]
+    assert subjects["ambiguous"] == []
+    assert subjects["changed"] == []
+
+    changed_group = _nested_delta(provider_b)["changed_groups"][0]
+    assert changed_group["group_id"] == "ownership-request"
+    assert changed_group["semantic_subject_changed"] is True
+    assert changed_group["value_changed_declaration_ids"] == []
+    assert changed_group["definition_changed_declaration_ids"] == ["owner"]
+
+    bindings = _nested_delta(provider_b)["repository_evidence"]["bindings"]
+    assert bindings["changed"] == []
+    assert bindings["added"] == []
+    assert bindings["removed"] == []
+    assert bindings["preserved"] == [declaration_b["binding_id"]]
+
+
+def _assert_provider_version_is_not_semantic_identity(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> None:
+    before_group = _nested_group(before)
+    after_group = _nested_group(after)
+    before_declaration = _single_role_declaration(before)
+    after_declaration = _single_role_declaration(after)
+
+    assert before["providers"][0]["provenance"]["version"] == "1"
+    assert after["providers"][0]["provenance"]["version"] == "2"
+    assert after["delta_from_previous"]["providers"] == {
+        "added": [],
+        "removed": [],
+        "changed": ["provider-b"],
+    }
+    assert (
+        before_group["semantic_subject_identity"]
+        == after_group["semantic_subject_identity"]
+    )
+    assert (
+        before_declaration["semantic_declaration_identity"]
+        == after_declaration["semantic_declaration_identity"]
+    )
+    assert (
+        before["declarations"]["observation_identity"]
+        == after["declarations"]["observation_identity"]
+    )
+    assert _nested_delta(after)["changed_groups"] == []
+    assert _nested_delta(after)["semantic_subjects"] == {
+        "added": [],
+        "removed": [],
+        "ambiguous": [],
+        "changed": [],
+    }
+
+
+def _assert_scope_change_is_semantic_remove_add(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> None:
+    before_group = _nested_group(before)
+    after_group = _nested_group(after)
+    before_declaration = _single_role_declaration(before)
+    after_declaration = _single_role_declaration(after)
+
+    assert before_group["semantic_namespace"] == after_group["semantic_namespace"]
+    assert before_group["concept"] == after_group["concept"]
+    assert before_group["scope"] == {"environment": "all"}
+    assert after_group["scope"] == {"environment": "production"}
+    assert (
+        before_group["semantic_subject_identity"]
+        != after_group["semantic_subject_identity"]
+    )
+    assert (
+        before_declaration["semantic_declaration_identity"]
+        != after_declaration["semantic_declaration_identity"]
+    )
+
+    delta = after["delta_from_previous"]
+    assert delta["providers"] == {
+        "added": [],
+        "removed": [],
+        "changed": [],
+    }
+    subjects = _nested_delta(after)["semantic_subjects"]
+    assert subjects["added"] == [after_group["semantic_subject_identity"]]
+    assert subjects["removed"] == [before_group["semantic_subject_identity"]]
+    assert subjects["ambiguous"] == []
+    assert subjects["changed"] == []
+
+    changed_group = _nested_delta(after)["changed_groups"][0]
+    assert changed_group["semantic_subject_changed"] is True
+    assert changed_group["value_changed_declaration_ids"] == []
+    assert changed_group["definition_changed_declaration_ids"] == ["owner"]
+
+    bindings = _nested_delta(after)["repository_evidence"]["bindings"]
+    assert bindings["changed"] == []
+    assert bindings["added"] == []
+    assert bindings["removed"] == []
+    assert bindings["preserved"] == [after_declaration["binding_id"]]
+
+
+def test_provider_namespace_version_and_scope_identity_boundaries(
+    tmp_path: Path,
+) -> None:
+    provider_a, provider_b, provider_b_version, provider_b_scope = (
+        _namespace_isolation_packets(tmp_path)
+    )
+    _assert_cross_provider_namespace_isolation(provider_a, provider_b)
+    _assert_provider_version_is_not_semantic_identity(
+        provider_b,
+        provider_b_version,
+    )
+    _assert_scope_change_is_semantic_remove_add(
+        provider_b_version,
+        provider_b_scope,
+    )
