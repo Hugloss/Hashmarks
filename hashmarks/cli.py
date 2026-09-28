@@ -23,6 +23,19 @@ from .daemon import IdentityDaemon
 from .errors import UserFacingError
 from .identity import RepositoryIdentity, RepositoryIdentityMode
 from .paths import canonical_host_path
+from .release_update import (
+    InstallationOwner,
+    ReleaseCheckError,
+    ReleaseInfo,
+    UpgradeDelegationError,
+    automatic_check_allowed,
+    can_delegate_upgrade,
+    delegate_upgrade,
+    detect_installation_owner,
+    fetch_latest_release,
+    manual_upgrade_command,
+    periodic_release_check,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +58,117 @@ def _client(args) -> IdentityClient:
 
 def _print(value) -> None:
     log_command_output(logger, json.dumps(value, indent=2, sort_keys=True))
+
+
+def _text(*values: object, file=None) -> None:
+    for value in values:
+        log_command_output(logger, value, file=file)
+
+
+def _interactive_terminal() -> bool:
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _render_upgrade(
+    release: ReleaseInfo,
+    owner: InstallationOwner,
+    *,
+    announce: bool,
+) -> None:
+    if announce:
+        _text("A newer Hashmarks version is available.", "")
+    _text(
+        f"Hashmarks {release.current_version}",
+        f"Latest: {release.latest_version}",
+        "",
+        f"This installation is managed by {owner.label}.",
+    )
+    command = manual_upgrade_command(owner, release.latest_version)
+    if command is not None:
+        _text("", "Native upgrade command:", "", f"    {command}")
+
+
+def _manual_upgrade(owner: InstallationOwner, latest_version: str) -> None:
+    command = manual_upgrade_command(owner, latest_version)
+    if command is None:
+        _text(
+            "Hashmarks could not determine a safe native upgrade command.",
+            "No changes were made.",
+        )
+        return
+    _text(
+        "",
+        "Hashmarks does not modify its own installation directly.",
+        "No changes were made.",
+    )
+
+
+def _prompt_upgrade() -> bool:
+    _text("", "[1] Upgrade now", "[2] Skip for now")
+    return input("Select [1/2]: ").strip() == "1"
+
+
+def _delegate_selected_upgrade(
+    release: ReleaseInfo,
+    owner: InstallationOwner,
+) -> None:
+    _text(
+        "",
+        f"Delegating update to {owner.label}.",
+        "Hashmarks exits before the installation owner mutates the installation.",
+        "Restart Hashmarks after the upgrade completes.",
+    )
+    delegate_upgrade(owner, release.latest_version)
+
+
+def _upgrade(args) -> int:
+    del args
+    release = fetch_latest_release(__version__, timeout=5.0)
+    if not release.update_available:
+        if release.current_version == release.latest_version:
+            _text(f"Hashmarks {release.current_version} is up to date.")
+        else:
+            _text(
+                f"Hashmarks {release.current_version} is newer than the latest "
+                f"stable release {release.latest_version}.",
+                "No changes were made.",
+            )
+        return 0
+
+    owner = detect_installation_owner()
+    _render_upgrade(release, owner, announce=False)
+    if not _interactive_terminal() or not can_delegate_upgrade(owner):
+        _manual_upgrade(owner, release.latest_version)
+        return 0
+    if not _prompt_upgrade():
+        _text("Upgrade skipped.")
+        return 0
+    _delegate_selected_upgrade(release, owner)
+    return 0
+
+
+def _maybe_offer_periodic_upgrade(command: str) -> None:
+    interactive = _interactive_terminal()
+    if not automatic_check_allowed(command=command, interactive=interactive):
+        return
+    owner = detect_installation_owner()
+    if owner.kind not in {"standalone", "uv", "pipx"}:
+        return
+    release = periodic_release_check(
+        __version__,
+        command=command,
+        interactive=interactive,
+    )
+    if release is None:
+        return
+    _render_upgrade(release, owner, announce=True)
+    if not can_delegate_upgrade(owner):
+        _manual_upgrade(owner, release.latest_version)
+        return
+    if not _prompt_upgrade():
+        _text("Upgrade skipped for now.")
+        return
+    _delegate_selected_upgrade(release, owner)
 
 
 def _daemon_serve_command(workspace: Path, state: Path) -> list[str]:
@@ -301,11 +425,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     install.add_argument("--opencode", action="store_true")
     install.set_defaults(func=_install)
+    upgrade = sub.add_parser(
+        "upgrade",
+        help="check the latest release and delegate explicitly to the installation owner",
+    )
+    upgrade.set_defaults(func=_upgrade)
     from .repository_cli import add_repository_cli
 
     add_repository_cli(sub, add_common_arguments=_add_common_arguments)
     args = parser.parse_args(argv)
     try:
+        _maybe_offer_periodic_upgrade(args.command)
         args.workspace = _workspace(args.workspace)
         if args.state_dir is not None:
             state = Path(args.state_dir)
@@ -318,6 +448,8 @@ def main(argv: list[str] | None = None) -> int:
         DaemonUnavailableError,
         DaemonCompatibilityError,
         StateDirectoryError,
+        ReleaseCheckError,
+        UpgradeDelegationError,
     ) as exc:
         raise SystemExit(str(exc)) from exc
 

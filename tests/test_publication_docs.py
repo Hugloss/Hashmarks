@@ -525,3 +525,33 @@ def test_ci_and_dev_check_enforce_current_ruff_gate() -> None:
     )
     assert "lint-debt-summary || true" not in dev_check
     assert "Ruff:        PASS (zero debt)" in dev_check
+
+
+def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() -> None:
+    readme = _text("README.md")
+    getting_started = _text("docs/GETTING_STARTED.md")
+    architecture = _text("docs/reference/ARCHITECTURE.md")
+    invariants = _text("docs/reference/INVARIANTS.md")
+    boundary = _text("docs/reference/PRODUCT_BOUNDARY.md")
+
+    governing_rule = (
+        "Hashmarks may discover update availability. It never owns updating itself."
+    )
+    assert governing_rule in readme
+    assert governing_rule in getting_started
+    assert governing_rule in architecture
+    assert governing_rule in boundary
+
+    for text in (readme, getting_started, architecture, invariants, boundary):
+        assert "HASHMARKS_NO_UPDATE_CHECK=1" in text
+        assert "MCP" in text
+        assert "CI" in text
+
+    assert "hashmarks upgrade" in readme
+    assert "hashmarks upgrade" in getting_started
+    assert "installation owner" in architecture
+    assert "U5. Installation mutation is explicit." in invariants
+    assert "U6. Hashmarks never owns updating itself." in invariants
+    assert "Narrow product-distribution lifecycle exception" in boundary
+    assert "package resolver" in boundary
+    assert "repository/task command execution" in boundary

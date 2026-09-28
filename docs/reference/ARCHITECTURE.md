@@ -85,6 +85,20 @@ Hashmarks repository evidence
 
 The normative feature-admission contract is [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.md).
 
+### Product release awareness and installation handoff
+
+Release awareness is a narrow product-distribution lifecycle surface, not repository intelligence and not general execution authority.
+
+> **Hashmarks may discover update availability. It never owns updating itself.**
+
+An eligible interactive CLI invocation may periodically read public GitHub latest-release metadata. That request is bounded, credential-free, contains no repository-derived information, and is independent of workspace, CodeMap, semantic identity, MCP, or repository evidence. Its small timestamp/latest-version cache is disposable product-local state in the user cache directory; it never lives under `.hashmarks/`, never enters repository identity, and never becomes historical observation state.
+
+Automatic update awareness is excluded from MCP, daemon, CI, and non-interactive invocations and is hard-disabled by `HASHMARKS_NO_UPDATE_CHECK=1`. Network failure, malformed metadata, cache corruption, rate limiting, or GitHub unavailability cannot change repository semantics or prevent the requested repository command from running.
+
+Installation mutation requires a separate explicit user decision. `hashmarks upgrade` performs a fresh release check and, only after an interactive **Upgrade now** selection, visibly hands control to the already-authoritative installation owner. Hashmarks replaces its own running process before the native owner mutates installation state; it does not keep executing old in-memory code after a successful handoff. uv and pipx remain their own installation authorities, while standalone releases reuse the exact-release checksum-verifying installer. Unknown/source-managed installations are not guessed or mutated.
+
+This does **not** admit a general command runner, package resolver, updater backend hierarchy, repository process execution, release promotion, or workflow engine. The product lifecycle may discover one public release fact and hand an explicitly approved self-update to an existing native owner; repository/task execution remains external.
+
 ## Authority model
 
 Hashmarks distinguishes several kinds of authority that must not be conflated:
