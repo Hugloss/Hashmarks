@@ -1048,6 +1048,80 @@ def test_splunk_csv_dogfood_traceback_anchor_id_stays_within_core_bound(
     assert len(str(anchor["anchor_id"])) <= 512
 
 
+def test_splunk_csv_dogfood_preserves_syntaxerror_path_line_without_symbol(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","Traceback:\n'
+        '  File ""/app/src/bad.py"", line 17\n'
+        '    if True print(""bad"")\n'
+        "            ^^^^^\n"
+        'SyntaxError: invalid syntax"\n',
+    )
+
+    report = collect(source)
+    summary = report["summary"]
+    assert summary["traceback_locator_occurrences"] == 1
+    assert summary["unique_traceback_anchors_observed"] == 1
+    anchor = report["bundle"]["anchors"][0]
+    assert anchor["path"] == "/app/src/bad.py"
+    assert anchor["line"] == 17
+    assert "symbol" not in anchor
+
+
+def test_splunk_csv_dogfood_distinguishes_symbol_less_and_symbol_frames(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","Traceback:\n'
+        '  File ""/app/src/main.py"", line 9\n'
+        'SyntaxError: invalid syntax"\n'
+        '"2","2026-09-14T23:59:57.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","Traceback:\n'
+        '  File ""/app/src/main.py"", line 9, in run\n'
+        'RuntimeError: boom"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["traceback_locator_occurrences"] == 2
+    assert report["summary"]["unique_traceback_anchors_observed"] == 2
+    locators = {
+        (
+            anchor["path"],
+            anchor["line"],
+            anchor.get("symbol"),
+        )
+        for anchor in report["bundle"]["anchors"]
+    }
+    assert locators == {
+        ("/app/src/main.py", 9, None),
+        ("/app/src/main.py", 9, "run"),
+    }
+
+
+def test_splunk_csv_dogfood_does_not_treat_nonframe_suffix_as_syntaxerror(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","INFO File ""/app/src/bad.py"", '
+        'line 17, column 3"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["traceback_locator_occurrences"] == 0
+    assert report["summary"]["events_without_extracted_locator"] == 1
+    assert report["bundle"]["anchors"] == []
+
+
 def test_splunk_csv_dogfood_preserves_pseudo_traceback_symbols(
     tmp_path,
 ) -> None:

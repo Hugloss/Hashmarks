@@ -40,7 +40,8 @@ _TIMESTAMP_START = re.compile(r"^\d{4}-\d{2}-\d{2}T")
 _MODULE = re.compile(r'\bname=([^"\s]+)')
 _TRACEBACK = re.compile(
     r'File\s+(?:"([^"]+)"|"?([^",\r\n]+)"?),'
-    r'\s+line\s+(\d+),\s+in\s+([^"\r\n]+)'
+    r'\s+line\s+(\d+)(?:,\s+in\s+([^"\r\n]+))?'
+    r'(?="?(?:\r?\n|$))'
 )
 _HANDLING_IDENT = re.compile(r"\bhandling_ident=([^\s]+)")
 _COMMIT_VALUE = re.compile(r"\bcommit=([^\s]+)")
@@ -405,19 +406,19 @@ def _traceback_anchor(
     stats: _ModuleStats,
 ) -> dict[str, object]:
     path, line, symbol = key
-    anchor_identity = _identity_json(
-        {
-            "kind": "python-traceback-frame",
-            "path": path,
-            "line": line,
-            "symbol": symbol,
-        }
-    )
+    locator_claim: dict[str, object] = {
+        "kind": "python-traceback-frame",
+        "path": path,
+        "line": line,
+    }
+    if symbol:
+        locator_claim["symbol"] = symbol
+    anchor_identity = _identity_json(locator_claim)
     return {
         "anchor_id": f"traceback:{anchor_identity}",
         "path": path,
         "line": line,
-        "symbol": symbol,
+        **({"symbol": symbol} if symbol else {}),
         "metadata": {
             "kind": "python-traceback-frame",
             **_stats_metadata(stats),
@@ -572,12 +573,12 @@ class _CollectionState:
         for match in _TRACEBACK.finditer(parsed.raw):
             path = (match.group(1) or match.group(2)).strip()
             line = int(match.group(3))
-            symbol = match.group(4).strip()
+            symbol = match.group(4).strip() if match.group(4) is not None else ""
             try:
                 validate_evidence_locator_claim(
                     path=path,
                     line=line,
-                    symbol=symbol,
+                    symbol=(symbol or None),
                 )
             except ValueError:
                 continue
