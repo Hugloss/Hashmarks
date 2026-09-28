@@ -194,6 +194,94 @@ class _FixedSubjectProvider:
         )
 
 
+@dataclass
+class _SemanticRoleProvider:
+    name: str = "runtime-provider"
+    group_id: str = "runtime-request"
+    project_declaration_id: str = "project-intent"
+    runtime_declaration_id: str = "container-runtime"
+    project_path: str = "pyproject.toml"
+    runtime_path: str = "Dockerfile"
+    provenance_version: str = "1"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return True
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        return RepositoryDeclarationProviderResult(
+            groups=(
+                {
+                    "group_id": self.group_id,
+                    "concept": {
+                        "kind": "runtime-compatibility",
+                        "identity": "python",
+                    },
+                    "scope": {"environment": "application"},
+                    "correspondence": {
+                        "state": "declared",
+                        "basis": {
+                            "provider": self.name,
+                            "rule": "explicit-runtime-correspondence",
+                        },
+                    },
+                    "declarations": [
+                        {
+                            "declaration_id": self.project_declaration_id,
+                            "semantic_role": {"kind": "project-intent"},
+                            "value_state": "resolved",
+                            "value": _value(context, self.project_path),
+                            "producer": {
+                                "provider": self.name,
+                                "source": "project-intent",
+                            },
+                            "evidence": [
+                                {
+                                    "path": self.project_path,
+                                    "start_line": 1,
+                                    "end_line": 1,
+                                }
+                            ],
+                        },
+                        {
+                            "declaration_id": self.runtime_declaration_id,
+                            "semantic_role": {"kind": "container-runtime"},
+                            "value_state": "resolved",
+                            "value": _value(context, self.runtime_path),
+                            "producer": {
+                                "provider": self.name,
+                                "source": "container-runtime",
+                            },
+                            "evidence": [
+                                {
+                                    "path": self.runtime_path,
+                                    "start_line": 1,
+                                    "end_line": 1,
+                                }
+                            ],
+                        },
+                    ],
+                    "coverage": {
+                        "state": "complete",
+                        "truncation": "complete",
+                        "expected_declaration_ids": [
+                            self.project_declaration_id,
+                            self.runtime_declaration_id,
+                        ],
+                        "scope": {"environment": "application"},
+                        "provenance": {"provider": self.name},
+                    },
+                },
+            ),
+            provenance={
+                "provider": self.name,
+                "version": self.provenance_version,
+            },
+        )
+
+
 class _FailingProvider:
     name = "failing-provider"
 
@@ -283,6 +371,171 @@ def test_discovery_is_format_and_domain_neutral(
     assert group["concept"] == concept
     assert group["comparison"]["state"] == "equivalent"
     assert packet["observation_identity"].startswith("sha256:")
+
+
+def _semantic_role_rows(packet: dict[str, object]) -> dict[str, dict[str, object]]:
+    group = packet["declarations"]["groups"][0]
+    return {row["semantic_role"]["kind"]: row for row in group["declarations"]}
+
+
+def _binding_rows(packet: dict[str, object]) -> dict[str, dict[str, object]]:
+    return {
+        row["binding_id"]: row
+        for row in packet["declarations"]["repository_evidence"]["bindings"]
+    }
+
+
+def _provider_role_churn_packets(
+    tmp_path: Path,
+) -> tuple[dict[str, object], dict[str, object]]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "pyproject.toml").write_text('python = "3.12"\n', encoding="utf-8")
+    (repo / "Dockerfile").write_text("python: 3.12\n", encoding="utf-8")
+    before_provider = _SemanticRoleProvider(
+        group_id="runtime-request-v1",
+        project_declaration_id="intent-v1",
+        runtime_declaration_id="container-v1",
+        provenance_version="1",
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.discover_repository_declarations([before_provider])
+
+        moved = repo / "deploy" / "runtime.meta"
+        moved.parent.mkdir()
+        (repo / "Dockerfile").replace(moved)
+        moved.write_text("python: 3.13\n", encoding="utf-8")
+        codemap.sync(["Dockerfile", "deploy/runtime.meta"])
+
+        after = codemap.discover_repository_declarations(
+            [
+                _SemanticRoleProvider(
+                    group_id="runtime-request-v2",
+                    project_declaration_id="intent-v2",
+                    runtime_declaration_id="container-v2",
+                    runtime_path="deploy/runtime.meta",
+                    provenance_version="2",
+                )
+            ],
+            previous_observation=before,
+        )
+    return before, after
+
+
+def _assert_provider_role_semantics(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> None:
+    assert before["providers"][0]["provenance"]["version"] == "1"
+    assert after["providers"][0]["provenance"]["version"] == "2"
+    assert after["delta_from_previous"]["providers"] == {
+        "added": [],
+        "removed": [],
+        "changed": ["runtime-provider"],
+    }
+
+    before_group = before["declarations"]["groups"][0]
+    after_group = after["declarations"]["groups"][0]
+    assert (
+        before_group["semantic_subject_identity"]
+        == after_group["semantic_subject_identity"]
+    )
+
+    before_by_role = _semantic_role_rows(before)
+    after_by_role = _semantic_role_rows(after)
+    for role in ("project-intent", "container-runtime"):
+        assert (
+            before_by_role[role]["semantic_declaration_identity"]
+            == after_by_role[role]["semantic_declaration_identity"]
+        )
+
+    subject = after["delta_from_previous"]["declarations"]["semantic_subjects"][
+        "changed"
+    ][0]
+    assert subject["previous_group_id"] == "runtime-request-v1"
+    assert subject["current_group_id"] == "runtime-request-v2"
+    assert subject["group_id_changed"] is True
+
+    semantic = subject["semantic_declarations"]
+    assert semantic["added"] == []
+    assert semantic["removed"] == []
+    assert semantic["ambiguous"] == []
+    changes = {row["semantic_role"]["kind"]: row for row in semantic["changed"]}
+    assert changes["project-intent"] == {
+        "semantic_declaration_identity": before_by_role["project-intent"][
+            "semantic_declaration_identity"
+        ],
+        "semantic_role": {"kind": "project-intent"},
+        "previous_declaration_id": "intent-v1",
+        "current_declaration_id": "intent-v2",
+        "declaration_id_changed": True,
+    }
+    assert changes["container-runtime"]["value_transition"] == {
+        "before": {"value_state": "resolved", "value": "3.12"},
+        "after": {"value_state": "resolved", "value": "3.13"},
+    }
+    assert changes["container-runtime"]["previous_declaration_id"] == "container-v1"
+    assert changes["container-runtime"]["current_declaration_id"] == "container-v2"
+    assert changes["container-runtime"]["declaration_id_changed"] is True
+    assert "producer_transition" not in changes["container-runtime"]
+
+    assert subject["coverage_transition"]["before"]["expected_declaration_ids"] == [
+        "container-v1",
+        "intent-v1",
+    ]
+    assert subject["coverage_transition"]["after"]["expected_declaration_ids"] == [
+        "container-v2",
+        "intent-v2",
+    ]
+
+
+def _assert_provider_binding_authority_separation(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> None:
+    before_by_role = _semantic_role_rows(before)
+    after_by_role = _semantic_role_rows(after)
+    assert (
+        before_by_role["container-runtime"]["declaration_definition_identity"]
+        != after_by_role["container-runtime"]["declaration_definition_identity"]
+    )
+
+    binding_delta = after["delta_from_previous"]["declarations"]["repository_evidence"][
+        "bindings"
+    ]
+    assert binding_delta["changed"] == []
+    assert binding_delta["preserved"] == []
+    assert binding_delta["removed"] == sorted(
+        row["binding_id"] for row in before_by_role.values()
+    )
+    assert binding_delta["added"] == sorted(
+        row["binding_id"] for row in after_by_role.values()
+    )
+
+    before_bindings = _binding_rows(before)
+    after_bindings = _binding_rows(after)
+    assert (
+        before_bindings[before_by_role["container-runtime"]["binding_id"]]["evidence"][
+            0
+        ]["path"]
+        == "Dockerfile"
+    )
+    assert (
+        after_bindings[after_by_role["container-runtime"]["binding_id"]]["evidence"][0][
+            "path"
+        ]
+        == "deploy/runtime.meta"
+    )
+
+
+def test_discovery_preserves_semantic_roles_across_provider_request_churn(
+    tmp_path: Path,
+) -> None:
+    before, after = _provider_role_churn_packets(tmp_path)
+    _assert_provider_role_semantics(before, after)
+    _assert_provider_binding_authority_separation(before, after)
 
 
 def test_provider_order_is_not_discovery_identity(tmp_path: Path) -> None:
