@@ -8,6 +8,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TextIO
 
@@ -50,13 +51,70 @@ class _OpaqueRuntimeContext:
 
 
 @dataclass
+class _TimeBounds:
+    lexical_start: str | None = None
+    lexical_end: str | None = None
+    instant_start: tuple[datetime, str] | None = None
+    instant_end: tuple[datetime, str] | None = None
+    unparseable_count: int = 0
+
+    def observe(self, timestamp: str) -> None:
+        self.lexical_start = (
+            timestamp
+            if self.lexical_start is None
+            else min(self.lexical_start, timestamp)
+        )
+        self.lexical_end = (
+            timestamp
+            if self.lexical_end is None
+            else max(self.lexical_end, timestamp)
+        )
+        try:
+            parsed = datetime.fromisoformat(timestamp)
+        except ValueError:
+            self.unparseable_count += 1
+            return
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            self.unparseable_count += 1
+            return
+        instant_key = (parsed.astimezone(timezone.utc), timestamp)
+        self.instant_start = (
+            instant_key
+            if self.instant_start is None
+            else min(self.instant_start, instant_key)
+        )
+        self.instant_end = (
+            instant_key
+            if self.instant_end is None
+            else max(self.instant_end, instant_key)
+        )
+
+    @property
+    def ordering_state(self) -> str:
+        if self.unparseable_count:
+            return "lexical-fallback"
+        return "instant-aware"
+
+    @property
+    def start(self) -> str | None:
+        if self.unparseable_count or self.instant_start is None:
+            return self.lexical_start
+        return self.instant_start[1]
+
+    @property
+    def end(self) -> str | None:
+        if self.unparseable_count or self.instant_end is None:
+            return self.lexical_end
+        return self.instant_end[1]
+
+
+@dataclass
 class _ModuleStats:
     count: int = 0
     strict_valid: int = 0
     recovered: int = 0
     widened: int = 0
-    first_time: str | None = None
-    last_time: str | None = None
+    time_bounds: _TimeBounds = field(default_factory=_TimeBounds)
     sample_occurrence_ids: list[str] = field(default_factory=list)
     sample_observation_identities: list[str] = field(default_factory=list)
     handling_idents: set[str] = field(default_factory=set)
@@ -78,12 +136,7 @@ class _ModuleStats:
         self.strict_valid += int(parser_state == "strict-valid")
         self.recovered += int(parser_state == "recovered")
         self.widened += int(widened)
-        self.first_time = (
-            timestamp if self.first_time is None else min(self.first_time, timestamp)
-        )
-        self.last_time = (
-            timestamp if self.last_time is None else max(self.last_time, timestamp)
-        )
+        self.time_bounds.observe(timestamp)
         if len(self.sample_occurrence_ids) < _MAX_IDENTITY_SAMPLES:
             self.sample_occurrence_ids.append(occurrence_id)
         _bounded_sorted_sample(
@@ -253,8 +306,10 @@ def _stats_metadata(stats: _ModuleStats) -> dict[str, object]:
         "strict_valid_count": stats.strict_valid,
         "recovered_count": stats.recovered,
         "widened_count": stats.widened,
-        "first_time": stats.first_time,
-        "last_time": stats.last_time,
+        "first_time": stats.time_bounds.start,
+        "last_time": stats.time_bounds.end,
+        "time_ordering_state": stats.time_bounds.ordering_state,
+        "timestamp_parse_failure_count": stats.time_bounds.unparseable_count,
         "sample_event_ids": stats.sample_occurrence_ids,
         "sample_occurrence_ids": stats.sample_occurrence_ids,
         "sample_observation_identities": stats.sample_observation_identities,
@@ -325,8 +380,7 @@ class _CollectionState:
     unlocated_sample_occurrence_ids: list[str] = field(default_factory=list)
     unlocated_sample_observation_identities: list[str] = field(default_factory=list)
     physical_lines: int = 1
-    first_time: str | None = None
-    last_time: str | None = None
+    time_bounds: _TimeBounds = field(default_factory=_TimeBounds)
 
     def observe(
         self,
@@ -396,12 +450,7 @@ class _CollectionState:
         index: str,
         server: str,
     ) -> None:
-        self.first_time = (
-            timestamp if self.first_time is None else min(self.first_time, timestamp)
-        )
-        self.last_time = (
-            timestamp if self.last_time is None else max(self.last_time, timestamp)
-        )
+        self.time_bounds.observe(timestamp)
         self.scope_values_truncated |= _bounded_value(self.sources, source)
         self.scope_values_truncated |= _bounded_value(self.sourcetypes, sourcetype)
         self.scope_values_truncated |= _bounded_value(self.hosts, host)
@@ -511,8 +560,10 @@ def _select_anchors(
 
 def _scope(state: _CollectionState) -> dict[str, object]:
     return {
-        "time_start": state.first_time,
-        "time_end": state.last_time,
+        "time_start": state.time_bounds.start,
+        "time_end": state.time_bounds.end,
+        "time_ordering_state": state.time_bounds.ordering_state,
+        "timestamp_parse_failure_count": state.time_bounds.unparseable_count,
         "sources": sorted(state.sources),
         "sourcetypes": sorted(state.sourcetypes),
         "hosts": sorted(state.hosts),
