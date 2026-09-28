@@ -144,6 +144,44 @@ def _bounded_module(value: object) -> str | None:
     return text
 
 
+def _normalize_evidence_locator_claim(
+    *,
+    path: object | None = None,
+    line: object | None = None,
+    symbol: object | None = None,
+    module: object | None = None,
+) -> dict[str, object]:
+    claimed_path = _external_path(path) if path is not None else None
+    claimed_line = _positive_line(line)
+    claimed_symbol = _bounded_symbol(symbol)
+    claimed_module = _bounded_module(module)
+    if claimed_path is None and claimed_symbol is None and claimed_module is None:
+        raise ValueError("each anchor requires path, symbol, and/or module")
+    if claimed_line is not None and claimed_path is None and claimed_module is None:
+        raise ValueError("line requires path or module")
+    return {
+        **({"path": claimed_path} if claimed_path is not None else {}),
+        **({"line": claimed_line} if claimed_line is not None else {}),
+        **({"symbol": claimed_symbol} if claimed_symbol is not None else {}),
+        **({"module": claimed_module} if claimed_module is not None else {}),
+    }
+
+
+def validate_evidence_locator_claim(
+    *,
+    path: object | None = None,
+    line: object | None = None,
+    symbol: object | None = None,
+    module: object | None = None,
+) -> None:
+    _normalize_evidence_locator_claim(
+        path=path,
+        line=line,
+        symbol=symbol,
+        module=module,
+    )
+
+
 def _positive_line(value: object) -> int | None:
     if value is None:
         return None
@@ -316,18 +354,16 @@ class EvidenceCorrelationMixin:
 
     @staticmethod
     def _anchor_claims(raw_anchor: Mapping[str, object]) -> _AnchorClaims:
-        claimed_path = (
-            _external_path(raw_anchor.get("path"))
-            if raw_anchor.get("path") is not None
-            else None
+        locator = _normalize_evidence_locator_claim(
+            path=raw_anchor.get("path"),
+            line=raw_anchor.get("line"),
+            symbol=raw_anchor.get("symbol"),
+            module=raw_anchor.get("module"),
         )
-        line = _positive_line(raw_anchor.get("line"))
-        symbol = _bounded_symbol(raw_anchor.get("symbol"))
-        module = _bounded_module(raw_anchor.get("module"))
-        if claimed_path is None and symbol is None and module is None:
-            raise ValueError("each anchor requires path, symbol, and/or module")
-        if line is not None and claimed_path is None and module is None:
-            raise ValueError("line requires path or module")
+        claimed_path = locator.get("path")
+        line = locator.get("line")
+        symbol = locator.get("symbol")
+        module = locator.get("module")
         metadata = raw_anchor.get("metadata", {})
         if not isinstance(metadata, Mapping):
             raise ValueError("anchor metadata must be an object")
