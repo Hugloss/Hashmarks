@@ -1105,6 +1105,23 @@ def test_splunk_csv_dogfood_distinguishes_symbol_less_and_symbol_frames(
     }
 
 
+def test_splunk_csv_dogfood_does_not_treat_nonframe_suffix_as_syntaxerror(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","INFO File ""/app/src/bad.py"", '
+        'line 17, column 3"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["traceback_locator_occurrences"] == 0
+    assert report["summary"]["events_without_extracted_locator"] == 1
+    assert report["bundle"]["anchors"] == []
+
+
 def test_splunk_csv_dogfood_preserves_pseudo_traceback_symbols(
     tmp_path,
 ) -> None:
