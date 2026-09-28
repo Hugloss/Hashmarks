@@ -330,4 +330,3 @@ def delegate_standalone_upgrade(latest_version: str) -> None:
     environment = os.environ.copy()
     environment["HASHMARKS_VERSION"] = latest_version
     _exec_owner(executable, argv, environment)
-
