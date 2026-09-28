@@ -739,6 +739,7 @@ def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
     groups = [
         {
             "group_id": "python-runtime",
+            "semantic_namespace": "mcp-fixture",
             "concept": {"kind": "runtime", "identity": "python"},
             "scope": {"environment": "application"},
             "correspondence": {
@@ -804,6 +805,7 @@ def test_mcp_repository_declarations_explain_reuses_typed_projection(
     groups = [
         {
             "group_id": "owner",
+            "semantic_namespace": "mcp-fixture",
             "concept": {"kind": "ownership", "identity": "component"},
             "scope": {},
             "correspondence": {
