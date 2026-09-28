@@ -206,6 +206,8 @@ Producer time ranges must distinguish timestamp representation from temporal ord
 
 For high-volume streams, consumers should aggregate repeated events into **unique repository locators** before correlation when event identity itself is not needed for repository truth. Occurrence counts, time windows, representative event IDs, and similar summary fields remain opaque consumer metadata. Hashmarks may also reuse repeated locators within one request, but its anchor/count bounds remain a repository-intelligence economics guard rather than a log-retention mechanism. Consumers should split independent locator sets only after aggregation; separate correlation packets do not imply that Hashmarks owns cross-chunk incident state.
 
+Any bounded producer-side set that participates in evidence projection identity must retain values deterministically independent of observation arrival order. Truncation may reduce cardinality, but it must not turn container order into hidden semantic input. A deterministic bounded subset plus an explicit truncation marker is acceptable; “first N seen” is not when list order itself is not evidence.
+
 Producer adapters must keep identity layers explicit rather than letting one digest silently own several meanings:
 
 - **source artifact identity** names the exact producer bytes and belongs in provenance;

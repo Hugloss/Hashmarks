@@ -492,6 +492,68 @@ def test_splunk_csv_dogfood_preserves_runtime_placement_scope(tmp_path) -> None:
     assert scope["scope_values_truncated"] is False
 
 
+def test_splunk_csv_dogfood_scope_truncation_is_order_independent(
+    tmp_path,
+) -> None:
+    forward = tmp_path / "forward.csv"
+    reverse = tmp_path / "reverse.csv"
+    rows = []
+    for index in range(40):
+        rows.append(
+            f'"{index}","2026-09-14T23:59:{index % 60:02d}.000+0200",'
+            f'"[source-{index:02d}]","kube:container:x","[host-{index:02d}]",'
+            f'"idx","[server-{index:02d}]","INFO name=tasks.worker"\n'
+        )
+    _write(forward, "".join(rows))
+    _write(reverse, "".join(reversed(rows)))
+
+    forward_report = collect(forward)
+    reverse_report = collect(reverse)
+
+    assert forward_report["bundle"]["scope"] == reverse_report["bundle"]["scope"]
+    assert forward_report["bundle"]["scope"]["scope_values_truncated"] is True
+    assert (
+        forward_report["bundle"]["bundle_id"] == reverse_report["bundle"]["bundle_id"]
+    )
+    assert (
+        forward_report["bundle"]["provenance"]["evidence_projection_identity"]
+        == reverse_report["bundle"]["provenance"]["evidence_projection_identity"]
+    )
+
+
+def test_splunk_csv_dogfood_context_truncation_is_order_independent(
+    tmp_path,
+) -> None:
+    forward = tmp_path / "forward.csv"
+    reverse = tmp_path / "reverse.csv"
+    rows = []
+    for index in range(12):
+        rows.append(
+            f'"{index}","2026-09-14T23:59:{index:02d}.000+0200",'
+            '"[path]","kube:container:x","[host]","idx","[server]",'
+            f'"INFO name=pipelines.worker handling_ident=[DOC_{index:02d}] '
+            f'commit=[REV_{index:02d}]"\n'
+        )
+    _write(forward, "".join(rows))
+    _write(reverse, "".join(reversed(rows)))
+
+    forward_report = collect(forward)
+    reverse_report = collect(reverse)
+    forward_context = forward_report["bundle"]["anchors"][0]["metadata"][
+        "runtime_context"
+    ]
+    reverse_context = reverse_report["bundle"]["anchors"][0]["metadata"][
+        "runtime_context"
+    ]
+
+    assert forward_context == reverse_context
+    assert forward_context["handling_ident_values_truncated"] is True
+    assert forward_context["commit_values_truncated"] is True
+    assert (
+        forward_report["bundle"]["bundle_id"] == reverse_report["bundle"]["bundle_id"]
+    )
+
+
 def test_splunk_csv_dogfood_bounds_context_without_splitting_anchor(
     tmp_path,
 ) -> None:
