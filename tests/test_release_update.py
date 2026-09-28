@@ -412,6 +412,21 @@ def test_lookalike_manager_paths_do_not_gain_installation_authority(
     assert owner.command is None
 
 
+def test_windows_global_pipx_home_does_not_gain_unsupported_authority() -> None:
+    owner = release_update._detect_python_installation_owner(
+        prefix=r"C:\\pipx-global\\venvs\\hashmarks",
+        base_prefix=r"C:\\Python314",
+        environ={"PIPX_GLOBAL_HOME": r"C:\\pipx-global"},
+        home=r"C:\\Users\\User",
+        os_name="nt",
+        platform="win32",
+    )
+
+    assert owner.kind == "environment"
+    assert owner.command is None
+    assert release_update.can_delegate_upgrade(owner) is False
+
+
 def test_python_environment_is_not_guessed_as_an_installation_owner(
     monkeypatch,
 ) -> None:
