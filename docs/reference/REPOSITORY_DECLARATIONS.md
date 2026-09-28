@@ -33,7 +33,7 @@ The declaration provider owns:
 - normalization of comparable values;
 - provenance for each declaration;
 - the claim, with explicit provenance/basis, that declarations correspond to the same conceptual fact;
-- the semantic scope in which they are comparable;
+- the semantic namespace and scope in which that conceptual identity is meaningful;
 - coverage claims, coverage provenance, and expected declaration membership.
 
 Hashmarks core owns:
@@ -60,14 +60,17 @@ Provider claims do not become repository truth merely because Hashmarks carries 
 
 ## No universal schema
 
-A declaration group has a non-empty opaque \`concept\` object and an opaque semantic \`scope\`.
+A declaration group has a non-empty \`semantic_namespace\`, a non-empty opaque \`concept\` object, and an opaque semantic \`scope\`.
 
-Core does not interpret either object. Declaration producer metadata, correspondence basis, and coverage provenance are required to be non-empty objects so semantic claims cannot silently lose the provenance that made them meaningful.
+The namespace prevents unrelated producers from accidentally sharing semantic identity merely because their opaque concept/scope JSON happens to match. Direct \`repository_declarations()\` callers supply the namespace explicitly. Provider discovery binds it to the registered provider name and rejects provider attempts to override it.
+
+Core does not interpret the namespace, concept, or scope. Declaration producer metadata, correspondence basis, and coverage provenance are required to be non-empty objects so semantic claims cannot silently lose the provenance that made them meaningful.
 
 For example, a provider may use:
 
 ~~~json
 {
+  "semantic_namespace": "example-runtime-provider",
   "concept": {
     "kind": "runtime-compatibility",
     "identity": "python"
@@ -82,7 +85,9 @@ Another provider may use completely different fields. Those names do not become 
 
 The invariant is:
 
-> Producer-specific semantics terminate at the provider boundary. Core operates on declared correspondence, scope, normalized values, evidence, provenance, completeness, freshness, ambiguity, identity, and delta.
+> Producer-specific semantics terminate at the provider boundary. Core operates on an explicit semantic namespace, declared correspondence, scope, normalized values, evidence, provenance, completeness, freshness, ambiguity, identity, and delta.
+
+Equal \`concept + scope\` under different semantic namespaces is **not** semantic equivalence. Cross-provider correspondence requires an explicit producer that owns that correspondence; Hashmarks core never manufactures it from matching opaque JSON.
 
 ## Scope prevents false disagreement
 
@@ -203,7 +208,9 @@ A physical source may support several semantic declarations without acquiring se
 
 The contract separates **semantic subject**, **declaration definition**, and **observation** identity.
 
-`semantic_subject_identity` identifies the provider-declared conceptual subject from the opaque `concept + scope` pair only. It deliberately does **not** bind `group_id`, declaration membership, file path, line/range location, normalized value, coverage, or current repository evidence. Therefore the same provider-declared subject keeps the same subject identity when a declaration moves or when a caller uses a different request-local group label. A scope or concept change produces a different subject identity.
+`semantic_subject_identity` identifies the declared conceptual subject from `semantic_namespace + concept + scope`. It deliberately does **not** bind `group_id`, declaration membership, file path, line/range location, normalized value, coverage, or current repository evidence. Therefore the same namespaced subject keeps the same subject identity when a declaration moves or when a caller uses a different request-local group label. A namespace, scope, or concept change produces a different subject identity.
+
+The namespace is identity scoping, not ontology. Two independent providers that emit byte-for-byte equal opaque concept/scope objects still receive different subject identities because discovery binds each group to its own provider namespace. A provider cannot spoof another discovery namespace.
 
 This identity is correlation evidence, not ontology authority. Hashmarks does not interpret the opaque concept, infer correspondence, select a winner, or promote the identity into a universal metadata schema. Every projected declaration carries its group's `semantic_subject_identity` so consumers can correlate subject identity separately from exact declaration provenance.
 
@@ -235,6 +242,8 @@ The factual delta reports:
 
 - added/removed groups;
 - whether the provider-declared semantic subject changed for a stable group ID (`semantic_subject_changed`);
+- a `semantic_subjects` projection that correlates unique namespaced subjects even when request-local group IDs change;
+- added/removed semantic subjects and ambiguity when one subject identity maps to multiple groups at either endpoint;
 - added/removed declarations;
 - declaration/group definition changes;
 - normalized value changes;
@@ -248,6 +257,8 @@ composes the existing repository-evidence-binding delta authority, which keeps
 repository evidence and observer-capability change distinct.
 
 A delta does not say whether any change is correct or desirable.
+
+Subject-level delta is intentionally conservative. It correlates endpoints only when one `semantic_subject_identity` maps to exactly one group in both observations. Duplicate subject groups produce `semantic_subjects.ambiguous` with the competing group IDs; Hashmarks does not pick one by order, similarity, declaration count, or value. For a uniquely correlated subject, the projection can report request-local group-label change, declaration additions/removals, normalized-value changes, producer changes, evidence-qualification changes, and before/after comparison/absence/correspondence/coverage transitions. Exact locator/member change remains owned by the nested repository-evidence binding delta.
 
 A subject identity is intentionally **not** a branch, commit, ref, snapshot lineage, or retained history node. Hashmarks compares caller-supplied/current observations; Git and the caller remain the owners of repository history and mutation.
 
@@ -328,6 +339,7 @@ from hashmarks import CodeMap
 groups = [
     {
         "group_id": "python-runtime",
+        "semantic_namespace": "example-runtime-provider",
         "concept": {"kind": "runtime-compatibility", "identity": "python"},
         "scope": {"environment": "application"},
         "correspondence": {
@@ -459,6 +471,8 @@ The wrapper records deterministic provider observation state and provenance, the
 contains the ordinary \`hashmarks.repository-declarations.v1\` packet. This keeps
 provider execution/discovery provenance separate from declaration semantics and
 canonical repository evidence.
+
+For collected groups, discovery also binds \`semantic_namespace\` to the selected provider's registered \`name\`. Provider-returned groups must not supply or override that field. This prevents two independent providers with coincidentally equal opaque \`concept + scope\` objects from collapsing into one semantic subject. If cross-provider semantic correspondence is desired, it must be modeled explicitly by a provider/integration that owns that correspondence rather than inferred by core.
 
 Provider states have narrow meaning:
 
