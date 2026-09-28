@@ -373,9 +373,24 @@ def test_discovery_is_format_and_domain_neutral(
     assert packet["observation_identity"].startswith("sha256:")
 
 
-def test_discovery_preserves_semantic_roles_across_provider_request_churn(
+def _semantic_role_rows(packet: dict[str, object]) -> dict[str, dict[str, object]]:
+    group = packet["declarations"]["groups"][0]
+    return {
+        row["semantic_role"]["kind"]: row
+        for row in group["declarations"]
+    }
+
+
+def _binding_rows(packet: dict[str, object]) -> dict[str, dict[str, object]]:
+    return {
+        row["binding_id"]: row
+        for row in packet["declarations"]["repository_evidence"]["bindings"]
+    }
+
+
+def _provider_role_churn_packets(
     tmp_path: Path,
-) -> None:
+) -> tuple[dict[str, object], dict[str, object]]:
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "pyproject.toml").write_text('python = "3.12"\n', encoding="utf-8")
@@ -397,18 +412,25 @@ def test_discovery_preserves_semantic_roles_across_provider_request_churn(
         moved.write_text("python: 3.13\n", encoding="utf-8")
         codemap.sync(["Dockerfile", "deploy/runtime.meta"])
 
-        after_provider = _SemanticRoleProvider(
-            group_id="runtime-request-v2",
-            project_declaration_id="intent-v2",
-            runtime_declaration_id="container-v2",
-            runtime_path="deploy/runtime.meta",
-            provenance_version="2",
-        )
         after = codemap.discover_repository_declarations(
-            [after_provider],
+            [
+                _SemanticRoleProvider(
+                    group_id="runtime-request-v2",
+                    project_declaration_id="intent-v2",
+                    runtime_declaration_id="container-v2",
+                    runtime_path="deploy/runtime.meta",
+                    provenance_version="2",
+                )
+            ],
             previous_observation=before,
         )
+    return before, after
 
+
+def _assert_provider_role_semantics(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> None:
     assert before["providers"][0]["provenance"]["version"] == "1"
     assert after["providers"][0]["provenance"]["version"] == "2"
     assert after["delta_from_previous"]["providers"] == {
@@ -424,22 +446,17 @@ def test_discovery_preserves_semantic_roles_across_provider_request_churn(
         == after_group["semantic_subject_identity"]
     )
 
-    before_by_role = {
-        row["semantic_role"]["kind"]: row
-        for row in before_group["declarations"]
-    }
-    after_by_role = {
-        row["semantic_role"]["kind"]: row
-        for row in after_group["declarations"]
-    }
+    before_by_role = _semantic_role_rows(before)
+    after_by_role = _semantic_role_rows(after)
     for role in ("project-intent", "container-runtime"):
         assert (
             before_by_role[role]["semantic_declaration_identity"]
             == after_by_role[role]["semantic_declaration_identity"]
         )
 
-    nested = after["delta_from_previous"]["declarations"]
-    subject = nested["semantic_subjects"]["changed"][0]
+    subject = after["delta_from_previous"]["declarations"]["semantic_subjects"][
+        "changed"
+    ][0]
     assert subject["previous_group_id"] == "runtime-request-v1"
     assert subject["current_group_id"] == "runtime-request-v2"
     assert subject["group_id_changed"] is True
@@ -460,44 +477,14 @@ def test_discovery_preserves_semantic_roles_across_provider_request_churn(
         "current_declaration_id": "intent-v2",
         "declaration_id_changed": True,
     }
-    runtime_change = changes["container-runtime"]
-    assert runtime_change["previous_declaration_id"] == "container-v1"
-    assert runtime_change["current_declaration_id"] == "container-v2"
-    assert runtime_change["declaration_id_changed"] is True
-    assert runtime_change["value_transition"] == {
+    assert changes["container-runtime"]["value_transition"] == {
         "before": {"value_state": "resolved", "value": "3.12"},
         "after": {"value_state": "resolved", "value": "3.13"},
     }
-    assert "producer_transition" not in runtime_change
-
-    assert (
-        before_by_role["container-runtime"]["declaration_definition_identity"]
-        != after_by_role["container-runtime"]["declaration_definition_identity"]
-    )
-    binding_delta = nested["repository_evidence"]["bindings"]
-    assert binding_delta["changed"] == []
-    assert binding_delta["preserved"] == []
-    assert binding_delta["removed"] == sorted(
-        row["binding_id"] for row in before_by_role.values()
-    )
-    assert binding_delta["added"] == sorted(
-        row["binding_id"] for row in after_by_role.values()
-    )
-
-    before_bindings = {
-        row["binding_id"]: row
-        for row in before["declarations"]["repository_evidence"]["bindings"]
-    }
-    after_bindings = {
-        row["binding_id"]: row
-        for row in after["declarations"]["repository_evidence"]["bindings"]
-    }
-    assert before_bindings[
-        before_by_role["container-runtime"]["binding_id"]
-    ]["evidence"][0]["path"] == "Dockerfile"
-    assert after_bindings[
-        after_by_role["container-runtime"]["binding_id"]
-    ]["evidence"][0]["path"] == "deploy/runtime.meta"
+    assert changes["container-runtime"]["previous_declaration_id"] == "container-v1"
+    assert changes["container-runtime"]["current_declaration_id"] == "container-v2"
+    assert changes["container-runtime"]["declaration_id_changed"] is True
+    assert "producer_transition" not in changes["container-runtime"]
 
     assert subject["coverage_transition"]["before"]["expected_declaration_ids"] == [
         "container-v1",
@@ -507,6 +494,47 @@ def test_discovery_preserves_semantic_roles_across_provider_request_churn(
         "container-v2",
         "intent-v2",
     ]
+
+
+def _assert_provider_binding_authority_separation(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> None:
+    before_by_role = _semantic_role_rows(before)
+    after_by_role = _semantic_role_rows(after)
+    assert (
+        before_by_role["container-runtime"]["declaration_definition_identity"]
+        != after_by_role["container-runtime"]["declaration_definition_identity"]
+    )
+
+    binding_delta = after["delta_from_previous"]["declarations"][
+        "repository_evidence"
+    ]["bindings"]
+    assert binding_delta["changed"] == []
+    assert binding_delta["preserved"] == []
+    assert binding_delta["removed"] == sorted(
+        row["binding_id"] for row in before_by_role.values()
+    )
+    assert binding_delta["added"] == sorted(
+        row["binding_id"] for row in after_by_role.values()
+    )
+
+    before_bindings = _binding_rows(before)
+    after_bindings = _binding_rows(after)
+    assert before_bindings[
+        before_by_role["container-runtime"]["binding_id"]
+    ]["evidence"][0]["path"] == "Dockerfile"
+    assert after_bindings[
+        after_by_role["container-runtime"]["binding_id"]
+    ]["evidence"][0]["path"] == "deploy/runtime.meta"
+
+
+def test_discovery_preserves_semantic_roles_across_provider_request_churn(
+    tmp_path: Path,
+) -> None:
+    before, after = _provider_role_churn_packets(tmp_path)
+    _assert_provider_role_semantics(before, after)
+    _assert_provider_binding_authority_separation(before, after)
 
 
 def test_provider_order_is_not_discovery_identity(tmp_path: Path) -> None:
