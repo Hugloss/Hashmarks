@@ -21,6 +21,44 @@ hashmarks --version
 
 The installer downloads the current standalone release executable and its SHA-256 asset from GitHub Releases, verifies the executable, smoke-tests the downloaded candidate, and only then atomically replaces `~/.local/bin/hashmarks`. A broken candidate therefore does not destroy an existing working installation.
 
+## Update awareness and explicit upgrades
+
+Hashmarks keeps repository analysis local. Separately, an interactive CLI invocation may perform a bounded product-release check against GitHub's public latest-release metadata at most once every 24 hours. This request carries no repository path, repository identity, source, hash, observation, MCP payload, or ambient GitHub credential. Its disposable timestamp/latest-version cache lives in the user cache directory, never under `.hashmarks/` and never in repository evidence.
+
+Automatic release checks are skipped for MCP, daemon, CI, and non-interactive invocations. Set:
+
+```bash
+export HASHMARKS_NO_UPDATE_CHECK=1
+```
+
+to disable automatic checks completely. This variable does not block `hashmarks upgrade`: that command is an explicit user request to contact release infrastructure.
+
+When a newer stable release is found interactively, Hashmarks offers exactly two actions:
+
+```text
+A newer Hashmarks version is available.
+
+Hashmarks 0.24.0
+Latest: 0.25.0
+
+This installation is managed by uv.
+
+[1] Upgrade now
+[2] Skip for now
+```
+
+Choosing **Skip for now** leaves the installation unchanged. Choosing **Upgrade now** is an explicit handoff: Hashmarks shows the detected native installation owner, then replaces the running Hashmarks process with that owner. A uv-managed install delegates to `uv tool upgrade hashmarks`; pipx delegates to `pipx upgrade hashmarks`; the standalone release path delegates to the checksum-verifying exact-release installer already used for installation. Hashmarks does not grow a second package resolver, rewrite its executable itself, or continue repository work after handing off. Restart Hashmarks after the native owner completes.
+
+You can request the same flow explicitly at any time:
+
+```bash
+hashmarks upgrade
+```
+
+Without an interactive terminal, `hashmarks upgrade` reports the current/latest versions and prints the native upgrade command, but it makes no installation change.
+
+> **Hashmarks may discover update availability. It never owns updating itself.**
+
 Check the installed CLI against a repository:
 
 ```bash
