@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks import CodeMap
-from hashmarks.codemap import evidence_component_fits, validate_evidence_locator_claim
+from hashmarks.codemap import (
+    evidence_component_fits,
+    evidence_request_budget_fits,
+    validate_evidence_locator_claim,
+)
 from hashmarks.codemap.evidence_correlation import CORRELATION_PACKET_MAX_BYTES
 
 if TYPE_CHECKING:
@@ -35,6 +39,47 @@ def _binding(
     binding_id = anchor["repository_evidence_binding_id"]
     rows = packet["repository_evidence"]["bindings"]
     return next(row for row in rows if row["binding_id"] == binding_id)
+
+
+def test_evidence_request_budget_owner_matches_total_limits() -> None:
+    small_bundle = {
+        "bundle_id": "small",
+        "producer": {"kind": "test"},
+        "provenance": {},
+        "scope": {},
+        "anchors": [
+            {
+                "anchor_id": "a",
+                "module": "tasks.worker",
+                "metadata": {"value": "small"},
+            }
+        ],
+    }
+    assert evidence_request_budget_fits([small_bundle])
+
+    metadata_heavy = dict(small_bundle)
+    metadata_heavy["anchors"] = [
+        {
+            "anchor_id": f"a-{index}",
+            "module": f"tasks.worker_{index}",
+            "metadata": {"value": "x" * 5_000},
+        }
+        for index in range(60)
+    ]
+    assert not evidence_request_budget_fits([metadata_heavy])
+
+    request_heavy = dict(small_bundle)
+    request_heavy["anchors"] = [
+        {
+            "anchor_id": f"a-{index}",
+            "path": "/" + ("p" * 7_000) + f"-{index}.py",
+            "line": 1,
+            "symbol": "run",
+            "metadata": {},
+        }
+        for index in range(160)
+    ]
+    assert not evidence_request_budget_fits([request_heavy])
 
 
 def test_evidence_component_budget_owner_matches_correlation_envelope() -> None:
