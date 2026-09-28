@@ -30,12 +30,30 @@ The permanent ownership split is:
 - **Consumer / coding agent / IDE / human:** reasoning, planning, choices, memory of its own work, edits, hypotheses, interaction strategy, and final solution behavior.
 - **Execution / certification system:** process execution, admission, isolation, scheduling, timeouts, retries, resume, environment recovery, result authority, and certification.
 
+### Narrow product-distribution lifecycle exception
+
+Hashmarks also has one deliberately narrow responsibility that is **not repository intelligence**: maintaining awareness of its own published product release and handing an explicitly approved self-update to the installation mechanism that already owns the installed bytes.
+
+> **Hashmarks may discover update availability. It never owns updating itself.**
+
+This exception is bounded to product self-maintenance:
+
+- an eligible interactive CLI may periodically read public GitHub latest-release metadata;
+- the request carries no repository-derived data or ambient GitHub credentials and its disposable cache stays outside repository state;
+- MCP, daemon, CI, and non-interactive invocations perform no automatic check, and `HASHMARKS_NO_UPDATE_CHECK=1` disables automatic checks;
+- `hashmarks upgrade` may perform an explicit fresh release check;
+- installation mutation requires an explicit interactive **Upgrade now** choice;
+- after consent, Hashmarks visibly replaces its own process with the native installation owner, such as uv, pipx, or the existing checksum-verifying standalone installer;
+- unknown/source-managed installations are reported rather than guessed.
+
+This exception does not transfer general process-execution authority into Hashmarks. It does not admit repository/task command execution, package resolution, installer backend registries, workflow orchestration, release promotion, retries/supervision, or execution-result authority. The handoff exists only to stop the old Hashmarks process and let the pre-existing installation owner update Hashmarks itself.
+
 ## Three permanent non-goals
 
 Hashmarks must never be turned into any of the adjacent systems or authorities it serves.
 
 1. **Not the agent.** Hashmarks must not absorb the consumer's reasoning, planning, attempt history, memory, edits, delegation, model or tool choices, workflow sequencing, recovery decisions, or final-solution authority. An agent may consume Hashmarks evidence, but Hashmarks must not become the agent's solution loop.
-2. **Not the execution/certification motor.** Hashmarks must not absorb Oh-Goon-style admission, sandboxing, process launch or supervision, cancellation, timeout/retry/resume, worker placement, runtime-environment control, execution-result authority, certification, release promotion, or Game Tape/execution-history ownership. Oh-Goon or another execution layer may consume Hashmarks evidence, but Hashmarks must not become its execution engine.
+2. **Not the execution/certification motor.** Hashmarks must not absorb Oh-Goon-style admission, sandboxing, repository/task process launch or supervision, cancellation, timeout/retry/resume, worker placement, runtime-environment control, execution-result authority, certification, release promotion, or Game Tape/execution-history ownership. The bounded self-update handoff above does not grant any of those authorities: it can only replace the running Hashmarks CLI with its already-authoritative installation owner after explicit consent. Oh-Goon or another execution layer may consume Hashmarks evidence, but Hashmarks must not become its execution engine.
 3. **Not a repository version-control, mutation, or historical-archive engine.** Hashmarks may observe caller-selected repository authorities, preserve immutable observations needed by the active consumer work window, and compare or diff repository meaning and evidence across those authorities. It must not create or manage branches, implement merge/rebase/cherry-pick or conflict-resolution semantics, roll back/revert/reset/checkout repository state, mutate refs or worktrees, crawl or pre-index Git history, retain an unbounded timeline of repository observations, or otherwise become an alternative Git/repository-lifecycle/history owner. Git and the external consumer/harness own those operations. Historical observation and semantic diff are bounded, read-only repository intelligence; they never grant repository-mutation authority or require permanent retention.
 
 Historical support is a **bounded working-set capability**, not time travel over the repository's lifetime. Hashmarks may retain the small set of explicit authorities useful to an active agent/session or similarly bounded task window, subject to bounded count/time/bytes retention and ordinary eviction. Eviction changes availability/cost, never repository meaning. If an older authority is needed after eviction, the caller or Git must supply/reconstruct that authority again; Hashmarks must not scan backwards through repository history to recover it.
@@ -76,7 +94,7 @@ This rule protects both product scope and economics: dependency fan-out must not
 
 ## Direct observer admission test
 
-A new production responsibility must fit the observer model before implementation. This is a direct ownership check, not a requirement to invent policy about policy.
+A new **repository-intelligence** production responsibility must fit the observer model before implementation. This is a direct ownership check, not a requirement to invent policy about policy. The narrowly bounded product-distribution lifecycle above is governed by its own explicit limits and must not be used as precedent for repository/task execution.
 
 A change is in profile when its semantic output is an observation or projection of repository state/evidence: identity, structure, relationship, provenance, completeness, freshness, uncertainty, capability, or delta. If its semantic output is a recommendation, sufficiency decision, workflow choice, retry/recovery decision, execution control, or certification decision, that responsibility belongs outside Hashmarks.
 
