@@ -90,6 +90,7 @@ def test_declaration_derivation_traces_exact_repository_evidence(
 
     group_authority = derivation["groups"][0]
     assert group_authority["group_id"] == "runtime-python"
+    assert group_authority["semantic_namespace"] == "fixture"
     assert (
         group_authority["semantic_subject_identity"]
         == packet["groups"][0]["semantic_subject_identity"]
@@ -135,6 +136,7 @@ def test_declaration_explain_is_endpoint_local_after_repository_advances(
     )
     assert explanation["semantic_result"]["group_count"] == 1
     assert explanation["semantic_result"]["declaration_count"] == 1
+    assert explanation["semantic_result"]["groups"][0]["semantic_namespace"] == "fixture"
     assert (
         explanation["semantic_result"]["groups"][0]["semantic_subject_identity"]
         == packet["groups"][0]["semantic_subject_identity"]
