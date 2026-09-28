@@ -759,8 +759,7 @@ def _assert_named_source_removal_does_not_cascade(
         for row in before["correspondence-ab"]["declarations"]
     }
     after_correlation = {
-        row["declaration_id"]: row
-        for row in after["correspondence-ab"]["declarations"]
+        row["declaration_id"]: row for row in after["correspondence-ab"]["declarations"]
     }
     bindings = declarations["repository_evidence"]["bindings"]
     assert before_correlation["left-owner"]["binding_id"] in bindings["preserved"]
@@ -769,9 +768,10 @@ def _assert_named_source_removal_does_not_cascade(
         before_correlation["right-owner"]["binding_id"]
         == after_correlation["right-owner"]["binding_id"]
     )
-    assert before["provider-b-owner"]["declarations"][0]["binding_id"] in bindings[
-        "removed"
-    ]
+    assert (
+        before["provider-b-owner"]["declarations"][0]["binding_id"]
+        in bindings["removed"]
+    )
 
 
 def _assert_unknown_provider_name_is_opaque_basis_metadata(
@@ -788,8 +788,7 @@ def _assert_unknown_provider_name_is_opaque_basis_metadata(
 
     correlation = after["correspondence-ab"]
     assert (
-        correlation["correspondence"]["basis"]["right_provider"]
-        == "provider-missing"
+        correlation["correspondence"]["basis"]["right_provider"] == "provider-missing"
     )
     assert correlation["comparison"] == {
         "state": "equivalent",
