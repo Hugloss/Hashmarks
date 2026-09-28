@@ -137,9 +137,7 @@ class RepositoryDeclarationsMixin:
     ) -> tuple[dict[str, object], dict[str, object]]:
         definition_payload = {
             "group_id": group_id,
-            "semantic_subject_identity": semantic_subject[
-                "semantic_subject_identity"
-            ],
+            "semantic_subject_identity": semantic_subject["semantic_subject_identity"],
             "coverage_scope": coverage["scope"],
             "expected_declaration_ids": coverage["expected_declaration_ids"],
             "declaration_definition_identities": [
