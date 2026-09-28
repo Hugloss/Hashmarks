@@ -188,7 +188,7 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **U6. Hashmarks never owns updating itself.** Hashmarks may discover that a newer stable release exists and identify an already-authoritative native installation owner. After explicit consent it replaces the running Hashmarks process with that owner; it does not implement a package resolver, installer backend framework, hidden downloader/updater authority, or continue repository work with mixed old/new code. Unknown/source-managed installations remain caller-owned rather than guessed.
 
-**U7. Native installation authority stays native.** uv-owned installs delegate to uv, pipx-owned installs delegate to pipx, and standalone installs delegate to the release's existing checksum-verifying installer. The exact native operation is visible before consent. Release promotion/publication remains external to the running Hashmarks product.
+**U7. Native installation authority stays native.** uv-owned installs delegate to uv, pipx-owned installs delegate to pipx, and standalone installs delegate to the release's existing checksum-verifying installer. Python-tool ownership must be proven by equality with the exact manager-owned environment root; substring, suffix, or lookalike path resemblance is not installation authority. Global pipx ownership remains distinct and delegates with its native `--global` operation. The exact native operation is visible before consent. Release promotion/publication remains external to the running Hashmarks product.
 
 ## Product-boundary constitution
 
