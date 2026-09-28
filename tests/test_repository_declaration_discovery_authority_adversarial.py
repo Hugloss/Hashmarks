@@ -917,9 +917,7 @@ def _policy_multiplicity_packets(
         baseline = codemap.discover_repository_declarations([provider])
 
         policy.write_text(
-            "* team-a\n"
-            "/components/* team-a\n"
-            "/components/specific team-b\n",
+            "* team-a\n/components/* team-a\n/components/specific team-b\n",
             encoding="utf-8",
         )
         codemap.sync([".github/CODEOWNERS"])
@@ -955,9 +953,9 @@ def _assert_policy_multiplicity_current_state(
     assert len(baseline_policy) == 1
     assert len(stressed_policy) == 3
     policy_identity = baseline_policy[0]["semantic_declaration_identity"]
-    assert {
-        row["semantic_declaration_identity"] for row in stressed_policy
-    } == {policy_identity}
+    assert {row["semantic_declaration_identity"] for row in stressed_policy} == {
+        policy_identity
+    }
     assert [row["producer"]["ordinal"] for row in stressed_policy] == [1, 2, 3]
     assert [row["producer"]["specificity"] for row in stressed_policy] == [
         1,
