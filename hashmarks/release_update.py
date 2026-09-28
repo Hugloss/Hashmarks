@@ -5,7 +5,6 @@ import os
 import re
 import shutil
 import sys
-import tempfile
 import time
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -19,7 +18,6 @@ _RELEASE_DOWNLOAD = "https://github.com/Hugloss/Hashmarks/releases/download"
 _CHECK_INTERVAL_SECONDS = 24 * 60 * 60
 _LOCK_STALE_SECONDS = 5 * 60
 _MAX_RELEASE_RESPONSE_BYTES = 1024 * 1024
-_MAX_INSTALLER_BYTES = 256 * 1024
 _RELEASE_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _AUTOMATIC_SKIP_COMMANDS = {"daemon", "mcp", "upgrade", "version"}
@@ -290,7 +288,11 @@ def manual_upgrade_command(owner: InstallationOwner, latest_version: str) -> str
     return None
 
 
-def _standalone_exec_target() -> tuple[str, tuple[str, ...]]:
+def _standalone_exec_target(latest_version: str) -> tuple[str, tuple[str, ...]]:
+    owner = InstallationOwner("standalone", "Hashmarks standalone installer", None)
+    command = manual_upgrade_command(owner, latest_version)
+    if command is None:
+        raise UpgradeDelegationError("standalone upgrade command is unavailable")
     if os.name == "nt":
         executable = shutil.which("pwsh") or shutil.which("powershell")
         if executable is None:
@@ -300,35 +302,22 @@ def _standalone_exec_target() -> tuple[str, tuple[str, ...]]:
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            "-",
+            command,
         )
     executable = shutil.which("sh")
     if executable is None:
         raise UpgradeDelegationError("sh is required for the installer")
-    return executable, (executable,)
+    if shutil.which("curl") is None:
+        raise UpgradeDelegationError("curl is required for the installer")
+    return executable, (executable, "-c", command)
 
 
 def can_delegate_upgrade(owner: InstallationOwner) -> bool:
     if owner.kind == "standalone":
-        try:
-            _standalone_exec_target()
-        except UpgradeDelegationError:
-            return False
-        return True
+        if os.name == "nt":
+            return bool(shutil.which("pwsh") or shutil.which("powershell"))
+        return shutil.which("sh") is not None and shutil.which("curl") is not None
     return owner.command is not None and shutil.which(owner.command[0]) is not None
-
-
-def _fetch_installer(latest_version: str, *, timeout: float) -> bytes:
-    _version_key(latest_version)
-    name = "install.ps1" if os.name == "nt" else "install.sh"
-    url = f"{_RELEASE_DOWNLOAD}/v{latest_version}/{name}"
-    try:
-        with urlopen(_request(url), timeout=timeout) as response:
-            return _read_bounded_response(response, limit=_MAX_INSTALLER_BYTES)
-    except (HTTPError, URLError, TimeoutError, OSError) as exc:
-        raise UpgradeDelegationError(
-            "could not download the exact release installer"
-        ) from exc
 
 
 def _exec_owner(
@@ -347,26 +336,14 @@ def _exec_owner(
 def delegate_upgrade(
     owner: InstallationOwner,
     latest_version: str,
-    *,
-    timeout: float = 5.0,
 ) -> None:
     _version_key(latest_version)
     environment = os.environ.copy()
     environment["HASHMARKS_VERSION"] = latest_version
     if owner.kind == "standalone":
-        installer = _fetch_installer(latest_version, timeout=timeout)
-        executable, argv = _standalone_exec_target()
-        with tempfile.TemporaryFile() as stream:
-            stream.write(installer)
-            stream.flush()
-            stream.seek(0)
-            try:
-                os.dup2(stream.fileno(), 0, inheritable=True)
-            except OSError as exc:
-                raise UpgradeDelegationError(
-                    "could not bind the standalone installer to native stdin"
-                ) from exc
-            _exec_owner(executable, argv, environment)
+        executable, argv = _standalone_exec_target(latest_version)
+        _exec_owner(executable, argv, environment)
+        return
     if owner.command is None:
         raise UpgradeDelegationError("Hashmarks cannot mutate this installation")
     executable = shutil.which(owner.command[0])
