@@ -558,12 +558,7 @@ def _assert_no_transitive_ac_claim(packet: dict[str, object]) -> None:
         "correspondence-bc",
     }
     assert "correspondence-ac" not in groups
-    assert len(
-        {
-            group["semantic_subject_identity"]
-            for group in groups.values()
-        }
-    ) == 5
+    assert len({group["semantic_subject_identity"] for group in groups.values()}) == 5
     assert groups["correspondence-ab"]["comparison"] == {
         "state": "equivalent",
         "distinct_values": ["team-a"],
@@ -617,9 +612,7 @@ def _assert_middle_change_stays_on_explicit_edges(
     assert subjects["added"] == []
     assert subjects["removed"] == []
     assert subjects["ambiguous"] == []
-    assert {
-        row["current_group_id"] for row in subjects["changed"]
-    } == changed_groups
+    assert {row["current_group_id"] for row in subjects["changed"]} == changed_groups
 
 
 def _assert_ac_exists_only_after_explicit_provider(
@@ -651,9 +644,7 @@ def _assert_ac_exists_only_after_explicit_provider(
     assert delta["added_group_ids"] == ["correspondence-ac"]
     assert delta["removed_group_ids"] == []
     assert delta["changed_groups"] == []
-    assert delta["semantic_subjects"]["added"] == [
-        ac["semantic_subject_identity"]
-    ]
+    assert delta["semantic_subjects"]["added"] == [ac["semantic_subject_identity"]]
     assert delta["semantic_subjects"]["removed"] == []
     assert delta["semantic_subjects"]["changed"] == []
     assert delta["semantic_subjects"]["ambiguous"] == []
@@ -662,9 +653,7 @@ def _assert_ac_exists_only_after_explicit_provider(
 def test_explicit_correspondence_chain_never_creates_transitive_edge(
     tmp_path: Path,
 ) -> None:
-    chain, middle_changed, explicit_ac = _nontransitive_correspondence_packets(
-        tmp_path
-    )
+    chain, middle_changed, explicit_ac = _nontransitive_correspondence_packets(tmp_path)
     _assert_no_transitive_ac_claim(chain)
     _assert_middle_change_stays_on_explicit_edges(chain, middle_changed)
     _assert_ac_exists_only_after_explicit_provider(middle_changed, explicit_ac)
