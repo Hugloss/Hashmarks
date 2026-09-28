@@ -588,6 +588,8 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
     assert "hashmarks upgrade" in readme
     assert "hashmarks upgrade" in getting_started
     assert "installation owner" in architecture
+    assert "manager\'s own on-disk receipt proving Hashmarks" in architecture
+    assert "native manager receipt" in getting_started
     assert "U5. Installation mutation is explicit." in invariants
     assert "U6. Hashmarks never owns updating itself." in invariants
     assert "exact manager-owned environment root" in invariants
