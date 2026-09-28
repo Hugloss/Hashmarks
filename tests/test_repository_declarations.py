@@ -15,11 +15,13 @@ def _group(
     expected: list[str] | None = None,
     correspondence_state: str = "declared",
     scope: dict[str, object] | None = None,
+    semantic_namespace: str = "fixture",
 ) -> dict[str, object]:
     ids = [str(row["declaration_id"]) for row in declarations]
     coverage_state, truncation = coverage
     return {
         "group_id": group_id,
+        "semantic_namespace": semantic_namespace,
         "concept": {"kind": "runtime-compatibility", "identity": "python"},
         "scope": {} if scope is None else scope,
         "correspondence": {
