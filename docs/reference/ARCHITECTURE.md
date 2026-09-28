@@ -124,6 +124,29 @@ The diagram is not a total ordering across unrelated evidence kinds. Each eviden
 
 Cross-artifact declaration correspondence follows the same rule. Providers may normalize producer-native syntax into scoped declaration claims, but provider provenance, correspondence, normalized values, and coverage do not become a global precedence system. Hashmarks binds those claims to exact repository evidence and may report equivalence, difference, ambiguity, or coverage-qualified absence; it never selects the declaration that should win. See [`REPOSITORY_DECLARATIONS.md`](REPOSITORY_DECLARATIONS.md).
 
+### Semantic identity layers
+
+Repository declarations separate three identity questions instead of overloading file location or one universal ID:
+
+\`\`\`text
+provider-declared concept + scope
+        │
+        ▼
+semantic subject identity        what conceptual subject is being described?
+        │
+        ├── exact evidence locator/binding
+        ▼
+declaration definition identity  which exact declaration/evidence definition?
+        │
+        ├── value + producer/provenance + qualified evidence state
+        ▼
+observation identity             which exact observed semantic state?
+\`\`\`
+
+Semantic subject identity is location-independent but provider-scoped: core deterministically identifies the opaque \`concept + scope\` supplied by the provider and does not infer a universal ontology. Exact path/range location remains declaration provenance. Observation identity remains immutable evidence for an endpoint.
+
+These identities support correlation and factual endpoint comparison only. They are not Hashmarks branches, commits, refs, checkout targets, or retained repository history. Git/caller/native tools continue to own mutation and lifecycle. See [the semantic-identity decision](../maintainers/SEMANTIC_IDENTITY_WITHOUT_REPOSITORY_OWNERSHIP.md).
+
 ## Cache model
 
 Caches are semantic accelerators only.
