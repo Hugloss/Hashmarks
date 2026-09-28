@@ -54,8 +54,7 @@ def test_splunk_csv_dogfood_binds_artifact_hash_and_parse_to_same_snapshot(
     assert report["bundle"]["provenance"]["source_artifact_identity"] == expected_sha
     assert report["bundle"]["anchors"][0]["module"] == "tasks.before"
     assert "tasks.after" not in {
-        anchor.get("module")
-        for anchor in report["bundle"]["anchors"]
+        anchor.get("module") for anchor in report["bundle"]["anchors"]
     }
     assert snapshots
     assert snapshots[0] != source
