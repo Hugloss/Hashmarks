@@ -328,6 +328,95 @@ class _OwnershipUncertaintyProvider:
         )
 
 
+@dataclass
+class _PolicyMultiplicityProvider:
+    name: str = "policy-multiplicity-provider"
+    source_path: str = "owners/source.meta"
+    policy_path: str = ".github/CODEOWNERS"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return context.exists(self.source_path)
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        source = context.read_text(self.source_path).strip()
+        declarations: list[dict[str, object]] = [
+            {
+                "declaration_id": "source-owner",
+                "semantic_role": {"kind": "source-metadata"},
+                "value_state": "resolved",
+                "value": source,
+                "producer": {"provider": self.name, "source": "metadata"},
+                "evidence": [
+                    {
+                        "path": self.source_path,
+                        "start_line": 1,
+                        "end_line": 1,
+                    }
+                ],
+            }
+        ]
+        expected = ["source-owner"]
+        for line_number, raw in enumerate(
+            context.read_text(self.policy_path).splitlines(),
+            start=1,
+        ):
+            line = raw.strip()
+            if not line:
+                continue
+            pattern, owner = line.split(maxsplit=1)
+            declaration_id = f"policy-rule-{line_number}"
+            expected.append(declaration_id)
+            declarations.append(
+                {
+                    "declaration_id": declaration_id,
+                    "semantic_role": {"kind": "repository-policy"},
+                    "value_state": "resolved",
+                    "value": owner,
+                    "producer": {
+                        "provider": self.name,
+                        "pattern": pattern,
+                        "ordinal": line_number,
+                        "specificity": len(pattern),
+                    },
+                    "evidence": [
+                        {
+                            "path": self.policy_path,
+                            "start_line": line_number,
+                            "end_line": line_number,
+                        }
+                    ],
+                }
+            )
+        return RepositoryDeclarationProviderResult(
+            groups=(
+                {
+                    "group_id": "component-owner",
+                    "concept": {"kind": "ownership", "identity": "component-a"},
+                    "scope": {"component": "component-a"},
+                    "correspondence": {
+                        "state": "declared",
+                        "basis": {
+                            "provider": self.name,
+                            "rule": "explicit-policy-correspondence",
+                        },
+                    },
+                    "declarations": declarations,
+                    "coverage": {
+                        "state": "complete",
+                        "truncation": "complete",
+                        "expected_declaration_ids": expected,
+                        "scope": {"repository": "fixture"},
+                        "provenance": {"provider": self.name},
+                    },
+                },
+            ),
+            provenance={"provider": self.name, "version": "1"},
+        )
+
+
 def _provider(packet: dict[str, object]) -> dict[str, object]:
     return packet["providers"][0]
 
@@ -801,3 +890,100 @@ def test_ownership_value_ambiguity_and_incomplete_coverage_remain_orthogonal(
     _assert_ownership_uncertainty_current_state(baseline, stressed)
     _assert_ownership_uncertainty_semantic_delta(baseline, stressed)
     _assert_ownership_uncertainty_binding_separation(baseline, stressed)
+
+
+def _policy_role_rows(packet: dict[str, object]) -> list[dict[str, object]]:
+    return [
+        row
+        for row in _nested_group(packet)["declarations"]
+        if row.get("semantic_role") == {"kind": "repository-policy"}
+    ]
+
+
+def test_provider_duplicate_policy_role_preserves_multiplicity_without_precedence(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    source = repo / "owners" / "source.meta"
+    policy = repo / ".github" / "CODEOWNERS"
+    source.parent.mkdir(parents=True)
+    policy.parent.mkdir(parents=True)
+    source.write_text("team-a\n", encoding="utf-8")
+    policy.write_text("* team-a\n", encoding="utf-8")
+    provider = _PolicyMultiplicityProvider()
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        baseline = codemap.discover_repository_declarations([provider])
+
+        policy.write_text(
+            "* team-a\n"
+            "/components/* team-a\n"
+            "/components/specific team-b\n",
+            encoding="utf-8",
+        )
+        codemap.sync([".github/CODEOWNERS"])
+        stressed = codemap.discover_repository_declarations(
+            [provider],
+            previous_observation=baseline,
+        )
+
+    baseline_group = _nested_group(baseline)
+    stressed_group = _nested_group(stressed)
+    assert baseline_group["comparison"] == {
+        "state": "equivalent",
+        "distinct_values": ["team-a"],
+    }
+    assert stressed_group["comparison"] == {
+        "state": "differing",
+        "distinct_values": ["team-a", "team-b"],
+    }
+    assert baseline_group["absence"]["state"] == "known-present"
+    assert stressed_group["absence"]["state"] == "known-present"
+    assert stressed["declarations"]["winner"] == "not-selected"
+    assert "preferred" not in stressed_group["comparison"]
+    assert "authoritative_value" not in stressed_group["comparison"]
+
+    baseline_policy = _policy_role_rows(baseline)
+    stressed_policy = _policy_role_rows(stressed)
+    assert len(baseline_policy) == 1
+    assert len(stressed_policy) == 3
+    policy_identity = baseline_policy[0]["semantic_declaration_identity"]
+    assert {
+        row["semantic_declaration_identity"] for row in stressed_policy
+    } == {policy_identity}
+    assert [row["producer"]["ordinal"] for row in stressed_policy] == [1, 2, 3]
+    assert [row["producer"]["specificity"] for row in stressed_policy] == [
+        1,
+        13,
+        20,
+    ]
+    assert [row["value"] for row in stressed_policy] == [
+        "team-a",
+        "team-a",
+        "team-b",
+    ]
+
+    semantic = _nested_delta(stressed)["semantic_subjects"]["changed"][0][
+        "semantic_declarations"
+    ]
+    assert semantic["added"] == []
+    assert semantic["removed"] == []
+    assert semantic["changed"] == []
+    assert semantic["ambiguous"] == [
+        {
+            "semantic_declaration_identity": policy_identity,
+            "previous_declaration_ids": ["policy-rule-1"],
+            "current_declaration_ids": [
+                "policy-rule-1",
+                "policy-rule-2",
+                "policy-rule-3",
+            ],
+            "reason": "semantic-declaration-not-unique",
+        }
+    ]
+
+    bindings = _nested_delta(stressed)["repository_evidence"]["bindings"]
+    assert baseline_policy[0]["binding_id"] in bindings["preserved"]
+    assert len(bindings["added"]) == 2
+    assert bindings["removed"] == []
