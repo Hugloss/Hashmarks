@@ -252,6 +252,7 @@ def test_declaration_evidence_loss_and_restoration_change_observation_not_defini
     _assert_evidence_loss(present, missing)
     _assert_evidence_restoration(missing, restored)
 
+
 def test_declaration_producer_provenance_change_is_observation_only(
     tmp_path: Path,
 ) -> None:
@@ -320,9 +321,10 @@ def test_correspondence_basis_change_is_group_observation_only(
             previous_observation=before,
         )
 
-    assert before["groups"][0]["group_definition_identity"] == after["groups"][0][
-        "group_definition_identity"
-    ]
+    assert (
+        before["groups"][0]["group_definition_identity"]
+        == after["groups"][0]["group_definition_identity"]
+    )
     assert before["groups"][0]["comparison"] == after["groups"][0]["comparison"]
     assert before["groups"][0]["absence"] == after["groups"][0]["absence"]
 
