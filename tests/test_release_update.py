@@ -280,6 +280,9 @@ def test_cli_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate(
     assert "Hashmarks 0.24.0" in output
     assert "Latest: 0.25.0" in output
     assert "This installation is managed by uv." in output
+    assert "Native upgrade command:" in output
+    assert "uv tool upgrade hashmarks" in output
+    assert output.index("uv tool upgrade hashmarks") < output.index("[1] Upgrade now")
     assert "[1] Upgrade now" in output
     assert "[2] Skip for now" in output
     assert "Upgrade skipped." in output
