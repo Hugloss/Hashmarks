@@ -803,7 +803,7 @@ def _assert_unknown_provider_name_is_opaque_basis_metadata(
     assert delta["providers"] == {
         "added": [],
         "removed": [],
-        "changed": ["correlation-ab"],
+        "changed": [],
     }
     changed = delta["declarations"]["changed_groups"]
     assert [row["group_id"] for row in changed] == ["correspondence-ab"]
