@@ -46,7 +46,7 @@ This exception is bounded to product self-maintenance:
 - after consent, Hashmarks visibly replaces its own process with the native installation owner, such as uv, pipx, or the existing checksum-verifying standalone installer;
 - unknown/source-managed installations are reported rather than guessed.
 
-This exception does not transfer general process-execution authority into Hashmarks. It does not admit repository/task command execution, package resolution, installer backend registries, workflow orchestration, release promotion, retries/supervision, or execution-result authority. The handoff exists only to stop the old Hashmarks process and let the pre-existing installation owner update Hashmarks itself.
+This exception does not transfer general process-execution authority into Hashmarks. It does not admit repository/task command execution, a Hashmarks-owned package resolver or package-resolution layer, installer backend registries, workflow orchestration, release promotion, retries/supervision, or execution-result authority. The handoff exists only to stop the old Hashmarks process and let the pre-existing installation owner update Hashmarks itself.
 
 ## Three permanent non-goals
 
