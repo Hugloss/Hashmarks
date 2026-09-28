@@ -51,7 +51,7 @@ Native upgrade command:
 [2] Skip for now
 ```
 
-Choosing **Skip for now** leaves the installation unchanged. Choosing **Upgrade now** replaces the running Hashmarks process with the existing checksum-verifying standalone installer; Hashmarks does not continue repository work with old in-memory code after that handoff.
+Choosing **Skip for now** leaves the installation unchanged and does not preflight installer prerequisites. Choosing **Upgrade now** resolves the standalone installer requirements once, then replaces the running Hashmarks process with the existing checksum-verifying standalone installer; Hashmarks does not continue repository work with old in-memory code after that handoff.
 
 Python-package and source installations are intentionally different. Hashmarks reports that an update exists but does **not** decide whether uv, pip, pipx, Git, or another native mechanism owns the installation. Use the same native mechanism that already owns it. For example:
 
