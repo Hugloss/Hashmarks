@@ -254,6 +254,31 @@ def test_declaration_derivation_rejects_resigned_semantic_role_tamper(
             codemap.repository_declaration_derivation_authority(tampered)
 
 
+def test_declaration_derivation_rejects_orphan_semantic_declaration_identity(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "owner.yaml").write_text("owner: team-a\n", encoding="utf-8")
+    group = _group([_declaration("owner", "owner.yaml", "team-a")])
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations([group])
+        tampered = copy.deepcopy(packet)
+        declaration = tampered["groups"][0]["declarations"][0]
+        declaration["semantic_declaration_identity"] = "sha256:" + ("0" * 64)
+        tampered["observation_identity"] = codemap._declaration_packet_identity(
+            tampered
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="semantic declaration identity without semantic_role",
+        ):
+            codemap.repository_declaration_derivation_authority(tampered)
+
+
 def test_declaration_derivation_rejects_resigned_projection_mismatch(
     tmp_path: Path,
 ) -> None:
