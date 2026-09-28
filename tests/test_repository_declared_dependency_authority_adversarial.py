@@ -19,10 +19,7 @@ def _binding(binding_id: str, evidence_path: str) -> dict[str, object]:
 
 
 def _changed_by_id(delta: dict[str, object]) -> dict[str, dict[str, object]]:
-    return {
-        row["binding_id"]: row
-        for row in delta["bindings"]["changed"]
-    }
+    return {row["binding_id"]: row for row in delta["bindings"]["changed"]}
 
 
 def test_equal_dependency_bytes_at_new_path_are_definition_change_not_observation_change(
