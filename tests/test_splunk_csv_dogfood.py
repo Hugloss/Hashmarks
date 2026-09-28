@@ -512,7 +512,9 @@ def test_splunk_csv_dogfood_scope_truncation_is_order_independent(
 
     assert forward_report["bundle"]["scope"] == reverse_report["bundle"]["scope"]
     assert forward_report["bundle"]["scope"]["scope_values_truncated"] is True
-    assert forward_report["bundle"]["bundle_id"] == reverse_report["bundle"]["bundle_id"]
+    assert (
+        forward_report["bundle"]["bundle_id"] == reverse_report["bundle"]["bundle_id"]
+    )
     assert (
         forward_report["bundle"]["provenance"]["evidence_projection_identity"]
         == reverse_report["bundle"]["provenance"]["evidence_projection_identity"]
@@ -537,13 +539,19 @@ def test_splunk_csv_dogfood_context_truncation_is_order_independent(
 
     forward_report = collect(forward)
     reverse_report = collect(reverse)
-    forward_context = forward_report["bundle"]["anchors"][0]["metadata"]["runtime_context"]
-    reverse_context = reverse_report["bundle"]["anchors"][0]["metadata"]["runtime_context"]
+    forward_context = forward_report["bundle"]["anchors"][0]["metadata"][
+        "runtime_context"
+    ]
+    reverse_context = reverse_report["bundle"]["anchors"][0]["metadata"][
+        "runtime_context"
+    ]
 
     assert forward_context == reverse_context
     assert forward_context["handling_ident_values_truncated"] is True
     assert forward_context["commit_values_truncated"] is True
-    assert forward_report["bundle"]["bundle_id"] == reverse_report["bundle"]["bundle_id"]
+    assert (
+        forward_report["bundle"]["bundle_id"] == reverse_report["bundle"]["bundle_id"]
+    )
 
 
 def test_splunk_csv_dogfood_bounds_context_without_splitting_anchor(
