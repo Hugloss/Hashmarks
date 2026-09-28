@@ -579,9 +579,7 @@ def test_semantic_role_correlates_child_change_across_request_label_renames(
     assert roles["added"] == []
     assert roles["removed"] == []
     assert roles["ambiguous"] == []
-    changed_by_role = {
-        row["semantic_role"]["kind"]: row for row in roles["changed"]
-    }
+    changed_by_role = {row["semantic_role"]["kind"]: row for row in roles["changed"]}
     intent = changed_by_role["project-intent"]
     assert intent["declaration_id_changed"] is True
     assert intent["previous_declaration_id"] == "intent-before"
@@ -680,9 +678,7 @@ def test_semantic_role_change_is_remove_add_not_guessed_rename(
     roles = after["delta_from_previous"]["semantic_subjects"]["changed"][0][
         "semantic_declarations"
     ]
-    assert roles["removed"] == [
-        before_declaration["semantic_declaration_identity"]
-    ]
+    assert roles["removed"] == [before_declaration["semantic_declaration_identity"]]
     assert roles["added"] == [after_declaration["semantic_declaration_identity"]]
     assert roles["ambiguous"] == []
     assert roles["changed"] == []
@@ -745,9 +741,7 @@ def test_semantic_role_delta_preserves_duplicate_role_ambiguity(
             previous_observation=before,
         )
 
-    identity = before["groups"][0]["declarations"][0][
-        "semantic_declaration_identity"
-    ]
+    identity = before["groups"][0]["declarations"][0]["semantic_declaration_identity"]
     roles = after["delta_from_previous"]["semantic_subjects"]["changed"][0][
         "semantic_declarations"
     ]
