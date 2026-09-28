@@ -57,6 +57,8 @@ Semantic identity and explicit correspondence do not admit a graph-owned semanti
 
 Hashmarks does not maintain a global set of semantic nodes and edges across providers, infer relationships between claims, compute transitive closure, traverse semantic neighborhoods, or preserve correspondence independently of the provider-owned declaration group that emitted it. Explicit A↔B and B↔C claims remain two separate producer-owned observations; they do not create A↔C.
 
+The same rule applies to cycles. A↔B, B↔C, and C↔A do not collapse into an equivalence class or connected component and do not create component-level consensus, majority truth, or winner semantics. If a consumer needs a three-way comparison, a producer must emit that aggregate claim explicitly with its own evidence and namespace.
+
 This is a permanent architectural boundary. A proposal that requires graph reachability, inferred semantic edges, global ontology alignment, edge persistence, graph query APIs, centrality/ranking, or transitive relationship semantics is outside the repository-declaration owner by default and must not be smuggled in as an optimization or projection.
 
 Existing CodeMap graphs such as imports, calls, references, dependencies, and other repository-derived relationships are different: they are bounded projections over repository evidence with established owners. They do not turn semantic declarations into a general-purpose knowledge graph.
