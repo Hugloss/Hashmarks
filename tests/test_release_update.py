@@ -160,7 +160,7 @@ def test_network_failure_is_non_fatal_and_throttled(
     assert (
         release_update.periodic_release_check(
             "0.24.0",
-                interactive=True,
+            interactive=True,
             environ=environ,
             now=3000.0,
         )
@@ -169,7 +169,7 @@ def test_network_failure_is_non_fatal_and_throttled(
     assert (
         release_update.periodic_release_check(
             "0.24.0",
-                interactive=True,
+            interactive=True,
             environ=environ,
             now=3001.0,
         )
@@ -250,7 +250,9 @@ def test_cli_command_semantics_opt_out_of_automatic_update_awareness(
     monkeypatch.setattr(
         cli,
         "_maybe_offer_periodic_upgrade",
-        lambda: pytest.fail("command semantics must suppress automatic update awareness"),
+        lambda: pytest.fail(
+            "command semantics must suppress automatic update awareness"
+        ),
     )
 
     assert cli.main(argv) == 0
