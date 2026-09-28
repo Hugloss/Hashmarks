@@ -70,7 +70,7 @@ def test_relationship_fact_change_is_path_shared_but_range_impact_stays_local(
         assert relationships["state"] == "changed"
         assert relationships["comparability"] == "comparable"
         assert relationships["facts"]["state"] == "changed"
-        assert relationships["locators"]["state"] == "preserved"
+        assert relationships["locators"]["state"] == "unchanged"
 
     assert delta["bindings"]["preserved"] == ["unrelated"]
     assert coverage["binding_impacts"] == [
