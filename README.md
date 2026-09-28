@@ -4,7 +4,7 @@
 
 Hashmarks is **local repository intelligence** and a read-only **Model Context Protocol (MCP) server for coding agents**. It provides **codebase search for agents**, repository context, code navigation, symbols and references, code ownership, dependency relationships, **change impact analysis**, freshness, and verification evidence from the repository itself.
 
-Use Hashmarks with **Claude Code, Codex, OpenCode, Pi**, other stdio MCP clients, developer tools, CI, or directly from the CLI and Python API. Hashmarks runs locally, does not call models, and does not edit files or execute shell commands.
+Use Hashmarks with **Claude Code, Codex, OpenCode, Pi**, other stdio MCP clients, developer tools, CI, or directly from the CLI and Python API. Repository analysis runs locally, does not call models, and does not edit repository files or execute repository/task commands. The interactive CLI may periodically check public GitHub release metadata; MCP, CI, and non-interactive runs never perform that automatic check.
 
 > **Hashmarks understands the repository. Your agent still decides what to do.**
 
@@ -18,6 +18,28 @@ curl -fsSL https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh |
 ```
 
 The installer downloads checksum-verified, self-contained release bytes from GitHub Releases. The target machine does not need Python, uv, pip, or PyPI access.
+
+### Update awareness and explicit upgrades
+
+Interactive CLI commands may check GitHub's public latest-release metadata at most once every 24 hours. The check sends no repository-derived data and stores only disposable product-update metadata outside repository state. Set `HASHMARKS_NO_UPDATE_CHECK=1` to disable automatic update checks completely. Automatic checks never run in MCP, CI, daemon, or non-interactive use.
+
+When a newer stable release is available, Hashmarks offers two explicit choices:
+
+```text
+A newer Hashmarks version is available.
+
+Hashmarks 0.24.0
+Latest: 0.25.0
+
+This installation is managed by uv.
+
+[1] Upgrade now
+[2] Skip for now
+```
+
+`hashmarks upgrade` performs an explicit fresh release check. If you choose **Upgrade now**, Hashmarks shows the detected native installation owner and replaces the running Hashmarks process with that owner; for example, a uv-managed install delegates to `uv tool upgrade hashmarks`. Hashmarks does not implement its own resolver or silently update itself. Restart Hashmarks after the native owner completes. In non-interactive use, `hashmarks upgrade` prints the native command but does not mutate the installation.
+
+> **Hashmarks may discover update availability. It never owns updating itself.**
 
 ## Why Hashmarks
 
@@ -339,6 +361,7 @@ Run `hashmarks --help` for the complete command surface.
 | `change-impact TASK --changed PATH` | Recompute impact and verification relevance from changed paths |
 | `post-change TASK --changed PATH --previous-evidence FILE` | Reconcile changed paths and return evidence deltas |
 | `doctor` | Show runtime/observer configuration |
+| `upgrade` | Explicitly check the latest stable release and hand an approved update to the native installation owner |
 
 ## FAQ
 
@@ -352,7 +375,7 @@ Yes. Hashmarks provides project-local configuration examples for Claude Code, Co
 
 ### Does Hashmarks send my source code to a cloud service?
 
-Hashmarks itself runs locally and does not call a model or remote repository-analysis service. An external coding-agent host may have its own network/model behavior; that is outside Hashmarks.
+Hashmarks repository analysis runs locally and does not call a model or remote repository-analysis service. The interactive CLI may make the bounded public GitHub release check described above; it sends no repository-derived data and can be disabled with `HASHMARKS_NO_UPDATE_CHECK=1`. An external coding-agent host may have its own network/model behavior; that is outside Hashmarks.
 
 ### Does Hashmarks edit code or run tests?
 
