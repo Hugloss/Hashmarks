@@ -61,6 +61,8 @@ This is a permanent architectural boundary. A proposal that requires graph reach
 
 Existing CodeMap graphs such as imports, calls, references, dependencies, and other repository-derived relationships are different: they are bounded projections over repository evidence with established owners. They do not turn semantic declarations into a general-purpose knowledge graph.
 
+Correspondence provenance is likewise non-referential. Provider names recorded in basis/provenance describe the producer's claim; they are not foreign keys into provider observations. Core does not cascade-delete, auto-bind, or rewire correspondence when named providers disappear or appear. Such semantics would create a hidden graph/database owner and are therefore outside this decision.
+
 ## Why this is not a new ontology
 
 `concept` and `scope` stay opaque provider vocabulary. Core hashes those already-admitted semantic inputs; it does not understand names such as `service.owner`, `runtime.python`, dependency coordinates, or organization-specific precedence.

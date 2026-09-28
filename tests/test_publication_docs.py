@@ -333,6 +333,25 @@ def test_hashmarks_never_becomes_a_semantic_knowledge_graph() -> None:
     assert "There is no global semantic edge/knowledge-graph owner" in owners
 
 
+def test_correspondence_provenance_never_becomes_referential_integrity() -> None:
+    agents = _text("AGENTS.md")
+    invariants = _text("docs/reference/INVARIANTS.md")
+    declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")
+    decision = _text(
+        "docs/maintainers/SEMANTIC_IDENTITY_WITHOUT_REPOSITORY_OWNERSHIP.md"
+    )
+    owners = _text("docs/reference/STATE_AND_SEMANTIC_OWNERS.md")
+
+    assert "G76. Correspondence provenance is not referential integrity" in invariants
+    assert "not foreign keys" in declarations
+    assert "does not cascade-delete" in declarations
+    assert "no hidden referential-integrity graph" in declarations
+    assert "Provider names or identifiers" in agents
+    assert "are **not foreign keys**" in agents
+    assert "Correspondence provenance is likewise non-referential" in decision
+    assert "foreign-key joins, cascade deletion" in owners
+
+
 def test_duplicate_semantic_roles_never_gain_core_precedence() -> None:
     invariants = _text("docs/reference/INVARIANTS.md")
     declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")

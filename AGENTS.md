@@ -28,6 +28,8 @@ Coding agents must not introduce a global semantic node/edge registry, inferred/
 
 Existing CodeMap graphs such as imports, calls, references, dependencies, ownership, and other bounded repository-derived relationships remain valid under their existing owners. That does not authorize turning repository-declaration semantics into a general-purpose knowledge graph, graph database, RDF/triple-store-like authority, or semantic query engine.
 
+Provider names or identifiers carried inside correspondence basis/provenance are **not foreign keys**. Do not add provider-existence validation, cascade deletion, automatic relationship rewiring, or referential-integrity joins based on those names. A correspondence producer owns its own explicit claim and exact evidence; source-provider add/remove events remain independent unless that producer changes its claim.
+
 ## Evidence authority is non-strengthening
 
 A derived, cached, summarized, ranked, or presentation-layer result must never silently become stronger than the repository evidence and freshness/provenance authority that supports it. Do not turn stale into fresh, unknown into proven, ambiguous into unique, or a consumer/model interpretation into repository truth.
