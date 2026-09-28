@@ -138,6 +138,26 @@ The diagram is not a total ordering across unrelated evidence kinds. Each eviden
 
 Cross-artifact declaration correspondence follows the same rule. Providers may normalize producer-native syntax into scoped declaration claims, but provider provenance, correspondence, normalized values, and coverage do not become a global precedence system. Hashmarks binds those claims to exact repository evidence and may report equivalence, difference, ambiguity, or coverage-qualified absence; it never selects the declaration that should win. See [`REPOSITORY_DECLARATIONS.md`](REPOSITORY_DECLARATIONS.md).
 
+### Semantic knowledge graph is a permanent non-goal
+
+Hashmarks may expose bounded repository-derived relationship graphs whose owners already exist in CodeMap—for example imports, calls, references, dependencies, ownership, and explicit repository-declaration correspondence. Those are typed projections over repository evidence.
+
+Hashmarks must **not** generalize semantic identity or correspondence into a repository-wide knowledge graph.
+
+In particular, Hashmarks must not introduce:
+
+- a global semantic node/edge registry spanning unrelated providers or domains;
+- persistent semantic edges that outlive the explicit producer-owned claim that created them;
+- inferred, transitive, symmetric, inverse, or reachability-derived semantic relationships;
+- graph traversal, path search, shortest-path, neighborhood expansion, or transitive-closure APIs over semantic declarations;
+- ontology/schema unification that makes opaque provider vocabulary globally meaningful;
+- edge weighting, confidence propagation, centrality, ranking, or graph-based winner/precedence selection;
+- a graph database, RDF/triple-store-like authority, or graph query layer as a second semantic source of truth.
+
+Explicit correspondence remains local to the producer-owned declaration group that states it. If provider A relates A↔B and provider B relates B↔C, Hashmarks does **not** derive A↔C. A separate explicit producer must own and evidence that A↔C claim.
+
+This boundary does not prohibit ordinary repository graphs already owned by CodeMap. It prohibits turning semantic declarations, identities, and cross-provider correspondence into a general-purpose knowledge graph or relationship authority.
+
 ### Semantic identity layers
 
 Repository declarations separate four identity questions instead of overloading file location or one universal ID:
