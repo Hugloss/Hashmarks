@@ -162,10 +162,7 @@ class _CrossProviderCorrespondenceProvider:
 
 
 def _groups(packet: dict[str, object]) -> dict[str, dict[str, object]]:
-    return {
-        row["group_id"]: row
-        for row in packet["declarations"]["groups"]
-    }
+    return {row["group_id"]: row for row in packet["declarations"]["groups"]}
 
 
 def _bindings(packet: dict[str, object]) -> dict[str, dict[str, object]]:
@@ -215,9 +212,7 @@ def _cross_provider_packets(
             [
                 provider_a,
                 provider_b,
-                _CrossProviderCorrespondenceProvider(
-                    correspondence_state="ambiguous"
-                ),
+                _CrossProviderCorrespondenceProvider(correspondence_state="ambiguous"),
             ],
             previous_observation=differing,
         )
@@ -239,21 +234,23 @@ def _assert_baseline_identity_separation(packet: dict[str, object]) -> None:
     assert source_a["semantic_namespace"] == "provider-a"
     assert source_b["semantic_namespace"] == "provider-b"
     assert correlation["semantic_namespace"] == "correlation-provider"
-    assert len(
-        {
-            source_a["semantic_subject_identity"],
-            source_b["semantic_subject_identity"],
-            correlation["semantic_subject_identity"],
-        }
-    ) == 3
+    assert (
+        len(
+            {
+                source_a["semantic_subject_identity"],
+                source_b["semantic_subject_identity"],
+                correlation["semantic_subject_identity"],
+            }
+        )
+        == 3
+    )
 
     source_roles = {
         source_a["declarations"][0]["semantic_declaration_identity"],
         source_b["declarations"][0]["semantic_declaration_identity"],
     }
     correlation_roles = {
-        row["semantic_declaration_identity"]
-        for row in correlation["declarations"]
+        row["semantic_declaration_identity"] for row in correlation["declarations"]
     }
     assert len(source_roles) == 2
     assert source_roles.isdisjoint(correlation_roles)
@@ -304,9 +301,9 @@ def _assert_cross_provider_value_change_is_local(
     assert changed_groups["provider-b-owner"]["value_changed_declaration_ids"] == [
         "owner"
     ]
-    assert changed_groups["cross-provider-owner"][
-        "value_changed_declaration_ids"
-    ] == ["right-owner"]
+    assert changed_groups["cross-provider-owner"]["value_changed_declaration_ids"] == [
+        "right-owner"
+    ]
 
 
 def _assert_correspondence_ambiguity_does_not_rewrite_sources(
