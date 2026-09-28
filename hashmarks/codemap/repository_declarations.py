@@ -130,17 +130,16 @@ class RepositoryDeclarationsMixin:
     def _group_identity_payloads(
         *,
         group_id: str,
-        semantic_namespace: str,
-        concept: Mapping[str, object],
-        scope: Mapping[str, object],
-        semantic_subject_identity: str,
+        semantic_subject: Mapping[str, object],
         correspondence: Mapping[str, object],
         coverage: Mapping[str, object],
         declarations: Sequence[Mapping[str, object]],
     ) -> tuple[dict[str, object], dict[str, object]]:
         definition_payload = {
             "group_id": group_id,
-            "semantic_subject_identity": semantic_subject_identity,
+            "semantic_subject_identity": semantic_subject[
+                "semantic_subject_identity"
+            ],
             "coverage_scope": coverage["scope"],
             "expected_declaration_ids": coverage["expected_declaration_ids"],
             "declaration_definition_identities": [
@@ -153,9 +152,7 @@ class RepositoryDeclarationsMixin:
         }
         observation_payload = {
             **definition_payload,
-            "semantic_namespace": semantic_namespace,
-            "concept": concept,
-            "scope": scope,
+            **semantic_subject,
             "correspondence": correspondence,
             "coverage": coverage,
             "declarations": list(declarations),
@@ -182,6 +179,12 @@ class RepositoryDeclarationsMixin:
             concept=concept,
             scope=scope,
         )
+        semantic_subject = {
+            "semantic_namespace": semantic_namespace,
+            "concept": concept,
+            "scope": scope,
+            "semantic_subject_identity": semantic_subject_identity,
+        }
         raw_declarations = cast(
             "Sequence[Mapping[str, object]]",
             group["declarations"],
@@ -199,10 +202,7 @@ class RepositoryDeclarationsMixin:
 
         definition_payload, observation_payload = self._group_identity_payloads(
             group_id=group_id,
-            semantic_namespace=semantic_namespace,
-            concept=concept,
-            scope=scope,
-            semantic_subject_identity=semantic_subject_identity,
+            semantic_subject=semantic_subject,
             correspondence=correspondence,
             coverage=coverage,
             declarations=declarations,
@@ -456,15 +456,15 @@ class RepositoryDeclarationsMixin:
             coverage,
             declarations,
         ) = contract
-        semantic_subject_identity = str(
-            raw_group.get("semantic_subject_identity") or ""
-        )
+        semantic_subject = {
+            "semantic_namespace": semantic_namespace,
+            "concept": concept,
+            "scope": scope,
+            "semantic_subject_identity": raw_group.get("semantic_subject_identity"),
+        }
         definition_payload, observation_payload = self._group_identity_payloads(
             group_id=group_id,
-            semantic_namespace=semantic_namespace,
-            concept=concept,
-            scope=scope,
-            semantic_subject_identity=semantic_subject_identity,
+            semantic_subject=semantic_subject,
             correspondence=correspondence,
             coverage=coverage,
             declarations=declarations,
