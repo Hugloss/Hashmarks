@@ -33,7 +33,7 @@ export HASHMARKS_NO_UPDATE_CHECK=1
 
 to disable automatic checks completely. This variable does not block `hashmarks upgrade`: that command is an explicit user request to contact release infrastructure.
 
-When a newer stable release is found interactively, Hashmarks offers exactly two actions:
+For the canonical standalone installation shown above, a newer stable release offers exactly two actions:
 
 ```text
 A newer Hashmarks version is available.
@@ -41,25 +41,35 @@ A newer Hashmarks version is available.
 Hashmarks 0.24.0
 Latest: 0.25.0
 
-This installation is managed by uv.
+This installation uses the Hashmarks standalone installer.
 
 Native upgrade command:
 
-    uv tool upgrade hashmarks
+    <exact standalone installer handoff>
 
 [1] Upgrade now
 [2] Skip for now
 ```
 
-Choosing **Skip for now** leaves the installation unchanged. Choosing **Upgrade now** is an explicit handoff: Hashmarks shows the detected native installation owner, then replaces the running Hashmarks process with that owner. A uv-managed install delegates to `uv tool upgrade hashmarks`; pipx delegates to `pipx upgrade hashmarks`; the standalone release path delegates to the checksum-verifying exact-release installer already used for installation. Hashmarks does not grow a second package resolver, rewrite its executable itself, or continue repository work after handing off. Restart Hashmarks after the native owner completes.
+Choosing **Skip for now** leaves the installation unchanged. Choosing **Upgrade now** replaces the running Hashmarks process with the existing checksum-verifying standalone installer; Hashmarks does not continue repository work with old in-memory code after that handoff.
 
-You can request the same flow explicitly at any time:
+Python-package and source installations are intentionally different. Hashmarks reports that an update exists but does **not** decide whether uv, pip, pipx, Git, or another native mechanism owns the installation. Use the same native mechanism that already owns it. For example:
+
+```bash
+uv tool upgrade hashmarks
+pipx upgrade hashmarks
+pip install --upgrade hashmarks
+```
+
+Those commands are examples, not Hashmarks-owned manager selection. Hashmarks does not reconstruct package-manager paths, parse package-manager receipts, or preflight whether those tools consider the installation upgradeable.
+
+You can request a fresh release check at any time:
 
 ```bash
 hashmarks upgrade
 ```
 
-Without an interactive terminal, `hashmarks upgrade` reports the current/latest versions and prints the native upgrade command, but it makes no installation change.
+Without an interactive terminal, `hashmarks upgrade` never mutates the installation.
 
 > **Hashmarks may discover update availability. It never owns updating itself.**
 
