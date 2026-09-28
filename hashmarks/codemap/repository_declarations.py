@@ -25,6 +25,20 @@ _SCHEMA = "hashmarks.repository-declarations.v1"
 class RepositoryDeclarationsMixin:
     """Project cross-artifact declarations without choosing a winning value."""
 
+    def _semantic_subject_identity(
+        self,
+        *,
+        concept: Mapping[str, object],
+        scope: Mapping[str, object],
+    ) -> str:
+        """Identify the provider-declared semantic subject independently of location."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        return "sha256:" + self._packet_digest(
+            "hashmarks.repository-declaration-semantic-subject.v1",
+            {"concept": concept, "scope": scope},
+        )
+
     @staticmethod
     def _binding_evidence_state(binding: Mapping[str, object]) -> str:
         evidence = binding.get("evidence")
@@ -80,6 +94,7 @@ class RepositoryDeclarationsMixin:
         group_id: str,
         concept: Mapping[str, object],
         scope: Mapping[str, object],
+        semantic_subject_identity: str,
         binding_rows: Mapping[str, Mapping[str, object]],
     ) -> dict[str, object]:
         if TYPE_CHECKING:
@@ -87,6 +102,7 @@ class RepositoryDeclarationsMixin:
         binding = binding_rows[str(normalized["binding_id"])]
         projected = {
             **normalized,
+            "semantic_subject_identity": semantic_subject_identity,
             "evidence_state": self._binding_evidence_state(binding),
         }
         definition, observation = self._declaration_identity_payloads(
@@ -156,6 +172,10 @@ class RepositoryDeclarationsMixin:
         scope = cast("Mapping[str, object]", group["scope"])
         correspondence = cast("Mapping[str, object]", group["correspondence"])
         coverage = cast("Mapping[str, object]", group["coverage"])
+        semantic_subject_identity = self._semantic_subject_identity(
+            concept=concept,
+            scope=scope,
+        )
         raw_declarations = cast(
             "Sequence[Mapping[str, object]]",
             group["declarations"],
@@ -167,6 +187,7 @@ class RepositoryDeclarationsMixin:
                 concept,
                 scope,
                 binding_rows,
+                semantic_subject_identity,
             )
             for normalized in raw_declarations
         ]
@@ -182,6 +203,7 @@ class RepositoryDeclarationsMixin:
         )
         return {
             **observation_payload,
+            "semantic_subject_identity": semantic_subject_identity,
             "group_definition_identity": "sha256:"
             + self._packet_digest(
                 "hashmarks.repository-declaration-group-definition.v1",
@@ -465,6 +487,16 @@ class RepositoryDeclarationsMixin:
             coverage,
             projected_rows,
         ) = self._projected_group_contract(raw_group, name=name)
+
+        semantic_subject_identity = self._semantic_subject_identity(
+            concept=concept,
+            scope=scope,
+        )
+        if raw_group.get("semantic_subject_identity") != semantic_subject_identity:
+            raise ValueError(f"{name} semantic subject identity mismatch")
+        for declaration in projected_rows:
+            if declaration.get("semantic_subject_identity") != semantic_subject_identity:
+                raise ValueError(f"{name} declaration semantic subject identity mismatch")
 
         referenced = {
             self._validate_projected_declaration(
