@@ -334,8 +334,7 @@ def test_splunk_csv_dogfood_rejects_invalid_module_locator_without_repair(
     _write(
         source,
         '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
-        '"[host]","idx","[host]","INFO name=tasks..worker"
-',
+        '"[host]","idx","[host]","INFO name=tasks..worker"\n',
     )
 
     report = collect(source)
@@ -355,8 +354,7 @@ def test_splunk_csv_dogfood_rejects_locator_beyond_core_module_bound(
     _write(
         source,
         '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
-        f'"[host]","idx","[host]","INFO name={module}"
-',
+        f'"[host]","idx","[host]","INFO name={module}"\n',
     )
 
     report = collect(source)
@@ -372,12 +370,9 @@ def test_splunk_csv_dogfood_rejects_invalid_traceback_locator_without_repair(
     _write(
         source,
         '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
-        '"[host]","idx","[host]","Traceback:
-'
-        '  File ""/app/../src/worker.py"", line 7, in worker
-'
-        'RuntimeError: boom"
-',
+        '"[host]","idx","[host]","Traceback:\n'
+        '  File ""/app/../src/worker.py"", line 7, in worker\n'
+        'RuntimeError: boom"\n',
     )
 
     report = collect(source)
