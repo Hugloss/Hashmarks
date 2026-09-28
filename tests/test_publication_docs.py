@@ -324,8 +324,7 @@ def test_hashmarks_never_becomes_a_semantic_knowledge_graph() -> None:
     assert "four negative questions before admission" in boundary
     assert "G75. Hashmarks is not a semantic knowledge graph" in invariants
     assert (
-        "Explicit A↔B plus explicit B↔C does not authorize inferred A↔C"
-        in invariants
+        "Explicit A↔B plus explicit B↔C does not authorize inferred A↔C" in invariants
     )
     assert "Correspondence is also deliberately **non-transitive**" in declarations
     assert "does not derive A↔C" in declarations
