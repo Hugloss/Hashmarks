@@ -24,17 +24,16 @@ from .errors import UserFacingError
 from .identity import RepositoryIdentity, RepositoryIdentityMode
 from .paths import canonical_host_path
 from .release_update import (
-    InstallationOwner,
     ReleaseCheckError,
     ReleaseInfo,
     UpgradeDelegationError,
     automatic_check_allowed,
-    can_delegate_upgrade,
-    delegate_upgrade,
-    detect_installation_owner,
+    can_delegate_standalone_upgrade,
+    delegate_standalone_upgrade,
     fetch_latest_release,
-    manual_upgrade_command,
+    is_standalone_installation,
     periodic_release_check,
+    standalone_upgrade_command,
 )
 
 logger = logging.getLogger(__name__)
@@ -69,38 +68,37 @@ def _interactive_terminal() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty()
 
 
-def _render_upgrade(
-    release: ReleaseInfo,
-    owner: InstallationOwner,
-    *,
-    announce: bool,
-) -> None:
+def _render_release(release: ReleaseInfo, *, announce: bool) -> None:
     if announce:
         _text("A newer Hashmarks version is available.", "")
     _text(
         f"Hashmarks {release.current_version}",
         f"Latest: {release.latest_version}",
-        "",
-        f"This installation is managed by {owner.label}.",
     )
-    command = manual_upgrade_command(owner, release.latest_version)
-    if command is not None:
-        _text("", "Native upgrade command:", "", f"    {command}")
 
 
-def _manual_upgrade(owner: InstallationOwner, latest_version: str) -> None:
-    command = manual_upgrade_command(owner, latest_version)
-    if command is None:
-        _text(
-            "Hashmarks could not determine a safe native upgrade command.",
-            "No changes were made.",
-        )
-        return
+def _render_external_upgrade_guidance() -> None:
     _text(
         "",
-        "Hashmarks does not modify its own installation directly.",
+        "This installation is managed outside Hashmarks.",
+        "Use the native mechanism that installed or owns this Hashmarks installation.",
+        "Hashmarks does not detect, validate, or certify that package-manager state.",
+        "",
+        "Examples:",
+        "    uv tool upgrade hashmarks",
+        "    pipx upgrade hashmarks",
+        "    pip install --upgrade hashmarks",
+        "",
         "No changes were made.",
     )
+
+
+def _render_standalone_upgrade(release: ReleaseInfo, *, announce: bool) -> None:
+    _render_release(release, announce=announce)
+    command = standalone_upgrade_command(release.latest_version)
+    _text("", "This installation uses the Hashmarks standalone installer.")
+    if command is not None:
+        _text("", "Native upgrade command:", "", f"    {command}")
 
 
 def _prompt_upgrade() -> bool:
@@ -108,17 +106,14 @@ def _prompt_upgrade() -> bool:
     return input("Select [1/2]: ").strip() == "1"
 
 
-def _delegate_selected_upgrade(
-    release: ReleaseInfo,
-    owner: InstallationOwner,
-) -> None:
+def _delegate_selected_upgrade(release: ReleaseInfo) -> None:
     _text(
         "",
-        f"Delegating update to {owner.label}.",
-        "Hashmarks exits before the installation owner mutates the installation.",
+        "Delegating update to the Hashmarks standalone installer.",
+        "Hashmarks exits before the installer mutates the installation.",
         "Restart Hashmarks after the upgrade completes.",
     )
-    delegate_upgrade(owner, release.latest_version)
+    delegate_standalone_upgrade(release.latest_version)
 
 
 def _upgrade(args) -> int:
@@ -135,24 +130,25 @@ def _upgrade(args) -> int:
             )
         return 0
 
-    owner = detect_installation_owner()
-    _render_upgrade(release, owner, announce=False)
-    if not _interactive_terminal() or not can_delegate_upgrade(owner):
-        _manual_upgrade(owner, release.latest_version)
+    if not is_standalone_installation():
+        _render_release(release, announce=False)
+        _render_external_upgrade_guidance()
+        return 0
+
+    _render_standalone_upgrade(release, announce=False)
+    if not _interactive_terminal() or not can_delegate_standalone_upgrade():
+        _text("", "No changes were made.")
         return 0
     if not _prompt_upgrade():
         _text("Upgrade skipped.")
         return 0
-    _delegate_selected_upgrade(release, owner)
+    _delegate_selected_upgrade(release)
     return 0
 
 
 def _maybe_offer_periodic_upgrade(command: str) -> None:
     interactive = _interactive_terminal()
     if not automatic_check_allowed(command=command, interactive=interactive):
-        return
-    owner = detect_installation_owner()
-    if owner.kind not in {"standalone", "uv", "pipx", "pipx-global"}:
         return
     release = periodic_release_check(
         __version__,
@@ -161,14 +157,19 @@ def _maybe_offer_periodic_upgrade(command: str) -> None:
     )
     if release is None:
         return
-    _render_upgrade(release, owner, announce=True)
-    if not can_delegate_upgrade(owner):
-        _manual_upgrade(owner, release.latest_version)
+    if not is_standalone_installation():
+        _render_release(release, announce=True)
+        _render_external_upgrade_guidance()
+        return
+
+    _render_standalone_upgrade(release, announce=True)
+    if not can_delegate_standalone_upgrade():
+        _text("", "No changes were made.")
         return
     if not _prompt_upgrade():
         _text("Upgrade skipped for now.")
         return
-    _delegate_selected_upgrade(release, owner)
+    _delegate_selected_upgrade(release)
 
 
 def _daemon_serve_command(workspace: Path, state: Path) -> list[str]:

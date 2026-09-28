@@ -587,13 +587,19 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
 
     assert "hashmarks upgrade" in readme
     assert "hashmarks upgrade" in getting_started
-    assert "installation owner" in architecture
-    assert "U5. Installation mutation is explicit." in invariants
+    assert "canonical standalone distribution" in architecture
+    assert "does not determine whether that mechanism is uv, pip, pipx" in architecture
+    assert "U5. Installation mutation is explicit and narrow." in invariants
     assert "U6. Hashmarks never owns updating itself." in invariants
-    assert "exact manager-owned environment root" in invariants
-    assert "Global pipx ownership remains distinct" in invariants
-    assert "unsupported on the current platform" in invariants
-    assert "admitted only on platforms where pipx supports `--global`" in invariants
+    assert "U7. Native package-manager state stays opaque and native." in invariants
+    assert "must not reconstruct uv/pip/pipx filesystem layouts" in invariants
+    assert "inspect or certify their receipts/metadata" in invariants
+    assert "package-manager detector" in invariants
+    assert "Those commands are examples, not Hashmarks-owned manager selection." in (
+        getting_started
+    )
+    assert "does not detect/certify uv, pip, pipx" in boundary
+    assert "package-manager detection/certification" in boundary
     assert "Narrow product-distribution lifecycle exception" in boundary
     assert "package resolver" in boundary
     assert "repository/task command execution" in boundary

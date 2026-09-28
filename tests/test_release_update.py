@@ -8,7 +8,7 @@ import pytest
 
 import hashmarks.cli as cli
 import hashmarks.release_update as release_update
-from hashmarks.release_update import InstallationOwner, ReleaseInfo
+from hashmarks.release_update import ReleaseInfo
 
 
 class _Response:
@@ -150,7 +150,8 @@ def test_corrupt_periodic_cache_is_disposable(monkeypatch, tmp_path: Path) -> No
 
 
 def test_network_failure_is_non_fatal_and_throttled(
-    monkeypatch, tmp_path: Path
+    monkeypatch,
+    tmp_path: Path,
 ) -> None:
     calls = 0
 
@@ -186,351 +187,23 @@ def test_network_failure_is_non_fatal_and_throttled(
     assert calls == 1
 
 
-@pytest.mark.parametrize(
-    "case",
-    [
-        pytest.param(
-            (
-                "/home/user/.local/share/uv/tools/hashmarks",
-                "/usr",
-                {},
-                "/home/user",
-                "posix",
-                "linux",
-                InstallationOwner(
-                    kind="uv",
-                    label="uv",
-                    command=("uv", "tool", "upgrade", "hashmarks"),
-                ),
-            ),
-            id="uv-linux",
-        ),
-        pytest.param(
-            (
-                r"C:\Users\User\AppData\Roaming\uv\data\tools\hashmarks",
-                r"C:\Python314",
-                {"APPDATA": r"C:\Users\User\AppData\Roaming"},
-                r"C:\Users\User",
-                "nt",
-                "win32",
-                InstallationOwner(
-                    kind="uv",
-                    label="uv",
-                    command=("uv", "tool", "upgrade", "hashmarks"),
-                ),
-            ),
-            id="uv-windows",
-        ),
-        pytest.param(
-            (
-                "/home/user/.local/share/pipx/venvs/hashmarks",
-                "/usr",
-                {},
-                "/home/user",
-                "posix",
-                "linux",
-                InstallationOwner(
-                    kind="pipx",
-                    label="pipx",
-                    command=("pipx", "upgrade", "hashmarks"),
-                ),
-            ),
-            id="pipx-linux",
-        ),
-        pytest.param(
-            (
-                r"C:\Users\User\AppData\Local\pipx\pipx\venvs\hashmarks",
-                r"C:\Python314",
-                {"LOCALAPPDATA": r"C:\Users\User\AppData\Local"},
-                r"C:\Users\User",
-                "nt",
-                "win32",
-                InstallationOwner(
-                    kind="pipx",
-                    label="pipx",
-                    command=("pipx", "upgrade", "hashmarks"),
-                ),
-            ),
-            id="pipx-windows",
-        ),
-        pytest.param(
-            (
-                "/opt/pipx/venvs/hashmarks",
-                "/usr",
-                {},
-                "/home/user",
-                "posix",
-                "linux",
-                InstallationOwner(
-                    kind="pipx-global",
-                    label="pipx (global)",
-                    command=("pipx", "upgrade", "--global", "hashmarks"),
-                ),
-            ),
-            id="pipx-global-linux",
-        ),
-        pytest.param(
-            (
-                "/srv/uv-tools/hashmarks",
-                "/usr",
-                {"UV_TOOL_DIR": "/srv/uv-tools"},
-                "/home/user",
-                "posix",
-                "linux",
-                InstallationOwner(
-                    kind="uv",
-                    label="uv",
-                    command=("uv", "tool", "upgrade", "hashmarks"),
-                ),
-            ),
-            id="uv-custom-root",
-        ),
-        pytest.param(
-            (
-                "/srv/pipx/venvs/hashmarks",
-                "/usr",
-                {"PIPX_HOME": "/srv/pipx"},
-                "/home/user",
-                "posix",
-                "linux",
-                InstallationOwner(
-                    kind="pipx",
-                    label="pipx",
-                    command=("pipx", "upgrade", "hashmarks"),
-                ),
-            ),
-            id="pipx-custom-root",
-        ),
-        pytest.param(
-            (
-                "/srv/pipx-global/venvs/hashmarks",
-                "/usr",
-                {"PIPX_GLOBAL_HOME": "/srv/pipx-global"},
-                "/home/user",
-                "posix",
-                "linux",
-                InstallationOwner(
-                    kind="pipx-global",
-                    label="pipx (global)",
-                    command=("pipx", "upgrade", "--global", "hashmarks"),
-                ),
-            ),
-            id="pipx-global-custom-root",
-        ),
-    ],
-)
-def test_python_tool_owner_requires_exact_manager_root(
-    case: tuple[
-        str,
-        str,
-        dict[str, str],
-        str,
-        str,
-        str,
-        InstallationOwner,
-    ],
-) -> None:
-    prefix, base_prefix, environ, home, os_name, platform, expected = case
-    owner = release_update._detect_python_installation_owner(
-        prefix=prefix,
-        base_prefix=base_prefix,
-        environ=environ,
-        home=home,
-        os_name=os_name,
-        platform=platform,
-    )
-
-    assert owner == expected
-    command = release_update.manual_upgrade_command(owner, "0.25.0")
-    assert command is not None
-    assert "hashmarks" in command
-
-
-@pytest.mark.parametrize(
-    ("prefix", "environ", "home", "os_name", "platform"),
-    [
-        (
-            "/work/project/uv/tools/hashmarks/.venv",
-            {},
-            "/home/user",
-            "posix",
-            "linux",
-        ),
-        (
-            "/work/project/uv/tools/hashmarks",
-            {},
-            "/home/user",
-            "posix",
-            "linux",
-        ),
-        (
-            "/work/project/pipx/venvs/hashmarks/.venv",
-            {},
-            "/home/user",
-            "posix",
-            "linux",
-        ),
-        (
-            r"C:\\work\\pipx\\pipx\\venvs\\hashmarks\\.venv",
-            {
-                "LOCALAPPDATA": r"C:\\Users\\User\\AppData\\Local",
-                "APPDATA": r"C:\\Users\\User\\AppData\\Roaming",
-            },
-            r"C:\\Users\\User",
-            "nt",
-            "win32",
-        ),
-        (
-            r"C:\\work\\uv\\data\\tools\\hashmarks",
-            {
-                "LOCALAPPDATA": r"C:\\Users\\User\\AppData\\Local",
-                "APPDATA": r"C:\\Users\\User\\AppData\\Roaming",
-            },
-            r"C:\\Users\\User",
-            "nt",
-            "win32",
-        ),
-    ],
-)
-def test_lookalike_manager_paths_do_not_gain_installation_authority(
-    prefix: str,
-    environ: dict[str, str],
-    home: str,
-    os_name: str,
-    platform: str,
-) -> None:
-    owner = release_update._detect_python_installation_owner(
-        prefix=prefix,
-        base_prefix="/system-python",
-        environ=environ,
-        home=home,
-        os_name=os_name,
-        platform=platform,
-    )
-
-    assert owner.kind == "environment"
-    assert owner.command is None
-
-
-def test_windows_global_pipx_home_does_not_gain_unsupported_authority() -> None:
-    owner = release_update._detect_python_installation_owner(
-        prefix=r"C:\\pipx-global\\venvs\\hashmarks",
-        base_prefix=r"C:\\Python314",
-        environ={"PIPX_GLOBAL_HOME": r"C:\\pipx-global"},
-        home=r"C:\\Users\\User",
-        os_name="nt",
-        platform="win32",
-    )
-
-    assert owner.kind == "environment"
-    assert owner.command is None
-    assert release_update.can_delegate_upgrade(owner) is False
-
-
-def test_python_environment_is_not_guessed_as_an_installation_owner(
+def test_package_manager_environment_configuration_does_not_create_authority(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(release_update.sys, "prefix", "/repo/.venv")
-    monkeypatch.setattr(release_update.sys, "base_prefix", "/usr")
+    monkeypatch.delattr(release_update.sys, "frozen", raising=False)
+    monkeypatch.setenv("UV_TOOL_DIR", "/arbitrary/uv-tools")
+    monkeypatch.setenv("PIPX_HOME", "/arbitrary/pipx")
+    monkeypatch.setenv("PIPX_GLOBAL_HOME", "/arbitrary/pipx-global")
 
-    owner = release_update.detect_installation_owner()
-
-    assert owner.kind == "environment"
-    assert owner.command is None
-    assert release_update.can_delegate_upgrade(owner) is False
-
-
-def test_native_uv_delegation_replaces_hashmarks_process(monkeypatch) -> None:
-    owner = InstallationOwner(
-        kind="uv",
-        label="uv",
-        command=("uv", "tool", "upgrade", "hashmarks"),
-    )
-    monkeypatch.setattr(
-        release_update.shutil,
-        "which",
-        lambda name: "/tools/uv" if name == "uv" else None,
-    )
-    seen: dict[str, object] = {}
-
-    def execve(executable: str, argv: list[str], environ: dict[str, str]) -> None:
-        seen["executable"] = executable
-        seen["argv"] = argv
-        seen["version"] = environ["HASHMARKS_VERSION"]
-        raise OSError("blocked by test")
-
-    monkeypatch.setattr(release_update.os, "execve", execve)
-
-    with pytest.raises(release_update.UpgradeDelegationError):
-        release_update.delegate_upgrade(owner, "0.25.0")
-
-    assert seen == {
-        "executable": "/tools/uv",
-        "argv": ["/tools/uv", "tool", "upgrade", "hashmarks"],
-        "version": "0.25.0",
-    }
+    assert release_update.is_standalone_installation() is False
+    assert release_update.standalone_upgrade_command("0.25.0") is None
+    assert release_update.can_delegate_standalone_upgrade() is False
 
 
-def test_periodic_cli_check_accepts_global_pipx_owner(monkeypatch) -> None:
-    owner = InstallationOwner(
-        kind="pipx-global",
-        label="pipx (global)",
-        command=("pipx", "upgrade", "--global", "hashmarks"),
-    )
-    calls: list[tuple[str, str, bool]] = []
-
-    monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
-    monkeypatch.setattr(
-        cli,
-        "automatic_check_allowed",
-        lambda *, command, interactive: command == "find" and interactive,
-    )
-    monkeypatch.setattr(cli, "detect_installation_owner", lambda: owner)
-
-    def periodic(
-        current_version: str,
-        *,
-        command: str,
-        interactive: bool,
-    ) -> None:
-        calls.append((current_version, command, interactive))
-        return None
-
-    monkeypatch.setattr(cli, "periodic_release_check", periodic)
-
-    cli._maybe_offer_periodic_upgrade("find")
-
-    assert calls == [("0.24.0", "find", True)]
-
-
-def test_periodic_cli_check_skips_unmanaged_installation(monkeypatch) -> None:
-    owner = InstallationOwner(
-        kind="environment",
-        label="the current Python environment",
-        command=None,
-    )
-    monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
-    monkeypatch.setattr(cli, "detect_installation_owner", lambda: owner)
-    monkeypatch.setattr(
-        cli,
-        "periodic_release_check",
-        lambda *args, **kwargs: pytest.fail(
-            "unmanaged/source environments must not perform automatic release checks"
-        ),
-    )
-
-    cli._maybe_offer_periodic_upgrade("find")
-
-
-def test_cli_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate(
+def test_external_python_upgrade_reports_native_tool_handoff_without_mutation(
     monkeypatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    owner = InstallationOwner(
-        kind="uv",
-        label="uv",
-        command=("uv", "tool", "upgrade", "hashmarks"),
-    )
     monkeypatch.setattr(
         cli,
         "fetch_latest_release",
@@ -539,14 +212,20 @@ def test_cli_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate(
             latest_version="0.25.0",
         ),
     )
-    monkeypatch.setattr(cli, "detect_installation_owner", lambda: owner)
-    monkeypatch.setattr(cli, "can_delegate_upgrade", lambda value: value == owner)
-    monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
-    monkeypatch.setattr("builtins.input", lambda prompt: "2")
+    monkeypatch.setattr(cli, "is_standalone_installation", lambda: False)
     monkeypatch.setattr(
         cli,
-        "delegate_upgrade",
-        lambda *args, **kwargs: pytest.fail("skip must not mutate"),
+        "_prompt_upgrade",
+        lambda: pytest.fail(
+            "external package-manager installs must not prompt mutation"
+        ),
+    )
+    monkeypatch.setattr(
+        cli,
+        "delegate_standalone_upgrade",
+        lambda *args, **kwargs: pytest.fail(
+            "external package-manager installs must not delegate standalone mutation"
+        ),
     )
 
     assert cli.main(["upgrade"]) == 0
@@ -554,48 +233,49 @@ def test_cli_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate(
     output = capsys.readouterr().out
     assert "Hashmarks 0.24.0" in output
     assert "Latest: 0.25.0" in output
-    assert "This installation is managed by uv." in output
-    assert "Native upgrade command:" in output
+    assert "managed outside Hashmarks" in output
+    assert "Use the native mechanism that installed or owns" in output
+    assert "does not detect, validate, or certify that package-manager state" in output
     assert "uv tool upgrade hashmarks" in output
-    assert output.index("uv tool upgrade hashmarks") < output.index("[1] Upgrade now")
-    assert "[1] Upgrade now" in output
-    assert "[2] Skip for now" in output
-    assert "Upgrade skipped." in output
+    assert "pipx upgrade hashmarks" in output
+    assert "pip install --upgrade hashmarks" in output
+    assert "No changes were made." in output
 
 
-def test_cli_upgrade_noninteractive_prints_native_command_without_mutation(
+def test_periodic_external_installation_reports_update_without_manager_selection(
     monkeypatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    owner = InstallationOwner(
-        kind="uv",
-        label="uv",
-        command=("uv", "tool", "upgrade", "hashmarks"),
+    monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
+    monkeypatch.setattr(
+        cli,
+        "automatic_check_allowed",
+        lambda *, command, interactive: command == "find" and interactive,
     )
     monkeypatch.setattr(
         cli,
-        "fetch_latest_release",
-        lambda current_version, *, timeout: ReleaseInfo(
+        "periodic_release_check",
+        lambda current_version, *, command, interactive: ReleaseInfo(
             current_version=current_version,
             latest_version="0.25.0",
         ),
     )
-    monkeypatch.setattr(cli, "detect_installation_owner", lambda: owner)
-    monkeypatch.setattr(cli, "_interactive_terminal", lambda: False)
+    monkeypatch.setattr(cli, "is_standalone_installation", lambda: False)
     monkeypatch.setattr(
         cli,
-        "delegate_upgrade",
-        lambda *args, **kwargs: pytest.fail("noninteractive use must not mutate"),
+        "_prompt_upgrade",
+        lambda: pytest.fail("external installs must not prompt mutation"),
     )
 
-    assert cli.main(["upgrade"]) == 0
+    cli._maybe_offer_periodic_upgrade("find")
 
     output = capsys.readouterr().out
-    assert "Hashmarks does not modify its own installation directly." in output
-    assert "uv tool upgrade hashmarks" in output
+    assert "A newer Hashmarks version is available." in output
+    assert "managed outside Hashmarks" in output
+    assert "[1] Upgrade now" not in output
 
 
-def test_cli_upgrade_reports_up_to_date_without_owner_detection(
+def test_cli_upgrade_reports_up_to_date_without_installation_detection(
     monkeypatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -609,8 +289,8 @@ def test_cli_upgrade_reports_up_to_date_without_owner_detection(
     )
     monkeypatch.setattr(
         cli,
-        "detect_installation_owner",
-        lambda: pytest.fail("owner is irrelevant when already current"),
+        "is_standalone_installation",
+        lambda: pytest.fail("installation mode is irrelevant when already current"),
     )
 
     assert cli.main(["upgrade"]) == 0
@@ -618,7 +298,7 @@ def test_cli_upgrade_reports_up_to_date_without_owner_detection(
     assert "Hashmarks 0.24.0 is up to date." in capsys.readouterr().out
 
 
-def test_managed_standalone_owner_requires_canonical_installed_name(
+def test_managed_standalone_requires_canonical_installed_name(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -627,10 +307,9 @@ def test_managed_standalone_owner_requires_canonical_installed_name(
     monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
     monkeypatch.setattr(release_update.sys, "executable", str(executable))
 
-    owner = release_update.detect_installation_owner()
+    assert release_update.is_standalone_installation() is True
 
-    assert owner.kind == "standalone"
-    command = release_update.manual_upgrade_command(owner, "0.25.0")
+    command = release_update.standalone_upgrade_command("0.25.0")
     assert command is not None
     assert "HASHMARKS_VERSION" in command
     assert "0.25.0" in command
@@ -638,7 +317,7 @@ def test_managed_standalone_owner_requires_canonical_installed_name(
     assert str(tmp_path.resolve()) in command
 
 
-def test_raw_frozen_release_asset_is_not_guessed_as_managed_install(
+def test_raw_frozen_release_asset_is_not_treated_as_installed_standalone(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -646,11 +325,78 @@ def test_raw_frozen_release_asset_is_not_guessed_as_managed_install(
     monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
     monkeypatch.setattr(release_update.sys, "executable", str(executable))
 
-    owner = release_update.detect_installation_owner()
+    assert release_update.is_standalone_installation() is False
+    assert release_update.standalone_upgrade_command("0.25.0") is None
+    assert release_update.can_delegate_standalone_upgrade() is False
 
-    assert owner.kind == "frozen-unmanaged"
-    assert owner.command is None
-    assert release_update.can_delegate_upgrade(owner) is False
+
+def test_standalone_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate(
+    monkeypatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"
+    monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(
+        release_update.sys, "executable", str(tmp_path / installed_name)
+    )
+    monkeypatch.setattr(
+        cli,
+        "fetch_latest_release",
+        lambda current_version, *, timeout: ReleaseInfo(
+            current_version=current_version,
+            latest_version="0.25.0",
+        ),
+    )
+    monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
+    monkeypatch.setattr(cli, "can_delegate_standalone_upgrade", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda prompt: "2")
+    monkeypatch.setattr(
+        cli,
+        "delegate_standalone_upgrade",
+        lambda *args, **kwargs: pytest.fail("skip must not mutate"),
+    )
+
+    assert cli.main(["upgrade"]) == 0
+
+    output = capsys.readouterr().out
+    assert "This installation uses the Hashmarks standalone installer." in output
+    assert "Native upgrade command:" in output
+    assert "[1] Upgrade now" in output
+    assert "[2] Skip for now" in output
+    assert "Upgrade skipped." in output
+
+
+def test_standalone_upgrade_noninteractive_prints_command_without_mutation(
+    monkeypatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"
+    monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(
+        release_update.sys, "executable", str(tmp_path / installed_name)
+    )
+    monkeypatch.setattr(
+        cli,
+        "fetch_latest_release",
+        lambda current_version, *, timeout: ReleaseInfo(
+            current_version=current_version,
+            latest_version="0.25.0",
+        ),
+    )
+    monkeypatch.setattr(cli, "_interactive_terminal", lambda: False)
+    monkeypatch.setattr(
+        cli,
+        "delegate_standalone_upgrade",
+        lambda *args, **kwargs: pytest.fail("noninteractive use must not mutate"),
+    )
+
+    assert cli.main(["upgrade"]) == 0
+
+    output = capsys.readouterr().out
+    assert "Native upgrade command:" in output
+    assert "No changes were made." in output
 
 
 def test_standalone_delegation_executes_the_displayed_native_command(
@@ -659,13 +405,9 @@ def test_standalone_delegation_executes_the_displayed_native_command(
 ) -> None:
     installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"
     executable = tmp_path / installed_name
+    monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
     monkeypatch.setattr(release_update.sys, "executable", str(executable))
-    owner = InstallationOwner(
-        kind="standalone",
-        label="Hashmarks standalone installer",
-        command=None,
-    )
-    displayed = release_update.manual_upgrade_command(owner, "0.25.0")
+    displayed = release_update.standalone_upgrade_command("0.25.0")
     assert displayed is not None
 
     def which(name: str) -> str | None:
@@ -687,7 +429,7 @@ def test_standalone_delegation_executes_the_displayed_native_command(
 
     monkeypatch.setattr(release_update, "_exec_owner", exec_owner)
 
-    release_update.delegate_upgrade(owner, "0.25.0")
+    release_update.delegate_standalone_upgrade("0.25.0")
 
     argv = seen["argv"]
     assert isinstance(argv, tuple)
