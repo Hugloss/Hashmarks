@@ -18,9 +18,7 @@ def _declarations(group: Mapping[str, object]) -> dict[str, Mapping[str, object]
     rows = group.get("declarations", [])
     if not isinstance(rows, list):
         return {}
-    return {
-        str(row["declaration_id"]): row for row in rows if isinstance(row, Mapping)
-    }
+    return {str(row["declaration_id"]): row for row in rows if isinstance(row, Mapping)}
 
 
 def _value_signature(row: Mapping[str, object]) -> tuple[object, object, object]:
@@ -90,9 +88,7 @@ def _group_change(
         != new.get("semantic_subject_identity"),
         "definition_changed": old.get("group_definition_identity")
         != new.get("group_definition_identity"),
-        "added_declaration_ids": sorted(
-            set(new_declarations) - set(old_declarations)
-        ),
+        "added_declaration_ids": sorted(set(new_declarations) - set(old_declarations)),
         "removed_declaration_ids": sorted(
             set(old_declarations) - set(new_declarations)
         ),
