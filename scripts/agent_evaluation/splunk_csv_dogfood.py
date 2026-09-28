@@ -10,11 +10,14 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 from typing import TextIO
 
 from hashmarks._command_output import log_command_output
 
 logger = logging.getLogger(__name__)
+
+_CSV_FIELD_LIMIT_LOCK = Lock()
 
 SCHEMA = "hashmarks.splunk-csv-dogfood.v1"
 EXPECTED_HEADER = (
@@ -584,10 +587,16 @@ def _collect_recovery_stream(path: Path) -> _CollectionState:
 
 
 def _collect_stream(path: Path) -> _CollectionState:
-    try:
-        return _collect_native_csv_stream(path)
-    except csv.Error:
-        return _collect_recovery_stream(path)
+    field_limit = max(1, path.stat().st_size)
+    with _CSV_FIELD_LIMIT_LOCK:
+        previous_limit = csv.field_size_limit(field_limit)
+        try:
+            try:
+                return _collect_native_csv_stream(path)
+            except csv.Error:
+                return _collect_recovery_stream(path)
+        finally:
+            csv.field_size_limit(previous_limit)
 
 
 def _select_anchors(
