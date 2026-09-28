@@ -91,7 +91,7 @@ Release awareness is a narrow product-distribution lifecycle surface, not reposi
 
 > **Hashmarks may discover update availability. It never owns updating itself.**
 
-An eligible interactive CLI invocation may periodically read public GitHub latest-release metadata. That request is bounded, credential-free, contains no repository-derived information, and is independent of workspace, CodeMap, semantic identity, MCP, or repository evidence. Its small timestamp/latest-version cache is disposable product-local state in the user cache directory; it never lives under `.hashmarks/`, never enters repository identity, and never becomes historical observation state.
+An eligible interactive CLI invocation may periodically read public GitHub latest-release metadata. That request is bounded, credential-free, contains no repository-derived information, and is independent of workspace, CodeMap, semantic identity, MCP, or repository evidence. Its disposable cache stores only the last-check timestamp used to throttle automatic checks; latest-release identity is not persisted. The cache lives in the user cache directory, never under `.hashmarks/`, never enters repository identity, and never becomes historical observation state.
 
 Automatic update awareness is excluded from MCP, daemon, CI, and non-interactive invocations and is hard-disabled by `HASHMARKS_NO_UPDATE_CHECK=1`. Network failure, malformed metadata, cache corruption, rate limiting, or GitHub unavailability cannot change repository semantics or prevent the requested repository command from running.
 

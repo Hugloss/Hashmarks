@@ -612,6 +612,16 @@ def test_ci_and_dev_check_enforce_current_ruff_gate() -> None:
     assert "Ruff:        PASS (zero debt)" in dev_check
 
 
+def test_update_check_cache_is_throttle_only() -> None:
+    getting_started = _text("docs/GETTING_STARTED.md")
+    architecture = _text("docs/reference/ARCHITECTURE.md")
+
+    for text in (getting_started, architecture):
+        assert "stores only the last-check timestamp" in text
+        assert "latest-release identity is not persisted" in text
+        assert "timestamp/latest-version cache" not in text
+
+
 def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() -> None:
     readme = _text("README.md")
     getting_started = _text("docs/GETTING_STARTED.md")
