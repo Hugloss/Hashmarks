@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks import CodeMap
+from hashmarks.codemap import validate_evidence_locator_claim
 from hashmarks.codemap.evidence_correlation import CORRELATION_PACKET_MAX_BYTES
 
 if TYPE_CHECKING:
@@ -34,6 +35,31 @@ def _binding(
     binding_id = anchor["repository_evidence_binding_id"]
     rows = packet["repository_evidence"]["bindings"]
     return next(row for row in rows if row["binding_id"] == binding_id)
+
+
+def test_evidence_locator_admission_reuses_correlation_claim_contract() -> None:
+    validate_evidence_locator_claim(module="tasks.worker")
+    validate_evidence_locator_claim(
+        path="/app/src/worker.py",
+        line=7,
+        symbol="<module>",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="module must be an exact dotted module identity",
+    ):
+        validate_evidence_locator_claim(module="tasks..worker")
+
+    with pytest.raises(ValueError, match="external path must not contain"):
+        validate_evidence_locator_claim(
+            path="/app/../src/worker.py",
+            line=7,
+            symbol="worker",
+        )
+
+    with pytest.raises(ValueError, match="module exceeds"):
+        validate_evidence_locator_claim(module="m" * 1025)
 
 
 def test_evidence_correlation_extension_preserves_repository_coverage_owner(
