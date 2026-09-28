@@ -274,11 +274,20 @@ def test_provider_namespace_identity_never_infers_cross_provider_aliases() -> No
 
     assert "Replacing one provider namespace with another" in invariants
     assert "never an inferred rename, alias, or provider migration" in invariants
-    assert "Provider implementation/provenance/version is not semantic identity" in invariants
+    assert (
+        "Provider implementation/provenance/version is not semantic identity"
+        in invariants
+    )
     assert "changing semantic scope changes subject identity" in invariants
     assert "do not infer a cross-provider rename, alias, migration" in declarations
-    assert "does not maintain a provider-alias or provider-migration table" in declarations
-    assert "Provider build/provenance version is not identity; semantic scope is" in owners
+    assert (
+        "does not maintain a provider-alias or provider-migration table"
+        in declarations
+    )
+    assert (
+        "Provider build/provenance version is not identity; semantic scope is"
+        in owners
+    )
 
 
 def test_duplicate_semantic_roles_never_gain_core_precedence() -> None:
