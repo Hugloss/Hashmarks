@@ -623,6 +623,8 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
         in invariants
     )
     assert "requirements are resolved once" in architecture
+    assert "single resolution of both installation mode and exact execution payload" in invariants
+    assert "resolved together by one optional command result" in architecture
     assert "must not transport the same upgrade inputs again" in invariants
     assert "displayed standalone command is also the execution payload" in architecture
     assert "does not preflight installer prerequisites" in getting_started
