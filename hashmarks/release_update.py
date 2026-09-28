@@ -278,12 +278,7 @@ def standalone_upgrade_command(latest_version: str) -> str | None:
     )
 
 
-def _standalone_exec_target(latest_version: str) -> tuple[str, tuple[str, ...]]:
-    command = standalone_upgrade_command(latest_version)
-    if command is None:
-        raise StandaloneUpgradeError(
-            "this installation is not managed by the Hashmarks standalone installer"
-        )
+def _standalone_exec_target(command: str) -> tuple[str, tuple[str, ...]]:
     if os.name == "nt":
         executable = shutil.which("pwsh") or shutil.which("powershell")
         if executable is None:
@@ -315,7 +310,6 @@ def _exec_standalone_installer(
         ) from exc
 
 
-def delegate_standalone_upgrade(latest_version: str) -> None:
-    _version_key(latest_version)
-    executable, argv = _standalone_exec_target(latest_version)
+def delegate_standalone_upgrade(command: str) -> None:
+    executable, argv = _standalone_exec_target(command)
     _exec_standalone_installer(executable, argv)
