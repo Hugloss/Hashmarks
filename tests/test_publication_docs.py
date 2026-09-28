@@ -288,6 +288,20 @@ def test_provider_namespace_identity_never_infers_cross_provider_aliases() -> No
     )
 
 
+def test_cross_provider_correspondence_never_unions_source_identities() -> None:
+    invariants = _text("docs/reference/INVARIANTS.md")
+    declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")
+    owners = _text("docs/reference/STATE_AND_SEMANTIC_OWNERS.md")
+
+    assert "G74. Cross-provider correspondence is a producer-owned claim" in invariants
+    assert "not identity union" in invariants
+    assert "must not rewrite source-provider identities" in invariants
+    assert "third explicit producer" in declarations
+    assert "does **not** merge, rename, alias" in declarations
+    assert "not a global semantic edge registry or ontology layer" in declarations
+    assert "owns a separate namespaced claim rather than merging source identities" in owners
+
+
 def test_duplicate_semantic_roles_never_gain_core_precedence() -> None:
     invariants = _text("docs/reference/INVARIANTS.md")
     declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")
