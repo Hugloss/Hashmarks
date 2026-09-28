@@ -15,13 +15,12 @@ def _group(
     expected: list[str] | None = None,
     correspondence_state: str = "declared",
     scope: dict[str, object] | None = None,
-    semantic_namespace: str = "fixture",
 ) -> dict[str, object]:
     ids = [str(row["declaration_id"]) for row in declarations]
     coverage_state, truncation = coverage
     return {
         "group_id": group_id,
-        "semantic_namespace": semantic_namespace,
+        "semantic_namespace": "fixture",
         "concept": {"kind": "runtime-compatibility", "identity": "python"},
         "scope": {} if scope is None else scope,
         "correspondence": {
@@ -206,12 +205,12 @@ def test_semantic_namespace_is_required_and_prevents_cross_namespace_collision(
         codemap.sync()
         with pytest.raises(ValueError, match="semantic_namespace"):
             codemap.repository_declarations([missing_namespace])
-        first = codemap.repository_declarations(
-            [_group(declaration, semantic_namespace="provider-a")]
-        )
-        second = codemap.repository_declarations(
-            [_group(declaration, semantic_namespace="provider-b")]
-        )
+        first_group = _group(declaration)
+        first_group["semantic_namespace"] = "provider-a"
+        second_group = _group(declaration)
+        second_group["semantic_namespace"] = "provider-b"
+        first = codemap.repository_declarations([first_group])
+        second = codemap.repository_declarations([second_group])
 
     assert (
         first["groups"][0]["semantic_subject_identity"]
