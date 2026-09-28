@@ -290,6 +290,8 @@ It must not create a second repository observer, source identity, freshness mode
 
 Producer adapters may derive request-local source-artifact, source-occurrence, normalized-observation, and bounded evidence-projection identities so that transport provenance does not masquerade as observation or repository identity. Those identities remain producer/caller evidence vocabulary: they are deterministic projections of supplied evidence, not a new Hashmarks repository identity owner. Repository locator identity continues to be owned by the existing evidence-correlation claim plus repository correspondence authority.
 
+Producer parser diagnostics are likewise scoped to the syntax layer the adapter actually validates. CSV strict/recovered/malformed state is transport-envelope evidence only; it is not application-payload validity, semantic correctness, or repository authority. Opaque embedded payloads remain `not-assessed` unless a separate typed contract explicitly owns their validation.
+
 Changing producer serialization may change exact artifact/occurrence provenance without changing the normalized observation or bounded evidence projection. Repeated occurrences may share one normalized observation identity. None of these identities authorize retained history, incident identity, Git traversal, branch/ref ownership, merge/rollback semantics, or repository mutation.
 
 ## Repository declaration work
