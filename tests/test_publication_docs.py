@@ -305,6 +305,29 @@ def test_cross_provider_correspondence_never_unions_source_identities() -> None:
     )
 
 
+def test_hashmarks_never_becomes_a_semantic_knowledge_graph() -> None:
+    architecture = _text("docs/reference/ARCHITECTURE.md")
+    boundary = _text("docs/reference/PRODUCT_BOUNDARY.md")
+    invariants = _text("docs/reference/INVARIANTS.md")
+    declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")
+    decision = _text(
+        "docs/maintainers/SEMANTIC_IDENTITY_WITHOUT_REPOSITORY_OWNERSHIP.md"
+    )
+    owners = _text("docs/reference/STATE_AND_SEMANTIC_OWNERS.md")
+
+    assert "Semantic knowledge graph is a permanent non-goal" in architecture
+    assert "must **not** generalize semantic identity or correspondence" in architecture
+    assert "Not a semantic knowledge graph" in boundary
+    assert "four negative questions before admission" in boundary
+    assert "G75. Hashmarks is not a semantic knowledge graph" in invariants
+    assert "Explicit A↔B plus explicit B↔C does not authorize inferred A↔C" in invariants
+    assert "Correspondence is also deliberately **non-transitive**" in declarations
+    assert "does not derive A↔C" in declarations
+    assert "Why this is not a knowledge graph" in decision
+    assert "they do not create A↔C" in decision
+    assert "There is no global semantic edge/knowledge-graph owner" in owners
+
+
 def test_duplicate_semantic_roles_never_gain_core_precedence() -> None:
     invariants = _text("docs/reference/INVARIANTS.md")
     declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")
