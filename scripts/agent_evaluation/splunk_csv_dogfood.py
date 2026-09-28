@@ -15,7 +15,10 @@ from threading import Lock
 from typing import TextIO
 
 from hashmarks._command_output import log_command_output
-from hashmarks.codemap import validate_evidence_locator_claim
+from hashmarks.codemap import (
+    evidence_component_fits,
+    validate_evidence_locator_claim,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -313,7 +316,14 @@ def _physical_line_count(text: str) -> int:
 
 
 def _stats_metadata(stats: _ModuleStats) -> dict[str, object]:
-    return {
+    runtime_context = {
+        "handling_ident_values": [],
+        "handling_ident_values_truncated": True,
+        "commit_values": [],
+        "commit_values_truncated": True,
+        "values_truncated": True,
+    }
+    metadata: dict[str, object] = {
         "observed_count": stats.count,
         "strict_valid_count": stats.strict_valid,
         "recovered_count": stats.recovered,
@@ -333,16 +343,46 @@ def _stats_metadata(stats: _ModuleStats) -> dict[str, object]:
         "producer_payload_validation": {
             "state": _PRODUCER_PAYLOAD_VALIDATION_STATE,
         },
-        "runtime_context": {
-            "handling_ident_values": sorted(stats.handling_idents),
-            "handling_ident_values_truncated": stats.handling_idents_truncated,
-            "commit_values": sorted(stats.commit_values),
-            "commit_values_truncated": stats.commit_values_truncated,
-            "values_truncated": (
-                stats.handling_idents_truncated or stats.commit_values_truncated
-            ),
-        },
+        "runtime_context": runtime_context,
+        "metadata_values_truncated": True,
     }
+    handling_truncated = stats.handling_idents_truncated
+    commit_truncated = stats.commit_values_truncated
+    metadata_truncated = False
+
+    for value in sorted(stats.handling_idents):
+        runtime_context["handling_ident_values"].append(value)
+        if not evidence_component_fits(metadata):
+            runtime_context["handling_ident_values"].pop()
+            handling_truncated = True
+            metadata_truncated = True
+
+    for value in sorted(stats.commit_values):
+        runtime_context["commit_values"].append(value)
+        if not evidence_component_fits(metadata):
+            runtime_context["commit_values"].pop()
+            commit_truncated = True
+            metadata_truncated = True
+
+    runtime_context["handling_ident_values_truncated"] = handling_truncated
+    runtime_context["commit_values_truncated"] = commit_truncated
+    runtime_context["values_truncated"] = handling_truncated or commit_truncated
+
+    if not evidence_component_fits(metadata):
+        metadata["first_time"] = None
+        metadata["last_time"] = None
+        metadata_truncated = True
+
+    if metadata_truncated:
+        metadata["metadata_values_truncated"] = True
+    else:
+        metadata.pop("metadata_values_truncated", None)
+
+    if not evidence_component_fits(metadata):
+        raise ValueError(
+            "Splunk anchor metadata could not fit evidence component budget"
+        )
+    return metadata
 
 
 def _module_anchor(module: str, stats: _ModuleStats) -> dict[str, object]:
@@ -660,30 +700,85 @@ def _select_anchors(
     )
 
 
+def _selection_context_truncated(selection: _AnchorSelection) -> bool:
+    for anchor in selection.anchors:
+        metadata = anchor.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+        runtime_context = metadata.get("runtime_context")
+        if (
+            isinstance(runtime_context, dict)
+            and runtime_context.get("values_truncated") is True
+        ):
+            return True
+    return False
+
+
+def _selection_metadata_truncated(selection: _AnchorSelection) -> bool:
+    return any(
+        isinstance(anchor.get("metadata"), dict)
+        and anchor["metadata"].get("metadata_values_truncated") is True
+        for anchor in selection.anchors
+    )
+
+
 def _projection_truncated(
     state: _CollectionState,
     selection: _AnchorSelection,
 ) -> bool:
     return (
         selection.truncated
-        or state.scope_values_truncated
+        or bool(_scope(state)["scope_values_truncated"])
         or state.context_values_truncated
+        or _selection_metadata_truncated(selection)
     )
 
 
 def _scope(state: _CollectionState) -> dict[str, object]:
-    return {
-        "time_start": state.time_bounds.start,
-        "time_end": state.time_bounds.end,
+    scope: dict[str, object] = {
+        "time_start": None,
+        "time_end": None,
         "time_ordering_state": state.time_bounds.ordering_state,
         "timestamp_parse_failure_count": state.time_bounds.unparseable_count,
-        "sources": sorted(state.sources),
-        "sourcetypes": sorted(state.sourcetypes),
-        "hosts": sorted(state.hosts),
-        "indexes": sorted(state.indexes),
-        "splunk_servers": sorted(state.splunk_servers),
-        "scope_values_truncated": state.scope_values_truncated,
+        "sources": [],
+        "sourcetypes": [],
+        "hosts": [],
+        "indexes": [],
+        "splunk_servers": [],
+        "scope_values_truncated": True,
     }
+    truncated = state.scope_values_truncated
+
+    for field, value in (
+        ("time_start", state.time_bounds.start),
+        ("time_end", state.time_bounds.end),
+    ):
+        if value is None:
+            continue
+        scope[field] = value
+        if not evidence_component_fits(scope):
+            scope[field] = None
+            truncated = True
+
+    for field, values in (
+        ("sources", state.sources),
+        ("sourcetypes", state.sourcetypes),
+        ("hosts", state.hosts),
+        ("indexes", state.indexes),
+        ("splunk_servers", state.splunk_servers),
+    ):
+        projected = scope[field]
+        assert isinstance(projected, list)
+        for value in sorted(values):
+            projected.append(value)
+            if not evidence_component_fits(scope):
+                projected.pop()
+                truncated = True
+
+    scope["scope_values_truncated"] = truncated
+    if not evidence_component_fits(scope):
+        raise ValueError("Splunk scope could not fit evidence component budget")
+    return scope
 
 
 def _identity_anchor(anchor: dict[str, object]) -> dict[str, object]:
@@ -839,8 +934,12 @@ def _report(
             "unique_anchors_observed": selection.observed,
             "anchors_emitted": len(selection.anchors),
             "anchors_truncated": selection.truncated,
-            "scope_values_truncated": state.scope_values_truncated,
-            "context_values_truncated": state.context_values_truncated,
+            "scope_values_truncated": bool(_scope(state)["scope_values_truncated"]),
+            "context_values_truncated": (
+                state.context_values_truncated
+                or _selection_context_truncated(selection)
+            ),
+            "metadata_values_truncated": _selection_metadata_truncated(selection),
             "projection_truncated": _projection_truncated(state, selection),
         },
         "bundle": _bundle(source_sha256, state, selection),

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks import CodeMap
-from hashmarks.codemap import validate_evidence_locator_claim
+from hashmarks.codemap import evidence_component_fits, validate_evidence_locator_claim
 from hashmarks.codemap.evidence_correlation import CORRELATION_PACKET_MAX_BYTES
 
 if TYPE_CHECKING:
@@ -35,6 +35,11 @@ def _binding(
     binding_id = anchor["repository_evidence_binding_id"]
     rows = packet["repository_evidence"]["bindings"]
     return next(row for row in rows if row["binding_id"] == binding_id)
+
+
+def test_evidence_component_budget_owner_matches_correlation_envelope() -> None:
+    assert evidence_component_fits({"value": "small"})
+    assert not evidence_component_fits({"value": "x" * 9_000})
 
 
 def test_evidence_locator_admission_reuses_correlation_claim_contract() -> None:

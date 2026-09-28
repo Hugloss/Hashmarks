@@ -751,6 +751,72 @@ def test_splunk_csv_dogfood_bounds_context_without_splitting_anchor(
     assert context["values_truncated"] is True
 
 
+def test_splunk_csv_dogfood_fits_oversized_scope_to_core_budget(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    oversized_source = "[source-" + ("x" * 9_000) + "]"
+    _write(
+        source,
+        f'"1","2026-09-14T23:59:59.000+0200","{oversized_source}",'
+        '"kube:container:x","[host]","idx","[server]",'
+        '"INFO name=tasks.worker"\n',
+    )
+
+    report = collect(source)
+    scope = report["bundle"]["scope"]
+    assert oversized_source not in scope["sources"]
+    assert scope["scope_values_truncated"] is True
+    assert report["summary"]["scope_values_truncated"] is True
+    assert report["summary"]["projection_truncated"] is True
+    assert report["bundle"]["truncation"] == "truncated"
+
+    workspace = tmp_path / "repo"
+    (workspace / "tasks").mkdir(parents=True)
+    (workspace / "tasks" / "__init__.py").write_text("", encoding="utf-8")
+    (workspace / "tasks" / "worker.py").write_text(
+        "def run():\n    return 1\n",
+        encoding="utf-8",
+    )
+    result = correlate(workspace, report)
+    assert result["resolution_states"] == {"resolved-unique": 1}
+
+
+def test_splunk_csv_dogfood_fits_oversized_context_to_core_budget(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    oversized_context = "[DOC-" + ("x" * 9_000) + "]"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]",'
+        '"kube:container:x","[host]","idx","[server]",'
+        f'"INFO name=tasks.worker handling_ident={oversized_context}"\n',
+    )
+
+    report = collect(source)
+    metadata = report["bundle"]["anchors"][0]["metadata"]
+    runtime_context = metadata["runtime_context"]
+    assert oversized_context not in runtime_context["handling_ident_values"]
+    assert runtime_context["handling_ident_values_truncated"] is True
+    assert runtime_context["values_truncated"] is True
+    assert metadata["metadata_values_truncated"] is True
+    assert report["summary"]["context_values_truncated"] is True
+    assert report["summary"]["metadata_values_truncated"] is True
+    assert report["summary"]["projection_truncated"] is True
+    assert report["bundle"]["truncation"] == "truncated"
+
+    workspace = tmp_path / "repo"
+    (workspace / "tasks").mkdir(parents=True)
+    (workspace / "tasks" / "__init__.py").write_text("", encoding="utf-8")
+    (workspace / "tasks" / "worker.py").write_text(
+        "def run():\n    return 1\n",
+        encoding="utf-8",
+    )
+    result = correlate(workspace, report)
+    assert result["resolution_states"] == {"resolved-unique": 1}
+
+
 def test_splunk_csv_dogfood_nontruncated_projection_remains_unknown(
     tmp_path,
 ) -> None:

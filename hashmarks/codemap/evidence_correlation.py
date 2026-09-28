@@ -109,6 +109,12 @@ def _json_size(value: object, *, label: str) -> int:
     return len(encoded)
 
 
+def evidence_component_fits(value: object) -> bool:
+    return (
+        _json_size(value, label="evidence component") <= _MAX_METADATA_BYTES_PER_ANCHOR
+    )
+
+
 def _bounded_identifier(value: object, *, label: str) -> str:
     text = str(value or "").strip()
     if not text:
