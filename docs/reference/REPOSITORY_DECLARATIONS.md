@@ -117,6 +117,10 @@ Hashmarks core never decides that two declarations concern the same conceptual f
 
 Ambiguous or unresolved correspondence never becomes equivalence or disagreement in core.
 
+Cross-provider correspondence follows the same rule. If two independent providers expose related facts, a third explicit producer may read the qualified repository evidence for both and emit its own declaration group that declares those facts comparable. That correspondence group receives the producer's own semantic namespace, subject identity, role identities, coverage, and bindings. It does **not** merge, rename, alias, or otherwise replace the source providers' subjects. Matching values in the correspondence group can produce `equivalent`; differing values can produce `differing`; ambiguous or unresolved correspondence remains `ambiguous`. Removing the correspondence producer removes only that producer-owned claim and its bindings—the independently observed source-provider claims remain intact.
+
+This is intentionally not a global semantic edge registry or ontology layer. A correspondence provider may identify the source producers in opaque provenance/basis metadata, but core does not interpret those names as identity links, transitive equivalence, precedence, or migration authority.
+
 ## Values and comparison
 
 Each declaration has:
