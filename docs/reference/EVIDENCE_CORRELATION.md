@@ -196,6 +196,18 @@ For large logs or exports, the external parser should recover/validate the produ
 
 For high-volume streams, consumers should aggregate repeated events into **unique repository locators** before correlation when event identity itself is not needed for repository truth. Occurrence counts, time windows, representative event IDs, and similar summary fields remain opaque consumer metadata. Hashmarks may also reuse repeated locators within one request, but its anchor/count bounds remain a repository-intelligence economics guard rather than a log-retention mechanism. Consumers should split independent locator sets only after aggregation; separate correlation packets do not imply that Hashmarks owns cross-chunk incident state.
 
+Producer adapters must keep identity layers explicit rather than letting one digest silently own several meanings:
+
+- **source artifact identity** names the exact producer bytes and belongs in provenance;
+- **source occurrence identity** is an artifact-local reference to one occurrence and may legitimately depend on source ordering or serialization;
+- **normalized observation identity** names the producer-normalized observation value and must not use transport-only row ordinals, CSV quoting, or equivalent serialization as semantic input;
+- **repository locator identity** names the bounded path/module/symbol/line claim used for correlation and remains independent of runtime occurrence count;
+- an aggregated **evidence projection identity** may name the bounded normalized evidence projection submitted for correlation, but it must not masquerade as source-artifact identity, incident identity, or repository identity.
+
+Equivalent producer serialization may therefore preserve normalized-observation and evidence-projection identity while changing source-artifact and source-occurrence identity. Because exact source provenance remains part of the correlation request, the overall `correlation_identity` may still change when source bytes change; that does not imply semantic repository change. Repeated normalized observations may also have distinct source occurrences. Producer row numbers such as Splunk `_serial` are provenance unless a separate typed contract gives them stronger semantics.
+
+These identities are request-scoped evidence vocabulary only. They do not create incident history, cross-request retention, Git/ref identity, branch/merge/rollback semantics, or repository mutation authority.
+
 ## Permanent boundary
 
 Evidence correlation must not add:
