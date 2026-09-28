@@ -157,6 +157,77 @@ def test_splunk_csv_dogfood_bounds_unlocated_event_samples(tmp_path) -> None:
     assert len(set(sample_ids)) == 3
 
 
+def test_splunk_csv_dogfood_preserves_bounded_opaque_context_per_anchor(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host-a]","idx","[server-a]","INFO name=pipelines.worker '
+        'handling_ident=[DOCUMENT_A] commit=[REV_A]"\n'
+        '"2","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host-a]","idx","[server-b]","INFO name=pipelines.worker '
+        'handling_ident=[DOCUMENT_B] commit=[REV_A]"\n'
+        '"3","2026-09-14T23:59:57.000+0200","[path]","kube:container:x",'
+        '"[host-b]","idx","[server-b]","INFO name=pipelines.worker '
+        'handling_ident=[DOCUMENT_B] commit=[REV_B]"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["unique_module_anchors_observed"] == 1
+    anchor = report["bundle"]["anchors"][0]
+    assert anchor["metadata"]["observed_count"] == 3
+    context = anchor["metadata"]["runtime_context"]
+    assert context["handling_ident_values"] == ["[DOCUMENT_A]", "[DOCUMENT_B]"]
+    assert context["handling_ident_values_truncated"] is False
+    assert context["commit_values"] == ["[REV_A]", "[REV_B]"]
+    assert context["commit_values_truncated"] is False
+    assert context["values_truncated"] is False
+
+
+def test_splunk_csv_dogfood_preserves_runtime_placement_scope(tmp_path) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host-a]","idx","[server-a]","INFO name=tasks.worker"\n'
+        '"2","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host-b]","idx","[server-b]","INFO name=tasks.worker"\n',
+    )
+
+    scope = collect(source)["bundle"]["scope"]
+    assert scope["hosts"] == ["[host-a]", "[host-b]"]
+    assert scope["splunk_servers"] == ["[server-a]", "[server-b]"]
+    assert scope["scope_values_truncated"] is False
+
+
+def test_splunk_csv_dogfood_bounds_context_without_splitting_anchor(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    rows = []
+    for index in range(10):
+        rows.append(
+            f'"{index}","2026-09-14T23:59:{index:02d}.000+0200",'
+            '"[path]","kube:container:x","[host]","idx","[server]",'
+            f'"INFO name=pipelines.worker handling_ident=[DOC_{index}] '
+            f'commit=[REV_{index}]"\n'
+        )
+    _write(source, "".join(rows))
+
+    report = collect(source)
+    assert report["summary"]["unique_module_anchors_observed"] == 1
+    anchor = report["bundle"]["anchors"][0]
+    assert anchor["metadata"]["observed_count"] == 10
+    context = anchor["metadata"]["runtime_context"]
+    assert len(context["handling_ident_values"]) == 8
+    assert context["handling_ident_values_truncated"] is True
+    assert len(context["commit_values"]) == 8
+    assert context["commit_values_truncated"] is True
+    assert context["values_truncated"] is True
+
+
 def test_splunk_csv_dogfood_preserves_multiline_record_and_exact_source_identity(
     tmp_path,
 ) -> None:

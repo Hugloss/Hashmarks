@@ -31,9 +31,18 @@ _MODULE = re.compile(r"\bname=([A-Za-z_][A-Za-z0-9_.]*)")
 _TRACEBACK = re.compile(
     r'File\s+"?([^",]+)"?,\s+line\s+(\d+),\s+in\s+([A-Za-z_][A-Za-z0-9_]*)'
 )
+_HANDLING_IDENT = re.compile(r"\bhandling_ident=([^\s]+)")
+_COMMIT_VALUE = re.compile(r"\bcommit=([^\s]+)")
 _MAX_SCOPE_VALUES = 32
+_MAX_ANCHOR_CONTEXT_VALUES = 8
 _MAX_UNLOCATED_SAMPLE_EVENT_IDS = 3
 _DEFAULT_MAX_ANCHORS = 256
+
+
+@dataclass(frozen=True)
+class _OpaqueRuntimeContext:
+    handling_ident: str | None
+    commit_value: str | None
 
 
 @dataclass
@@ -45,6 +54,10 @@ class _ModuleStats:
     first_time: str | None = None
     last_time: str | None = None
     sample_event_ids: list[str] = field(default_factory=list)
+    handling_idents: set[str] = field(default_factory=set)
+    commit_values: set[str] = field(default_factory=set)
+    handling_idents_truncated: bool = False
+    commit_values_truncated: bool = False
 
     def observe(
         self,
@@ -53,6 +66,7 @@ class _ModuleStats:
         parser_state: str,
         widened: bool,
         event_id: str,
+        context: _OpaqueRuntimeContext,
     ) -> None:
         self.count += 1
         self.strict_valid += int(parser_state == "strict-valid")
@@ -66,6 +80,16 @@ class _ModuleStats:
         )
         if len(self.sample_event_ids) < 3:
             self.sample_event_ids.append(event_id)
+        self.handling_idents_truncated |= _bounded_value(
+            self.handling_idents,
+            context.handling_ident,
+            limit=_MAX_ANCHOR_CONTEXT_VALUES,
+        )
+        self.commit_values_truncated |= _bounded_value(
+            self.commit_values,
+            context.commit_value,
+            limit=_MAX_ANCHOR_CONTEXT_VALUES,
+        )
 
 
 @dataclass(frozen=True)
@@ -145,13 +169,27 @@ def _parse_record(text: str) -> _ParsedRecord | None:
     )
 
 
-def _bounded_value(values: set[str], value: str) -> bool:
+def _bounded_value(
+    values: set[str],
+    value: str | None,
+    *,
+    limit: int = _MAX_SCOPE_VALUES,
+) -> bool:
     if not value or value in values:
         return False
-    if len(values) >= _MAX_SCOPE_VALUES:
+    if len(values) >= limit:
         return True
     values.add(value)
     return False
+
+
+def _opaque_runtime_context(raw: str) -> _OpaqueRuntimeContext:
+    handling_match = _HANDLING_IDENT.search(raw)
+    commit_match = _COMMIT_VALUE.search(raw)
+    return _OpaqueRuntimeContext(
+        handling_ident=(handling_match.group(1) if handling_match else None),
+        commit_value=(commit_match.group(1) if commit_match else None),
+    )
 
 
 def _event_id(ordinal: int, text: str) -> str:
@@ -172,6 +210,15 @@ def _stats_metadata(stats: _ModuleStats) -> dict[str, object]:
         "first_time": stats.first_time,
         "last_time": stats.last_time,
         "sample_event_ids": stats.sample_event_ids,
+        "runtime_context": {
+            "handling_ident_values": sorted(stats.handling_idents),
+            "handling_ident_values_truncated": stats.handling_idents_truncated,
+            "commit_values": sorted(stats.commit_values),
+            "commit_values_truncated": stats.commit_values_truncated,
+            "values_truncated": (
+                stats.handling_idents_truncated or stats.commit_values_truncated
+            ),
+        },
     }
 
 
@@ -207,6 +254,8 @@ class _CollectionState:
     sourcetypes: set[str] = field(default_factory=set)
     indexes: set[str] = field(default_factory=set)
     sources: set[str] = field(default_factory=set)
+    hosts: set[str] = field(default_factory=set)
+    splunk_servers: set[str] = field(default_factory=set)
     scope_values_truncated: bool = False
     event_count: int = 0
     strict_valid_count: int = 0
@@ -244,11 +293,12 @@ class _CollectionState:
         self.strict_valid_count += int(parsed.parser_state == "strict-valid")
         self.recovered_count += int(parsed.parser_state == "recovered")
         self.widened_count += int(parsed.widened)
-        _serial, timestamp, source, sourcetype, _host, index, _server = parsed.fields
-        self._observe_scope(timestamp, source, sourcetype, index)
+        _serial, timestamp, source, sourcetype, host, index, server = parsed.fields
+        self._observe_scope(timestamp, source, sourcetype, host, index, server)
         event_id = _event_id(ordinal, text)
-        module_found = self._observe_module(parsed, timestamp, event_id)
-        traceback_found = self._observe_traceback(parsed, timestamp, event_id)
+        context = _opaque_runtime_context(parsed.raw)
+        module_found = self._observe_module(parsed, timestamp, event_id, context)
+        traceback_found = self._observe_traceback(parsed, timestamp, event_id, context)
         locator_occurrences = int(module_found) + int(traceback_found)
         self.module_locator_occurrences += int(module_found)
         self.traceback_locator_occurrences += int(traceback_found)
@@ -264,7 +314,9 @@ class _CollectionState:
         timestamp: str,
         source: str,
         sourcetype: str,
+        host: str,
         index: str,
+        server: str,
     ) -> None:
         self.first_time = (
             timestamp if self.first_time is None else min(self.first_time, timestamp)
@@ -274,13 +326,16 @@ class _CollectionState:
         )
         self.scope_values_truncated |= _bounded_value(self.sources, source)
         self.scope_values_truncated |= _bounded_value(self.sourcetypes, sourcetype)
+        self.scope_values_truncated |= _bounded_value(self.hosts, host)
         self.scope_values_truncated |= _bounded_value(self.indexes, index)
+        self.scope_values_truncated |= _bounded_value(self.splunk_servers, server)
 
     def _observe_module(
         self,
         parsed: _ParsedRecord,
         timestamp: str,
         event_id: str,
+        context: _OpaqueRuntimeContext,
     ) -> bool:
         match = _MODULE.search(parsed.raw)
         if match is None:
@@ -292,6 +347,7 @@ class _CollectionState:
             parser_state=parsed.parser_state,
             widened=parsed.widened,
             event_id=event_id,
+            context=context,
         )
         return True
 
@@ -300,6 +356,7 @@ class _CollectionState:
         parsed: _ParsedRecord,
         timestamp: str,
         event_id: str,
+        context: _OpaqueRuntimeContext,
     ) -> bool:
         match = _TRACEBACK.search(parsed.raw)
         if match is None:
@@ -311,6 +368,7 @@ class _CollectionState:
             parser_state=parsed.parser_state,
             widened=parsed.widened,
             event_id=event_id,
+            context=context,
         )
         return True
 
@@ -404,7 +462,9 @@ def _bundle(
             "time_end": state.last_time,
             "sources": sorted(state.sources),
             "sourcetypes": sorted(state.sourcetypes),
+            "hosts": sorted(state.hosts),
             "indexes": sorted(state.indexes),
+            "splunk_servers": sorted(state.splunk_servers),
             "scope_values_truncated": state.scope_values_truncated,
         },
         "anchors": selection.anchors,
