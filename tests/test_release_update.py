@@ -120,7 +120,6 @@ def test_periodic_check_is_cached_outside_repository_state(
     cache = tmp_path / "cache" / "hashmarks" / "update-check.json"
     assert json.loads(cache.read_text(encoding="utf-8")) == {
         "checked_at": 1000.0,
-        "latest_version": "0.25.0",
     }
     assert not (tmp_path / ".hashmarks").exists()
 
@@ -187,24 +186,230 @@ def test_network_failure_is_non_fatal_and_throttled(
     assert calls == 1
 
 
-def test_uv_tool_environment_maps_to_native_uv_upgrade(monkeypatch) -> None:
-    monkeypatch.setattr(
-        release_update.sys,
-        "prefix",
-        "/home/user/.local/share/uv/tools/hashmarks",
+@pytest.mark.parametrize(
+    "case",
+    [
+        pytest.param(
+            (
+                "/home/user/.local/share/uv/tools/hashmarks",
+                "/usr",
+                {},
+                "/home/user",
+                "posix",
+                "linux",
+                InstallationOwner(
+                    kind="uv",
+                    label="uv",
+                    command=("uv", "tool", "upgrade", "hashmarks"),
+                ),
+            ),
+            id="uv-linux",
+        ),
+        pytest.param(
+            (
+                r"C:\Users\User\AppData\Roaming\uv\data\tools\hashmarks",
+                r"C:\Python314",
+                {"APPDATA": r"C:\Users\User\AppData\Roaming"},
+                r"C:\Users\User",
+                "nt",
+                "win32",
+                InstallationOwner(
+                    kind="uv",
+                    label="uv",
+                    command=("uv", "tool", "upgrade", "hashmarks"),
+                ),
+            ),
+            id="uv-windows",
+        ),
+        pytest.param(
+            (
+                "/home/user/.local/share/pipx/venvs/hashmarks",
+                "/usr",
+                {},
+                "/home/user",
+                "posix",
+                "linux",
+                InstallationOwner(
+                    kind="pipx",
+                    label="pipx",
+                    command=("pipx", "upgrade", "hashmarks"),
+                ),
+            ),
+            id="pipx-linux",
+        ),
+        pytest.param(
+            (
+                r"C:\Users\User\AppData\Local\pipx\pipx\venvs\hashmarks",
+                r"C:\Python314",
+                {"LOCALAPPDATA": r"C:\Users\User\AppData\Local"},
+                r"C:\Users\User",
+                "nt",
+                "win32",
+                InstallationOwner(
+                    kind="pipx",
+                    label="pipx",
+                    command=("pipx", "upgrade", "hashmarks"),
+                ),
+            ),
+            id="pipx-windows",
+        ),
+        pytest.param(
+            (
+                "/opt/pipx/venvs/hashmarks",
+                "/usr",
+                {},
+                "/home/user",
+                "posix",
+                "linux",
+                InstallationOwner(
+                    kind="pipx-global",
+                    label="pipx (global)",
+                    command=("pipx", "upgrade", "--global", "hashmarks"),
+                ),
+            ),
+            id="pipx-global-linux",
+        ),
+        pytest.param(
+            (
+                "/srv/uv-tools/hashmarks",
+                "/usr",
+                {"UV_TOOL_DIR": "/srv/uv-tools"},
+                "/home/user",
+                "posix",
+                "linux",
+                InstallationOwner(
+                    kind="uv",
+                    label="uv",
+                    command=("uv", "tool", "upgrade", "hashmarks"),
+                ),
+            ),
+            id="uv-custom-root",
+        ),
+        pytest.param(
+            (
+                "/srv/pipx/venvs/hashmarks",
+                "/usr",
+                {"PIPX_HOME": "/srv/pipx"},
+                "/home/user",
+                "posix",
+                "linux",
+                InstallationOwner(
+                    kind="pipx",
+                    label="pipx",
+                    command=("pipx", "upgrade", "hashmarks"),
+                ),
+            ),
+            id="pipx-custom-root",
+        ),
+        pytest.param(
+            (
+                "/srv/pipx-global/venvs/hashmarks",
+                "/usr",
+                {"PIPX_GLOBAL_HOME": "/srv/pipx-global"},
+                "/home/user",
+                "posix",
+                "linux",
+                InstallationOwner(
+                    kind="pipx-global",
+                    label="pipx (global)",
+                    command=("pipx", "upgrade", "--global", "hashmarks"),
+                ),
+            ),
+            id="pipx-global-custom-root",
+        ),
+    ],
+)
+def test_python_tool_owner_requires_exact_manager_root(
+    case: tuple[
+        str,
+        str,
+        dict[str, str],
+        str,
+        str,
+        str,
+        InstallationOwner,
+    ],
+) -> None:
+    prefix, base_prefix, environ, home, os_name, platform, expected = case
+    owner = release_update._detect_python_installation_owner(
+        prefix=prefix,
+        base_prefix=base_prefix,
+        environ=environ,
+        home=home,
+        os_name=os_name,
+        platform=platform,
     )
-    monkeypatch.setattr(release_update.sys, "base_prefix", "/usr")
 
-    owner = release_update.detect_installation_owner()
+    assert owner == expected
+    command = release_update.manual_upgrade_command(owner, "0.25.0")
+    assert command is not None
+    assert "hashmarks" in command
 
-    assert owner == InstallationOwner(
-        kind="uv",
-        label="uv",
-        command=("uv", "tool", "upgrade", "hashmarks"),
+
+@pytest.mark.parametrize(
+    ("prefix", "environ", "home", "os_name", "platform"),
+    [
+        (
+            "/work/project/uv/tools/hashmarks/.venv",
+            {},
+            "/home/user",
+            "posix",
+            "linux",
+        ),
+        (
+            "/work/project/uv/tools/hashmarks",
+            {},
+            "/home/user",
+            "posix",
+            "linux",
+        ),
+        (
+            "/work/project/pipx/venvs/hashmarks/.venv",
+            {},
+            "/home/user",
+            "posix",
+            "linux",
+        ),
+        (
+            r"C:\\work\\pipx\\pipx\\venvs\\hashmarks\\.venv",
+            {
+                "LOCALAPPDATA": r"C:\\Users\\User\\AppData\\Local",
+                "APPDATA": r"C:\\Users\\User\\AppData\\Roaming",
+            },
+            r"C:\\Users\\User",
+            "nt",
+            "win32",
+        ),
+        (
+            r"C:\\work\\uv\\data\\tools\\hashmarks",
+            {
+                "LOCALAPPDATA": r"C:\\Users\\User\\AppData\\Local",
+                "APPDATA": r"C:\\Users\\User\\AppData\\Roaming",
+            },
+            r"C:\\Users\\User",
+            "nt",
+            "win32",
+        ),
+    ],
+)
+def test_lookalike_manager_paths_do_not_gain_installation_authority(
+    prefix: str,
+    environ: dict[str, str],
+    home: str,
+    os_name: str,
+    platform: str,
+) -> None:
+    owner = release_update._detect_python_installation_owner(
+        prefix=prefix,
+        base_prefix="/system-python",
+        environ=environ,
+        home=home,
+        os_name=os_name,
+        platform=platform,
     )
-    assert release_update.manual_upgrade_command(owner, "0.25.0") == (
-        "uv tool upgrade hashmarks"
-    )
+
+    assert owner.kind == "environment"
+    assert owner.command is None
 
 
 def test_python_environment_is_not_guessed_as_an_installation_owner(
@@ -249,6 +454,38 @@ def test_native_uv_delegation_replaces_hashmarks_process(monkeypatch) -> None:
         "argv": ["/tools/uv", "tool", "upgrade", "hashmarks"],
         "version": "0.25.0",
     }
+
+
+def test_periodic_cli_check_accepts_global_pipx_owner(monkeypatch) -> None:
+    owner = InstallationOwner(
+        kind="pipx-global",
+        label="pipx (global)",
+        command=("pipx", "upgrade", "--global", "hashmarks"),
+    )
+    calls: list[tuple[str, str, bool]] = []
+
+    monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
+    monkeypatch.setattr(
+        cli,
+        "automatic_check_allowed",
+        lambda *, command, interactive: command == "find" and interactive,
+    )
+    monkeypatch.setattr(cli, "detect_installation_owner", lambda: owner)
+
+    def periodic(
+        current_version: str,
+        *,
+        command: str,
+        interactive: bool,
+    ) -> None:
+        calls.append((current_version, command, interactive))
+        return None
+
+    monkeypatch.setattr(cli, "periodic_release_check", periodic)
+
+    cli._maybe_offer_periodic_upgrade("find")
+
+    assert calls == [("0.24.0", "find", True)]
 
 
 def test_periodic_cli_check_skips_unmanaged_installation(monkeypatch) -> None:

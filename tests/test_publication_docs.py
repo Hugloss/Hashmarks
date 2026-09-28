@@ -573,6 +573,8 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
     assert "installation owner" in architecture
     assert "U5. Installation mutation is explicit." in invariants
     assert "U6. Hashmarks never owns updating itself." in invariants
+    assert "exact manager-owned environment root" in invariants
+    assert "Global pipx ownership remains distinct" in invariants
     assert "Narrow product-distribution lifecycle exception" in boundary
     assert "package resolver" in boundary
     assert "repository/task command execution" in boundary
