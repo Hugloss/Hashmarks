@@ -299,7 +299,10 @@ def test_cross_provider_correspondence_never_unions_source_identities() -> None:
     assert "third explicit producer" in declarations
     assert "does **not** merge, rename, alias" in declarations
     assert "not a global semantic edge registry or ontology layer" in declarations
-    assert "owns a separate namespaced claim rather than merging source identities" in owners
+    assert (
+        "owns a separate namespaced claim rather than merging source identities"
+        in owners
+    )
 
 
 def test_duplicate_semantic_roles_never_gain_core_precedence() -> None:
