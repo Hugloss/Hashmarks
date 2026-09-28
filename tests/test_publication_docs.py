@@ -109,6 +109,7 @@ def test_public_docs_expose_repository_evidence_binding_contract() -> None:
         assert schema in binding
     assert "Locator/content identity separation" in binding
     assert "Precision/completeness separation" in binding
+    assert "Declared dependency topology and locality" in binding
     assert "Relationship scope and binding locality" in binding
     assert "Relationship comparability boundary" in binding
     assert (
