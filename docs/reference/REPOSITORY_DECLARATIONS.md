@@ -219,10 +219,9 @@ The remaining identities keep their existing, narrower jobs:
 \`group_definition_identity\` binds:
 
 - group ID;
-- semantic namespace;
-- opaque concept;
-- semantic scope;
-- expected declaration membership.
+- \`semantic_subject_identity\` (which already binds semantic namespace, opaque concept, and semantic scope);
+- coverage scope and expected declaration membership;
+- the declaration definition identities in the group.
 
 \`group_observation_identity\` additionally binds:
 
@@ -232,10 +231,7 @@ The remaining identities keep their existing, narrower jobs:
 - exact repository-evidence observations;
 - comparison and absence result.
 
-Each declaration likewise has definition and observation identities. A
-declaration definition also binds the existing repository-evidence binding
-definition, so moving a declaration to a different file/range cannot masquerade
-as the same declaration definition.
+Each declaration likewise has definition and observation identities. A declaration definition binds the group ID, the already-issued \`semantic_subject_identity\`, its request-local declaration ID, and the existing repository-evidence binding definition. Moving a declaration to a different file/range therefore cannot masquerade as the same declaration definition, while namespace/concept/scope canonicalization still has one owner: the semantic subject identity.
 
 A previous packet is revalidated before delta. Mutation under an old identity is rejected.
 
