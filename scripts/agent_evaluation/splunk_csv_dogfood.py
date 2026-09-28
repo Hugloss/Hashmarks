@@ -241,10 +241,15 @@ def _bounded_value(
 ) -> bool:
     if not value or value in values:
         return False
-    if len(values) >= limit:
-        return True
-    values.add(value)
-    return False
+    if len(values) < limit:
+        values.add(value)
+        return False
+
+    largest = max(values)
+    if value < largest:
+        values.remove(largest)
+        values.add(value)
+    return True
 
 
 def _bounded_sorted_sample(values: list[str], value: str, *, limit: int) -> None:
