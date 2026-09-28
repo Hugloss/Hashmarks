@@ -634,6 +634,12 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
 
     assert "hashmarks upgrade" in readme
     assert "hashmarks upgrade" in getting_started
+    assert "stores only the last-check timestamp" in getting_started
+    assert "latest-release identity is not persisted" in getting_started
+    assert "stores only the last-check timestamp" in architecture
+    assert "latest-release identity is not persisted" in architecture
+    assert "timestamp/latest-version cache" not in getting_started
+    assert "timestamp/latest-version cache" not in architecture
     assert "canonical standalone distribution" in architecture
     assert "does not determine whether that mechanism is uv, pip, pipx" in architecture
     assert "U5. Installation mutation is explicit and narrow." in invariants
