@@ -33,7 +33,8 @@ EXPECTED_HEADER = (
 _TIMESTAMP_START = re.compile(r"^\d{4}-\d{2}-\d{2}T")
 _MODULE = re.compile(r"\bname=([A-Za-z_][A-Za-z0-9_.]*)")
 _TRACEBACK = re.compile(
-    r'File\s+(?:"([^"]+)"|([^,\r\n]+)),\s+line\s+(\d+),\s+in\s+([^\r\n]+)'
+    r'File\s+(?:"([^"]+)"|"?([^",\r\n]+)"?),'
+    r'\s+line\s+(\d+),\s+in\s+([^"\r\n]+)'
 )
 _HANDLING_IDENT = re.compile(r"\bhandling_ident=([^\s]+)")
 _COMMIT_VALUE = re.compile(r"\bcommit=([^\s]+)")
