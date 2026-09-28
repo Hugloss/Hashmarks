@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from threading import Lock
 from typing import TextIO
 
@@ -168,11 +169,12 @@ class _ParsedRecord:
     widened: bool
 
 
-def _sha256_file(path: Path) -> str:
+def _snapshot_source(source: Path, snapshot: Path) -> str:
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
+    with source.open("rb") as source_handle, snapshot.open("wb") as snapshot_handle:
+        for block in iter(lambda: source_handle.read(1024 * 1024), b""):
             digest.update(block)
+            snapshot_handle.write(block)
     return "sha256:" + digest.hexdigest()
 
 
@@ -822,8 +824,10 @@ def collect(
 ) -> dict[str, object]:
     if max_anchors < 1 or max_anchors > _DEFAULT_MAX_ANCHORS:
         raise ValueError(f"max_anchors must be between 1 and {_DEFAULT_MAX_ANCHORS}")
-    source_sha256 = _sha256_file(path)
-    state = _collect_stream(path)
+    with TemporaryDirectory(prefix="hashmarks-splunk-") as temp_dir:
+        snapshot = Path(temp_dir) / "source.csv"
+        source_sha256 = _snapshot_source(path, snapshot)
+        state = _collect_stream(snapshot)
     selection = _select_anchors(state, max_anchors)
     return _report(path, source_sha256, state, selection)
 
