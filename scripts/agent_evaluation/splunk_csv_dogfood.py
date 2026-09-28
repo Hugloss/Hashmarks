@@ -45,7 +45,7 @@ _MAX_IDENTITY_SAMPLES = 3
 _MAX_UNLOCATED_SAMPLE_EVENT_IDS = 3
 _DEFAULT_MAX_ANCHORS = 256
 _NORMALIZED_OBSERVATION_SCHEMA = "hashmarks.splunk-normalized-observation.v1"
-_EVIDENCE_PROJECTION_SCHEMA = "hashmarks.splunk-evidence-projection.v2"
+_EVIDENCE_PROJECTION_SCHEMA = "hashmarks.splunk-evidence-projection.v3"
 _PRODUCER_PAYLOAD_VALIDATION_STATE = "not-assessed"
 
 
@@ -345,8 +345,14 @@ def _stats_metadata(stats: _ModuleStats) -> dict[str, object]:
 
 
 def _module_anchor(module: str, stats: _ModuleStats) -> dict[str, object]:
+    anchor_identity = _identity_json(
+        {
+            "kind": "module",
+            "module": module,
+        }
+    )
     return {
-        "anchor_id": f"module:{module}",
+        "anchor_id": f"module:{anchor_identity}",
         "module": module,
         "metadata": _stats_metadata(stats),
     }
@@ -357,8 +363,16 @@ def _traceback_anchor(
     stats: _ModuleStats,
 ) -> dict[str, object]:
     path, line, symbol = key
+    anchor_identity = _identity_json(
+        {
+            "kind": "python-traceback-frame",
+            "path": path,
+            "line": line,
+            "symbol": symbol,
+        }
+    )
     return {
-        "anchor_id": f"traceback:{path}:{line}:{symbol}",
+        "anchor_id": f"traceback:{anchor_identity}",
         "path": path,
         "line": line,
         "symbol": symbol,
