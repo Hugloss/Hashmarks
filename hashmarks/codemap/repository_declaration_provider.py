@@ -346,6 +346,33 @@ def _declared_evidence_paths(groups: Sequence[Mapping[str, object]]) -> set[str]
     return paths
 
 
+def _bind_provider_group_namespaces(
+    groups: Sequence[dict[str, object]],
+    *,
+    provider_name: str,
+) -> list[str]:
+    group_ids: list[str] = []
+    for group in groups:
+        if "semantic_namespace" in group:
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {provider_name} must not override "
+                "semantic_namespace"
+            )
+        group["semantic_namespace"] = provider_name
+        group_id = group.get("group_id")
+        if not isinstance(group_id, str) or not group_id.strip():
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {provider_name} returned a group "
+                "without a non-empty group_id"
+            )
+        group_ids.append(group_id.strip())
+    if len(set(group_ids)) != len(group_ids):
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} returned duplicate group_id values"
+        )
+    return sorted(group_ids)
+
+
 def _provider_result(
     provider_name: str,
     result: object,
@@ -387,31 +414,16 @@ def _provider_result(
         result.warnings,
         provider_name=provider_name,
     )
-    group_ids: list[str] = []
-    for group in groups:
-        if "semantic_namespace" in group:
-            raise RepositoryDeclarationProviderError(
-                f"declaration provider {provider_name} must not override "
-                "semantic_namespace"
-            )
-        group["semantic_namespace"] = provider_name
-        group_id = group.get("group_id")
-        if not isinstance(group_id, str) or not group_id.strip():
-            raise RepositoryDeclarationProviderError(
-                f"declaration provider {provider_name} returned a group "
-                "without a non-empty group_id"
-            )
-        group_ids.append(group_id.strip())
-    if len(set(group_ids)) != len(group_ids):
-        raise RepositoryDeclarationProviderError(
-            f"declaration provider {provider_name} returned duplicate group_id values"
-        )
+    group_ids = _bind_provider_group_namespaces(
+        groups,
+        provider_name=provider_name,
+    )
     return groups, {
         "name": provider_name,
         "state": "collected",
         "provenance": provenance,
         "warnings": warnings,
-        "group_ids": sorted(group_ids),
+        "group_ids": group_ids,
         "inputs": context.input_observations(),
         "enumerations": context.enumeration_observations(),
     }
