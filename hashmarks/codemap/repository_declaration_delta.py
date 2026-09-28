@@ -231,9 +231,7 @@ def _semantic_subject_change(
     old: Mapping[str, object],
     new: Mapping[str, object],
 ) -> dict[str, object] | None:
-    if old.get("group_observation_identity") == new.get(
-        "group_observation_identity"
-    ):
+    if old.get("group_observation_identity") == new.get("group_observation_identity"):
         return None
     old_declarations = _declarations(old)
     new_declarations = _declarations(new)
