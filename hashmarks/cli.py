@@ -82,6 +82,9 @@ def _render_upgrade(
         "",
         f"This installation is managed by {owner.label}.",
     )
+    command = manual_upgrade_command(owner, release.latest_version)
+    if command is not None:
+        _text("", "Native upgrade command:", "", f"    {command}")
 
 
 def _manual_upgrade(owner: InstallationOwner, latest_version: str) -> None:
@@ -93,10 +96,9 @@ def _manual_upgrade(owner: InstallationOwner, latest_version: str) -> None:
         )
         return
     _text(
-        "Hashmarks does not modify its own installation directly.",
-        "To upgrade, run:",
         "",
-        f"    {command}",
+        "Hashmarks does not modify its own installation directly.",
+        "No changes were made.",
     )
 
 
