@@ -745,6 +745,55 @@ def test_splunk_csv_dogfood_prioritizes_traceback_path_line_symbol_anchor(
     assert anchor["metadata"]["kind"] == "python-traceback-frame"
 
 
+def test_splunk_csv_dogfood_preserves_pseudo_traceback_symbols(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","Traceback:\n'
+        '  File ""/app/src/main.py"", line 9, in <module>\n'
+        '  File ""/app/src/main.py"", line 4, in <lambda>\n'
+        'RuntimeError: boom"\n',
+    )
+
+    report = collect(source)
+    summary = report["summary"]
+    assert summary["traceback_locator_occurrences"] == 2
+    assert summary["unique_traceback_anchors_observed"] == 2
+    anchors = {
+        (anchor["path"], anchor["line"], anchor["symbol"])
+        for anchor in report["bundle"]["anchors"]
+    }
+    assert anchors == {
+        ("/app/src/main.py", 9, "<module>"),
+        ("/app/src/main.py", 4, "<lambda>"),
+    }
+
+
+def test_splunk_csv_dogfood_preserves_comma_in_quoted_traceback_path(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","Traceback:\n'
+        '  File ""/app/src/parser,legacy.py"", line 17, in parse_result\n'
+        'ValueError: bad payload"\n',
+    )
+
+    report = collect(source)
+    summary = report["summary"]
+    assert summary["traceback_locator_occurrences"] == 1
+    assert summary["unique_traceback_anchors_observed"] == 1
+    anchor = report["bundle"]["anchors"][0]
+    assert anchor["path"] == "/app/src/parser,legacy.py"
+    assert anchor["line"] == 17
+    assert anchor["symbol"] == "parse_result"
+
+
 def test_splunk_csv_dogfood_preserves_all_traceback_frames_in_one_event(
     tmp_path,
 ) -> None:
