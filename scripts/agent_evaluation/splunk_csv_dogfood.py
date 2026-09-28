@@ -379,7 +379,9 @@ def _stats_metadata(stats: _ModuleStats) -> dict[str, object]:
         metadata.pop("metadata_values_truncated", None)
 
     if not evidence_component_fits(metadata):
-        raise ValueError("Splunk anchor metadata could not fit evidence component budget")
+        raise ValueError(
+            "Splunk anchor metadata could not fit evidence component budget"
+        )
     return metadata
 
 
