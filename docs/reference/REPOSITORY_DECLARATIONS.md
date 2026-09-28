@@ -478,6 +478,8 @@ canonical repository evidence.
 
 For collected groups, discovery also binds \`semantic_namespace\` to the selected provider's registered \`name\`. Provider-returned groups must not supply or override that field. This prevents two independent providers with coincidentally equal opaque \`concept + scope\` objects from collapsing into one semantic subject. If cross-provider semantic correspondence is desired, it must be modeled explicitly by a provider/integration that owns that correspondence rather than inferred by core.
 
+Providers may optionally emit declaration-level `semantic_role` objects inside those groups. Discovery passes them through the same canonical declaration contract; it does not invent, normalize, alias, require, or separately index roles. The derived `semantic_declaration_identity` therefore remains scoped by the provider-bound semantic subject and is independent of provider wrapper provenance/version, request-local group/declaration labels, and exact evidence location. If a provider changes what one of its opaque roles means, it must change the role object and accept removal-plus-addition semantics rather than hiding the change behind an alias or migration table.
+
 Provider states have narrow meaning:
 
 - \`collected\` means the explicitly selected provider detected the workspace and
