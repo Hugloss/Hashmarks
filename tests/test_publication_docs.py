@@ -203,6 +203,7 @@ def test_semantic_identity_is_documented_without_repository_history_ownership() 
     assert "G69. Semantic-subject identity" in invariants
     assert "G70. Semantic-subject delta" in invariants
     assert "G71. Semantic declaration identity" in invariants
+    assert "G72. Semantic identity reappearance" in invariants
     assert "Declaration semantic subject identity" in owners
     assert "Declaration semantic role identity" in owners
     assert "Declaration semantic-subject delta" in owners
@@ -225,6 +226,11 @@ def test_semantic_identity_is_documented_without_repository_history_ownership() 
     assert "Child-role admission evidence" in decision
     assert "Untagged children remain request-local" in decision
     assert "duplicate subject identities remain explicitly ambiguous" in decision
+    assert "same semantic_declaration_identity" in declarations
+    assert "not an existence timeline" in declarations
+    assert "stores no tombstone or resurrection record" in declarations
+    assert "does not prove uninterrupted existence" in decision
+    assert "caller-supplied bounded evidence" in decision
     assert "no history store and no retention layer" in decision
     for forbidden_owner in (
         "Hashmarks owns branch management",
