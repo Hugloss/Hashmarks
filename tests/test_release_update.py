@@ -150,7 +150,9 @@ def test_corrupt_periodic_cache_is_disposable(monkeypatch, tmp_path: Path) -> No
     assert json.loads(cache.read_text(encoding="utf-8"))["checked_at"] == 2000.0
 
 
-def test_network_failure_is_non_fatal_and_throttled(monkeypatch, tmp_path: Path) -> None:
+def test_network_failure_is_non_fatal_and_throttled(
+    monkeypatch, tmp_path: Path
+) -> None:
     calls = 0
 
     def fail(current_version: str, *, timeout: float) -> ReleaseInfo:
@@ -205,7 +207,9 @@ def test_uv_tool_environment_maps_to_native_uv_upgrade(monkeypatch) -> None:
     )
 
 
-def test_python_environment_is_not_guessed_as_an_installation_owner(monkeypatch) -> None:
+def test_python_environment_is_not_guessed_as_an_installation_owner(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(release_update.sys, "prefix", "/repo/.venv")
     monkeypatch.setattr(release_update.sys, "base_prefix", "/usr")
 
@@ -438,4 +442,4 @@ def test_standalone_delegation_executes_the_displayed_native_command(
         assert argv[-1] == displayed
     else:
         assert argv == ("/tools/sh", "-c", displayed)
-    assert seen["version"] == "0.25.0"\n
+    assert seen["version"] == "0.25.0"
