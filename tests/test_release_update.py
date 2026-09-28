@@ -371,6 +371,33 @@ def test_standalone_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate
     assert "Upgrade skipped." in output
 
 
+def test_cli_executes_the_exact_displayed_standalone_command(
+    monkeypatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    command = "exact-displayed-standalone-command"
+    monkeypatch.setattr(
+        cli,
+        "fetch_latest_release",
+        lambda current_version, *, timeout: ReleaseInfo(
+            current_version=current_version,
+            latest_version="0.25.0",
+        ),
+    )
+    monkeypatch.setattr(cli, "is_standalone_installation", lambda: True)
+    monkeypatch.setattr(cli, "standalone_upgrade_command", lambda version: command)
+    monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda prompt: "1")
+    seen: list[str] = []
+    monkeypatch.setattr(cli, "delegate_standalone_upgrade", seen.append)
+
+    assert cli.main(["upgrade"]) == 0
+
+    output = capsys.readouterr().out
+    assert command in output
+    assert seen == [command]
+
+
 def test_standalone_prerequisites_are_resolved_only_after_upgrade_consent(
     monkeypatch,
     tmp_path: Path,
@@ -467,7 +494,7 @@ def test_standalone_delegation_executes_the_displayed_native_command(
         exec_installer,
     )
 
-    release_update.delegate_standalone_upgrade("0.25.0")
+    release_update.delegate_standalone_upgrade(displayed)
 
     argv = seen["argv"]
     assert isinstance(argv, tuple)
