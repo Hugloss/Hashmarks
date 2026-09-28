@@ -269,6 +269,7 @@ Hashmarks must not take responsibility for behavior whose primary authority belo
 - execution scheduling, process supervision, timeout/retry/resume policy, or environment recovery;
 - runtime result authority or certification;
 - git/worktree lifecycle as part of solving the task;
+- global semantic graph/ontology ownership, persistent semantic edge registries, inferred semantic relationships, transitive closure, semantic reachability/path queries, or graph-derived ranking/precedence;
 - final solution correctness or completion authority.
 
 This is a category rule, not a blacklist. New terminology or implementation techniques do not change ownership.
@@ -340,7 +341,8 @@ Before proposing implementation work, coding agents must first ask:
 
 1. **Does this strengthen Hashmarks' repository-intelligence profile?**
 2. **Does it reduce correctness risk, stale authority, ambiguity, cost, or evidence size within that profile?**
-3. **Or does it merely move more of the consumer/execution workflow into Hashmarks?**
+3. **Does it merely move more of the consumer/execution workflow into Hashmarks?**
+4. **Does it turn bounded semantic identity/correspondence into a general knowledge graph, ontology, edge registry, or transitive relationship engine?**
 
 Prefer correctness, simplification, narrower ownership boundaries, better evidence, better economics, and clearer contracts over feature accumulation.
 
