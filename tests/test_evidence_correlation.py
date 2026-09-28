@@ -50,6 +50,11 @@ def test_evidence_locator_admission_reuses_correlation_claim_contract() -> None:
         match="module must be an exact dotted module identity",
     ):
         validate_evidence_locator_claim(module="tasks..worker")
+    with pytest.raises(
+        ValueError,
+        match="module must be an exact dotted module identity",
+    ):
+        validate_evidence_locator_claim(module="tasks.worker...")
 
     with pytest.raises(ValueError, match="external path must not contain"):
         validate_evidence_locator_claim(
