@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 
 import pytest
@@ -13,6 +14,39 @@ HEADER = (
 
 def _write(path, body: str) -> None:
     path.write_text(HEADER + body, encoding="utf-8")
+
+
+def test_splunk_csv_dogfood_accepts_strict_valid_raw_above_runtime_csv_limit(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    raw = "INFO name=tasks.worker " + ("x" * 150_000)
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        f'"[host]","idx","[server]","{raw}"\n',
+    )
+
+    assert source.stat().st_size > csv.field_size_limit()
+    report = collect(source)
+    assert report["summary"]["events"] == 1
+    assert report["summary"]["csv_strict_valid"] == 1
+    assert report["summary"]["record_framing_state"] == "native-csv"
+    assert report["bundle"]["anchors"][0]["module"] == "tasks.worker"
+
+
+def test_splunk_csv_dogfood_restores_runtime_csv_field_limit(tmp_path) -> None:
+    source = tmp_path / "masked.csv"
+    raw = "INFO name=tasks.worker " + ("x" * 150_000)
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        f'"[host]","idx","[server]","{raw}"\n',
+    )
+
+    before = csv.field_size_limit()
+    collect(source)
+    assert csv.field_size_limit() == before
 
 
 def test_splunk_csv_dogfood_accepts_utf8_bom_as_transport_marker(
