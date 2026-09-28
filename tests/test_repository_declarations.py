@@ -604,6 +604,38 @@ def test_semantic_role_correlates_child_change_across_request_label_renames(
     assert subject["comparison_transition"]["after"]["state"] == "differing"
 
 
+def test_semantic_role_identity_is_scoped_by_semantic_subject(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    role = {"kind": "runtime-source"}
+    first_group = _group(
+        [_declaration("runtime", "runtime.yaml", "3.12", semantic_role=role)]
+    )
+    second_group = _group(
+        [_declaration("runtime", "runtime.yaml", "3.12", semantic_role=role)]
+    )
+    second_group["concept"] = {
+        "kind": "runtime-compatibility",
+        "identity": "pypy",
+    }
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        first = codemap.repository_declarations([first_group])
+        second = codemap.repository_declarations([second_group])
+
+    first_row = first["groups"][0]["declarations"][0]
+    second_row = second["groups"][0]["declarations"][0]
+    assert first_row["semantic_role"] == second_row["semantic_role"]
+    assert (
+        first_row["semantic_declaration_identity"]
+        != second_row["semantic_declaration_identity"]
+    )
+
+
 def test_semantic_role_change_is_remove_add_not_guessed_rename(
     tmp_path: Path,
 ) -> None:
@@ -654,6 +686,35 @@ def test_semantic_role_change_is_remove_add_not_guessed_rename(
     assert roles["added"] == [after_declaration["semantic_declaration_identity"]]
     assert roles["ambiguous"] == []
     assert roles["changed"] == []
+
+
+def test_unchanged_duplicate_semantic_roles_do_not_manufacture_delta(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    (repo / "b.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    role = {"kind": "runtime-source"}
+    group = _group(
+        [
+            _declaration("a", "a.yaml", "3.12", semantic_role=role),
+            _declaration("b", "b.yaml", "3.12", semantic_role=role),
+        ]
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([group])
+        after = codemap.repository_declarations(
+            [group],
+            previous_observation=before,
+        )
+
+    delta = after["delta_from_previous"]
+    assert delta["changed_groups"] == []
+    assert delta["semantic_subjects"]["changed"] == []
+    assert delta["semantic_subjects"]["ambiguous"] == []
 
 
 def test_semantic_role_delta_preserves_duplicate_role_ambiguity(
