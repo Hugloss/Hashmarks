@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 
 import pytest
@@ -13,6 +14,39 @@ HEADER = (
 
 def _write(path, body: str) -> None:
     path.write_text(HEADER + body, encoding="utf-8")
+
+
+def test_splunk_csv_dogfood_accepts_strict_valid_raw_above_runtime_csv_limit(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    raw = "INFO name=tasks.worker " + ("x" * 150_000)
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        f'"[host]","idx","[server]","{raw}"\n',
+    )
+
+    assert source.stat().st_size > csv.field_size_limit()
+    report = collect(source)
+    assert report["summary"]["events"] == 1
+    assert report["summary"]["csv_strict_valid"] == 1
+    assert report["summary"]["record_framing_state"] == "native-csv"
+    assert report["bundle"]["anchors"][0]["module"] == "tasks.worker"
+
+
+def test_splunk_csv_dogfood_restores_runtime_csv_field_limit(tmp_path) -> None:
+    source = tmp_path / "masked.csv"
+    raw = "INFO name=tasks.worker " + ("x" * 150_000)
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        f'"[host]","idx","[server]","{raw}"\n',
+    )
+
+    before = csv.field_size_limit()
+    collect(source)
+    assert csv.field_size_limit() == before
 
 
 def test_splunk_csv_dogfood_accepts_utf8_bom_as_transport_marker(
@@ -82,6 +116,50 @@ def test_splunk_csv_dogfood_accepts_unquoted_serial_record_start(tmp_path) -> No
     assert report["summary"]["strict_valid"] == 1
     assert report["summary"]["malformed"] == 0
     assert report["bundle"]["anchors"][0]["module"] == "tasks.worker"
+
+
+def test_splunk_csv_dogfood_native_framing_ignores_full_row_like_raw_continuation(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","first line\n'
+        "7,2026-09-14T23:59:57.000+0200,[path],kube:container:x,"
+        "[host],idx,[server],fake raw\n"
+        'last line"\n'
+        '"2","2026-09-14T23:59:56.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.worker"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["events"] == 2
+    assert report["summary"]["csv_strict_valid"] == 2
+    assert report["summary"]["malformed"] == 0
+    assert report["summary"]["record_framing_state"] == "native-csv"
+    assert report["bundle"]["provenance"]["record_framing_state"] == "native-csv"
+    assert report["bundle"]["anchors"][0]["module"] == "tasks.worker"
+
+
+def test_splunk_csv_dogfood_falls_back_only_for_damaged_csv_framing(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO GET [url] "HTTP/1.1 200 OK" '
+        'name=httpx"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["events"] == 1
+    assert report["summary"]["recovered"] == 1
+    assert report["summary"]["record_framing_state"] == "recovery-heuristic"
+    assert report["bundle"]["provenance"]["record_framing_state"] == (
+        "recovery-heuristic"
+    )
 
 
 def test_splunk_csv_dogfood_does_not_split_record_like_raw_continuation(
@@ -448,6 +526,74 @@ def test_splunk_csv_dogfood_preserves_runtime_placement_scope(tmp_path) -> None:
     assert scope["scope_values_truncated"] is False
 
 
+def test_splunk_csv_dogfood_scope_truncation_is_order_independent(
+    tmp_path,
+) -> None:
+    forward = tmp_path / "forward.csv"
+    reverse = tmp_path / "reverse.csv"
+    rows = []
+    for index in range(40):
+        rows.append(
+            f'"{index}","2026-09-14T23:59:{index % 60:02d}.000+0200",'
+            f'"[source-{index:02d}]","kube:container:x","[host-{index:02d}]",'
+            f'"idx","[server-{index:02d}]","INFO name=tasks.worker"\n'
+        )
+    _write(forward, "".join(rows))
+    _write(reverse, "".join(reversed(rows)))
+
+    forward_report = collect(forward)
+    reverse_report = collect(reverse)
+
+    assert forward_report["bundle"]["scope"] == reverse_report["bundle"]["scope"]
+    assert forward_report["bundle"]["scope"]["scope_values_truncated"] is True
+    assert forward_report["bundle"]["truncation"] == "truncated"
+    assert forward_report["summary"]["scope_values_truncated"] is True
+    assert forward_report["summary"]["projection_truncated"] is True
+    assert (
+        forward_report["bundle"]["bundle_id"] == reverse_report["bundle"]["bundle_id"]
+    )
+    assert (
+        forward_report["bundle"]["provenance"]["evidence_projection_identity"]
+        == reverse_report["bundle"]["provenance"]["evidence_projection_identity"]
+    )
+
+
+def test_splunk_csv_dogfood_context_truncation_is_order_independent(
+    tmp_path,
+) -> None:
+    forward = tmp_path / "forward.csv"
+    reverse = tmp_path / "reverse.csv"
+    rows = []
+    for index in range(12):
+        rows.append(
+            f'"{index}","2026-09-14T23:59:{index:02d}.000+0200",'
+            '"[path]","kube:container:x","[host]","idx","[server]",'
+            f'"INFO name=pipelines.worker handling_ident=[DOC_{index:02d}] '
+            f'commit=[REV_{index:02d}]"\n'
+        )
+    _write(forward, "".join(rows))
+    _write(reverse, "".join(reversed(rows)))
+
+    forward_report = collect(forward)
+    reverse_report = collect(reverse)
+    forward_context = forward_report["bundle"]["anchors"][0]["metadata"][
+        "runtime_context"
+    ]
+    reverse_context = reverse_report["bundle"]["anchors"][0]["metadata"][
+        "runtime_context"
+    ]
+
+    assert forward_context == reverse_context
+    assert forward_context["handling_ident_values_truncated"] is True
+    assert forward_context["commit_values_truncated"] is True
+    assert forward_report["bundle"]["truncation"] == "truncated"
+    assert forward_report["summary"]["context_values_truncated"] is True
+    assert forward_report["summary"]["projection_truncated"] is True
+    assert (
+        forward_report["bundle"]["bundle_id"] == reverse_report["bundle"]["bundle_id"]
+    )
+
+
 def test_splunk_csv_dogfood_bounds_context_without_splitting_anchor(
     tmp_path,
 ) -> None:
@@ -472,6 +618,25 @@ def test_splunk_csv_dogfood_bounds_context_without_splitting_anchor(
     assert len(context["commit_values"]) == 8
     assert context["commit_values_truncated"] is True
     assert context["values_truncated"] is True
+
+
+def test_splunk_csv_dogfood_nontruncated_projection_remains_unknown(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.worker '
+        'handling_ident=[DOC] commit=[REV]"\n',
+    )
+
+    report = collect(source)
+    assert report["bundle"]["truncation"] == "unknown"
+    assert report["summary"]["anchors_truncated"] is False
+    assert report["summary"]["scope_values_truncated"] is False
+    assert report["summary"]["context_values_truncated"] is False
+    assert report["summary"]["projection_truncated"] is False
 
 
 def test_splunk_csv_dogfood_preserves_multiline_record_and_exact_source_identity(

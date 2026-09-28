@@ -189,6 +189,20 @@ When every explicitly expected declaration is observed with current evidence, th
 
 Hashmarks does not invent expectations such as "every deployment must contain file X." Expected declaration membership is provider evidence.
 
+## Uncertainty axes remain independent
+
+Repository declaration uncertainty is intentionally multi-dimensional. A group can simultaneously contain an ambiguous provider-normalized value, incomplete coverage, qualified evidence for some declarations, and missing or unqualified evidence for others. Hashmarks preserves those facts separately rather than collapsing them into one generic uncertainty state.
+
+In particular:
+
+- an ambiguous declaration value remains `comparison.state = ambiguous`; candidate values are not promoted into a factual disagreement;
+- incomplete or truncated coverage keeps unseen expected declarations under `absence.state = unknown`; it does not manufacture known absence;
+- repository-evidence qualification can make comparison ambiguous without rewriting the provider's normalized value claim;
+- correspondence ambiguity is independent of both value ambiguity and coverage;
+- agreement among the remaining resolved declarations never selects a winner or overrides unresolved, ambiguous, absent, or incompletely enumerated evidence.
+
+The output may therefore truthfully report, for the same group, `comparison.state = ambiguous` and `absence.state = unknown`. Those states answer different questions. Core does not combine them into a score, severity, precedence rule, or synthetic "overall confidence" authority.
+
 ## Distributed declarations
 
 File boundaries are not semantic boundaries.
@@ -217,6 +231,8 @@ A semantic namespace names a semantic contract, not a provider build. Provider i
 A declaration may optionally supply a non-empty opaque `semantic_role` object. When present, Hashmarks derives `semantic_declaration_identity` from the already-issued `semantic_subject_identity + semantic_role`. The role is provider vocabulary scoped inside that subject; it is not a global role taxonomy. Request-local `declaration_id`, value, producer metadata, repository path/range, and evidence state do not define this semantic declaration identity. When no role is supplied, Hashmarks deliberately creates no child semantic identity.
 
 These identities are correlation evidence, not ontology authority. Hashmarks does not interpret the opaque concept or semantic role, infer correspondence or child roles, select a winner, or promote either identity into a universal metadata schema. Every projected declaration carries its group's `semantic_subject_identity`; declarations with an explicit role additionally carry `semantic_declaration_identity`, so consumers can correlate provider-declared roles separately from exact declaration provenance.
+
+Deterministic semantic identity is also **not an existence timeline**. A role-tagged declaration may be present in one explicit observation, absent in the next because complete coverage proves its request-local declaration missing, and later reappear with the same `semantic_declaration_identity` when the provider emits the same role again. That later identity match does not fill the gap between endpoints or prove the declaration continuously existed. Hashmarks stores no tombstone or resurrection record and does not search repository history to connect the endpoints. The current endpoint's absence remains owned by provider coverage; its exact evidence remains owned by repository-evidence bindings; any older packet used for comparison is caller-supplied bounded evidence.
 
 The remaining identities keep their existing, narrower jobs:
 
@@ -260,7 +276,7 @@ repository evidence and observer-capability change distinct.
 
 A delta does not say whether any change is correct or desirable.
 
-Subject-level delta is intentionally conservative. It correlates endpoints only when one `semantic_subject_identity` maps to exactly one group in both observations. Duplicate subject groups produce `semantic_subjects.ambiguous` with the competing group IDs; Hashmarks does not pick one by order, similarity, declaration count, or value. A request-local `group_id` change therefore does **not** authorize pairing ordinary request-local `declaration_id` values. Child correlation across group/declaration-label changes exists only for declarations whose producer explicitly supplied `semantic_role`; the derived `semantic_declaration_identity` must itself be unique at both endpoints. Duplicate roles remain `semantic_declarations.ambiguous`, and untagged declarations remain unpaired. A role change is removal plus addition, never an inferred rename. Group-level comparison/absence/correspondence/coverage transitions may still be compared for a uniquely identified subject. Semantic-role correlation does not strengthen coverage or negative evidence: `coverage.expected_declaration_ids` remains the provider's request-local absence authority. Exact member/span/locator change remains owned by the nested repository-evidence binding delta.
+Subject-level delta is intentionally conservative. It correlates endpoints only when one `semantic_subject_identity` maps to exactly one group in both observations. Duplicate subject groups produce `semantic_subjects.ambiguous` with the competing group IDs; Hashmarks does not pick one by order, similarity, declaration count, or value. A request-local `group_id` change therefore does **not** authorize pairing ordinary request-local `declaration_id` values. Child correlation across group/declaration-label changes exists only for declarations whose producer explicitly supplied `semantic_role`; the derived `semantic_declaration_identity` must itself be unique at both endpoints. Duplicate roles remain `semantic_declarations.ambiguous`, and untagged declarations remain unpaired. Core does not break duplicate-role ambiguity by rule order, apparent source/path specificity, majority, matching normalized values, agreement with another declaration, or producer metadata. If order/specificity really carries precedence in a native format, the provider that owns that format must resolve and expose the precedence claim explicitly with provenance; repository-declaration core does not recreate native precedence rules from raw declarations. A role change is removal plus addition, never an inferred rename. Group-level comparison/absence/correspondence/coverage transitions may still be compared for a uniquely identified subject. Semantic-role correlation does not strengthen coverage or negative evidence: `coverage.expected_declaration_ids` remains the provider's request-local absence authority. Exact member/span/locator change remains owned by the nested repository-evidence binding delta.
 
 A subject identity is intentionally **not** a branch, commit, ref, snapshot lineage, or retained history node. Hashmarks compares caller-supplied/current observations; Git and the caller remain the owners of repository history and mutation.
 

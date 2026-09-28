@@ -10,11 +10,14 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Lock
 from typing import TextIO
 
 from hashmarks._command_output import log_command_output
 
 logger = logging.getLogger(__name__)
+
+_CSV_FIELD_LIMIT_LOCK = Lock()
 
 SCHEMA = "hashmarks.splunk-csv-dogfood.v1"
 EXPECTED_HEADER = (
@@ -241,10 +244,15 @@ def _bounded_value(
 ) -> bool:
     if not value or value in values:
         return False
-    if len(values) >= limit:
-        return True
-    values.add(value)
-    return False
+    if len(values) < limit:
+        values.add(value)
+        return False
+
+    largest = max(values)
+    if value < largest:
+        values.remove(largest)
+        values.add(value)
+    return True
 
 
 def _bounded_sorted_sample(values: list[str], value: str, *, limit: int) -> None:
@@ -380,7 +388,16 @@ class _CollectionState:
     unlocated_sample_occurrence_ids: list[str] = field(default_factory=list)
     unlocated_sample_observation_identities: list[str] = field(default_factory=list)
     physical_lines: int = 1
+    record_framing_state: str = "native-csv"
     time_bounds: _TimeBounds = field(default_factory=_TimeBounds)
+
+    @property
+    def context_values_truncated(self) -> bool:
+        stats = [*self.modules.values(), *self.tracebacks.values()]
+        return any(
+            item.handling_idents_truncated or item.commit_values_truncated
+            for item in stats
+        )
 
     def observe(
         self,
@@ -521,13 +538,65 @@ def _validate_header(handle: TextIO) -> None:
         raise ValueError("Splunk CSV header must be " + ",".join(EXPECTED_HEADER))
 
 
-def _collect_stream(path: Path) -> _CollectionState:
-    state = _CollectionState()
+class _TrackingLineIterator:
+    def __init__(self, handle: TextIO) -> None:
+        self.handle = handle
+        self.consumed: list[str] = []
+
+    def __iter__(self) -> _TrackingLineIterator:
+        return self
+
+    def __next__(self) -> str:
+        line = self.handle.readline()
+        if line == "":
+            raise StopIteration
+        self.consumed.append(line)
+        return line
+
+    def take(self) -> str:
+        text = "".join(self.consumed)
+        self.consumed.clear()
+        return text
+
+
+def _strict_logical_records(handle: TextIO):
+    tracker = _TrackingLineIterator(handle)
+    reader = csv.reader(tracker, strict=True)
+    ordinal = 0
+    for _row in reader:
+        yield ordinal, tracker.take()
+        ordinal += 1
+
+
+def _collect_native_csv_stream(path: Path) -> _CollectionState:
+    state = _CollectionState(record_framing_state="native-csv")
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        _validate_header(handle)
+        for ordinal, text in _strict_logical_records(handle):
+            state.observe(ordinal, text, _parse_record(text))
+    return state
+
+
+def _collect_recovery_stream(path: Path) -> _CollectionState:
+    state = _CollectionState(record_framing_state="recovery-heuristic")
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         _validate_header(handle)
         for ordinal, text in _logical_records(handle):
             state.observe(ordinal, text, _parse_record(text))
     return state
+
+
+def _collect_stream(path: Path) -> _CollectionState:
+    field_limit = max(1, path.stat().st_size)
+    with _CSV_FIELD_LIMIT_LOCK:
+        previous_limit = csv.field_size_limit(field_limit)
+        try:
+            try:
+                return _collect_native_csv_stream(path)
+            except csv.Error:
+                return _collect_recovery_stream(path)
+        finally:
+            csv.field_size_limit(previous_limit)
 
 
 def _select_anchors(
@@ -555,6 +624,17 @@ def _select_anchors(
         module_emitted=len(selected_modules),
         observed=observed,
         truncated=observed > len(anchors),
+    )
+
+
+def _projection_truncated(
+    state: _CollectionState,
+    selection: _AnchorSelection,
+) -> bool:
+    return (
+        selection.truncated
+        or state.scope_values_truncated
+        or state.context_values_truncated
     )
 
 
@@ -600,7 +680,9 @@ def _evidence_projection_identity(
                 "format": "csv-export",
             },
             "completeness": "unknown",
-            "truncation": "truncated" if selection.truncated else "unknown",
+            "truncation": (
+                "truncated" if _projection_truncated(state, selection) else "unknown"
+            ),
             "scope": _scope(state),
             "accounting": {
                 "logical_event_count": state.event_count,
@@ -644,6 +726,7 @@ def _bundle(
             "recovered_count": state.recovered_count,
             "malformed_count": state.malformed_count,
             "widened_count": state.widened_count,
+            "record_framing_state": state.record_framing_state,
             "csv_parsing": {
                 "strict_valid_count": state.strict_valid_count,
                 "recovered_count": state.recovered_count,
@@ -667,7 +750,9 @@ def _bundle(
             ),
         },
         "completeness": "unknown",
-        "truncation": "truncated" if selection.truncated else "unknown",
+        "truncation": (
+            "truncated" if _projection_truncated(state, selection) else "unknown"
+        ),
         "scope": _scope(state),
         "anchors": selection.anchors,
     }
@@ -697,6 +782,7 @@ def _report(
             "csv_recovered": state.recovered_count,
             "csv_malformed": state.malformed_count,
             "csv_widened": state.widened_count,
+            "record_framing_state": state.record_framing_state,
             "producer_payload_validation_state": (_PRODUCER_PAYLOAD_VALIDATION_STATE),
             "time_ordering_state": state.time_bounds.ordering_state,
             "timestamp_parse_failure_count": state.time_bounds.unparseable_count,
@@ -721,6 +807,8 @@ def _report(
             "anchors_emitted": len(selection.anchors),
             "anchors_truncated": selection.truncated,
             "scope_values_truncated": state.scope_values_truncated,
+            "context_values_truncated": state.context_values_truncated,
+            "projection_truncated": _projection_truncated(state, selection),
         },
         "bundle": _bundle(source_sha256, state, selection),
     }
