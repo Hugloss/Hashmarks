@@ -28,6 +28,7 @@ from .release_update import (
     ReleaseCheckError,
     ReleaseInfo,
     UpgradeDelegationError,
+    automatic_check_allowed,
     can_delegate_upgrade,
     delegate_upgrade,
     detect_installation_owner,
@@ -104,11 +105,7 @@ def _manual_upgrade(owner: InstallationOwner, latest_version: str) -> None:
 
 def _prompt_upgrade() -> bool:
     _text("", "[1] Upgrade now", "[2] Skip for now")
-    try:
-        choice = input("Select [1/2]: ").strip()
-    except EOFError:
-        return False
-    return choice == "1"
+    return input("Select [1/2]: ").strip() == "1"
 
 
 def _delegate_selected_upgrade(
@@ -151,10 +148,12 @@ def _upgrade(args) -> int:
 
 
 def _maybe_offer_periodic_upgrade(command: str) -> None:
+    interactive = _interactive_terminal()
+    if not automatic_check_allowed(command=command, interactive=interactive):
+        return
     owner = detect_installation_owner()
     if owner.kind not in {"standalone", "uv", "pipx"}:
         return
-    interactive = _interactive_terminal()
     release = periodic_release_check(
         __version__,
         command=command,
@@ -169,10 +168,7 @@ def _maybe_offer_periodic_upgrade(command: str) -> None:
     if not _prompt_upgrade():
         _text("Upgrade skipped for now.")
         return
-    try:
-        _delegate_selected_upgrade(release, owner)
-    except UpgradeDelegationError as exc:
-        _text(f"Upgrade delegation failed: {exc}", file=sys.stderr)
+    _delegate_selected_upgrade(release, owner)
 
 
 def _daemon_serve_command(workspace: Path, state: Path) -> list[str]:
