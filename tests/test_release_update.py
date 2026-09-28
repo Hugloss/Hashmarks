@@ -187,131 +187,150 @@ def test_network_failure_is_non_fatal_and_throttled(
 
 
 @pytest.mark.parametrize(
-    (
-        "prefix",
-        "base_prefix",
-        "environ",
-        "home",
-        "os_name",
-        "platform",
-        "expected",
-    ),
+    "case",
     [
-        (
-            "/home/user/.local/share/uv/tools/hashmarks",
-            "/usr",
-            {},
-            "/home/user",
-            "posix",
-            "linux",
-            InstallationOwner(
-                kind="uv",
-                label="uv",
-                command=("uv", "tool", "upgrade", "hashmarks"),
+        pytest.param(
+            (
+                "/home/user/.local/share/uv/tools/hashmarks",
+                "/usr",
+                {},
+                "/home/user",
+                "posix",
+                "linux",
+                InstallationOwner(
+                    kind="uv",
+                    label="uv",
+                    command=("uv", "tool", "upgrade", "hashmarks"),
+                ),
             ),
+            id="uv-linux",
         ),
-        (
-            r"C:\\Users\\User\\AppData\\Roaming\\uv\\data\\tools\\hashmarks",
-            r"C:\\Python314",
-            {"APPDATA": r"C:\\Users\\User\\AppData\\Roaming"},
-            r"C:\\Users\\User",
-            "nt",
-            "win32",
-            InstallationOwner(
-                kind="uv",
-                label="uv",
-                command=("uv", "tool", "upgrade", "hashmarks"),
+        pytest.param(
+            (
+                r"C:\Users\User\AppData\Roaming\uv\data\tools\hashmarks",
+                r"C:\Python314",
+                {"APPDATA": r"C:\Users\User\AppData\Roaming"},
+                r"C:\Users\User",
+                "nt",
+                "win32",
+                InstallationOwner(
+                    kind="uv",
+                    label="uv",
+                    command=("uv", "tool", "upgrade", "hashmarks"),
+                ),
             ),
+            id="uv-windows",
         ),
-        (
-            "/home/user/.local/share/pipx/venvs/hashmarks",
-            "/usr",
-            {},
-            "/home/user",
-            "posix",
-            "linux",
-            InstallationOwner(
-                kind="pipx",
-                label="pipx",
-                command=("pipx", "upgrade", "hashmarks"),
+        pytest.param(
+            (
+                "/home/user/.local/share/pipx/venvs/hashmarks",
+                "/usr",
+                {},
+                "/home/user",
+                "posix",
+                "linux",
+                InstallationOwner(
+                    kind="pipx",
+                    label="pipx",
+                    command=("pipx", "upgrade", "hashmarks"),
+                ),
             ),
+            id="pipx-linux",
         ),
-        (
-            r"C:\\Users\\User\\AppData\\Local\\pipx\\pipx\\venvs\\hashmarks",
-            r"C:\\Python314",
-            {"LOCALAPPDATA": r"C:\\Users\\User\\AppData\\Local"},
-            r"C:\\Users\\User",
-            "nt",
-            "win32",
-            InstallationOwner(
-                kind="pipx",
-                label="pipx",
-                command=("pipx", "upgrade", "hashmarks"),
+        pytest.param(
+            (
+                r"C:\Users\User\AppData\Local\pipx\pipx\venvs\hashmarks",
+                r"C:\Python314",
+                {"LOCALAPPDATA": r"C:\Users\User\AppData\Local"},
+                r"C:\Users\User",
+                "nt",
+                "win32",
+                InstallationOwner(
+                    kind="pipx",
+                    label="pipx",
+                    command=("pipx", "upgrade", "hashmarks"),
+                ),
             ),
+            id="pipx-windows",
         ),
-        (
-            "/opt/pipx/venvs/hashmarks",
-            "/usr",
-            {},
-            "/home/user",
-            "posix",
-            "linux",
-            InstallationOwner(
-                kind="pipx-global",
-                label="pipx (global)",
-                command=("pipx", "upgrade", "--global", "hashmarks"),
+        pytest.param(
+            (
+                "/opt/pipx/venvs/hashmarks",
+                "/usr",
+                {},
+                "/home/user",
+                "posix",
+                "linux",
+                InstallationOwner(
+                    kind="pipx-global",
+                    label="pipx (global)",
+                    command=("pipx", "upgrade", "--global", "hashmarks"),
+                ),
             ),
+            id="pipx-global-linux",
         ),
-        (
-            "/srv/uv-tools/hashmarks",
-            "/usr",
-            {"UV_TOOL_DIR": "/srv/uv-tools"},
-            "/home/user",
-            "posix",
-            "linux",
-            InstallationOwner(
-                kind="uv",
-                label="uv",
-                command=("uv", "tool", "upgrade", "hashmarks"),
+        pytest.param(
+            (
+                "/srv/uv-tools/hashmarks",
+                "/usr",
+                {"UV_TOOL_DIR": "/srv/uv-tools"},
+                "/home/user",
+                "posix",
+                "linux",
+                InstallationOwner(
+                    kind="uv",
+                    label="uv",
+                    command=("uv", "tool", "upgrade", "hashmarks"),
+                ),
             ),
+            id="uv-custom-root",
         ),
-        (
-            "/srv/pipx/venvs/hashmarks",
-            "/usr",
-            {"PIPX_HOME": "/srv/pipx"},
-            "/home/user",
-            "posix",
-            "linux",
-            InstallationOwner(
-                kind="pipx",
-                label="pipx",
-                command=("pipx", "upgrade", "hashmarks"),
+        pytest.param(
+            (
+                "/srv/pipx/venvs/hashmarks",
+                "/usr",
+                {"PIPX_HOME": "/srv/pipx"},
+                "/home/user",
+                "posix",
+                "linux",
+                InstallationOwner(
+                    kind="pipx",
+                    label="pipx",
+                    command=("pipx", "upgrade", "hashmarks"),
+                ),
             ),
+            id="pipx-custom-root",
         ),
-        (
-            "/srv/pipx-global/venvs/hashmarks",
-            "/usr",
-            {"PIPX_GLOBAL_HOME": "/srv/pipx-global"},
-            "/home/user",
-            "posix",
-            "linux",
-            InstallationOwner(
-                kind="pipx-global",
-                label="pipx (global)",
-                command=("pipx", "upgrade", "--global", "hashmarks"),
+        pytest.param(
+            (
+                "/srv/pipx-global/venvs/hashmarks",
+                "/usr",
+                {"PIPX_GLOBAL_HOME": "/srv/pipx-global"},
+                "/home/user",
+                "posix",
+                "linux",
+                InstallationOwner(
+                    kind="pipx-global",
+                    label="pipx (global)",
+                    command=("pipx", "upgrade", "--global", "hashmarks"),
+                ),
             ),
+            id="pipx-global-custom-root",
         ),
     ],
 )
 def test_python_tool_owner_requires_exact_manager_root(
-    prefix: str,
-    base_prefix: str,
-    environ: dict[str, str],
-    home: str,
-    os_name: str,
-    platform: str,
-    expected: InstallationOwner,
+    case: tuple[
+        str,
+        str,
+        dict[str, str],
+        str,
+        str,
+        str,
+        InstallationOwner,
+    ],
 ) -> None:
+    prefix, base_prefix, environ, home, os_name, platform, expected = case
     owner = release_update._detect_python_installation_owner(
         prefix=prefix,
         base_prefix=base_prefix,
