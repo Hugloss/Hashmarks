@@ -21,7 +21,6 @@ _LOCK_STALE_SECONDS = 5 * 60
 _MAX_RELEASE_RESPONSE_BYTES = 1024 * 1024
 _RELEASE_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 _TRUE_VALUES = {"1", "true", "yes", "on"}
-_AUTOMATIC_SKIP_COMMANDS = {"daemon", "mcp", "upgrade", "version"}
 
 
 class ReleaseCheckError(RuntimeError):
@@ -204,11 +203,10 @@ def _truthy(value: str | None) -> bool:
 
 def automatic_check_allowed(
     *,
-    command: str,
     interactive: bool,
     environ: Mapping[str, str] = os.environ,
 ) -> bool:
-    if command in _AUTOMATIC_SKIP_COMMANDS or not interactive:
+    if not interactive:
         return False
     if _truthy(environ.get("HASHMARKS_NO_UPDATE_CHECK")):
         return False
@@ -218,14 +216,12 @@ def automatic_check_allowed(
 def periodic_release_check(
     current_version: str,
     *,
-    command: str,
     interactive: bool,
     environ: Mapping[str, str] = os.environ,
     now: float | None = None,
     timeout: float = 1.0,
 ) -> ReleaseInfo | None:
     if not automatic_check_allowed(
-        command=command,
         interactive=interactive,
         environ=environ,
     ):

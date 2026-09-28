@@ -178,7 +178,7 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **U1. Update awareness is not repository authority.** Public release metadata, check timestamps, and update prompts are product-lifecycle state only. They must not participate in repository identity, CodeMap generations, semantic observations, evidence history, freshness, or `.hashmarks/` state.
 
-**U2. Automatic release checks are strictly bounded and suppressible.** They may occur only for eligible interactive CLI invocations, at most once per configured check interval. MCP, daemon, CI, and non-interactive invocations perform no automatic release check. `HASHMARKS_NO_UPDATE_CHECK=1` hard-disables automatic update-related network traffic.
+**U2. Automatic release checks are strictly bounded and suppressible.** They may occur only for eligible interactive CLI invocations, at most once per configured check interval. CLI command declarations own eligibility; release-update code must not branch on command names or maintain command-identity allow/deny lists. MCP, daemon, CI, and non-interactive invocations perform no automatic release check. `HASHMARKS_NO_UPDATE_CHECK=1` hard-disables automatic update-related network traffic.
 
 **U3. Release checks disclose no repository-derived information.** The public latest-release request must not include workspace paths, repository names/remotes, source, content hashes, observations, semantic identities, MCP payloads, or ambient GitHub credentials. Release discovery must not depend on repository state.
 

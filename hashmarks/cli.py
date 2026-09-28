@@ -154,13 +154,12 @@ def _upgrade(args) -> int:
     return 0
 
 
-def _maybe_offer_periodic_upgrade(command: str) -> None:
+def _maybe_offer_periodic_upgrade() -> None:
     interactive = _interactive_terminal()
-    if not automatic_check_allowed(command=command, interactive=interactive):
+    if not automatic_check_allowed(interactive=interactive):
         return
     release = periodic_release_check(
         __version__,
-        command=command,
         interactive=interactive,
     )
     if release is None:
@@ -373,9 +372,10 @@ def _add_common_arguments(
 
 def _add_daemon_cli(sub) -> None:
     version = sub.add_parser("version")
-    version.set_defaults(func=_version)
+    version.set_defaults(func=_version, automatic_update_check=False)
 
     daemon = sub.add_parser("daemon")
+    daemon.set_defaults(automatic_update_check=False)
     daemon_sub = daemon.add_subparsers(dest="daemon_command", required=True)
     start = daemon_sub.add_parser("start")
     _add_common_arguments(start, inherited=True)
@@ -419,6 +419,7 @@ def main(argv: list[str] | None = None) -> int:
         version=f"hashmarks version {__version__}",
     )
     _add_common_arguments(parser)
+    parser.set_defaults(automatic_update_check=True)
     sub = parser.add_subparsers(dest="command", required=True)
     _add_daemon_cli(sub)
     _add_identity_cli(sub)
@@ -426,7 +427,7 @@ def main(argv: list[str] | None = None) -> int:
         "mcp", help="serve this workspace as a local read-only MCP stdio server"
     )
     _add_common_arguments(mcp, inherited=True)
-    mcp.set_defaults(func=_mcp)
+    mcp.set_defaults(func=_mcp, automatic_update_check=False)
     install = sub.add_parser(
         "install", help="register the installed Hashmarks executable with agent hosts"
     )
@@ -436,13 +437,14 @@ def main(argv: list[str] | None = None) -> int:
         "upgrade",
         help="check the latest release and explicitly hand standalone installs to the existing installer",
     )
-    upgrade.set_defaults(func=_upgrade)
+    upgrade.set_defaults(func=_upgrade, automatic_update_check=False)
     from .repository_cli import add_repository_cli
 
     add_repository_cli(sub, add_common_arguments=_add_common_arguments)
     args = parser.parse_args(argv)
     try:
-        _maybe_offer_periodic_upgrade(args.command)
+        if args.automatic_update_check:
+            _maybe_offer_periodic_upgrade()
         args.workspace = _workspace(args.workspace)
         if args.state_dir is not None:
             state = Path(args.state_dir)

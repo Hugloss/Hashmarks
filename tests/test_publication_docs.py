@@ -628,6 +628,16 @@ def test_update_check_cache_is_throttle_only() -> None:
         assert "timestamp/latest-version cache" not in text
 
 
+def test_automatic_update_eligibility_is_semantic_not_command_named() -> None:
+    architecture = _text("docs/reference/ARCHITECTURE.md")
+    invariants = _text("docs/reference/INVARIANTS.md")
+
+    assert "CLI command declarations own eligibility" in invariants
+    assert "must not branch on command names" in invariants
+    assert "does not know or branch on command names" in architecture
+    assert "parser declarations" in architecture
+
+
 def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() -> None:
     readme = _text("README.md")
     getting_started = _text("docs/GETTING_STARTED.md")
