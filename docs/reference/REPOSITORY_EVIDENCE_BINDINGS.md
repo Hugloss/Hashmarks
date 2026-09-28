@@ -101,6 +101,19 @@ The optional **dependency_paths** mapping declares explicit repository members a
 
 These are **declared dependencies**, not inferred semantic dependency closure. The delta schema therefore uses the field **declared_dependencies**.
 
+### Declared dependency topology and locality
+
+Declared dependency authority is explicit, path-based repository evidence:
+
+- two dependency paths with identical bytes may share a `member_revision`, but equal content does not collapse their repository path authority;
+- moving a binding's declared dependency from one path to another changes the binding definition even when both dependency members have identical bytes;
+- dependency-path definition changes remain separate from dependency observation changes;
+- when several bindings explicitly declare the same dependency path, a change to that member may affect each of those bindings;
+- a binding that did not declare that dependency receives no dependency impact merely because it appears in the same packet or relationship graph.
+
+The invariant is: **declared dependency sharing is explicit by binding and path; Hashmarks does not infer dependency authority from content equality, relationship evidence, or neighboring bindings.**
+
+
 ## Relationship evidence
 
 When **include_relationships=True**, Hashmarks projects bounded indexed repository relationships for the bound evidence paths. Relationship rows reuse canonical relationship evidence identities and provenance.
