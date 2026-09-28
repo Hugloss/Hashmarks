@@ -92,8 +92,8 @@ def test_splunk_csv_dogfood_native_framing_ignores_full_row_like_raw_continuatio
         source,
         '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
         '"[host]","idx","[server]","first line\n'
-        '7,2026-09-14T23:59:57.000+0200,[path],kube:container:x,'
-        '[host],idx,[server],fake raw\n'
+        "7,2026-09-14T23:59:57.000+0200,[path],kube:container:x,"
+        "[host],idx,[server],fake raw\n"
         'last line"\n'
         '"2","2026-09-14T23:59:56.000+0200","[path]","kube:container:x",'
         '"[host]","idx","[server]","INFO name=tasks.worker"\n',
