@@ -380,6 +380,7 @@ class _CollectionState:
     unlocated_sample_occurrence_ids: list[str] = field(default_factory=list)
     unlocated_sample_observation_identities: list[str] = field(default_factory=list)
     physical_lines: int = 1
+    record_framing_state: str = "native-csv"
     time_bounds: _TimeBounds = field(default_factory=_TimeBounds)
 
     def observe(
@@ -521,13 +522,59 @@ def _validate_header(handle: TextIO) -> None:
         raise ValueError("Splunk CSV header must be " + ",".join(EXPECTED_HEADER))
 
 
-def _collect_stream(path: Path) -> _CollectionState:
-    state = _CollectionState()
+class _TrackingLineIterator:
+    def __init__(self, handle: TextIO) -> None:
+        self.handle = handle
+        self.consumed: list[str] = []
+
+    def __iter__(self) -> _TrackingLineIterator:
+        return self
+
+    def __next__(self) -> str:
+        line = self.handle.readline()
+        if line == "":
+            raise StopIteration
+        self.consumed.append(line)
+        return line
+
+    def take(self) -> str:
+        text = "".join(self.consumed)
+        self.consumed.clear()
+        return text
+
+
+def _strict_logical_records(handle: TextIO):
+    tracker = _TrackingLineIterator(handle)
+    reader = csv.reader(tracker, strict=True)
+    ordinal = 0
+    for _row in reader:
+        yield ordinal, tracker.take()
+        ordinal += 1
+
+
+def _collect_native_csv_stream(path: Path) -> _CollectionState:
+    state = _CollectionState(record_framing_state="native-csv")
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        _validate_header(handle)
+        for ordinal, text in _strict_logical_records(handle):
+            state.observe(ordinal, text, _parse_record(text))
+    return state
+
+
+def _collect_recovery_stream(path: Path) -> _CollectionState:
+    state = _CollectionState(record_framing_state="recovery-heuristic")
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         _validate_header(handle)
         for ordinal, text in _logical_records(handle):
             state.observe(ordinal, text, _parse_record(text))
     return state
+
+
+def _collect_stream(path: Path) -> _CollectionState:
+    try:
+        return _collect_native_csv_stream(path)
+    except csv.Error:
+        return _collect_recovery_stream(path)
 
 
 def _select_anchors(
@@ -644,6 +691,7 @@ def _bundle(
             "recovered_count": state.recovered_count,
             "malformed_count": state.malformed_count,
             "widened_count": state.widened_count,
+            "record_framing_state": state.record_framing_state,
             "csv_parsing": {
                 "strict_valid_count": state.strict_valid_count,
                 "recovered_count": state.recovered_count,
@@ -697,6 +745,7 @@ def _report(
             "csv_recovered": state.recovered_count,
             "csv_malformed": state.malformed_count,
             "csv_widened": state.widened_count,
+            "record_framing_state": state.record_framing_state,
             "producer_payload_validation_state": (_PRODUCER_PAYLOAD_VALIDATION_STATE),
             "time_ordering_state": state.time_bounds.ordering_state,
             "timestamp_parse_failure_count": state.time_bounds.unparseable_count,
