@@ -659,9 +659,9 @@ def test_generated_role_reappears_without_history_or_invented_continuity(
     )
 
 
-def test_ownership_value_ambiguity_and_incomplete_coverage_remain_orthogonal(
+def _ownership_uncertainty_packets(
     tmp_path: Path,
-) -> None:
+) -> tuple[dict[str, object], dict[str, object]]:
     repo = tmp_path / "repo"
     source = repo / "owners" / "source.meta"
     generated = repo / "owners" / "catalog.meta"
@@ -690,7 +690,13 @@ def test_ownership_value_ambiguity_and_incomplete_coverage_remain_orthogonal(
             ],
             previous_observation=baseline,
         )
+    return baseline, stressed
 
+
+def _assert_ownership_uncertainty_current_state(
+    baseline: dict[str, object],
+    stressed: dict[str, object],
+) -> None:
     baseline_group = _nested_group(baseline)
     stressed_group = _nested_group(stressed)
     assert baseline_group["comparison"] == {
@@ -698,7 +704,6 @@ def test_ownership_value_ambiguity_and_incomplete_coverage_remain_orthogonal(
         "distinct_values": ["team-a"],
     }
     assert baseline_group["absence"]["state"] == "known-present"
-
     assert stressed_group["comparison"] == {
         "state": "ambiguous",
         "reason": "one-or-more-values-not-resolved",
@@ -724,6 +729,12 @@ def test_ownership_value_ambiguity_and_incomplete_coverage_remain_orthogonal(
             == stressed_roles[role]["semantic_declaration_identity"]
         )
 
+
+def _assert_ownership_uncertainty_semantic_delta(
+    baseline: dict[str, object],
+    stressed: dict[str, object],
+) -> None:
+    baseline_roles = _role_rows(baseline)
     delta = _nested_delta(stressed)
     changed = delta["changed_groups"][0]
     assert changed["definition_changed"] is True
@@ -766,7 +777,14 @@ def test_ownership_value_ambiguity_and_incomplete_coverage_remain_orthogonal(
     assert subject["coverage_transition"]["before"]["state"] == "complete"
     assert subject["coverage_transition"]["after"]["state"] == "incomplete"
 
-    bindings = delta["repository_evidence"]["bindings"]
+
+def _assert_ownership_uncertainty_binding_separation(
+    baseline: dict[str, object],
+    stressed: dict[str, object],
+) -> None:
+    baseline_roles = _role_rows(baseline)
+    stressed_roles = _role_rows(stressed)
+    bindings = _nested_delta(stressed)["repository_evidence"]["bindings"]
     assert bindings["removed"] == [
         baseline_roles["repository-policy"]["binding_id"]
     ]
@@ -776,3 +794,12 @@ def test_ownership_value_ambiguity_and_incomplete_coverage_remain_orthogonal(
         stressed_roles["generated-catalog"]["binding_id"]
         == baseline_roles["generated-catalog"]["binding_id"]
     )
+
+
+def test_ownership_value_ambiguity_and_incomplete_coverage_remain_orthogonal(
+    tmp_path: Path,
+) -> None:
+    baseline, stressed = _ownership_uncertainty_packets(tmp_path)
+    _assert_ownership_uncertainty_current_state(baseline, stressed)
+    _assert_ownership_uncertainty_semantic_delta(baseline, stressed)
+    _assert_ownership_uncertainty_binding_separation(baseline, stressed)
