@@ -998,11 +998,40 @@ def _assert_policy_multiplicity_binding_separation(
     baseline: dict[str, object],
     stressed: dict[str, object],
 ) -> None:
+    baseline_group = _nested_group(baseline)
     baseline_policy = _policy_role_rows(baseline)
+    source = next(
+        row
+        for row in baseline_group["declarations"]
+        if row.get("semantic_role") == {"kind": "source-metadata"}
+    )
     bindings = _nested_delta(stressed)["repository_evidence"]["bindings"]
-    assert baseline_policy[0]["binding_id"] in bindings["preserved"]
+    assert bindings["preserved"] == [source["binding_id"]]
     assert len(bindings["added"]) == 2
     assert bindings["removed"] == []
+
+    policy_binding = next(
+        row
+        for row in bindings["changed"]
+        if row["binding_id"] == baseline_policy[0]["binding_id"]
+    )
+    assert policy_binding["definition"]["state"] == "preserved"
+    assert policy_binding["direct_evidence"]["state"] == "preserved"
+    assert policy_binding["locator_evidence"]["state"] == "preserved"
+    assert policy_binding["member_evidence"] == {
+        "state": "changed",
+        "changes": [
+            {
+                "scope": "lines",
+                "evidence": [".github/CODEOWNERS", 1, 1],
+                "state": "changed",
+                "revision_changed": True,
+                "observation_state_changed": False,
+                "before_state": "known-present",
+                "after_state": "known-present",
+            }
+        ],
+    }
 
 
 def test_provider_duplicate_policy_role_preserves_multiplicity_without_precedence(
