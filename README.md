@@ -33,6 +33,10 @@ Latest: 0.25.0
 
 This installation is managed by uv.
 
+Native upgrade command:
+
+    uv tool upgrade hashmarks
+
 [1] Upgrade now
 [2] Skip for now
 ```
