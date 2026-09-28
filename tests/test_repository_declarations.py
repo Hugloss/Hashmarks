@@ -499,8 +499,11 @@ def test_semantic_role_correlates_child_change_across_request_label_renames(
     with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
         codemap.sync()
         before = codemap.repository_declarations([before_group])
-        (repo / "Dockerfile").write_text("python = 3.13\n", encoding="utf-8")
-        codemap.sync(["Dockerfile"])
+        moved = repo / "container" / "Dockerfile"
+        moved.parent.mkdir()
+        (repo / "Dockerfile").replace(moved)
+        moved.write_text("python = 3.13\n", encoding="utf-8")
+        codemap.sync(["Dockerfile", "container/Dockerfile"])
         after_group = _group(
             [
                 _declaration(
@@ -511,7 +514,7 @@ def test_semantic_role_correlates_child_change_across_request_label_renames(
                 ),
                 _declaration(
                     "runtime-after",
-                    "Dockerfile",
+                    "container/Dockerfile",
                     "3.13",
                     semantic_role={"kind": "container-runtime"},
                 ),
@@ -562,6 +565,10 @@ def test_semantic_role_correlates_child_change_across_request_label_renames(
         "before": {"value_state": "resolved", "value": "3.12"},
         "after": {"value_state": "resolved", "value": "3.13"},
     }
+    assert (
+        before_by_role["container-runtime"]["declaration_definition_identity"]
+        != after_by_role["container-runtime"]["declaration_definition_identity"]
+    )
     assert subject["comparison_transition"]["before"]["state"] == "equivalent"
     assert subject["comparison_transition"]["after"]["state"] == "differing"
 
