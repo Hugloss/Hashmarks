@@ -342,6 +342,7 @@ def test_cli_upgrade_reports_up_to_date_without_owner_detection(
 
     assert "Hashmarks 0.24.0 is up to date." in capsys.readouterr().out
 
+
 def test_managed_standalone_owner_requires_canonical_installed_name(
     monkeypatch,
     tmp_path: Path,
