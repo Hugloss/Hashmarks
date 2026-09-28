@@ -34,6 +34,7 @@ def _group(
     ids = [str(row["declaration_id"]) for row in declarations]
     return {
         "group_id": "component-owner",
+        "semantic_namespace": "authority-adversarial-fixture",
         "concept": {"kind": "ownership", "identity": "component-a"},
         "scope": {"environment": "all"},
         "correspondence": {
