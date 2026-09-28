@@ -278,9 +278,7 @@ def test_declaration_producer_provenance_change_is_observation_only(
     (repo / "owner.yaml").write_text("owner: team-a\n", encoding="utf-8")
 
     before_group = _group([_declaration("owner", "owner.yaml", "team-a")])
-    before_group["declarations"][0]["semantic_role"] = {
-        "kind": "repository-owner"
-    }
+    before_group["declarations"][0]["semantic_role"] = {"kind": "repository-owner"}
     after_group = copy.deepcopy(before_group)
     after_group["declarations"][0]["producer"]["version"] = "2"
 
