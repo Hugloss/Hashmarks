@@ -180,7 +180,9 @@ def test_splunk_csv_dogfood_preserves_bounded_opaque_context_per_anchor(
     assert anchor["metadata"]["observed_count"] == 3
     context = anchor["metadata"]["runtime_context"]
     assert context["handling_ident_values"] == ["[DOCUMENT_A]", "[DOCUMENT_B]"]
+    assert context["handling_ident_values_truncated"] is False
     assert context["commit_values"] == ["[REV_A]", "[REV_B]"]
+    assert context["commit_values_truncated"] is False
     assert context["values_truncated"] is False
 
 
@@ -194,7 +196,7 @@ def test_splunk_csv_dogfood_preserves_runtime_placement_scope(tmp_path) -> None:
         '"[host-b]","idx","[server-b]","INFO name=tasks.worker"\n',
     )
 
-    scope = report = collect(source)["bundle"]["scope"]
+    scope = collect(source)["bundle"]["scope"]
     assert scope["hosts"] == ["[host-a]", "[host-b]"]
     assert scope["splunk_servers"] == ["[server-a]", "[server-b]"]
     assert scope["scope_values_truncated"] is False
@@ -220,7 +222,9 @@ def test_splunk_csv_dogfood_bounds_context_without_splitting_anchor(
     assert anchor["metadata"]["observed_count"] == 10
     context = anchor["metadata"]["runtime_context"]
     assert len(context["handling_ident_values"]) == 8
+    assert context["handling_ident_values_truncated"] is True
     assert len(context["commit_values"]) == 8
+    assert context["commit_values_truncated"] is True
     assert context["values_truncated"] is True
 
 
