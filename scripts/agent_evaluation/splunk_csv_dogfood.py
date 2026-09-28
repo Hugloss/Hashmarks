@@ -388,6 +388,14 @@ class _CollectionState:
     record_framing_state: str = "native-csv"
     time_bounds: _TimeBounds = field(default_factory=_TimeBounds)
 
+    @property
+    def context_values_truncated(self) -> bool:
+        stats = [*self.modules.values(), *self.tracebacks.values()]
+        return any(
+            item.handling_idents_truncated or item.commit_values_truncated
+            for item in stats
+        )
+
     def observe(
         self,
         ordinal: int,
@@ -610,6 +618,17 @@ def _select_anchors(
     )
 
 
+def _projection_truncated(
+    state: _CollectionState,
+    selection: _AnchorSelection,
+) -> bool:
+    return (
+        selection.truncated
+        or state.scope_values_truncated
+        or state.context_values_truncated
+    )
+
+
 def _scope(state: _CollectionState) -> dict[str, object]:
     return {
         "time_start": state.time_bounds.start,
@@ -652,7 +671,9 @@ def _evidence_projection_identity(
                 "format": "csv-export",
             },
             "completeness": "unknown",
-            "truncation": "truncated" if selection.truncated else "unknown",
+            "truncation": (
+                "truncated" if _projection_truncated(state, selection) else "unknown"
+            ),
             "scope": _scope(state),
             "accounting": {
                 "logical_event_count": state.event_count,
@@ -720,7 +741,9 @@ def _bundle(
             ),
         },
         "completeness": "unknown",
-        "truncation": "truncated" if selection.truncated else "unknown",
+        "truncation": (
+            "truncated" if _projection_truncated(state, selection) else "unknown"
+        ),
         "scope": _scope(state),
         "anchors": selection.anchors,
     }
@@ -775,6 +798,8 @@ def _report(
             "anchors_emitted": len(selection.anchors),
             "anchors_truncated": selection.truncated,
             "scope_values_truncated": state.scope_values_truncated,
+            "context_values_truncated": state.context_values_truncated,
+            "projection_truncated": _projection_truncated(state, selection),
         },
         "bundle": _bundle(source_sha256, state, selection),
     }
