@@ -389,6 +389,12 @@ def _provider_result(
     )
     group_ids: list[str] = []
     for group in groups:
+        if "semantic_namespace" in group:
+            raise RepositoryDeclarationProviderError(
+                f"declaration provider {provider_name} must not override "
+                "semantic_namespace"
+            )
+        group["semantic_namespace"] = provider_name
         group_id = group.get("group_id")
         if not isinstance(group_id, str) or not group_id.strip():
             raise RepositoryDeclarationProviderError(
