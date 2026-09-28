@@ -296,6 +296,57 @@ def test_splunk_csv_dogfood_repeated_observation_keeps_distinct_occurrences(
     assert len(metadata["sample_observation_identities"]) == 1
 
 
+def test_splunk_csv_dogfood_orders_scope_by_instant_across_offsets(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-10-25T02:15:00.000+0100","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.worker later"\n'
+        '"2","2026-10-25T02:30:00.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.worker earlier"\n',
+    )
+
+    report = collect(source)
+    scope = report["bundle"]["scope"]
+    assert scope["time_start"] == "2026-10-25T02:30:00.000+0200"
+    assert scope["time_end"] == "2026-10-25T02:15:00.000+0100"
+    assert scope["time_ordering_state"] == "instant-aware"
+    assert scope["timestamp_parse_failure_count"] == 0
+    assert report["summary"]["time_ordering_state"] == "instant-aware"
+    assert report["summary"]["timestamp_parse_failure_count"] == 0
+
+    metadata = report["bundle"]["anchors"][0]["metadata"]
+    assert metadata["first_time"] == "2026-10-25T02:30:00.000+0200"
+    assert metadata["last_time"] == "2026-10-25T02:15:00.000+0100"
+    assert metadata["time_ordering_state"] == "instant-aware"
+    assert metadata["timestamp_parse_failure_count"] == 0
+
+
+def test_splunk_csv_dogfood_marks_unparseable_timestamp_ordering_fallback(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-10-25T02:15:00.000+0100","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.worker valid"\n'
+        '"2","2026-10-25Tbad","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.worker invalid"\n',
+    )
+
+    report = collect(source)
+    scope = report["bundle"]["scope"]
+    assert scope["time_ordering_state"] == "lexical-fallback"
+    assert scope["timestamp_parse_failure_count"] == 1
+    assert report["summary"]["time_ordering_state"] == "lexical-fallback"
+    assert report["summary"]["timestamp_parse_failure_count"] == 1
+    metadata = report["bundle"]["anchors"][0]["metadata"]
+    assert metadata["time_ordering_state"] == "lexical-fallback"
+    assert metadata["timestamp_parse_failure_count"] == 1
+
+
 def test_splunk_csv_dogfood_preserves_bounded_opaque_context_per_anchor(
     tmp_path,
 ) -> None:
