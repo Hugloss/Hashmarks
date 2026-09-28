@@ -257,6 +257,7 @@ def test_periodic_cli_check_skips_unmanaged_installation(monkeypatch) -> None:
         label="the current Python environment",
         command=None,
     )
+    monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
     monkeypatch.setattr(cli, "detect_installation_owner", lambda: owner)
     monkeypatch.setattr(
         cli,
