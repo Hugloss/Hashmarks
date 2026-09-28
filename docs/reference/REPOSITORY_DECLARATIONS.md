@@ -125,6 +125,10 @@ Correspondence is also deliberately **non-transitive**. Explicit A↔B and B↔C
 
 Removing A↔B or B↔C removes only that explicit producer-owned claim. Hashmarks does not retain an inferred edge or graph residue that survives after the originating correspondence disappears.
 
+Provider names carried inside `correspondence.basis` or declaration producer metadata are opaque provenance, not foreign keys. Core does not require those named providers to be simultaneously selected, does not cascade-delete a correspondence claim when one disappears, and does not automatically attach or rewire correspondence when a provider later appears. The correspondence producer remains solely responsible for making its own claim true from the exact repository evidence it cites.
+
+This also means there is no hidden referential-integrity graph behind provider discovery. Provider add/remove events and correspondence add/remove/change events remain independent observations unless an explicit producer claim itself changes.
+
 ## Values and comparison
 
 Each declaration has:
