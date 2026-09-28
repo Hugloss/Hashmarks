@@ -333,7 +333,9 @@ def test_hashmarks_never_becomes_a_semantic_knowledge_graph() -> None:
     assert "There is no global semantic edge/knowledge-graph owner" in owners
     assert "do not create a connected component, equivalence class" in invariants
     assert "Cycles do not strengthen correspondence authority" in declarations
-    assert "do not create a semantic component, equivalence class" in _text("AGENTS.md")
+    assert "do **not** create a semantic component, equivalence class" in _text(
+        "AGENTS.md"
+    )
     assert "connected components, cycle consensus, majority authority" in owners
 
 
