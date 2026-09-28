@@ -142,6 +142,58 @@ class _SingleProvider:
         )
 
 
+@dataclass
+class _FixedSubjectProvider:
+    name: str
+    path: str
+    override_namespace: bool = False
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return True
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        group: dict[str, object] = {
+            "group_id": self.name,
+            "concept": {"kind": "shared-fixture", "identity": "subject"},
+            "scope": {"environment": "all"},
+            "correspondence": {
+                "state": "declared",
+                "basis": {"provider": self.name},
+            },
+            "declarations": [
+                {
+                    "declaration_id": "value",
+                    "value_state": "resolved",
+                    "value": _value(context, self.path),
+                    "producer": {"provider": self.name},
+                    "evidence": [
+                        {
+                            "path": self.path,
+                            "start_line": 1,
+                            "end_line": 1,
+                        }
+                    ],
+                }
+            ],
+            "coverage": {
+                "state": "complete",
+                "truncation": "complete",
+                "expected_declaration_ids": ["value"],
+                "scope": {},
+                "provenance": {"provider": self.name},
+            },
+        }
+        if self.override_namespace:
+            group["semantic_namespace"] = "spoofed-provider"
+        return RepositoryDeclarationProviderResult(
+            groups=(group,),
+            provenance={"provider": self.name},
+        )
+
+
 class _FailingProvider:
     name = "failing-provider"
 
@@ -227,6 +279,7 @@ def test_discovery_is_format_and_domain_neutral(
         for row in provider_row["inputs"]
     )
     group = packet["declarations"]["groups"][0]
+    assert group["semantic_namespace"] == "fixture-provider"
     assert group["concept"] == concept
     assert group["comparison"]["state"] == "equivalent"
     assert packet["observation_identity"].startswith("sha256:")
@@ -250,6 +303,56 @@ def test_provider_order_is_not_discovery_identity(tmp_path: Path) -> None:
         "a-provider",
         "b-provider",
     ]
+
+
+def test_discovery_namespaces_equal_opaque_subjects_by_provider(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.txt").write_text("value: same\n", encoding="utf-8")
+    (repo / "b.txt").write_text("value: same\n", encoding="utf-8")
+    providers = [
+        _FixedSubjectProvider("provider-a", "a.txt"),
+        _FixedSubjectProvider("provider-b", "b.txt"),
+    ]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.discover_repository_declarations(providers)
+
+    groups = packet["declarations"]["groups"]
+    assert [row["semantic_namespace"] for row in groups] == [
+        "provider-a",
+        "provider-b",
+    ]
+    assert groups[0]["concept"] == groups[1]["concept"]
+    assert groups[0]["scope"] == groups[1]["scope"]
+    assert (
+        groups[0]["semantic_subject_identity"]
+        != groups[1]["semantic_subject_identity"]
+    )
+
+
+def test_discovery_rejects_provider_semantic_namespace_spoofing(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "value.txt").write_text("value: same\n", encoding="utf-8")
+    provider = _FixedSubjectProvider(
+        "provider-a",
+        "value.txt",
+        override_namespace=True,
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            RepositoryDeclarationProviderError,
+            match="must not override semantic_namespace",
+        ):
+            codemap.discover_repository_declarations([provider])
 
 
 def test_not_detected_provider_is_observable_without_claiming_absence(
