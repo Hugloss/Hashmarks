@@ -51,6 +51,16 @@ The governing rule is:
 
 > **Identity without ownership; compare without mutation; bounded evidence without repository-lifetime history.**
 
+## Why this is not a knowledge graph
+
+Semantic identity and explicit correspondence do not admit a graph-owned semantic model.
+
+Hashmarks does not maintain a global set of semantic nodes and edges across providers, infer relationships between claims, compute transitive closure, traverse semantic neighborhoods, or preserve correspondence independently of the provider-owned declaration group that emitted it. Explicit A↔B and B↔C claims remain two separate producer-owned observations; they do not create A↔C.
+
+This is a permanent architectural boundary. A proposal that requires graph reachability, inferred semantic edges, global ontology alignment, edge persistence, graph query APIs, centrality/ranking, or transitive relationship semantics is outside the repository-declaration owner by default and must not be smuggled in as an optimization or projection.
+
+Existing CodeMap graphs such as imports, calls, references, dependencies, and other repository-derived relationships are different: they are bounded projections over repository evidence with established owners. They do not turn semantic declarations into a general-purpose knowledge graph.
+
 ## Why this is not a new ontology
 
 `concept` and `scope` stay opaque provider vocabulary. Core hashes those already-admitted semantic inputs; it does not understand names such as `service.owner`, `runtime.python`, dependency coordinates, or organization-specific precedence.
