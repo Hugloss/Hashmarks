@@ -137,8 +137,7 @@ def test_declaration_explain_is_endpoint_local_after_repository_advances(
     assert explanation["semantic_result"]["group_count"] == 1
     assert explanation["semantic_result"]["declaration_count"] == 1
     assert (
-        explanation["semantic_result"]["groups"][0]["semantic_namespace"]
-        == "fixture"
+        explanation["semantic_result"]["groups"][0]["semantic_namespace"] == "fixture"
     )
     assert (
         explanation["semantic_result"]["groups"][0]["semantic_subject_identity"]
