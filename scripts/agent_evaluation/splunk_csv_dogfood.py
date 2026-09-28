@@ -440,10 +440,13 @@ def _report(
             "locator_occurrences": (
                 state.module_locator_occurrences + state.traceback_locator_occurrences
             ),
+            "traceback_anchors_observed": selection.traceback_observed,
             "unique_traceback_anchors_observed": selection.traceback_observed,
             "traceback_anchors_emitted": selection.traceback_emitted,
+            "module_anchors_observed": selection.module_observed,
             "unique_module_anchors_observed": selection.module_observed,
             "module_anchors_emitted": selection.module_emitted,
+            "anchors_observed": selection.observed,
             "unique_anchors_observed": selection.observed,
             "anchors_emitted": len(selection.anchors),
             "anchors_truncated": selection.truncated,
