@@ -84,6 +84,50 @@ def test_splunk_csv_dogfood_accepts_unquoted_serial_record_start(tmp_path) -> No
     assert report["bundle"]["anchors"][0]["module"] == "tasks.worker"
 
 
+def test_splunk_csv_dogfood_native_framing_ignores_full_row_like_raw_continuation(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","first line\n'
+        '7,2026-09-14T23:59:57.000+0200,[path],kube:container:x,'
+        '[host],idx,[server],fake raw\n'
+        'last line"\n'
+        '"2","2026-09-14T23:59:56.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.worker"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["events"] == 2
+    assert report["summary"]["csv_strict_valid"] == 2
+    assert report["summary"]["malformed"] == 0
+    assert report["summary"]["record_framing_state"] == "native-csv"
+    assert report["bundle"]["provenance"]["record_framing_state"] == "native-csv"
+    assert report["bundle"]["anchors"][0]["module"] == "tasks.worker"
+
+
+def test_splunk_csv_dogfood_falls_back_only_for_damaged_csv_framing(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO GET [url] "HTTP/1.1 200 OK" '
+        'name=httpx"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["events"] == 1
+    assert report["summary"]["recovered"] == 1
+    assert report["summary"]["record_framing_state"] == "recovery-heuristic"
+    assert report["bundle"]["provenance"]["record_framing_state"] == (
+        "recovery-heuristic"
+    )
+
+
 def test_splunk_csv_dogfood_does_not_split_record_like_raw_continuation(
     tmp_path,
 ) -> None:
