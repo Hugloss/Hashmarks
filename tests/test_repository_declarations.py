@@ -170,6 +170,37 @@ def test_absence_requires_complete_untruncated_semantic_coverage(
     }
 
 
+def test_semantic_role_does_not_create_expected_membership_or_absence(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    declaration = _declaration(
+        "runtime",
+        "runtime.yaml",
+        "3.12",
+        semantic_role={"kind": "container-runtime"},
+    )
+    group = _group([declaration], expected=[])
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations([group])
+
+    projected = packet["groups"][0]
+    assert projected["declarations"][0]["semantic_declaration_identity"].startswith(
+        "sha256:"
+    )
+    assert projected["absence"] == {
+        "state": "unknown",
+        "missing_declaration_ids": [],
+        "unseen_expected_declaration_ids": [],
+        "unexpected_declaration_ids": ["runtime"],
+        "reason": "expected-membership-not-declared",
+    }
+
+
 def test_ambiguous_correspondence_never_becomes_a_conflict_or_equivalence(
     tmp_path: Path,
 ) -> None:
