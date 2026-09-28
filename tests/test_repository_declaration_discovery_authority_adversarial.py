@@ -45,9 +45,7 @@ def _group(
         "coverage": {
             "state": coverage_state,
             "truncation": truncation,
-            "expected_declaration_ids": (
-                ["value"] if expected is None else expected
-            ),
+            "expected_declaration_ids": (["value"] if expected is None else expected),
             "scope": {"repository": "fixture"},
             "provenance": {"provider": provider},
         },
