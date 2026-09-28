@@ -75,6 +75,8 @@ Two declarations become one semantic subject only inside the same explicit seman
 
 The current declaration APIs operate on current or caller-supplied explicit endpoint packets. Explain/derivation is endpoint-local. Comparison receives the previous observation from the caller. No server-side sequence of observations is required for correctness.
 
+`previous_observation` therefore has no replay or restoration authority. It is validated and consumed for one explicit comparison only. It must never hydrate declaration state, repopulate correspondence after a restart, seed a semantic cache, or write a persistent relationship edge. Reopening CodeMap against the same state directory and selecting no correspondence provider must yield no correspondence, regardless of any correspondence packet observed earlier.
+
 This change therefore admits **no history store and no retention layer**. A future retention proposal remains a separate architecture/economics decision and must prove that explicit packets are materially insufficient before adding state.
 
 ## Consequences
