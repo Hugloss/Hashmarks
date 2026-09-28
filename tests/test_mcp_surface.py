@@ -749,6 +749,7 @@ def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
             "declarations": [
                 {
                     "declaration_id": "a",
+                    "semantic_role": {"kind": "project-intent"},
                     "value_state": "resolved",
                     "value": "3.12",
                     "producer": {"kind": "fixture-yaml"},
@@ -762,6 +763,7 @@ def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
                 },
                 {
                     "declaration_id": "b",
+                    "semantic_role": {"kind": "container-runtime"},
                     "value_state": "resolved",
                     "value": "3.13",
                     "producer": {"kind": "fixture-yaml"},
@@ -793,6 +795,10 @@ def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
 
     assert packet["schema"] == "hashmarks.repository-declarations.v1"
     assert packet["groups"][0]["comparison"]["state"] == "differing"
+    assert all(
+        row["semantic_declaration_identity"].startswith("sha256:")
+        for row in packet["groups"][0]["declarations"]
+    )
     assert packet["winner"] == "not-selected"
     assert packet["interpretation_authority"] == "consumer-owned"
 

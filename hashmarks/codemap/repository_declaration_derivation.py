@@ -50,6 +50,16 @@ class RepositoryDeclarationDerivationMixin:
                         "semantic_subject_identity": declaration[
                             "semantic_subject_identity"
                         ],
+                        **(
+                            {
+                                "semantic_role": deepcopy(declaration["semantic_role"]),
+                                "semantic_declaration_identity": declaration[
+                                    "semantic_declaration_identity"
+                                ],
+                            }
+                            if "semantic_role" in declaration
+                            else {}
+                        ),
                         "declaration_definition_identity": declaration[
                             "declaration_definition_identity"
                         ],

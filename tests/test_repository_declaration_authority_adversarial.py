@@ -278,6 +278,7 @@ def test_declaration_producer_provenance_change_is_observation_only(
     (repo / "owner.yaml").write_text("owner: team-a\n", encoding="utf-8")
 
     before_group = _group([_declaration("owner", "owner.yaml", "team-a")])
+    before_group["declarations"][0]["semantic_role"] = {"kind": "repository-owner"}
     after_group = copy.deepcopy(before_group)
     after_group["declarations"][0]["producer"]["version"] = "2"
 
@@ -300,6 +301,10 @@ def test_declaration_producer_provenance_change_is_observation_only(
         != after_declaration["declaration_observation_identity"]
     )
     assert (
+        before_declaration["semantic_declaration_identity"]
+        == after_declaration["semantic_declaration_identity"]
+    )
+    assert (
         before["groups"][0]["group_definition_identity"]
         == after["groups"][0]["group_definition_identity"]
     )
@@ -311,6 +316,19 @@ def test_declaration_producer_provenance_change_is_observation_only(
     assert changed["observation_changed_declaration_ids"] == ["owner"]
     assert changed["comparison_changed"] is False
     assert changed["absence_changed"] is False
+    semantic = after["delta_from_previous"]["semantic_subjects"]["changed"][0][
+        "semantic_declarations"
+    ]
+    assert semantic["added"] == []
+    assert semantic["removed"] == []
+    assert semantic["ambiguous"] == []
+    assert len(semantic["changed"]) == 1
+    role_change = semantic["changed"][0]
+    assert role_change["semantic_role"] == {"kind": "repository-owner"}
+    assert role_change["declaration_id_changed"] is False
+    assert role_change["producer_transition"]["before"]["version"] == "1"
+    assert role_change["producer_transition"]["after"]["version"] == "2"
+    assert "value_transition" not in role_change
     assert (
         after["delta_from_previous"]["repository_evidence"]["bindings"]["changed"] == []
     )

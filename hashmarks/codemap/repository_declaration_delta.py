@@ -127,11 +127,112 @@ def _transition(
     return {"before": before, "after": after}
 
 
+def _value_projection(row: Mapping[str, object]) -> dict[str, object]:
+    result: dict[str, object] = {"value_state": row.get("value_state")}
+    if "value" in row:
+        result["value"] = row["value"]
+    if "candidate_values" in row:
+        result["candidate_values"] = row["candidate_values"]
+    return result
+
+
+def _semantic_declaration_index(
+    group: Mapping[str, object],
+) -> dict[str, list[Mapping[str, object]]]:
+    index: dict[str, list[Mapping[str, object]]] = {}
+    rows = group.get("declarations", [])
+    if not isinstance(rows, list):
+        return index
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        identity = row.get("semantic_declaration_identity")
+        if isinstance(identity, str) and identity:
+            index.setdefault(identity, []).append(row)
+    for declarations in index.values():
+        declarations.sort(key=lambda row: str(row.get("declaration_id") or ""))
+    return index
+
+
+def _semantic_declaration_change(
+    identity: str,
+    old: Mapping[str, object],
+    new: Mapping[str, object],
+) -> dict[str, object] | None:
+    change: dict[str, object] = {
+        "semantic_declaration_identity": identity,
+        "semantic_role": new.get("semantic_role"),
+        "previous_declaration_id": old.get("declaration_id"),
+        "current_declaration_id": new.get("declaration_id"),
+        "declaration_id_changed": old.get("declaration_id")
+        != new.get("declaration_id"),
+    }
+    if _value_signature(old) != _value_signature(new):
+        change["value_transition"] = {
+            "before": _value_projection(old),
+            "after": _value_projection(new),
+        }
+    for field in ("producer", "evidence_state"):
+        transition = _transition(old, new, field)
+        if transition is not None:
+            change[f"{field}_transition"] = transition
+    meaningful = bool(
+        change["declaration_id_changed"]
+        or "value_transition" in change
+        or "producer_transition" in change
+        or "evidence_state_transition" in change
+    )
+    return change if meaningful else None
+
+
+def _semantic_declaration_delta(
+    old: Mapping[str, object],
+    new: Mapping[str, object],
+) -> dict[str, object] | None:
+    before = _semantic_declaration_index(old)
+    after = _semantic_declaration_index(new)
+    before_ids = set(before)
+    after_ids = set(after)
+    ambiguous: list[dict[str, object]] = []
+    changed: list[dict[str, object]] = []
+
+    for identity in sorted(before_ids & after_ids):
+        old_rows = before[identity]
+        new_rows = after[identity]
+        if len(old_rows) != 1 or len(new_rows) != 1:
+            ambiguous.append(
+                {
+                    "semantic_declaration_identity": identity,
+                    "previous_declaration_ids": [
+                        str(row.get("declaration_id") or "") for row in old_rows
+                    ],
+                    "current_declaration_ids": [
+                        str(row.get("declaration_id") or "") for row in new_rows
+                    ],
+                    "reason": "semantic-declaration-not-unique",
+                }
+            )
+            continue
+        change = _semantic_declaration_change(identity, old_rows[0], new_rows[0])
+        if change is not None:
+            changed.append(change)
+
+    delta = {
+        "added": sorted(after_ids - before_ids),
+        "removed": sorted(before_ids - after_ids),
+        "ambiguous": ambiguous,
+        "changed": changed,
+    }
+    return delta if any(delta.values()) else None
+
+
 def _semantic_subject_change(
     identity: str,
     old: Mapping[str, object],
     new: Mapping[str, object],
 ) -> dict[str, object] | None:
+    if old.get("group_observation_identity") == new.get("group_observation_identity"):
+        return None
     old_declarations = _declarations(old)
     new_declarations = _declarations(new)
     group_id_changed = old.get("group_id") != new.get("group_id")
@@ -167,6 +268,9 @@ def _semantic_subject_change(
                 ),
             }
         )
+    semantic_declarations = _semantic_declaration_delta(old, new)
+    if semantic_declarations is not None:
+        change["semantic_declarations"] = semantic_declarations
     for field in ("comparison", "absence", "correspondence", "coverage"):
         transition = _transition(old, new, field)
         if transition is not None:
@@ -179,6 +283,7 @@ def _semantic_subject_change(
         or change.get("value_changed_declaration_ids")
         or change.get("producer_changed_declaration_ids")
         or change.get("evidence_state_changed_declaration_ids")
+        or change.get("semantic_declarations")
         or any(key.endswith("_transition") for key in change)
     )
     return change if meaningful else None

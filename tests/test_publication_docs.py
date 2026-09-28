@@ -195,15 +195,23 @@ def test_semantic_identity_is_documented_without_repository_history_ownership() 
     assert "### Semantic identity layers" in architecture
     assert "semantic_subject_identity" in declarations
     assert "semantic_namespace" in declarations
+    assert "semantic_role" in declarations
+    assert "semantic_declaration_identity" in declarations
     assert "semantic_subject_changed" in declarations
     assert "semantic_subjects" in declarations
+    assert "semantic_declarations" in declarations
     assert "G69. Semantic-subject identity" in invariants
     assert "G70. Semantic-subject delta" in invariants
+    assert "G71. Semantic declaration identity" in invariants
     assert "Declaration semantic subject identity" in owners
+    assert "Declaration semantic role identity" in owners
     assert "Declaration semantic-subject delta" in owners
     assert "New semantic owner introduced: NO" in owners
     assert "Identity without ownership; compare without mutation" in boundary
     assert "semantic_namespace + concept + scope" in decision
+    assert "semantic_subject_identity + semantic_role" in declarations
+    assert "Child-role admission evidence" in decision
+    assert "Untagged children remain request-local" in decision
     assert "duplicate subject identities remain explicitly ambiguous" in decision
     assert "no history store and no retention layer" in decision
     for forbidden_owner in (

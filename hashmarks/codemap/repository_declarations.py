@@ -44,6 +44,23 @@ class RepositoryDeclarationsMixin:
             },
         )
 
+    def _semantic_declaration_identity(
+        self,
+        *,
+        semantic_subject_identity: str,
+        semantic_role: Mapping[str, object],
+    ) -> str:
+        """Identify one provider-declared semantic role inside a subject."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        return "sha256:" + self._packet_digest(
+            "hashmarks.repository-declaration-semantic-role.v1",
+            {
+                "semantic_subject_identity": semantic_subject_identity,
+                "semantic_role": semantic_role,
+            },
+        )
+
     @staticmethod
     def _binding_evidence_state(binding: Mapping[str, object]) -> str:
         evidence = binding.get("evidence")
@@ -73,6 +90,15 @@ class RepositoryDeclarationsMixin:
         definition = {
             "group_id": group_id,
             "semantic_subject_identity": semantic_subject_identity,
+            **(
+                {
+                    "semantic_declaration_identity": declaration[
+                        "semantic_declaration_identity"
+                    ]
+                }
+                if "semantic_declaration_identity" in declaration
+                else {}
+            ),
             "declaration_id": declaration["declaration_id"],
             "binding_definition_identity": binding["binding_definition_identity"],
         }
@@ -101,9 +127,23 @@ class RepositoryDeclarationsMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         binding = binding_rows[str(normalized["binding_id"])]
+        semantic_role = normalized.get("semantic_role")
+        semantic_declaration_identity = (
+            self._semantic_declaration_identity(
+                semantic_subject_identity=semantic_subject_identity,
+                semantic_role=cast("Mapping[str, object]", semantic_role),
+            )
+            if isinstance(semantic_role, Mapping)
+            else None
+        )
         projected = {
             **normalized,
             "semantic_subject_identity": semantic_subject_identity,
+            **(
+                {"semantic_declaration_identity": semantic_declaration_identity}
+                if semantic_declaration_identity is not None
+                else {}
+            ),
             "evidence_state": self._binding_evidence_state(binding),
         }
         definition, observation = self._declaration_identity_payloads(
@@ -336,6 +376,30 @@ class RepositoryDeclarationsMixin:
             raise ValueError(f"{name} contains duplicate group_id")
         return binding_rows, groups
 
+    def _validate_semantic_declaration_identity(
+        self,
+        declaration: Mapping[str, object],
+        *,
+        semantic_subject_identity: str,
+        name: str,
+    ) -> None:
+        role = declaration.get("semantic_role")
+        identity = declaration.get("semantic_declaration_identity")
+        if role is None:
+            if "semantic_declaration_identity" in declaration:
+                raise ValueError(
+                    f"{name} semantic declaration identity without semantic_role"
+                )
+            return
+        if not isinstance(role, Mapping) or not role:
+            raise ValueError(f"{name} semantic_role must be a non-empty object")
+        expected = self._semantic_declaration_identity(
+            semantic_subject_identity=semantic_subject_identity,
+            semantic_role=role,
+        )
+        if identity != expected:
+            raise ValueError(f"{name} semantic declaration identity mismatch")
+
     def _validate_projected_declaration(
         self,
         declaration: Mapping[str, object],
@@ -354,6 +418,11 @@ class RepositoryDeclarationsMixin:
             raise ValueError(f"{name} declaration binding missing: {binding_id}")
         if declaration.get("evidence_state") != self._binding_evidence_state(binding):
             raise ValueError(f"{name} declaration evidence state mismatch")
+        self._validate_semantic_declaration_identity(
+            declaration,
+            semantic_subject_identity=semantic_subject_identity,
+            name=name,
+        )
 
         definition, observation = self._declaration_identity_payloads(
             declaration,

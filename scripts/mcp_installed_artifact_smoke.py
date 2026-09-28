@@ -91,6 +91,7 @@ async def _exercise(executable: Path, repo: Path, state_dir: Path) -> None:
                             "declarations": [
                                 {
                                     "declaration_id": "a",
+                                    "semantic_role": {"kind": "project-intent"},
                                     "value_state": "resolved",
                                     "value": "3.12",
                                     "producer": {"kind": "fixture"},
@@ -104,6 +105,7 @@ async def _exercise(executable: Path, repo: Path, state_dir: Path) -> None:
                                 },
                                 {
                                     "declaration_id": "b",
+                                    "semantic_role": {"kind": "container-runtime"},
                                     "value_state": "resolved",
                                     "value": "3.12",
                                     "producer": {"kind": "fixture"},
@@ -136,6 +138,10 @@ async def _exercise(executable: Path, repo: Path, state_dir: Path) -> None:
             assert (
                 declarations.structured_content["groups"][0]["comparison"]["state"]
                 == "equivalent"
+            )
+            assert all(
+                row["semantic_declaration_identity"].startswith("sha256:")
+                for row in declarations.structured_content["groups"][0]["declarations"]
             )
 
             invalid = await session.call_tool(

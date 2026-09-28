@@ -44,8 +44,9 @@ def _declaration(
     value: object,
     *,
     line: int = 1,
+    semantic_role: dict[str, object] | None = None,
 ) -> dict[str, object]:
-    return {
+    declaration: dict[str, object] = {
         "declaration_id": declaration_id,
         "value_state": "resolved",
         "value": value,
@@ -58,6 +59,9 @@ def _declaration(
             }
         ],
     }
+    if semantic_role is not None:
+        declaration["semantic_role"] = semantic_role
+    return declaration
 
 
 def test_cross_file_declarations_preserve_exact_evidence_and_equivalence(
@@ -163,6 +167,38 @@ def test_absence_requires_complete_untruncated_semantic_coverage(
         "missing_declaration_ids": ["owner-b"],
         "unseen_expected_declaration_ids": [],
         "unexpected_declaration_ids": [],
+    }
+
+
+def test_semantic_role_does_not_create_expected_membership_or_absence(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    declaration = _declaration(
+        "runtime",
+        "runtime.yaml",
+        "3.12",
+        semantic_role={"kind": "container-runtime"},
+    )
+    group = _group([declaration], expected=[])
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations([group])
+
+    projected = packet["groups"][0]
+    assert projected["coverage"]["expected_declaration_ids"] == []
+    assert projected["declarations"][0]["semantic_declaration_identity"].startswith(
+        "sha256:"
+    )
+    assert projected["absence"] == {
+        "state": "unknown",
+        "missing_declaration_ids": [],
+        "unseen_expected_declaration_ids": [],
+        "unexpected_declaration_ids": [],
+        "reason": "expected-membership-not-declared",
     }
 
 
@@ -462,8 +498,285 @@ def test_semantic_subject_delta_correlates_group_label_change_without_history(
     assert "evidence_state_changed_declaration_ids" not in change
     assert "added_declaration_ids" not in change
     assert "removed_declaration_ids" not in change
+    assert "semantic_declarations" not in change
     assert "comparison_transition" not in change
     assert "absence_transition" not in change
+
+
+def test_semantic_role_correlates_child_change_across_request_label_renames(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "pyproject.toml").write_text("python = 3.12\n", encoding="utf-8")
+    (repo / "Dockerfile").write_text("python = 3.12\n", encoding="utf-8")
+    before_group = _group(
+        [
+            _declaration(
+                "intent-before",
+                "pyproject.toml",
+                "3.12",
+                semantic_role={"kind": "project-intent"},
+            ),
+            _declaration(
+                "runtime-before",
+                "Dockerfile",
+                "3.12",
+                semantic_role={"kind": "container-runtime"},
+            ),
+        ],
+        group_id="request-before",
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([before_group])
+        moved = repo / "container" / "Dockerfile"
+        moved.parent.mkdir()
+        (repo / "Dockerfile").replace(moved)
+        moved.write_text("python = 3.13\n", encoding="utf-8")
+        codemap.sync(["Dockerfile", "container/Dockerfile"])
+        after_group = _group(
+            [
+                _declaration(
+                    "intent-after",
+                    "pyproject.toml",
+                    "3.12",
+                    semantic_role={"kind": "project-intent"},
+                ),
+                _declaration(
+                    "runtime-after",
+                    "container/Dockerfile",
+                    "3.13",
+                    semantic_role={"kind": "container-runtime"},
+                ),
+            ],
+            group_id="request-after",
+        )
+        after = codemap.repository_declarations(
+            [after_group],
+            previous_observation=before,
+        )
+
+    before_by_role = {
+        row["semantic_role"]["kind"]: row for row in before["groups"][0]["declarations"]
+    }
+    after_by_role = {
+        row["semantic_role"]["kind"]: row for row in after["groups"][0]["declarations"]
+    }
+    assert (
+        before_by_role["project-intent"]["semantic_declaration_identity"]
+        == after_by_role["project-intent"]["semantic_declaration_identity"]
+    )
+    assert (
+        before_by_role["container-runtime"]["semantic_declaration_identity"]
+        == after_by_role["container-runtime"]["semantic_declaration_identity"]
+    )
+
+    subject = after["delta_from_previous"]["semantic_subjects"]["changed"][0]
+    assert subject["group_id_changed"] is True
+    assert "value_changed_declaration_ids" not in subject
+    roles = subject["semantic_declarations"]
+    assert roles["added"] == []
+    assert roles["removed"] == []
+    assert roles["ambiguous"] == []
+    changed_by_role = {row["semantic_role"]["kind"]: row for row in roles["changed"]}
+    intent = changed_by_role["project-intent"]
+    assert intent["declaration_id_changed"] is True
+    assert intent["previous_declaration_id"] == "intent-before"
+    assert intent["current_declaration_id"] == "intent-after"
+    assert "value_transition" not in intent
+
+    runtime = changed_by_role["container-runtime"]
+    assert runtime["declaration_id_changed"] is True
+    assert runtime["previous_declaration_id"] == "runtime-before"
+    assert runtime["current_declaration_id"] == "runtime-after"
+    assert runtime["value_transition"] == {
+        "before": {"value_state": "resolved", "value": "3.12"},
+        "after": {"value_state": "resolved", "value": "3.13"},
+    }
+    assert (
+        before_by_role["container-runtime"]["declaration_definition_identity"]
+        != after_by_role["container-runtime"]["declaration_definition_identity"]
+    )
+    assert subject["comparison_transition"]["before"]["state"] == "equivalent"
+    assert subject["comparison_transition"]["after"]["state"] == "differing"
+
+
+def test_semantic_role_identity_is_scoped_by_semantic_subject(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    role = {"kind": "runtime-source"}
+    first_group = _group(
+        [_declaration("runtime", "runtime.yaml", "3.12", semantic_role=role)]
+    )
+    second_group = _group(
+        [_declaration("runtime", "runtime.yaml", "3.12", semantic_role=role)]
+    )
+    second_group["concept"] = {
+        "kind": "runtime-compatibility",
+        "identity": "pypy",
+    }
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        first = codemap.repository_declarations([first_group])
+        second = codemap.repository_declarations([second_group])
+
+    first_row = first["groups"][0]["declarations"][0]
+    second_row = second["groups"][0]["declarations"][0]
+    assert first_row["semantic_role"] == second_row["semantic_role"]
+    assert (
+        first_row["semantic_declaration_identity"]
+        != second_row["semantic_declaration_identity"]
+    )
+
+
+def test_semantic_role_change_is_remove_add_not_guessed_rename(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    before_group = _group(
+        [
+            _declaration(
+                "runtime",
+                "runtime.yaml",
+                "3.12",
+                semantic_role={"kind": "project-intent"},
+            )
+        ]
+    )
+    after_group = _group(
+        [
+            _declaration(
+                "runtime",
+                "runtime.yaml",
+                "3.12",
+                semantic_role={"kind": "container-runtime"},
+            )
+        ]
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([before_group])
+        after = codemap.repository_declarations(
+            [after_group],
+            previous_observation=before,
+        )
+
+    before_declaration = before["groups"][0]["declarations"][0]
+    after_declaration = after["groups"][0]["declarations"][0]
+    assert (
+        before_declaration["semantic_declaration_identity"]
+        != after_declaration["semantic_declaration_identity"]
+    )
+    roles = after["delta_from_previous"]["semantic_subjects"]["changed"][0][
+        "semantic_declarations"
+    ]
+    assert roles["removed"] == [before_declaration["semantic_declaration_identity"]]
+    assert roles["added"] == [after_declaration["semantic_declaration_identity"]]
+    assert roles["ambiguous"] == []
+    assert roles["changed"] == []
+
+
+def test_unchanged_duplicate_semantic_roles_do_not_manufacture_delta(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "a.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    (repo / "b.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    role = {"kind": "runtime-source"}
+    group = _group(
+        [
+            _declaration("a", "a.yaml", "3.12", semantic_role=role),
+            _declaration("b", "b.yaml", "3.12", semantic_role=role),
+        ]
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([group])
+        after = codemap.repository_declarations(
+            [group],
+            previous_observation=before,
+        )
+
+    delta = after["delta_from_previous"]
+    assert delta["changed_groups"] == []
+    assert delta["semantic_subjects"]["changed"] == []
+    assert delta["semantic_subjects"]["ambiguous"] == []
+
+
+def test_semantic_role_delta_preserves_duplicate_role_ambiguity(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for path in ("a.yaml", "b.yaml", "c.yaml"):
+        (repo / path).write_text("python: 3.12\n", encoding="utf-8")
+    role = {"kind": "runtime-source"}
+    before_group = _group(
+        [
+            _declaration("a", "a.yaml", "3.12", semantic_role=role),
+            _declaration("b", "b.yaml", "3.12", semantic_role=role),
+        ],
+        group_id="before",
+    )
+    after_group = _group(
+        [_declaration("c", "c.yaml", "3.12", semantic_role=role)],
+        group_id="after",
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([before_group])
+        after = codemap.repository_declarations(
+            [after_group],
+            previous_observation=before,
+        )
+
+    identity = before["groups"][0]["declarations"][0]["semantic_declaration_identity"]
+    roles = after["delta_from_previous"]["semantic_subjects"]["changed"][0][
+        "semantic_declarations"
+    ]
+    assert roles["added"] == []
+    assert roles["removed"] == []
+    assert roles["changed"] == []
+    assert roles["ambiguous"] == [
+        {
+            "semantic_declaration_identity": identity,
+            "previous_declaration_ids": ["a", "b"],
+            "current_declaration_ids": ["c"],
+            "reason": "semantic-declaration-not-unique",
+        }
+    ]
+
+
+@pytest.mark.parametrize("semantic_role", [{}, [], "runtime"])
+def test_semantic_role_requires_non_empty_object(
+    tmp_path: Path,
+    semantic_role: object,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    declaration = _declaration("runtime", "runtime.yaml", "3.12")
+    declaration["semantic_role"] = semantic_role
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(
+            ValueError,
+            match="semantic_role must be a non-empty object",
+        ):
+            codemap.repository_declarations([_group([declaration])])
 
 
 def test_semantic_subject_delta_preserves_duplicate_subject_ambiguity(

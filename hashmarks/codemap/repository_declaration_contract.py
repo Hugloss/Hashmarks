@@ -23,6 +23,7 @@ GROUP_KEYS = frozenset(
 DECLARATION_KEYS = frozenset(
     {
         "declaration_id",
+        "semantic_role",
         "value_state",
         "value",
         "candidate_values",
@@ -190,6 +191,15 @@ def _normalized_ambiguous_value(
     return {"candidate_values": [by_identity[key] for key in sorted(by_identity)]}
 
 
+def _normalized_semantic_role(row: Mapping[str, object]) -> dict[str, object]:
+    if "semantic_role" not in row:
+        return {}
+    role = json_value(row["semantic_role"], name="semantic_role")
+    if not isinstance(role, dict) or not role:
+        raise ValueError("semantic_role must be a non-empty object")
+    return {"semantic_role": role}
+
+
 def _normalized_value_fields(
     row: Mapping[str, object], value_state: str
 ) -> dict[str, object]:
@@ -224,6 +234,7 @@ def normalize_declaration(
     binding_id = _binding_id(group_id, declaration_id)
     result = {
         "declaration_id": declaration_id,
+        **_normalized_semantic_role(row),
         "value_state": value_state,
         "producer": producer,
         "semantic_value_authority": "provider-claimed",
