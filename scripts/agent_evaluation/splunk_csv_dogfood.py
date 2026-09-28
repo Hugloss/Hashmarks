@@ -362,16 +362,16 @@ class _CollectionState:
             observation_identity,
             context,
         )
-        traceback_found = self._observe_traceback(
+        traceback_occurrences = self._observe_tracebacks(
             parsed,
             timestamp,
             occurrence_id,
             observation_identity,
             context,
         )
-        locator_occurrences = int(module_found) + int(traceback_found)
+        locator_occurrences = int(module_found) + traceback_occurrences
         self.module_locator_occurrences += int(module_found)
-        self.traceback_locator_occurrences += int(traceback_found)
+        self.traceback_locator_occurrences += traceback_occurrences
         if locator_occurrences:
             self.events_with_extracted_locator += 1
         else:
@@ -431,28 +431,28 @@ class _CollectionState:
         )
         return True
 
-    def _observe_traceback(
+    def _observe_tracebacks(
         self,
         parsed: _ParsedRecord,
         timestamp: str,
         occurrence_id: str,
         observation_identity: str,
         context: _OpaqueRuntimeContext,
-    ) -> bool:
-        match = _TRACEBACK.search(parsed.raw)
-        if match is None:
-            return False
-        key = (match.group(1), int(match.group(2)), match.group(3))
-        stats = self.tracebacks.setdefault(key, _ModuleStats())
-        stats.observe(
-            timestamp=timestamp,
-            parser_state=parsed.parser_state,
-            widened=parsed.widened,
-            occurrence_id=occurrence_id,
-            observation_identity=observation_identity,
-            context=context,
-        )
-        return True
+    ) -> int:
+        occurrences = 0
+        for match in _TRACEBACK.finditer(parsed.raw):
+            key = (match.group(1), int(match.group(2)), match.group(3))
+            stats = self.tracebacks.setdefault(key, _ModuleStats())
+            stats.observe(
+                timestamp=timestamp,
+                parser_state=parsed.parser_state,
+                widened=parsed.widened,
+                occurrence_id=occurrence_id,
+                observation_identity=observation_identity,
+                context=context,
+            )
+            occurrences += 1
+        return occurrences
 
 
 @dataclass(frozen=True)
