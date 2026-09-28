@@ -56,8 +56,7 @@ def test_unrelated_repository_generation_change_preserves_binding_observation(
     after_binding = after["bindings"][0]
 
     assert (
-        before_repository["codemap_generation"]
-        < after_repository["codemap_generation"]
+        before_repository["codemap_generation"] < after_repository["codemap_generation"]
     )
     assert before_repository["source_identity"] != after_repository["source_identity"]
     assert before["bindings_identity"] != after["bindings_identity"]
@@ -81,9 +80,7 @@ def test_unrelated_repository_generation_change_preserves_binding_observation(
     assert delta["repository"]["before"] == before_repository
     assert delta["repository"]["after"] == after_repository
 
-    assert coverage["classification"]["outside_declared_bindings"] == [
-        "unrelated.py"
-    ]
+    assert coverage["classification"]["outside_declared_bindings"] == ["unrelated.py"]
     assert coverage["classification"]["bound_member_precision_unknown"] == []
     assert coverage["binding_impacts"] == []
     assert coverage["coverage"]["state"] == "complete"
