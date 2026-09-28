@@ -40,6 +40,7 @@ _MAX_UNLOCATED_SAMPLE_EVENT_IDS = 3
 _DEFAULT_MAX_ANCHORS = 256
 _NORMALIZED_OBSERVATION_SCHEMA = "hashmarks.splunk-normalized-observation.v1"
 _EVIDENCE_PROJECTION_SCHEMA = "hashmarks.splunk-evidence-projection.v1"
+_PRODUCER_PAYLOAD_VALIDATION_STATE = "not-assessed"
 
 
 @dataclass(frozen=True)
@@ -257,6 +258,14 @@ def _stats_metadata(stats: _ModuleStats) -> dict[str, object]:
         "sample_event_ids": stats.sample_occurrence_ids,
         "sample_occurrence_ids": stats.sample_occurrence_ids,
         "sample_observation_identities": stats.sample_observation_identities,
+        "csv_parsing": {
+            "strict_valid_count": stats.strict_valid,
+            "recovered_count": stats.recovered,
+            "widened_count": stats.widened,
+        },
+        "producer_payload_validation": {
+            "state": _PRODUCER_PAYLOAD_VALIDATION_STATE,
+        },
         "runtime_context": {
             "handling_ident_values": sorted(stats.handling_idents),
             "handling_ident_values_truncated": stats.handling_idents_truncated,
@@ -584,6 +593,15 @@ def _bundle(
             "recovered_count": state.recovered_count,
             "malformed_count": state.malformed_count,
             "widened_count": state.widened_count,
+            "csv_parsing": {
+                "strict_valid_count": state.strict_valid_count,
+                "recovered_count": state.recovered_count,
+                "malformed_count": state.malformed_count,
+                "widened_count": state.widened_count,
+            },
+            "producer_payload_validation": {
+                "state": _PRODUCER_PAYLOAD_VALIDATION_STATE,
+            },
             "events_with_extracted_locator": state.events_with_extracted_locator,
             "events_without_extracted_locator": (
                 state.events_without_extracted_locator
@@ -624,6 +642,13 @@ def _report(
             "recovered": state.recovered_count,
             "malformed": state.malformed_count,
             "widened": state.widened_count,
+            "csv_strict_valid": state.strict_valid_count,
+            "csv_recovered": state.recovered_count,
+            "csv_malformed": state.malformed_count,
+            "csv_widened": state.widened_count,
+            "producer_payload_validation_state": (
+                _PRODUCER_PAYLOAD_VALIDATION_STATE
+            ),
             "parsed_events": state.strict_valid_count + state.recovered_count,
             "events_with_extracted_locator": state.events_with_extracted_locator,
             "events_without_extracted_locator": (
