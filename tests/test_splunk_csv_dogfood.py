@@ -83,6 +83,39 @@ def test_splunk_csv_dogfood_recovers_invalid_raw_without_hiding_parser_state(
     }
 
 
+def test_splunk_csv_dogfood_does_not_confuse_csv_validity_with_payload_validity(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO | {""data"":[{""x"":1}]}"\n'
+        '"2","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO | {""data"":[{""x"":1]"\n',
+    )
+
+    report = collect(source)
+    summary = report["summary"]
+    assert summary["events"] == 2
+    assert summary["strict_valid"] == 2
+    assert summary["csv_strict_valid"] == 2
+    assert summary["csv_recovered"] == 0
+    assert summary["csv_malformed"] == 0
+    assert summary["producer_payload_validation_state"] == "not-assessed"
+
+    provenance = report["bundle"]["provenance"]
+    assert provenance["csv_parsing"] == {
+        "strict_valid_count": 2,
+        "recovered_count": 0,
+        "malformed_count": 0,
+        "widened_count": 0,
+    }
+    assert provenance["producer_payload_validation"] == {
+        "state": "not-assessed",
+    }
+
+
 def test_splunk_csv_dogfood_accounts_for_locator_free_events(tmp_path) -> None:
     source = tmp_path / "masked.csv"
     _write(
