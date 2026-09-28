@@ -10,7 +10,15 @@ MAX_REQUEST_BYTES = 1_048_576
 MAX_PACKET_BYTES = 1_048_576
 
 GROUP_KEYS = frozenset(
-    {"group_id", "concept", "scope", "correspondence", "declarations", "coverage"}
+    {
+        "group_id",
+        "semantic_namespace",
+        "concept",
+        "scope",
+        "correspondence",
+        "declarations",
+        "coverage",
+    }
 )
 DECLARATION_KEYS = frozenset(
     {
@@ -334,6 +342,10 @@ def _normalize_group(
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
     reject_unknown(raw_group, allowed=GROUP_KEYS, name="declaration group")
     group_id = required_text(raw_group.get("group_id"), name="group_id")
+    semantic_namespace = required_text(
+        raw_group.get("semantic_namespace"),
+        name="semantic_namespace",
+    )
     concept = json_value(raw_group.get("concept"), name="concept")
     scope = json_value(raw_group.get("scope", {}), name="scope")
     if not isinstance(concept, dict) or not concept:
@@ -357,6 +369,7 @@ def _normalize_group(
 
     group = {
         "group_id": group_id,
+        "semantic_namespace": semantic_namespace,
         "concept": concept,
         "scope": scope,
         "correspondence": normalize_correspondence(raw_group.get("correspondence", {})),

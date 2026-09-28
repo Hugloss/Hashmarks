@@ -401,6 +401,7 @@ def _declaration_groups(scale: int) -> list[dict[str, object]]:
     return [
         {
             "group_id": "component-ownership",
+            "semantic_namespace": "derived-authority-economics",
             "concept": {"kind": "ownership", "identity": "benchmark"},
             "scope": {"environment": "benchmark"},
             "correspondence": {

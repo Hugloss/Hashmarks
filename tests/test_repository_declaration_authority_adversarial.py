@@ -34,6 +34,7 @@ def _group(
     ids = [str(row["declaration_id"]) for row in declarations]
     return {
         "group_id": "component-owner",
+        "semantic_namespace": "authority-adversarial-fixture",
         "concept": {"kind": "ownership", "identity": "component-a"},
         "scope": {"environment": "all"},
         "correspondence": {
@@ -210,6 +211,14 @@ def _assert_evidence_loss(
     assert delta["comparison_changed"] is True
     assert delta["absence_changed"] is True
 
+    subject = missing["delta_from_previous"]["semantic_subjects"]["changed"][0]
+    assert subject["evidence_state_changed_declaration_ids"] == ["secondary"]
+    assert subject["value_changed_declaration_ids"] == []
+    assert subject["comparison_transition"]["before"]["state"] == "equivalent"
+    assert subject["comparison_transition"]["after"]["state"] == "ambiguous"
+    assert subject["absence_transition"]["before"]["state"] == "known-present"
+    assert subject["absence_transition"]["after"]["state"] == "known-absent"
+
     binding = _binding_change(missing, missing_secondary)
     assert binding["definition"]["state"] == "preserved"
     assert binding["member_evidence"]["changes"][0]["state"] == "removed"
@@ -239,6 +248,14 @@ def _assert_evidence_restoration(
     assert delta["observation_changed_declaration_ids"] == ["secondary"]
     assert delta["comparison_changed"] is True
     assert delta["absence_changed"] is True
+
+    subject = restored["delta_from_previous"]["semantic_subjects"]["changed"][0]
+    assert subject["evidence_state_changed_declaration_ids"] == ["secondary"]
+    assert subject["value_changed_declaration_ids"] == []
+    assert subject["comparison_transition"]["before"]["state"] == "ambiguous"
+    assert subject["comparison_transition"]["after"]["state"] == "equivalent"
+    assert subject["absence_transition"]["before"]["state"] == "known-absent"
+    assert subject["absence_transition"]["after"]["state"] == "known-present"
 
     binding = _binding_change(restored, restored_secondary)
     assert binding["definition"]["state"] == "preserved"

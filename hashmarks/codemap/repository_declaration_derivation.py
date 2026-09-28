@@ -71,6 +71,7 @@ class RepositoryDeclarationDerivationMixin:
             group_authorities.append(
                 {
                     "group_id": group["group_id"],
+                    "semantic_namespace": group["semantic_namespace"],
                     "semantic_subject_identity": group["semantic_subject_identity"],
                     "group_definition_identity": group["group_definition_identity"],
                     "group_observation_identity": group["group_observation_identity"],
@@ -114,6 +115,7 @@ class RepositoryDeclarationDerivationMixin:
         semantic_groups = [
             {
                 "group_id": group["group_id"],
+                "semantic_namespace": group["semantic_namespace"],
                 "semantic_subject_identity": group["semantic_subject_identity"],
                 "group_definition_identity": group["group_definition_identity"],
                 "group_observation_identity": group["group_observation_identity"],

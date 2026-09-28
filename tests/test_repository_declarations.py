@@ -20,6 +20,7 @@ def _group(
     coverage_state, truncation = coverage
     return {
         "group_id": group_id,
+        "semantic_namespace": "fixture",
         "concept": {"kind": "runtime-compatibility", "identity": "python"},
         "scope": {} if scope is None else scope,
         "correspondence": {
@@ -190,6 +191,33 @@ def test_ambiguous_correspondence_never_becomes_a_conflict_or_equivalence(
     }
 
 
+def test_semantic_namespace_is_required_and_prevents_cross_namespace_collision(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    declaration = [_declaration("runtime", "runtime.yaml", "3.12")]
+    missing_namespace = _group(declaration)
+    missing_namespace.pop("semantic_namespace")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="semantic_namespace"):
+            codemap.repository_declarations([missing_namespace])
+        first_group = _group(declaration)
+        first_group["semantic_namespace"] = "provider-a"
+        second_group = _group(declaration)
+        second_group["semantic_namespace"] = "provider-b"
+        first = codemap.repository_declarations([first_group])
+        second = codemap.repository_declarations([second_group])
+
+    assert (
+        first["groups"][0]["semantic_subject_identity"]
+        != second["groups"][0]["semantic_subject_identity"]
+    )
+
+
 def test_semantic_subject_identity_is_independent_of_group_label_and_locator(
     tmp_path: Path,
 ) -> None:
@@ -297,6 +325,10 @@ def test_declaration_delta_separates_value_change_from_group_definition(
     assert changed["definition_changed"] is False
     assert changed["value_changed_declaration_ids"] == ["b"]
     assert changed["comparison_changed"] is True
+    subject_change = delta["semantic_subjects"]["changed"][0]
+    assert subject_change["value_changed_declaration_ids"] == ["b"]
+    assert subject_change["comparison_transition"]["before"]["state"] == "equivalent"
+    assert subject_change["comparison_transition"]["after"]["state"] == "differing"
     assert delta["repository_evidence"]["bindings"]["changed"] == []
 
 
@@ -395,6 +427,82 @@ def test_definition_identity_binds_exact_evidence_definition(tmp_path: Path) -> 
     assert changed["definition_changed_declaration_ids"] == ["runtime"]
 
 
+def test_semantic_subject_delta_correlates_group_label_change_without_history(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    declaration = [_declaration("runtime", "runtime.yaml", "3.12")]
+    before_group = _group(declaration, group_id="request-a")
+    after_group = _group(declaration, group_id="request-b")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([before_group])
+        after = codemap.repository_declarations(
+            [after_group],
+            previous_observation=before,
+        )
+
+    delta = after["delta_from_previous"]
+    assert delta["added_group_ids"] == ["request-b"]
+    assert delta["removed_group_ids"] == ["request-a"]
+    subjects = delta["semantic_subjects"]
+    assert subjects["added"] == []
+    assert subjects["removed"] == []
+    assert subjects["ambiguous"] == []
+    assert len(subjects["changed"]) == 1
+    change = subjects["changed"][0]
+    assert change["group_id_changed"] is True
+    assert change["previous_group_id"] == "request-a"
+    assert change["current_group_id"] == "request-b"
+    assert "value_changed_declaration_ids" not in change
+    assert "producer_changed_declaration_ids" not in change
+    assert "evidence_state_changed_declaration_ids" not in change
+    assert "added_declaration_ids" not in change
+    assert "removed_declaration_ids" not in change
+    assert "comparison_transition" not in change
+    assert "absence_transition" not in change
+
+
+def test_semantic_subject_delta_preserves_duplicate_subject_ambiguity(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    declaration = [_declaration("runtime", "runtime.yaml", "3.12")]
+    before_group = _group(declaration, group_id="single")
+    after_groups = [
+        _group(declaration, group_id="first"),
+        _group(declaration, group_id="second"),
+    ]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([before_group])
+        after = codemap.repository_declarations(
+            after_groups,
+            previous_observation=before,
+        )
+
+    subjects = after["delta_from_previous"]["semantic_subjects"]
+    assert subjects["added"] == []
+    assert subjects["removed"] == []
+    assert subjects["changed"] == []
+    assert subjects["ambiguous"] == [
+        {
+            "semantic_subject_identity": before["groups"][0][
+                "semantic_subject_identity"
+            ],
+            "previous_group_ids": ["single"],
+            "current_group_ids": ["first", "second"],
+            "reason": "semantic-subject-not-unique",
+        }
+    ]
+
+
 def test_semantic_subject_change_is_explicit_in_delta(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -416,9 +524,16 @@ def test_semantic_subject_change_is_explicit_in_delta(tmp_path: Path) -> None:
         before["groups"][0]["semantic_subject_identity"]
         != after["groups"][0]["semantic_subject_identity"]
     )
-    changed = after["delta_from_previous"]["changed_groups"][0]
+    delta = after["delta_from_previous"]
+    changed = delta["changed_groups"][0]
     assert changed["semantic_subject_changed"] is True
     assert changed["definition_changed"] is True
+    before_subject = before["groups"][0]["semantic_subject_identity"]
+    after_subject = after["groups"][0]["semantic_subject_identity"]
+    assert delta["semantic_subjects"]["removed"] == [before_subject]
+    assert delta["semantic_subjects"]["added"] == [after_subject]
+    assert delta["semantic_subjects"]["changed"] == []
+    assert delta["semantic_subjects"]["ambiguous"] == []
 
 
 def test_group_definition_identity_binds_coverage_scope(tmp_path: Path) -> None:

@@ -14,13 +14,13 @@ Extend the existing repository-declaration owner rather than introduce a new sem
 
 The identity layers are:
 
-1. **Semantic subject identity** — `semantic_subject_identity` is a deterministic digest of the provider-declared opaque `concept + scope` pair. It identifies what conceptual subject the provider says the group concerns.
+1. **Semantic subject identity** — `semantic_subject_identity` is a deterministic digest of `semantic_namespace + concept + scope`. Direct callers provide the namespace explicitly; provider discovery binds it to the selected provider name. It identifies one conceptual subject without pretending opaque concept names are globally universal.
 2. **Declaration definition identity** — the existing `declaration_definition_identity` identifies one exact declaration definition, including its repository-evidence binding. Moving the declaration or changing its exact evidence definition changes this identity without necessarily changing the semantic subject.
 3. **Observation identity** — the existing declaration, group, and packet observation identities identify exact qualified observed state, including values, provenance, evidence state, and the repository observation that supports it.
 
-The semantic subject identity deliberately excludes request-local group labels, declaration membership, file/range locators, values, coverage, and current evidence state. Those facts remain in their existing declaration/observation owners.
+The semantic subject identity deliberately excludes request-local group labels, declaration membership, file/range locators, values, coverage, and current evidence state. It includes the semantic namespace so independent producers cannot collide merely because their opaque concept/scope objects happen to serialize identically. Those other facts remain in their existing declaration/observation owners.
 
-Repository-declaration delta may report `semantic_subject_changed` when a stable request-local group ID changes its provider-declared `concept + scope`. This is a factual endpoint comparison only.
+Repository-declaration delta may report `semantic_subject_changed` when a stable request-local group ID changes namespace/concept/scope. It also exposes an ambiguity-preserving `semantic_subjects` projection: unique subject identities may be correlated across request-local group-label changes, while duplicate subject identities remain explicitly ambiguous. This is factual endpoint comparison only.
 
 ## Authority boundary
 
@@ -44,7 +44,7 @@ The governing rule is:
 
 `concept` and `scope` stay opaque provider vocabulary. Core hashes those already-admitted semantic inputs; it does not understand names such as `service.owner`, `runtime.python`, dependency coordinates, or organization-specific precedence.
 
-Two declarations become one semantic subject only because the provider placed them in the same explicit concept/scope. Similar names, values, file paths, or model inference do not create semantic identity.
+Two declarations become one semantic subject only inside the same explicit semantic namespace with the same concept/scope. Similar names, values, file paths, matching opaque JSON from another namespace, or model inference do not create semantic identity. Discovery owns namespace binding to provider name and rejects provider namespace spoofing.
 
 ## Why this is not a history store
 
@@ -56,7 +56,9 @@ This change therefore admits **no history store and no retention layer**. A futu
 
 A declaration may move between file/range locations while retaining the same semantic subject identity. Its declaration-definition identity still changes, preserving exact evidence provenance.
 
-Changing `concept` or `scope` changes semantic subject identity, even when the normalized value and physical evidence stay equal.
+Changing `semantic_namespace`, `concept`, or `scope` changes semantic subject identity, even when the normalized value and physical evidence stay equal.
+
+Subject-level delta may correlate a unique subject across a request-local `group_id` rename. If either endpoint contains more than one group with the same subject identity, the delta reports ambiguity and performs no arbitrary pairing.
 
 All declarations projected in one group carry the group's semantic subject identity. Validation recomputes it from the provider-declared semantic inputs so resigning a forged identity does not gain authority.
 
