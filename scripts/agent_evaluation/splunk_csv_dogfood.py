@@ -523,7 +523,7 @@ def _validate_header(handle: TextIO) -> None:
 
 def _collect_stream(path: Path) -> _CollectionState:
     state = _CollectionState()
-    with path.open("r", encoding="utf-8", newline="") as handle:
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
         _validate_header(handle)
         for ordinal, text in _logical_records(handle):
             state.observe(ordinal, text, _parse_record(text))
