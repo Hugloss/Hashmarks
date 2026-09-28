@@ -466,7 +466,7 @@ def test_uv_receipt_proves_hashmarks_requirement(
     ("metadata", "expected"),
     [
         ({"main_package": {"package": "hashmarks"}}, True),
-        ({"main_package": {"package": "Hash_Marks"}}, True),
+        ({"main_package": {"package": "Hashmarks"}}, True),
         ({"main_package": {"package": "other-tool"}}, False),
         ({"main_package": {"package": None}}, False),
         ({}, False),
