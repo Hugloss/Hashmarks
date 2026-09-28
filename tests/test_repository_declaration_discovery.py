@@ -329,8 +329,7 @@ def test_discovery_namespaces_equal_opaque_subjects_by_provider(
     assert groups[0]["concept"] == groups[1]["concept"]
     assert groups[0]["scope"] == groups[1]["scope"]
     assert (
-        groups[0]["semantic_subject_identity"]
-        != groups[1]["semantic_subject_identity"]
+        groups[0]["semantic_subject_identity"] != groups[1]["semantic_subject_identity"]
     )
 
 
