@@ -440,6 +440,107 @@ def test_python_environment_is_not_guessed_as_an_installation_owner(
     assert release_update.can_delegate_upgrade(owner) is False
 
 
+@pytest.mark.parametrize(
+    ("receipt", "expected"),
+    [
+        (
+            '[tool]\nrequirements = [{ name = "hashmarks", specifier = "==0.24.0" }]\n',
+            True,
+        ),
+        ('[tool]\nrequirements = ["hashmarks==0.24.0"]\n', True),
+        ('[tool]\nrequirements = [{ name = "other-tool" }]\n', False),
+        ("not = [valid", False),
+    ],
+)
+def test_uv_receipt_proves_hashmarks_requirement(
+    tmp_path: Path,
+    receipt: str,
+    expected: bool,
+) -> None:
+    (tmp_path / "uv-receipt.toml").write_text(receipt, encoding="utf-8")
+
+    assert release_update._uv_receipt_proves_hashmarks(tmp_path) is expected
+
+
+@pytest.mark.parametrize(
+    ("metadata", "expected"),
+    [
+        ({"main_package": {"package": "hashmarks"}}, True),
+        ({"main_package": {"package": "Hash_Marks"}}, True),
+        ({"main_package": {"package": "other-tool"}}, False),
+        ({"main_package": {"package": None}}, False),
+        ({}, False),
+    ],
+)
+def test_pipx_metadata_proves_hashmarks_main_package(
+    tmp_path: Path,
+    metadata: dict[str, object],
+    expected: bool,
+) -> None:
+    (tmp_path / "pipx_metadata.json").write_text(
+        json.dumps(metadata),
+        encoding="utf-8",
+    )
+
+    assert release_update._pipx_metadata_proves_hashmarks(tmp_path) is expected
+
+
+def test_uv_tool_dir_alone_cannot_manufacture_upgrade_authority(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    tool_root = tmp_path / "uv-tools"
+    prefix = tool_root / "hashmarks"
+    prefix.mkdir(parents=True)
+    monkeypatch.setenv("UV_TOOL_DIR", str(tool_root))
+    monkeypatch.setattr(release_update.sys, "prefix", str(prefix))
+    monkeypatch.setattr(release_update.sys, "base_prefix", str(tmp_path / "python"))
+    monkeypatch.delattr(release_update.sys, "frozen", raising=False)
+
+    owner = release_update.detect_installation_owner()
+
+    assert owner.kind == "environment"
+    assert owner.command is None
+
+    (prefix / "uv-receipt.toml").write_text(
+        '[tool]\nrequirements = [{ name = "hashmarks" }]\n',
+        encoding="utf-8",
+    )
+
+    owner = release_update.detect_installation_owner()
+
+    assert owner.kind == "uv"
+    assert owner.command == ("uv", "tool", "upgrade", "hashmarks")
+
+
+def test_pipx_home_alone_cannot_manufacture_upgrade_authority(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    pipx_home = tmp_path / "pipx"
+    prefix = pipx_home / "venvs" / "hashmarks"
+    prefix.mkdir(parents=True)
+    monkeypatch.setenv("PIPX_HOME", str(pipx_home))
+    monkeypatch.setattr(release_update.sys, "prefix", str(prefix))
+    monkeypatch.setattr(release_update.sys, "base_prefix", str(tmp_path / "python"))
+    monkeypatch.delattr(release_update.sys, "frozen", raising=False)
+
+    owner = release_update.detect_installation_owner()
+
+    assert owner.kind == "environment"
+    assert owner.command is None
+
+    (prefix / "pipx_metadata.json").write_text(
+        json.dumps({"main_package": {"package": "hashmarks"}}),
+        encoding="utf-8",
+    )
+
+    owner = release_update.detect_installation_owner()
+
+    assert owner.kind == "pipx"
+    assert owner.command == ("pipx", "upgrade", "hashmarks")
+
+
 def test_native_uv_delegation_replaces_hashmarks_process(monkeypatch) -> None:
     owner = InstallationOwner(
         kind="uv",
