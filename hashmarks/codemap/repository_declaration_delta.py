@@ -170,22 +170,14 @@ def _semantic_subject_change(
         if transition is not None:
             change[f"{field}_transition"] = transition
 
-    unchanged_values = {
-        False,
-        (),
-        "",
-        None,
-    }
-    meaningful = any(
-        value not in unchanged_values and value != []
-        for key, value in change.items()
-        if key
-        not in {
-            "semantic_subject_identity",
-            "semantic_namespace",
-            "previous_group_id",
-            "current_group_id",
-        }
+    meaningful = bool(
+        change["group_id_changed"]
+        or change["added_declaration_ids"]
+        or change["removed_declaration_ids"]
+        or change["value_changed_declaration_ids"]
+        or change["producer_changed_declaration_ids"]
+        or change["evidence_state_changed_declaration_ids"]
+        or any(key.endswith("_transition") for key in change)
     )
     return change if meaningful else None
 
