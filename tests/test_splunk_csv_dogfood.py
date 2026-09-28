@@ -327,6 +327,65 @@ def test_splunk_csv_dogfood_accounts_for_locator_free_events(tmp_path) -> None:
     assert all(value.startswith("event:") for value in sample_ids)
 
 
+def test_splunk_csv_dogfood_rejects_invalid_module_locator_without_repair(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","INFO name=tasks..worker"
+',
+    )
+
+    report = collect(source)
+    summary = report["summary"]
+    assert summary["parsed_events"] == 1
+    assert summary["module_locator_occurrences"] == 0
+    assert summary["events_with_extracted_locator"] == 0
+    assert summary["events_without_extracted_locator"] == 1
+    assert report["bundle"]["anchors"] == []
+
+
+def test_splunk_csv_dogfood_rejects_locator_beyond_core_module_bound(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    module = "m" * 1025
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        f'"[host]","idx","[host]","INFO name={module}"
+',
+    )
+
+    report = collect(source)
+    assert report["summary"]["module_locator_occurrences"] == 0
+    assert report["summary"]["events_without_extracted_locator"] == 1
+    assert report["bundle"]["anchors"] == []
+
+
+def test_splunk_csv_dogfood_rejects_invalid_traceback_locator_without_repair(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","Traceback:
+'
+        '  File ""/app/../src/worker.py"", line 7, in worker
+'
+        'RuntimeError: boom"
+',
+    )
+
+    report = collect(source)
+    assert report["summary"]["traceback_locator_occurrences"] == 0
+    assert report["summary"]["events_without_extracted_locator"] == 1
+    assert report["bundle"]["anchors"] == []
+
+
 def test_splunk_csv_dogfood_counts_multiple_locator_types_once_per_event(
     tmp_path,
 ) -> None:
