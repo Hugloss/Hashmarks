@@ -569,9 +569,7 @@ def _bundle(
 ) -> dict[str, object]:
     projection_identity = _evidence_projection_identity(state, selection)
     return {
-        "bundle_id": (
-            "splunk-evidence:" + projection_identity.removeprefix("sha256:")
-        ),
+        "bundle_id": ("splunk-evidence:" + projection_identity.removeprefix("sha256:")),
         "producer": {
             "kind": "splunk-style",
             "format": "csv-export",
@@ -594,9 +592,7 @@ def _bundle(
                 state.module_locator_occurrences + state.traceback_locator_occurrences
             ),
             "unlocated_sample_event_ids": state.unlocated_sample_occurrence_ids,
-            "unlocated_sample_occurrence_ids": (
-                state.unlocated_sample_occurrence_ids
-            ),
+            "unlocated_sample_occurrence_ids": (state.unlocated_sample_occurrence_ids),
             "unlocated_sample_observation_identities": (
                 state.unlocated_sample_observation_identities
             ),
