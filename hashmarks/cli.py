@@ -26,9 +26,8 @@ from .paths import canonical_host_path
 from .release_update import (
     ReleaseCheckError,
     ReleaseInfo,
-    UpgradeDelegationError,
+    StandaloneUpgradeError,
     automatic_check_allowed,
-    can_delegate_standalone_upgrade,
     delegate_standalone_upgrade,
     fetch_latest_release,
     is_standalone_installation,
@@ -106,7 +105,7 @@ def _prompt_upgrade() -> bool:
     return input("Select [1/2]: ").strip() == "1"
 
 
-def _delegate_selected_upgrade(release: ReleaseInfo) -> None:
+def _delegate_selected_standalone_upgrade(release: ReleaseInfo) -> None:
     _text(
         "",
         "Delegating update to the Hashmarks standalone installer.",
@@ -136,13 +135,13 @@ def _upgrade(args) -> int:
         return 0
 
     _render_standalone_upgrade(release, announce=False)
-    if not _interactive_terminal() or not can_delegate_standalone_upgrade():
+    if not _interactive_terminal():
         _text("", "No changes were made.")
         return 0
     if not _prompt_upgrade():
         _text("Upgrade skipped.")
         return 0
-    _delegate_selected_upgrade(release)
+    _delegate_selected_standalone_upgrade(release)
     return 0
 
 
@@ -163,13 +162,10 @@ def _maybe_offer_periodic_upgrade(command: str) -> None:
         return
 
     _render_standalone_upgrade(release, announce=True)
-    if not can_delegate_standalone_upgrade():
-        _text("", "No changes were made.")
-        return
     if not _prompt_upgrade():
         _text("Upgrade skipped for now.")
         return
-    _delegate_selected_upgrade(release)
+    _delegate_selected_standalone_upgrade(release)
 
 
 def _daemon_serve_command(workspace: Path, state: Path) -> list[str]:
@@ -428,7 +424,7 @@ def main(argv: list[str] | None = None) -> int:
     install.set_defaults(func=_install)
     upgrade = sub.add_parser(
         "upgrade",
-        help="check the latest release and delegate explicitly to the installation owner",
+        help="check the latest release and explicitly hand standalone installs to the existing installer",
     )
     upgrade.set_defaults(func=_upgrade)
     from .repository_cli import add_repository_cli
@@ -450,7 +446,7 @@ def main(argv: list[str] | None = None) -> int:
         DaemonCompatibilityError,
         StateDirectoryError,
         ReleaseCheckError,
-        UpgradeDelegationError,
+        StandaloneUpgradeError,
     ) as exc:
         raise SystemExit(str(exc)) from exc
 
