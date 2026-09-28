@@ -457,11 +457,9 @@ def test_standalone_delegation_executes_the_displayed_native_command(
     def exec_installer(
         native_executable: str,
         argv: tuple[str, ...],
-        environment: dict[str, str],
     ) -> None:
         seen["executable"] = native_executable
         seen["argv"] = argv
-        seen["version"] = environment["HASHMARKS_VERSION"]
 
     monkeypatch.setattr(
         release_update,
@@ -477,4 +475,5 @@ def test_standalone_delegation_executes_the_displayed_native_command(
         assert argv[-1] == displayed
     else:
         assert argv == ("/tools/sh", "-c", displayed)
-    assert seen["version"] == "0.25.0"
+    assert "0.25.0" in displayed
+    assert str(tmp_path.resolve()) in displayed
