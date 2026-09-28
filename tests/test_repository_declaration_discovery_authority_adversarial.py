@@ -479,12 +479,8 @@ def _assert_generated_role_absence(
     }
     bindings = delta["repository_evidence"]["bindings"]
     assert bindings["changed"] == []
-    assert bindings["removed"] == [
-        _role_rows(present)["generated-copy"]["binding_id"]
-    ]
-    assert bindings["preserved"] == [
-        _role_rows(present)["source"]["binding_id"]
-    ]
+    assert bindings["removed"] == [_role_rows(present)["generated-copy"]["binding_id"]]
+    assert bindings["preserved"] == [_role_rows(present)["source"]["binding_id"]]
     return generated_identity
 
 
