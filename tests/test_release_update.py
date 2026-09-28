@@ -341,3 +341,83 @@ def test_cli_upgrade_reports_up_to_date_without_owner_detection(
     assert cli.main(["upgrade"]) == 0
 
     assert "Hashmarks 0.24.0 is up to date." in capsys.readouterr().out
+
+def test_managed_standalone_owner_requires_canonical_installed_name(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"
+    executable = tmp_path / installed_name
+    monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(release_update.sys, "executable", str(executable))
+
+    owner = release_update.detect_installation_owner()
+
+    assert owner.kind == "standalone"
+    command = release_update.manual_upgrade_command(owner, "0.25.0")
+    assert command is not None
+    assert "HASHMARKS_VERSION" in command
+    assert "0.25.0" in command
+    assert "HASHMARKS_INSTALL_DIR" in command
+    assert str(tmp_path.resolve()) in command
+
+
+def test_raw_frozen_release_asset_is_not_guessed_as_managed_install(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "hashmarks-linux-x86_64"
+    monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(release_update.sys, "executable", str(executable))
+
+    owner = release_update.detect_installation_owner()
+
+    assert owner.kind == "frozen-unmanaged"
+    assert owner.command is None
+    assert release_update.can_delegate_upgrade(owner) is False
+
+
+def test_standalone_delegation_executes_the_displayed_native_command(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"
+    executable = tmp_path / installed_name
+    monkeypatch.setattr(release_update.sys, "executable", str(executable))
+    owner = InstallationOwner(
+        kind="standalone",
+        label="Hashmarks standalone installer",
+        command=None,
+    )
+    displayed = release_update.manual_upgrade_command(owner, "0.25.0")
+    assert displayed is not None
+
+    def which(name: str) -> str | None:
+        if release_update.os.name == "nt":
+            return "C:\\Tools\\pwsh.exe" if name == "pwsh" else None
+        return f"/tools/{name}" if name in {"sh", "curl"} else None
+
+    monkeypatch.setattr(release_update.shutil, "which", which)
+    seen: dict[str, object] = {}
+
+    def exec_owner(
+        native_executable: str,
+        argv: tuple[str, ...],
+        environment: dict[str, str],
+    ) -> None:
+        seen["executable"] = native_executable
+        seen["argv"] = argv
+        seen["version"] = environment["HASHMARKS_VERSION"]
+
+    monkeypatch.setattr(release_update, "_exec_owner", exec_owner)
+
+    release_update.delegate_upgrade(owner, "0.25.0")
+
+    argv = seen["argv"]
+    assert isinstance(argv, tuple)
+    if release_update.os.name == "nt":
+        assert argv[-1] == displayed
+    else:
+        assert argv == ("/tools/sh", "-c", displayed)
+    assert seen["version"] == "0.25.0"
+
