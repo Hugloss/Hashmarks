@@ -242,7 +242,7 @@ def test_semantic_identity_reappearance_remains_non_historical() -> None:
     )
 
     assert "G72. Semantic identity reappearance" in invariants
-    assert "same semantic_declaration_identity" in declarations
+    assert "same `semantic_declaration_identity`" in declarations
     assert "not an existence timeline" in declarations
     assert "stores no tombstone or resurrection record" in declarations
     assert "does not prove uninterrupted existence" in decision
