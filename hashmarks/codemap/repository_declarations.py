@@ -67,16 +67,12 @@ class RepositoryDeclarationsMixin:
         declaration: Mapping[str, object],
         *,
         group_id: str,
-        semantic_namespace: str,
-        concept: Mapping[str, object],
-        scope: Mapping[str, object],
+        semantic_subject_identity: str,
         binding: Mapping[str, object],
     ) -> tuple[dict[str, object], dict[str, object]]:
         definition = {
             "group_id": group_id,
-            "semantic_namespace": semantic_namespace,
-            "concept": concept,
-            "scope": scope,
+            "semantic_subject_identity": semantic_subject_identity,
             "declaration_id": declaration["declaration_id"],
             "binding_definition_identity": binding["binding_definition_identity"],
         }
@@ -99,9 +95,6 @@ class RepositoryDeclarationsMixin:
         self,
         normalized: Mapping[str, object],
         group_id: str,
-        semantic_namespace: str,
-        concept: Mapping[str, object],
-        scope: Mapping[str, object],
         semantic_subject_identity: str,
         binding_rows: Mapping[str, Mapping[str, object]],
     ) -> dict[str, object]:
@@ -116,9 +109,7 @@ class RepositoryDeclarationsMixin:
         definition, observation = self._declaration_identity_payloads(
             projected,
             group_id=group_id,
-            semantic_namespace=semantic_namespace,
-            concept=concept,
-            scope=scope,
+            semantic_subject_identity=semantic_subject_identity,
             binding=binding,
         )
         return {
@@ -142,15 +133,14 @@ class RepositoryDeclarationsMixin:
         semantic_namespace: str,
         concept: Mapping[str, object],
         scope: Mapping[str, object],
+        semantic_subject_identity: str,
         correspondence: Mapping[str, object],
         coverage: Mapping[str, object],
         declarations: Sequence[Mapping[str, object]],
     ) -> tuple[dict[str, object], dict[str, object]]:
         definition_payload = {
             "group_id": group_id,
-            "semantic_namespace": semantic_namespace,
-            "concept": concept,
-            "scope": scope,
+            "semantic_subject_identity": semantic_subject_identity,
             "coverage_scope": coverage["scope"],
             "expected_declaration_ids": coverage["expected_declaration_ids"],
             "declaration_definition_identities": [
@@ -163,6 +153,9 @@ class RepositoryDeclarationsMixin:
         }
         observation_payload = {
             **definition_payload,
+            "semantic_namespace": semantic_namespace,
+            "concept": concept,
+            "scope": scope,
             "correspondence": correspondence,
             "coverage": coverage,
             "declarations": list(declarations),
@@ -197,9 +190,6 @@ class RepositoryDeclarationsMixin:
             self._project_declaration(
                 normalized,
                 group_id,
-                semantic_namespace,
-                concept,
-                scope,
                 semantic_subject_identity,
                 binding_rows,
             )
@@ -212,13 +202,13 @@ class RepositoryDeclarationsMixin:
             semantic_namespace=semantic_namespace,
             concept=concept,
             scope=scope,
+            semantic_subject_identity=semantic_subject_identity,
             correspondence=correspondence,
             coverage=coverage,
             declarations=declarations,
         )
         return {
             **observation_payload,
-            "semantic_subject_identity": semantic_subject_identity,
             "group_definition_identity": "sha256:"
             + self._packet_digest(
                 "hashmarks.repository-declaration-group-definition.v1",
@@ -353,9 +343,7 @@ class RepositoryDeclarationsMixin:
         declaration: Mapping[str, object],
         *,
         group_id: str,
-        semantic_namespace: str,
-        concept: Mapping[str, object],
-        scope: Mapping[str, object],
+        semantic_subject_identity: str,
         binding_rows: Mapping[str, Mapping[str, object]],
         name: str,
     ) -> str:
@@ -372,9 +360,7 @@ class RepositoryDeclarationsMixin:
         definition, observation = self._declaration_identity_payloads(
             declaration,
             group_id=group_id,
-            semantic_namespace=semantic_namespace,
-            concept=concept,
-            scope=scope,
+            semantic_subject_identity=semantic_subject_identity,
             binding=binding,
         )
         expected_definition = "sha256:" + self._packet_digest(
@@ -470,11 +456,15 @@ class RepositoryDeclarationsMixin:
             coverage,
             declarations,
         ) = contract
+        semantic_subject_identity = str(
+            raw_group.get("semantic_subject_identity") or ""
+        )
         definition_payload, observation_payload = self._group_identity_payloads(
             group_id=group_id,
             semantic_namespace=semantic_namespace,
             concept=concept,
             scope=scope,
+            semantic_subject_identity=semantic_subject_identity,
             correspondence=correspondence,
             coverage=coverage,
             declarations=declarations,
@@ -534,9 +524,7 @@ class RepositoryDeclarationsMixin:
             self._validate_projected_declaration(
                 declaration,
                 group_id=group_id,
-                semantic_namespace=semantic_namespace,
-                concept=concept,
-                scope=scope,
+                semantic_subject_identity=semantic_subject_identity,
                 binding_rows=binding_rows,
                 name=name,
             )
