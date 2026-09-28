@@ -109,6 +109,19 @@ The relationship projection is explicitly bounded. Changing **relationship_limit
 
 Set **include_relationships=False** for the cheaper evidence-only path.
 
+### Relationship scope and binding locality
+
+Relationship evidence is observed for the repository **paths** present in one binding, not for its individual line ranges:
+
+- two bindings over different ranges of the same member intentionally observe the same bounded relationship fact set for that member;
+- a relationship fact or locator change on that member may therefore affect both bindings even when only one binding's direct line evidence changed;
+- direct range-content reasons remain local to the binding whose exact span changed and must not leak merely because relationship evidence is shared at member scope;
+- a binding over a different repository member receives no relationship impact from another member's relationship change;
+- relationship fact identity, relationship locator, containing-member evidence, direct evidence, and observation configuration remain separate delta axes and separate impact reasons.
+
+Member-scoped relationship sharing is therefore explicit authority, not cross-binding inference.
+
+
 ## Binding delta
 
 Compare two binding packets with:
