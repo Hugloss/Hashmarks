@@ -219,6 +219,115 @@ class _GeneratedOwnershipProvider:
         )
 
 
+@dataclass
+class _OwnershipUncertaintyProvider:
+    coverage_state: str = "complete"
+    truncation: str = "complete"
+    name: str = "ownership-uncertainty-provider"
+    source_path: str = "owners/source.meta"
+    generated_path: str = "owners/catalog.meta"
+    policy_path: str = ".github/CODEOWNERS"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return context.exists(self.source_path)
+
+    @staticmethod
+    def _resolved(
+        *,
+        declaration_id: str,
+        semantic_role: str,
+        path: str,
+        value: str,
+    ) -> dict[str, object]:
+        return {
+            "declaration_id": declaration_id,
+            "semantic_role": {"kind": semantic_role},
+            "value_state": "resolved",
+            "value": value,
+            "producer": {"provider": "ownership-uncertainty-provider"},
+            "evidence": [{"path": path, "start_line": 1, "end_line": 1}],
+        }
+
+    def _generated_declaration(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> dict[str, object]:
+        raw = context.read_text(self.generated_path).strip()
+        base = {
+            "declaration_id": "generated-owner",
+            "semantic_role": {"kind": "generated-catalog"},
+            "producer": {"provider": self.name},
+            "evidence": [
+                {
+                    "path": self.generated_path,
+                    "start_line": 1,
+                    "end_line": 1,
+                }
+            ],
+        }
+        candidates = [value.strip() for value in raw.split("|") if value.strip()]
+        if len(candidates) > 1:
+            return {
+                **base,
+                "value_state": "ambiguous",
+                "candidate_values": candidates,
+            }
+        return {**base, "value_state": "resolved", "value": raw}
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        source = context.read_text(self.source_path).strip()
+        declarations = [
+            self._resolved(
+                declaration_id="source-owner",
+                semantic_role="source-metadata",
+                path=self.source_path,
+                value=source,
+            ),
+            self._generated_declaration(context),
+        ]
+        if context.exists(self.policy_path):
+            declarations.append(
+                self._resolved(
+                    declaration_id="policy-owner",
+                    semantic_role="repository-policy",
+                    path=self.policy_path,
+                    value=context.read_text(self.policy_path).strip(),
+                )
+            )
+        return RepositoryDeclarationProviderResult(
+            groups=(
+                {
+                    "group_id": "component-owner",
+                    "concept": {"kind": "ownership", "identity": "component-a"},
+                    "scope": {"environment": "all"},
+                    "correspondence": {
+                        "state": "declared",
+                        "basis": {
+                            "provider": self.name,
+                            "rule": "explicit-owner-correspondence",
+                        },
+                    },
+                    "declarations": declarations,
+                    "coverage": {
+                        "state": self.coverage_state,
+                        "truncation": self.truncation,
+                        "expected_declaration_ids": [
+                            "source-owner",
+                            "generated-owner",
+                            "policy-owner",
+                        ],
+                        "scope": {"repository": "fixture"},
+                        "provenance": {"provider": self.name},
+                    },
+                },
+            ),
+            provenance={"provider": self.name, "version": "1"},
+        )
+
+
 def _provider(packet: dict[str, object]) -> dict[str, object]:
     return packet["providers"][0]
 
@@ -548,3 +657,147 @@ def test_generated_role_reappears_without_history_or_invented_continuity(
         restored,
         generated_identity,
     )
+
+
+def _ownership_uncertainty_packets(
+    tmp_path: Path,
+) -> tuple[dict[str, object], dict[str, object]]:
+    repo = tmp_path / "repo"
+    source = repo / "owners" / "source.meta"
+    generated = repo / "owners" / "catalog.meta"
+    policy = repo / ".github" / "CODEOWNERS"
+    source.parent.mkdir(parents=True)
+    policy.parent.mkdir(parents=True)
+    source.write_text("team-a\n", encoding="utf-8")
+    generated.write_text("team-a\n", encoding="utf-8")
+    policy.write_text("team-a\n", encoding="utf-8")
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        baseline = codemap.discover_repository_declarations(
+            [_OwnershipUncertaintyProvider()]
+        )
+
+        generated.write_text("team-a | team-b\n", encoding="utf-8")
+        policy.unlink()
+        codemap.sync(["owners/catalog.meta", ".github/CODEOWNERS"])
+        stressed = codemap.discover_repository_declarations(
+            [
+                _OwnershipUncertaintyProvider(
+                    coverage_state="incomplete",
+                    truncation="unknown",
+                )
+            ],
+            previous_observation=baseline,
+        )
+    return baseline, stressed
+
+
+def _assert_ownership_uncertainty_current_state(
+    baseline: dict[str, object],
+    stressed: dict[str, object],
+) -> None:
+    baseline_group = _nested_group(baseline)
+    stressed_group = _nested_group(stressed)
+    assert baseline_group["comparison"] == {
+        "state": "equivalent",
+        "distinct_values": ["team-a"],
+    }
+    assert baseline_group["absence"]["state"] == "known-present"
+    assert stressed_group["comparison"] == {
+        "state": "ambiguous",
+        "reason": "one-or-more-values-not-resolved",
+        "ambiguous_declaration_ids": ["generated-owner"],
+        "distinct_values": [],
+    }
+    assert stressed_group["absence"] == {
+        "state": "unknown",
+        "missing_declaration_ids": [],
+        "unseen_expected_declaration_ids": ["policy-owner"],
+        "unexpected_declaration_ids": [],
+        "reason": "coverage-does-not-authorize-negative-evidence",
+    }
+    assert stressed["declarations"]["winner"] == "not-selected"
+    assert "preferred" not in stressed_group["comparison"]
+    assert "authoritative_value" not in stressed_group["comparison"]
+
+    baseline_roles = _role_rows(baseline)
+    stressed_roles = _role_rows(stressed)
+    for role in ("source-metadata", "generated-catalog"):
+        assert (
+            baseline_roles[role]["semantic_declaration_identity"]
+            == stressed_roles[role]["semantic_declaration_identity"]
+        )
+
+
+def _assert_ownership_uncertainty_semantic_delta(
+    baseline: dict[str, object],
+    stressed: dict[str, object],
+) -> None:
+    baseline_roles = _role_rows(baseline)
+    delta = _nested_delta(stressed)
+    changed = delta["changed_groups"][0]
+    assert changed["definition_changed"] is True
+    assert changed["removed_declaration_ids"] == ["policy-owner"]
+    assert changed["added_declaration_ids"] == []
+    assert changed["value_changed_declaration_ids"] == ["generated-owner"]
+    assert changed["comparison_changed"] is True
+    assert changed["absence_changed"] is True
+    assert changed["coverage_changed"] is True
+
+    subject = delta["semantic_subjects"]["changed"][0]
+    semantic = subject["semantic_declarations"]
+    assert semantic["added"] == []
+    assert semantic["ambiguous"] == []
+    assert semantic["removed"] == [
+        baseline_roles["repository-policy"]["semantic_declaration_identity"]
+    ]
+    assert semantic["changed"] == [
+        {
+            "semantic_declaration_identity": baseline_roles["generated-catalog"][
+                "semantic_declaration_identity"
+            ],
+            "semantic_role": {"kind": "generated-catalog"},
+            "previous_declaration_id": "generated-owner",
+            "current_declaration_id": "generated-owner",
+            "declaration_id_changed": False,
+            "value_transition": {
+                "before": {"value_state": "resolved", "value": "team-a"},
+                "after": {
+                    "value_state": "ambiguous",
+                    "candidate_values": ["team-a", "team-b"],
+                },
+            },
+        }
+    ]
+    assert subject["comparison_transition"]["before"]["state"] == "equivalent"
+    assert subject["comparison_transition"]["after"]["state"] == "ambiguous"
+    assert subject["absence_transition"]["before"]["state"] == "known-present"
+    assert subject["absence_transition"]["after"]["state"] == "unknown"
+    assert subject["coverage_transition"]["before"]["state"] == "complete"
+    assert subject["coverage_transition"]["after"]["state"] == "incomplete"
+
+
+def _assert_ownership_uncertainty_binding_separation(
+    baseline: dict[str, object],
+    stressed: dict[str, object],
+) -> None:
+    baseline_roles = _role_rows(baseline)
+    stressed_roles = _role_rows(stressed)
+    bindings = _nested_delta(stressed)["repository_evidence"]["bindings"]
+    assert bindings["removed"] == [baseline_roles["repository-policy"]["binding_id"]]
+    assert bindings["added"] == []
+    assert stressed_roles["source-metadata"]["binding_id"] in bindings["preserved"]
+    assert (
+        stressed_roles["generated-catalog"]["binding_id"]
+        == baseline_roles["generated-catalog"]["binding_id"]
+    )
+
+
+def test_ownership_value_ambiguity_and_incomplete_coverage_remain_orthogonal(
+    tmp_path: Path,
+) -> None:
+    baseline, stressed = _ownership_uncertainty_packets(tmp_path)
+    _assert_ownership_uncertainty_current_state(baseline, stressed)
+    _assert_ownership_uncertainty_semantic_delta(baseline, stressed)
+    _assert_ownership_uncertainty_binding_separation(baseline, stressed)

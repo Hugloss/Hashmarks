@@ -189,6 +189,20 @@ When every explicitly expected declaration is observed with current evidence, th
 
 Hashmarks does not invent expectations such as "every deployment must contain file X." Expected declaration membership is provider evidence.
 
+## Uncertainty axes remain independent
+
+Repository declaration uncertainty is intentionally multi-dimensional. A group can simultaneously contain an ambiguous provider-normalized value, incomplete coverage, qualified evidence for some declarations, and missing or unqualified evidence for others. Hashmarks preserves those facts separately rather than collapsing them into one generic uncertainty state.
+
+In particular:
+
+- an ambiguous declaration value remains `comparison.state = ambiguous`; candidate values are not promoted into a factual disagreement;
+- incomplete or truncated coverage keeps unseen expected declarations under `absence.state = unknown`; it does not manufacture known absence;
+- repository-evidence qualification can make comparison ambiguous without rewriting the provider's normalized value claim;
+- correspondence ambiguity is independent of both value ambiguity and coverage;
+- agreement among the remaining resolved declarations never selects a winner or overrides unresolved, ambiguous, absent, or incompletely enumerated evidence.
+
+The output may therefore truthfully report, for the same group, `comparison.state = ambiguous` and `absence.state = unknown`. Those states answer different questions. Core does not combine them into a score, severity, precedence rule, or synthetic "overall confidence" authority.
+
 ## Distributed declarations
 
 File boundaries are not semantic boundaries.

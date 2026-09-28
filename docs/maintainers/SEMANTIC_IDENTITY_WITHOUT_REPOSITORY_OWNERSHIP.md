@@ -79,6 +79,8 @@ All declarations projected in one group carry the group's semantic subject ident
 
 Derived relationships remain recomputable from source evidence and do not become independent source truth.
 
+Semantic identity also does not collapse uncertainty dimensions. The same subject/role identities may coexist with value ambiguity, incomplete coverage, repository-evidence uncertainty, or ambiguous correspondence. These states remain owned by their existing declaration/evidence contracts. No combined confidence object, precedence rule, or uncertainty owner is introduced merely because a consumer wants one summary answer.
+
 ## Future design gate
 
 If future work appears to require branch/history machinery, answer these questions before implementation:
