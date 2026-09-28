@@ -790,6 +790,62 @@ def test_splunk_csv_dogfood_prioritizes_traceback_path_line_symbol_anchor(
     assert anchor["metadata"]["kind"] == "python-traceback-frame"
 
 
+def test_splunk_csv_dogfood_anchor_ids_do_not_collide_for_distinct_tracebacks(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","Traceback:\n'
+        '  File ""a.py"", line 1, in b:2:c\n'
+        '  File ""a.py:1:b"", line 2, in c\n'
+        'RuntimeError: boom"\n',
+    )
+
+    report = collect(source)
+    anchors = report["bundle"]["anchors"]
+    assert len(anchors) == 2
+    assert len({anchor["anchor_id"] for anchor in anchors}) == 2
+    assert all(len(str(anchor["anchor_id"])) <= 512 for anchor in anchors)
+
+
+def test_splunk_csv_dogfood_module_anchor_id_stays_within_core_bound(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    module = "m" * 600
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        f'"[host]","idx","[host]","INFO name={module}"\n',
+    )
+
+    report = collect(source)
+    anchor = report["bundle"]["anchors"][0]
+    assert anchor["module"] == module
+    assert len(str(anchor["anchor_id"])) <= 512
+
+
+def test_splunk_csv_dogfood_traceback_anchor_id_stays_within_core_bound(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    path = "/" + ("p" * 700) + ".py"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        f'"[host]","idx","[host]","Traceback:\n'
+        f'  File ""{path}"", line 17, in parse_result\n'
+        'ValueError: bad payload"\n',
+    )
+
+    report = collect(source)
+    anchor = report["bundle"]["anchors"][0]
+    assert anchor["path"] == path
+    assert len(str(anchor["anchor_id"])) <= 512
+
+
 def test_splunk_csv_dogfood_preserves_pseudo_traceback_symbols(
     tmp_path,
 ) -> None:
