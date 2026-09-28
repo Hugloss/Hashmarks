@@ -56,7 +56,8 @@ class _ModuleStats:
     sample_event_ids: list[str] = field(default_factory=list)
     handling_idents: set[str] = field(default_factory=set)
     commit_values: set[str] = field(default_factory=set)
-    context_values_truncated: bool = False
+    handling_idents_truncated: bool = False
+    commit_values_truncated: bool = False
 
     def observe(
         self,
@@ -79,12 +80,12 @@ class _ModuleStats:
         )
         if len(self.sample_event_ids) < 3:
             self.sample_event_ids.append(event_id)
-        self.context_values_truncated |= _bounded_value(
+        self.handling_idents_truncated |= _bounded_value(
             self.handling_idents,
             context.handling_ident,
             limit=_MAX_ANCHOR_CONTEXT_VALUES,
         )
-        self.context_values_truncated |= _bounded_value(
+        self.commit_values_truncated |= _bounded_value(
             self.commit_values,
             context.commit_value,
             limit=_MAX_ANCHOR_CONTEXT_VALUES,
@@ -211,8 +212,12 @@ def _stats_metadata(stats: _ModuleStats) -> dict[str, object]:
         "sample_event_ids": stats.sample_event_ids,
         "runtime_context": {
             "handling_ident_values": sorted(stats.handling_idents),
+            "handling_ident_values_truncated": stats.handling_idents_truncated,
             "commit_values": sorted(stats.commit_values),
-            "values_truncated": stats.context_values_truncated,
+            "commit_values_truncated": stats.commit_values_truncated,
+            "values_truncated": (
+                stats.handling_idents_truncated or stats.commit_values_truncated
+            ),
         },
     }
 
