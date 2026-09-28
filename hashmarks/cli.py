@@ -151,6 +151,9 @@ def _upgrade(args) -> int:
 
 
 def _maybe_offer_periodic_upgrade(command: str) -> None:
+    owner = detect_installation_owner()
+    if owner.kind not in {"standalone", "uv", "pipx"}:
+        return
     interactive = _interactive_terminal()
     release = periodic_release_check(
         __version__,
@@ -159,7 +162,6 @@ def _maybe_offer_periodic_upgrade(command: str) -> None:
     )
     if release is None:
         return
-    owner = detect_installation_owner()
     _render_upgrade(release, owner, announce=True)
     if not can_delegate_upgrade(owner):
         _manual_upgrade(owner, release.latest_version)
