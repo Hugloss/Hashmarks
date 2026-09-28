@@ -249,6 +249,22 @@ def test_semantic_identity_reappearance_remains_non_historical() -> None:
     assert "it supplies that bounded packet explicitly" in decision
 
 
+def test_declaration_uncertainty_axes_remain_orthogonal() -> None:
+    invariants = _text("docs/reference/INVARIANTS.md")
+    declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")
+    decision = _text(
+        "docs/maintainers/SEMANTIC_IDENTITY_WITHOUT_REPOSITORY_OWNERSHIP.md"
+    )
+
+    assert "G73. Declaration uncertainty axes remain orthogonal" in invariants
+    assert "## Uncertainty axes remain independent" in declarations
+    assert "candidate values are not promoted into a factual disagreement" in declarations
+    assert "does not manufacture known absence" in declarations
+    assert 'synthetic "overall confidence" authority' in declarations
+    assert "No combined confidence object" in decision
+    assert "uncertainty owner is introduced" in decision
+
+
 def test_derived_authority_economics_remains_diagnostic_only() -> None:
     makefile = _text("Makefile")
     plan = _text("docs/maintainers/DERIVED_AUTHORITY_AND_BOUNDED_COMPARISON_PLAN.md")
