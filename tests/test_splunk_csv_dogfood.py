@@ -83,6 +83,80 @@ def test_splunk_csv_dogfood_recovers_invalid_raw_without_hiding_parser_state(
     }
 
 
+def test_splunk_csv_dogfood_accounts_for_locator_free_events(tmp_path) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","INFO name=api.kafka_consumer"\n'
+        '"2","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","Back-off restarting failed container"\n'
+        '"3","2026-09-14T23:59:57.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","detections: 3, timing: 9ms"\n',
+    )
+
+    report = collect(source)
+    summary = report["summary"]
+    assert summary["parsed_events"] == 3
+    assert summary["events_with_extracted_locator"] == 1
+    assert summary["events_without_extracted_locator"] == 2
+    assert (
+        summary["events_with_extracted_locator"]
+        + summary["events_without_extracted_locator"]
+        == summary["parsed_events"]
+    )
+    assert summary["module_locator_occurrences"] == 1
+    assert summary["traceback_locator_occurrences"] == 0
+    assert summary["locator_occurrences"] == 1
+    assert summary["unique_module_anchors_observed"] == 1
+    assert summary["unique_anchors_observed"] == 1
+    sample_ids = report["bundle"]["provenance"]["unlocated_sample_event_ids"]
+    assert len(sample_ids) == 2
+    assert all(value.startswith("event:") for value in sample_ids)
+
+
+def test_splunk_csv_dogfood_counts_multiple_locator_types_once_per_event(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","INFO name=api.kafka_consumer '
+        'File /app/src/utils/__init__.py, line 2, in process_output_data"\n',
+    )
+
+    report = collect(source)
+    summary = report["summary"]
+    assert summary["parsed_events"] == 1
+    assert summary["events_with_extracted_locator"] == 1
+    assert summary["events_without_extracted_locator"] == 0
+    assert summary["module_locator_occurrences"] == 1
+    assert summary["traceback_locator_occurrences"] == 1
+    assert summary["locator_occurrences"] == 2
+    assert summary["unique_module_anchors_observed"] == 1
+    assert summary["unique_traceback_anchors_observed"] == 1
+    assert summary["unique_anchors_observed"] == 2
+
+
+def test_splunk_csv_dogfood_bounds_unlocated_event_samples(tmp_path) -> None:
+    source = tmp_path / "masked.csv"
+    rows = []
+    for index in range(5):
+        rows.append(
+            f'"{index}","2026-09-14T23:59:{index:02d}.000+0200",'
+            '"[path]","kube:container:x","[host]","idx","[host]",'
+            f'"unlocated event {index}"\n'
+        )
+    _write(source, "".join(rows))
+
+    report = collect(source)
+    assert report["summary"]["events_without_extracted_locator"] == 5
+    sample_ids = report["bundle"]["provenance"]["unlocated_sample_event_ids"]
+    assert len(sample_ids) == 3
+    assert len(set(sample_ids)) == 3
+
+
 def test_splunk_csv_dogfood_preserves_multiline_record_and_exact_source_identity(
     tmp_path,
 ) -> None:
