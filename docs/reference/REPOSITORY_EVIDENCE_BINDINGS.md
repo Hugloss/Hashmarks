@@ -122,6 +122,19 @@ Relationship evidence is observed for the repository **paths** present in one bi
 Member-scoped relationship sharing is therefore explicit authority, not cross-binding inference.
 
 
+### Relationship comparability boundary
+
+Relationship fact comparison requires compatible observation authority:
+
+- changing relationship observation from `not-requested` to `observed`, or back again, is an observation-configuration change; relationship facts and locators become **unknown/non-comparable**, with no fabricated added/removed edges;
+- changing relationship bounds or other relationship observation configuration follows the same rule;
+- changing observer capability identity likewise makes relationship facts non-comparable and is carried by the packet-level observer axis rather than being rewritten as repository relationship change;
+- if containing-member or direct evidence also changed, those independent evidence axes remain reportable even while relationship facts are non-comparable;
+- a pure observer-capability change with otherwise identical binding observations may leave the binding preserved while `delta.observer.changed=true`.
+
+The invariant is: **loss of relationship comparability removes authority to claim edge change; it does not remove independent authority already held by member, direct-evidence, definition, or observer axes.**
+
+
 ## Binding delta
 
 Compare two binding packets with:
