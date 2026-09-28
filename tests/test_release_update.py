@@ -350,7 +350,9 @@ def test_standalone_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate
     monkeypatch.setattr(
         release_update.shutil,
         "which",
-        lambda name: pytest.fail(f"skip must not preflight installer prerequisite {name}"),
+        lambda name: pytest.fail(
+            f"skip must not preflight installer prerequisite {name}"
+        ),
     )
     monkeypatch.setattr("builtins.input", lambda prompt: "2")
     monkeypatch.setattr(
