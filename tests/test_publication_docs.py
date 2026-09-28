@@ -107,6 +107,8 @@ def test_public_docs_expose_repository_evidence_binding_contract() -> None:
         "hashmarks.repository-evidence-coverage.v1",
     ):
         assert schema in binding
+    assert "Locator/content identity separation" in binding
+    assert "content equality may prove equivalence of observed bytes" in binding
     for state in ("current", "stale", "unknown"):
         assert state in binding
 

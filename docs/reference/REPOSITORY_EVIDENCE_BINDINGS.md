@@ -83,6 +83,18 @@ Changing a declaration or relationship bound is definition/observation-configura
 
 The complete packet uses schema **hashmarks.repository-evidence-bindings.v1** and carries **bindings_identity**, repository identity, source identity, CodeMap generation, identity generation, canonical observer capability identity, and **current | stale | unknown** freshness.
 
+### Locator/content identity separation
+
+Repository evidence keeps physical locator authority separate from content-derived identity:
+
+- two different repository paths may legitimately expose the same `member_revision` and line `span_identity` when their bytes are equal;
+- equal content identities do not collapse those paths into one evidence locator or one binding definition;
+- moving otherwise identical evidence to a different path changes `binding_definition_identity` and `binding_observation_identity` because the exact locator is part of the binding definition;
+- a pure path relocation does not manufacture direct span-content change or containing-member content change when the observed bytes are identical;
+- coverage/impact reports the definition transition through `binding-definition-changed` unless an independent member, locator-state, dependency, or relationship fact also changed.
+
+The invariant is: **content equality may prove equivalence of observed bytes, never equivalence of repository location authority.**
+
 ## Declared dependencies
 
 The optional **dependency_paths** mapping declares explicit repository members associated with a binding. Hashmarks reports their member observations and revisions.
