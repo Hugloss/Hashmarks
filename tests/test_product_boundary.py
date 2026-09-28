@@ -39,6 +39,11 @@ def test_product_profile_explicitly_rejects_agent_execution_and_repository_lifec
         in boundary
     )
     assert "Not a semantic knowledge graph." in boundary
+    assert (
+        "hydrate semantic/relationship state from caller-supplied previous observations"
+        in boundary
+    )
+    assert "comparison input, not replay state" in agents
     assert "Hashmarks must not drift into a semantic knowledge graph." in agents
     assert "Explicit A↔B plus B↔C does **not** create A↔C." in agents
     assert (
