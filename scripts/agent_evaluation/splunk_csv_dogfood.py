@@ -698,13 +698,11 @@ def _select_anchors(
     )
 
 
-def _selection_metadata_truncated(selection: _AnchorSelection) -> bool:
+def _selection_context_truncated(selection: _AnchorSelection) -> bool:
     for anchor in selection.anchors:
         metadata = anchor.get("metadata")
         if not isinstance(metadata, dict):
             continue
-        if metadata.get("metadata_values_truncated") is True:
-            return True
         runtime_context = metadata.get("runtime_context")
         if (
             isinstance(runtime_context, dict)
@@ -712,6 +710,14 @@ def _selection_metadata_truncated(selection: _AnchorSelection) -> bool:
         ):
             return True
     return False
+
+
+def _selection_metadata_truncated(selection: _AnchorSelection) -> bool:
+    return any(
+        isinstance(anchor.get("metadata"), dict)
+        and anchor["metadata"].get("metadata_values_truncated") is True
+        for anchor in selection.anchors
+    )
 
 
 def _projection_truncated(
@@ -929,7 +935,7 @@ def _report(
             "scope_values_truncated": bool(_scope(state)["scope_values_truncated"]),
             "context_values_truncated": (
                 state.context_values_truncated
-                or _selection_metadata_truncated(selection)
+                or _selection_context_truncated(selection)
             ),
             "metadata_values_truncated": _selection_metadata_truncated(selection),
             "projection_truncated": _projection_truncated(state, selection),
