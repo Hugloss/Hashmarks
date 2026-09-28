@@ -40,7 +40,7 @@ _MAX_IDENTITY_SAMPLES = 3
 _MAX_UNLOCATED_SAMPLE_EVENT_IDS = 3
 _DEFAULT_MAX_ANCHORS = 256
 _NORMALIZED_OBSERVATION_SCHEMA = "hashmarks.splunk-normalized-observation.v1"
-_EVIDENCE_PROJECTION_SCHEMA = "hashmarks.splunk-evidence-projection.v1"
+_EVIDENCE_PROJECTION_SCHEMA = "hashmarks.splunk-evidence-projection.v2"
 _PRODUCER_PAYLOAD_VALIDATION_STATE = "not-assessed"
 
 
@@ -91,6 +91,8 @@ class _TimeBounds:
 
     @property
     def ordering_state(self) -> str:
+        if self.lexical_start is None:
+            return "not-observed"
         if self.unparseable_count:
             return "lexical-fallback"
         return "instant-aware"
@@ -698,6 +700,8 @@ def _report(
             "csv_malformed": state.malformed_count,
             "csv_widened": state.widened_count,
             "producer_payload_validation_state": (_PRODUCER_PAYLOAD_VALIDATION_STATE),
+            "time_ordering_state": state.time_bounds.ordering_state,
+            "timestamp_parse_failure_count": state.time_bounds.unparseable_count,
             "parsed_events": state.strict_valid_count + state.recovered_count,
             "events_with_extracted_locator": state.events_with_extracted_locator,
             "events_without_extracted_locator": (
