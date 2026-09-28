@@ -15,7 +15,7 @@ from threading import Lock
 from typing import TextIO
 
 from hashmarks._command_output import log_command_output
-from hashmarks.codemap import normalize_evidence_locator_claim
+from hashmarks.codemap import validate_evidence_locator_claim
 
 logger = logging.getLogger(__name__)
 
@@ -503,11 +503,11 @@ class _CollectionState:
         match = _MODULE.search(parsed.raw)
         if match is None:
             return False
+        module = match.group(1).strip(".")
         try:
-            locator = normalize_evidence_locator_claim(module=match.group(1))
+            validate_evidence_locator_claim(module=module)
         except ValueError:
             return False
-        module = str(locator["module"])
         stats = self.modules.setdefault(module, _ModuleStats())
         stats.observe(
             timestamp=timestamp,
@@ -529,19 +529,18 @@ class _CollectionState:
     ) -> int:
         occurrences = 0
         for match in _TRACEBACK.finditer(parsed.raw):
+            path = (match.group(1) or match.group(2)).strip()
+            line = int(match.group(3))
+            symbol = match.group(4).strip()
             try:
-                locator = normalize_evidence_locator_claim(
-                    path=(match.group(1) or match.group(2)).strip(),
-                    line=int(match.group(3)),
-                    symbol=match.group(4).strip(),
+                validate_evidence_locator_claim(
+                    path=path,
+                    line=line,
+                    symbol=symbol,
                 )
             except ValueError:
                 continue
-            key = (
-                str(locator["path"]),
-                int(locator["line"]),
-                str(locator["symbol"]),
-            )
+            key = (path, line, symbol)
             stats = self.tracebacks.setdefault(key, _ModuleStats())
             stats.observe(
                 timestamp=timestamp,
