@@ -61,24 +61,20 @@ def test_latest_release_request_is_public_and_repository_neutral(monkeypatch) ->
 
 
 @pytest.mark.parametrize(
-    ("command", "interactive", "environ"),
+    ("interactive", "environ"),
     [
-        ("mcp", True, {}),
-        ("daemon", True, {}),
-        ("find", False, {}),
-        ("find", True, {"CI": "1"}),
-        ("find", True, {"GITHUB_ACTIONS": "true"}),
-        ("find", True, {"HASHMARKS_NO_UPDATE_CHECK": "1"}),
+        (False, {}),
+        (True, {"CI": "1"}),
+        (True, {"GITHUB_ACTIONS": "true"}),
+        (True, {"HASHMARKS_NO_UPDATE_CHECK": "1"}),
     ],
 )
-def test_automatic_update_check_respects_hard_skip_boundaries(
-    command: str,
+def test_automatic_update_check_respects_environment_boundaries(
     interactive: bool,
     environ: dict[str, str],
 ) -> None:
     assert (
         release_update.automatic_check_allowed(
-            command=command,
             interactive=interactive,
             environ=environ,
         )
@@ -101,14 +97,12 @@ def test_periodic_check_is_cached_outside_repository_state(
 
     first = release_update.periodic_release_check(
         "0.24.0",
-        command="find",
         interactive=True,
         environ=environ,
         now=1000.0,
     )
     second = release_update.periodic_release_check(
         "0.24.0",
-        command="find",
         interactive=True,
         environ=environ,
         now=1001.0,
@@ -139,7 +133,6 @@ def test_corrupt_periodic_cache_is_disposable(monkeypatch, tmp_path: Path) -> No
 
     result = release_update.periodic_release_check(
         "0.24.0",
-        command="find",
         interactive=True,
         environ={"XDG_CACHE_HOME": str(tmp_path / "cache")},
         now=2000.0,
@@ -167,8 +160,7 @@ def test_network_failure_is_non_fatal_and_throttled(
     assert (
         release_update.periodic_release_check(
             "0.24.0",
-            command="find",
-            interactive=True,
+                interactive=True,
             environ=environ,
             now=3000.0,
         )
@@ -177,8 +169,7 @@ def test_network_failure_is_non_fatal_and_throttled(
     assert (
         release_update.periodic_release_check(
             "0.24.0",
-            command="find",
-            interactive=True,
+                interactive=True,
             environ=environ,
             now=3001.0,
         )
@@ -241,6 +232,45 @@ def test_external_python_upgrade_reports_native_tool_handoff_without_mutation(
     assert "No changes were made." in output
 
 
+@pytest.mark.parametrize(
+    ("argv", "handler_name"),
+    [
+        (["version"], "_version"),
+        (["daemon", "status"], "_daemon_status"),
+        (["mcp"], "_mcp"),
+        (["upgrade"], "_upgrade"),
+    ],
+)
+def test_cli_command_semantics_opt_out_of_automatic_update_awareness(
+    monkeypatch,
+    argv: list[str],
+    handler_name: str,
+) -> None:
+    monkeypatch.setattr(cli, handler_name, lambda args: 0)
+    monkeypatch.setattr(
+        cli,
+        "_maybe_offer_periodic_upgrade",
+        lambda: pytest.fail("command semantics must suppress automatic update awareness"),
+    )
+
+    assert cli.main(argv) == 0
+
+
+def test_ordinary_cli_command_semantics_enable_automatic_update_awareness(
+    monkeypatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(cli, "_doctor", lambda args: 0)
+    monkeypatch.setattr(
+        cli,
+        "_maybe_offer_periodic_upgrade",
+        lambda: calls.append("checked"),
+    )
+
+    assert cli.main(["doctor"]) == 0
+    assert calls == ["checked"]
+
+
 def test_periodic_external_installation_reports_update_without_manager_selection(
     monkeypatch,
     capsys: pytest.CaptureFixture[str],
@@ -249,12 +279,12 @@ def test_periodic_external_installation_reports_update_without_manager_selection
     monkeypatch.setattr(
         cli,
         "automatic_check_allowed",
-        lambda *, command, interactive: command == "find" and interactive,
+        lambda *, interactive: interactive,
     )
     monkeypatch.setattr(
         cli,
         "periodic_release_check",
-        lambda current_version, *, command, interactive: ReleaseInfo(
+        lambda current_version, *, interactive: ReleaseInfo(
             current_version=current_version,
             latest_version="0.25.0",
         ),
@@ -266,7 +296,7 @@ def test_periodic_external_installation_reports_update_without_manager_selection
         lambda: pytest.fail("external installs must not prompt mutation"),
     )
 
-    cli._maybe_offer_periodic_upgrade("find")
+    cli._maybe_offer_periodic_upgrade()
 
     output = capsys.readouterr().out
     assert "A newer Hashmarks version is available." in output
