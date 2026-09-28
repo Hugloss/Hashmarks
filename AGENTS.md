@@ -30,6 +30,8 @@ Existing CodeMap graphs such as imports, calls, references, dependencies, owners
 
 Provider names or identifiers carried inside correspondence basis/provenance are **not foreign keys**. Do not add provider-existence validation, cascade deletion, automatic relationship rewiring, or referential-integrity joins based on those names. A correspondence producer owns its own explicit claim and exact evidence; source-provider add/remove events remain independent unless that producer changes its claim.
 
+`previous_observation` is **comparison input, not replay state**. Do not hydrate semantic subjects, correspondence groups, relationship edges, provider claims, or graph state from an older declaration packet. Reopening CodeMap against the same durable `state_dir` must reconstruct current declaration/correspondence state only from the providers selected for the current call and current qualified repository evidence. Replaying an old packet may affect that one delta calculation only; it must not change later calls that omit the packet.
+
 ## Evidence authority is non-strengthening
 
 A derived, cached, summarized, ranked, or presentation-layer result must never silently become stronger than the repository evidence and freshness/provenance authority that supports it. Do not turn stale into fresh, unknown into proven, ambiguous into unique, or a consumer/model interpretation into repository truth.
