@@ -267,6 +267,18 @@ def test_declaration_uncertainty_axes_remain_orthogonal() -> None:
     assert "uncertainty owner is introduced" in decision
 
 
+def test_duplicate_semantic_roles_never_gain_core_precedence() -> None:
+    invariants = _text("docs/reference/INVARIANTS.md")
+    declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")
+
+    assert "Duplicate roles may not be collapsed" in invariants
+    assert "apparent source specificity" in invariants
+    assert "majority" in invariants
+    assert "provider must resolve and expose that claim explicitly" in invariants
+    assert "Core does not break duplicate-role ambiguity" in declarations
+    assert "repository-declaration core does not recreate native precedence" in declarations
+
+
 def test_derived_authority_economics_remains_diagnostic_only() -> None:
     makefile = _text("Makefile")
     plan = _text("docs/maintainers/DERIVED_AUTHORITY_AND_BOUNDED_COMPARISON_PLAN.md")
