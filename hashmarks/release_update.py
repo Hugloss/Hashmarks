@@ -383,6 +383,8 @@ def _pipx_global_tool_roots(
     environ: Mapping[str, str],
     windows: bool,
 ) -> tuple[str, ...]:
+    if windows:
+        return ()
     pipx_global_home = environ.get("PIPX_GLOBAL_HOME")
     if pipx_global_home:
         return (
@@ -390,11 +392,9 @@ def _pipx_global_tool_roots(
                 pipx_global_home,
                 "venvs",
                 "hashmarks",
-                windows=windows,
+                windows=False,
             ),
         )
-    if windows:
-        return ()
     return (
         _join_managed_path(
             "/opt/pipx",
