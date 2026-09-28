@@ -63,7 +63,9 @@ def _binding_change(
     packet: dict[str, object],
     declaration: dict[str, object],
 ) -> dict[str, object]:
-    changed = packet["delta_from_previous"]["repository_evidence"]["bindings"]["changed"]
+    changed = packet["delta_from_previous"]["repository_evidence"]["bindings"][
+        "changed"
+    ]
     return next(
         row
         for row in changed
@@ -269,7 +271,9 @@ def test_declaration_producer_provenance_change_is_observation_only(
     assert changed["observation_changed_declaration_ids"] == ["owner"]
     assert changed["comparison_changed"] is False
     assert changed["absence_changed"] is False
-    assert after["delta_from_previous"]["repository_evidence"]["bindings"]["changed"] == []
+    assert (
+        after["delta_from_previous"]["repository_evidence"]["bindings"]["changed"] == []
+    )
 
 
 def test_correspondence_basis_change_is_group_observation_only(
@@ -308,4 +312,6 @@ def test_correspondence_basis_change_is_group_observation_only(
     assert changed["correspondence_changed"] is True
     assert changed["comparison_changed"] is False
     assert changed["absence_changed"] is False
-    assert after["delta_from_previous"]["repository_evidence"]["bindings"]["changed"] == []
+    assert (
+        after["delta_from_previous"]["repository_evidence"]["bindings"]["changed"] == []
+    )
