@@ -211,7 +211,7 @@ def test_external_python_upgrade_reports_native_tool_handoff_without_mutation(
             latest_version="0.25.0",
         ),
     )
-    monkeypatch.setattr(cli, "is_standalone_installation", lambda: False)
+    monkeypatch.setattr(cli, "standalone_upgrade_command", lambda version: None)
     monkeypatch.setattr(
         cli,
         "_prompt_upgrade",
@@ -288,8 +288,10 @@ def test_cli_upgrade_reports_up_to_date_without_installation_detection(
     )
     monkeypatch.setattr(
         cli,
-        "is_standalone_installation",
-        lambda: pytest.fail("installation mode is irrelevant when already current"),
+        "standalone_upgrade_command",
+        lambda version: pytest.fail(
+            "standalone update resolution is irrelevant when already current"
+        ),
     )
 
     assert cli.main(["upgrade"]) == 0
@@ -384,8 +386,12 @@ def test_cli_executes_the_exact_displayed_standalone_command(
             latest_version="0.25.0",
         ),
     )
-    monkeypatch.setattr(cli, "is_standalone_installation", lambda: True)
-    monkeypatch.setattr(cli, "standalone_upgrade_command", lambda version: command)
+    resolved_versions: list[str] = []
+    monkeypatch.setattr(
+        cli,
+        "standalone_upgrade_command",
+        lambda version: resolved_versions.append(version) or command,
+    )
     monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
     monkeypatch.setattr("builtins.input", lambda prompt: "1")
     seen: list[str] = []
@@ -395,6 +401,7 @@ def test_cli_executes_the_exact_displayed_standalone_command(
 
     output = capsys.readouterr().out
     assert command in output
+    assert resolved_versions == ["0.25.0"]
     assert seen == [command]
 
 
