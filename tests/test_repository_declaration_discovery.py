@@ -474,9 +474,31 @@ def test_discovery_preserves_semantic_roles_across_provider_request_churn(
         before_by_role["container-runtime"]["declaration_definition_identity"]
         != after_by_role["container-runtime"]["declaration_definition_identity"]
     )
-    binding_changes = nested["repository_evidence"]["bindings"]["changed"]
-    assert len(binding_changes) == 1
-    assert binding_changes[0]["definition"]["state"] == "changed"
+    binding_delta = nested["repository_evidence"]["bindings"]
+    assert binding_delta["changed"] == []
+    assert binding_delta["preserved"] == []
+    assert binding_delta["removed"] == sorted(
+        row["binding_id"] for row in before_by_role.values()
+    )
+    assert binding_delta["added"] == sorted(
+        row["binding_id"] for row in after_by_role.values()
+    )
+
+    before_bindings = {
+        row["binding_id"]: row
+        for row in before["declarations"]["repository_evidence"]["bindings"]
+    }
+    after_bindings = {
+        row["binding_id"]: row
+        for row in after["declarations"]["repository_evidence"]["bindings"]
+    }
+    assert before_bindings[
+        before_by_role["container-runtime"]["binding_id"]
+    ]["evidence"][0]["path"] == "Dockerfile"
+    assert after_bindings[
+        after_by_role["container-runtime"]["binding_id"]
+    ]["evidence"][0]["path"] == "deploy/runtime.meta"
+
     assert subject["coverage_transition"]["before"]["expected_declaration_ids"] == [
         "container-v1",
         "intent-v1",
