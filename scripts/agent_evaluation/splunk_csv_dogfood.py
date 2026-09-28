@@ -32,6 +32,7 @@ _TRACEBACK = re.compile(
     r'File\s+"?([^",]+)"?,\s+line\s+(\d+),\s+in\s+([A-Za-z_][A-Za-z0-9_]*)'
 )
 _MAX_SCOPE_VALUES = 32
+_MAX_UNLOCATED_SAMPLE_EVENT_IDS = 3
 _DEFAULT_MAX_ANCHORS = 256
 
 
@@ -212,6 +213,11 @@ class _CollectionState:
     recovered_count: int = 0
     malformed_count: int = 0
     widened_count: int = 0
+    events_with_extracted_locator: int = 0
+    events_without_extracted_locator: int = 0
+    module_locator_occurrences: int = 0
+    traceback_locator_occurrences: int = 0
+    unlocated_sample_event_ids: list[str] = field(default_factory=list)
     physical_lines: int = 1
     first_time: str | None = None
     last_time: str | None = None
@@ -241,8 +247,20 @@ class _CollectionState:
         _serial, timestamp, source, sourcetype, _host, index, _server = parsed.fields
         self._observe_scope(timestamp, source, sourcetype, index)
         event_id = _event_id(ordinal, text)
-        self._observe_module(parsed, timestamp, event_id)
-        self._observe_traceback(parsed, timestamp, event_id)
+        module_found = self._observe_module(parsed, timestamp, event_id)
+        traceback_found = self._observe_traceback(parsed, timestamp, event_id)
+        locator_occurrences = int(module_found) + int(traceback_found)
+        self.module_locator_occurrences += int(module_found)
+        self.traceback_locator_occurrences += int(traceback_found)
+        if locator_occurrences:
+            self.events_with_extracted_locator += 1
+        else:
+            self.events_without_extracted_locator += 1
+            if (
+                len(self.unlocated_sample_event_ids)
+                < _MAX_UNLOCATED_SAMPLE_EVENT_IDS
+            ):
+                self.unlocated_sample_event_ids.append(event_id)
 
     def _observe_scope(
         self,
@@ -266,10 +284,10 @@ class _CollectionState:
         parsed: _ParsedRecord,
         timestamp: str,
         event_id: str,
-    ) -> None:
+    ) -> bool:
         match = _MODULE.search(parsed.raw)
         if match is None:
-            return
+            return False
         module = match.group(1).strip(".")
         stats = self.modules.setdefault(module, _ModuleStats())
         stats.observe(
@@ -278,16 +296,17 @@ class _CollectionState:
             widened=parsed.widened,
             event_id=event_id,
         )
+        return True
 
     def _observe_traceback(
         self,
         parsed: _ParsedRecord,
         timestamp: str,
         event_id: str,
-    ) -> None:
+    ) -> bool:
         match = _TRACEBACK.search(parsed.raw)
         if match is None:
-            return
+            return False
         key = (match.group(1), int(match.group(2)), match.group(3))
         stats = self.tracebacks.setdefault(key, _ModuleStats())
         stats.observe(
@@ -296,6 +315,7 @@ class _CollectionState:
             widened=parsed.widened,
             event_id=event_id,
         )
+        return True
 
 
 @dataclass(frozen=True)
@@ -371,6 +391,15 @@ def _bundle(
             "recovered_count": state.recovered_count,
             "malformed_count": state.malformed_count,
             "widened_count": state.widened_count,
+            "events_with_extracted_locator": state.events_with_extracted_locator,
+            "events_without_extracted_locator": (
+                state.events_without_extracted_locator
+            ),
+            "locator_occurrences": (
+                state.module_locator_occurrences
+                + state.traceback_locator_occurrences
+            ),
+            "unlocated_sample_event_ids": state.unlocated_sample_event_ids,
         },
         "completeness": "unknown",
         "truncation": "truncated" if selection.truncated else "unknown",
@@ -405,11 +434,24 @@ def _report(
             "recovered": state.recovered_count,
             "malformed": state.malformed_count,
             "widened": state.widened_count,
-            "traceback_anchors_observed": selection.traceback_observed,
+            "parsed_events": state.strict_valid_count + state.recovered_count,
+            "events_with_extracted_locator": state.events_with_extracted_locator,
+            "events_without_extracted_locator": (
+                state.events_without_extracted_locator
+            ),
+            "module_locator_occurrences": state.module_locator_occurrences,
+            "traceback_locator_occurrences": (
+                state.traceback_locator_occurrences
+            ),
+            "locator_occurrences": (
+                state.module_locator_occurrences
+                + state.traceback_locator_occurrences
+            ),
+            "unique_traceback_anchors_observed": selection.traceback_observed,
             "traceback_anchors_emitted": selection.traceback_emitted,
-            "module_anchors_observed": selection.module_observed,
+            "unique_module_anchors_observed": selection.module_observed,
             "module_anchors_emitted": selection.module_emitted,
-            "anchors_observed": selection.observed,
+            "unique_anchors_observed": selection.observed,
             "anchors_emitted": len(selection.anchors),
             "anchors_truncated": selection.truncated,
             "scope_values_truncated": state.scope_values_truncated,
