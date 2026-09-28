@@ -138,33 +138,39 @@ def _semantic_subject_change(
 ) -> dict[str, object] | None:
     old_declarations = _declarations(old)
     new_declarations = _declarations(new)
+    group_id_changed = old.get("group_id") != new.get("group_id")
     change: dict[str, object] = {
         "semantic_subject_identity": identity,
         "semantic_namespace": new.get("semantic_namespace"),
         "previous_group_id": old.get("group_id"),
         "current_group_id": new.get("group_id"),
-        "group_id_changed": old.get("group_id") != new.get("group_id"),
-        "added_declaration_ids": sorted(
-            set(new_declarations) - set(old_declarations)
-        ),
-        "removed_declaration_ids": sorted(
-            set(old_declarations) - set(new_declarations)
-        ),
-        "value_changed_declaration_ids": _value_changed_declaration_ids(
-            old_declarations,
-            new_declarations,
-        ),
-        "producer_changed_declaration_ids": _changed_declaration_ids(
-            old_declarations,
-            new_declarations,
-            field="producer",
-        ),
-        "evidence_state_changed_declaration_ids": _changed_declaration_ids(
-            old_declarations,
-            new_declarations,
-            field="evidence_state",
-        ),
+        "group_id_changed": group_id_changed,
     }
+    if not group_id_changed:
+        change.update(
+            {
+                "added_declaration_ids": sorted(
+                    set(new_declarations) - set(old_declarations)
+                ),
+                "removed_declaration_ids": sorted(
+                    set(old_declarations) - set(new_declarations)
+                ),
+                "value_changed_declaration_ids": _value_changed_declaration_ids(
+                    old_declarations,
+                    new_declarations,
+                ),
+                "producer_changed_declaration_ids": _changed_declaration_ids(
+                    old_declarations,
+                    new_declarations,
+                    field="producer",
+                ),
+                "evidence_state_changed_declaration_ids": _changed_declaration_ids(
+                    old_declarations,
+                    new_declarations,
+                    field="evidence_state",
+                ),
+            }
+        )
     for field in ("comparison", "absence", "correspondence", "coverage"):
         transition = _transition(old, new, field)
         if transition is not None:
@@ -172,11 +178,11 @@ def _semantic_subject_change(
 
     meaningful = bool(
         change["group_id_changed"]
-        or change["added_declaration_ids"]
-        or change["removed_declaration_ids"]
-        or change["value_changed_declaration_ids"]
-        or change["producer_changed_declaration_ids"]
-        or change["evidence_state_changed_declaration_ids"]
+        or change.get("added_declaration_ids")
+        or change.get("removed_declaration_ids")
+        or change.get("value_changed_declaration_ids")
+        or change.get("producer_changed_declaration_ids")
+        or change.get("evidence_state_changed_declaration_ids")
         or any(key.endswith("_transition") for key in change)
     )
     return change if meaningful else None
