@@ -49,13 +49,14 @@ This exception is bounded to product self-maintenance:
 
 This exception does not transfer general process-execution authority into Hashmarks. It does not admit repository/task command execution, a Hashmarks-owned package resolver or package-resolution layer, package-manager detection/certification, installer backend registries, workflow orchestration, release promotion, retries/supervision, or execution-result authority. The standalone handoff exists only to stop the old Hashmarks process and let the existing standalone installer replace its own product bytes.
 
-## Three permanent non-goals
+## Four permanent non-goals
 
 Hashmarks must never be turned into any of the adjacent systems or authorities it serves.
 
 1. **Not the agent.** Hashmarks must not absorb the consumer's reasoning, planning, attempt history, memory, edits, delegation, model or tool choices, workflow sequencing, recovery decisions, or final-solution authority. An agent may consume Hashmarks evidence, but Hashmarks must not become the agent's solution loop.
 2. **Not the execution/certification motor.** Hashmarks must not absorb Oh-Goon-style admission, sandboxing, repository/task process launch or supervision, cancellation, timeout/retry/resume, worker placement, runtime-environment control, execution-result authority, certification, release promotion, or Game Tape/execution-history ownership. The bounded standalone self-update handoff above does not grant any of those authorities: it can only replace the running standalone Hashmarks CLI with its existing standalone installer after explicit consent. Oh-Goon or another execution layer may consume Hashmarks evidence, but Hashmarks must not become its execution engine.
 3. **Not a repository version-control, mutation, or historical-archive engine.** Hashmarks may observe caller-selected repository authorities, preserve immutable observations needed by the active consumer work window, and compare or diff repository meaning and evidence across those authorities. It must not create or manage branches, implement merge/rebase/cherry-pick or conflict-resolution semantics, roll back/revert/reset/checkout repository state, mutate refs or worktrees, crawl or pre-index Git history, retain an unbounded timeline of repository observations, or otherwise become an alternative Git/repository-lifecycle/history owner. Git and the external consumer/harness own those operations. Historical observation and semantic diff are bounded, read-only repository intelligence; they never grant repository-mutation authority or require permanent retention.
+4. **Not a semantic knowledge graph.** Hashmarks may expose bounded repository-derived graphs already owned by CodeMap and explicit producer-owned correspondence inside repository declarations. It must not turn semantic subjects, roles, or correspondence into a global node/edge registry, infer transitive/symmetric/inverse/reachability relationships, compute semantic graph closure or paths, unify provider vocabularies into a global ontology, persist semantic edges independently of the producer claim that created them, or derive graph confidence/centrality/ranking/precedence. Explicit A↔B and B↔C claims never manufacture A↔C. A general semantic graph or graph query layer is outside the Hashmarks product boundary.
 
 Historical support is a **bounded working-set capability**, not time travel over the repository's lifetime. Hashmarks may retain the small set of explicit authorities useful to an active agent/session or similarly bounded task window, subject to bounded count/time/bytes retention and ordinary eviction. Eviction changes availability/cost, never repository meaning. If an older authority is needed after eviction, the caller or Git must supply/reconstruct that authority again; Hashmarks must not scan backwards through repository history to recover it.
 
@@ -73,7 +74,7 @@ If a proposed identity/history feature requires Hashmarks to manage an evolving 
 
 These are ownership rules, not wording rules. Renaming orchestration as "intelligence", execution policy as "evidence", agent memory as "context", or Git lifecycle as "history management" does not make it Hashmarks functionality. Interoperability transfers evidence, never authority.
 
-Every proposal must therefore answer three negative questions before admission: **does this make Hashmarks more like the agent, more like the execution/certification system, or more like a repository version-control/mutation engine?** If yes, reject it or split out only the repository-derived primitive.
+Every proposal must therefore answer four negative questions before admission: **does this make Hashmarks more like the agent, more like the execution/certification system, more like a repository version-control/mutation engine, or more like a general semantic knowledge graph?** If yes, reject it or split out only the repository-derived primitive.
 
 ## Repository scope boundary: do not chase external libraries
 
@@ -122,6 +123,8 @@ If the result is made true primarily by consumer workflow history, model reasoni
 Repositories may contain several declarations of the same conceptual fact across files, formats, generated metadata, and repository areas. Hashmarks may bind explicitly scoped/provider-normalized declarations to exact repository evidence and report canonical equality/difference, ambiguity, qualified absence, provenance, freshness, identity, and factual deltas.
 
 Hashmarks core must not invent a universal metadata ontology, infer semantic correspondence from similar names or values, rank sources of truth, choose a winning declaration, or turn majority agreement into authority. Producer-specific extraction and normalization terminate at a provider/adapter boundary; context that makes declarations non-comparable must remain in semantic scope rather than being flattened into a false conflict.
+
+Explicit cross-provider correspondence also does not admit a semantic graph. Each correspondence remains a local producer-owned declaration claim. Hashmarks must not persist or compose those claims into inferred edges, transitive closure, reachability, graph paths, ontology equivalence, or graph-derived ranking. If A↔C matters, an explicit producer must own and evidence A↔C rather than relying on A↔B plus B↔C.
 
 The normative contract is [Repository declarations](REPOSITORY_DECLARATIONS.md).
 
@@ -267,6 +270,7 @@ Hashmarks must not take responsibility for behavior whose primary authority belo
 - execution scheduling, process supervision, timeout/retry/resume policy, or environment recovery;
 - runtime result authority or certification;
 - git/worktree lifecycle as part of solving the task;
+- global semantic graph/ontology ownership, persistent semantic edge registries, inferred semantic relationships, transitive closure, semantic reachability/path queries, or graph-derived ranking/precedence;
 - final solution correctness or completion authority.
 
 This is a category rule, not a blacklist. New terminology or implementation techniques do not change ownership.
@@ -338,7 +342,8 @@ Before proposing implementation work, coding agents must first ask:
 
 1. **Does this strengthen Hashmarks' repository-intelligence profile?**
 2. **Does it reduce correctness risk, stale authority, ambiguity, cost, or evidence size within that profile?**
-3. **Or does it merely move more of the consumer/execution workflow into Hashmarks?**
+3. **Does it merely move more of the consumer/execution workflow into Hashmarks?**
+4. **Does it turn bounded semantic identity/correspondence into a general knowledge graph, ontology, edge registry, or transitive relationship engine?**
 
 Prefer correctness, simplification, narrower ownership boundaries, better evidence, better economics, and clearer contracts over feature accumulation.
 

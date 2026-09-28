@@ -20,6 +20,14 @@ A finding is not automatically a requirement. Real-world traces and benchmarks m
 
 Existing implementation surfaces are not automatic precedent. Prefer extending the existing identity/CodeMap/evidence/freshness/delta owners over creating parallel graphs, generations, caches, policy engines, or workflow state.
 
+## Semantic knowledge graph boundary
+
+**Hashmarks must not drift into a semantic knowledge graph.** Semantic subjects, declaration roles, and explicit correspondence are bounded producer-owned repository claims, not nodes and edges in a global graph Hashmarks owns.
+
+Coding agents must not introduce a global semantic node/edge registry, inferred/transitive/symmetric/inverse relationships, semantic reachability or path traversal, transitive closure, connected-component semantics, ontology alignment, persistent relationship edges independent of their producer claim, or graph-derived confidence/ranking/precedence. Explicit A↔B plus B↔C does **not** create A↔C. If A↔C matters, an explicit producer must own and evidence that claim.
+
+Existing CodeMap graphs such as imports, calls, references, dependencies, ownership, and other bounded repository-derived relationships remain valid under their existing owners. That does not authorize turning repository-declaration semantics into a general-purpose knowledge graph, graph database, RDF/triple-store-like authority, or semantic query engine.
+
 ## Evidence authority is non-strengthening
 
 A derived, cached, summarized, ranked, or presentation-layer result must never silently become stronger than the repository evidence and freshness/provenance authority that supports it. Do not turn stale into fresh, unknown into proven, ambiguous into unique, or a consumer/model interpretation into repository truth.

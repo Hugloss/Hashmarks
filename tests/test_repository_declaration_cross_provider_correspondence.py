@@ -161,6 +161,94 @@ class _CrossProviderCorrespondenceProvider:
         )
 
 
+@dataclass
+class _PairCorrespondenceProvider:
+    name: str
+    group_id: str
+    left_provider: str
+    right_provider: str
+    left_path: str
+    right_path: str
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return True
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        left = context.read_text(self.left_path).strip().split(":", 1)[1].strip()
+        right = context.read_text(self.right_path).strip().split(":", 1)[1].strip()
+        return RepositoryDeclarationProviderResult(
+            groups=(
+                {
+                    "group_id": self.group_id,
+                    "concept": {
+                        "kind": "ownership-correspondence",
+                        "identity": self.group_id,
+                    },
+                    "scope": {"environment": "all"},
+                    "correspondence": {
+                        "state": "declared",
+                        "basis": {
+                            "provider": self.name,
+                            "left_provider": self.left_provider,
+                            "right_provider": self.right_provider,
+                            "rule": "explicit-pair-correspondence",
+                        },
+                    },
+                    "declarations": [
+                        {
+                            "declaration_id": "left-owner",
+                            "semantic_role": {"kind": "left-source"},
+                            "value_state": "resolved",
+                            "value": left,
+                            "producer": {
+                                "provider": self.name,
+                                "source_provider": self.left_provider,
+                            },
+                            "evidence": [
+                                {
+                                    "path": self.left_path,
+                                    "start_line": 1,
+                                    "end_line": 1,
+                                }
+                            ],
+                        },
+                        {
+                            "declaration_id": "right-owner",
+                            "semantic_role": {"kind": "right-source"},
+                            "value_state": "resolved",
+                            "value": right,
+                            "producer": {
+                                "provider": self.name,
+                                "source_provider": self.right_provider,
+                            },
+                            "evidence": [
+                                {
+                                    "path": self.right_path,
+                                    "start_line": 1,
+                                    "end_line": 1,
+                                }
+                            ],
+                        },
+                    ],
+                    "coverage": {
+                        "state": "complete",
+                        "truncation": "complete",
+                        "expected_declaration_ids": [
+                            "left-owner",
+                            "right-owner",
+                        ],
+                        "scope": {"environment": "all"},
+                        "provenance": {"provider": self.name},
+                    },
+                },
+            ),
+            provenance={"provider": self.name, "version": "1"},
+        )
+
+
 def _groups(packet: dict[str, object]) -> dict[str, dict[str, object]]:
     return {row["group_id"]: row for row in packet["declarations"]["groups"]}
 
@@ -394,3 +482,178 @@ def test_explicit_cross_provider_correspondence_never_merges_namespaces(
         ambiguous,
     )
     _assert_removing_correlation_preserves_source_authority(ambiguous, removed)
+
+
+def _nontransitive_correspondence_packets(
+    tmp_path: Path,
+) -> tuple[
+    dict[str, object],
+    dict[str, object],
+    dict[str, object],
+]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for name in ("a", "b", "c"):
+        (repo / f"owner-{name}.txt").write_text(
+            "owner: team-a\n",
+            encoding="utf-8",
+        )
+
+    provider_a = _IndependentOwnerProvider("provider-a", "owner-a.txt")
+    provider_b = _IndependentOwnerProvider("provider-b", "owner-b.txt")
+    provider_c = _IndependentOwnerProvider("provider-c", "owner-c.txt")
+    ab = _PairCorrespondenceProvider(
+        name="correlation-ab",
+        group_id="correspondence-ab",
+        left_provider="provider-a",
+        right_provider="provider-b",
+        left_path="owner-a.txt",
+        right_path="owner-b.txt",
+    )
+    bc = _PairCorrespondenceProvider(
+        name="correlation-bc",
+        group_id="correspondence-bc",
+        left_provider="provider-b",
+        right_provider="provider-c",
+        left_path="owner-b.txt",
+        right_path="owner-c.txt",
+    )
+    ac = _PairCorrespondenceProvider(
+        name="correlation-ac",
+        group_id="correspondence-ac",
+        left_provider="provider-a",
+        right_provider="provider-c",
+        left_path="owner-a.txt",
+        right_path="owner-c.txt",
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        chain = codemap.discover_repository_declarations(
+            [provider_a, provider_b, provider_c, ab, bc]
+        )
+
+        (repo / "owner-b.txt").write_text("owner: team-b\n", encoding="utf-8")
+        codemap.sync(["owner-b.txt"])
+        middle_changed = codemap.discover_repository_declarations(
+            [provider_a, provider_b, provider_c, ab, bc],
+            previous_observation=chain,
+        )
+
+        explicit_ac = codemap.discover_repository_declarations(
+            [provider_a, provider_b, provider_c, ab, bc, ac],
+            previous_observation=middle_changed,
+        )
+
+    return chain, middle_changed, explicit_ac
+
+
+def _assert_no_transitive_ac_claim(packet: dict[str, object]) -> None:
+    groups = _groups(packet)
+    assert set(groups) == {
+        "provider-a-owner",
+        "provider-b-owner",
+        "provider-c-owner",
+        "correspondence-ab",
+        "correspondence-bc",
+    }
+    assert "correspondence-ac" not in groups
+    assert len({group["semantic_subject_identity"] for group in groups.values()}) == 5
+    assert groups["correspondence-ab"]["comparison"] == {
+        "state": "equivalent",
+        "distinct_values": ["team-a"],
+    }
+    assert groups["correspondence-bc"]["comparison"] == {
+        "state": "equivalent",
+        "distinct_values": ["team-a"],
+    }
+
+
+def _assert_middle_change_stays_on_explicit_edges(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> None:
+    before_groups = _groups(before)
+    after_groups = _groups(after)
+    assert set(after_groups) == set(before_groups)
+    assert "correspondence-ac" not in after_groups
+
+    for group_id in ("provider-a-owner", "provider-c-owner"):
+        assert (
+            before_groups[group_id]["group_observation_identity"]
+            == after_groups[group_id]["group_observation_identity"]
+        )
+
+    assert after_groups["correspondence-ab"]["comparison"] == {
+        "state": "differing",
+        "distinct_values": ["team-a", "team-b"],
+    }
+    assert after_groups["correspondence-bc"]["comparison"] == {
+        "state": "differing",
+        "distinct_values": ["team-a", "team-b"],
+    }
+
+    provider_delta = after["delta_from_previous"]["providers"]
+    assert provider_delta == {
+        "added": [],
+        "removed": [],
+        "changed": ["correlation-ab", "correlation-bc", "provider-b"],
+    }
+    changed_groups = {
+        row["group_id"]
+        for row in after["delta_from_previous"]["declarations"]["changed_groups"]
+    }
+    assert changed_groups == {
+        "correspondence-ab",
+        "correspondence-bc",
+        "provider-b-owner",
+    }
+    subjects = after["delta_from_previous"]["declarations"]["semantic_subjects"]
+    assert subjects["added"] == []
+    assert subjects["removed"] == []
+    assert subjects["ambiguous"] == []
+    assert {row["current_group_id"] for row in subjects["changed"]} == changed_groups
+
+
+def _assert_ac_exists_only_after_explicit_provider(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> None:
+    before_groups = _groups(before)
+    after_groups = _groups(after)
+    assert set(after_groups) == set(before_groups) | {"correspondence-ac"}
+    for group_id in before_groups:
+        assert (
+            before_groups[group_id]["group_observation_identity"]
+            == after_groups[group_id]["group_observation_identity"]
+        )
+
+    ac = after_groups["correspondence-ac"]
+    assert ac["semantic_namespace"] == "correlation-ac"
+    assert ac["comparison"] == {
+        "state": "equivalent",
+        "distinct_values": ["team-a"],
+    }
+    assert after["delta_from_previous"]["providers"] == {
+        "added": ["correlation-ac"],
+        "removed": [],
+        "changed": [],
+    }
+
+    delta = after["delta_from_previous"]["declarations"]
+    assert delta["added_group_ids"] == ["correspondence-ac"]
+    assert delta["removed_group_ids"] == []
+    assert delta["changed_groups"] == []
+    assert delta["semantic_subjects"]["added"] == [ac["semantic_subject_identity"]]
+    assert delta["semantic_subjects"]["removed"] == []
+    assert delta["semantic_subjects"]["changed"] == []
+    assert delta["semantic_subjects"]["ambiguous"] == []
+
+
+def test_explicit_correspondence_chain_never_creates_transitive_edge(
+    tmp_path: Path,
+) -> None:
+    chain, middle_changed, explicit_ac = _nontransitive_correspondence_packets(tmp_path)
+    _assert_no_transitive_ac_claim(chain)
+    _assert_middle_change_stays_on_explicit_edges(chain, middle_changed)
+    _assert_ac_exists_only_after_explicit_provider(middle_changed, explicit_ac)
