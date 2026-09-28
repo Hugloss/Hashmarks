@@ -1,6 +1,6 @@
 # Derived authority and bounded comparison plan
 
-**Status: implemented baseline; saturation complete.** The derived-authority, endpoint-comparison, typed explanation, native MCP projection, economics, and real-producer dogfood phases are complete. No Hashmarks history store or bounded retention cache is admitted by this program. Any future retention proposal must reopen the economics and product-boundary gates with new measured evidence.
+**Status: implemented baseline; saturation complete.** The derived-authority, endpoint-comparison, typed explanation, native MCP projection, economics, real-producer dogfood, and post-saturation repository-evidence authority follow-through are complete. No Hashmarks history store or bounded retention cache is admitted by this program. Any future retention proposal must reopen the economics and product-boundary gates with new measured evidence.
 
 The governing product boundary remains `PRODUCT_BOUNDARY.md`: Hashmarks observes repository state and evidence. Git owns repository history and mutation. Consumers own the work loop. Historical support, where useful, is a bounded working set rather than repository-lifetime time travel.
 
@@ -349,6 +349,44 @@ Post-saturation adversarial coverage is now complete:
 - evidence-source disappearance is covered as topology/qualification/coverage change without false semantic-resolution churn.
 
 The post-saturation authority attack on PR #199 qualified on head `3e7da07d6437c080e09070e2b22a34fc18ed9045`, CI run `1842`, through the full Python 3.11/3.14, release, standalone, publication, and convergence matrix.
+
+### Repository-evidence authority follow-through saturation
+
+After the original program reached saturation, the adjacent repository-declaration and repository-evidence owners were attacked directly rather than extending the product with new history or workflow machinery. The follow-through now covers:
+
+- declaration definition vs observation transitions for exact evidence moves, disappearance/restoration, producer provenance, and correspondence provenance;
+- declaration-provider lifecycle, warnings vs explicit coverage, provider input/enumeration changes, and provider-selected source relocation;
+- repository evidence locator identity vs content identity, including same bytes at distinct paths and same-content path relocation;
+- range precision vs change-set completeness across overlapping bindings and incomplete caller/repository-observer change sets;
+- member-scoped relationship locality, relationship fact vs locator change, and non-comparability under observer/configuration changes;
+- declared dependency path topology, equal-content path relocation, and shared dependency locality across bindings;
+- explicit evidence multiplicity and scope topology, including duplicate locator count and `lines <-> member` transitions;
+- repository generation/source-identity advancement caused by unrelated changes while unchanged binding semantic observation remains preserved.
+
+Exact-head qualification receipts:
+
+| PR | Qualified head | CI run | Focus |
+| --- | --- | ---: | --- |
+| #201 | `f0e84281bacb34289cff58447dd053775290a213` | 1848 | declaration authority transitions |
+| #202 | `aaa1964ced00928ad9efb2da8dd67ad15161a685` | 1851 | declaration discovery transitions |
+| #203 | `98e33732972a6eeee827d49c870e93eb590ba2e1` | 1854 | repository-evidence path topology |
+| #204 | `186cf1a1bd3dff1e13698f795feb34eb3ed0144b` | 1856 | coverage precision/completeness split |
+| #205 | `8650691ad74e5993d9aac0cf19c77362be6193ac` | 1860 | relationship authority locality |
+| #206 | `8cf3a0952b46becdbfb27dce9e3867bc2938ee85` | 1862 | relationship comparability boundary |
+| #207 | `3296fc8eb3ea81849b3300fb3b0cfbff35e996af` | 1865 | declared dependency topology |
+| #208 | `63cbd2a6aadd3491f3d6cd776e0fa9b3fa66f168` | 1867 | evidence multiplicity/scope topology |
+| #209 | `af323c8c0a3fbed3b66f27f787db1f5c6ce9e018` | 1870 | repository generation vs binding locality |
+
+Each receipt passed the repository's full qualification matrix, including Python 3.11/3.14, release qualification, Linux/WSL and Windows standalone artifacts, publication rehearsal, and qualification convergence.
+
+**Saturation rule:** do not keep producing same-family micro-permutations merely to extend the attack count. Reopen this follow-through only when at least one of these is true:
+
+1. a reproducible defect is found;
+2. a new independent evidence family or producer exercises authority semantics not represented above;
+3. an existing semantic contract, identity input, or comparability rule changes;
+4. measured real-workflow evidence disproves one of the documented locality/completeness assumptions.
+
+When reopened, feed every reproduced defect back into the same branch and attack again until the normal clean-pass discipline is restored. Otherwise, move to a genuinely different semantic owner instead of adding another near-duplicate binding permutation.
 
 Bounded packet eviction/reconstruction is **not an open attack** in this program because no retention layer is admitted. It becomes applicable only if a future, separately approved retention proposal survives the product-boundary and economics gates.
 
