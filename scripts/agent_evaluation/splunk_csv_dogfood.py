@@ -646,9 +646,7 @@ def _report(
             "csv_recovered": state.recovered_count,
             "csv_malformed": state.malformed_count,
             "csv_widened": state.widened_count,
-            "producer_payload_validation_state": (
-                _PRODUCER_PAYLOAD_VALIDATION_STATE
-            ),
+            "producer_payload_validation_state": (_PRODUCER_PAYLOAD_VALIDATION_STATE),
             "parsed_events": state.strict_valid_count + state.recovered_count,
             "events_with_extracted_locator": state.events_with_extracted_locator,
             "events_without_extracted_locator": (
