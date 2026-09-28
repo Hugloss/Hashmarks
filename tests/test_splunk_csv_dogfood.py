@@ -175,23 +175,30 @@ def test_splunk_csv_dogfood_separates_artifact_occurrence_and_observation_identi
 
     quoted_report = collect(quoted)
     unquoted_report = collect(unquoted)
-    assert quoted_report["source"]["artifact_identity"] != (
-        unquoted_report["source"]["artifact_identity"]
+    assert (
+        quoted_report["source"]["artifact_identity"]
+        != (unquoted_report["source"]["artifact_identity"])
     )
-    assert quoted_report["bundle"]["bundle_id"] == unquoted_report["bundle"]["bundle_id"]
+    assert (
+        quoted_report["bundle"]["bundle_id"] == unquoted_report["bundle"]["bundle_id"]
+    )
     quoted_metadata = quoted_report["bundle"]["anchors"][0]["metadata"]
     unquoted_metadata = unquoted_report["bundle"]["anchors"][0]["metadata"]
-    assert quoted_metadata["sample_occurrence_ids"] != (
-        unquoted_metadata["sample_occurrence_ids"]
-    )
-    assert quoted_metadata["sample_event_ids"] == (
+    assert (
         quoted_metadata["sample_occurrence_ids"]
+        != (unquoted_metadata["sample_occurrence_ids"])
     )
-    assert unquoted_metadata["sample_event_ids"] == (
-        unquoted_metadata["sample_occurrence_ids"]
+    assert (
+        quoted_metadata["sample_event_ids"]
+        == (quoted_metadata["sample_occurrence_ids"])
     )
-    assert quoted_metadata["sample_observation_identities"] == (
-        unquoted_metadata["sample_observation_identities"]
+    assert (
+        unquoted_metadata["sample_event_ids"]
+        == (unquoted_metadata["sample_occurrence_ids"])
+    )
+    assert (
+        quoted_metadata["sample_observation_identities"]
+        == (unquoted_metadata["sample_observation_identities"])
     )
 
 
@@ -215,12 +222,14 @@ def test_splunk_csv_dogfood_projection_identity_is_order_independent(
 
     first_report = collect(first)
     reversed_report = collect(reversed_source)
-    assert first_report["source"]["artifact_identity"] != (
-        reversed_report["source"]["artifact_identity"]
+    assert (
+        first_report["source"]["artifact_identity"]
+        != (reversed_report["source"]["artifact_identity"])
     )
     assert first_report["bundle"]["bundle_id"] == reversed_report["bundle"]["bundle_id"]
-    assert first_report["bundle"]["provenance"]["evidence_projection_identity"] == (
-        reversed_report["bundle"]["provenance"]["evidence_projection_identity"]
+    assert (
+        first_report["bundle"]["provenance"]["evidence_projection_identity"]
+        == (reversed_report["bundle"]["provenance"]["evidence_projection_identity"])
     )
     first_observations = {
         identity
