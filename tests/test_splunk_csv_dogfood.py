@@ -481,8 +481,8 @@ def test_splunk_csv_dogfood_preserves_all_traceback_frames_in_one_event(
         source,
         '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
         '"[host]","idx","[host]","Traceback (most recent call last):\n'
-        '  File "/app/src/api/worker.py", line 14, in handle\n'
-        '  File "/app/src/utils/helpers.py", line 7, in parse_result\n'
+        '  File ""/app/src/api/worker.py"", line 14, in handle\n'
+        '  File ""/app/src/utils/helpers.py"", line 7, in parse_result\n'
         'ValueError: bad payload"\n',
     )
 
@@ -512,8 +512,8 @@ def test_splunk_csv_dogfood_counts_repeated_traceback_frame_occurrences(
         source,
         '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
         '"[host]","idx","[host]","Traceback:\n'
-        '  File "/app/src/utils/helpers.py", line 7, in parse_result\n'
-        '  File "/app/src/utils/helpers.py", line 7, in parse_result"\n',
+        '  File ""/app/src/utils/helpers.py"", line 7, in parse_result\n'
+        '  File ""/app/src/utils/helpers.py"", line 7, in parse_result"\n',
     )
 
     report = collect(source)
