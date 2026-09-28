@@ -512,6 +512,9 @@ def test_splunk_csv_dogfood_scope_truncation_is_order_independent(
 
     assert forward_report["bundle"]["scope"] == reverse_report["bundle"]["scope"]
     assert forward_report["bundle"]["scope"]["scope_values_truncated"] is True
+    assert forward_report["bundle"]["truncation"] == "truncated"
+    assert forward_report["summary"]["scope_values_truncated"] is True
+    assert forward_report["summary"]["projection_truncated"] is True
     assert (
         forward_report["bundle"]["bundle_id"] == reverse_report["bundle"]["bundle_id"]
     )
@@ -549,6 +552,9 @@ def test_splunk_csv_dogfood_context_truncation_is_order_independent(
     assert forward_context == reverse_context
     assert forward_context["handling_ident_values_truncated"] is True
     assert forward_context["commit_values_truncated"] is True
+    assert forward_report["bundle"]["truncation"] == "truncated"
+    assert forward_report["summary"]["context_values_truncated"] is True
+    assert forward_report["summary"]["projection_truncated"] is True
     assert (
         forward_report["bundle"]["bundle_id"] == reverse_report["bundle"]["bundle_id"]
     )
@@ -578,6 +584,25 @@ def test_splunk_csv_dogfood_bounds_context_without_splitting_anchor(
     assert len(context["commit_values"]) == 8
     assert context["commit_values_truncated"] is True
     assert context["values_truncated"] is True
+
+
+def test_splunk_csv_dogfood_nontruncated_projection_remains_unknown(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.worker '
+        'handling_ident=[DOC] commit=[REV]"\n',
+    )
+
+    report = collect(source)
+    assert report["bundle"]["truncation"] == "unknown"
+    assert report["summary"]["anchors_truncated"] is False
+    assert report["summary"]["scope_values_truncated"] is False
+    assert report["summary"]["context_values_truncated"] is False
+    assert report["summary"]["projection_truncated"] is False
 
 
 def test_splunk_csv_dogfood_preserves_multiline_record_and_exact_source_identity(
