@@ -206,7 +206,7 @@ A physical source may support several semantic declarations without acquiring se
 
 ## Identity and delta
 
-The contract separates **semantic subject**, **declaration definition**, and **observation** identity.
+The contract separates **semantic subject**, optional **semantic declaration role**, exact **declaration definition**, and **observation** identity.
 
 `semantic_subject_identity` identifies the declared conceptual subject from `semantic_namespace + concept + scope`. It deliberately does **not** bind `group_id`, declaration membership, file path, line/range location, normalized value, coverage, or current repository evidence. Therefore the same namespaced subject keeps the same subject identity when a declaration moves or when a caller uses a different request-local group label. A namespace, scope, or concept change produces a different subject identity.
 
@@ -214,7 +214,9 @@ The namespace is identity scoping, not ontology. Two independent providers that 
 
 A semantic namespace names a semantic contract, not a provider build. Provider implementation/provenance/version may change without changing subject identity when the provider is still making the same namespaced concept/scope claim. If an integration changes what that claim means, it must change the namespace, concept, or scope rather than silently reusing the old subject identity.
 
-This identity is correlation evidence, not ontology authority. Hashmarks does not interpret the opaque concept, infer correspondence, select a winner, or promote the identity into a universal metadata schema. Every projected declaration carries its group's `semantic_subject_identity` so consumers can correlate subject identity separately from exact declaration provenance.
+A declaration may optionally supply a non-empty opaque `semantic_role` object. When present, Hashmarks derives `semantic_declaration_identity` from the already-issued `semantic_subject_identity + semantic_role`. The role is provider vocabulary scoped inside that subject; it is not a global role taxonomy. Request-local `declaration_id`, value, producer metadata, repository path/range, and evidence state do not define this semantic declaration identity. When no role is supplied, Hashmarks deliberately creates no child semantic identity.
+
+These identities are correlation evidence, not ontology authority. Hashmarks does not interpret the opaque concept or semantic role, infer correspondence or child roles, select a winner, or promote either identity into a universal metadata schema. Every projected declaration carries its group's `semantic_subject_identity`; declarations with an explicit role additionally carry `semantic_declaration_identity`, so consumers can correlate provider-declared roles separately from exact declaration provenance.
 
 The remaining identities keep their existing, narrower jobs:
 
@@ -233,7 +235,7 @@ The remaining identities keep their existing, narrower jobs:
 - exact repository-evidence observations;
 - comparison and absence result.
 
-Each declaration likewise has definition and observation identities. A declaration definition binds the group ID, the already-issued \`semantic_subject_identity\`, its request-local declaration ID, and the existing repository-evidence binding definition. Moving a declaration to a different file/range therefore cannot masquerade as the same declaration definition, while namespace/concept/scope canonicalization still has one owner: the semantic subject identity.
+Each declaration likewise has definition and observation identities. A declaration definition binds the group ID, the already-issued \`semantic_subject_identity\`, its optional derived \`semantic_declaration_identity\`, its request-local declaration ID, and the existing repository-evidence binding definition. Moving a declaration to a different file/range therefore cannot masquerade as the same exact declaration definition, even when an explicit semantic role proves that the conceptual child remains the same. Subject and role canonicalization still have one owner inside the declaration domain.
 
 A previous packet is revalidated before delta. Mutation under an old identity is rejected.
 
@@ -242,7 +244,8 @@ The factual delta reports:
 - added/removed groups;
 - whether the provider-declared semantic subject changed for a stable group ID (`semantic_subject_changed`);
 - a `semantic_subjects` projection that correlates unique namespaced subjects even when request-local group IDs change;
-- added/removed semantic subjects and ambiguity when one subject identity maps to multiple groups at either endpoint;
+- optional nested `semantic_declarations` correlation for declarations that explicitly provide a semantic role, including request-local declaration-label change plus value/producer/evidence-qualification transitions;
+- added/removed semantic subjects or semantic declaration roles and explicit ambiguity when one identity maps to multiple candidates at either endpoint;
 - added/removed declarations;
 - declaration/group definition changes;
 - normalized value changes;
@@ -257,7 +260,7 @@ repository evidence and observer-capability change distinct.
 
 A delta does not say whether any change is correct or desirable.
 
-Subject-level delta is intentionally conservative. It correlates endpoints only when one `semantic_subject_identity` maps to exactly one group in both observations. Duplicate subject groups produce `semantic_subjects.ambiguous` with the competing group IDs; Hashmarks does not pick one by order, similarity, declaration count, or value. A request-local `group_id` change can therefore be reported as a subject-level label transition, but it does **not** authorize child declaration pairing because `declaration_id` is request-local. Per-declaration additions/removals, normalized-value changes, producer changes, and evidence-qualification changes are reported at subject level only while the group ID is stable. Group-level comparison/absence/correspondence/coverage transitions may still be compared for a uniquely identified subject. Exact locator/member change remains owned by the nested repository-evidence binding delta.
+Subject-level delta is intentionally conservative. It correlates endpoints only when one `semantic_subject_identity` maps to exactly one group in both observations. Duplicate subject groups produce `semantic_subjects.ambiguous` with the competing group IDs; Hashmarks does not pick one by order, similarity, declaration count, or value. A request-local `group_id` change therefore does **not** authorize pairing ordinary request-local `declaration_id` values. Child correlation across group/declaration-label changes exists only for declarations whose producer explicitly supplied `semantic_role`; the derived `semantic_declaration_identity` must itself be unique at both endpoints. Duplicate roles remain `semantic_declarations.ambiguous`, and untagged declarations remain unpaired. A role change is removal plus addition, never an inferred rename. Group-level comparison/absence/correspondence/coverage transitions may still be compared for a uniquely identified subject. Semantic-role correlation does not strengthen coverage or negative evidence: `coverage.expected_declaration_ids` remains the provider's request-local absence authority. Exact member/span/locator change remains owned by the nested repository-evidence binding delta.
 
 A subject identity is intentionally **not** a branch, commit, ref, snapshot lineage, or retained history node. Hashmarks compares caller-supplied/current observations; Git and the caller remain the owners of repository history and mutation.
 
@@ -281,7 +284,7 @@ schema `hashmarks.repository-declaration-derivation.v1` and reuses, rather than
 redefines:
 
 - the packet observation identity;
-- group and declaration definition/observation identities;
+- group and declaration definition/observation identities plus optional semantic declaration-role identity;
 - exact repository-evidence binding definition/observation identities;
 - the canonical repository-evidence binding packet identity;
 - provider provenance and evidence qualification state;
@@ -532,7 +535,7 @@ This contract does not:
 - generate missing metadata;
 - translate descriptions;
 - repair files;
-- infer semantic correspondence with an LLM;
+- infer semantic correspondence or semantic declaration roles with an LLM;
 - ambiently discover/load Python provider plugins;
 - execute arbitrary declaration providers inside MCP;
 - use majority voting;
