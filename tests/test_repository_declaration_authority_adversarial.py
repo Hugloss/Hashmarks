@@ -67,9 +67,7 @@ def _binding_change(
         "changed"
     ]
     return next(
-        row
-        for row in changed
-        if row["binding_id"] == declaration["binding_id"]
+        row for row in changed if row["binding_id"] == declaration["binding_id"]
     )
 
 
@@ -140,14 +138,13 @@ def test_declaration_evidence_path_move_is_definition_change_not_value_change(
     assert binding_change["member_evidence"]["state"] == "preserved"
 
 
-def test_declaration_evidence_loss_and_restoration_change_observation_not_definition(
+def _loss_restoration_packets(
     tmp_path: Path,
-) -> None:
+) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
     repo = tmp_path / "repo"
     repo.mkdir()
-    primary = repo / "owner-primary.yaml"
+    (repo / "owner-primary.yaml").write_text("owner: team-a\n", encoding="utf-8")
     secondary = repo / "owner-secondary.yaml"
-    primary.write_text("owner: team-a\n", encoding="utf-8")
     secondary.write_text("owner: team-a\n", encoding="utf-8")
     group = _group(
         [
@@ -173,23 +170,24 @@ def test_declaration_evidence_loss_and_restoration_change_observation_not_defini
             [group],
             previous_observation=missing,
         )
+    return present, missing, restored
 
+
+def _assert_evidence_loss(
+    present: dict[str, object],
+    missing: dict[str, object],
+) -> None:
     present_group = present["groups"][0]
     missing_group = missing["groups"][0]
-    restored_group = restored["groups"][0]
     present_secondary = _by_id(present)["secondary"]
     missing_secondary = _by_id(missing)["secondary"]
-    restored_secondary = _by_id(restored)["secondary"]
 
     assert (
         present_secondary["declaration_definition_identity"]
         == missing_secondary["declaration_definition_identity"]
-        == restored_secondary["declaration_definition_identity"]
     )
     assert present_secondary["evidence_state"] == "known-present"
     assert missing_secondary["evidence_state"] == "known-absent"
-    assert restored_secondary["evidence_state"] == "known-present"
-
     assert present_group["comparison"]["state"] == "equivalent"
     assert missing_group["comparison"] == {
         "state": "ambiguous",
@@ -197,8 +195,6 @@ def test_declaration_evidence_loss_and_restoration_change_observation_not_defini
         "unqualified_declaration_ids": ["secondary"],
         "distinct_values": [],
     }
-    assert restored_group["comparison"]["state"] == "equivalent"
-
     assert present_group["absence"]["state"] == "known-present"
     assert missing_group["absence"] == {
         "state": "known-absent",
@@ -206,30 +202,55 @@ def test_declaration_evidence_loss_and_restoration_change_observation_not_defini
         "unseen_expected_declaration_ids": [],
         "unexpected_declaration_ids": [],
     }
-    assert restored_group["absence"]["state"] == "known-present"
 
-    missing_delta = missing["delta_from_previous"]["changed_groups"][0]
-    assert missing_delta["definition_changed"] is False
-    assert missing_delta["value_changed_declaration_ids"] == []
-    assert missing_delta["observation_changed_declaration_ids"] == ["secondary"]
-    assert missing_delta["comparison_changed"] is True
-    assert missing_delta["absence_changed"] is True
+    delta = missing["delta_from_previous"]["changed_groups"][0]
+    assert delta["definition_changed"] is False
+    assert delta["value_changed_declaration_ids"] == []
+    assert delta["observation_changed_declaration_ids"] == ["secondary"]
+    assert delta["comparison_changed"] is True
+    assert delta["absence_changed"] is True
 
-    missing_binding = _binding_change(missing, missing_secondary)
-    assert missing_binding["definition"]["state"] == "preserved"
-    assert missing_binding["member_evidence"]["changes"][0]["state"] == "removed"
+    binding = _binding_change(missing, missing_secondary)
+    assert binding["definition"]["state"] == "preserved"
+    assert binding["member_evidence"]["changes"][0]["state"] == "removed"
 
-    restored_delta = restored["delta_from_previous"]["changed_groups"][0]
-    assert restored_delta["definition_changed"] is False
-    assert restored_delta["value_changed_declaration_ids"] == []
-    assert restored_delta["observation_changed_declaration_ids"] == ["secondary"]
-    assert restored_delta["comparison_changed"] is True
-    assert restored_delta["absence_changed"] is True
 
-    restored_binding = _binding_change(restored, restored_secondary)
-    assert restored_binding["definition"]["state"] == "preserved"
-    assert restored_binding["member_evidence"]["changes"][0]["state"] == "added"
+def _assert_evidence_restoration(
+    missing: dict[str, object],
+    restored: dict[str, object],
+) -> None:
+    missing_secondary = _by_id(missing)["secondary"]
+    restored_secondary = _by_id(restored)["secondary"]
 
+    assert (
+        missing_secondary["declaration_definition_identity"]
+        == restored_secondary["declaration_definition_identity"]
+    )
+    assert missing_secondary["evidence_state"] == "known-absent"
+    assert restored_secondary["evidence_state"] == "known-present"
+    assert missing["groups"][0]["comparison"]["state"] == "ambiguous"
+    assert restored["groups"][0]["comparison"]["state"] == "equivalent"
+    assert missing["groups"][0]["absence"]["state"] == "known-absent"
+    assert restored["groups"][0]["absence"]["state"] == "known-present"
+
+    delta = restored["delta_from_previous"]["changed_groups"][0]
+    assert delta["definition_changed"] is False
+    assert delta["value_changed_declaration_ids"] == []
+    assert delta["observation_changed_declaration_ids"] == ["secondary"]
+    assert delta["comparison_changed"] is True
+    assert delta["absence_changed"] is True
+
+    binding = _binding_change(restored, restored_secondary)
+    assert binding["definition"]["state"] == "preserved"
+    assert binding["member_evidence"]["changes"][0]["state"] == "added"
+
+
+def test_declaration_evidence_loss_and_restoration_change_observation_not_definition(
+    tmp_path: Path,
+) -> None:
+    present, missing, restored = _loss_restoration_packets(tmp_path)
+    _assert_evidence_loss(present, missing)
+    _assert_evidence_restoration(missing, restored)
 
 def test_declaration_producer_provenance_change_is_observation_only(
     tmp_path: Path,
@@ -260,9 +281,10 @@ def test_declaration_producer_provenance_change_is_observation_only(
         before_declaration["declaration_observation_identity"]
         != after_declaration["declaration_observation_identity"]
     )
-    assert before["groups"][0]["group_definition_identity"] == after["groups"][0][
-        "group_definition_identity"
-    ]
+    assert (
+        before["groups"][0]["group_definition_identity"]
+        == after["groups"][0]["group_definition_identity"]
+    )
     assert before["groups"][0]["comparison"] == after["groups"][0]["comparison"]
 
     changed = after["delta_from_previous"]["changed_groups"][0]
