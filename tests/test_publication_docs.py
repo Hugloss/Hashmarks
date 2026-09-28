@@ -180,6 +180,34 @@ def test_public_docs_expose_typed_declaration_derivation() -> None:
     assert "MCP `result_mode` is transport vocabulary only" in state
 
 
+def test_semantic_identity_is_documented_without_repository_history_ownership() -> None:
+    docs = _text("docs/README.md")
+    architecture = _text("docs/reference/ARCHITECTURE.md")
+    boundary = _text("docs/reference/PRODUCT_BOUNDARY.md")
+    invariants = _text("docs/reference/INVARIANTS.md")
+    declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")
+    owners = _text("docs/reference/STATE_AND_SEMANTIC_OWNERS.md")
+    decision = _text(
+        "docs/maintainers/SEMANTIC_IDENTITY_WITHOUT_REPOSITORY_OWNERSHIP.md"
+    )
+
+    assert "SEMANTIC_IDENTITY_WITHOUT_REPOSITORY_OWNERSHIP.md" in docs
+    assert "### Semantic identity layers" in architecture
+    assert "semantic_subject_identity" in declarations
+    assert "semantic_subject_changed" in declarations
+    assert "G69. Semantic-subject identity" in invariants
+    assert "Declaration semantic subject identity" in owners
+    assert "New semantic owner introduced: NO" in owners
+    assert "Identity without ownership; compare without mutation" in boundary
+    assert "no history store and no retention layer" in decision
+    for forbidden_owner in (
+        "Hashmarks owns branch management",
+        "Hashmarks owns merge",
+        "Hashmarks owns repository history",
+    ):
+        assert forbidden_owner not in decision
+
+
 def test_derived_authority_economics_remains_diagnostic_only() -> None:
     makefile = _text("Makefile")
     plan = _text("docs/maintainers/DERIVED_AUTHORITY_AND_BOUNDED_COMPARISON_PLAN.md")
