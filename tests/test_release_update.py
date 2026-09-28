@@ -259,7 +259,7 @@ def test_periodic_external_installation_reports_update_without_manager_selection
             latest_version="0.25.0",
         ),
     )
-    monkeypatch.setattr(cli, "is_standalone_installation", lambda: False)
+    monkeypatch.setattr(cli, "standalone_upgrade_command", lambda version: None)
     monkeypatch.setattr(
         cli,
         "_prompt_upgrade",
