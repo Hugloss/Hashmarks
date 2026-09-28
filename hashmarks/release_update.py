@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import posixpath
 import re
 import shlex
 import shutil
@@ -41,13 +40,6 @@ class ReleaseInfo:
     @property
     def update_available(self) -> bool:
         return _version_key(self.latest_version) > _version_key(self.current_version)
-
-
-@dataclass(frozen=True)
-class InstallationOwner:
-    kind: str
-    label: str
-    command: tuple[str, ...] | None
 
 
 def _version_key(version: str) -> tuple[int, int, int]:
@@ -258,241 +250,19 @@ def periodic_release_check(
     return release
 
 
-def _normalized_managed_path(value: str, *, windows: bool) -> str:
-    normalized = posixpath.normpath(value.replace("\\", "/"))
-    return normalized.casefold() if windows else normalized
+def is_standalone_installation() -> bool:
+    if not getattr(sys, "frozen", False):
+        return False
+    installed_name = "hashmarks.exe" if os.name == "nt" else "hashmarks"
+    return Path(sys.executable).name.casefold() == installed_name
 
 
-def _join_managed_path(
-    root: str,
-    *parts: str,
-    windows: bool,
-) -> str:
-    combined = "/".join((root.rstrip("/\\"), *parts))
-    return _normalized_managed_path(combined, windows=windows)
-
-
-def _uv_tool_roots(
-    *,
-    environ: Mapping[str, str],
-    home: str,
-    windows: bool,
-) -> tuple[str, ...]:
-    uv_tool_dir = environ.get("UV_TOOL_DIR")
-    if uv_tool_dir:
-        return (_join_managed_path(uv_tool_dir, "hashmarks", windows=windows),)
-    if windows:
-        appdata = environ.get("APPDATA")
-        if appdata is None:
-            return ()
-        return (
-            _join_managed_path(
-                appdata,
-                "uv",
-                "data",
-                "tools",
-                "hashmarks",
-                windows=True,
-            ),
-        )
-    data_home = environ.get("XDG_DATA_HOME") or f"{home}/.local/share"
-    return (
-        _join_managed_path(
-            data_home,
-            "uv",
-            "tools",
-            "hashmarks",
-            windows=False,
-        ),
-    )
-
-
-def _pipx_tool_roots(
-    *,
-    environ: Mapping[str, str],
-    home: str,
-    windows: bool,
-    platform: str,
-) -> tuple[str, ...]:
-    pipx_home = environ.get("PIPX_HOME")
-    if pipx_home:
-        return (
-            _join_managed_path(
-                pipx_home,
-                "venvs",
-                "hashmarks",
-                windows=windows,
-            ),
-        )
-    if windows:
-        local_appdata = environ.get("LOCALAPPDATA")
-        defaults = (
-            ()
-            if local_appdata is None
-            else (
-                _join_managed_path(
-                    local_appdata,
-                    "pipx",
-                    "pipx",
-                    "venvs",
-                    "hashmarks",
-                    windows=True,
-                ),
-            )
-        )
-        legacy = _join_managed_path(
-            home,
-            "pipx",
-            "venvs",
-            "hashmarks",
-            windows=True,
-        )
-        return (*defaults, legacy)
-    if platform == "darwin":
-        default = _join_managed_path(
-            home,
-            "Library",
-            "Application Support",
-            "pipx",
-            "venvs",
-            "hashmarks",
-            windows=False,
-        )
-    else:
-        data_home = environ.get("XDG_DATA_HOME") or f"{home}/.local/share"
-        default = _join_managed_path(
-            data_home,
-            "pipx",
-            "venvs",
-            "hashmarks",
-            windows=False,
-        )
-    legacy = _join_managed_path(
-        home,
-        ".local",
-        "pipx",
-        "venvs",
-        "hashmarks",
-        windows=False,
-    )
-    return default, legacy
-
-
-def _pipx_global_tool_roots(
-    *,
-    environ: Mapping[str, str],
-    windows: bool,
-) -> tuple[str, ...]:
-    if windows:
-        return ()
-    pipx_global_home = environ.get("PIPX_GLOBAL_HOME")
-    if pipx_global_home:
-        return (
-            _join_managed_path(
-                pipx_global_home,
-                "venvs",
-                "hashmarks",
-                windows=False,
-            ),
-        )
-    return (
-        _join_managed_path(
-            "/opt/pipx",
-            "venvs",
-            "hashmarks",
-            windows=False,
-        ),
-    )
-
-
-def _managed_python_tool_roots(
-    *,
-    environ: Mapping[str, str],
-    home: str,
-    os_name: str,
-    platform: str,
-) -> dict[str, tuple[str, ...]]:
-    windows = os_name == "nt"
-    return {
-        "uv": _uv_tool_roots(
-            environ=environ,
-            home=home,
-            windows=windows,
-        ),
-        "pipx": _pipx_tool_roots(
-            environ=environ,
-            home=home,
-            windows=windows,
-            platform=platform,
-        ),
-        "pipx-global": _pipx_global_tool_roots(
-            environ=environ,
-            windows=windows,
-        ),
-    }
-
-
-def _detect_python_installation_owner(
-    *,
-    prefix: str,
-    base_prefix: str,
-    environ: Mapping[str, str],
-    home: str,
-    os_name: str,
-    platform: str,
-) -> InstallationOwner:
-    windows = os_name == "nt"
-    managed_prefix = _normalized_managed_path(prefix, windows=windows)
-    roots = _managed_python_tool_roots(
-        environ=environ,
-        home=home,
-        os_name=os_name,
-        platform=platform,
-    )
-    if managed_prefix in roots["uv"]:
-        return InstallationOwner("uv", "uv", ("uv", "tool", "upgrade", "hashmarks"))
-    if managed_prefix in roots["pipx"]:
-        return InstallationOwner("pipx", "pipx", ("pipx", "upgrade", "hashmarks"))
-    if managed_prefix in roots["pipx-global"]:
-        return InstallationOwner(
-            "pipx-global",
-            "pipx (global)",
-            ("pipx", "upgrade", "--global", "hashmarks"),
-        )
-    managed_base_prefix = _normalized_managed_path(base_prefix, windows=windows)
-    if managed_prefix != managed_base_prefix:
-        return InstallationOwner("environment", "the current Python environment", None)
-    return InstallationOwner("unknown", "an unknown installation owner", None)
-
-
-def detect_installation_owner() -> InstallationOwner:
-    if getattr(sys, "frozen", False):
-        installed_name = "hashmarks.exe" if os.name == "nt" else "hashmarks"
-        if Path(sys.executable).name.casefold() == installed_name:
-            return InstallationOwner(
-                "standalone", "Hashmarks standalone installer", None
-            )
-        return InstallationOwner(
-            "frozen-unmanaged",
-            "an unmanaged standalone executable",
-            None,
-        )
-    return _detect_python_installation_owner(
-        prefix=str(Path(sys.prefix).resolve()),
-        base_prefix=str(Path(sys.base_prefix).resolve()),
-        environ=os.environ,
-        home=str(Path.home()),
-        os_name=os.name,
-        platform=sys.platform,
-    )
-
-
-def manual_upgrade_command(owner: InstallationOwner, latest_version: str) -> str | None:
+def standalone_upgrade_command(latest_version: str) -> str | None:
     _version_key(latest_version)
-    if owner.command is not None:
-        return " ".join(owner.command)
+    if not is_standalone_installation():
+        return None
     tag = f"v{latest_version}"
-    if owner.kind == "standalone" and os.name == "nt":
+    if os.name == "nt":
         url = f"{_RELEASE_DOWNLOAD}/{tag}/install.ps1"
         install_dir = str(Path(sys.executable).resolve().parent).replace("'", "''")
         return (
@@ -500,21 +270,20 @@ def manual_upgrade_command(owner: InstallationOwner, latest_version: str) -> str
             f"$env:HASHMARKS_INSTALL_DIR='{install_dir}'; "
             f"Invoke-RestMethod {url} | Invoke-Expression"
         )
-    if owner.kind == "standalone":
-        url = f"{_RELEASE_DOWNLOAD}/{tag}/install.sh"
-        install_dir = shlex.quote(str(Path(sys.executable).resolve().parent))
-        return (
-            f"curl -fsSL {url} | HASHMARKS_VERSION={latest_version} "
-            f"HASHMARKS_INSTALL_DIR={install_dir} sh"
-        )
-    return None
+    url = f"{_RELEASE_DOWNLOAD}/{tag}/install.sh"
+    install_dir = shlex.quote(str(Path(sys.executable).resolve().parent))
+    return (
+        f"curl -fsSL {url} | HASHMARKS_VERSION={latest_version} "
+        f"HASHMARKS_INSTALL_DIR={install_dir} sh"
+    )
 
 
 def _standalone_exec_target(latest_version: str) -> tuple[str, tuple[str, ...]]:
-    owner = InstallationOwner("standalone", "Hashmarks standalone installer", None)
-    command = manual_upgrade_command(owner, latest_version)
+    command = standalone_upgrade_command(latest_version)
     if command is None:
-        raise UpgradeDelegationError("standalone upgrade command is unavailable")
+        raise UpgradeDelegationError(
+            "this installation is not managed by the Hashmarks standalone installer"
+        )
     if os.name == "nt":
         executable = shutil.which("pwsh") or shutil.which("powershell")
         if executable is None:
@@ -534,12 +303,12 @@ def _standalone_exec_target(latest_version: str) -> tuple[str, tuple[str, ...]]:
     return executable, (executable, "-c", command)
 
 
-def can_delegate_upgrade(owner: InstallationOwner) -> bool:
-    if owner.kind == "standalone":
-        if os.name == "nt":
-            return bool(shutil.which("pwsh") or shutil.which("powershell"))
-        return shutil.which("sh") is not None and shutil.which("curl") is not None
-    return owner.command is not None and shutil.which(owner.command[0]) is not None
+def can_delegate_standalone_upgrade() -> bool:
+    if not is_standalone_installation():
+        return False
+    if os.name == "nt":
+        return bool(shutil.which("pwsh") or shutil.which("powershell"))
+    return shutil.which("sh") is not None and shutil.which("curl") is not None
 
 
 def _exec_owner(
@@ -555,23 +324,10 @@ def _exec_owner(
         ) from exc
 
 
-def delegate_upgrade(
-    owner: InstallationOwner,
-    latest_version: str,
-) -> None:
+def delegate_standalone_upgrade(latest_version: str) -> None:
     _version_key(latest_version)
+    executable, argv = _standalone_exec_target(latest_version)
     environment = os.environ.copy()
     environment["HASHMARKS_VERSION"] = latest_version
-    if owner.kind == "standalone":
-        executable, argv = _standalone_exec_target(latest_version)
-        _exec_owner(executable, argv, environment)
-        return
-    if owner.command is None:
-        raise UpgradeDelegationError("Hashmarks cannot mutate this installation")
-    executable = shutil.which(owner.command[0])
-    if executable is None:
-        raise UpgradeDelegationError(
-            f"{owner.command[0]} is not on PATH; run the printed command manually"
-        )
-    argv = (executable, *owner.command[1:])
     _exec_owner(executable, argv, environment)
+
