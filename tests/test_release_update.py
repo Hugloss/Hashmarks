@@ -420,5 +420,4 @@ def test_standalone_delegation_executes_the_displayed_native_command(
         assert argv[-1] == displayed
     else:
         assert argv == ("/tools/sh", "-c", displayed)
-    assert seen["version"] == "0.25.0"
-
+    assert seen["version"] == "0.25.0"\n
