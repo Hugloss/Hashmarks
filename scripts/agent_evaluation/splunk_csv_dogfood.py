@@ -26,7 +26,7 @@ EXPECTED_HEADER = (
     "splunk_server",
     "_raw",
 )
-_RECORD_START = re.compile(r'^"[^"]*","\d{4}-\d{2}-\d{2}T')
+_TIMESTAMP_START = re.compile(r"^\d{4}-\d{2}-\d{2}T")
 _MODULE = re.compile(r"\bname=([A-Za-z_][A-Za-z0-9_.]*)")
 _TRACEBACK = re.compile(
     r'File\s+"?([^",]+)"?,\s+line\s+(\d+),\s+in\s+([A-Za-z_][A-Za-z0-9_]*)'
@@ -83,11 +83,25 @@ def _sha256_file(path: Path) -> str:
     return "sha256:" + digest.hexdigest()
 
 
+def _starts_logical_record(line: str) -> bool:
+    """Recognize a Splunk row from its parsed stable CSV prefix."""
+    try:
+        rows = list(csv.reader([line], strict=False))
+    except csv.Error:
+        return False
+    if len(rows) != 1:
+        return False
+    row = rows[0]
+    if len(row) < len(EXPECTED_HEADER):
+        return False
+    return bool(_TIMESTAMP_START.match(row[1]))
+
+
 def _logical_records(handle: TextIO):
     current: list[str] = []
     ordinal = 0
     for line in handle:
-        if _RECORD_START.match(line):
+        if _starts_logical_record(line):
             if current:
                 yield ordinal, "".join(current)
                 ordinal += 1
