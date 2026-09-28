@@ -29,10 +29,7 @@ def _bindings() -> list[dict[str, object]]:
 
 
 def _delta_by_id(delta: dict[str, object]) -> dict[str, dict[str, object]]:
-    return {
-        row["binding_id"]: row
-        for row in delta["bindings"]["changed"]
-    }
+    return {row["binding_id"]: row for row in delta["bindings"]["changed"]}
 
 
 def test_relationship_fact_change_is_path_shared_but_range_impact_stays_local(
