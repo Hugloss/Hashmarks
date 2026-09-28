@@ -35,8 +35,11 @@ _HANDLING_IDENT = re.compile(r"\bhandling_ident=([^\s]+)")
 _COMMIT_VALUE = re.compile(r"\bcommit=([^\s]+)")
 _MAX_SCOPE_VALUES = 32
 _MAX_ANCHOR_CONTEXT_VALUES = 8
+_MAX_IDENTITY_SAMPLES = 3
 _MAX_UNLOCATED_SAMPLE_EVENT_IDS = 3
 _DEFAULT_MAX_ANCHORS = 256
+_NORMALIZED_OBSERVATION_SCHEMA = "hashmarks.splunk-normalized-observation.v1"
+_EVIDENCE_PROJECTION_SCHEMA = "hashmarks.splunk-evidence-projection.v1"
 
 
 @dataclass(frozen=True)
@@ -53,7 +56,8 @@ class _ModuleStats:
     widened: int = 0
     first_time: str | None = None
     last_time: str | None = None
-    sample_event_ids: list[str] = field(default_factory=list)
+    sample_occurrence_ids: list[str] = field(default_factory=list)
+    sample_observation_identities: list[str] = field(default_factory=list)
     handling_idents: set[str] = field(default_factory=set)
     commit_values: set[str] = field(default_factory=set)
     handling_idents_truncated: bool = False
@@ -65,7 +69,8 @@ class _ModuleStats:
         timestamp: str,
         parser_state: str,
         widened: bool,
-        event_id: str,
+        occurrence_id: str,
+        observation_identity: str,
         context: _OpaqueRuntimeContext,
     ) -> None:
         self.count += 1
@@ -78,8 +83,13 @@ class _ModuleStats:
         self.last_time = (
             timestamp if self.last_time is None else max(self.last_time, timestamp)
         )
-        if len(self.sample_event_ids) < 3:
-            self.sample_event_ids.append(event_id)
+        if len(self.sample_occurrence_ids) < _MAX_IDENTITY_SAMPLES:
+            self.sample_occurrence_ids.append(occurrence_id)
+        _bounded_sorted_sample(
+            self.sample_observation_identities,
+            observation_identity,
+            limit=_MAX_IDENTITY_SAMPLES,
+        )
         self.handling_idents_truncated |= _bounded_value(
             self.handling_idents,
             context.handling_ident,
@@ -183,6 +193,40 @@ def _bounded_value(
     return False
 
 
+def _bounded_sorted_sample(values: list[str], value: str, *, limit: int) -> None:
+    if value in values:
+        return
+    values.append(value)
+    values.sort()
+    del values[limit:]
+
+
+def _identity_json(value: object) -> str:
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _normalized_observation_identity(parsed: _ParsedRecord) -> str:
+    _serial, timestamp, source, sourcetype, host, index, server = parsed.fields
+    return _identity_json(
+        {
+            "schema": _NORMALIZED_OBSERVATION_SCHEMA,
+            "_time": timestamp,
+            "source": source,
+            "sourcetype": sourcetype,
+            "host": host,
+            "index": index,
+            "splunk_server": server,
+            "_raw": parsed.raw,
+        }
+    )
+
+
 def _opaque_runtime_context(raw: str) -> _OpaqueRuntimeContext:
     handling_match = _HANDLING_IDENT.search(raw)
     commit_match = _COMMIT_VALUE.search(raw)
@@ -192,7 +236,8 @@ def _opaque_runtime_context(raw: str) -> _OpaqueRuntimeContext:
     )
 
 
-def _event_id(ordinal: int, text: str) -> str:
+def _occurrence_id(ordinal: int, text: str) -> str:
+    """Artifact-local source occurrence reference; not semantic event identity."""
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
     return f"event:{ordinal:06d}:sha256:{digest}"
 
@@ -209,7 +254,9 @@ def _stats_metadata(stats: _ModuleStats) -> dict[str, object]:
         "widened_count": stats.widened,
         "first_time": stats.first_time,
         "last_time": stats.last_time,
-        "sample_event_ids": stats.sample_event_ids,
+        "sample_event_ids": stats.sample_occurrence_ids,
+        "sample_occurrence_ids": stats.sample_occurrence_ids,
+        "sample_observation_identities": stats.sample_observation_identities,
         "runtime_context": {
             "handling_ident_values": sorted(stats.handling_idents),
             "handling_ident_values_truncated": stats.handling_idents_truncated,
@@ -266,7 +313,8 @@ class _CollectionState:
     events_without_extracted_locator: int = 0
     module_locator_occurrences: int = 0
     traceback_locator_occurrences: int = 0
-    unlocated_sample_event_ids: list[str] = field(default_factory=list)
+    unlocated_sample_occurrence_ids: list[str] = field(default_factory=list)
+    unlocated_sample_observation_identities: list[str] = field(default_factory=list)
     physical_lines: int = 1
     first_time: str | None = None
     last_time: str | None = None
@@ -295,10 +343,23 @@ class _CollectionState:
         self.widened_count += int(parsed.widened)
         _serial, timestamp, source, sourcetype, host, index, server = parsed.fields
         self._observe_scope(timestamp, source, sourcetype, host, index, server)
-        event_id = _event_id(ordinal, text)
+        occurrence_id = _occurrence_id(ordinal, text)
+        observation_identity = _normalized_observation_identity(parsed)
         context = _opaque_runtime_context(parsed.raw)
-        module_found = self._observe_module(parsed, timestamp, event_id, context)
-        traceback_found = self._observe_traceback(parsed, timestamp, event_id, context)
+        module_found = self._observe_module(
+            parsed,
+            timestamp,
+            occurrence_id,
+            observation_identity,
+            context,
+        )
+        traceback_found = self._observe_traceback(
+            parsed,
+            timestamp,
+            occurrence_id,
+            observation_identity,
+            context,
+        )
         locator_occurrences = int(module_found) + int(traceback_found)
         self.module_locator_occurrences += int(module_found)
         self.traceback_locator_occurrences += int(traceback_found)
@@ -306,8 +367,16 @@ class _CollectionState:
             self.events_with_extracted_locator += 1
         else:
             self.events_without_extracted_locator += 1
-            if len(self.unlocated_sample_event_ids) < _MAX_UNLOCATED_SAMPLE_EVENT_IDS:
-                self.unlocated_sample_event_ids.append(event_id)
+            if (
+                len(self.unlocated_sample_occurrence_ids)
+                < _MAX_UNLOCATED_SAMPLE_EVENT_IDS
+            ):
+                self.unlocated_sample_occurrence_ids.append(occurrence_id)
+            _bounded_sorted_sample(
+                self.unlocated_sample_observation_identities,
+                observation_identity,
+                limit=_MAX_UNLOCATED_SAMPLE_EVENT_IDS,
+            )
 
     def _observe_scope(
         self,
@@ -334,7 +403,8 @@ class _CollectionState:
         self,
         parsed: _ParsedRecord,
         timestamp: str,
-        event_id: str,
+        occurrence_id: str,
+        observation_identity: str,
         context: _OpaqueRuntimeContext,
     ) -> bool:
         match = _MODULE.search(parsed.raw)
@@ -346,7 +416,8 @@ class _CollectionState:
             timestamp=timestamp,
             parser_state=parsed.parser_state,
             widened=parsed.widened,
-            event_id=event_id,
+            occurrence_id=occurrence_id,
+            observation_identity=observation_identity,
             context=context,
         )
         return True
@@ -355,7 +426,8 @@ class _CollectionState:
         self,
         parsed: _ParsedRecord,
         timestamp: str,
-        event_id: str,
+        occurrence_id: str,
+        observation_identity: str,
         context: _OpaqueRuntimeContext,
     ) -> bool:
         match = _TRACEBACK.search(parsed.raw)
@@ -367,7 +439,8 @@ class _CollectionState:
             timestamp=timestamp,
             parser_state=parsed.parser_state,
             widened=parsed.widened,
-            event_id=event_id,
+            occurrence_id=occurrence_id,
+            observation_identity=observation_identity,
             context=context,
         )
         return True
@@ -427,19 +500,86 @@ def _select_anchors(
     )
 
 
+def _scope(state: _CollectionState) -> dict[str, object]:
+    return {
+        "time_start": state.first_time,
+        "time_end": state.last_time,
+        "sources": sorted(state.sources),
+        "sourcetypes": sorted(state.sourcetypes),
+        "hosts": sorted(state.hosts),
+        "indexes": sorted(state.indexes),
+        "splunk_servers": sorted(state.splunk_servers),
+        "scope_values_truncated": state.scope_values_truncated,
+    }
+
+
+def _identity_anchor(anchor: dict[str, object]) -> dict[str, object]:
+    result = dict(anchor)
+    metadata = result.get("metadata")
+    if isinstance(metadata, dict):
+        stable_metadata = dict(metadata)
+        stable_metadata.pop("sample_event_ids", None)
+        stable_metadata.pop("sample_occurrence_ids", None)
+        result["metadata"] = stable_metadata
+    return result
+
+
+def _evidence_projection_identity(
+    state: _CollectionState,
+    selection: _AnchorSelection,
+) -> str:
+    anchors = sorted(
+        (_identity_anchor(anchor) for anchor in selection.anchors),
+        key=lambda anchor: str(anchor["anchor_id"]),
+    )
+    return _identity_json(
+        {
+            "schema": _EVIDENCE_PROJECTION_SCHEMA,
+            "producer": {
+                "kind": "splunk-style",
+                "format": "csv-export",
+            },
+            "completeness": "unknown",
+            "truncation": "truncated" if selection.truncated else "unknown",
+            "scope": _scope(state),
+            "accounting": {
+                "logical_event_count": state.event_count,
+                "strict_valid_count": state.strict_valid_count,
+                "recovered_count": state.recovered_count,
+                "malformed_count": state.malformed_count,
+                "widened_count": state.widened_count,
+                "events_with_extracted_locator": state.events_with_extracted_locator,
+                "events_without_extracted_locator": (
+                    state.events_without_extracted_locator
+                ),
+                "locator_occurrences": (
+                    state.module_locator_occurrences
+                    + state.traceback_locator_occurrences
+                ),
+            },
+            "anchors": anchors,
+        }
+    )
+
+
 def _bundle(
     source_sha256: str,
     state: _CollectionState,
     selection: _AnchorSelection,
 ) -> dict[str, object]:
+    projection_identity = _evidence_projection_identity(state, selection)
     return {
-        "bundle_id": "splunk-export:" + source_sha256.removeprefix("sha256:")[:32],
+        "bundle_id": (
+            "splunk-evidence:" + projection_identity.removeprefix("sha256:")
+        ),
         "producer": {
             "kind": "splunk-style",
             "format": "csv-export",
         },
         "provenance": {
             "source_sha256": source_sha256,
+            "source_artifact_identity": source_sha256,
+            "evidence_projection_identity": projection_identity,
             "logical_event_count": state.event_count,
             "physical_line_count": state.physical_lines,
             "strict_valid_count": state.strict_valid_count,
@@ -453,20 +593,17 @@ def _bundle(
             "locator_occurrences": (
                 state.module_locator_occurrences + state.traceback_locator_occurrences
             ),
-            "unlocated_sample_event_ids": state.unlocated_sample_event_ids,
+            "unlocated_sample_event_ids": state.unlocated_sample_occurrence_ids,
+            "unlocated_sample_occurrence_ids": (
+                state.unlocated_sample_occurrence_ids
+            ),
+            "unlocated_sample_observation_identities": (
+                state.unlocated_sample_observation_identities
+            ),
         },
         "completeness": "unknown",
         "truncation": "truncated" if selection.truncated else "unknown",
-        "scope": {
-            "time_start": state.first_time,
-            "time_end": state.last_time,
-            "sources": sorted(state.sources),
-            "sourcetypes": sorted(state.sourcetypes),
-            "hosts": sorted(state.hosts),
-            "indexes": sorted(state.indexes),
-            "splunk_servers": sorted(state.splunk_servers),
-            "scope_values_truncated": state.scope_values_truncated,
-        },
+        "scope": _scope(state),
         "anchors": selection.anchors,
     }
 
@@ -482,6 +619,7 @@ def _report(
         "source": {
             "path": str(path),
             "sha256": source_sha256,
+            "artifact_identity": source_sha256,
         },
         "summary": {
             "events": state.event_count,
