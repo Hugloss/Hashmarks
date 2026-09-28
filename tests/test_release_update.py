@@ -437,6 +437,38 @@ def test_native_uv_delegation_replaces_hashmarks_process(monkeypatch) -> None:
     }
 
 
+def test_periodic_cli_check_accepts_global_pipx_owner(monkeypatch) -> None:
+    owner = InstallationOwner(
+        kind="pipx-global",
+        label="pipx (global)",
+        command=("pipx", "upgrade", "--global", "hashmarks"),
+    )
+    calls: list[tuple[str, str, bool]] = []
+
+    monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
+    monkeypatch.setattr(
+        cli,
+        "automatic_check_allowed",
+        lambda *, command, interactive: command == "find" and interactive,
+    )
+    monkeypatch.setattr(cli, "detect_installation_owner", lambda: owner)
+
+    def periodic(
+        current_version: str,
+        *,
+        command: str,
+        interactive: bool,
+    ) -> None:
+        calls.append((current_version, command, interactive))
+        return None
+
+    monkeypatch.setattr(cli, "periodic_release_check", periodic)
+
+    cli._maybe_offer_periodic_upgrade("find")
+
+    assert calls == [("0.24.0", "find", True)]
+
+
 def test_periodic_cli_check_skips_unmanaged_installation(monkeypatch) -> None:
     owner = InstallationOwner(
         kind="environment",
