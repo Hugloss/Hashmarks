@@ -1173,10 +1173,7 @@ def _assert_cross_provider_namespace_isolation(
     assert declaration_a["binding_id"] == declaration_b["binding_id"]
     assert group_a["semantic_namespace"] == "provider-a"
     assert group_b["semantic_namespace"] == "provider-b"
-    assert (
-        group_a["semantic_subject_identity"]
-        != group_b["semantic_subject_identity"]
-    )
+    assert group_a["semantic_subject_identity"] != group_b["semantic_subject_identity"]
     assert (
         declaration_a["semantic_declaration_identity"]
         != declaration_b["semantic_declaration_identity"]
@@ -1231,9 +1228,10 @@ def _assert_provider_version_is_not_semantic_identity(
         before_declaration["semantic_declaration_identity"]
         == after_declaration["semantic_declaration_identity"]
     )
-    assert before["declarations"]["observation_identity"] == after["declarations"][
-        "observation_identity"
-    ]
+    assert (
+        before["declarations"]["observation_identity"]
+        == after["declarations"]["observation_identity"]
+    )
     assert _nested_delta(after)["changed_groups"] == []
     assert _nested_delta(after)["semantic_subjects"] == {
         "added": [],
