@@ -33,7 +33,7 @@ EXPECTED_HEADER = (
     "_raw",
 )
 _TIMESTAMP_START = re.compile(r"^\d{4}-\d{2}-\d{2}T")
-_MODULE = re.compile(r"\bname=([^\s]+)")
+_MODULE = re.compile(r'\bname=([^"\s]+)')
 _TRACEBACK = re.compile(
     r'File\s+(?:"([^"]+)"|"?([^",\r\n]+)"?),'
     r'\s+line\s+(\d+),\s+in\s+([^"\r\n]+)'
