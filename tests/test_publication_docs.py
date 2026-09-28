@@ -203,7 +203,6 @@ def test_semantic_identity_is_documented_without_repository_history_ownership() 
     assert "G69. Semantic-subject identity" in invariants
     assert "G70. Semantic-subject delta" in invariants
     assert "G71. Semantic declaration identity" in invariants
-    assert "G72. Semantic identity reappearance" in invariants
     assert "Declaration semantic subject identity" in owners
     assert "Declaration semantic role identity" in owners
     assert "Declaration semantic-subject delta" in owners
@@ -226,11 +225,6 @@ def test_semantic_identity_is_documented_without_repository_history_ownership() 
     assert "Child-role admission evidence" in decision
     assert "Untagged children remain request-local" in decision
     assert "duplicate subject identities remain explicitly ambiguous" in decision
-    assert "same semantic_declaration_identity" in declarations
-    assert "not an existence timeline" in declarations
-    assert "stores no tombstone or resurrection record" in declarations
-    assert "does not prove uninterrupted existence" in decision
-    assert "caller-supplied bounded evidence" in decision
     assert "no history store and no retention layer" in decision
     for forbidden_owner in (
         "Hashmarks owns branch management",
@@ -238,6 +232,21 @@ def test_semantic_identity_is_documented_without_repository_history_ownership() 
         "Hashmarks owns repository history",
     ):
         assert forbidden_owner not in decision
+
+
+def test_semantic_identity_reappearance_remains_non_historical() -> None:
+    invariants = _text("docs/reference/INVARIANTS.md")
+    declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")
+    decision = _text(
+        "docs/maintainers/SEMANTIC_IDENTITY_WITHOUT_REPOSITORY_OWNERSHIP.md"
+    )
+
+    assert "G72. Semantic identity reappearance" in invariants
+    assert "same semantic_declaration_identity" in declarations
+    assert "not an existence timeline" in declarations
+    assert "stores no tombstone or resurrection record" in declarations
+    assert "does not prove uninterrupted existence" in decision
+    assert "caller-supplied bounded evidence" in decision
 
 
 def test_derived_authority_economics_remains_diagnostic_only() -> None:
