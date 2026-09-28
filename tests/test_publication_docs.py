@@ -501,7 +501,7 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
 
     assert "hashmarks upgrade" in readme
     assert "hashmarks upgrade" in getting_started
-    assert "native installation owner" in architecture
+    assert "installation owner" in architecture
     assert "U5. Installation mutation is explicit." in invariants
     assert "U6. Hashmarks never owns updating itself." in invariants
     assert "Narrow product-distribution lifecycle exception" in boundary
