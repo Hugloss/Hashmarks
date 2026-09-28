@@ -210,10 +210,16 @@ def test_semantic_identity_is_documented_without_repository_history_ownership() 
     assert "Identity without ownership; compare without mutation" in boundary
     assert "semantic_namespace + concept + scope" in decision
     assert "semantic_subject_identity + semantic_role" in declarations
-    assert "does not invent, normalize, alias, require, or separately index roles" in declarations
+    assert (
+        "does not invent, normalize, alias, require, or separately index roles"
+        in declarations
+    )
     assert "provider wrapper provenance/version" in declarations
     assert "alias or migration table" in declarations
-    assert "does not promote semantic identity into repository-evidence binding identity" in declarations
+    assert (
+        "does not promote semantic identity into repository-evidence binding identity"
+        in declarations
+    )
     assert "removed and added rather than guessing continuity" in declarations
     assert "does not add a cross-binding alias" in declarations
     assert "Child-role admission evidence" in decision
