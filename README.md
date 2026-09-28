@@ -23,7 +23,7 @@ The installer downloads checksum-verified, self-contained release bytes from Git
 
 Interactive CLI commands may check GitHub's public latest-release metadata at most once every 24 hours. The check sends no repository-derived data and stores only disposable product-update metadata outside repository state. Set `HASHMARKS_NO_UPDATE_CHECK=1` to disable automatic update checks completely. Automatic checks never run in MCP, CI, daemon, or non-interactive use.
 
-When a newer stable release is available, Hashmarks offers two explicit choices:
+For the canonical standalone installation, a newer stable release offers two explicit choices:
 
 ```text
 A newer Hashmarks version is available.
@@ -31,17 +31,13 @@ A newer Hashmarks version is available.
 Hashmarks 0.24.0
 Latest: 0.25.0
 
-This installation is managed by uv.
-
-Native upgrade command:
-
-    uv tool upgrade hashmarks
+This installation uses the Hashmarks standalone installer.
 
 [1] Upgrade now
 [2] Skip for now
 ```
 
-`hashmarks upgrade` performs an explicit fresh release check. If you choose **Upgrade now**, Hashmarks shows the detected native installation owner and replaces the running Hashmarks process with that owner; for example, a uv-managed install delegates to `uv tool upgrade hashmarks`. Hashmarks does not implement its own resolver or silently update itself. Restart Hashmarks after the native owner completes. In non-interactive use, `hashmarks upgrade` prints the native command but does not mutate the installation.
+`hashmarks upgrade` performs an explicit fresh release check. For the standalone distribution, **Upgrade now** hands control to the existing checksum-verifying installer and the running Hashmarks process exits. For Python-package or source installations, Hashmarks reports the available version and tells you to use the native mechanism that already owns that installation. It does not detect or certify uv/pip/pipx ownership, parse their metadata, or implement its own package-manager semantics.
 
 > **Hashmarks may discover update availability. It never owns updating itself.**
 
@@ -365,7 +361,7 @@ Run `hashmarks --help` for the complete command surface.
 | `change-impact TASK --changed PATH` | Recompute impact and verification relevance from changed paths |
 | `post-change TASK --changed PATH --previous-evidence FILE` | Reconcile changed paths and return evidence deltas |
 | `doctor` | Show runtime/observer configuration |
-| `upgrade` | Explicitly check the latest stable release and hand an approved update to the native installation owner |
+| `upgrade` | Explicitly check the latest stable release; standalone installs can hand off to the existing installer, while externally managed installs stay native-tool owned |
 
 ## FAQ
 
