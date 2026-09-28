@@ -318,9 +318,15 @@ def test_hashmarks_never_becomes_a_semantic_knowledge_graph() -> None:
     assert "Semantic knowledge graph is a permanent non-goal" in architecture
     assert "must **not** generalize semantic identity or correspondence" in architecture
     assert "Not a semantic knowledge graph" in boundary
+    assert "Four permanent non-goals" in boundary
+    assert "global semantic graph/ontology ownership" in boundary
+    assert "general knowledge graph, ontology, edge registry" in boundary
     assert "four negative questions before admission" in boundary
     assert "G75. Hashmarks is not a semantic knowledge graph" in invariants
-    assert "Explicit A↔B plus explicit B↔C does not authorize inferred A↔C" in invariants
+    assert (
+        "Explicit A↔B plus explicit B↔C does not authorize inferred A↔C"
+        in invariants
+    )
     assert "Correspondence is also deliberately **non-transitive**" in declarations
     assert "does not derive A↔C" in declarations
     assert "Why this is not a knowledge graph" in decision
