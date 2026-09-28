@@ -115,12 +115,8 @@ def test_declaration_derivation_traces_exact_repository_evidence(
         for row in by_id.values()
     )
     assert by_id["python-intent"]["semantic_role"] == {"kind": "project-intent"}
-    assert by_id["python-intent"]["semantic_declaration_identity"].startswith(
-        "sha256:"
-    )
-    assert by_id["python-container"]["semantic_role"] == {
-        "kind": "container-runtime"
-    }
+    assert by_id["python-intent"]["semantic_declaration_identity"].startswith("sha256:")
+    assert by_id["python-container"]["semantic_role"] == {"kind": "container-runtime"}
     assert by_id["python-container"]["semantic_declaration_identity"].startswith(
         "sha256:"
     )
