@@ -126,7 +126,7 @@ Cross-artifact declaration correspondence follows the same rule. Providers may n
 
 ### Semantic identity layers
 
-Repository declarations separate three identity questions instead of overloading file location or one universal ID:
+Repository declarations separate four identity questions instead of overloading file location or one universal ID:
 
 \`\`\`text
 semantic namespace + provider-declared concept + scope
@@ -134,7 +134,11 @@ semantic namespace + provider-declared concept + scope
         ▼
 semantic subject identity        what conceptual subject is being described?
         │
-        ├── exact evidence locator/binding
+        ├── optional opaque semantic_role
+        ▼
+semantic declaration identity    which provider-declared role inside the subject?
+        │
+        ├── request-local labels + exact evidence locator/binding
         ▼
 declaration definition identity  which exact declaration/evidence definition?
         │
@@ -145,9 +149,13 @@ observation identity             which exact observed semantic state?
 
 Semantic subject identity is location-independent but namespace-scoped: core deterministically identifies \`semantic_namespace + concept + scope\` and does not infer a universal ontology. Direct callers provide the namespace; declaration discovery binds it to the selected provider name and rejects provider attempts to override it. Exact path/range location remains declaration provenance. Observation identity remains immutable evidence for an endpoint.
 
+Semantic declaration identity is optional and subject-scoped. Core derives it only from an explicit non-empty provider-declared `semantic_role` plus the already-issued subject identity. It never derives a role from declaration labels, paths, values, producer names, or model similarity. Untagged declarations remain request-local children.
+
 These identities support correlation and factual endpoint comparison only. They are not Hashmarks branches, commits, refs, checkout targets, or retained repository history. Git/caller/native tools continue to own mutation and lifecycle. See [the semantic-identity decision](../maintainers/SEMANTIC_IDENTITY_WITHOUT_REPOSITORY_OWNERSHIP.md).
 
 Subject-level delta is ambiguity-preserving: a semantic identity is correlated across endpoints only when it names exactly one group on each side. Multiple groups with the same subject identity remain ambiguous rather than being paired by group order, lexical similarity, or value agreement.
+
+The same rule applies inside a uniquely correlated subject: semantic declaration roles are paired only when their derived identities are unique at both endpoints. Role identity supports correlation, not coverage, absence, precedence, or repository-locator authority.
 
 ## Cache model
 
