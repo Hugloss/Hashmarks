@@ -351,6 +351,7 @@ groups = [
         "declarations": [
             {
                 "declaration_id": "project-intent",
+                "semantic_role": {"kind": "project-intent"},
                 "value_state": "resolved",
                 "value": ">=3.12",
                 "producer": {"kind": "example-project-metadata"},
@@ -364,6 +365,7 @@ groups = [
             },
             {
                 "declaration_id": "container-runtime",
+                "semantic_role": {"kind": "container-runtime"},
                 "value_state": "resolved",
                 "value": "3.11",
                 "producer": {"kind": "example-container-config"},
