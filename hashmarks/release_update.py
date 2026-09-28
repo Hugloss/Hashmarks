@@ -306,10 +306,9 @@ def _standalone_exec_target(latest_version: str) -> tuple[str, tuple[str, ...]]:
 def _exec_standalone_installer(
     executable: str,
     argv: tuple[str, ...],
-    environment: Mapping[str, str],
 ) -> None:
     try:
-        os.execve(executable, list(argv), dict(environment))
+        os.execv(executable, list(argv))
     except OSError as exc:
         raise StandaloneUpgradeError(
             f"could not start Hashmarks standalone installer: {Path(executable).name}"
@@ -319,6 +318,4 @@ def _exec_standalone_installer(
 def delegate_standalone_upgrade(latest_version: str) -> None:
     _version_key(latest_version)
     executable, argv = _standalone_exec_target(latest_version)
-    environment = os.environ.copy()
-    environment["HASHMARKS_VERSION"] = latest_version
-    _exec_standalone_installer(executable, argv, environment)
+    _exec_standalone_installer(executable, argv)
