@@ -13,6 +13,38 @@ def _write(path, body: str) -> None:
     path.write_text(HEADER + body, encoding="utf-8")
 
 
+def test_splunk_csv_dogfood_accepts_unquoted_serial_record_start(tmp_path) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '0,"2026-09-28T08:09:45.000+0200",kubernetes,"kube:events",'
+        '"[host]","idx","[server]","INFO name=tasks.worker ok"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["events"] == 1
+    assert report["summary"]["strict_valid"] == 1
+    assert report["summary"]["malformed"] == 0
+    assert report["bundle"]["anchors"][0]["module"] == "tasks.worker"
+
+
+def test_splunk_csv_dogfood_does_not_split_record_like_raw_continuation(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","ERROR first line\n'
+        '"7","2026-09-14T23:59:57.000+0200"\n'
+        'continuation payload"\n',
+    )
+
+    report = collect(source)
+    assert report["summary"]["events"] == 1
+    assert report["summary"]["malformed"] == 1
+
+
 def test_splunk_csv_dogfood_recovers_invalid_raw_without_hiding_parser_state(
     tmp_path,
 ) -> None:
