@@ -186,8 +186,8 @@ class RepositoryDeclarationsMixin:
                 group_id,
                 concept,
                 scope,
-                binding_rows,
                 semantic_subject_identity,
+                binding_rows,
             )
             for normalized in raw_declarations
         ]
