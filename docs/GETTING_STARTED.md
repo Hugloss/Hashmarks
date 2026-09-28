@@ -23,7 +23,7 @@ The installer downloads the current standalone release executable and its SHA-25
 
 ## Update awareness and explicit upgrades
 
-Hashmarks keeps repository analysis local. Separately, an interactive CLI invocation may perform a bounded product-release check against GitHub's public latest-release metadata at most once every 24 hours. This request carries no repository path, repository identity, source, hash, observation, MCP payload, or ambient GitHub credential. Its disposable timestamp/latest-version cache lives in the user cache directory, never under `.hashmarks/` and never in repository evidence.
+Hashmarks keeps repository analysis local. Separately, an interactive CLI invocation may perform a bounded product-release check against GitHub's public latest-release metadata at most once every 24 hours. This request carries no repository path, repository identity, source, hash, observation, MCP payload, or ambient GitHub credential. Its disposable cache stores only the last-check timestamp used to throttle automatic checks; latest-release identity is not persisted there. The cache lives in the user cache directory, never under `.hashmarks/` and never in repository evidence.
 
 Automatic release checks are skipped for MCP, daemon, CI, and non-interactive invocations. Set:
 
