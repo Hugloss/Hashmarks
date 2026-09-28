@@ -612,6 +612,16 @@ def test_ci_and_dev_check_enforce_current_ruff_gate() -> None:
     assert "Ruff:        PASS (zero debt)" in dev_check
 
 
+def test_update_check_cache_is_throttle_only() -> None:
+    getting_started = _text("docs/GETTING_STARTED.md")
+    architecture = _text("docs/reference/ARCHITECTURE.md")
+
+    for text in (getting_started, architecture):
+        assert "stores only the last-check timestamp" in text
+        assert "latest-release identity is not persisted" in text
+        assert "timestamp/latest-version cache" not in text
+
+
 def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() -> None:
     readme = _text("README.md")
     getting_started = _text("docs/GETTING_STARTED.md")
@@ -634,12 +644,6 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
 
     assert "hashmarks upgrade" in readme
     assert "hashmarks upgrade" in getting_started
-    assert "stores only the last-check timestamp" in getting_started
-    assert "latest-release identity is not persisted" in getting_started
-    assert "stores only the last-check timestamp" in architecture
-    assert "latest-release identity is not persisted" in architecture
-    assert "timestamp/latest-version cache" not in getting_started
-    assert "timestamp/latest-version cache" not in architecture
     assert "canonical standalone distribution" in architecture
     assert "does not determine whether that mechanism is uv, pip, pipx" in architecture
     assert "U5. Installation mutation is explicit and narrow." in invariants
