@@ -758,7 +758,9 @@ def _fit_selection_to_request(
             high = midpoint - 1
     fitted = _selection_prefix(selection, low)
     if not evidence_request_budget_fits([_bundle(source_sha256, state, fitted)]):
-        raise ValueError("Splunk evidence bundle could not fit correlation request budget")
+        raise ValueError(
+            "Splunk evidence bundle could not fit correlation request budget"
+        )
     return fitted
 
 
