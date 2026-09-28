@@ -46,18 +46,11 @@ def test_identical_span_bytes_keep_distinct_repository_path_authority(
     assert first_evidence["path"] == "a.py"
     assert second_evidence["path"] == "b.py"
     assert first_evidence["state"] == second_evidence["state"] == "known-present"
-    assert (
-        first_evidence["member_revision"]
-        == second_evidence["member_revision"]
-    )
+    assert first_evidence["member_revision"] == second_evidence["member_revision"]
     assert first_evidence["span_identity"] == second_evidence["span_identity"]
+    assert first["binding_definition_identity"] != second["binding_definition_identity"]
     assert (
-        first["binding_definition_identity"]
-        != second["binding_definition_identity"]
-    )
-    assert (
-        first["binding_observation_identity"]
-        != second["binding_observation_identity"]
+        first["binding_observation_identity"] != second["binding_observation_identity"]
     )
 
 
