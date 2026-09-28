@@ -225,12 +225,11 @@ def _assert_old_packet_replay_is_one_call_only(
         fresh = codemap.discover_repository_declarations(_source_providers())
 
     assert set(_groups(replayed)) == {"provider-a-owner", "provider-b-owner"}
-    assert replayed["delta_from_previous"]["providers"]["removed"] == [
-        "correlation-ab"
-    ]
-    assert replayed["declarations"]["observation_identity"] == expected_current[
-        "declarations"
-    ]["observation_identity"]
+    assert replayed["delta_from_previous"]["providers"]["removed"] == ["correlation-ab"]
+    assert (
+        replayed["declarations"]["observation_identity"]
+        == expected_current["declarations"]["observation_identity"]
+    )
 
     assert set(_groups(fresh)) == {"provider-a-owner", "provider-b-owner"}
     assert "delta_from_previous" not in fresh
