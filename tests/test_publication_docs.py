@@ -590,6 +590,14 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
     assert "canonical standalone distribution" in architecture
     assert "does not determine whether that mechanism is uv, pip, pipx" in architecture
     assert "U5. Installation mutation is explicit and narrow." in invariants
+    assert (
+        "Skip for now** path does not resolve or preflight installer prerequisites"
+        in invariants
+    )
+    assert "requirements are resolved once" in architecture
+    assert "must not transport the same upgrade inputs again" in invariants
+    assert "displayed standalone command is also the execution payload" in architecture
+    assert "does not preflight installer prerequisites" in getting_started
     assert "U6. Hashmarks never owns updating itself." in invariants
     assert "U7. Native package-manager state stays opaque and native." in invariants
     assert "must not reconstruct uv/pip/pipx filesystem layouts" in invariants

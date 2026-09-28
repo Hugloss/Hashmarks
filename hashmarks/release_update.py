@@ -28,8 +28,8 @@ class ReleaseCheckError(RuntimeError):
     """Latest-release metadata could not be obtained safely."""
 
 
-class UpgradeDelegationError(RuntimeError):
-    """The installation owner could not be delegated to safely."""
+class StandaloneUpgradeError(RuntimeError):
+    """The standalone installer could not be started safely."""
 
 
 @dataclass(frozen=True)
@@ -278,16 +278,11 @@ def standalone_upgrade_command(latest_version: str) -> str | None:
     )
 
 
-def _standalone_exec_target(latest_version: str) -> tuple[str, tuple[str, ...]]:
-    command = standalone_upgrade_command(latest_version)
-    if command is None:
-        raise UpgradeDelegationError(
-            "this installation is not managed by the Hashmarks standalone installer"
-        )
+def _standalone_exec_target(command: str) -> tuple[str, tuple[str, ...]]:
     if os.name == "nt":
         executable = shutil.which("pwsh") or shutil.which("powershell")
         if executable is None:
-            raise UpgradeDelegationError("PowerShell is required for the installer")
+            raise StandaloneUpgradeError("PowerShell is required for the installer")
         return executable, (
             executable,
             "-NoProfile",
@@ -297,36 +292,24 @@ def _standalone_exec_target(latest_version: str) -> tuple[str, tuple[str, ...]]:
         )
     executable = shutil.which("sh")
     if executable is None:
-        raise UpgradeDelegationError("sh is required for the installer")
+        raise StandaloneUpgradeError("sh is required for the installer")
     if shutil.which("curl") is None:
-        raise UpgradeDelegationError("curl is required for the installer")
+        raise StandaloneUpgradeError("curl is required for the installer")
     return executable, (executable, "-c", command)
 
 
-def can_delegate_standalone_upgrade() -> bool:
-    if not is_standalone_installation():
-        return False
-    if os.name == "nt":
-        return bool(shutil.which("pwsh") or shutil.which("powershell"))
-    return shutil.which("sh") is not None and shutil.which("curl") is not None
-
-
-def _exec_owner(
+def _exec_standalone_installer(
     executable: str,
     argv: tuple[str, ...],
-    environment: Mapping[str, str],
 ) -> None:
     try:
-        os.execve(executable, list(argv), dict(environment))
+        os.execv(executable, list(argv))
     except OSError as exc:
-        raise UpgradeDelegationError(
-            f"could not start native installation owner: {Path(executable).name}"
+        raise StandaloneUpgradeError(
+            f"could not start Hashmarks standalone installer: {Path(executable).name}"
         ) from exc
 
 
-def delegate_standalone_upgrade(latest_version: str) -> None:
-    _version_key(latest_version)
-    executable, argv = _standalone_exec_target(latest_version)
-    environment = os.environ.copy()
-    environment["HASHMARKS_VERSION"] = latest_version
-    _exec_owner(executable, argv, environment)
+def delegate_standalone_upgrade(command: str) -> None:
+    executable, argv = _standalone_exec_target(command)
+    _exec_standalone_installer(executable, argv)

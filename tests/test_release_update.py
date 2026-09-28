@@ -197,7 +197,6 @@ def test_package_manager_environment_configuration_does_not_create_authority(
 
     assert release_update.is_standalone_installation() is False
     assert release_update.standalone_upgrade_command("0.25.0") is None
-    assert release_update.can_delegate_standalone_upgrade() is False
 
 
 def test_external_python_upgrade_reports_native_tool_handoff_without_mutation(
@@ -327,7 +326,6 @@ def test_raw_frozen_release_asset_is_not_treated_as_installed_standalone(
 
     assert release_update.is_standalone_installation() is False
     assert release_update.standalone_upgrade_command("0.25.0") is None
-    assert release_update.can_delegate_standalone_upgrade() is False
 
 
 def test_standalone_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate(
@@ -349,7 +347,13 @@ def test_standalone_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate
         ),
     )
     monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
-    monkeypatch.setattr(cli, "can_delegate_standalone_upgrade", lambda: True)
+    monkeypatch.setattr(
+        release_update.shutil,
+        "which",
+        lambda name: pytest.fail(
+            f"skip must not preflight installer prerequisite {name}"
+        ),
+    )
     monkeypatch.setattr("builtins.input", lambda prompt: "2")
     monkeypatch.setattr(
         cli,
@@ -365,6 +369,65 @@ def test_standalone_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate
     assert "[1] Upgrade now" in output
     assert "[2] Skip for now" in output
     assert "Upgrade skipped." in output
+
+
+def test_cli_executes_the_exact_displayed_standalone_command(
+    monkeypatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    command = "exact-displayed-standalone-command"
+    monkeypatch.setattr(
+        cli,
+        "fetch_latest_release",
+        lambda current_version, *, timeout: ReleaseInfo(
+            current_version=current_version,
+            latest_version="0.25.0",
+        ),
+    )
+    monkeypatch.setattr(cli, "is_standalone_installation", lambda: True)
+    monkeypatch.setattr(cli, "standalone_upgrade_command", lambda version: command)
+    monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda prompt: "1")
+    seen: list[str] = []
+    monkeypatch.setattr(cli, "delegate_standalone_upgrade", seen.append)
+
+    assert cli.main(["upgrade"]) == 0
+
+    output = capsys.readouterr().out
+    assert command in output
+    assert seen == [command]
+
+
+def test_standalone_prerequisites_are_resolved_only_after_upgrade_consent(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"
+    monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(
+        release_update.sys,
+        "executable",
+        str(tmp_path / installed_name),
+    )
+    monkeypatch.setattr(
+        cli,
+        "fetch_latest_release",
+        lambda current_version, *, timeout: ReleaseInfo(
+            current_version=current_version,
+            latest_version="0.25.0",
+        ),
+    )
+    monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda prompt: "1")
+    monkeypatch.setattr(release_update.shutil, "which", lambda name: None)
+
+    expected = (
+        "PowerShell is required for the installer"
+        if release_update.os.name == "nt"
+        else "sh is required for the installer"
+    )
+    with pytest.raises(SystemExit, match=expected):
+        cli.main(["upgrade"])
 
 
 def test_standalone_upgrade_noninteractive_prints_command_without_mutation(
@@ -418,18 +481,20 @@ def test_standalone_delegation_executes_the_displayed_native_command(
     monkeypatch.setattr(release_update.shutil, "which", which)
     seen: dict[str, object] = {}
 
-    def exec_owner(
+    def exec_installer(
         native_executable: str,
         argv: tuple[str, ...],
-        environment: dict[str, str],
     ) -> None:
         seen["executable"] = native_executable
         seen["argv"] = argv
-        seen["version"] = environment["HASHMARKS_VERSION"]
 
-    monkeypatch.setattr(release_update, "_exec_owner", exec_owner)
+    monkeypatch.setattr(
+        release_update,
+        "_exec_standalone_installer",
+        exec_installer,
+    )
 
-    release_update.delegate_standalone_upgrade("0.25.0")
+    release_update.delegate_standalone_upgrade(displayed)
 
     argv = seen["argv"]
     assert isinstance(argv, tuple)
@@ -437,4 +502,5 @@ def test_standalone_delegation_executes_the_displayed_native_command(
         assert argv[-1] == displayed
     else:
         assert argv == ("/tools/sh", "-c", displayed)
-    assert seen["version"] == "0.25.0"
+    assert "0.25.0" in displayed
+    assert str(tmp_path.resolve()) in displayed
