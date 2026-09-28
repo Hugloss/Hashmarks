@@ -129,7 +129,7 @@ Cross-artifact declaration correspondence follows the same rule. Providers may n
 Repository declarations separate three identity questions instead of overloading file location or one universal ID:
 
 \`\`\`text
-provider-declared concept + scope
+semantic namespace + provider-declared concept + scope
         │
         ▼
 semantic subject identity        what conceptual subject is being described?
@@ -143,9 +143,11 @@ declaration definition identity  which exact declaration/evidence definition?
 observation identity             which exact observed semantic state?
 \`\`\`
 
-Semantic subject identity is location-independent but provider-scoped: core deterministically identifies the opaque \`concept + scope\` supplied by the provider and does not infer a universal ontology. Exact path/range location remains declaration provenance. Observation identity remains immutable evidence for an endpoint.
+Semantic subject identity is location-independent but namespace-scoped: core deterministically identifies \`semantic_namespace + concept + scope\` and does not infer a universal ontology. Direct callers provide the namespace; declaration discovery binds it to the selected provider name and rejects provider attempts to override it. Exact path/range location remains declaration provenance. Observation identity remains immutable evidence for an endpoint.
 
 These identities support correlation and factual endpoint comparison only. They are not Hashmarks branches, commits, refs, checkout targets, or retained repository history. Git/caller/native tools continue to own mutation and lifecycle. See [the semantic-identity decision](../maintainers/SEMANTIC_IDENTITY_WITHOUT_REPOSITORY_OWNERSHIP.md).
+
+Subject-level delta is ambiguity-preserving: a semantic identity is correlated across endpoints only when it names exactly one group on each side. Multiple groups with the same subject identity remain ambiguous rather than being paired by group order, lexical similarity, or value agreement.
 
 ## Cache model
 
