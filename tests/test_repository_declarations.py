@@ -458,7 +458,11 @@ def test_semantic_subject_delta_correlates_group_label_change_without_history(
     assert change["group_id_changed"] is True
     assert change["previous_group_id"] == "request-a"
     assert change["current_group_id"] == "request-b"
-    assert change["value_changed_declaration_ids"] == []
+    assert "value_changed_declaration_ids" not in change
+    assert "producer_changed_declaration_ids" not in change
+    assert "evidence_state_changed_declaration_ids" not in change
+    assert "added_declaration_ids" not in change
+    assert "removed_declaration_ids" not in change
     assert "comparison_transition" not in change
     assert "absence_transition" not in change
 
