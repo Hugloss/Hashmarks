@@ -787,7 +787,10 @@ def _assert_unknown_provider_name_is_opaque_basis_metadata(
     )
 
     correlation = after["correspondence-ab"]
-    assert correlation["correspondence"]["basis"]["right_provider"] == "provider-missing"
+    assert (
+        correlation["correspondence"]["basis"]["right_provider"]
+        == "provider-missing"
+    )
     assert correlation["comparison"] == {
         "state": "equivalent",
         "distinct_values": ["team-a"],
