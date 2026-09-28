@@ -189,6 +189,7 @@ def test_semantic_role_does_not_create_expected_membership_or_absence(
         packet = codemap.repository_declarations([group])
 
     projected = packet["groups"][0]
+    assert projected["coverage"]["expected_declaration_ids"] == []
     assert projected["declarations"][0]["semantic_declaration_identity"].startswith(
         "sha256:"
     )
@@ -196,7 +197,7 @@ def test_semantic_role_does_not_create_expected_membership_or_absence(
         "state": "unknown",
         "missing_declaration_ids": [],
         "unseen_expected_declaration_ids": [],
-        "unexpected_declaration_ids": ["runtime"],
+        "unexpected_declaration_ids": [],
         "reason": "expected-membership-not-declared",
     }
 
