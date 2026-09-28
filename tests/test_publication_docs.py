@@ -478,6 +478,7 @@ def test_ci_and_dev_check_enforce_current_ruff_gate() -> None:
     assert "lint-debt-summary || true" not in dev_check
     assert "Ruff:        PASS (zero debt)" in dev_check
 
+
 def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() -> None:
     readme = _text("README.md")
     getting_started = _text("docs/GETTING_STARTED.md")
@@ -505,4 +506,4 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
     assert "U6. Hashmarks never owns updating itself." in invariants
     assert "Narrow product-distribution lifecycle exception" in boundary
     assert "package resolver" in boundary
-    assert "repository/task command execution" in boundary\n
+    assert "repository/task command execution" in boundary
