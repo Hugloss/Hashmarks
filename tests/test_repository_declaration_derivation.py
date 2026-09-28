@@ -15,8 +15,9 @@ def _declaration(
     *,
     producer: str = "fixture-config",
     line: int = 1,
+    semantic_role: dict[str, object] | None = None,
 ) -> dict[str, object]:
-    return {
+    declaration: dict[str, object] = {
         "declaration_id": declaration_id,
         "value_state": "resolved",
         "value": value,
@@ -29,6 +30,9 @@ def _declaration(
             }
         ],
     }
+    if semantic_role is not None:
+        declaration["semantic_role"] = semantic_role
+    return declaration
 
 
 def _group(
@@ -69,8 +73,18 @@ def test_declaration_derivation_traces_exact_repository_evidence(
     (repo / "Dockerfile").write_text("FROM python:3.12\n", encoding="utf-8")
     group = _group(
         [
-            _declaration("python-intent", "pyproject.toml", ">=3.12"),
-            _declaration("python-container", "Dockerfile", ">=3.12"),
+            _declaration(
+                "python-intent",
+                "pyproject.toml",
+                ">=3.12",
+                semantic_role={"kind": "project-intent"},
+            ),
+            _declaration(
+                "python-container",
+                "Dockerfile",
+                ">=3.12",
+                semantic_role={"kind": "container-runtime"},
+            ),
         ]
     )
 
@@ -99,6 +113,16 @@ def test_declaration_derivation_traces_exact_repository_evidence(
     assert all(
         row["semantic_subject_identity"] == group_authority["semantic_subject_identity"]
         for row in by_id.values()
+    )
+    assert by_id["python-intent"]["semantic_role"] == {"kind": "project-intent"}
+    assert by_id["python-intent"]["semantic_declaration_identity"].startswith(
+        "sha256:"
+    )
+    assert by_id["python-container"]["semantic_role"] == {
+        "kind": "container-runtime"
+    }
+    assert by_id["python-container"]["semantic_declaration_identity"].startswith(
+        "sha256:"
     )
     assert {row["repository_evidence"][0]["path"] for row in by_id.values()} == {
         "pyproject.toml",
@@ -193,6 +217,40 @@ def test_declaration_derivation_rejects_resigned_semantic_subject_tamper(
         )
 
         with pytest.raises(ValueError, match="semantic subject identity mismatch"):
+            codemap.repository_declaration_derivation_authority(tampered)
+
+
+def test_declaration_derivation_rejects_resigned_semantic_role_tamper(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "owner.yaml").write_text("owner: team-a\n", encoding="utf-8")
+    group = _group(
+        [
+            _declaration(
+                "owner",
+                "owner.yaml",
+                "team-a",
+                semantic_role={"kind": "repository-owner"},
+            )
+        ]
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        packet = codemap.repository_declarations([group])
+        tampered = copy.deepcopy(packet)
+        declaration = tampered["groups"][0]["declarations"][0]
+        declaration["semantic_role"] = {"kind": "different-role"}
+        tampered["observation_identity"] = codemap._declaration_packet_identity(
+            tampered
+        )
+
+        with pytest.raises(
+            ValueError,
+            match="semantic declaration identity mismatch",
+        ):
             codemap.repository_declaration_derivation_authority(tampered)
 
 
