@@ -218,6 +218,8 @@ A declaration may optionally supply a non-empty opaque `semantic_role` object. W
 
 These identities are correlation evidence, not ontology authority. Hashmarks does not interpret the opaque concept or semantic role, infer correspondence or child roles, select a winner, or promote either identity into a universal metadata schema. Every projected declaration carries its group's `semantic_subject_identity`; declarations with an explicit role additionally carry `semantic_declaration_identity`, so consumers can correlate provider-declared roles separately from exact declaration provenance.
 
+Deterministic semantic identity is also **not an existence timeline**. A role-tagged declaration may be present in one explicit observation, absent in the next because complete coverage proves its request-local declaration missing, and later reappear with the same `semantic_declaration_identity` when the provider emits the same role again. That later identity match does not fill the gap between endpoints or prove the declaration continuously existed. Hashmarks stores no tombstone or resurrection record and does not search repository history to connect the endpoints. The current endpoint's absence remains owned by provider coverage; its exact evidence remains owned by repository-evidence bindings; any older packet used for comparison is caller-supplied bounded evidence.
+
 The remaining identities keep their existing, narrower jobs:
 
 \`group_definition_identity\` binds:

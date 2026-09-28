@@ -234,6 +234,21 @@ def test_semantic_identity_is_documented_without_repository_history_ownership() 
         assert forbidden_owner not in decision
 
 
+def test_semantic_identity_reappearance_remains_non_historical() -> None:
+    invariants = _text("docs/reference/INVARIANTS.md")
+    declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")
+    decision = _text(
+        "docs/maintainers/SEMANTIC_IDENTITY_WITHOUT_REPOSITORY_OWNERSHIP.md"
+    )
+
+    assert "G72. Semantic identity reappearance" in invariants
+    assert "same `semantic_declaration_identity`" in declarations
+    assert "not an existence timeline" in declarations
+    assert "stores no tombstone or resurrection record" in declarations
+    assert "does **not** prove uninterrupted existence" in decision
+    assert "it supplies that bounded packet explicitly" in decision
+
+
 def test_derived_authority_economics_remains_diagnostic_only() -> None:
     makefile = _text("Makefile")
     plan = _text("docs/maintainers/DERIVED_AUTHORITY_AND_BOUNDED_COMPARISON_PLAN.md")

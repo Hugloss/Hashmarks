@@ -73,6 +73,8 @@ Subject-level delta may correlate a unique subject across a request-local `group
 
 Semantic declaration identity is correlation evidence only. It does not change provider coverage, authorize negative evidence, select precedence, or replace canonical repository-evidence delta for exact member/span/locator changes.
 
+A deterministic identity may disappear from one explicit endpoint and reappear in a later endpoint when the provider again supplies the same semantic namespace/concept/scope or semantic role. Reappearance means only that the later claim resolves to the same semantic identity. It does **not** prove uninterrupted existence between endpoints and does not justify a tombstone, resurrection state, retained timeline, or Git-history search. If a caller needs to compare with an earlier observation, it supplies that bounded packet explicitly.
+
 All declarations projected in one group carry the group's semantic subject identity. Validation recomputes it from the provider-declared semantic inputs so resigning a forged identity does not gain authority.
 
 Derived relationships remain recomputable from source evidence and do not become independent source truth.

@@ -140,6 +140,85 @@ class _EnumeratingProvider:
         )
 
 
+@dataclass
+class _GeneratedOwnershipProvider:
+    name: str = "generated-owner-provider"
+    source_path: str = "owners/source.meta"
+    generated_path: str = "owners/generated.meta"
+
+    def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
+        return context.exists(self.source_path)
+
+    @staticmethod
+    def _declaration(
+        *,
+        declaration_id: str,
+        semantic_role: str,
+        path: str,
+        value: str,
+    ) -> dict[str, object]:
+        return {
+            "declaration_id": declaration_id,
+            "semantic_role": {"kind": semantic_role},
+            "value_state": "resolved",
+            "value": value,
+            "producer": {"provider": "generated-owner-provider"},
+            "evidence": [{"path": path, "start_line": 1, "end_line": 1}],
+        }
+
+    def discover(
+        self,
+        context: RepositoryDeclarationProviderContext,
+    ) -> RepositoryDeclarationProviderResult:
+        source = context.read_text(self.source_path).strip()
+        declarations = [
+            self._declaration(
+                declaration_id="source-owner",
+                semantic_role="source",
+                path=self.source_path,
+                value=source,
+            )
+        ]
+        if context.exists(self.generated_path):
+            generated = context.read_text(self.generated_path).strip()
+            declarations.append(
+                self._declaration(
+                    declaration_id="generated-owner",
+                    semantic_role="generated-copy",
+                    path=self.generated_path,
+                    value=generated,
+                )
+            )
+        return RepositoryDeclarationProviderResult(
+            groups=(
+                {
+                    "group_id": "component-owner",
+                    "concept": {"kind": "ownership", "identity": "component-a"},
+                    "scope": {"environment": "all"},
+                    "correspondence": {
+                        "state": "declared",
+                        "basis": {
+                            "provider": self.name,
+                            "rule": "source-generated-correspondence",
+                        },
+                    },
+                    "declarations": declarations,
+                    "coverage": {
+                        "state": "complete",
+                        "truncation": "complete",
+                        "expected_declaration_ids": [
+                            "source-owner",
+                            "generated-owner",
+                        ],
+                        "scope": {"repository": "fixture"},
+                        "provenance": {"provider": self.name},
+                    },
+                },
+            ),
+            provenance={"provider": self.name, "version": "1"},
+        )
+
+
 def _provider(packet: dict[str, object]) -> dict[str, object]:
     return packet["providers"][0]
 
@@ -316,3 +395,156 @@ def test_enumerated_source_move_changes_definition_without_value_churn(
     assert binding["definition"]["state"] == "changed"
     assert binding["direct_evidence"]["state"] == "preserved"
     assert binding["member_evidence"]["state"] == "preserved"
+
+
+def _role_rows(packet: dict[str, object]) -> dict[str, dict[str, object]]:
+    return {
+        row["semantic_role"]["kind"]: row
+        for row in _nested_group(packet)["declarations"]
+    }
+
+
+def _generated_ownership_lifecycle(
+    tmp_path: Path,
+) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+    repo = tmp_path / "repo"
+    source = repo / "owners" / "source.meta"
+    generated = repo / "owners" / "generated.meta"
+    source.parent.mkdir(parents=True)
+    source.write_text("team-a\n", encoding="utf-8")
+    generated.write_text("team-a\n", encoding="utf-8")
+    provider = _GeneratedOwnershipProvider()
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        present = codemap.discover_repository_declarations([provider])
+
+        generated.unlink()
+        codemap.sync(["owners/generated.meta"])
+        absent = codemap.discover_repository_declarations(
+            [provider],
+            previous_observation=present,
+        )
+
+        generated.write_text("team-b\n", encoding="utf-8")
+        codemap.sync(["owners/generated.meta"])
+        restored = codemap.discover_repository_declarations(
+            [provider],
+            previous_observation=absent,
+        )
+
+    return present, absent, restored
+
+
+def _assert_generated_role_absence(
+    present: dict[str, object],
+    absent: dict[str, object],
+) -> str:
+    present_group = _nested_group(present)
+    absent_group = _nested_group(absent)
+    generated_identity = _role_rows(present)["generated-copy"][
+        "semantic_declaration_identity"
+    ]
+
+    assert present_group["comparison"]["state"] == "equivalent"
+    assert present_group["absence"]["state"] == "known-present"
+    assert absent_group["comparison"]["state"] == "insufficient"
+    assert absent_group["absence"] == {
+        "state": "known-absent",
+        "missing_declaration_ids": ["generated-owner"],
+        "unseen_expected_declaration_ids": [],
+        "unexpected_declaration_ids": [],
+    }
+    assert _provider(absent)["state"] == "collected"
+    assert absent["delta_from_previous"]["providers"] == {
+        "added": [],
+        "removed": [],
+        "changed": ["generated-owner-provider"],
+    }
+
+    delta = _nested_delta(absent)
+    changed = delta["changed_groups"][0]
+    assert changed["removed_declaration_ids"] == ["generated-owner"]
+    assert changed["added_declaration_ids"] == []
+    assert changed["comparison_changed"] is True
+    assert changed["absence_changed"] is True
+    assert changed["coverage_changed"] is False
+
+    subject = delta["semantic_subjects"]["changed"][0]
+    assert subject["semantic_declarations"] == {
+        "added": [],
+        "removed": [generated_identity],
+        "ambiguous": [],
+        "changed": [],
+    }
+    bindings = delta["repository_evidence"]["bindings"]
+    assert bindings["changed"] == []
+    assert bindings["removed"] == [_role_rows(present)["generated-copy"]["binding_id"]]
+    assert bindings["preserved"] == [_role_rows(present)["source"]["binding_id"]]
+    return generated_identity
+
+
+def _assert_generated_role_reappearance(
+    present: dict[str, object],
+    absent: dict[str, object],
+    restored: dict[str, object],
+    generated_identity: str,
+) -> None:
+    restored_group = _nested_group(restored)
+    restored_roles = _role_rows(restored)
+    assert restored_group["comparison"] == {
+        "state": "differing",
+        "distinct_values": ["team-a", "team-b"],
+    }
+    assert restored_group["absence"]["state"] == "known-present"
+    assert (
+        restored_roles["generated-copy"]["semantic_declaration_identity"]
+        == generated_identity
+    )
+    assert (
+        restored_group["semantic_subject_identity"]
+        == _nested_group(present)["semantic_subject_identity"]
+        == _nested_group(absent)["semantic_subject_identity"]
+    )
+
+    delta = _nested_delta(restored)
+    subject = delta["semantic_subjects"]["changed"][0]
+    assert subject["semantic_declarations"] == {
+        "added": [generated_identity],
+        "removed": [],
+        "ambiguous": [],
+        "changed": [],
+    }
+    assert subject["comparison_transition"]["before"]["state"] == "insufficient"
+    assert subject["comparison_transition"]["after"]["state"] == "differing"
+    assert subject["absence_transition"]["before"]["state"] == "known-absent"
+    assert subject["absence_transition"]["after"]["state"] == "known-present"
+
+    bindings = delta["repository_evidence"]["bindings"]
+    assert bindings["added"] == [restored_roles["generated-copy"]["binding_id"]]
+    assert bindings["changed"] == []
+    assert bindings["preserved"] == [restored_roles["source"]["binding_id"]]
+
+    original_generated = _role_rows(present)["generated-copy"]
+    restored_generated = restored_roles["generated-copy"]
+    assert (
+        original_generated["declaration_definition_identity"]
+        == restored_generated["declaration_definition_identity"]
+    )
+    assert (
+        original_generated["declaration_observation_identity"]
+        != restored_generated["declaration_observation_identity"]
+    )
+
+
+def test_generated_role_reappears_without_history_or_invented_continuity(
+    tmp_path: Path,
+) -> None:
+    present, absent, restored = _generated_ownership_lifecycle(tmp_path)
+    generated_identity = _assert_generated_role_absence(present, absent)
+    _assert_generated_role_reappearance(
+        present,
+        absent,
+        restored,
+        generated_identity,
+    )
