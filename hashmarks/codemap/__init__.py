@@ -7,7 +7,10 @@ change analysis is needed.
 
 from .change_impact import ChangeImpactOptions
 from .engine import CodeMap
-from .evidence_correlation import validate_evidence_locator_claim
+from .evidence_correlation import (
+    evidence_component_fits,
+    validate_evidence_locator_claim,
+)
 from .model import (
     ContextDisclosure,
     ContextPack,
@@ -35,6 +38,7 @@ from .worktree_overlay import WorktreeOverlay
 
 __all__ = [
     "CodeMap",
+    "evidence_component_fits",
     "validate_evidence_locator_claim",
     "ChangeImpactOptions",
     "PostChangeOptions",
