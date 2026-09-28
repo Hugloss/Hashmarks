@@ -125,7 +125,9 @@ def _budget_sequence(value: object) -> Sequence[object] | None:
 
 
 def _bundle_budget_usage(bundle: Mapping[str, object]) -> tuple[int, int] | None:
-    components = (bundle.get(field, {}) for field in ("scope", "producer", "provenance"))
+    components = (
+        bundle.get(field, {}) for field in ("scope", "producer", "provenance")
+    )
     if not all(
         isinstance(value, Mapping) and evidence_component_fits(dict(value))
         for value in components
