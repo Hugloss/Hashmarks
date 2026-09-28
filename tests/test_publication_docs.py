@@ -281,12 +281,10 @@ def test_provider_namespace_identity_never_infers_cross_provider_aliases() -> No
     assert "changing semantic scope changes subject identity" in invariants
     assert "do not infer a cross-provider rename, alias, migration" in declarations
     assert (
-        "does not maintain a provider-alias or provider-migration table"
-        in declarations
+        "does not maintain a provider-alias or provider-migration table" in declarations
     )
     assert (
-        "Provider build/provenance version is not identity; semantic scope is"
-        in owners
+        "Provider build/provenance version is not identity; semantic scope is" in owners
     )
 
 
