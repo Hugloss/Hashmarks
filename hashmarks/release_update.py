@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import posixpath
 import re
 import shlex
 import shutil
@@ -147,10 +148,10 @@ def _cache_is_fresh(path: Path, *, now: float) -> bool:
     return 0 <= age < _CHECK_INTERVAL_SECONDS
 
 
-def _write_cache(path: Path, *, now: float, latest_version: str | None) -> None:
+def _write_cache(path: Path, *, now: float) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    payload = {"checked_at": now, "latest_version": latest_version}
+    payload = {"checked_at": now}
     try:
         temporary.write_text(
             json.dumps(payload, sort_keys=True) + "\n",
@@ -249,16 +250,205 @@ def periodic_release_check(
         except ReleaseCheckError:
             release = None
         try:
-            _write_cache(
-                cache,
-                now=checked_at,
-                latest_version=None if release is None else release.latest_version,
-            )
+            _write_cache(cache, now=checked_at)
         except OSError:
             pass
     if release is None or not release.update_available:
         return None
     return release
+
+
+def _normalized_managed_path(value: str, *, windows: bool) -> str:
+    normalized = posixpath.normpath(value.replace("\\", "/"))
+    return normalized.casefold() if windows else normalized
+
+
+def _join_managed_path(
+    root: str,
+    *parts: str,
+    windows: bool,
+) -> str:
+    combined = "/".join((root.rstrip("/\\"), *parts))
+    return _normalized_managed_path(combined, windows=windows)
+
+
+def _managed_python_tool_roots(
+    *,
+    environ: Mapping[str, str],
+    home: str,
+    os_name: str,
+    platform: str,
+) -> dict[str, tuple[str, ...]]:
+    windows = os_name == "nt"
+
+    uv_tool_dir = environ.get("UV_TOOL_DIR")
+    if uv_tool_dir:
+        uv_roots = (
+            _join_managed_path(uv_tool_dir, "hashmarks", windows=windows),
+        )
+    elif windows:
+        appdata = environ.get("APPDATA")
+        uv_roots = (
+            ()
+            if appdata is None
+            else (
+                _join_managed_path(
+                    appdata,
+                    "uv",
+                    "data",
+                    "tools",
+                    "hashmarks",
+                    windows=True,
+                ),
+            )
+        )
+    else:
+        data_home = environ.get("XDG_DATA_HOME") or f"{home}/.local/share"
+        uv_roots = (
+            _join_managed_path(
+                data_home,
+                "uv",
+                "tools",
+                "hashmarks",
+                windows=False,
+            ),
+        )
+
+    pipx_home = environ.get("PIPX_HOME")
+    if pipx_home:
+        pipx_roots = (
+            _join_managed_path(
+                pipx_home,
+                "venvs",
+                "hashmarks",
+                windows=windows,
+            ),
+        )
+    elif windows:
+        local_appdata = environ.get("LOCALAPPDATA")
+        default_roots = (
+            ()
+            if local_appdata is None
+            else (
+                _join_managed_path(
+                    local_appdata,
+                    "pipx",
+                    "pipx",
+                    "venvs",
+                    "hashmarks",
+                    windows=True,
+                ),
+            )
+        )
+        pipx_roots = (
+            *default_roots,
+            _join_managed_path(
+                home,
+                "pipx",
+                "venvs",
+                "hashmarks",
+                windows=True,
+            ),
+        )
+    elif platform == "darwin":
+        pipx_roots = (
+            _join_managed_path(
+                home,
+                "Library",
+                "Application Support",
+                "pipx",
+                "venvs",
+                "hashmarks",
+                windows=False,
+            ),
+            _join_managed_path(
+                home,
+                ".local",
+                "pipx",
+                "venvs",
+                "hashmarks",
+                windows=False,
+            ),
+        )
+    else:
+        data_home = environ.get("XDG_DATA_HOME") or f"{home}/.local/share"
+        pipx_roots = (
+            _join_managed_path(
+                data_home,
+                "pipx",
+                "venvs",
+                "hashmarks",
+                windows=False,
+            ),
+            _join_managed_path(
+                home,
+                ".local",
+                "pipx",
+                "venvs",
+                "hashmarks",
+                windows=False,
+            ),
+        )
+
+    pipx_global_home = environ.get("PIPX_GLOBAL_HOME")
+    if pipx_global_home:
+        pipx_global_roots = (
+            _join_managed_path(
+                pipx_global_home,
+                "venvs",
+                "hashmarks",
+                windows=windows,
+            ),
+        )
+    elif windows:
+        pipx_global_roots = ()
+    else:
+        pipx_global_roots = (
+            _join_managed_path(
+                "/opt/pipx",
+                "venvs",
+                "hashmarks",
+                windows=False,
+            ),
+        )
+
+    return {
+        "uv": tuple(uv_roots),
+        "pipx": tuple(pipx_roots),
+        "pipx-global": tuple(pipx_global_roots),
+    }
+
+
+def _detect_python_installation_owner(
+    *,
+    prefix: str,
+    base_prefix: str,
+    environ: Mapping[str, str],
+    home: str,
+    os_name: str,
+    platform: str,
+) -> InstallationOwner:
+    windows = os_name == "nt"
+    managed_prefix = _normalized_managed_path(prefix, windows=windows)
+    roots = _managed_python_tool_roots(
+        environ=environ,
+        home=home,
+        os_name=os_name,
+        platform=platform,
+    )
+    if managed_prefix in roots["uv"]:
+        return InstallationOwner("uv", "uv", ("uv", "tool", "upgrade", "hashmarks"))
+    if managed_prefix in roots["pipx"]:
+        return InstallationOwner("pipx", "pipx", ("pipx", "upgrade", "hashmarks"))
+    if managed_prefix in roots["pipx-global"]:
+        return InstallationOwner(
+            "pipx-global",
+            "pipx (global)",
+            ("pipx", "upgrade", "--global", "hashmarks"),
+        )
+    if prefix != base_prefix:
+        return InstallationOwner("environment", "the current Python environment", None)
+    return InstallationOwner("unknown", "an unknown installation owner", None)
 
 
 def detect_installation_owner() -> InstallationOwner:
@@ -273,14 +463,14 @@ def detect_installation_owner() -> InstallationOwner:
             "an unmanaged standalone executable",
             None,
         )
-    prefix = str(Path(sys.prefix).resolve()).replace("\\", "/").casefold()
-    if "/uv/tools/hashmarks" in prefix:
-        return InstallationOwner("uv", "uv", ("uv", "tool", "upgrade", "hashmarks"))
-    if "/pipx/venvs/hashmarks" in prefix:
-        return InstallationOwner("pipx", "pipx", ("pipx", "upgrade", "hashmarks"))
-    if sys.prefix != sys.base_prefix:
-        return InstallationOwner("environment", "the current Python environment", None)
-    return InstallationOwner("unknown", "an unknown installation owner", None)
+    return _detect_python_installation_owner(
+        prefix=str(Path(sys.prefix).resolve()),
+        base_prefix=str(Path(sys.base_prefix).resolve()),
+        environ=os.environ,
+        home=str(Path.home()),
+        os_name=os.name,
+        platform=sys.platform,
+    )
 
 
 def manual_upgrade_command(owner: InstallationOwner, latest_version: str) -> str | None:
