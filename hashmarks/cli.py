@@ -92,12 +92,22 @@ def _render_external_upgrade_guidance() -> None:
     )
 
 
-def _render_standalone_upgrade(release: ReleaseInfo, *, announce: bool) -> None:
+def _render_standalone_upgrade(release: ReleaseInfo, *, announce: bool) -> str:
     _render_release(release, announce=announce)
     command = standalone_upgrade_command(release.latest_version)
-    _text("", "This installation uses the Hashmarks standalone installer.")
-    if command is not None:
-        _text("", "Native upgrade command:", "", f"    {command}")
+    if command is None:
+        raise StandaloneUpgradeError(
+            "this installation is not managed by the Hashmarks standalone installer"
+        )
+    _text(
+        "",
+        "This installation uses the Hashmarks standalone installer.",
+        "",
+        "Native upgrade command:",
+        "",
+        f"    {command}",
+    )
+    return command
 
 
 def _prompt_upgrade() -> bool:
@@ -105,14 +115,14 @@ def _prompt_upgrade() -> bool:
     return input("Select [1/2]: ").strip() == "1"
 
 
-def _delegate_selected_standalone_upgrade(release: ReleaseInfo) -> None:
+def _delegate_selected_standalone_upgrade(command: str) -> None:
     _text(
         "",
         "Delegating update to the Hashmarks standalone installer.",
         "Hashmarks exits before the installer mutates the installation.",
         "Restart Hashmarks after the upgrade completes.",
     )
-    delegate_standalone_upgrade(release.latest_version)
+    delegate_standalone_upgrade(command)
 
 
 def _upgrade(args) -> int:
@@ -134,14 +144,14 @@ def _upgrade(args) -> int:
         _render_external_upgrade_guidance()
         return 0
 
-    _render_standalone_upgrade(release, announce=False)
+    command = _render_standalone_upgrade(release, announce=False)
     if not _interactive_terminal():
         _text("", "No changes were made.")
         return 0
     if not _prompt_upgrade():
         _text("Upgrade skipped.")
         return 0
-    _delegate_selected_standalone_upgrade(release)
+    _delegate_selected_standalone_upgrade(command)
     return 0
 
 
@@ -161,11 +171,11 @@ def _maybe_offer_periodic_upgrade(command: str) -> None:
         _render_external_upgrade_guidance()
         return
 
-    _render_standalone_upgrade(release, announce=True)
+    upgrade_command = _render_standalone_upgrade(release, announce=True)
     if not _prompt_upgrade():
         _text("Upgrade skipped for now.")
         return
-    _delegate_selected_standalone_upgrade(release)
+    _delegate_selected_standalone_upgrade(upgrade_command)
 
 
 def _daemon_serve_command(workspace: Path, state: Path) -> list[str]:
