@@ -30,8 +30,9 @@ def test_splunk_csv_dogfood_accepts_utf8_bom_as_transport_marker(
     plain_report = collect(plain)
     bom_report = collect(bom)
 
-    assert plain_report["source"]["artifact_identity"] != (
-        bom_report["source"]["artifact_identity"]
+    assert (
+        plain_report["source"]["artifact_identity"]
+        != (bom_report["source"]["artifact_identity"])
     )
     assert plain_report["summary"] == bom_report["summary"]
     assert plain_report["bundle"]["bundle_id"] == bom_report["bundle"]["bundle_id"]
