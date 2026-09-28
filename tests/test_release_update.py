@@ -247,6 +247,24 @@ def test_native_uv_delegation_replaces_hashmarks_process(monkeypatch) -> None:
     }
 
 
+def test_periodic_cli_check_skips_unmanaged_installation(monkeypatch) -> None:
+    owner = InstallationOwner(
+        kind="environment",
+        label="the current Python environment",
+        command=None,
+    )
+    monkeypatch.setattr(cli, "detect_installation_owner", lambda: owner)
+    monkeypatch.setattr(
+        cli,
+        "periodic_release_check",
+        lambda *args, **kwargs: pytest.fail(
+            "unmanaged/source environments must not perform automatic release checks"
+        ),
+    )
+
+    cli._maybe_offer_periodic_upgrade("find")
+
+
 def test_cli_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate(
     monkeypatch,
     capsys: pytest.CaptureFixture[str],
