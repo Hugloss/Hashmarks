@@ -157,6 +157,103 @@ def test_splunk_csv_dogfood_bounds_unlocated_event_samples(tmp_path) -> None:
     assert len(set(sample_ids)) == 3
 
 
+def test_splunk_csv_dogfood_separates_artifact_occurrence_and_observation_identity(
+    tmp_path,
+) -> None:
+    quoted = tmp_path / "quoted.csv"
+    unquoted = tmp_path / "unquoted.csv"
+    _write(
+        quoted,
+        '"7","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.worker"\n',
+    )
+    _write(
+        unquoted,
+        '7,"2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.worker"\n',
+    )
+
+    quoted_report = collect(quoted)
+    unquoted_report = collect(unquoted)
+    assert quoted_report["source"]["artifact_identity"] != (
+        unquoted_report["source"]["artifact_identity"]
+    )
+    assert quoted_report["bundle"]["bundle_id"] == unquoted_report["bundle"]["bundle_id"]
+    quoted_metadata = quoted_report["bundle"]["anchors"][0]["metadata"]
+    unquoted_metadata = unquoted_report["bundle"]["anchors"][0]["metadata"]
+    assert quoted_metadata["sample_occurrence_ids"] != (
+        unquoted_metadata["sample_occurrence_ids"]
+    )
+    assert quoted_metadata["sample_event_ids"] == (
+        quoted_metadata["sample_occurrence_ids"]
+    )
+    assert unquoted_metadata["sample_event_ids"] == (
+        unquoted_metadata["sample_occurrence_ids"]
+    )
+    assert quoted_metadata["sample_observation_identities"] == (
+        unquoted_metadata["sample_observation_identities"]
+    )
+
+
+def test_splunk_csv_dogfood_projection_identity_is_order_independent(
+    tmp_path,
+) -> None:
+    first = tmp_path / "first.csv"
+    reversed_source = tmp_path / "reversed.csv"
+    row_a = (
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host-a]","idx","[server-a]","INFO name=tasks.worker '
+        'handling_ident=[DOC_A]"\n'
+    )
+    row_b = (
+        '"2","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host-b]","idx","[server-b]","INFO name=utils.kafka '
+        'handling_ident=[DOC_B]"\n'
+    )
+    _write(first, row_a + row_b)
+    _write(reversed_source, row_b + row_a)
+
+    first_report = collect(first)
+    reversed_report = collect(reversed_source)
+    assert first_report["source"]["artifact_identity"] != (
+        reversed_report["source"]["artifact_identity"]
+    )
+    assert first_report["bundle"]["bundle_id"] == reversed_report["bundle"]["bundle_id"]
+    assert first_report["bundle"]["provenance"]["evidence_projection_identity"] == (
+        reversed_report["bundle"]["provenance"]["evidence_projection_identity"]
+    )
+    first_observations = {
+        identity
+        for anchor in first_report["bundle"]["anchors"]
+        for identity in anchor["metadata"]["sample_observation_identities"]
+    }
+    reversed_observations = {
+        identity
+        for anchor in reversed_report["bundle"]["anchors"]
+        for identity in anchor["metadata"]["sample_observation_identities"]
+    }
+    assert first_observations == reversed_observations
+
+
+def test_splunk_csv_dogfood_repeated_observation_keeps_distinct_occurrences(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"7","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=utils.kafka same"\n'
+        '"8","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=utils.kafka same"\n',
+    )
+
+    metadata = collect(source)["bundle"]["anchors"][0]["metadata"]
+    assert metadata["observed_count"] == 2
+    assert len(metadata["sample_occurrence_ids"]) == 2
+    assert len(set(metadata["sample_occurrence_ids"])) == 2
+    assert len(metadata["sample_observation_identities"]) == 1
+
+
 def test_splunk_csv_dogfood_preserves_bounded_opaque_context_per_anchor(
     tmp_path,
 ) -> None:
