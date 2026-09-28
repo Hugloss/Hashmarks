@@ -372,11 +372,17 @@ def test_previous_observations_never_become_semantic_replay_state() -> None:
     assert "G77. Previous declaration observations are comparison inputs" in invariants
     assert "never semantic storage" in invariants
     assert "Reopening CodeMap with the same durable `state_dir`" in declarations
-    assert "`previous_observation` is a bounded caller-supplied comparison endpoint" in declarations
+    assert (
+        "`previous_observation` is a bounded caller-supplied comparison endpoint"
+        in declarations
+    )
     assert "has no replay or restoration authority" in decision
     assert "never hydrate, restore, cache, or persist correspondence state" in owners
     assert "comparison input, not replay state" in agents
-    assert "hydrate semantic/relationship state from caller-supplied previous observations" in boundary
+    assert (
+        "hydrate semantic/relationship state from caller-supplied previous observations"
+        in boundary
+    )
     assert "replay/hydration of semantic declarations or correspondence" in architecture
 
 
