@@ -169,9 +169,7 @@ class _ExplicitSummaryProvider:
                         "provider": self.name,
                         "source_provider": provider,
                     },
-                    "evidence": [
-                        {"path": path, "start_line": 1, "end_line": 1}
-                    ],
+                    "evidence": [{"path": path, "start_line": 1, "end_line": 1}],
                 }
             )
         return RepositoryDeclarationProviderResult(
@@ -379,9 +377,7 @@ def _assert_summary_exists_only_when_explicitly_owned(
     assert delta["added_group_ids"] == ["explicit-abc-summary"]
     assert delta["removed_group_ids"] == []
     assert delta["changed_groups"] == []
-    assert delta["semantic_subjects"]["added"] == [
-        summary["semantic_subject_identity"]
-    ]
+    assert delta["semantic_subjects"]["added"] == [summary["semantic_subject_identity"]]
     assert delta["semantic_subjects"]["removed"] == []
     assert delta["semantic_subjects"]["changed"] == []
     assert delta["semantic_subjects"]["ambiguous"] == []
