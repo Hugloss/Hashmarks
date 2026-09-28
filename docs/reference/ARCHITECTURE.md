@@ -156,6 +156,8 @@ In particular, Hashmarks must not introduce:
 
 Explicit correspondence remains local to the producer-owned declaration group that states it. If provider A relates A↔B and provider B relates B↔C, Hashmarks does **not** derive A↔C. A separate explicit producer must own and evidence that A↔C claim.
 
+Cycles do not create stronger graph authority. Explicit A↔B, B↔C, and C↔A remain three local producer-owned claims; they do not create a semantic connected component, equivalence class, consensus, majority result, or cycle-level winner. Any aggregate A/B/C view must itself be another explicit producer-owned repository claim.
+
 This boundary does not prohibit ordinary repository graphs already owned by CodeMap. It prohibits turning semantic declarations, identities, and cross-provider correspondence into a general-purpose knowledge graph or relationship authority.
 
 ### Semantic identity layers
