@@ -115,6 +115,66 @@ def evidence_component_fits(value: object) -> bool:
     )
 
 
+def evidence_request_budget_fits(
+    bundles: object,
+    *,
+    path_mappings: object = None,
+) -> bool:
+    if not isinstance(bundles, Sequence) or isinstance(
+        bundles,
+        (str, bytes, bytearray),
+    ):
+        return False
+    if len(bundles) > _MAX_BUNDLES:
+        return False
+
+    total_metadata = 0
+    total_anchors = 0
+    for bundle in bundles:
+        if not isinstance(bundle, Mapping):
+            return False
+        for field in ("scope", "producer", "provenance"):
+            value = bundle.get(field, {})
+            if not isinstance(value, Mapping) or not evidence_component_fits(dict(value)):
+                return False
+        anchors = bundle.get("anchors", ())
+        if not isinstance(anchors, Sequence) or isinstance(
+            anchors,
+            (str, bytes, bytearray),
+        ):
+            return False
+        if len(anchors) > _MAX_ANCHORS_PER_BUNDLE:
+            return False
+        total_anchors += len(anchors)
+        if total_anchors > _MAX_TOTAL_ANCHORS:
+            return False
+        for anchor in anchors:
+            if not isinstance(anchor, Mapping):
+                return False
+            metadata = anchor.get("metadata", {})
+            if not isinstance(metadata, Mapping):
+                return False
+            metadata_dict = dict(metadata)
+            if not evidence_component_fits(metadata_dict):
+                return False
+            total_metadata += _json_size(metadata_dict, label="anchor metadata")
+            if total_metadata > _MAX_TOTAL_METADATA_BYTES:
+                return False
+
+    if path_mappings is None:
+        normalized_mappings: object = []
+    else:
+        normalized_mappings = path_mappings
+    request = {
+        "bundles": bundles,
+        "path_mappings": normalized_mappings,
+    }
+    return _json_size(
+        request,
+        label="evidence correlation request",
+    ) <= CORRELATION_REQUEST_MAX_BYTES
+
+
 def _bounded_identifier(value: object, *, label: str) -> str:
     text = str(value or "").strip()
     if not text:
