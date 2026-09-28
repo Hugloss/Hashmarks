@@ -9,6 +9,7 @@ from .change_impact import ChangeImpactOptions
 from .engine import CodeMap
 from .evidence_correlation import (
     evidence_component_fits,
+    evidence_request_budget_fits,
     validate_evidence_locator_claim,
 )
 from .model import (
@@ -39,6 +40,7 @@ from .worktree_overlay import WorktreeOverlay
 __all__ = [
     "CodeMap",
     "evidence_component_fits",
+    "evidence_request_budget_fits",
     "validate_evidence_locator_claim",
     "ChangeImpactOptions",
     "PostChangeOptions",

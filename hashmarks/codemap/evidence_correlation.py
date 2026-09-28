@@ -115,6 +115,87 @@ def evidence_component_fits(value: object) -> bool:
     )
 
 
+def _budget_sequence(value: object) -> Sequence[object] | None:
+    if isinstance(value, Sequence) and not isinstance(
+        value,
+        (str, bytes, bytearray),
+    ):
+        return value
+    return None
+
+
+def _bundle_budget_usage(bundle: Mapping[str, object]) -> tuple[int, int] | None:
+    components = (
+        bundle.get(field, {}) for field in ("scope", "producer", "provenance")
+    )
+    if not all(
+        isinstance(value, Mapping) and evidence_component_fits(dict(value))
+        for value in components
+    ):
+        return None
+
+    anchors = _budget_sequence(bundle.get("anchors", ()))
+    if anchors is None or len(anchors) > _MAX_ANCHORS_PER_BUNDLE:
+        return None
+
+    metadata_bytes = 0
+    for anchor in anchors:
+        if not isinstance(anchor, Mapping):
+            return None
+        metadata = anchor.get("metadata", {})
+        if not isinstance(metadata, Mapping):
+            return None
+        metadata_dict = dict(metadata)
+        if not evidence_component_fits(metadata_dict):
+            return None
+        metadata_bytes += _json_size(metadata_dict, label="anchor metadata")
+    return len(anchors), metadata_bytes
+
+
+def _request_budget_usage(
+    bundles: Sequence[object],
+) -> tuple[int, int] | None:
+    total_anchors = 0
+    total_metadata = 0
+    for bundle in bundles:
+        if not isinstance(bundle, Mapping):
+            return None
+        usage = _bundle_budget_usage(bundle)
+        if usage is None:
+            return None
+        anchor_count, metadata_bytes = usage
+        total_anchors += anchor_count
+        total_metadata += metadata_bytes
+    return total_anchors, total_metadata
+
+
+def evidence_request_budget_fits(
+    bundles: object,
+    *,
+    path_mappings: object = None,
+) -> bool:
+    bundle_sequence = _budget_sequence(bundles)
+    if bundle_sequence is None or len(bundle_sequence) > _MAX_BUNDLES:
+        return False
+    usage = _request_budget_usage(bundle_sequence)
+    if usage is None:
+        return False
+    total_anchors, total_metadata = usage
+    if total_anchors > _MAX_TOTAL_ANCHORS:
+        return False
+    if total_metadata > _MAX_TOTAL_METADATA_BYTES:
+        return False
+
+    request = {
+        "bundles": bundles,
+        "path_mappings": [] if path_mappings is None else path_mappings,
+    }
+    return (
+        _json_size(request, label="evidence correlation request")
+        <= CORRELATION_REQUEST_MAX_BYTES
+    )
+
+
 def _bounded_identifier(value: object, *, label: str) -> str:
     text = str(value or "").strip()
     if not text:

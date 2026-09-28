@@ -220,6 +220,8 @@ Deliberate producer-side truncation must also propagate to the enclosing evidenc
 
 Producer projections must also fit the same encoded component budgets enforced by correlation. Producers should reuse the correlation budget owner rather than copy its byte constants or serialization rules. When an opaque scope or metadata value does not fit, omit that whole value deterministically and report truncation; never slice an opaque identifier into a new value merely to satisfy the byte envelope. Previously admitted values must be selected independently of observation arrival order.
 
+Per-component admission is not sufficient when correlation also owns request-wide budgets. Producers must reuse the request-budget owner for total anchor metadata, total anchor count, and encoded request size. If the complete projection does not fit, retain a deterministic canonical subset of whole anchors according to the producer's existing priority order and report truncation. Do not shorten locator claims, split one locator across anchors, or invent a second budget policy.
+
 Producer adapters must keep identity layers explicit rather than letting one digest silently own several meanings:
 
 When a producer adapter reports source-artifact identity, the digest and every observation derived from that artifact must come from the same captured byte stream. Hashing a live path and then reopening that path for parsing is insufficient because concurrent replacement or mutation can bind provenance to different bytes than the emitted evidence. A request-local immutable snapshot is transport only: it may be discarded immediately after collection and does not create retained source history.

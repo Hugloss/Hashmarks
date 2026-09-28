@@ -6,6 +6,7 @@ import hashlib
 import pytest
 
 import scripts.agent_evaluation.splunk_csv_dogfood as splunk_csv_dogfood
+from hashmarks.codemap import evidence_request_budget_fits
 from scripts.agent_evaluation.splunk_csv_dogfood import collect, correlate
 
 HEADER = (
@@ -815,6 +816,55 @@ def test_splunk_csv_dogfood_fits_oversized_context_to_core_budget(
     )
     result = correlate(workspace, report)
     assert result["resolution_states"] == {"resolved-unique": 1}
+
+
+def test_splunk_csv_dogfood_fits_total_metadata_request_budget(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    rows = []
+    context = "[DOC-" + ("x" * 5_000) + "]"
+    for index in range(60):
+        rows.append(
+            f'"{index}","2026-09-14T23:59:{index % 60:02d}.000+0200",'
+            '"[path]","kube:container:x","[host]","idx","[server]",'
+            f'"INFO name=tasks.worker_{index:03d} handling_ident={context}"\n'
+        )
+    _write(source, "".join(rows))
+
+    report = collect(source)
+
+    assert report["summary"]["anchors_observed"] == 60
+    assert report["summary"]["anchors_emitted"] < 60
+    assert report["summary"]["anchors_truncated"] is True
+    assert report["summary"]["projection_truncated"] is True
+    assert report["bundle"]["truncation"] == "truncated"
+    assert evidence_request_budget_fits([report["bundle"]])
+
+
+def test_splunk_csv_dogfood_fits_encoded_request_budget(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    rows = []
+    path_body = "p" * 7_000
+    for index in range(160):
+        path = f"/{path_body}-{index:03d}.py"
+        rows.append(
+            f'"{index}","2026-09-14T23:59:{index % 60:02d}.000+0200",'
+            '"[path]","kube:container:x","[host]","idx","[server]",'
+            f'"  File ""{path}"", line 7, in run"\n'
+        )
+    _write(source, "".join(rows))
+
+    report = collect(source)
+
+    assert report["summary"]["traceback_anchors_observed"] == 160
+    assert report["summary"]["traceback_anchors_emitted"] < 160
+    assert report["summary"]["anchors_truncated"] is True
+    assert report["summary"]["projection_truncated"] is True
+    assert report["bundle"]["truncation"] == "truncated"
+    assert evidence_request_budget_fits([report["bundle"]])
 
 
 def test_splunk_csv_dogfood_nontruncated_projection_remains_unknown(

@@ -17,6 +17,7 @@ from typing import TextIO
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import (
     evidence_component_fits,
+    evidence_request_budget_fits,
     validate_evidence_locator_claim,
 )
 
@@ -722,6 +723,47 @@ def _selection_metadata_truncated(selection: _AnchorSelection) -> bool:
     )
 
 
+def _selection_prefix(
+    selection: _AnchorSelection,
+    count: int,
+) -> _AnchorSelection:
+    anchors = selection.anchors[:count]
+    traceback_emitted = min(selection.traceback_emitted, count)
+    module_emitted = max(0, count - traceback_emitted)
+    return _AnchorSelection(
+        anchors=anchors,
+        traceback_observed=selection.traceback_observed,
+        traceback_emitted=traceback_emitted,
+        module_observed=selection.module_observed,
+        module_emitted=module_emitted,
+        observed=selection.observed,
+        truncated=(selection.truncated or count < len(selection.anchors)),
+    )
+
+
+def _fit_selection_to_request(
+    source_sha256: str,
+    state: _CollectionState,
+    selection: _AnchorSelection,
+) -> _AnchorSelection:
+    low = 0
+    high = len(selection.anchors)
+    while low < high:
+        midpoint = (low + high + 1) // 2
+        candidate = _selection_prefix(selection, midpoint)
+        bundle = _bundle(source_sha256, state, candidate)
+        if evidence_request_budget_fits([bundle]):
+            low = midpoint
+        else:
+            high = midpoint - 1
+    fitted = _selection_prefix(selection, low)
+    if not evidence_request_budget_fits([_bundle(source_sha256, state, fitted)]):
+        raise ValueError(
+            "Splunk evidence bundle could not fit correlation request budget"
+        )
+    return fitted
+
+
 def _projection_truncated(
     state: _CollectionState,
     selection: _AnchorSelection,
@@ -956,6 +998,7 @@ def collect(
         source_sha256 = _snapshot_source(path, snapshot)
         state = _collect_stream(snapshot)
     selection = _select_anchors(state, max_anchors)
+    selection = _fit_selection_to_request(source_sha256, state, selection)
     return _report(path, source_sha256, state, selection)
 
 
