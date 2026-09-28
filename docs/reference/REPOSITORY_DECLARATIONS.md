@@ -242,6 +242,18 @@ repository evidence and observer-capability change distinct.
 
 A delta does not say whether any change is correct or desirable.
 
+### Authority-transition separation
+
+Declaration change reporting keeps definition, observation, repository evidence, and provider interpretation separate:
+
+- moving otherwise equivalent declaration evidence to a different repository file or range changes the declaration/binding **definition** because the exact evidence locator is part of authority; it does not manufacture a normalized-value change;
+- deleting or restoring evidence at the same declared locator preserves the declaration definition while changing its **observation**, evidence qualification, comparison, and—when complete coverage authorizes it—absence result;
+- changing declaration producer provenance with the same normalized value and exact evidence changes declaration **observation** only; it does not change semantic definition or repository evidence;
+- changing correspondence state/basis or its provenance changes the **group observation** and is reported through `correspondence_changed`; correspondence provenance is not smuggled into declaration values or repository evidence;
+- canonical repository-evidence binding delta remains the owner of member/span/locator transitions underneath these declaration-level facts.
+
+These axes are intentionally independent. A source move, source disappearance, provider version change, or correspondence-basis change must not be collapsed into a generic semantic-value change merely because the group observation identity changed.
+
 ## Derivation authority and explanation
 
 `CodeMap.repository_declaration_derivation_authority(observation)` is a pure
