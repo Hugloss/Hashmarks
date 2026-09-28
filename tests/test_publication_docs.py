@@ -108,7 +108,9 @@ def test_public_docs_expose_repository_evidence_binding_contract() -> None:
     ):
         assert schema in binding
     assert "Locator/content identity separation" in binding
+    assert "Precision/completeness separation" in binding
     assert "content equality may prove equivalence of observed bytes" in binding
+    assert "never upgrades the completeness" in binding
     for state in ("current", "stale", "unknown"):
         assert state in binding
 

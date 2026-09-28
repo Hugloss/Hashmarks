@@ -162,6 +162,18 @@ Coverage preserves the source of change-set completeness. Completeness uses its 
 
 Incomplete change observations never prove that a changed path is outside all declared bindings.
 
+### Precision/completeness separation
+
+Range/member precision and change-set completeness are independent authorities:
+
+- a supplied, replay-validated binding delta can make bound-range precision **known** for an observed changed member even when the overall changed-path set is incomplete;
+- incomplete change-set authority still keeps `outside_declared_bindings` empty and reports only outside candidates, because unobserved repository changes cannot be ruled out;
+- when several bindings share one member, direct range change belongs only to the binding whose exact evidence changed; another binding over the same member may receive a containing-member change without inheriting the first binding's range-content reason;
+- bindings with no changed evidence/dependency/relationship authority receive no impact merely because another binding shares the same packet;
+- caller-asserted and repository-observer completeness sources obey the same split.
+
+Precise evidence about one observed path therefore never upgrades the completeness of the surrounding repository change set or leaks one binding's direct-evidence authority into another binding.
+
 The packet includes **binding_impacts**, keyed by opaque binding ID, with stable repository-evidence reason codes such as:
 
 - **bound-range-content-changed**;
