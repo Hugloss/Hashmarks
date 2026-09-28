@@ -39,6 +39,7 @@ def _group(
     ids = [str(row["declaration_id"]) for row in declarations]
     return {
         "group_id": group_id,
+        "semantic_namespace": "fixture",
         "concept": {"kind": "runtime-compatibility", "identity": "python"},
         "scope": {},
         "correspondence": {
