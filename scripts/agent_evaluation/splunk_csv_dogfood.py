@@ -33,7 +33,7 @@ EXPECTED_HEADER = (
     "_raw",
 )
 _TIMESTAMP_START = re.compile(r"^\d{4}-\d{2}-\d{2}T")
-_MODULE = re.compile(r"\bname=([A-Za-z_][A-Za-z0-9_.]*)")
+_MODULE = re.compile(r"\bname=([^\s]+)")
 _TRACEBACK = re.compile(
     r'File\s+(?:"([^"]+)"|"?([^",\r\n]+)"?),'
     r'\s+line\s+(\d+),\s+in\s+([^"\r\n]+)'
@@ -503,7 +503,7 @@ class _CollectionState:
         match = _MODULE.search(parsed.raw)
         if match is None:
             return False
-        module = match.group(1).strip(".")
+        module = match.group(1)
         try:
             validate_evidence_locator_claim(module=module)
         except ValueError:
