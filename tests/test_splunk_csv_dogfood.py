@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 
+import pytest
+
 from scripts.agent_evaluation.splunk_csv_dogfood import collect, correlate
 
 HEADER = (
@@ -11,6 +13,60 @@ HEADER = (
 
 def _write(path, body: str) -> None:
     path.write_text(HEADER + body, encoding="utf-8")
+
+
+def test_splunk_csv_dogfood_accepts_utf8_bom_as_transport_marker(
+    tmp_path,
+) -> None:
+    plain = tmp_path / "plain.csv"
+    bom = tmp_path / "bom.csv"
+    body = (
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.worker"\n'
+    )
+    _write(plain, body)
+    bom.write_text("\ufeff" + HEADER + body, encoding="utf-8")
+
+    plain_report = collect(plain)
+    bom_report = collect(bom)
+
+    assert (
+        plain_report["source"]["artifact_identity"]
+        != (bom_report["source"]["artifact_identity"])
+    )
+    assert plain_report["summary"] == bom_report["summary"]
+    assert plain_report["bundle"]["bundle_id"] == bom_report["bundle"]["bundle_id"]
+    assert (
+        plain_report["bundle"]["provenance"]["evidence_projection_identity"]
+        == bom_report["bundle"]["provenance"]["evidence_projection_identity"]
+    )
+
+
+def test_splunk_csv_dogfood_accepts_equivalent_header_quoting(tmp_path) -> None:
+    source = tmp_path / "masked.csv"
+    source.write_text(
+        "_serial,_time,source,sourcetype,host,index,splunk_server,_raw\n"
+        '"1","2026-09-14T23:59:59.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[server]","INFO name=tasks.worker"\n',
+        encoding="utf-8",
+    )
+
+    report = collect(source)
+    assert report["summary"]["events"] == 1
+    assert report["summary"]["csv_strict_valid"] == 1
+
+
+def test_splunk_csv_dogfood_keeps_header_schema_exact(tmp_path) -> None:
+    source = tmp_path / "masked.csv"
+    source.write_text(
+        "_serial,_time,source,host,sourcetype,index,splunk_server,_raw\n"
+        '"1","2026-09-14T23:59:59.000+0200","[path]","[host]",'
+        '"kube:container:x","idx","[server]","INFO name=tasks.worker"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Splunk CSV header must be"):
+        collect(source)
 
 
 def test_splunk_csv_dogfood_accepts_unquoted_serial_record_start(tmp_path) -> None:
