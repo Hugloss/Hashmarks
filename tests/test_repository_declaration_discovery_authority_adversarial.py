@@ -900,9 +900,9 @@ def _policy_role_rows(packet: dict[str, object]) -> list[dict[str, object]]:
     ]
 
 
-def test_provider_duplicate_policy_role_preserves_multiplicity_without_precedence(
+def _policy_multiplicity_packets(
     tmp_path: Path,
-) -> None:
+) -> tuple[dict[str, object], dict[str, object]]:
     repo = tmp_path / "repo"
     source = repo / "owners" / "source.meta"
     policy = repo / ".github" / "CODEOWNERS"
@@ -927,7 +927,13 @@ def test_provider_duplicate_policy_role_preserves_multiplicity_without_precedenc
             [provider],
             previous_observation=baseline,
         )
+    return baseline, stressed
 
+
+def _assert_policy_multiplicity_current_state(
+    baseline: dict[str, object],
+    stressed: dict[str, object],
+) -> str:
     baseline_group = _nested_group(baseline)
     stressed_group = _nested_group(stressed)
     assert baseline_group["comparison"] == {
@@ -963,7 +969,13 @@ def test_provider_duplicate_policy_role_preserves_multiplicity_without_precedenc
         "team-a",
         "team-b",
     ]
+    return policy_identity
 
+
+def _assert_policy_multiplicity_semantic_delta(
+    stressed: dict[str, object],
+    policy_identity: str,
+) -> None:
     semantic = _nested_delta(stressed)["semantic_subjects"]["changed"][0][
         "semantic_declarations"
     ]
@@ -983,7 +995,25 @@ def test_provider_duplicate_policy_role_preserves_multiplicity_without_precedenc
         }
     ]
 
+
+def _assert_policy_multiplicity_binding_separation(
+    baseline: dict[str, object],
+    stressed: dict[str, object],
+) -> None:
+    baseline_policy = _policy_role_rows(baseline)
     bindings = _nested_delta(stressed)["repository_evidence"]["bindings"]
     assert baseline_policy[0]["binding_id"] in bindings["preserved"]
     assert len(bindings["added"]) == 2
     assert bindings["removed"] == []
+
+
+def test_provider_duplicate_policy_role_preserves_multiplicity_without_precedence(
+    tmp_path: Path,
+) -> None:
+    baseline, stressed = _policy_multiplicity_packets(tmp_path)
+    policy_identity = _assert_policy_multiplicity_current_state(
+        baseline,
+        stressed,
+    )
+    _assert_policy_multiplicity_semantic_delta(stressed, policy_identity)
+    _assert_policy_multiplicity_binding_separation(baseline, stressed)
