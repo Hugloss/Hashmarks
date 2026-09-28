@@ -595,6 +595,8 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
         in invariants
     )
     assert "requirements are resolved once" in architecture
+    assert "must not transport the same upgrade inputs again" in invariants
+    assert "displayed standalone command is also the execution payload" in architecture
     assert "does not preflight installer prerequisites" in getting_started
     assert "U6. Hashmarks never owns updating itself." in invariants
     assert "U7. Native package-manager state stays opaque and native." in invariants
