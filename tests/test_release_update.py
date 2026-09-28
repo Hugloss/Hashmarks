@@ -216,7 +216,9 @@ def test_external_python_upgrade_reports_native_tool_handoff_without_mutation(
     monkeypatch.setattr(
         cli,
         "_prompt_upgrade",
-        lambda: pytest.fail("external package-manager installs must not prompt mutation"),
+        lambda: pytest.fail(
+            "external package-manager installs must not prompt mutation"
+        ),
     )
     monkeypatch.setattr(
         cli,
@@ -335,7 +337,9 @@ def test_standalone_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate
 ) -> None:
     installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"
     monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
-    monkeypatch.setattr(release_update.sys, "executable", str(tmp_path / installed_name))
+    monkeypatch.setattr(
+        release_update.sys, "executable", str(tmp_path / installed_name)
+    )
     monkeypatch.setattr(
         cli,
         "fetch_latest_release",
@@ -370,7 +374,9 @@ def test_standalone_upgrade_noninteractive_prints_command_without_mutation(
 ) -> None:
     installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"
     monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
-    monkeypatch.setattr(release_update.sys, "executable", str(tmp_path / installed_name))
+    monkeypatch.setattr(
+        release_update.sys, "executable", str(tmp_path / installed_name)
+    )
     monkeypatch.setattr(
         cli,
         "fetch_latest_release",
