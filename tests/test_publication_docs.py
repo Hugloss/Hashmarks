@@ -277,7 +277,8 @@ def test_duplicate_semantic_roles_never_gain_core_precedence() -> None:
     assert "provider must resolve and expose that claim explicitly" in invariants
     assert "Core does not break duplicate-role ambiguity" in declarations
     assert (
-        "repository-declaration core does not recreate native precedence" in declarations
+        "repository-declaration core does not recreate native precedence"
+        in declarations
     )
 
 
