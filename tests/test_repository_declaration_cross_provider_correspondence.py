@@ -657,3 +657,208 @@ def test_explicit_correspondence_chain_never_creates_transitive_edge(
     _assert_no_transitive_ac_claim(chain)
     _assert_middle_change_stays_on_explicit_edges(chain, middle_changed)
     _assert_ac_exists_only_after_explicit_provider(middle_changed, explicit_ac)
+
+
+def _referential_isolation_packets(
+    tmp_path: Path,
+) -> tuple[
+    dict[str, object],
+    dict[str, object],
+    dict[str, object],
+    dict[str, object],
+]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "owner-a.txt").write_text("owner: team-a\n", encoding="utf-8")
+    (repo / "owner-b.txt").write_text("owner: team-a\n", encoding="utf-8")
+
+    provider_a = _IndependentOwnerProvider("provider-a", "owner-a.txt")
+    provider_b = _IndependentOwnerProvider("provider-b", "owner-b.txt")
+    correlation = _PairCorrespondenceProvider(
+        name="correlation-ab",
+        group_id="correspondence-ab",
+        left_provider="provider-a",
+        right_provider="provider-b",
+        left_path="owner-a.txt",
+        right_path="owner-b.txt",
+    )
+    correlation_unknown = _PairCorrespondenceProvider(
+        name="correlation-ab",
+        group_id="correspondence-ab",
+        left_provider="provider-a",
+        right_provider="provider-missing",
+        left_path="owner-a.txt",
+        right_path="owner-b.txt",
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        baseline = codemap.discover_repository_declarations(
+            [provider_a, provider_b, correlation]
+        )
+
+        source_removed = codemap.discover_repository_declarations(
+            [provider_a, correlation],
+            previous_observation=baseline,
+        )
+
+        unknown_basis = codemap.discover_repository_declarations(
+            [provider_a, correlation_unknown],
+            previous_observation=source_removed,
+        )
+
+        source_restored = codemap.discover_repository_declarations(
+            [provider_a, provider_b, correlation_unknown],
+            previous_observation=unknown_basis,
+        )
+
+    return baseline, source_removed, unknown_basis, source_restored
+
+
+def _assert_named_source_removal_does_not_cascade(
+    baseline: dict[str, object],
+    source_removed: dict[str, object],
+) -> None:
+    before = _groups(baseline)
+    after = _groups(source_removed)
+    assert set(after) == {"provider-a-owner", "correspondence-ab"}
+    assert (
+        before["provider-a-owner"]["group_observation_identity"]
+        == after["provider-a-owner"]["group_observation_identity"]
+    )
+    assert (
+        before["correspondence-ab"]["group_observation_identity"]
+        == after["correspondence-ab"]["group_observation_identity"]
+    )
+    assert after["correspondence-ab"]["comparison"] == {
+        "state": "equivalent",
+        "distinct_values": ["team-a"],
+    }
+
+    delta = source_removed["delta_from_previous"]
+    assert delta["providers"] == {
+        "added": [],
+        "removed": ["provider-b"],
+        "changed": [],
+    }
+    declarations = delta["declarations"]
+    assert declarations["removed_group_ids"] == ["provider-b-owner"]
+    assert declarations["added_group_ids"] == []
+    assert declarations["changed_groups"] == []
+
+    subjects = declarations["semantic_subjects"]
+    assert subjects["removed"] == [
+        before["provider-b-owner"]["semantic_subject_identity"]
+    ]
+    assert subjects["added"] == []
+    assert subjects["changed"] == []
+    assert subjects["ambiguous"] == []
+
+    before_correlation = {
+        row["declaration_id"]: row
+        for row in before["correspondence-ab"]["declarations"]
+    }
+    after_correlation = {
+        row["declaration_id"]: row
+        for row in after["correspondence-ab"]["declarations"]
+    }
+    bindings = declarations["repository_evidence"]["bindings"]
+    assert before_correlation["left-owner"]["binding_id"] in bindings["preserved"]
+    assert before_correlation["right-owner"]["binding_id"] in bindings["preserved"]
+    assert (
+        before_correlation["right-owner"]["binding_id"]
+        == after_correlation["right-owner"]["binding_id"]
+    )
+    assert before["provider-b-owner"]["declarations"][0]["binding_id"] in bindings[
+        "removed"
+    ]
+
+
+def _assert_unknown_provider_name_is_opaque_basis_metadata(
+    source_removed: dict[str, object],
+    unknown_basis: dict[str, object],
+) -> None:
+    before = _groups(source_removed)
+    after = _groups(unknown_basis)
+    assert set(after) == set(before)
+    assert (
+        before["provider-a-owner"]["group_observation_identity"]
+        == after["provider-a-owner"]["group_observation_identity"]
+    )
+
+    correlation = after["correspondence-ab"]
+    assert correlation["correspondence"]["basis"]["right_provider"] == "provider-missing"
+    assert correlation["comparison"] == {
+        "state": "equivalent",
+        "distinct_values": ["team-a"],
+    }
+    assert (
+        before["correspondence-ab"]["semantic_subject_identity"]
+        == correlation["semantic_subject_identity"]
+    )
+
+    delta = unknown_basis["delta_from_previous"]
+    assert delta["providers"] == {
+        "added": [],
+        "removed": [],
+        "changed": ["correlation-ab"],
+    }
+    changed = delta["declarations"]["changed_groups"]
+    assert [row["group_id"] for row in changed] == ["correspondence-ab"]
+    assert changed[0]["correspondence_changed"] is True
+    assert changed[0]["value_changed_declaration_ids"] == []
+    assert changed[0]["semantic_subject_changed"] is False
+
+
+def _assert_source_restore_does_not_rewire_correlation(
+    unknown_basis: dict[str, object],
+    source_restored: dict[str, object],
+) -> None:
+    before = _groups(unknown_basis)
+    after = _groups(source_restored)
+    assert set(after) == {
+        "provider-a-owner",
+        "provider-b-owner",
+        "correspondence-ab",
+    }
+    assert (
+        before["correspondence-ab"]["group_observation_identity"]
+        == after["correspondence-ab"]["group_observation_identity"]
+    )
+    assert after["correspondence-ab"]["correspondence"]["basis"]["right_provider"] == (
+        "provider-missing"
+    )
+
+    delta = source_restored["delta_from_previous"]
+    assert delta["providers"] == {
+        "added": ["provider-b"],
+        "removed": [],
+        "changed": [],
+    }
+    declarations = delta["declarations"]
+    assert declarations["added_group_ids"] == ["provider-b-owner"]
+    assert declarations["removed_group_ids"] == []
+    assert declarations["changed_groups"] == []
+    assert declarations["semantic_subjects"]["added"] == [
+        after["provider-b-owner"]["semantic_subject_identity"]
+    ]
+    assert declarations["semantic_subjects"]["removed"] == []
+    assert declarations["semantic_subjects"]["changed"] == []
+    assert declarations["semantic_subjects"]["ambiguous"] == []
+
+
+def test_correspondence_basis_names_never_become_foreign_keys(
+    tmp_path: Path,
+) -> None:
+    baseline, source_removed, unknown_basis, source_restored = (
+        _referential_isolation_packets(tmp_path)
+    )
+    _assert_named_source_removal_does_not_cascade(baseline, source_removed)
+    _assert_unknown_provider_name_is_opaque_basis_metadata(
+        source_removed,
+        unknown_basis,
+    )
+    _assert_source_restore_does_not_rewire_correlation(
+        unknown_basis,
+        source_restored,
+    )
