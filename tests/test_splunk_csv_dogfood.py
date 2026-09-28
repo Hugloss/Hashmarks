@@ -473,6 +473,58 @@ def test_splunk_csv_dogfood_prioritizes_traceback_path_line_symbol_anchor(
     assert anchor["metadata"]["kind"] == "python-traceback-frame"
 
 
+def test_splunk_csv_dogfood_preserves_all_traceback_frames_in_one_event(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","Traceback (most recent call last):\n'
+        '  File "/app/src/api/worker.py", line 14, in handle\n'
+        '  File "/app/src/utils/helpers.py", line 7, in parse_result\n'
+        'ValueError: bad payload"\n',
+    )
+
+    report = collect(source)
+    summary = report["summary"]
+    assert summary["events"] == 1
+    assert summary["events_with_extracted_locator"] == 1
+    assert summary["traceback_locator_occurrences"] == 2
+    assert summary["unique_traceback_anchors_observed"] == 2
+    assert summary["unique_anchors_observed"] == 2
+
+    anchors = {
+        (anchor["path"], anchor["line"], anchor["symbol"])
+        for anchor in report["bundle"]["anchors"]
+    }
+    assert anchors == {
+        ("/app/src/api/worker.py", 14, "handle"),
+        ("/app/src/utils/helpers.py", 7, "parse_result"),
+    }
+
+
+def test_splunk_csv_dogfood_counts_repeated_traceback_frame_occurrences(
+    tmp_path,
+) -> None:
+    source = tmp_path / "masked.csv"
+    _write(
+        source,
+        '"1","2026-09-14T23:59:58.000+0200","[path]","kube:container:x",'
+        '"[host]","idx","[host]","Traceback:\n'
+        '  File "/app/src/utils/helpers.py", line 7, in parse_result\n'
+        '  File "/app/src/utils/helpers.py", line 7, in parse_result"\n',
+    )
+
+    report = collect(source)
+    summary = report["summary"]
+    assert summary["events"] == 1
+    assert summary["traceback_locator_occurrences"] == 2
+    assert summary["unique_traceback_anchors_observed"] == 1
+    anchor = report["bundle"]["anchors"][0]
+    assert anchor["metadata"]["observed_count"] == 2
+
+
 def test_splunk_csv_dogfood_correlates_traceback_with_explicit_path_mapping(
     tmp_path,
 ) -> None:
