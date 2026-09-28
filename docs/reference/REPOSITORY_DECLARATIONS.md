@@ -469,6 +469,18 @@ the provider's ability to enumerate a declaration group, the provider must
 downgrade that group's \`coverage.state\` / \`coverage.truncation\`; warnings do
 not give Hashmarks permission to invent completeness.
 
+### Provider-transition separation
+
+Discovery transitions keep wrapper execution evidence separate from nested declaration authority:
+
+- `not-detected -> collected` and `collected -> not-detected` are provider-state transitions; they add or remove the provider's nested declaration groups, but `not-detected` itself never becomes a semantic absence claim;
+- changing only provider warnings/provenance changes the discovery wrapper observation while leaving the nested declaration packet unchanged;
+- when a warning genuinely means enumeration is incomplete, the provider must explicitly downgrade declaration coverage; the nested declaration delta then owns the resulting coverage/absence change;
+- moving a provider-selected source path changes provider inputs/enumerations and the nested declaration/binding definition, while an unchanged normalized value remains an unchanged value;
+- provider helper-input or enumeration changes that do not change qualified declarations remain wrapper-only observation changes.
+
+Hashmarks therefore does not infer declaration semantics from provider lifecycle, warning text, helper-input churn, or path-enumeration churn. Providers express semantic consequences through ordinary declaration groups, exact evidence, and coverage claims.
+
 Provider order is canonicalized, provider names must be unique, provider
 metadata is bounded, and each provider may content/existence-observe at most
 **256 distinct repository input paths** through the Hashmarks context. Path
