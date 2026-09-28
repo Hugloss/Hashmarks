@@ -121,6 +121,10 @@ Cross-provider correspondence follows the same rule. If two independent provider
 
 This is intentionally not a global semantic edge registry or ontology layer. A correspondence provider may identify the source producers in opaque provenance/basis metadata, but core does not interpret those names as identity links, transitive equivalence, precedence, or migration authority.
 
+Correspondence is also deliberately **non-transitive**. Explicit A↔B and B↔C groups remain two separate producer-owned declaration groups. Core does not derive A↔C, semantic reachability, connected components, shortest paths, neighborhoods, inverse edges, or transitive closure. Matching values across the chain do not strengthen this rule. If A↔C is meaningful repository evidence, an explicit producer must emit and evidence an A↔C correspondence claim in its own namespace.
+
+Removing A↔B or B↔C removes only that explicit producer-owned claim. Hashmarks does not retain an inferred edge or graph residue that survives after the originating correspondence disappears.
+
 ## Values and comparison
 
 Each declaration has:
