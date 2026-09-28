@@ -495,8 +495,13 @@ class RepositoryDeclarationsMixin:
         if raw_group.get("semantic_subject_identity") != semantic_subject_identity:
             raise ValueError(f"{name} semantic subject identity mismatch")
         for declaration in projected_rows:
-            if declaration.get("semantic_subject_identity") != semantic_subject_identity:
-                raise ValueError(f"{name} declaration semantic subject identity mismatch")
+            if (
+                declaration.get("semantic_subject_identity")
+                != semantic_subject_identity
+            ):
+                raise ValueError(
+                    f"{name} declaration semantic subject identity mismatch"
+                )
 
         referenced = {
             self._validate_projected_declaration(
