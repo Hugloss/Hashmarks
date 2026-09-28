@@ -256,10 +256,7 @@ class _CollectionState:
             self.events_with_extracted_locator += 1
         else:
             self.events_without_extracted_locator += 1
-            if (
-                len(self.unlocated_sample_event_ids)
-                < _MAX_UNLOCATED_SAMPLE_EVENT_IDS
-            ):
+            if len(self.unlocated_sample_event_ids) < _MAX_UNLOCATED_SAMPLE_EVENT_IDS:
                 self.unlocated_sample_event_ids.append(event_id)
 
     def _observe_scope(
@@ -396,8 +393,7 @@ def _bundle(
                 state.events_without_extracted_locator
             ),
             "locator_occurrences": (
-                state.module_locator_occurrences
-                + state.traceback_locator_occurrences
+                state.module_locator_occurrences + state.traceback_locator_occurrences
             ),
             "unlocated_sample_event_ids": state.unlocated_sample_event_ids,
         },
@@ -440,12 +436,9 @@ def _report(
                 state.events_without_extracted_locator
             ),
             "module_locator_occurrences": state.module_locator_occurrences,
-            "traceback_locator_occurrences": (
-                state.traceback_locator_occurrences
-            ),
+            "traceback_locator_occurrences": (state.traceback_locator_occurrences),
             "locator_occurrences": (
-                state.module_locator_occurrences
-                + state.traceback_locator_occurrences
+                state.module_locator_occurrences + state.traceback_locator_occurrences
             ),
             "unique_traceback_anchors_observed": selection.traceback_observed,
             "traceback_anchors_emitted": selection.traceback_emitted,
