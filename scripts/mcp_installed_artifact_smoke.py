@@ -81,6 +81,7 @@ async def _exercise(executable: Path, repo: Path, state_dir: Path) -> None:
                     "groups": [
                         {
                             "group_id": "runtime",
+                            "semantic_namespace": "installed-smoke",
                             "concept": {"kind": "runtime", "identity": "python"},
                             "scope": {},
                             "correspondence": {
