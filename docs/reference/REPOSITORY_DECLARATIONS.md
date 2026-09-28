@@ -219,6 +219,7 @@ The remaining identities keep their existing, narrower jobs:
 \`group_definition_identity\` binds:
 
 - group ID;
+- semantic namespace;
 - opaque concept;
 - semantic scope;
 - expected declaration membership.
