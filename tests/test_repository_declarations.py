@@ -368,6 +368,55 @@ def test_declaration_delta_separates_value_change_from_group_definition(
     assert delta["repository_evidence"]["bindings"]["changed"] == []
 
 
+@pytest.mark.parametrize("before_value,after_value", [(True, 1), (1, 1.0)])
+def test_declaration_delta_uses_canonical_json_value_identity(
+    tmp_path: Path, before_value: object, after_value: object
+) -> None:
+    source = tmp_path / "value.toml"
+    source.write_text("value = 1\n", encoding="utf-8")
+    role = {"kind": "project-intent", "identity": "value"}
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations(
+            [
+                _group(
+                    [
+                        _declaration(
+                            "value", "value.toml", before_value, semantic_role=role
+                        )
+                    ]
+                )
+            ]
+        )
+        after = codemap.repository_declarations(
+            [
+                _group(
+                    [
+                        _declaration(
+                            "value", "value.toml", after_value, semantic_role=role
+                        )
+                    ]
+                )
+            ],
+            previous_observation=before,
+        )
+
+    assert (
+        before["groups"][0]["group_observation_identity"]
+        != (after["groups"][0]["group_observation_identity"])
+    )
+    delta = after["delta_from_previous"]
+    group_change = delta["changed_groups"][0]
+    assert group_change["value_changed_declaration_ids"] == ["value"]
+    assert group_change["observation_changed_declaration_ids"] == []
+    assert group_change["comparison_changed"] is True
+    subject_change = delta["semantic_subjects"]["changed"][0]
+    assert subject_change["value_changed_declaration_ids"] == ["value"]
+    role_change = subject_change["semantic_declarations"]["changed"][0]
+    assert role_change["value_transition"]["before"]["value"] == before_value
+    assert role_change["value_transition"]["after"]["value"] == after_value
+
+
 def test_previous_declaration_packet_is_revalidated_before_delta(
     tmp_path: Path,
 ) -> None:
@@ -759,6 +808,70 @@ def test_semantic_role_delta_preserves_duplicate_role_ambiguity(
     ]
 
 
+def test_one_sided_duplicate_semantic_roles_remain_ambiguous(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    base = _group(
+        [_declaration("base", "runtime.yaml", "3.12", semantic_role={"kind": "base"})]
+    )
+    duplicates = _group(
+        [
+            *base["declarations"],
+            _declaration("a", "runtime.yaml", "3.12", semantic_role={"kind": "extra"}),
+            _declaration("b", "runtime.yaml", "3.12", semantic_role={"kind": "extra"}),
+        ]
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.repository_declarations([base])
+        added = codemap.repository_declarations(
+            [duplicates], previous_observation=before
+        )
+        removed = codemap.repository_declarations([base], previous_observation=added)
+
+    identity = next(
+        row["semantic_declaration_identity"]
+        for row in added["groups"][0]["declarations"]
+        if row["declaration_id"] == "a"
+    )
+    added_roles = added["delta_from_previous"]["semantic_subjects"]["changed"][0][
+        "semantic_declarations"
+    ]
+    removed_roles = removed["delta_from_previous"]["semantic_subjects"]["changed"][0][
+        "semantic_declarations"
+    ]
+    assert added_roles == {
+        "added": [identity],
+        "removed": [],
+        "ambiguous": [
+            {
+                "semantic_declaration_identity": identity,
+                "previous_declaration_ids": [],
+                "current_declaration_ids": ["a", "b"],
+                "reason": "semantic-declaration-not-unique",
+            }
+        ],
+        "changed": [],
+    }
+    assert removed_roles == {
+        "added": [],
+        "removed": [identity],
+        "ambiguous": [
+            {
+                "semantic_declaration_identity": identity,
+                "previous_declaration_ids": ["a", "b"],
+                "current_declaration_ids": [],
+                "reason": "semantic-declaration-not-unique",
+            }
+        ],
+        "changed": [],
+    }
+
+
 @pytest.mark.parametrize("semantic_role", [{}, [], "runtime"])
 def test_semantic_role_requires_non_empty_object(
     tmp_path: Path,
@@ -814,6 +927,55 @@ def test_semantic_subject_delta_preserves_duplicate_subject_ambiguity(
             "reason": "semantic-subject-not-unique",
         }
     ]
+
+
+def test_one_sided_duplicate_semantic_subjects_remain_ambiguous(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "runtime.yaml").write_text("python: 3.12\n", encoding="utf-8")
+    declaration = [_declaration("runtime", "runtime.yaml", "3.12")]
+    duplicate_groups = [
+        _group(declaration, group_id="first"),
+        _group(declaration, group_id="second"),
+    ]
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        empty = codemap.repository_declarations([])
+        added = codemap.repository_declarations(
+            duplicate_groups, previous_observation=empty
+        )
+        removed = codemap.repository_declarations([], previous_observation=added)
+
+    identity = added["groups"][0]["semantic_subject_identity"]
+    assert added["delta_from_previous"]["semantic_subjects"] == {
+        "added": [identity],
+        "removed": [],
+        "ambiguous": [
+            {
+                "semantic_subject_identity": identity,
+                "previous_group_ids": [],
+                "current_group_ids": ["first", "second"],
+                "reason": "semantic-subject-not-unique",
+            }
+        ],
+        "changed": [],
+    }
+    assert removed["delta_from_previous"]["semantic_subjects"] == {
+        "added": [],
+        "removed": [identity],
+        "ambiguous": [
+            {
+                "semantic_subject_identity": identity,
+                "previous_group_ids": ["first", "second"],
+                "current_group_ids": [],
+                "reason": "semantic-subject-not-unique",
+            }
+        ],
+        "changed": [],
+    }
 
 
 def test_semantic_subject_change_is_explicit_in_delta(tmp_path: Path) -> None:

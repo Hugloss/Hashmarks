@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -39,6 +39,17 @@ def _binding(
     binding_id = anchor["repository_evidence_binding_id"]
     rows = packet["repository_evidence"]["bindings"]
     return next(row for row in rows if row["binding_id"] == binding_id)
+
+
+def _resign_correlation(codemap: CodeMap, packet: dict[str, object]) -> None:
+    packet["correlation_identity"] = "sha256:" + codemap._packet_digest(
+        "hashmarks.evidence-correlation.v2",
+        {
+            key: value
+            for key, value in packet.items()
+            if key not in {"correlation_identity", "delta_from_previous"}
+        },
+    )
 
 
 def test_evidence_request_budget_owner_matches_total_limits() -> None:
@@ -167,7 +178,7 @@ def test_external_runtime_path_maps_to_repository_symbol_without_gaining_authori
         )
 
     anchor = packet["bundles"][0]["anchors"][0]
-    assert packet["schema"] == "hashmarks.evidence-correlation.v1"
+    assert packet["schema"] == "hashmarks.evidence-correlation.v2"
     assert packet["authority"] == "repository-intelligence-only"
     assert packet["interpretation_authority"] == "consumer-owned"
     assert packet["causation"] == "not-inferred"
@@ -635,7 +646,7 @@ def test_uv_lock_upgrade_delta_reuses_repository_binding_authority(
         )
 
     delta = after["delta_from_previous"]
-    assert delta["schema"] == "hashmarks.evidence-correlation-delta.v1"
+    assert delta["schema"] == "hashmarks.evidence-correlation-delta.v2"
     assert delta["definition"]["state"] == "preserved"
     changed = delta["repository_evidence_delta"]["bindings"]["changed"][0]
     assert changed["direct_evidence"]["state"] == "changed"
@@ -782,6 +793,158 @@ def test_previous_correlation_rejects_tampered_authority_definition_and_bounds(
                 match="correlation_identity does not match packet content",
             ):
                 codemap.evidence_correlation_delta(tampered, before)
+
+
+def test_correlation_replay_reproves_definition_even_after_outer_resign(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.correlate_evidence(
+            _bundle({"anchor_id": "owner", "path": "owner.py"}),
+            include_relationships=False,
+        )
+        changed = _bundle({"anchor_id": "owner", "path": "owner.py"})
+        changed[0]["provenance"] = {"producer_revision": "different"}
+        after = codemap.correlate_evidence(changed, include_relationships=False)
+        assert codemap.evidence_correlation_delta(before, after)["comparability"] == (
+            "not-comparable"
+        )
+
+        forged = json.loads(json.dumps(after))
+        forged["evidence_definition_identity"] = before["evidence_definition_identity"]
+        _resign_correlation(codemap, forged)
+        with pytest.raises(ValueError, match="evidence_definition_identity mismatch"):
+            codemap.evidence_correlation_delta(before, forged)
+
+
+def test_correlation_replay_reproves_packet_local_projections(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observed = codemap.correlate_evidence(
+            _bundle({"anchor_id": "owner", "path": "owner.py"}),
+            include_relationships=False,
+        )
+        revision = _binding(observed, observed["bundles"][0]["anchors"][0])["evidence"][
+            0
+        ]["member_revision"]
+        packet = codemap.correlate_evidence(
+            _bundle(
+                {"anchor_id": "owner", "path": "owner.py", "member_revision": revision}
+            ),
+            include_relationships=False,
+        )
+        for field, value, message in (
+            (
+                "source_equivalence",
+                {"state": "mismatch", "basis": []},
+                "source equivalence",
+            ),
+            ("repository_evidence", {"binding_id": "forged"}, "anchor evidence"),
+        ):
+            forged = json.loads(json.dumps(packet))
+            forged["bundles"][0]["anchors"][0][field] = value
+            _resign_correlation(codemap, forged)
+            with pytest.raises(ValueError, match=message):
+                codemap.evidence_correlation_delta(forged, packet)
+
+        forged = json.loads(json.dumps(packet))
+        forged["completeness"]["state"] = "unknown"
+        _resign_correlation(codemap, forged)
+        with pytest.raises(ValueError, match="completeness mismatch"):
+            codemap.evidence_correlation_delta(forged, packet)
+
+        forged = json.loads(json.dumps(packet))
+        forged["authority"] = "consumer-owned"
+        _resign_correlation(codemap, forged)
+        with pytest.raises(ValueError, match="authority or bounds mismatch"):
+            codemap.evidence_correlation_delta(forged, packet)
+
+
+def test_empty_correlation_retains_definition_options_and_rejects_v1(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.correlate_evidence([], include_relationships=False)
+        after = codemap.correlate_evidence(
+            [], include_relationships=True, relationship_limit_per_path=7
+        )
+        assert before["definition_options"] == {
+            "include_relationships": False,
+            "relationship_limit_per_path": None,
+        }
+        assert after["definition_options"] == {
+            "include_relationships": True,
+            "relationship_limit_per_path": 7,
+        }
+        assert codemap.evidence_correlation_delta(before, after)["comparability"] == (
+            "not-comparable"
+        )
+
+        forged = json.loads(json.dumps(after))
+        forged["definition_options"] = before["definition_options"]
+        _resign_correlation(codemap, forged)
+        with pytest.raises(ValueError, match="evidence_definition_identity mismatch"):
+            codemap.evidence_correlation_delta(forged, after)
+
+        legacy = json.loads(json.dumps(before))
+        legacy["schema"] = "hashmarks.evidence-correlation.v1"
+        with pytest.raises(
+            ValueError, match="must be a hashmarks.evidence-correlation.v2"
+        ):
+            codemap.evidence_correlation_delta(legacy, before)
+
+
+def test_correlation_requires_exact_relationship_option_types(tmp_path: Path) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(ValueError, match="include_relationships must be a boolean"):
+            codemap.correlate_evidence([], include_relationships=cast("bool", 1))
+        with pytest.raises(ValueError, match="relationship_limit_per_path must be"):
+            codemap.correlate_evidence(
+                [], relationship_limit_per_path=cast("int", True)
+            )
+
+
+def test_correlation_replay_rejects_swapped_anchor_bindings_and_correspondence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.py").write_text("A = 1\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("B = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.correlate_evidence(
+            _bundle(
+                {"anchor_id": "a", "path": "a.py"},
+                {"anchor_id": "b", "path": "b.py"},
+            ),
+            include_relationships=False,
+        )
+        forged = json.loads(json.dumps(packet))
+        anchors = forged["bundles"][0]["anchors"]
+        for field in ("repository_evidence_binding_id", "repository_evidence"):
+            anchors[0][field], anchors[1][field] = anchors[1][field], anchors[0][field]
+        _resign_correlation(codemap, forged)
+        with pytest.raises(ValueError, match="anchor binding references mismatch"):
+            codemap.evidence_correlation_delta(forged, packet)
+
+        second = _bundle({"anchor_id": "second", "path": "a.py"})[0]
+        second["bundle_id"] = "observation:2"
+        corresponded = codemap.correlate_evidence(
+            [_bundle({"anchor_id": "first", "path": "a.py"})[0], second],
+            include_relationships=False,
+        )
+        assert corresponded["correspondence"]
+        forged = json.loads(json.dumps(corresponded))
+        forged["correspondence"] = []
+        _resign_correlation(codemap, forged)
+        with pytest.raises(ValueError, match="correspondence mismatch"):
+            codemap.evidence_correlation_delta(forged, corresponded)
 
 
 def test_correlation_request_reuses_binding_total_bound(
@@ -1188,6 +1351,74 @@ def test_member_revision_and_span_identity_disagreement_is_mismatch(
     }
 
 
+def test_source_equivalence_requires_every_supplied_identity_to_be_checked(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "owner.py").write_text("VALUE = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        member, _raw = codemap._repository_member_observation("owner.py")
+        revision = member["member_revision"]
+        observed_span = codemap.correlate_evidence(
+            _bundle({"anchor_id": "line", "path": "owner.py", "line": 1}),
+            include_relationships=False,
+        )
+        span_anchor = observed_span["bundles"][0]["anchors"][0]
+        span_identity = _binding(observed_span, span_anchor)["evidence"][0][
+            "span_identity"
+        ]
+        claims = (
+            {
+                "anchor_id": "partial",
+                "path": "owner.py",
+                "member_revision": revision,
+                "span_identity": "sha256:" + "0" * 64,
+            },
+            {
+                "anchor_id": "mismatch",
+                "path": "owner.py",
+                "member_revision": "0" * 64,
+                "span_identity": "sha256:" + "0" * 64,
+            },
+            {
+                "anchor_id": "unchecked",
+                "path": "owner.py",
+                "span_identity": "sha256:" + "0" * 64,
+            },
+            {
+                "anchor_id": "full",
+                "path": "owner.py",
+                "line": 1,
+                "member_revision": revision,
+                "span_identity": span_identity,
+            },
+        )
+        packet = codemap.correlate_evidence(
+            _bundle(*claims), include_relationships=False
+        )
+
+    equivalences = {
+        row["anchor_id"]: row["source_equivalence"]
+        for row in packet["bundles"][0]["anchors"]
+    }
+    assert equivalences["partial"] == {
+        "state": "unknown",
+        "basis": [{"kind": "member-revision", "matched": True}],
+    }
+    assert equivalences["mismatch"] == {
+        "state": "mismatch",
+        "basis": [{"kind": "member-revision", "matched": False}],
+    }
+    assert equivalences["unchecked"] == {"state": "unknown", "basis": []}
+    assert equivalences["full"] == {
+        "state": "proven",
+        "basis": [
+            {"kind": "member-revision", "matched": True},
+            {"kind": "span-identity", "matched": True},
+        ],
+    }
+
+
 @pytest.mark.parametrize(
     ("producer_kind", "metadata"),
     [
@@ -1506,7 +1737,7 @@ def test_correlation_delta_rejects_nested_repository_evidence_tampering(
             "repository-evidence:forged"
         )
         tampered["correlation_identity"] = "sha256:" + codemap._packet_digest(
-            "hashmarks.evidence-correlation.v1",
+            "hashmarks.evidence-correlation.v2",
             {
                 key: value
                 for key, value in tampered.items()

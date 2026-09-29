@@ -101,7 +101,7 @@ def test_mcp_surface_correlates_external_evidence_without_interpreting_it(
             include_relationships=False,
         )
         anchor = packet["bundles"][0]["anchors"][0]
-        assert packet["schema"] == "hashmarks.evidence-correlation.v1"
+        assert packet["schema"] == "hashmarks.evidence-correlation.v2"
         assert packet["causation"] == "not-inferred"
         assert packet["interpretation_authority"] == "consumer-owned"
         assert anchor["resolution"]["repository_path"] == "src/feature.py"
@@ -148,7 +148,7 @@ def test_mcp_correlation_accepts_core_legal_request_above_old_transport_cap(
     finally:
         surface.close()
 
-    assert packet["schema"] == "hashmarks.evidence-correlation.v1"
+    assert packet["schema"] == "hashmarks.evidence-correlation.v2"
     assert packet["bounds"]["request_max_bytes"] == 1_048_576
     assert all(
         anchor["resolution"]["state"] == "unresolved"
@@ -198,7 +198,7 @@ def test_mcp_correlation_round_trips_max_repeated_anchor_set(
     assert len(before["repository_evidence"]["bindings"]) == 1
     assert (
         after["delta_from_previous"]["schema"]
-        == "hashmarks.evidence-correlation-delta.v1"
+        == "hashmarks.evidence-correlation-delta.v2"
     )
 
 
@@ -934,7 +934,7 @@ def test_mcp_correlation_rejects_recomputed_outer_identity_over_tampered_nested_
             "repository-evidence:forged"
         )
         tampered["correlation_identity"] = "sha256:" + surface._map._packet_digest(
-            "hashmarks.evidence-correlation.v1",
+            "hashmarks.evidence-correlation.v2",
             {
                 key: value
                 for key, value in tampered.items()

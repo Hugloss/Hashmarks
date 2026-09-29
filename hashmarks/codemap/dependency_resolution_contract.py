@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from typing import cast
 
 SCHEMA_V3 = "hashmarks.dependency-resolution.v3"
 DERIVATION_SCHEMA_V1 = "hashmarks.dependency-resolution-derivation.v1"
@@ -14,6 +15,7 @@ EVIDENCE_AUTHORITIES = {
     "module-ownership",
 }
 COVERAGE_KINDS = EVIDENCE_AUTHORITIES
+_MAX_TEXT_CHARS = 4096
 
 _FIELDS = {
     "snapshot": frozenset(
@@ -51,3 +53,27 @@ def reject_unknown_fields(value: Mapping[str, object], *, label: str) -> None:
     unknown = sorted(set(value) - _FIELDS[label])
     if unknown:
         raise ValueError(f"unknown dependency {label} field: {unknown[0]}")
+
+
+def normalized_text(value: object, *, label: str, required: bool = False) -> str:
+    if value is not None and not isinstance(value, str):
+        raise ValueError(f"{label} must be a string")
+    text = (value or "").strip()
+    if required and not text:
+        raise ValueError(f"{label} must not be empty")
+    if len(text) > _MAX_TEXT_CHARS:
+        raise ValueError(f"{label} exceeds {_MAX_TEXT_CHARS} characters")
+    return text
+
+
+def object_rows(value: object, *, label: str, limit: int) -> list[Mapping[str, object]]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        raise ValueError(f"{label} must be a sequence")
+    if len(value) > limit:
+        raise ValueError(f"{label} exceeds {limit} entries")
+    rows: list[Mapping[str, object]] = []
+    for row in value:
+        if not isinstance(row, Mapping):
+            raise ValueError(f"each {label} entry must be an object")
+        rows.append(cast("Mapping[str, object]", row))
+    return rows

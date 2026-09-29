@@ -10,27 +10,33 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped
+from .evidence_correlation_replay import (
+    _CORRELATION_SCHEMA,
+    _DEFINITION_DOMAIN,
+    _DELTA_SCHEMA,
+    _MAX_TOTAL_ANCHORS,
+    _SHA256,
+    CORRELATION_PACKET_MAX_BYTES,
+    CORRELATION_REQUEST_MAX_BYTES,
+    EvidenceCorrelationReplayMixin,
+)
 
 if TYPE_CHECKING:
     from .engine import CodeMap
 
 _MAX_BUNDLES = 64
 _MAX_ANCHORS_PER_BUNDLE = 256
-_MAX_TOTAL_ANCHORS = 256
 _MAX_PATH_MAPPINGS = 64
 _MAX_METADATA_BYTES_PER_ANCHOR = 8_192
 _MAX_TOTAL_METADATA_BYTES = 262_144
 _MAX_SYMBOL_CANDIDATES = 32
 _MAX_MODULE_CANDIDATES = 20
-CORRELATION_REQUEST_MAX_BYTES = 1_048_576
-CORRELATION_PACKET_MAX_BYTES = 1_048_576
 _MAX_ID_CHARS = 512
 _MAX_SYMBOL_CHARS = 1_024
 _MAX_EXTERNAL_PATH_CHARS = 8_192
 _COMPLETENESS = frozenset({"complete", "incomplete", "unknown"})
 _TRUNCATION = frozenset({"complete", "truncated", "unknown"})
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
-_SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:/")
 
 
@@ -355,7 +361,7 @@ def _binding_id(evidence: Sequence[Mapping[str, object]]) -> str:
     return "external-evidence:" + digest
 
 
-class EvidenceCorrelationMixin:
+class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
     """Correlate bounded external claims to canonical repository evidence.
 
     External claims remain claims. The implementation resolves them into the
@@ -1144,11 +1150,15 @@ class EvidenceCorrelationMixin:
         observed: Mapping[str, object],
     ) -> dict[str, object]:
         basis: list[dict[str, object]] = []
+        unchecked = False
         for claim_key, observed_key, kind in (
             ("member_revision", "member_revision", "member-revision"),
             ("span_identity", "span_identity", "span-identity"),
         ):
-            if claims.get(claim_key) is None or observed.get(observed_key) is None:
+            if claims.get(claim_key) is None:
+                continue
+            if observed.get(observed_key) is None:
+                unchecked = True
                 continue
             basis.append(
                 {
@@ -1156,9 +1166,12 @@ class EvidenceCorrelationMixin:
                     "matched": str(claims[claim_key]) == str(observed[observed_key]),
                 }
             )
-        if not basis:
-            return {"state": "unknown", "basis": []}
-        state = "proven" if all(bool(row["matched"]) for row in basis) else "mismatch"
+        if any(not row["matched"] for row in basis):
+            state = "mismatch"
+        elif unchecked or not basis:
+            state = "unknown"
+        else:
+            state = "proven"
         return {"state": state, "basis": basis}
 
     @staticmethod
@@ -1368,6 +1381,13 @@ class EvidenceCorrelationMixin:
         """Correlate bounded evidence bundles with current repository truth."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
+        if type(include_relationships) is not bool:
+            raise ValueError("include_relationships must be a boolean")
+        if (
+            type(relationship_limit_per_path) is not int
+            or not 1 <= relationship_limit_per_path <= 1000
+        ):
+            raise ValueError("relationship_limit_per_path must be between 1 and 1000")
         self._validate_request_size(bundles, path_mappings)
         if previous_correlation is not None:
             self._validate_previous_correlation_size(previous_correlation)
@@ -1394,7 +1414,7 @@ class EvidenceCorrelationMixin:
         )
         packet["correspondence"] = self._cross_bundle_correspondence(prepared)
         packet["correlation_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.evidence-correlation.v1",
+            _CORRELATION_SCHEMA,
             {
                 key: value
                 for key, value in packet.items()
@@ -1466,12 +1486,18 @@ class EvidenceCorrelationMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         packet: dict[str, object] = {
-            "schema": "hashmarks.evidence-correlation.v1",
+            "schema": _CORRELATION_SCHEMA,
             "evidence_definition_identity": "sha256:"
             + self._packet_digest(
-                "hashmarks.evidence-correlation-definition.v1",
+                _DEFINITION_DOMAIN,
                 definition,
             ),
+            "definition_options": {
+                "include_relationships": definition["include_relationships"],
+                "relationship_limit_per_path": definition[
+                    "relationship_limit_per_path"
+                ],
+            },
             "path_mappings": list(mappings),
             "bundles": bundles,
             "repository_evidence": repository_evidence,
@@ -1489,7 +1515,7 @@ class EvidenceCorrelationMixin:
             },
         }
         packet["correlation_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.evidence-correlation.v1",
+            _CORRELATION_SCHEMA,
             packet,
         )
         return packet
@@ -1518,53 +1544,10 @@ class EvidenceCorrelationMixin:
             repository_delta,
         )
         payload["delta_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.evidence-correlation-delta.v1",
+            _DELTA_SCHEMA,
             payload,
         )
         return payload
-
-    def _validate_correlation_packet(
-        self,
-        packet: Mapping[str, object],
-        *,
-        label: str,
-    ) -> None:
-        if packet.get("schema") != "hashmarks.evidence-correlation.v1":
-            raise ValueError(
-                f"{label} must be a hashmarks.evidence-correlation.v1 packet"
-            )
-        repository_evidence = packet.get("repository_evidence")
-        if not isinstance(repository_evidence, Mapping):
-            raise ValueError("correlation packets must contain repository_evidence")
-        repository = repository_evidence.get("repository")
-        repository_identity = (
-            str(repository.get("repository_identity") or "")
-            if isinstance(repository, Mapping)
-            else ""
-        )
-        if repository_identity != self._repository_packet_identity():
-            raise ValueError(f"{label} correlation repository-mismatch")
-        self._validate_binding_delta_input(
-            repository_evidence, name=f"{label} repository"
-        )
-        supplied_identity = packet.get("correlation_identity")
-        if not isinstance(supplied_identity, str) or not _SHA256.fullmatch(
-            supplied_identity
-        ):
-            raise ValueError(
-                f"{label} correlation_identity must use sha256:<64 lowercase hex characters>"
-            )
-        identity_payload = dict(packet)
-        identity_payload.pop("correlation_identity", None)
-        identity_payload.pop("delta_from_previous", None)
-        expected_identity = "sha256:" + self._packet_digest(
-            "hashmarks.evidence-correlation.v1",
-            identity_payload,
-        )
-        if supplied_identity != expected_identity:
-            raise ValueError(
-                f"{label} correlation_identity does not match packet content"
-            )
 
     @staticmethod
     def _correlation_delta_packet(
@@ -1580,7 +1563,7 @@ class EvidenceCorrelationMixin:
         )
         comparable = definition_state == "preserved"
         return {
-            "schema": "hashmarks.evidence-correlation-delta.v1",
+            "schema": _DELTA_SCHEMA,
             "comparability": "comparable" if comparable else "not-comparable",
             "definition": {
                 "state": definition_state,
