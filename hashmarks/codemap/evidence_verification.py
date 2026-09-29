@@ -51,7 +51,7 @@ class _VerificationRelevanceState:
     indirect_via_paths: dict[str, set[str]]
     source_ref_paths: set[str]
     unresolved_import_identity_paths: set[str]
-    search_bound_reasons: set[str]
+    search_bound_reasons: set[str] = field(default_factory=set)
     reference_indexes: dict[str, _VerificationReferenceIndex | None] = field(
         default_factory=dict
     )
@@ -1086,7 +1086,6 @@ class VerificationMixin:
         edit: Mapping[str, object] | None,
         current_verify: Mapping[str, object] | None,
         rows: Sequence[Mapping[str, object]],
-        canonical_retrieval_complete: bool = True,
         limit: int = 8,
     ) -> dict[str, object]:
         """Rank bounded verification surfaces around an already-selected edit owner."""
@@ -1103,8 +1102,6 @@ class VerificationMixin:
             return self._verification_without_edit_owner(current_path)
 
         state = self._verification_state(task, edit_path, current_path, rows)
-        if not canonical_retrieval_complete:
-            state.search_bound_reasons.add("task-retrieval-limit")
         symbol_names, symbol_scope_complete = self._verification_edit_symbols(
             edit_path, edit
         )
