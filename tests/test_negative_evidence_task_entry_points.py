@@ -36,6 +36,10 @@ def test_task_entry_point_ambiguity_does_not_turn_truncation_into_unambiguous(
     assert len(narrow["canonical"]) == 1
     assert narrow["schema"] == "hashmarks.task-entry-points.v3"
     assert narrow["bounds"]["canonical_completeness"] == "incomplete"
+    canonical_paths = {row["path"] for row in narrow["canonical"]}
+    assert {
+        row["path"] for row in narrow["ambiguity"]["alternatives"]
+    } <= canonical_paths
     assert narrow["ambiguity"] == {
         "schema": "hashmarks.entry-point-ambiguity.v3",
         "ambiguous": None,
