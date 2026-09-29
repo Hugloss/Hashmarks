@@ -79,14 +79,11 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         failed: set[str] = set()
-        canonical_hits = self.find_task(task, limit=limit)
-        canonical_probe = self.find_task(task, limit=limit + 1)
         hits = [
             hit
-            for hit in canonical_hits
+            for hit in self.find_task(task, limit=limit)
             if hit.evidence_visibility is not EvidenceVisibility.DENY
         ]
-        canonical_retrieval_complete = len(canonical_probe) <= limit
         cues = self._task_action_cues(task)
         strong_config_cues = self._strong_config_cues()
         rows = [
@@ -97,7 +94,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         return _TaskActionMapContext(
             hits=hits,
             rows=rows,
-            canonical_retrieval_complete=canonical_retrieval_complete,
             failed=failed,
             cues=cues,
             cue_words=set(cues.words),
@@ -243,7 +239,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 edit=edit,
                 current_verify=selection.verify,
                 rows=context.rows,
-                canonical_retrieval_complete=context.canonical_retrieval_complete,
                 limit=8,
             )
         else:
