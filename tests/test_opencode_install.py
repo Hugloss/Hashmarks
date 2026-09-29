@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 import hashmarks.cli as cli
+import hashmarks.opencode_registration as opencode_registration
 
 
 def _which(hashmarks: Path, opencode: Path):
@@ -63,7 +64,13 @@ def test_install_opencode_registers_exact_hashmarks_executable(
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(cli.shutil, "which", _which(hashmarks, opencode))
+    monkeypatch.setattr(
+        opencode_registration.shutil,
+        "which",
+        _which(hashmarks, opencode),
+    )
     monkeypatch.setattr(cli.subprocess, "run", run)
+    monkeypatch.setattr(opencode_registration.subprocess, "run", run)
 
     assert cli.main(["install", "--opencode"]) == 0
     assert calls[0] == [
@@ -129,7 +136,13 @@ def test_install_opencode_reports_project_shadowing_without_rewriting(
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(cli.shutil, "which", _which(hashmarks, opencode))
+    monkeypatch.setattr(
+        opencode_registration.shutil,
+        "which",
+        _which(hashmarks, opencode),
+    )
     monkeypatch.setattr(cli.subprocess, "run", run)
+    monkeypatch.setattr(opencode_registration.subprocess, "run", run)
 
     assert cli.main(["install", "--opencode"]) == 0
     output = capsys.readouterr().out
@@ -168,7 +181,13 @@ def test_install_opencode_keeps_registration_when_effective_config_unverifiable(
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(cli.shutil, "which", _which(hashmarks, opencode))
+    monkeypatch.setattr(
+        opencode_registration.shutil,
+        "which",
+        _which(hashmarks, opencode),
+    )
     monkeypatch.setattr(cli.subprocess, "run", run)
+    monkeypatch.setattr(opencode_registration.subprocess, "run", run)
 
     assert cli.main(["install", "--opencode"]) == 0
     output = capsys.readouterr().out
@@ -186,6 +205,11 @@ def test_install_opencode_reports_registration_failure(
     opencode.write_text("", encoding="utf-8")
 
     monkeypatch.setattr(cli.shutil, "which", _which(hashmarks, opencode))
+    monkeypatch.setattr(
+        opencode_registration.shutil,
+        "which",
+        _which(hashmarks, opencode),
+    )
 
     def run(
         command: list[str],
@@ -197,6 +221,7 @@ def test_install_opencode_reports_registration_failure(
         return subprocess.CompletedProcess(command, 17)
 
     monkeypatch.setattr(cli.subprocess, "run", run)
+    monkeypatch.setattr(opencode_registration.subprocess, "run", run)
 
     try:
         cli.main(["install", "--opencode"])
