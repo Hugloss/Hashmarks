@@ -37,7 +37,9 @@ def _canonical_test_hit() -> SearchHit:
     )
 
 
-def _install_bounded_exact_index(codemap: CodeMap, monkeypatch, *, visible: bool) -> None:
+def _install_bounded_exact_index(
+    codemap: CodeMap, monkeypatch, *, visible: bool
+) -> None:
     original = codemap._session_exact_symbol_candidates
     actual = list(original(["collision_owner"], limit=10))
     by_path = {str(row.get("path") or ""): dict(row) for row in actual}
