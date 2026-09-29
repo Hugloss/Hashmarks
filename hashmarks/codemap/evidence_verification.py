@@ -615,7 +615,6 @@ class VerificationMixin:
         state: _VerificationRelevanceState,
         symbol_names: Sequence[str],
     ) -> None:
-        # Explicit scale bound: 16 edit symbols × 1024 reverse refs.
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         selected_symbols = list(symbol_names[:16])
@@ -624,18 +623,13 @@ class VerificationMixin:
         direct_symbol_refs = self._verification_bounded_direct_refs(
             state, selected_symbols
         )
-
-        # Supplement same-short-name candidates with owner-targeted evidence,
-        # while probing every bound before semantic qualification.
+        # Probe owner-targeted evidence before semantic qualification.
         edit_row = self._session_file_row(state.edit_path)
         edit_module = "" if edit_row is None else str(edit_row.get("module_name") or "")
         if edit_module:
             for symbol in selected_symbols:
                 direct_symbol_refs[symbol] = self._verification_targeted_direct_refs(
-                    state,
-                    symbol,
-                    edit_module,
-                    direct_symbol_refs.get(symbol, ()),
+                    state, symbol, edit_module, direct_symbol_refs.get(symbol, ())
                 )
         self._verification_preload_import_resolution(direct_symbol_refs)
         for symbol in selected_symbols:
