@@ -16,9 +16,7 @@ def _write_source_and_test(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     (tmp_path / "tests" / "test_alpha.py").write_text(
-        "from src.alpha import alpha\n\n"
-        "def test_alpha():\n"
-        "    assert alpha() == 1\n",
+        "from src.alpha import alpha\n\ndef test_alpha():\n    assert alpha() == 1\n",
         encoding="utf-8",
     )
 
