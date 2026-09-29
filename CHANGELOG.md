@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.25.0 — Bounded evidence authority and native update handoff
+
+- Add reusable derived-authority surfaces for dependency resolution and repository declarations: explicit endpoint comparison, derivation/explain APIs, semantic subject and role identity, bounded deltas, and MCP exposure while keeping Git mutation, precedence/winner selection, and knowledge-graph behavior outside Hashmarks.
+- Make negative-evidence admissibility a global invariant: bounded retrieval, ownership, verification relevance, module correlation, structural locality, and plain-symbol searches now preserve useful positive evidence but withhold absence, uniqueness, and exactness whenever the relevant candidate scope is incomplete.
+- Harden external evidence and Splunk CSV dogfood with native CSV framing for valid exports, UTF-8 BOM and large-field handling, deterministic bounded identity/order/truncation, exact source-byte binding, traceback grammar and occurrence preservation, core component-budget reuse, and request-wide admissibility.
+- Add explicit, privacy-preserving update awareness and native upgrade handoff: automatic checks require opt-in, update cache is throttle-only, externally managed installs defer to the native package manager, standalone upgrades resolve one exact consent-time command/payload, and unsupported ownership fails closed.
+- Strengthen semantic non-interference across cross-provider correspondence and declaration identity: provenance names are not foreign keys, cycles do not create consensus, replay is not semantic state, provider namespaces and roles remain isolated, and simultaneous uncertainty axes stay explicit rather than collapsing into authority.
+- Add derived-authority economics measurements and real uv/Maven dogfood, and expose native explain/dependency comparison modes for consumers without introducing repository history, branch, merge, rollback, or mutation machinery.
+
 ## 0.24.0 — Cross-platform standalone release
 
 - Add a checksum-verified native Windows x86_64 standalone CLI/MCP release alongside the existing Linux x86_64 artifact used by Linux and WSL2, with a native PowerShell installer and independently qualified platform receipts.
