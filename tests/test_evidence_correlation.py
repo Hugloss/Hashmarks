@@ -976,6 +976,120 @@ def test_correlation_request_reuses_binding_total_bound(
             codemap.correlate_evidence(bundles, include_relationships=False)
 
 
+def test_module_lookup_bound_cannot_authorize_absence_after_filtering(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_paths = [f"stale-{index}.py" for index in range(21)] + ["current.py"]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+
+        def visible_module_paths(module: str, *, limit: int) -> list[str]:
+            assert module == "pkg.target"
+            assert limit == 21
+            return raw_paths[:limit]
+
+        def member_observation(
+            _self: CodeMap, path: str
+        ) -> tuple[dict[str, object], dict[str, object]]:
+            if path == "current.py":
+                return {"state": "known-present"}, {}
+            return {"state": "unknown", "reason": "stale-test-candidate"}, {}
+
+        monkeypatch.setattr(codemap.store, "visible_module_paths", visible_module_paths)
+        monkeypatch.setattr(
+            type(codemap),
+            "_repository_member_observation",
+            member_observation,
+        )
+
+        resolution = codemap._resolve_module_only("pkg.target")
+        projected = codemap._resolution_packet(resolution)
+
+    assert resolution.state == "unresolved"
+    assert resolution.reason == "module-match-bound-exhausted"
+    assert resolution.repository_path is None
+    assert resolution.candidates_truncated is True
+    assert projected["candidate_completeness"] == "bounded"
+
+
+def test_module_lookup_bound_cannot_authorize_uniqueness_after_filtering(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_paths = ["current-a.py", *[f"stale-{index}.py" for index in range(20)]]
+    raw_paths.append("current-b.py")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+
+        def visible_module_paths(module: str, *, limit: int) -> list[str]:
+            assert module == "pkg.target"
+            assert limit == 21
+            return raw_paths[:limit]
+
+        def member_observation(
+            _self: CodeMap, path: str
+        ) -> tuple[dict[str, object], dict[str, object]]:
+            if path.startswith("current-"):
+                return {"state": "known-present"}, {}
+            return {"state": "unknown", "reason": "stale-test-candidate"}, {}
+
+        monkeypatch.setattr(codemap.store, "visible_module_paths", visible_module_paths)
+        monkeypatch.setattr(
+            type(codemap),
+            "_repository_member_observation",
+            member_observation,
+        )
+
+        resolution = codemap._resolve_module_only("pkg.target")
+        projected = codemap._resolution_packet(resolution)
+
+    assert resolution.state == "resolved-ambiguous"
+    assert resolution.reason == "module-match-bound-exhausted"
+    assert resolution.repository_path is None
+    assert resolution.module_candidates == ("current-a.py",)
+    assert resolution.candidates_truncated is True
+    assert projected["candidate_completeness"] == "bounded"
+
+
+def test_exhausted_module_lookup_can_still_authorize_absence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_paths = [f"stale-{index}.py" for index in range(5)]
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+
+        def visible_module_paths(module: str, *, limit: int) -> list[str]:
+            assert module == "pkg.target"
+            assert limit == 21
+            return raw_paths[:limit]
+
+        def member_observation(
+            _self: CodeMap, path: str
+        ) -> tuple[dict[str, object], dict[str, object]]:
+            assert path in raw_paths
+            return {"state": "unknown", "reason": "stale-test-candidate"}, {}
+
+        monkeypatch.setattr(codemap.store, "visible_module_paths", visible_module_paths)
+        monkeypatch.setattr(
+            type(codemap),
+            "_repository_member_observation",
+            member_observation,
+        )
+
+        resolution = codemap._resolve_module_only("pkg.target")
+        projected = codemap._resolution_packet(resolution)
+
+    assert resolution.state == "unresolved"
+    assert resolution.reason == "module-not-found"
+    assert resolution.candidates_truncated is False
+    assert projected["candidate_completeness"] == "complete"
+
+
 def test_exact_module_locator_reuses_repository_module_identity(
     tmp_path: Path,
 ) -> None:
