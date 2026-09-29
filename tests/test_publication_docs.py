@@ -747,5 +747,6 @@ def test_negative_evidence_admissibility_is_global_and_domain_owned() -> None:
 
     # Existing typed owners remain the executable/domain-specific authority.
     assert "Absence is admissible only" in dependency
-    assert "Only `complete + complete` coverage" in declarations
+    assert "complete + complete" in declarations
+    assert "absence.state = known-absent" in declarations
     assert "Incomplete change observations never prove" in bindings
