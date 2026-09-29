@@ -371,9 +371,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                     selection.exact_identifier_search_complete
                 ),
                 "uniqueness_admissible": selection.exact_identifier_search_complete,
-                "bound_reasons": list(
-                    selection.exact_identifier_search_bound_reasons
-                ),
+                "bound_reasons": list(selection.exact_identifier_search_bound_reasons),
             },
             "verification_relevance": final.verification_relevance,
             "ambiguity": self._task_action_ambiguity_payload(
@@ -780,6 +778,15 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             selection.structural_owner_origin,
         )
 
+    @staticmethod
+    def _task_action_exact_identifier_search_incomplete(
+        selection: _TaskActionSelectionState,
+    ) -> bool:
+        return bool(
+            not selection.exact_identifier_search_complete
+            and selection.owner_basis != "literal-path"
+        )
+
     def _task_action_projection_ambiguity_state(
         self,
         task: str,
@@ -828,10 +835,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             choices,
             decisive_qualified_verification,
         )
-        exact_identifier_search_incomplete = bool(
-            not selection.exact_identifier_search_complete
-            and selection.owner_basis != "literal-path"
-        )
         ambiguous = self._task_action_global_ambiguity(
             choices.edit,
             competing,
@@ -852,7 +855,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 exact_identifier_ambiguity,
                 multi_identifier_edit_ambiguity,
                 weak_contract_anchor_ambiguity,
-                exact_identifier_search_incomplete,
+                self._task_action_exact_identifier_search_incomplete(selection),
                 selection.archive_live_owner_ambiguity,
                 multi_structural_owner_ambiguity,
                 verification_identity_ambiguity,
@@ -868,7 +871,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 ("weak-task-anchor", weak_contract_anchor_ambiguity),
                 (
                     "exact-identifier-search-bounded",
-                    exact_identifier_search_incomplete,
+                    self._task_action_exact_identifier_search_incomplete(selection),
                 ),
                 (
                     "multiple-live-owners-behind-archive-hit",
@@ -897,5 +900,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             "structural_owners": task_local_structural_owners,
             "verification_origins": task_local_verification_origins,
             "multi_structural_owner_ambiguity": multi_structural_owner_ambiguity,
-            "exact_identifier_search_incomplete": exact_identifier_search_incomplete,
+            "exact_identifier_search_incomplete": (
+                self._task_action_exact_identifier_search_incomplete(selection)
+            ),
         }
