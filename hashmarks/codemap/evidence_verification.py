@@ -51,6 +51,7 @@ class _VerificationRelevanceState:
     indirect_via_paths: dict[str, set[str]]
     source_ref_paths: set[str]
     unresolved_import_identity_paths: set[str]
+    search_bound_reasons: set[str]
     reference_indexes: dict[str, _VerificationReferenceIndex | None] = field(
         default_factory=dict
     )
@@ -252,6 +253,7 @@ class VerificationMixin:
             indirect_via_paths={},
             source_ref_paths=set(),
             unresolved_import_identity_paths=set(),
+            search_bound_reasons=set(),
             reference_indexes={},
         )
 
@@ -278,19 +280,20 @@ class VerificationMixin:
         self,
         edit_path: str,
         edit: Mapping[str, object] | None,
-    ) -> list[str]:
+    ) -> tuple[list[str], bool]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         selected_symbols: list[str] = []
         if isinstance(edit, Mapping):
             self._append_verification_symbol_names(selected_symbols, edit)
         if selected_symbols:
-            return selected_symbols
+            return selected_symbols, True
 
+        symbol_rows = self._session_symbols_for_path(edit_path)
         file_symbols: list[str] = []
-        for symbol in self._session_symbols_for_path(edit_path)[:32]:
+        for symbol in symbol_rows[:32]:
             self._append_verification_symbol_names(file_symbols, symbol)
-        return file_symbols
+        return file_symbols, len(symbol_rows) <= 32
 
     @staticmethod
     def _append_verification_symbol_names(
