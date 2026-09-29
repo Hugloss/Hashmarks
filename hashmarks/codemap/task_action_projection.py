@@ -750,6 +750,8 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         )
         explicit_identifier_surface = bool(
             selection.explicit_edit_surface_selected
+            or selection.localized_config_edit
+            or selection.explicit_config_surface_request
             or context.cues.explicit_architecture_contract
             or explicit_field_contract
             or selection.owner_basis
