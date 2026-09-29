@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.25.1 — OpenCode effective-registration diagnostics
+
+- Keep `hashmarks install --opencode` delegated to OpenCode's native MCP CLI, then inspect OpenCode's effective configuration and report whether the exact installed Hashmarks command is `active`, `shadowed`, or `unverified` without editing project configuration.
+- Detect project-level OpenCode configuration that shadows the installed standalone registration, including source-development commands such as `uv run --frozen --no-sync hashmarks --workspace . mcp`, and surface the conflict instead of silently implying the installed executable is active.
+- Add focused regression coverage and align benchmark/setup documentation with the authority boundary: end-user OpenCode registration remains OpenCode-owned, while benchmark subject selection owns and proves its exact trial executable separately.
+
 ## 0.25.0 — Bounded evidence authority and native update handoff
 
 - Add reusable derived-authority surfaces for dependency resolution and repository declarations: explicit endpoint comparison, derivation/explain APIs, semantic subject and role identity, bounded deltas, and MCP exposure while keeping Git mutation, precedence/winner selection, and knowledge-graph behavior outside Hashmarks.
