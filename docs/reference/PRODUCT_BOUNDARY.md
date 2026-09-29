@@ -297,6 +297,8 @@ Exact-symbol ownership is subject to the same rule independently of canonical ta
 
 Generic plain-name ambiguity admission is part of the same ownership proof. If an ordinary method token such as `resolve` or `close` is promoted only when the maintained exact index proves multiple repository definitions, an exhausted symbol window cannot establish that no duplicate exists. That generic-name evidence remains incomplete unless a stronger explicit path, qualified identifier, or shaped exact identifier independently supplies ownership proof.
 
+Structural Locality call binding follows the same rule. A bounded same-name symbol lookup may not turn one retained symbol into an exact call target, nor may a bounded qualified-root lookup prove that no indexed class namespace exists. When the relevant candidate window is exhausted, call-target evidence remains unresolved and the packet must carry incomplete/truncated candidate-search authority instead of counting an exact edge or exact caller.
+
 The general rule is:
 
 > **Consumer experience may trigger a new repository query; it must not silently become repository evidence.**
