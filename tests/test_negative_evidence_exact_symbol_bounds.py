@@ -46,7 +46,7 @@ def _install_bounded_exact_index(
     first = by_path["src/a.py"]
     hidden = by_path["src/b.py"]
     stale = [
-        {**first, "path": f"missing/noise_{index:04d}.py"}
+        {**first, "path": f"archive/noise_{index:04d}.py"}
         for index in range(_INDEX_LIMIT - int(visible))
     ]
     probe = ([first] if visible else []) + stale + [hidden]
