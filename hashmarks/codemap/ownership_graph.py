@@ -528,9 +528,9 @@ class OwnershipGraphMixin:
             raise ValueError("per_role must be >= 1")
         if per_role > 8:
             raise ValueError("per_role must be <= 8")
+        hits = self.find_task(task, limit=limit)
         probed_hits = self.find_task(task, limit=limit + 1)
         retrieval_complete = len(probed_hits) <= limit
-        hits = probed_hits[:limit]
         route = route_query(task)
         task_terms = set(_query_terms(task))
         role_domains = self._entry_role_domains()
