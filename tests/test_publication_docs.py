@@ -717,3 +717,30 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
     assert "Narrow product-distribution lifecycle exception" in boundary
     assert "package resolver" in boundary
     assert "repository/task command execution" in boundary
+
+
+def test_negative_evidence_admissibility_is_global_and_domain_owned() -> None:
+    agents = _text("AGENTS.md")
+    architecture = _text("docs/reference/ARCHITECTURE.md")
+    boundary = _text("docs/reference/PRODUCT_BOUNDARY.md")
+    invariants = _text("docs/reference/INVARIANTS.md")
+    dependency = _text("docs/reference/DEPENDENCY_EVIDENCE.md")
+    declarations = _text("docs/reference/REPOSITORY_DECLARATIONS.md")
+    bindings = _text("docs/reference/REPOSITORY_EVIDENCE_BINDINGS.md")
+
+    assert "## Negative evidence is qualified, never inferred from absence" in agents
+    assert "bounded projection -> semantic filtering -> absence" in agents
+    assert "not** a new global negative-evidence manager" in agents
+
+    assert "O8. Negative evidence requires qualified semantic observation scope" in invariants
+    assert "O9. Projection bounds never manufacture negative evidence" in invariants
+    assert "Negative evidence admissibility" in architecture
+    assert "qualified observation scope" in architecture
+    assert "bounded observation or projection" in architecture
+    assert "Projection happens after semantic qualification" in boundary
+    assert "negative-evidence manager" in boundary
+
+    # Existing typed owners remain the executable/domain-specific authority.
+    assert "Absence is admissible only" in dependency
+    assert "complete, untruncated declared coverage" in declarations
+    assert "Incomplete change observations never prove" in bindings
