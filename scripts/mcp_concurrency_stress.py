@@ -263,6 +263,7 @@ def _summary(receipt: dict[str, Any], path: Path) -> str:
         lines.extend(f"- {detail}" for detail in details)
     return "\n".join(lines)
 
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Stress independent Hashmarks MCP-style processes against one changing workspace/state."
