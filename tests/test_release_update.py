@@ -8,6 +8,7 @@ import pytest
 
 import hashmarks.cli as cli
 import hashmarks.release_update as release_update
+import hashmarks.repository_cli as repository_cli
 from hashmarks.release_update import ReleaseInfo
 
 
@@ -258,18 +259,29 @@ def test_cli_command_semantics_opt_out_of_automatic_update_awareness(
     assert cli.main(argv) == 0
 
 
-def test_ordinary_cli_command_semantics_enable_automatic_update_awareness(
+@pytest.mark.parametrize(
+    ("argv", "module", "handler_name"),
+    [
+        (["doctor"], cli, "_doctor"),
+        (["install"], cli, "_install"),
+        (["orient"], repository_cli, "_map_orient"),
+    ],
+)
+def test_declared_cli_semantics_opt_in_to_automatic_update_awareness(
     monkeypatch,
+    argv: list[str],
+    module,
+    handler_name: str,
 ) -> None:
     calls: list[str] = []
-    monkeypatch.setattr(cli, "_doctor", lambda args: 0)
+    monkeypatch.setattr(module, handler_name, lambda args: 0)
     monkeypatch.setattr(
         cli,
         "_maybe_offer_periodic_upgrade",
         lambda: calls.append("checked"),
     )
 
-    assert cli.main(["doctor"]) == 0
+    assert cli.main(argv) == 0
     assert calls == ["checked"]
 
 
