@@ -562,24 +562,38 @@ class VerificationMixin:
         # Explicit scale bound: 16 edit symbols × 1024 reverse refs.
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        direct_symbol_refs = self._session_refs_many(
-            symbol_names[:16], limit_per_target=1024
+        selected_symbols = list(symbol_names[:16])
+        if len(symbol_names) > 16:
+            state.search_bound_reasons.add("edit-symbol-limit")
+        raw_direct_symbol_refs = self._session_refs_many(
+            selected_symbols, limit_per_target=1025
         )
+        direct_symbol_refs: dict[str, list[Mapping[str, object]]] = {}
+        for symbol in selected_symbols:
+            raw_refs = list(raw_direct_symbol_refs.get(symbol, ()))
+            if len(raw_refs) > 1024:
+                state.search_bound_reasons.add("direct-reverse-ref-limit")
+            direct_symbol_refs[symbol] = raw_refs[:1024]
 
         # A repository-wide same-short-name prefix can hide the qualified
         # reference to the current edit once more than 1,024 unrelated refs sort
         # ahead of it.  Supplement the prefix with owner-targeted candidates,
-        # then keep the same total per-symbol safety bound.  These rows are still
-        # candidates: qualified import resolution below remains authoritative.
+        # then keep the same total per-symbol safety bound.  Probe one row past
+        # every bound so truncation cannot become uniqueness/absence authority.
         edit_row = self._session_file_row(state.edit_path)
         edit_module = "" if edit_row is None else str(edit_row.get("module_name") or "")
         if edit_module:
-            for symbol in symbol_names[:16]:
+            for symbol in selected_symbols:
                 short = symbol.rsplit(".", 1)[-1]
                 suffix = f"{edit_module}.{short}"
-                targeted = self.store.refs_matching_target_suffix(
-                    short, suffix, limit=1024
+                raw_targeted = list(
+                    self.store.refs_matching_target_suffix(
+                        short, suffix, limit=1025
+                    )
                 )
+                if len(raw_targeted) > 1024:
+                    state.search_bound_reasons.add("targeted-reverse-ref-limit")
+                targeted = raw_targeted[:1024]
                 existing = list(direct_symbol_refs.get(symbol, ()))
                 merged: list[Mapping[str, object]] = []
                 seen: set[tuple[str, int, str, str]] = set()
@@ -594,26 +608,33 @@ class VerificationMixin:
                         continue
                     seen.add(key)
                     merged.append(ref)
-                    if len(merged) >= 1024:
+                    if len(merged) > 1024:
+                        state.search_bound_reasons.add("merged-direct-ref-limit")
                         break
-                direct_symbol_refs[symbol] = merged
+                direct_symbol_refs[symbol] = merged[:1024]
         self._verification_preload_import_resolution(direct_symbol_refs)
-        for symbol in symbol_names[:16]:
+        for symbol in selected_symbols:
             self._verification_collect_direct_symbol_refs(
                 state, symbol, list(direct_symbol_refs.get(symbol, ()))
             )
 
     def _verification_via_symbols(
         self,
-        source_ref_paths: set[str],
+        state: _VerificationRelevanceState,
     ) -> list[tuple[str, str, str]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        via_paths = sorted(source_ref_paths)[:64]
-        via_symbols = self.store.symbols_for_paths_many(via_paths, limit_per_path=16)
+        source_ref_paths = sorted(state.source_ref_paths)
+        if len(source_ref_paths) > 64:
+            state.search_bound_reasons.add("indirect-source-path-limit")
+        via_paths = source_ref_paths[:64]
+        via_symbols = self.store.symbols_for_paths_many(via_paths, limit_per_path=17)
         result: list[tuple[str, str, str]] = []
         for via_path in via_paths:
-            for via_symbol in via_symbols.get(via_path, ()):
+            symbol_rows = list(via_symbols.get(via_path, ()))
+            if len(symbol_rows) > 16:
+                state.search_bound_reasons.add("indirect-symbol-limit")
+            for via_symbol in symbol_rows[:16]:
                 for key in ("name", "qualname"):
                     symbol = str(via_symbol.get(key) or "")
                     if symbol:
@@ -626,14 +647,17 @@ class VerificationMixin:
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        via_symbol_sources = self._verification_via_symbols(state.source_ref_paths)
+        via_symbol_sources = self._verification_via_symbols(state)
         indirect_ref_sets = self._session_refs_many(
             [symbol for _via_path, symbol, _short in via_symbol_sources],
-            limit_per_target=256,
+            limit_per_target=257,
         )
         for via_path, symbol, short in via_symbol_sources:
+            refs = list(indirect_ref_sets.get(symbol, ()))
+            if len(refs) > 256:
+                state.search_bound_reasons.add("indirect-reverse-ref-limit")
             self._verification_collect_indirect_symbol_refs(
-                state, via_path, short, indirect_ref_sets.get(symbol, ())
+                state, via_path, short, refs[:256]
             )
 
     def _verification_collect_indirect_symbol_refs(
