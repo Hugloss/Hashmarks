@@ -195,8 +195,8 @@ def test_find_task_preserves_scoped_agents_for_ambiguous_localized_task(
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
         monkeypatch.setattr(
             codemap,
-            "task_query_views",
-            lambda task: {
+            "_task_query_views_evidence",
+            lambda task, bound_reasons=None: {
                 "schema": "hashmarks.task-query-views.v2",
                 "base": "scheduler schedule interval",
                 "governance": "scheduler schedule interval ownership authority agents",
@@ -241,8 +241,8 @@ def test_find_task_does_not_override_high_confidence_relationship_route(
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
         monkeypatch.setattr(
             codemap,
-            "task_query_views",
-            lambda task: {
+            "_task_query_views_evidence",
+            lambda task, bound_reasons=None: {
                 "schema": "hashmarks.task-query-views.v2",
                 "base": "imports dependency declarations",
                 "governance": "imports dependency declarations ownership authority agents",
@@ -270,8 +270,10 @@ def test_find_task_does_not_override_high_confidence_relationship_route(
         )
         monkeypatch.setattr(
             codemap,
-            "find",
-            lambda query, *, limit=20: governance if "ownership" in query else base,
+            "_find_evidence",
+            lambda query, *, limit=20: _FindEvidence(
+                governance if "ownership" in query else base, ()
+            ),
         )
         hits = codemap.find_task("ignored", limit=20)
     assert "backend/AGENTS.md" not in {hit.path for hit in hits}
@@ -285,8 +287,8 @@ def test_find_task_preserves_deep_scoped_readme_for_conceptual_localization(
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
         monkeypatch.setattr(
             codemap,
-            "task_query_views",
-            lambda task: {
+            "_task_query_views_evidence",
+            lambda task, bound_reasons=None: {
                 "schema": "hashmarks.task-query-views.v2",
                 "base": "runtime ownership immutable representation",
                 "governance": "runtime ownership immutable representation architecture contract readme",
@@ -335,8 +337,8 @@ def test_find_task_does_not_preserve_scoped_readme_without_two_localized_results
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
         monkeypatch.setattr(
             codemap,
-            "task_query_views",
-            lambda task: {
+            "_task_query_views_evidence",
+            lambda task, bound_reasons=None: {
                 "schema": "hashmarks.task-query-views.v2",
                 "base": "runtime ownership immutable representation",
                 "governance": "runtime ownership immutable representation architecture contract readme",
@@ -363,8 +365,10 @@ def test_find_task_does_not_preserve_scoped_readme_without_two_localized_results
         )
         monkeypatch.setattr(
             codemap,
-            "find",
-            lambda query, *, limit=20: governance if "architecture" in query else base,
+            "_find_evidence",
+            lambda query, *, limit=20: _FindEvidence(
+                governance if "architecture" in query else base, ()
+            ),
         )
         hits = codemap.find_task("ignored", limit=20)
     assert "backend/src/pkg/runtime/README.md" not in {hit.path for hit in hits}
@@ -378,8 +382,8 @@ def test_find_task_does_not_preserve_scoped_readme_for_relationship_route(
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
         monkeypatch.setattr(
             codemap,
-            "task_query_views",
-            lambda task: {
+            "_task_query_views_evidence",
+            lambda task, bound_reasons=None: {
                 "schema": "hashmarks.task-query-views.v2",
                 "base": "imports dependency runtime representation",
                 "governance": "imports dependency runtime representation architecture contract readme",
@@ -411,8 +415,10 @@ def test_find_task_does_not_preserve_scoped_readme_for_relationship_route(
         )
         monkeypatch.setattr(
             codemap,
-            "find",
-            lambda query, *, limit=20: governance if "architecture" in query else base,
+            "_find_evidence",
+            lambda query, *, limit=20: _FindEvidence(
+                governance if "architecture" in query else base, ()
+            ),
         )
         hits = codemap.find_task("ignored", limit=20)
     assert "backend/src/pkg/runtime/README.md" not in {hit.path for hit in hits}

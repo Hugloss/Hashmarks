@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.model import SearchHit
+from hashmarks.codemap.task_retrieval import _TaskRetrievalResult
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -150,3 +152,96 @@ def test_stale_cached_task_hit_invalidates_retrieval_completeness(
     assert second["bounds"]["canonical_truncation"] == "unknown"
     assert second["ambiguity"]["ambiguous"] is None
     assert "task-stale-cached-hit" in second["bounds"]["bound_reasons"]
+
+
+def test_query_base_term_limit_invalidates_task_entry_absence(tmp_path: Path) -> None:
+    _write_source_and_test(tmp_path)
+    terms = "alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo"
+    (tmp_path / "src" / "alpha.py").write_text(
+        f"# {terms}\ndef alpha():\n    return 1\n", encoding="utf-8"
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        task = f"source tests {terms}"
+        packet = codemap.task_entry_points(task, limit=20)
+        canonical = [hit.as_dict() for hit in codemap.find_task(task, limit=20)]
+
+    assert packet["canonical"] == canonical
+    assert "task-query-base-term-limit" in packet["bounds"]["bound_reasons"]
+    assert packet["bounds"]["canonical_completeness"] == "incomplete"
+    assert packet["ambiguity"]["ambiguous"] is None
+
+
+def test_query_view_term_limits_invalidate_task_entry_absence(tmp_path: Path) -> None:
+    _write_source_and_test(tmp_path)
+    task = (
+        "alpha owner frontend backend plan make generated schedule privacy "
+        "observe local release lock dependency browser scout snapshot retry capacity"
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_entry_points(task, limit=20)
+
+    reasons = packet["bounds"]["bound_reasons"]
+    assert "task-query-governance-term-limit" in reasons
+    assert "task-query-evidence-term-limit" in reasons
+    assert packet["ambiguity"]["ambiguous"] is None
+
+
+def test_omitted_identifier_input_limit_invalidates_task_entry_absence(
+    tmp_path: Path,
+) -> None:
+    _write_source_and_test(tmp_path)
+    task = "alpha " + " ".join(f"cue{index:03d}" for index in range(34))
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_entry_points(task, limit=20)
+
+    assert "task-omitted-component-input-limit" in packet["bounds"]["bound_reasons"]
+    assert packet["bounds"]["canonical_completeness"] == "incomplete"
+    assert packet["ambiguity"]["ambiguous"] is None
+
+
+def test_role_presentation_limit_cannot_hide_competing_anchor(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src" / "anchor_owner.py").write_text(
+        "def AnchorOwner():\n    return 1\n", encoding="utf-8"
+    )
+    (tmp_path / "tests" / "test_unrelated.py").write_text(
+        "def test_unrelated():\n    assert True\n", encoding="utf-8"
+    )
+    (tmp_path / "tests" / "test_anchor_owner.py").write_text(
+        "def test_AnchorOwner():\n    assert True\n", encoding="utf-8"
+    )
+    hits = tuple(
+        SearchHit(path=path, score=100.0 - rank, kind="file")
+        for rank, path in enumerate(
+            (
+                "src/anchor_owner.py",
+                "tests/test_unrelated.py",
+                "tests/test_anchor_owner.py",
+            )
+        )
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        monkeypatch.setattr(
+            codemap,
+            "_find_task_evidence_impl",
+            lambda task, *, limit=20: _TaskRetrievalResult(hits[:limit], ()),
+        )
+        task = "change source tests AnchorOwner test_AnchorOwner"
+        narrow = codemap.task_entry_points(task, per_role=1)
+        wide = codemap.task_entry_points(task, per_role=2)
+
+    assert len(narrow["roles"]["verification"]) == 1
+    assert len(wide["roles"]["verification"]) == 2
+    assert narrow["ambiguity"]["ambiguous"] is True
+    assert wide["ambiguity"]["ambiguous"] is True
+    assert narrow["ambiguity"]["resolution"] == wide["ambiguity"]["resolution"]

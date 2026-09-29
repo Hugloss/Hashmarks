@@ -510,7 +510,13 @@ class TaskRetrievalMixin:
             bonus += 1.0
         return rarity + bonus, len(term), term
 
-    def _formulate_task_query_base(self, task: str, *, max_terms: int = 10) -> str:
+    def _formulate_task_query_base(
+        self,
+        task: str,
+        *,
+        max_terms: int = 10,
+        bound_reasons: set[str] | None = None,
+    ) -> str:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         raw_tokens = _WORD_RE.findall(task)
@@ -532,6 +538,9 @@ class TaskRetrievalMixin:
             ),
             reverse=True,
         )
+        eligible = ranked if ranked else words
+        if bound_reasons is not None and len(eligible) > max_terms:
+            bound_reasons.add("task-query-base-term-limit")
         selected = ranked[:max_terms]
         return " ".join(selected) if selected else " ".join(words[:max_terms])
 
@@ -549,7 +558,12 @@ class TaskRetrievalMixin:
 
     def task_query_views(self, task: str) -> dict[str, str]:
         """Return deterministic candidate-visible retrieval views for one task."""
-        base = self._formulate_task_query_base(task)
+        return self._task_query_views_evidence(task)
+
+    def _task_query_views_evidence(
+        self, task: str, bound_reasons: set[str] | None = None
+    ) -> dict[str, str]:
+        base = self._formulate_task_query_base(task, bound_reasons=bound_reasons)
         raw_tokens = _WORD_RE.findall(task)
         visible_words = {value.lower() for value in raw_tokens}
         additions: list[str] = []
@@ -568,11 +582,19 @@ class TaskRetrievalMixin:
             if visible_words & cues:
                 additions.extend(values)
         expanded = self._bounded_query_terms(base, additions, limit=16)
+        if bound_reasons is not None and any(
+            value not in expanded for value in additions
+        ):
+            bound_reasons.add("task-query-governance-term-limit")
         evidence_additions: list[str] = []
         for cues, values in _TASK_EVIDENCE_FAMILIES:
             if visible_words & cues:
                 evidence_additions.extend(values)
         evidence = self._bounded_query_terms(base, evidence_additions, limit=18)
+        if bound_reasons is not None and any(
+            value not in evidence for value in evidence_additions
+        ):
+            bound_reasons.add("task-query-evidence-term-limit")
         return {
             "schema": "hashmarks.task-query-views.v2",
             "base": base,
@@ -1063,10 +1085,10 @@ class TaskRetrievalMixin:
     ]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        views = self.task_query_views(task)
+        bound_reasons: set[str] = set()
+        views = self._task_query_views_evidence(task, bound_reasons)
         specs = self._task_sequence_specs(views, limit)
         rows: list[tuple[tuple[SearchHit, ...], float]] = []
-        bound_reasons: set[str] = set()
         session_scope = (
             nullcontext(self)
             if self._decision_session_depth > 0
@@ -1216,7 +1238,10 @@ class TaskRetrievalMixin:
 
     @classmethod
     def _task_omitted_alnum_tokens(
-        cls, task: str, views: Mapping[str, str]
+        cls,
+        task: str,
+        views: Mapping[str, str],
+        bound_reasons: set[str] | None = None,
     ) -> tuple[str, ...]:
         visible_terms = {
             term.lower()
@@ -1228,7 +1253,10 @@ class TaskRetrievalMixin:
             for token in _WORD_RE.findall(task)
             if cls._task_is_omitted_alnum_candidate(token, visible_terms)
         )
-        return tuple(dict.fromkeys(tokens))[:32]
+        eligible = tuple(dict.fromkeys(tokens))
+        if bound_reasons is not None and len(eligible) > 32:
+            bound_reasons.add("task-omitted-component-input-limit")
+        return eligible[:32]
 
     @staticmethod
     def _task_hits_for_token(
@@ -1255,7 +1283,7 @@ class TaskRetrievalMixin:
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        tokens = self._task_omitted_alnum_tokens(task, views)
+        tokens = self._task_omitted_alnum_tokens(task, views, bound_reasons)
         if not tokens:
             return
         preserve_limit = (
