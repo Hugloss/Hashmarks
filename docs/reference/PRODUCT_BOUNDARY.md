@@ -295,6 +295,8 @@ Ownership relation graphs follow the same rule. Bounded positive reachability/co
 
 Exact-symbol ownership is subject to the same rule independently of canonical task retrieval. A bounded exact-symbol index lookup may preserve observed exact candidates, but if its candidate bound is exhausted it may not mint `qualified-symbol`, `unique-exact-symbol`, `exact-symbol`, or weaker structural fallback as repository-global ownership proof. Literal repository-path identity remains an independent authority when the task explicitly names that path.
 
+Generic plain-name ambiguity admission is part of the same ownership proof. If an ordinary method token such as `resolve` or `close` is promoted only when the maintained exact index proves multiple repository definitions, an exhausted symbol window cannot establish that no duplicate exists. That generic-name evidence remains incomplete unless a stronger explicit path, qualified identifier, or shaped exact identifier independently supplies ownership proof.
+
 The general rule is:
 
 > **Consumer experience may trigger a new repository query; it must not silently become repository evidence.**
