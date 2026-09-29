@@ -905,9 +905,11 @@ class VerificationMixin:
             row for row in candidates if bool(row.get("direct_reference"))
         ]
         if direct_reference_candidates:
-            unique_reference = uniqueness_admissible and len(
-                direct_reference_candidates
-            ) == 1 and (selected is None or not bool(selected.get("direct_reference")))
+            unique_reference = (
+                uniqueness_admissible
+                and len(direct_reference_candidates) == 1
+                and (selected is None or not bool(selected.get("direct_reference")))
+            )
         else:
             indirect_reference_candidates = [
                 row for row in candidates if bool(row.get("indirect_reference"))
@@ -1057,8 +1059,7 @@ class VerificationMixin:
             "selection_reason": projected_reason,
             "completeness": "complete" if search_complete else "incomplete",
             "truncation": "complete" if search_complete else "truncated",
-            "negative_evidence_admissible": search_complete
-            and not identity_ambiguous,
+            "negative_evidence_admissible": search_complete and not identity_ambiguous,
             "search_bound_reasons": sorted(state.search_bound_reasons),
             "selection_changed": bool(
                 selected is not None
