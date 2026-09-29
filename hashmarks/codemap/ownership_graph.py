@@ -931,9 +931,7 @@ class OwnershipGraphMixin:
             return []
         paths = [path for path, _, _ in expandable]
         self._session_file_rows(paths)
-        probed_edge_map = self._session_edges_for_paths_many(
-            paths, limit_per_path=101
-        )
+        probed_edge_map = self._session_edges_for_paths_many(paths, limit_per_path=101)
         edge_map = {}
         for path in paths:
             path_edges = list(probed_edge_map.get(path, ()))
@@ -1080,9 +1078,7 @@ class OwnershipGraphMixin:
         if selected is None:
             return (
                 None,
-                "unresolved"
-                if search_complete
-                else "unresolved-search-incomplete",
+                "unresolved" if search_complete else "unresolved-search-incomplete",
             )
         if max_depth < 3:
             return selected, "bounded-two-hop-corroboration"
