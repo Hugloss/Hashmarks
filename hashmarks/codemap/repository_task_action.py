@@ -699,15 +699,12 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             return source_path
         return None
 
-    def _task_action_ambiguous_plain_identifiers(
-        self, task: str, rows: Sequence[dict[str, object]], failed: set[str]
-    ) -> set[str]:
-        """Return prose identifiers that are repository-globally non-unique.
-
-        Bounded canonical retrieval is presentation evidence only. Duplicate exact
-        symbol identity must therefore be established from the maintained exact
-        index so a small limit cannot manufacture unique ownership.
-        """
+    def _task_action_ambiguous_plain_identifier_evidence(
+        self,
+        task: str,
+        failed: set[str],
+    ) -> tuple[set[str], bool]:
+        """Return positive duplicate-name evidence plus index completeness."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         masked = task
@@ -719,12 +716,12 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             if len(token) >= 4 and token.lower() not in _TASK_STOPWORDS
         }
         if not plain_tokens:
-            return set()
-        indexed = self._session_exact_symbol_candidates(
-            tuple(sorted(plain_tokens)), limit=1024
+            return set(), True
+        probe = self._session_exact_symbol_candidates(
+            tuple(sorted(plain_tokens)), limit=_EXACT_IDENTIFIER_INDEX_LIMIT + 1
         )
         exact_paths: dict[str, set[str]] = {}
-        for symbol in indexed:
+        for symbol in probe[:_EXACT_IDENTIFIER_INDEX_LIMIT]:
             path = str(symbol.get("path") or "")
             name = str(symbol.get("name") or "").lower()
             if (
@@ -741,7 +738,18 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             }.intersection(domains):
                 continue
             exact_paths.setdefault(name, set()).add(path)
-        return {token for token, paths in exact_paths.items() if len(paths) > 1}
+        ambiguous = {token for token, paths in exact_paths.items() if len(paths) > 1}
+        return ambiguous, len(probe) <= _EXACT_IDENTIFIER_INDEX_LIMIT
+
+    def _task_action_ambiguous_plain_identifiers(
+        self, task: str, rows: Sequence[dict[str, object]], failed: set[str]
+    ) -> set[str]:
+        """Return positively observed ambiguous plain identifiers."""
+        del rows
+        ambiguous, _complete = self._task_action_ambiguous_plain_identifier_evidence(
+            task, failed
+        )
+        return ambiguous
 
     @staticmethod
     def _task_action_path_module_aliases(path: str) -> set[str]:
@@ -1062,6 +1070,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         terms = set(self._task_action_exact_identifier_terms(task))
+        has_explicit_identifier = bool(terms)
         qualified_terms = tuple(
             dict.fromkeys(
                 value.lower() for value in _QUALIFIED_IDENTIFIER_RE.findall(task)
@@ -1073,9 +1082,17 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         # already contains at least two live source definitions with that exact
         # symbol name.  This adds no discovery/ranking authority and prevents
         # lexical order from manufacturing a unique edit owner.
-        terms.update(self._task_action_ambiguous_plain_identifiers(task, rows, failed))
+        ambiguous_plain, plain_ambiguity_complete = (
+            self._task_action_ambiguous_plain_identifier_evidence(task, failed)
+        )
+        terms.update(ambiguous_plain)
         if not terms:
-            return _TaskActionExactIdentifierEvidence([], True, ())
+            reasons = (
+                ()
+                if plain_ambiguity_complete
+                else ("plain-ambiguity-symbol-index-limit",)
+            )
+            return _TaskActionExactIdentifierEvidence([], not reasons, reasons)
         candidates: list[dict[str, object]] = []
         for row in rows:
             path = str(row.get("path") or "")
@@ -1158,10 +1175,16 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         candidates = self._task_action_requested_exact_identifier_edits(
             task, candidates
         )
+        bound_reasons = indexed_evidence.bound_reasons
+        if not has_explicit_identifier and not plain_ambiguity_complete:
+            bound_reasons = (
+                "plain-ambiguity-symbol-index-limit",
+                *bound_reasons,
+            )
         return _TaskActionExactIdentifierEvidence(
             candidates=candidates,
-            search_complete=indexed_evidence.search_complete,
-            bound_reasons=indexed_evidence.bound_reasons,
+            search_complete=not bound_reasons,
+            bound_reasons=bound_reasons,
         )
 
     def _task_action_structural_exact_identifier_owner(
