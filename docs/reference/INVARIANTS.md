@@ -47,6 +47,8 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **O9. Projection bounds never manufacture negative evidence.** Result limits, retrieval limits, depth/visit limits, provider bounds, compact projections, and presentation sampling may reduce returned evidence, but may not turn an unobserved fact into `absent`, `false`, `none`, `no match`, or any equivalent authoritative negative. Negative facts are derived from qualified evidence before bounded projection; if a bound prevents that proof, the negative fact remains unknown/incomplete/not-admissible.
 
+**O10. Uniqueness is a negative claim about alternatives.** Hashmarks may call a repository candidate unique only when the semantic universe of relevant alternatives is qualified, complete, and non-truncated. Bounded graph edges, symbol/reference candidates, provider rows, or presentation sets may nominate a best observed candidate, but a hit bound makes uniqueness unknown rather than proven.
+
 ## Public API and daemon safety
 
 **A1. Local/daemon acceleration may change cost, never semantics.** Automatic fallback must preserve the same repository truth.
