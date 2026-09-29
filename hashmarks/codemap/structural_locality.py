@@ -488,6 +488,73 @@ class StructuralLocalityMixin:
             candidates=candidates,
         )
 
+    def _python_local_qualified_call_binding(
+        self,
+        source_path: str,
+        target: str,
+        root: str,
+        candidates: list[dict[str, object]],
+    ) -> tuple[dict[str, object] | None, list[str], bool, bool]:
+        qualified = [
+            row
+            for row in candidates
+            if str(row.get("path") or "") == source_path
+            and str(row.get("qualname") or "") == target
+        ]
+        if len(qualified) == 1:
+            return qualified[0], [_symbol_id(qualified[0])], False, True
+        evidence = self._visible_named_symbol_candidates(root)
+        root_present = any(
+            str(row.get("path") or "") == source_path
+            and str(row.get("qualname") or "") == root
+            for row in evidence.rows
+        )
+        if not evidence.complete:
+            return None, sorted(_symbol_id(row) for row in candidates), True, False
+        resolved, ids, unresolved = _binding_result(
+            qualified, candidates, unresolved=root_present
+        )
+        return resolved, ids, unresolved, True
+
+    def _python_reexport_qualified_call_binding(
+        self,
+        source_path: str,
+        target: str,
+        import_target: str,
+        candidates: list[dict[str, object]],
+    ) -> tuple[dict[str, object] | None, list[str], bool, bool]:
+        candidate_ids = sorted(_symbol_id(row) for row in candidates)
+        owners, unresolved = self._resolve_import_owner_evidence(
+            source_path, import_target
+        )
+        if unresolved:
+            return None, candidate_ids, True, True
+        owner_paths = set(owners)
+        imported_name = import_target.rsplit(".", 1)[-1]
+        evidence = self._visible_named_symbol_candidates(imported_name)
+        if not evidence.complete:
+            return None, candidate_ids, True, False
+        class_present = any(
+            str(row.get("path") or "") in owner_paths
+            and str(row.get("qualname") or "") == imported_name
+            and str(row.get("kind") or "") == "class"
+            for row in evidence.rows
+        )
+        if not class_present:
+            return None, candidate_ids, False, True
+        member = target.split(".", 1)[1]
+        qualified_name = f"{imported_name}.{member}"
+        qualified = [
+            row
+            for row in candidates
+            if str(row.get("path") or "") in owner_paths
+            and str(row.get("qualname") or "") == qualified_name
+        ]
+        resolved, ids, unresolved = _binding_result(
+            qualified, candidates, unresolved=True
+        )
+        return resolved, ids, unresolved, True
+
     def _python_repository_qualified_call_binding(
         self,
         *,
@@ -496,7 +563,6 @@ class StructuralLocalityMixin:
         target: str,
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool, bool]:
-        self = cast("CodeMap", self)
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
         root = target.split(".", 1)[0]
         if not root or self._python_function_locally_binds(
@@ -505,62 +571,13 @@ class StructuralLocalityMixin:
             return None, candidate_ids, False, True
         kind, targets = self._python_export_binding(source_path, root)
         if kind == "local":
-            qualified = [
-                row
-                for row in candidates
-                if str(row.get("path") or "") == source_path
-                and str(row.get("qualname") or "") == target
-            ]
-            if len(qualified) == 1:
-                return qualified[0], [_symbol_id(qualified[0])], False, True
-            root_evidence = self._visible_named_symbol_candidates(root)
-            root_symbols = [
-                row
-                for row in root_evidence.rows
-                if str(row.get("path") or "") == source_path
-                and str(row.get("qualname") or "") == root
-            ]
-            if not root_evidence.complete:
-                return None, candidate_ids, True, False
-            resolved, ids, unresolved = _binding_result(
-                qualified, candidates, unresolved=bool(root_symbols)
+            return self._python_local_qualified_call_binding(
+                source_path, target, root, candidates
             )
-            return resolved, ids, unresolved, True
         if kind == "reexport" and len(targets) == 1:
-            owners, unresolved = self._resolve_import_owner_evidence(
-                source_path, targets[0]
+            return self._python_reexport_qualified_call_binding(
+                source_path, target, targets[0], candidates
             )
-            if unresolved:
-                return None, candidate_ids, True, True
-            owner_paths = set(owners)
-            imported_name = targets[0].rsplit(".", 1)[-1]
-            root_evidence = self._visible_named_symbol_candidates(imported_name)
-            root_symbols = [
-                row
-                for row in root_evidence.rows
-                if str(row.get("path") or "") in owner_paths
-                and str(row.get("qualname") or "") == imported_name
-                and str(row.get("kind") or "") == "class"
-            ]
-            if not root_evidence.complete:
-                return None, candidate_ids, True, False
-            if not root_symbols:
-                # Imported data/functions can expose runtime methods such as
-                # dict.items().  Complete absence of an indexed class namespace
-                # keeps that runtime method outside repository call authority.
-                return None, candidate_ids, False, True
-            member = target.split(".", 1)[1]
-            qualified_name = f"{imported_name}.{member}"
-            qualified = [
-                row
-                for row in candidates
-                if str(row.get("path") or "") in owner_paths
-                and str(row.get("qualname") or "") == qualified_name
-            ]
-            resolved, ids, unresolved = _binding_result(
-                qualified, candidates, unresolved=True
-            )
-            return resolved, ids, unresolved, True
         return None, candidate_ids, kind in {"ambiguous", "star"}, True
 
     def _resolve_call_target(
