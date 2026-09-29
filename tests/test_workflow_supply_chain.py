@@ -290,6 +290,12 @@ def test_release_profile_installs_mcp_before_full_native_qualification() -> None
 
     assert "uv sync --frozen --group test --extra mcp --python 3.14" in release_job
     assert release_job.index("--extra mcp") < release_job.index("make test-profile")
+    assert "Prove MCP concurrency stress before publication" in release_job
+    assert "for attempt in 1 2 3; do" in release_job
+    assert release_job.count("make mcp-concurrency-stress") == 1
+    assert release_job.index("make test-profile") < release_job.index(
+        "make mcp-concurrency-stress"
+    )
 
 
 def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
