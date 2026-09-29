@@ -454,7 +454,11 @@ class OwnershipGraphMixin:
         return {"status": "unresolved" if ambiguous else "not-required"}
 
     def _entry_ambiguity(
-        self, task: str, role_rows: dict[str, list[dict[str, object]]]
+        self,
+        task: str,
+        role_rows: dict[str, list[dict[str, object]]],
+        *,
+        retrieval_complete: bool,
     ) -> dict[str, object]:
         explicit_roles = self._entry_explicit_roles(task, role_rows)
         alternatives = [{"role": role, **role_rows[role][0]} for role in explicit_roles]
@@ -465,6 +469,23 @@ class OwnershipGraphMixin:
                 str(row["path"]),
             )
         )
+        if not retrieval_complete:
+            return {
+                "schema": "hashmarks.entry-point-ambiguity.v3",
+                "ambiguous": None,
+                "reason": "canonical-retrieval-bound-not-exhausted",
+                "completeness": "incomplete",
+                "truncation": "truncated",
+                "explicit_roles": explicit_roles,
+                "alternatives": alternatives,
+                "resolution": {
+                    "status": "unknown",
+                    "reason": "canonical-retrieval-bound-not-exhausted",
+                },
+                "discrimination_question": None,
+                "secret_knowledge_used": False,
+            }
+
         distinctive = self._entry_distinctive_tokens(task)
         role_anchor_tokens: dict[str, list[str]] = {}
         for row in alternatives:
@@ -475,11 +496,13 @@ class OwnershipGraphMixin:
         resolved_role = anchored_roles[0] if len(anchored_roles) == 1 else None
         ambiguous = len(explicit_roles) >= 2 and resolved_role is None
         return {
-            "schema": "hashmarks.entry-point-ambiguity.v2",
+            "schema": "hashmarks.entry-point-ambiguity.v3",
             "ambiguous": ambiguous,
             "reason": self._entry_ambiguity_reason(
                 explicit_roles, resolved_role, ambiguous
             ),
+            "completeness": "complete",
+            "truncation": "complete",
             "explicit_roles": explicit_roles,
             "alternatives": alternatives,
             "resolution": self._entry_resolution(
@@ -505,16 +528,21 @@ class OwnershipGraphMixin:
             raise ValueError("per_role must be >= 1")
         if per_role > 8:
             raise ValueError("per_role must be <= 8")
-        hits = self.find_task(task, limit=limit)
+        probed_hits = self.find_task(task, limit=limit + 1)
+        retrieval_complete = len(probed_hits) <= limit
+        hits = probed_hits[:limit]
         route = route_query(task)
-        role_rows = self._entry_role_rows(
-            hits, self._entry_role_domains(), set(_query_terms(task)), per_role
+        task_terms = set(_query_terms(task))
+        role_domains = self._entry_role_domains()
+        role_rows = self._entry_role_rows(hits, role_domains, task_terms, per_role)
+        ambiguity_role_rows = self._entry_role_rows(
+            probed_hits, role_domains, task_terms, per_role
         )
         recommended = self._entry_recommended(
             role_rows, self._entry_ordered_roles(route)
         )
         return {
-            "schema": "hashmarks.task-entry-points.v2",
+            "schema": "hashmarks.task-entry-points.v3",
             "task": task,
             "intent": route.intent.value,
             "confidence": route.confidence,
@@ -522,8 +550,19 @@ class OwnershipGraphMixin:
             "canonical": [hit.as_dict() for hit in hits],
             "roles": role_rows,
             "recommended": recommended,
-            "ambiguity": self._entry_ambiguity(task, role_rows),
-            "bounds": {"limit": limit, "per_role": per_role},
+            "ambiguity": self._entry_ambiguity(
+                task,
+                ambiguity_role_rows,
+                retrieval_complete=retrieval_complete,
+            ),
+            "bounds": {
+                "limit": limit,
+                "per_role": per_role,
+                "probe_limit": limit + 1,
+                "canonical_completeness": (
+                    "complete" if retrieval_complete else "incomplete"
+                ),
+            },
             "ranking_effect": "none",
             "discovery_effect": "none",
         }
