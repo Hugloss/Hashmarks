@@ -26,6 +26,7 @@ PI ?= pi
 PI_MODEL ?=
 PI_HOST_PYTHON ?= $(ARTIFACT_PYTHON)
 PI_HOST_RECEIPT ?= dist/pi-mcp-host-gate.json
+MCP_STRESS_RECEIPT ?= dist/mcp-concurrency-stress.json
 DIAGNOSTIC_PYTHON ?= python3
 DIAGNOSTIC_SHARDS ?= 64
 DIAGNOSTIC_BATCH ?= 0
@@ -444,7 +445,7 @@ mcp-host-status:
 	@$(UV_RUN) --offline --no-sync python scripts/mcp_host_status.py --workspace .
 
 mcp-concurrency-stress:
-	@$(UV_RUN) --offline --no-sync python scripts/mcp_concurrency_stress.py
+	@$(UV_RUN) --offline --no-sync python scripts/mcp_concurrency_stress.py --receipt "$(MCP_STRESS_RECEIPT)"
 
 mcp-opencode-check:
 	@test -n "$(OPENCODE_MODEL)" || (echo "OPENCODE_MODEL is required; choose a tool-capable model from: opencode models" >&2; exit 2)

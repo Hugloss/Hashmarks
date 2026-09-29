@@ -261,6 +261,23 @@ def test_mcp_retry_does_not_hide_unrelated_runtime_failures() -> None:
     assert calls == 1
 
 
+def test_mcp_retry_propagates_unrelated_failure_after_transient_race() -> None:
+    calls = 0
+
+    def operation() -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("CodeMap generation changed during decision session")
+        raise RuntimeError(
+            "unrelated failure: CodeMap generation changed during decision session"
+        )
+
+    with pytest.raises(RuntimeError, match="^unrelated failure:"):
+        repository_retry.retry_transient_repository_race(operation)
+    assert calls == 2
+
+
 def test_mcp_retry_absorbs_release_scale_transient_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -285,6 +302,37 @@ def test_mcp_retry_absorbs_release_scale_transient_window(
 
     assert repository_retry.retry_transient_repository_race(operation) == "fresh"
     assert 1.0 <= clock < repository_retry._TRANSIENT_RETRY_BUDGET_SECONDS
+
+
+def test_mcp_surface_recovers_from_prolonged_building_generation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    surface = HashmarksMcpSurface(
+        str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
+    )
+    assert surface.find("flare041")["results"]
+    clock = 0.0
+    delays: list[float] = []
+
+    def sleep(delay: float) -> None:
+        nonlocal clock
+        delays.append(delay)
+        clock += delay
+        if clock >= 1.1:
+            surface._map.store.set_meta("sync.build_state", "COMPLETE")
+
+    monkeypatch.setattr(repository_retry.time, "monotonic", lambda: clock)
+    monkeypatch.setattr(repository_retry.time, "sleep", sleep)
+    try:
+        surface._map.store.set_meta("sync.build_state", "BUILDING")
+        result = surface.find("flare041")
+        assert result["results"]
+        assert "BUILDING" not in json.dumps(result)
+        assert 1.1 <= clock < repository_retry._TRANSIENT_RETRY_BUDGET_SECONDS
+        assert delays and max(delays) <= 0.25
+    finally:
+        surface._map.store.set_meta("sync.build_state", "COMPLETE")
+        surface.close()
 
 
 def test_mcp_retry_remains_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
