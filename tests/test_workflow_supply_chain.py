@@ -296,6 +296,28 @@ def test_release_profile_installs_mcp_before_full_native_qualification() -> None
     assert release_job.index("make test-profile") < release_job.index(
         "make mcp-concurrency-stress"
     )
+    assert "Preserve MCP concurrency stress receipt" in release_job
+    assert "if: always()" in release_job
+    assert "path: dist/mcp-concurrency-stress.json" in release_job
+    assert release_job.index("make mcp-concurrency-stress") < release_job.index(
+        "Preserve MCP concurrency stress receipt"
+    )
+
+
+def test_publish_preserves_mcp_concurrency_receipt_before_rebuilding_dist() -> None:
+    text = _publish_workflow_text()
+    build_job = text.split("  build:\n", 1)[1].split("\n  standalone-linux:\n", 1)[0]
+
+    assert "Run MCP concurrency stress" in build_job
+    assert "Preserve MCP concurrency stress receipt" in build_job
+    assert "if: always()" in build_job
+    assert "path: dist/mcp-concurrency-stress.json" in build_job
+    assert build_job.index("Run MCP concurrency stress") < build_job.index(
+        "Preserve MCP concurrency stress receipt"
+    )
+    assert build_job.index("Preserve MCP concurrency stress receipt") < build_job.index(
+        "Build exact release artifacts once"
+    )
 
 
 def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
