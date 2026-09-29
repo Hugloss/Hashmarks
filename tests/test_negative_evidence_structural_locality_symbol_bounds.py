@@ -196,9 +196,7 @@ def authority(value):
             refresh=False,
         )
 
-    assert [row["symbol_id"] for row in packet["nodes"]] == [
-        "pkg/core.py::authority"
-    ]
+    assert [row["symbol_id"] for row in packet["nodes"]] == ["pkg/core.py::authority"]
     assert packet["dimensions"]["unresolved_call_count"] == 1
     assert packet["dimensions"]["external_or_unindexed_call_count"] == 0
     unresolved = packet["unresolved_calls"][0]
