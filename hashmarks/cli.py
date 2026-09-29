@@ -22,6 +22,10 @@ from .client import (
 from .daemon import IdentityDaemon
 from .errors import UserFacingError
 from .identity import RepositoryIdentity, RepositoryIdentityMode
+from .opencode_registration import (
+    effective_command_uses_executable,
+    inspect_effective_hashmarks_command,
+)
 from .paths import canonical_host_path
 from .release_update import (
     ReleaseCheckError,
@@ -333,14 +337,26 @@ def _install(args) -> int:
         raise UserFacingError(
             f"OpenCode rejected Hashmarks MCP registration (exit {result.returncode})"
         )
-    _print(
-        {
-            "host": "opencode",
-            "registered": True,
-            "hashmarks": str(executable),
-            "workspace": ".",
-        }
-    )
+    effective_command, diagnostic = inspect_effective_hashmarks_command(opencode)
+    payload = {
+        "host": "opencode",
+        "registered": True,
+        "hashmarks": str(executable),
+        "workspace": ".",
+    }
+    if effective_command is None:
+        payload["effective_registration"] = "unverified"
+        payload["diagnostic"] = diagnostic
+    elif effective_command_uses_executable(effective_command, executable):
+        payload["effective_registration"] = "active"
+    else:
+        payload["effective_registration"] = "shadowed"
+        payload["effective_command"] = effective_command
+        payload["warning"] = (
+            "OpenCode's effective project configuration shadows the installed "
+            "Hashmarks registration; Hashmarks did not modify project configuration."
+        )
+    _print(payload)
     return 0
 
 

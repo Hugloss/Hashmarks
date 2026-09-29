@@ -25,6 +25,14 @@ opencode mcp list
 
 Hashmarks delegates configuration writing to OpenCode's own CLI and registers the exact installed Hashmarks executable with `--workspace . mcp`. This avoids requiring users to know OpenCode's config-file schema.
 
+After registration, Hashmarks asks OpenCode for its **effective** configuration in the current repository. The result reports `effective_registration` as:
+
+- `active` when OpenCode resolves the installed Hashmarks executable with the expected workspace-bound MCP command;
+- `shadowed` when a higher-precedence project configuration resolves a different `mcp.hashmarks` command;
+- `unverified` when OpenCode accepted registration but its effective configuration could not be inspected.
+
+A `shadowed` result is diagnostic, not a request for Hashmarks to rewrite the project. Hashmarks never becomes an OpenCode configuration manager: the project owns its local OpenCode file, OpenCode owns precedence and effective configuration, and Hashmarks only reports that the installed registration is not the active command.
+
 ## Run
 
 From a repository:
@@ -100,7 +108,9 @@ Hashmarks keeps host integration inside the repository. The checked-in developme
 
 ### OpenCode MCP server configuration
 
-`opencode.json` contains the project-local `mcp.hashmarks` registration. OpenCode should be started from this repository so it discovers that project config.
+`opencode.json` contains the project-local `mcp.hashmarks` registration for **Hashmarks source development**. It intentionally launches the locked checkout through `uv run --frozen --no-sync`; it is not the end-user standalone-binary registration.
+
+Because OpenCode resolves project configuration together with user/global configuration, this development entry can shadow a globally registered standalone Hashmarks executable when OpenCode is started from the Hashmarks checkout. `hashmarks install --opencode` detects and reports that effective shadowing but does not mutate `opencode.json`.
 
 ### Claude Code MCP server configuration
 
