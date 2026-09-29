@@ -936,6 +936,40 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             candidates.append(candidate)
         return candidates, complete
 
+    def _task_action_exact_index_evidence(
+        self,
+        terms: set[str],
+        qualified_terms: Sequence[str],
+        failed: set[str],
+        *,
+        canonical_rank: int,
+    ) -> _TaskActionExactIdentifierEvidence:
+        qualified, qualified_complete = (
+            self._task_action_qualified_identifier_index_candidates(
+                qualified_terms,
+                failed,
+                canonical_rank=canonical_rank,
+            )
+        )
+        plain, plain_complete = self._task_action_plain_identifier_index_candidates(
+            terms,
+            failed,
+            canonical_rank=canonical_rank,
+        )
+        reasons = tuple(
+            reason
+            for complete, reason in (
+                (qualified_complete, "qualified-exact-symbol-index-limit"),
+                (plain_complete, "plain-exact-symbol-index-limit"),
+            )
+            if not complete
+        )
+        return _TaskActionExactIdentifierEvidence(
+            candidates=[*qualified, *plain],
+            search_complete=not reasons,
+            bound_reasons=reasons,
+        )
+
     @staticmethod
     def _task_action_requested_edit_span(task: str) -> str:
         """Return the bounded request span that names the edit surface."""
@@ -1071,21 +1105,12 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             )
             + 1
         )
-        qualified_indexed, qualified_complete = (
-            self._task_action_qualified_identifier_index_candidates(
-                qualified_terms,
-                failed,
-                canonical_rank=projection_rank,
-            )
+        indexed_evidence = self._task_action_exact_index_evidence(
+            terms,
+            qualified_terms,
+            failed,
+            canonical_rank=projection_rank,
         )
-        plain_indexed, plain_complete = (
-            self._task_action_plain_identifier_index_candidates(
-                terms,
-                failed,
-                canonical_rank=projection_rank,
-            )
-        )
-        indexed = [*qualified_indexed, *plain_indexed]
         existing = {
             (
                 str(row.get("path") or ""),
@@ -1095,7 +1120,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         }
         candidates.extend(
             row
-            for row in indexed
+            for row in indexed_evidence.candidates
             if (
                 str(row.get("path") or ""),
                 str(row.get("qualname") or row.get("name") or ""),
@@ -1105,18 +1130,10 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         candidates = self._task_action_requested_exact_identifier_edits(
             task, candidates
         )
-        reasons = tuple(
-            reason
-            for complete, reason in (
-                (qualified_complete, "qualified-exact-symbol-index-limit"),
-                (plain_complete, "plain-exact-symbol-index-limit"),
-            )
-            if not complete
-        )
         return _TaskActionExactIdentifierEvidence(
             candidates=candidates,
-            search_complete=not reasons,
-            bound_reasons=reasons,
+            search_complete=indexed_evidence.search_complete,
+            bound_reasons=indexed_evidence.bound_reasons,
         )
 
     def _task_action_structural_exact_identifier_owner(
