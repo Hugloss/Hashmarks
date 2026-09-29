@@ -85,9 +85,7 @@ def test_bounded_reference_search_cannot_manufacture_unique_verifier(
         encoding="utf-8",
     )
     refs = [_ref("tests/test_owner.py")]
-    refs.extend(
-        _ref(f"src/noise_{index}.py") for index in range(_DIRECT_REF_LIMIT)
-    )
+    refs.extend(_ref(f"src/noise_{index}.py") for index in range(_DIRECT_REF_LIMIT))
 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
