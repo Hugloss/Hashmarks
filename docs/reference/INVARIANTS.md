@@ -42,6 +42,10 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **O7. Serialized freshness has one state vocabulary.** Current public repository-evidence projections use exactly `current`, `stale`, or `unknown` for freshness state. Proof strength such as `proven` is separate provenance; invalidation is a delta consequence, not an alternate freshness-state spelling.
 
+**O8. Negative evidence requires qualified semantic observation scope.** Absence is authoritative only when the owner of the fact can identify the required observation universe and prove the relevant semantic coverage complete and non-truncated. Empty results, provider non-detection, partial telemetry, bounded scans, stale evidence, or incomplete source coverage remain unknown/not-admissible unless an independent authority closes the required universe.
+
+**O9. Projection bounds never manufacture negative evidence.** Result limits, retrieval limits, depth/visit limits, provider bounds, compact projections, and presentation sampling may reduce returned evidence, but may not turn an unobserved fact into `absent`, `false`, `none`, `no match`, or any equivalent authoritative negative. Negative facts are derived from qualified evidence before bounded projection; if a bound prevents that proof, the negative fact remains unknown/incomplete/not-admissible.
+
 ## Public API and daemon safety
 
 **A1. Local/daemon acceleration may change cost, never semantics.** Automatic fallback must preserve the same repository truth.
