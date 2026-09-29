@@ -46,13 +46,15 @@ including when Hashmarks' `.venv` is active.
 The run uses your installed native CLI model/provider/auth settings. Check that
 `codex` and `opencode` already work interactively. Native Codex requires a
 `model` in your `~/.codex/config.toml`, and native OpenCode requires a configured
-model. The benchmark does not set a model or create MCP registrations.
+model. The benchmark never chooses or rewrites either host's model/provider/auth
+configuration.
 
-Register `hashmarks` and `enola` as stdio MCP servers in both host CLIs. The
-Hashmarks server command must resolve to this checkout's `.venv/bin/hashmarks`
-through `PATH`; use `hashmarks --workspace . mcp` from the trial working directory.
-The Enola server should use `enola` with no args, so it observes the trial working
-directory. For Codex, the global `~/.codex/config.toml` can contain:
+Codex still uses its native MCP registrations. Register `hashmarks` and `enola`
+there as stdio MCP servers. The Hashmarks server command must resolve to this
+checkout's `.venv/bin/hashmarks` through `PATH`; use
+`hashmarks --workspace . mcp` from the trial working directory. The Enola server
+should use `enola` with no args, so it observes the trial working directory. For
+Codex, the global `~/.codex/config.toml` can contain:
 
 ```toml
 [mcp_servers.hashmarks]
@@ -66,32 +68,24 @@ args = []
 cwd = "."
 ```
 
-Keep your existing Codex model and authentication fields. Native OpenCode uses
-command arrays in its JSON/JSONC configuration:
+Keep your existing Codex model and authentication fields.
 
-```jsonc
-{
-  "mcp": {
-    "hashmarks": {
-      "type": "local",
-      "command": ["hashmarks", "--workspace", ".", "mcp"],
-      "enabled": true
-    },
-    "enola": {
-      "type": "local",
-      "command": ["enola"],
-      "enabled": true
-    }
-  }
-}
-```
+Native OpenCode is intentionally different. It does **not** need a pre-existing
+Hashmarks or Enola MCP registration for the benchmark. agentsCookbook resolves the
+selected subject from the benchmark environment, records the exact executable identity,
+and supplies a temporary trial-scoped MCP exposure through OpenCode's native runtime
+configuration. OpenCode still owns model/provider/auth/permissions. Any project or
+global `mcp.hashmarks` / `mcp.enola` entry is observed but may be shadowed for the
+trial; it does not choose the executable under test. End-user
+`hashmarks install --opencode` registration is therefore not benchmark authority.
 
-Keep the OpenCode model/provider/auth settings already configured on the host.
-Avoid an absolute Hashmarks command from another installation; the benchmark
-puts this checkout's `.venv/bin` first on `PATH` and checks the executable. The
-runner verifies workspace binding and marks a trial `INCOMPLETE` if a registration
-is stale or absent. `codex mcp list --json` and `opencode mcp list` are useful
-host checks. Enola hooks are excluded; only MCP access varies between arms.
+The benchmark puts this checkout's `.venv/bin` first on `PATH` and proves the
+selected Hashmarks executable, exposure digest, and workspace binding before agent
+work. For OpenCode, a missing subject executable, changed exposure identity, or
+unprovable workspace binding yields `INCOMPLETE`; a missing native OpenCode subject
+registration does not. For Codex, stale or absent native MCP registration still yields
+`INCOMPLETE`. `codex mcp list --json` remains useful for Codex host checks. Enola
+hooks are excluded; only MCP access varies between arms.
 
 The earlier `codex-agent-economics` evaluation remains available through its
 separate Make targets. The native matrix compares subject assistance within each
