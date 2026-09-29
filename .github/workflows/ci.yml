@@ -157,6 +157,12 @@ jobs:
       - run: uv python install 3.14
       - run: uv sync --frozen --group test --extra mcp --python 3.14
       - run: make test-profile
+      - name: Prove MCP concurrency stress before publication
+        run: |
+          for attempt in 1 2 3; do
+            echo "MCP concurrency stress attempt $attempt/3"
+            make mcp-concurrency-stress
+          done
       - name: Smoke artifacts without changing existing dist
         run: |
           mkdir -p dist
