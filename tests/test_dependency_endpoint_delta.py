@@ -130,6 +130,25 @@ def test_dependency_delta_separates_adapter_semantics_from_repository_meaning(
     assert delta["change_axes"]["physical_evidence_content"] == "unchanged"
 
 
+def test_dependency_delta_uses_canonical_json_for_producer_provenance(
+    tmp_path: Path,
+) -> None:
+    before_raw = _snapshot()
+    after_raw = _snapshot()
+    before_raw["producer"]["flag"] = True
+    after_raw["producer"]["flag"] = 1
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = _qualify(codemap, before_raw)
+        after = _qualify(codemap, after_raw)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert before["observation_identity"] != after["observation_identity"]
+    assert delta["change_axes"]["producer_provenance"] == "changed"
+    assert delta["change_axes"]["semantic_resolution"] == "unchanged"
+
+
 def test_dependency_delta_separates_evidence_topology_from_equal_bytes(
     tmp_path: Path,
 ) -> None:

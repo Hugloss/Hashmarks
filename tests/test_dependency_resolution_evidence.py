@@ -888,19 +888,37 @@ def test_v3_dependency_correlation_preserves_contextual_ownership(
             },
         )
 
+    assert packet["schema"] == "hashmarks.dependency-evidence-correlation.v2"
     assert packet["dependency_links"] == [
         {
+            "bundle_id": packet["correlation"]["bundles"][0]["bundle_id"],
             "module": "library",
             "context": "compile",
             "distribution_state": "resolved-unique",
             "distribution_nodes": ["library@1"],
             "ownership_completeness": "complete",
             "observed_contexts": ["compile"],
+            "evidence_sources": ["list:compile"],
+            "observation_identity": observation["observation_identity"],
             "authority": "qualified-external-observation",
             "producer_authority": "caller-claimed",
             "causation": "not-inferred",
         }
     ]
+    assert packet["dependency_provenance"]["producer"] == observation["producer"]
+    assert (
+        packet["dependency_provenance"]["repository_binding"]
+        == observation["repository_binding"]
+    )
+    assert [
+        row["source_id"] for row in packet["dependency_provenance"]["evidence_sources"]
+    ] == ["list:compile"]
+    packet["dependency_provenance"]["producer"]["kind"] = "changed-by-consumer"
+    packet["dependency_provenance"]["evidence_sources"][0]["kind"] = (
+        "changed-by-consumer"
+    )
+    assert observation["producer"]["kind"] == "neutral-resolver"
+    assert observation["evidence_sources"][0]["kind"] == "test-inventory-source"
     assert packet["producer_authority"] == "caller-claimed"
     assert packet["observation_identity"] == observation["observation_identity"]
     assert packet["correlation"]["bundles"][0]["producer_authority"] == "caller-claimed"
@@ -958,6 +976,225 @@ def test_v3_dependency_correlation_without_context_preserves_cross_context_ambig
     assert link["distribution_state"] == "resolved-ambiguous"
     assert link["distribution_nodes"] == ["app@1", "library@1"]
     assert link["observed_contexts"] == ["compile", "runtime"]
+
+
+def test_import_correspondence_selects_most_specific_owner_per_context(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "consumer.py").write_text("import library.sub\n")
+    snapshot = _snapshot_v3()
+    runtime_source = next(
+        row
+        for row in snapshot["evidence_sources"]
+        if row["source_id"] == "tree:runtime"
+    )
+    runtime_source["authorities"].append("module-ownership")
+    snapshot["module_ownership"] = [
+        {
+            "module": "library.sub",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        },
+        {
+            "module": "library",
+            "context": "compile",
+            "owners": ["inventory-only@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        },
+        {
+            "module": "library",
+            "context": "runtime",
+            "owners": ["app@1"],
+            "completeness": "complete",
+            "evidence_sources": ["tree:runtime"],
+        },
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        compile_result = codemap.dependency_import_correspondence(
+            observation,
+            source_path="consumer.py",
+            import_target="library.sub",
+            context="compile",
+        )
+        aggregate = codemap.dependency_import_correspondence(
+            observation,
+            source_path="consumer.py",
+            import_target="library.sub",
+        )
+
+    assert compile_result["distribution_state"] == "resolved-unique"
+    assert compile_result["distribution_nodes"] == ["library@1"]
+    assert compile_result["matched_modules"] == [
+        {
+            "context": "compile",
+            "module": "library.sub",
+            "evidence_sources": ["list:compile"],
+        }
+    ]
+    assert compile_result["import_claim_authority"] == "caller-claimed"
+    assert (
+        compile_result["dependency_provenance"]["observation_identity"]
+        == (observation["observation_identity"])
+    )
+    assert aggregate["distribution_state"] == "resolved-ambiguous"
+    assert aggregate["distribution_nodes"] == ["app@1", "library@1"]
+    assert aggregate["matched_modules"] == [
+        {
+            "context": "compile",
+            "module": "library.sub",
+            "evidence_sources": ["list:compile"],
+        },
+        {
+            "context": "runtime",
+            "module": "library",
+            "evidence_sources": ["tree:runtime"],
+        },
+    ]
+    assert [
+        row["source_id"]
+        for row in aggregate["dependency_provenance"]["evidence_sources"]
+    ] == ["list:compile", "tree:runtime"]
+
+
+def test_import_correspondence_does_not_fall_back_from_observed_empty_exact_row(
+    tmp_path: Path,
+) -> None:
+    snapshot = _snapshot_v3()
+    parent = {
+        "module": "library",
+        "context": "compile",
+        "owners": ["library@1"],
+        "completeness": "complete",
+        "evidence_sources": ["list:compile"],
+    }
+    snapshot["module_ownership"] = [parent]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        fallback = codemap.dependency_resolution_evidence(snapshot)
+        fallback_result = codemap.dependency_import_correspondence(
+            fallback,
+            source_path="consumer.py",
+            import_target="library.sub",
+            context="compile",
+        )
+        snapshot["module_ownership"] = [
+            parent,
+            {
+                "module": "library.sub",
+                "context": "compile",
+                "owners": [],
+                "completeness": "incomplete",
+                "evidence_sources": ["list:compile"],
+            },
+        ]
+        observed = codemap.dependency_resolution_evidence(snapshot)
+        exact_result = codemap.dependency_import_correspondence(
+            observed,
+            source_path="consumer.py",
+            import_target="library.sub",
+            context="compile",
+        )
+        missing_result = codemap.dependency_import_correspondence(
+            observed,
+            source_path="consumer.py",
+            import_target="missing.module",
+            context="compile",
+        )
+
+    assert fallback_result["distribution_nodes"] == ["library@1"]
+    assert fallback_result["matched_modules"][0]["module"] == "library"
+    assert exact_result["distribution_state"] == "unresolved"
+    assert exact_result["distribution_nodes"] == []
+    assert exact_result["ownership_completeness"] == "incomplete"
+    assert exact_result["matched_modules"][0]["module"] == "library.sub"
+    assert missing_result["distribution_state"] == "unknown"
+    assert missing_result["matched_modules"] == []
+    assert missing_result["dependency_provenance"]["evidence_sources"] == []
+
+
+def test_dependency_correlation_identity_ignores_request_and_anchor_order(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "consumer.py").write_text("A = 1\nB = 2\n")
+    snapshot = _snapshot_v3()
+    snapshot["module_ownership"] = [
+        {
+            "module": "library",
+            "context": "compile",
+            "owners": ["library@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        },
+        {
+            "module": "inventory",
+            "context": "compile",
+            "owners": ["inventory-only@1"],
+            "completeness": "complete",
+            "evidence_sources": ["list:compile"],
+        },
+    ]
+    first = {
+        "module": "library",
+        "context": "compile",
+        "anchors": [
+            {"anchor_id": "a", "path": "consumer.py", "line": 1},
+            {"anchor_id": "b", "path": "consumer.py", "line": 2},
+        ],
+    }
+    second = {"module": "inventory", "context": "compile", "anchors": []}
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(snapshot)
+        forward = codemap.dependency_evidence_correlation(
+            observation, {"correlations": [first, second]}
+        )
+        reversed_first = {**first, "anchors": list(reversed(first["anchors"]))}
+        reverse = codemap.dependency_evidence_correlation(
+            observation, {"correlations": [second, reversed_first]}
+        )
+        changed = codemap.dependency_evidence_correlation(
+            observation,
+            {
+                "correlations": [
+                    {**first, "completeness": "complete", "truncation": "complete"},
+                    second,
+                ]
+            },
+        )
+        duplicates = codemap.dependency_evidence_correlation(
+            observation, {"correlations": [second, first, second]}
+        )
+        reordered_duplicates = codemap.dependency_evidence_correlation(
+            observation, {"correlations": [second, second, reversed_first]}
+        )
+
+    assert forward["schema"] == "hashmarks.dependency-evidence-correlation.v2"
+    assert (
+        forward["correlation"]["evidence_definition_identity"]
+        == (reverse["correlation"]["evidence_definition_identity"])
+    )
+    assert (
+        forward["correlation"]["correlation_identity"]
+        == (reverse["correlation"]["correlation_identity"])
+    )
+    assert forward["dependency_links"] == reverse["dependency_links"]
+    assert (
+        forward["correlation"]["evidence_definition_identity"]
+        != (changed["correlation"]["evidence_definition_identity"])
+    )
+    assert len({row["bundle_id"] for row in duplicates["dependency_links"]}) == 3
+    assert (
+        duplicates["correlation"]["correlation_identity"]
+        == (reordered_duplicates["correlation"]["correlation_identity"])
+    )
+    assert {row["bundle_id"] for row in forward["dependency_links"]} == {
+        row["bundle_id"] for row in forward["correlation"]["bundles"]
+    }
 
 
 def test_v3_repository_binding_tracks_current_codemap_generation(

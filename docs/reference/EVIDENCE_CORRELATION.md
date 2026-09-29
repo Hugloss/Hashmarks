@@ -81,9 +81,9 @@ with CodeMap(".") as codemap:
     )
 ~~~
 
-Schema: **`hashmarks.evidence-correlation.v1`**.
+Schema: **`hashmarks.evidence-correlation.v2`**.
 
-The result contains the original claims, resolution state, canonical repository evidence from the existing repository-evidence-binding authority, source-equivalence state, completeness, provenance-bearing repository identities, and an overall correlation identity.
+The result contains the original claims, resolution state, canonical repository evidence from the existing repository-evidence-binding authority, source-equivalence state, completeness, provenance-bearing repository identities, and an overall correlation identity. `definition_options` retains the normalized relationship request (`include_relationships` and `relationship_limit_per_path`, which is null when relationships were not requested). A previous v2 packet is checked against its retained definition inputs, anchor-to-binding references, source-equivalence and completeness projections, and same-target correspondence before delta comparison; v1 packets are not accepted as replay input. This does not re-resolve historical anchors against the current repository state.
 
 ## Anchor contract
 
@@ -139,9 +139,9 @@ Correlation and source equivalence are separate axes.
 
 `source_equivalence.state` is:
 
-- **`proven`** — every supplied qualified source identity comparable with the resolved repository evidence matches;
+- **`proven`** — every supplied qualified source identity was checked against repository evidence and matched;
 - **`mismatch`** — at least one comparable qualified identity differs;
-- **`unknown`** — the external observation did not provide enough qualified identity evidence.
+- **`unknown`** — no qualified identity could be checked, or at least one supplied identity could not be checked and none differed. The basis lists only checks that were possible.
 
 A current repository observation therefore never implies that an older runtime failure was produced by the same bytes.
 
@@ -174,7 +174,7 @@ after = codemap.correlate_evidence(
 )
 ~~~
 
-The result includes a **`hashmarks.evidence-correlation-delta.v1`** packet. Repository change classification is delegated to the existing repository-evidence-binding delta authority.
+The result includes a **`hashmarks.evidence-correlation-delta.v2`** packet. Repository change classification is delegated to the existing repository-evidence-binding delta authority.
 
 A supplied previous packet is treated as untrusted serialized evidence. Hashmarks validates its schema and recomputes the packet's `correlation_identity` over the authoritative packet content before it may participate in a delta. Missing, malformed, or content-mismatched identities fail closed; changing nested repository evidence while retaining the old identity is rejected. A derived `delta_from_previous` field is excluded from the base packet identity because it describes comparison history rather than the correlation observation itself.
 

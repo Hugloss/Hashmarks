@@ -135,9 +135,9 @@ def qualified_shared_input_identity(codemap: Any, *, relpath: str) -> dict[str, 
         None,
     )
     projects = _shared_input_projects(codemap, synthetic) if node is not None else []
+    payload = _shared_input_payload(codemap, rel, projects)
     fresh, stale_reason = codemap._evidence_fresh("project", "declared-project-links")
     status = _shared_input_status(node, fresh)
-    payload = _shared_input_payload(codemap, rel, projects)
     identity_available = (
         status == "resolved"
         and payload["content_sha256"] is not None

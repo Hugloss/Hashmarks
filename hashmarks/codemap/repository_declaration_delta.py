@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 
 
@@ -21,12 +22,22 @@ def _declarations(group: Mapping[str, object]) -> dict[str, Mapping[str, object]
     return {str(row["declaration_id"]): row for row in rows if isinstance(row, Mapping)}
 
 
-def _value_signature(row: Mapping[str, object]) -> tuple[object, object, object]:
-    return (
-        row.get("value_state"),
-        row.get("value"),
-        row.get("candidate_values"),
+def _canonical(value: object) -> str:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
     )
+
+
+def _different(left: object, right: object) -> bool:
+    return _canonical(left) != _canonical(right)
+
+
+def _value_signature(row: Mapping[str, object]) -> str:
+    return _canonical(_value_projection(row))
 
 
 def _changed_declaration_ids(
@@ -39,7 +50,7 @@ def _changed_declaration_ids(
     return sorted(
         declaration_id
         for declaration_id in shared
-        if old[declaration_id].get(field) != new[declaration_id].get(field)
+        if _different(old[declaration_id].get(field), new[declaration_id].get(field))
     )
 
 
@@ -95,11 +106,12 @@ def _group_change(
         "definition_changed_declaration_ids": definition_changed,
         "value_changed_declaration_ids": value_changed,
         "observation_changed_declaration_ids": observation_changed,
-        "comparison_changed": old.get("comparison") != new.get("comparison"),
-        "absence_changed": old.get("absence") != new.get("absence"),
-        "correspondence_changed": old.get("correspondence")
-        != new.get("correspondence"),
-        "coverage_changed": old.get("coverage") != new.get("coverage"),
+        "comparison_changed": _different(old.get("comparison"), new.get("comparison")),
+        "absence_changed": _different(old.get("absence"), new.get("absence")),
+        "correspondence_changed": _different(
+            old.get("correspondence"), new.get("correspondence")
+        ),
+        "coverage_changed": _different(old.get("coverage"), new.get("coverage")),
     }
 
 
@@ -122,7 +134,7 @@ def _transition(
 ) -> dict[str, object] | None:
     before = old.get(field)
     after = new.get(field)
-    if before == after:
+    if not _different(before, after):
         return None
     return {"before": before, "after": after}
 
@@ -196,10 +208,10 @@ def _semantic_declaration_delta(
     ambiguous: list[dict[str, object]] = []
     changed: list[dict[str, object]] = []
 
-    for identity in sorted(before_ids & after_ids):
-        old_rows = before[identity]
-        new_rows = after[identity]
-        if len(old_rows) != 1 or len(new_rows) != 1:
+    for identity in sorted(before_ids | after_ids):
+        old_rows = before.get(identity, [])
+        new_rows = after.get(identity, [])
+        if len(old_rows) > 1 or len(new_rows) > 1:
             ambiguous.append(
                 {
                     "semantic_declaration_identity": identity,
@@ -212,6 +224,8 @@ def _semantic_declaration_delta(
                     "reason": "semantic-declaration-not-unique",
                 }
             )
+            continue
+        if not old_rows or not new_rows:
             continue
         change = _semantic_declaration_change(identity, old_rows[0], new_rows[0])
         if change is not None:
@@ -300,10 +314,10 @@ def _semantic_subject_delta(
     ambiguous: list[dict[str, object]] = []
     changed: list[dict[str, object]] = []
 
-    for identity in sorted(before_ids & after_ids):
-        old_rows = before[identity]
-        new_rows = after[identity]
-        if len(old_rows) != 1 or len(new_rows) != 1:
+    for identity in sorted(before_ids | after_ids):
+        old_rows = before.get(identity, [])
+        new_rows = after.get(identity, [])
+        if len(old_rows) > 1 or len(new_rows) > 1:
             ambiguous.append(
                 {
                     "semantic_subject_identity": identity,
@@ -316,6 +330,8 @@ def _semantic_subject_delta(
                     "reason": "semantic-subject-not-unique",
                 }
             )
+            continue
+        if not old_rows or not new_rows:
             continue
         change = _semantic_subject_change(identity, old_rows[0], new_rows[0])
         if change is not None:

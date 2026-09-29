@@ -9,6 +9,9 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.paths import normalize_relative_path
 
 from . import dependency_resolution_contract as _contract
+from .dependency_resolution_contract import normalized_text as _text
+from .dependency_resolution_contract import object_rows as _objects
+from .dependency_resolution_correlation import DependencyResolutionCorrelationMixin
 from .dependency_resolution_query import dependency_queries
 
 if TYPE_CHECKING:
@@ -23,7 +26,6 @@ _MAX_ROOTS = 256
 _MAX_INPUTS = 256
 _MAX_MODULE_OWNERSHIP = 4096
 _MAX_ID_CHARS = 512
-_MAX_TEXT_CHARS = 4096
 _MAX_REQUEST_BYTES = 1_048_576
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MEMBER_REVISION = re.compile(r"^[0-9a-f]{64}$")
@@ -100,31 +102,7 @@ def _identifier(value: object, *, label: str) -> str:
     return text
 
 
-def _text(value: object, *, label: str, required: bool = False) -> str:
-    if value is not None and not isinstance(value, str):
-        raise ValueError(f"{label} must be a string")
-    text = (value or "").strip()
-    if required and not text:
-        raise ValueError(f"{label} must not be empty")
-    if len(text) > _MAX_TEXT_CHARS:
-        raise ValueError(f"{label} exceeds {_MAX_TEXT_CHARS} characters")
-    return text
-
-
-def _objects(value: object, *, label: str, limit: int) -> list[Mapping[str, object]]:
-    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
-        raise ValueError(f"{label} must be a sequence")
-    if len(value) > limit:
-        raise ValueError(f"{label} exceeds {limit} entries")
-    rows: list[Mapping[str, object]] = []
-    for row in value:
-        if not isinstance(row, Mapping):
-            raise ValueError(f"each {label} entry must be an object")
-        rows.append(row)
-    return rows
-
-
-class DependencyResolutionEvidenceMixin:
+class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
     """Qualify producer-neutral dependency resolution observations.
 
     The producer supplies the graph. Hashmarks validates, identifies, compares,
@@ -1218,78 +1196,6 @@ class DependencyResolutionEvidenceMixin:
             for row in coverage
         ]
 
-    def dependency_import_correspondence(
-        self,
-        observation: Mapping[str, object],
-        *,
-        source_path: str,
-        import_target: str,
-        context: str | None = None,
-    ) -> dict[str, object]:
-        self._require_current_dependency_observation_v3(observation)
-        candidates = self._python_import_module_candidates(source_path, import_target)
-        rows = [
-            row
-            for row in observation.get("module_ownership", ())
-            if isinstance(row, Mapping)
-            and row.get("module")
-            and (context is None or str(row.get("context") or "") == context)
-        ]
-        matches = [
-            row for module in candidates for row in rows if row.get("module") == module
-        ]
-        repository_paths = self._resolve_import_paths(source_path, import_target)
-        if not matches:
-            return {
-                "source_path": source_path,
-                "import_target": import_target,
-                **({"context": context} if context is not None else {}),
-                "repository_paths": repository_paths,
-                "distribution_state": "unknown",
-                "distribution_nodes": [],
-                "authority": "qualified-external-observation",
-                "producer_authority": "caller-claimed",
-                "causation": "not-inferred",
-            }
-
-        owners = sorted(
-            {str(owner) for row in matches for owner in row.get("owners", ()) if owner}
-        )
-        completeness = (
-            "complete"
-            if all(row.get("completeness") == "complete" for row in matches)
-            else "incomplete"
-            if any(row.get("completeness") == "incomplete" for row in matches)
-            else "unknown"
-        )
-        contexts = sorted(
-            {
-                str(row.get("context"))
-                for row in matches
-                if row.get("context") is not None
-            }
-        )
-        return {
-            "source_path": source_path,
-            "import_target": import_target,
-            **({"context": context} if context is not None else {}),
-            "repository_paths": repository_paths,
-            "module": str(matches[0]["module"]),
-            "distribution_state": (
-                "resolved-unique"
-                if len(owners) == 1
-                else "resolved-ambiguous"
-                if owners
-                else "unresolved"
-            ),
-            "distribution_nodes": owners,
-            "ownership_completeness": completeness,
-            "observed_contexts": contexts,
-            "authority": "qualified-external-observation",
-            "producer_authority": "caller-claimed",
-            "causation": "not-inferred",
-        }
-
     def _dependency_repository_inputs(self, value: object) -> list[dict[str, object]]:
         rows = _objects(value, label="repository_inputs", limit=_MAX_INPUTS)
         result: list[dict[str, object]] = []
@@ -1326,114 +1232,6 @@ class DependencyResolutionEvidenceMixin:
                 }
             )
         return sorted(result, key=lambda row: str(row["path"]))
-
-    def dependency_evidence_correlation(
-        self,
-        observation: Mapping[str, object],
-        request: Mapping[str, object],
-    ) -> dict[str, object]:
-        """Correlate dependency owners with current repository evidence."""
-        self._require_current_dependency_observation_v3(observation)
-        _contract.reject_unknown_fields(request, label="correlation request")
-        raw_correlations = request.get("correlations", ())
-        correlations = _objects(raw_correlations, label="correlations", limit=256)
-        bundles: list[dict[str, object]] = []
-        dependency_links: list[dict[str, object]] = []
-        ownership = [
-            row
-            for row in observation.get("module_ownership", ())
-            if isinstance(row, Mapping) and row.get("module")
-        ]
-        for index, raw in enumerate(correlations):
-            _contract.reject_unknown_fields(raw, label="correlation row")
-            module = _text(raw.get("module"), label="correlation module", required=True)
-            context = _text(raw.get("context"), label="correlation context")
-            anchors = raw.get("anchors", ())
-            if not isinstance(anchors, Sequence) or isinstance(
-                anchors, (str, bytes, bytearray)
-            ):
-                raise ValueError("correlation anchors must be a sequence")
-            matches = [
-                row
-                for row in ownership
-                if row.get("module") == module
-                and (not context or str(row.get("context") or "") == context)
-            ]
-            owners = sorted(
-                {
-                    str(owner)
-                    for row in matches
-                    for owner in row.get("owners", ())
-                    if owner
-                }
-            )
-            completeness = (
-                "complete"
-                if matches
-                and all(row.get("completeness") == "complete" for row in matches)
-                else "incomplete"
-                if any(row.get("completeness") == "incomplete" for row in matches)
-                else "unknown"
-            )
-            observed_contexts = sorted(
-                {
-                    str(row.get("context"))
-                    for row in matches
-                    if row.get("context") is not None
-                }
-            )
-            dependency_links.append(
-                {
-                    "module": module,
-                    **({"context": context} if context else {}),
-                    "distribution_state": (
-                        "resolved-unique"
-                        if len(owners) == 1
-                        else "resolved-ambiguous"
-                        if owners
-                        else "unknown"
-                    ),
-                    "distribution_nodes": owners,
-                    "ownership_completeness": completeness,
-                    "observed_contexts": observed_contexts,
-                    "authority": "qualified-external-observation",
-                    "producer_authority": "caller-claimed",
-                    "causation": "not-inferred",
-                }
-            )
-            bundles.append(
-                {
-                    "bundle_id": f"dependency-correlation-{index}",
-                    "producer": {
-                        "kind": "dependency-correlation-adapter",
-                        "resolution_identity": observation.get("resolution_identity"),
-                        "observation_identity": observation.get("observation_identity"),
-                    },
-                    "completeness": str(raw.get("completeness") or "unknown"),
-                    "scope": {
-                        "kind": "dependency-module-correlation",
-                        "module": module,
-                        **({"context": context} if context else {}),
-                    },
-                    "truncation": str(raw.get("truncation") or "unknown"),
-                    "anchors": list(anchors),
-                }
-            )
-        packet = self.correlate_evidence(
-            bundles,
-            path_mappings=list(request.get("path_mappings") or ()),
-        )
-        return {
-            "schema": "hashmarks.dependency-evidence-correlation.v1",
-            "resolution_identity": observation.get("resolution_identity"),
-            "observation_identity": observation.get("observation_identity"),
-            "correlation": packet,
-            "dependency_links": dependency_links,
-            "authority": "repository-intelligence-only",
-            "producer_authority": "caller-claimed",
-            "interpretation_authority": "consumer-owned",
-            "causation": "not-inferred",
-        }
 
     def dependency_resolution_queries(
         self,

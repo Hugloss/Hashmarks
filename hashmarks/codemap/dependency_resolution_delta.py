@@ -4,11 +4,14 @@ from collections.abc import Mapping, Sequence
 from typing import cast
 
 from . import dependency_resolution_contract as _contract
-from .dependency_resolution_evidence import DependencyResolutionEvidenceMixin
+from .dependency_resolution_evidence import (
+    DependencyResolutionEvidenceMixin,
+    _canonical,
+)
 
 
 def _changed(left: object, right: object) -> str:
-    return "unchanged" if left == right else "changed"
+    return "unchanged" if _canonical(left) == _canonical(right) else "changed"
 
 
 def _producer(observation: Mapping[str, object]) -> Mapping[str, object]:
