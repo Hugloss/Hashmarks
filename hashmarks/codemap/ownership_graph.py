@@ -535,9 +535,6 @@ class OwnershipGraphMixin:
         task_terms = set(_query_terms(task))
         role_domains = self._entry_role_domains()
         role_rows = self._entry_role_rows(hits, role_domains, task_terms, per_role)
-        ambiguity_role_rows = self._entry_role_rows(
-            probed_hits, role_domains, task_terms, per_role
-        )
         recommended = self._entry_recommended(
             role_rows, self._entry_ordered_roles(route)
         )
@@ -552,7 +549,7 @@ class OwnershipGraphMixin:
             "recommended": recommended,
             "ambiguity": self._entry_ambiguity(
                 task,
-                ambiguity_role_rows,
+                role_rows,
                 retrieval_complete=retrieval_complete,
             ),
             "bounds": {
