@@ -8,7 +8,9 @@ from .file_store import UnstableFileError
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-_TRANSIENT_RETRY_DELAYS = (0.0, 0.005, 0.01, 0.02, 0.04, 0.08, 0.16, 0.25)
+_TRANSIENT_RETRY_BUDGET_SECONDS = 5.0
+_TRANSIENT_RETRY_INITIAL_DELAY_SECONDS = 0.005
+_TRANSIENT_RETRY_MAX_DELAY_SECONDS = 0.25
 _TRANSIENT_RUNTIME_MESSAGES = (
     "CodeMap generation is incomplete (BUILDING)",
     "CodeMap generation changed before nested decision session",
@@ -37,15 +39,26 @@ def retry_transient_repository_race(operation: Callable[[], _T]) -> _T:
     Validation errors and unrelated runtime failures propagate immediately.
     """
 
-    last_error: BaseException | None = None
-    for delay in _TRANSIENT_RETRY_DELAYS:
-        if delay:
-            time.sleep(delay)
+    deadline: float | None = None
+    delay = 0.0
+    while True:
         try:
             return operation()
         except (RuntimeError, UnstableFileError) as exc:
             if not is_transient_repository_race(exc):
                 raise
-            last_error = exc
-    assert last_error is not None
-    raise last_error
+
+            now = time.monotonic()
+            if deadline is None:
+                deadline = now + _TRANSIENT_RETRY_BUDGET_SECONDS
+            remaining = deadline - now
+            if remaining <= 0:
+                raise
+
+            if delay:
+                time.sleep(min(delay, remaining))
+            delay = (
+                _TRANSIENT_RETRY_INITIAL_DELAY_SECONDS
+                if delay == 0.0
+                else min(delay * 2, _TRANSIENT_RETRY_MAX_DELAY_SECONDS)
+            )
