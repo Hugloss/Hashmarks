@@ -9,6 +9,7 @@ import pytest
 import hashmarks.cli as cli
 import hashmarks.release_update as release_update
 import hashmarks.repository_cli as repository_cli
+from hashmarks._version import __version__
 from hashmarks.release_update import ReleaseInfo
 
 
@@ -36,6 +37,11 @@ def _latest(version: str) -> bytes:
             "prerelease": False,
         }
     ).encode()
+
+
+def _next_patch_version() -> str:
+    major, minor, patch = map(int, __version__.split("."))
+    return f"{major}.{minor}.{patch + 1}"
 
 
 def test_latest_release_request_is_public_and_repository_neutral(monkeypatch) -> None:
@@ -195,12 +201,13 @@ def test_external_python_upgrade_reports_native_tool_handoff_without_mutation(
     monkeypatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    latest_version = _next_patch_version()
     monkeypatch.setattr(
         cli,
         "fetch_latest_release",
         lambda current_version, *, timeout: ReleaseInfo(
             current_version=current_version,
-            latest_version="0.25.0",
+            latest_version=latest_version,
         ),
     )
     monkeypatch.setattr(cli, "standalone_upgrade_command", lambda version: None)
@@ -222,12 +229,14 @@ def test_external_python_upgrade_reports_native_tool_handoff_without_mutation(
     assert cli.main(["upgrade"]) == 0
 
     output = capsys.readouterr().out
-    assert "Hashmarks 0.24.0" in output
-    assert "Latest: 0.25.0" in output
+    assert f"Hashmarks {__version__}" in output
+    assert f"Latest: {latest_version}" in output
     assert "managed outside Hashmarks" in output
     assert "Use the native mechanism that installed or owns" in output
     assert "does not detect, validate, or certify that package-manager state" in output
-    assert "https://github.com/Hugloss/Hashmarks/releases/tag/v0.25.0" in output
+    assert (
+        f"https://github.com/Hugloss/Hashmarks/releases/tag/v{latest_version}" in output
+    )
     assert "uv tool upgrade hashmarks" not in output
     assert "pipx upgrade hashmarks" not in output
     assert "pip install --upgrade hashmarks" not in output
@@ -341,7 +350,7 @@ def test_cli_upgrade_reports_up_to_date_without_installation_detection(
 
     assert cli.main(["upgrade"]) == 0
 
-    assert "Hashmarks 0.24.0 is up to date." in capsys.readouterr().out
+    assert f"Hashmarks {__version__} is up to date." in capsys.readouterr().out
 
 
 def test_managed_standalone_requires_canonical_installed_name(
@@ -380,6 +389,7 @@ def test_standalone_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    latest_version = _next_patch_version()
     installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"
     monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
     monkeypatch.setattr(
@@ -390,7 +400,7 @@ def test_standalone_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate
         "fetch_latest_release",
         lambda current_version, *, timeout: ReleaseInfo(
             current_version=current_version,
-            latest_version="0.25.0",
+            latest_version=latest_version,
         ),
     )
     monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
@@ -422,13 +432,14 @@ def test_cli_executes_the_exact_displayed_standalone_command(
     monkeypatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    latest_version = _next_patch_version()
     command = "exact-displayed-standalone-command"
     monkeypatch.setattr(
         cli,
         "fetch_latest_release",
         lambda current_version, *, timeout: ReleaseInfo(
             current_version=current_version,
-            latest_version="0.25.0",
+            latest_version=latest_version,
         ),
     )
     resolved_versions: list[str] = []
@@ -446,7 +457,7 @@ def test_cli_executes_the_exact_displayed_standalone_command(
 
     output = capsys.readouterr().out
     assert command in output
-    assert resolved_versions == ["0.25.0"]
+    assert resolved_versions == [latest_version]
     assert seen == [command]
 
 
@@ -454,6 +465,7 @@ def test_standalone_prerequisites_are_resolved_only_after_upgrade_consent(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
+    latest_version = _next_patch_version()
     installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"
     monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
     monkeypatch.setattr(
@@ -466,7 +478,7 @@ def test_standalone_prerequisites_are_resolved_only_after_upgrade_consent(
         "fetch_latest_release",
         lambda current_version, *, timeout: ReleaseInfo(
             current_version=current_version,
-            latest_version="0.25.0",
+            latest_version=latest_version,
         ),
     )
     monkeypatch.setattr(cli, "_interactive_terminal", lambda: True)
@@ -487,6 +499,7 @@ def test_standalone_upgrade_noninteractive_prints_command_without_mutation(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    latest_version = _next_patch_version()
     installed_name = "hashmarks.exe" if release_update.os.name == "nt" else "hashmarks"
     monkeypatch.setattr(release_update.sys, "frozen", True, raising=False)
     monkeypatch.setattr(
@@ -497,7 +510,7 @@ def test_standalone_upgrade_noninteractive_prints_command_without_mutation(
         "fetch_latest_release",
         lambda current_version, *, timeout: ReleaseInfo(
             current_version=current_version,
-            latest_version="0.25.0",
+            latest_version=latest_version,
         ),
     )
     monkeypatch.setattr(cli, "_interactive_terminal", lambda: False)
