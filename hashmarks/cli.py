@@ -75,17 +75,16 @@ def _render_release(release: ReleaseInfo, *, announce: bool) -> None:
     )
 
 
-def _render_external_upgrade_guidance() -> None:
+def _render_external_upgrade_guidance(latest_version: str) -> None:
+    tag = f"v{latest_version}"
     _text(
         "",
         "This installation is managed outside Hashmarks.",
         "Use the native mechanism that installed or owns this Hashmarks installation.",
         "Hashmarks does not detect, validate, or certify that package-manager state.",
         "",
-        "Examples:",
-        "    uv tool upgrade hashmarks",
-        "    pipx upgrade hashmarks",
-        "    pip install --upgrade hashmarks",
+        "Exact GitHub release (wheel and source distribution):",
+        f"    https://github.com/Hugloss/Hashmarks/releases/tag/{tag}",
         "",
         "No changes were made.",
     )
@@ -140,7 +139,7 @@ def _upgrade(args) -> int:
     command = standalone_upgrade_command(release.latest_version)
     if command is None:
         _render_release(release, announce=False)
-        _render_external_upgrade_guidance()
+        _render_external_upgrade_guidance(release.latest_version)
         return 0
 
     _render_standalone_upgrade(release, command, announce=False)
@@ -167,7 +166,7 @@ def _maybe_offer_periodic_upgrade() -> None:
     upgrade_command = standalone_upgrade_command(release.latest_version)
     if upgrade_command is None:
         _render_release(release, announce=True)
-        _render_external_upgrade_guidance()
+        _render_external_upgrade_guidance(release.latest_version)
         return
 
     _render_standalone_upgrade(release, upgrade_command, announce=True)

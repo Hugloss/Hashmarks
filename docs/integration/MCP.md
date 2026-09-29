@@ -7,7 +7,7 @@ Hashmarks exposes an optional **local, read-only stdio Model Context Protocol (M
 For end users on Linux x86_64 (including WSL2), install the self-contained CLI + MCP runtime:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh | sh
+curl -fsSL https://github.com/Hugloss/Hashmarks/releases/latest/download/install.sh | sh
 hashmarks --version
 ```
 

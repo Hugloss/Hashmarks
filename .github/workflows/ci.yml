@@ -68,13 +68,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
       - run: uv python install 3.11
       - name: Check committed dependency convergence
         run: uv lock --check
+      - name: Check changed release request before merge
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --quiet "$BASE_SHA" HEAD -- .github/release-request.toml; then
+            exit 0
+          fi
+          python3 scripts/release_contract.py validate-release-candidate --base-ref "$BASE_SHA"
       - run: uv sync --frozen --group test --python 3.11
       - run: make compile
   authority-diagnostics:
@@ -337,6 +346,7 @@ jobs:
           & scripts\windows_installer_smoke.ps1 `
             -Hashmarks "$PWD\dist\hashmarks.exe" `
             -Version $version
+          & .venv\Scripts\python.exe scripts\windows_handoff_smoke.py
       - name: Bind native Windows standalone qualification
         shell: pwsh
         run: |

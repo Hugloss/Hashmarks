@@ -70,6 +70,96 @@ def validate_release_notes(root: Path, version: str) -> None:
         )
 
 
+def _release_request_version(root: Path) -> tuple[str, bool]:
+    request = tomllib.loads(
+        (root / ".github" / "release-request.toml").read_text(encoding="utf-8")
+    )
+    unknown = set(request) - {"version", "source_sha", "publication_attempt"}
+    if unknown:
+        raise ValueError(f"unsupported release-request fields: {sorted(unknown)!r}")
+    version = request.get("version")
+    if (
+        not isinstance(version, str)
+        or re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) is None
+    ):
+        raise ValueError(f"invalid release version: {version!r}")
+
+    source_sha = request.get("source_sha")
+    if source_sha is not None and (
+        not isinstance(source_sha, str)
+        or re.fullmatch(r"[0-9a-f]{40}", source_sha) is None
+    ):
+        raise ValueError(
+            "source_sha must be an exact lowercase 40-character commit SHA"
+        )
+    attempt = request.get("publication_attempt")
+    if attempt is not None and (
+        isinstance(attempt, bool) or not isinstance(attempt, int) or attempt < 1
+    ):
+        raise ValueError("publication_attempt must be a positive integer")
+
+    return version, set(request) == {"version"}
+
+
+def _validate_normal_release_source(root: Path, version: str) -> None:
+    project_version = str(_project(root)["version"])
+    if version != project_version:
+        raise ValueError(
+            f"release request/version mismatch: request={version!r} project={project_version!r}"
+        )
+    runtime = (root / "hashmarks" / "_version.py").read_text(encoding="utf-8")
+    runtime_matches = re.findall(r'^__version__ = "([^"]+)"$', runtime, re.MULTILINE)
+    if runtime_matches != [version]:
+        raise ValueError("release runtime version does not match the request")
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    if readme.count(f"Current package version: **{version}**.") != 1:
+        raise ValueError("README package version does not match the request")
+    validate_release_notes(root, version)
+
+
+def _base_project_version(root: Path, base_ref: str) -> str:
+    if re.fullmatch(r"[0-9a-f]{40}", base_ref) is None:
+        raise ValueError("base-ref must be an exact lowercase 40-character commit SHA")
+    try:
+        base_project = subprocess.check_output(
+            ["git", "show", f"{base_ref}:pyproject.toml"],
+            cwd=root,
+            text=True,
+            stderr=subprocess.PIPE,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise ValueError("cannot read base package version") from exc
+    base_version = str(tomllib.loads(base_project)["project"]["version"])
+    if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", base_version) is None:
+        raise ValueError(f"invalid base package version: {base_version!r}")
+    return base_version
+
+
+def validate_release_candidate(
+    root: Path,
+    *,
+    base_ref: str | None = None,
+    normal_only: bool = False,
+) -> str:
+    """Check a changed release request before it can trigger publication."""
+    root = root.resolve()
+    version, normal = _release_request_version(root)
+    if normal_only and not normal:
+        raise ValueError("release-check requires a normal version-only release request")
+    if not normal:
+        return version  # Publish re-proves the selected source for retry requests.
+    _validate_normal_release_source(root, version)
+    if base_ref is not None:
+        base_version = _base_project_version(root, base_ref)
+        if tuple(map(int, version.split("."))) <= tuple(
+            map(int, base_version.split("."))
+        ):
+            raise ValueError(
+                f"release version {version} must be greater than base {base_version}"
+            )
+    return version
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -672,6 +762,11 @@ def _add_validation_commands(sub) -> None:
     release_notes.add_argument("--root", default=".")
     release_notes.add_argument("--version", required=True)
 
+    candidate = sub.add_parser("validate-release-candidate")
+    candidate.add_argument("--root", default=".")
+    candidate.add_argument("--base-ref")
+    candidate.add_argument("--normal-only", action="store_true")
+
 
 def _add_package_commands(sub) -> None:
     manifest = sub.add_parser("manifest")
@@ -854,6 +949,12 @@ def _run_command(args) -> int:
     elif args.command == "validate-release-notes":
         validate_release_notes(root, args.version)
         _log_command_output(f"Hashmarks release notes: PASS ({args.version})")
+        result = 0
+    elif args.command == "validate-release-candidate":
+        version = validate_release_candidate(
+            root, base_ref=args.base_ref, normal_only=args.normal_only
+        )
+        _log_command_output(f"Hashmarks release candidate: PASS ({version})")
         result = 0
     elif args.command == "publication-assets":
         result = _run_publication_assets(args)

@@ -172,6 +172,17 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
         assert publication_attempt >= 1
 
 
+def test_changed_release_request_is_checked_before_merge() -> None:
+    text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    fast_gate = text.split("  fast-gate:\n", 1)[1].split(
+        "\n  authority-diagnostics:\n", 1
+    )[0]
+    assert (
+        'git diff --quiet "$BASE_SHA" HEAD -- .github/release-request.toml' in fast_gate
+    )
+    assert 'validate-release-candidate --base-ref "$BASE_SHA"' in fast_gate
+
+
 def test_ci_qualifies_native_linux_wsl_and_windows_install_paths() -> None:
     text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     linux = text.split("  standalone-artifact:\n", 1)[1].split(
@@ -302,7 +313,9 @@ def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
     assert "map status" in text
     assert "raw.githubusercontent.com" not in text
     assert "/releases/latest/" not in text
-    assert "actions/checkout@" not in text
+    assert "Checkout exact published source for interactive upgrade smoke" in text
+    assert "ref: ${{ github.event.release.tag_name }}" in text
+    assert "windows_published_upgrade_smoke.py" in text
 
 
 def test_every_release_workflow_job_has_a_bounded_timeout() -> None:

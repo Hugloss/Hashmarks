@@ -227,9 +227,10 @@ def test_external_python_upgrade_reports_native_tool_handoff_without_mutation(
     assert "managed outside Hashmarks" in output
     assert "Use the native mechanism that installed or owns" in output
     assert "does not detect, validate, or certify that package-manager state" in output
-    assert "uv tool upgrade hashmarks" in output
-    assert "pipx upgrade hashmarks" in output
-    assert "pip install --upgrade hashmarks" in output
+    assert "https://github.com/Hugloss/Hashmarks/releases/tag/v0.25.0" in output
+    assert "uv tool upgrade hashmarks" not in output
+    assert "pipx upgrade hashmarks" not in output
+    assert "pip install --upgrade hashmarks" not in output
     assert "No changes were made." in output
 
 

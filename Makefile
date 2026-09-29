@@ -482,7 +482,7 @@ mcp-pi-check:
 	  --receipt "$(PI_HOST_RECEIPT)"
 
 release-prepare:
-	@test -n "$(VERSION)" || (echo "VERSION is required, e.g. make release-prepare VERSION=0.24.0" >&2; exit 2)
+	@test -n "$(VERSION)" || (echo "VERSION is required, e.g. make release-prepare VERSION=X.Y.Z" >&2; exit 2)
 	@$(UV_RUN) --offline --no-sync python scripts/release_prepare.py --version "$(VERSION)"
 	@$(UV) lock
 	@$(UV) lock --check
@@ -490,9 +490,11 @@ release-prepare:
 	  'Release mechanics prepared and uv.lock refreshed.' \
 	  'Next: replace the Development placeholder in CHANGELOG.md, review the diff, then run make release-check.'
 
-release-check: dev-check artifact-check
-	@version="$( $(UV_RUN) --offline --no-sync python -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])' )"; \
-	  $(UV_RUN) --offline --no-sync python scripts/release_contract.py validate-release-notes --version "$version"
+release-check:
+	@$(MAKE) --no-print-directory lock-check
+	@$(UV_RUN) --offline --no-sync python scripts/release_contract.py validate-release-candidate --normal-only
+	@$(MAKE) --no-print-directory dev-check
+	@$(MAKE) --no-print-directory artifact-check
 	@printf '\n%s\n' \
 	  '========================================' \
 	  ' HASHMARKS RELEASE CHECK: LOCAL PREFLIGHT PASS' \
