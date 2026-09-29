@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
 
+from .decision_session import decision_scoped
 from .model import EvidenceVisibility
 from .python_ast import estimate_tokens
 from .query_primitives import _WORD_RE, _query_terms
@@ -459,7 +460,8 @@ class OwnershipGraphMixin:
         task: str,
         role_rows: dict[str, list[dict[str, object]]],
         *,
-        retrieval_complete: bool,
+        retrieval_completeness: str,
+        retrieval_truncation: str,
     ) -> dict[str, object]:
         explicit_roles = self._entry_explicit_roles(task, role_rows)
         alternatives = [{"role": role, **role_rows[role][0]} for role in explicit_roles]
@@ -470,13 +472,13 @@ class OwnershipGraphMixin:
                 str(row["path"]),
             )
         )
-        if not retrieval_complete:
+        if retrieval_completeness != "complete":
             return {
-                "schema": "hashmarks.entry-point-ambiguity.v3",
+                "schema": "hashmarks.entry-point-ambiguity.v4",
                 "ambiguous": None,
                 "reason": "canonical-retrieval-bound-not-exhausted",
-                "completeness": "incomplete",
-                "truncation": "truncated",
+                "completeness": retrieval_completeness,
+                "truncation": retrieval_truncation,
                 "explicit_roles": explicit_roles,
                 "alternatives": alternatives,
                 "resolution": {
@@ -497,7 +499,7 @@ class OwnershipGraphMixin:
         resolved_role = anchored_roles[0] if len(anchored_roles) == 1 else None
         ambiguous = len(explicit_roles) >= 2 and resolved_role is None
         return {
-            "schema": "hashmarks.entry-point-ambiguity.v3",
+            "schema": "hashmarks.entry-point-ambiguity.v4",
             "ambiguous": ambiguous,
             "reason": self._entry_ambiguity_reason(
                 explicit_roles, resolved_role, ambiguous
@@ -517,6 +519,7 @@ class OwnershipGraphMixin:
             "secret_knowledge_used": False,
         }
 
+    @decision_scoped
     def task_entry_points(
         self, task: str, *, limit: int = 20, per_role: int = 2
     ) -> dict[str, object]:
@@ -529,9 +532,9 @@ class OwnershipGraphMixin:
             raise ValueError("per_role must be >= 1")
         if per_role > 8:
             raise ValueError("per_role must be <= 8")
-        hits = self.find_task(task, limit=limit)
-        probed_hits = self.find_task(task, limit=limit + 1)
-        retrieval_complete = len(probed_hits) <= limit
+        retrieval = self._find_task_evidence_impl(task, limit=limit)
+        hits = retrieval.hits
+        retrieval_completeness = "complete" if retrieval.complete else "incomplete"
         route = route_query(task)
         task_terms = set(_query_terms(task))
         role_domains = self._entry_role_domains()
@@ -540,7 +543,7 @@ class OwnershipGraphMixin:
             role_rows, self._entry_ordered_roles(route)
         )
         return {
-            "schema": "hashmarks.task-entry-points.v3",
+            "schema": "hashmarks.task-entry-points.v4",
             "task": task,
             "intent": route.intent.value,
             "confidence": route.confidence,
@@ -551,15 +554,15 @@ class OwnershipGraphMixin:
             "ambiguity": self._entry_ambiguity(
                 task,
                 role_rows,
-                retrieval_complete=retrieval_complete,
+                retrieval_completeness=retrieval_completeness,
+                retrieval_truncation=retrieval.truncation,
             ),
             "bounds": {
                 "limit": limit,
                 "per_role": per_role,
-                "probe_limit": limit + 1,
-                "canonical_completeness": (
-                    "complete" if retrieval_complete else "incomplete"
-                ),
+                "canonical_completeness": retrieval_completeness,
+                "canonical_truncation": retrieval.truncation,
+                "bound_reasons": list(retrieval.bound_reasons),
             },
             "ranking_effect": "none",
             "discovery_effect": "none",

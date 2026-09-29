@@ -378,20 +378,31 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             "owner_basis": selection.owner_basis,
             **ownership,
             "exact_identifier_search": {
+                "evaluation": (
+                    "not-evaluated"
+                    if selection.exact_identifier_search_complete is None
+                    else "evaluated"
+                ),
                 "completeness": (
                     "complete"
-                    if selection.exact_identifier_search_complete
+                    if selection.exact_identifier_search_complete is True
                     else "incomplete"
+                    if selection.exact_identifier_search_complete is False
+                    else "unknown"
                 ),
                 "truncation": (
                     "complete"
-                    if selection.exact_identifier_search_complete
+                    if selection.exact_identifier_search_complete is True
                     else "truncated"
+                    if selection.exact_identifier_search_complete is False
+                    else "unknown"
                 ),
                 "negative_evidence_admissible": (
-                    selection.exact_identifier_search_complete
+                    selection.exact_identifier_search_complete is True
                 ),
-                "uniqueness_admissible": selection.exact_identifier_search_complete,
+                "uniqueness_admissible": (
+                    selection.exact_identifier_search_complete is True
+                ),
                 "bound_reasons": list(selection.exact_identifier_search_bound_reasons),
             },
             "verification_relevance": final.verification_relevance,
@@ -822,7 +833,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         selection: _TaskActionSelectionState,
     ) -> bool:
         return bool(
-            not selection.exact_identifier_search_complete
+            selection.exact_identifier_search_complete is False
             and selection.owner_basis != "literal-path"
         )
 

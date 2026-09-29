@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks.codemap.engine import CodeMap
+from hashmarks.codemap.find_engine import _FindEvidence
 from hashmarks.codemap.query_router import QueryIntent, route_query
 
 if TYPE_CHECKING:
@@ -223,8 +224,10 @@ def test_find_task_preserves_scoped_agents_for_ambiguous_localized_task(
         )
         monkeypatch.setattr(
             codemap,
-            "find",
-            lambda query, *, limit=20: governance if "ownership" in query else base,
+            "_find_evidence",
+            lambda query, *, limit=20: _FindEvidence(
+                governance if "ownership" in query else base, ()
+            ),
         )
         hits = codemap.find_task("ignored", limit=20)
     assert hits[-1].path == "backend/AGENTS.md"
@@ -315,8 +318,10 @@ def test_find_task_preserves_deep_scoped_readme_for_conceptual_localization(
         )
         monkeypatch.setattr(
             codemap,
-            "find",
-            lambda query, *, limit=20: governance if "architecture" in query else base,
+            "_find_evidence",
+            lambda query, *, limit=20: _FindEvidence(
+                governance if "architecture" in query else base, ()
+            ),
         )
         hits = codemap.find_task("ignored", limit=20)
     assert hits[-1].path == "backend/src/pkg/runtime/README.md"
@@ -566,14 +571,14 @@ def test_find_task_reuses_generation_bound_result_without_replaying_views(
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
         codemap.sync()
         calls = 0
-        original_find = codemap.find
+        original_find = codemap._find_evidence
 
         def counted_find(query: str, *, limit: int = 20):
             nonlocal calls
             calls += 1
             return original_find(query, limit=limit)
 
-        monkeypatch.setattr(codemap, "find", counted_find)
+        monkeypatch.setattr(codemap, "_find_evidence", counted_find)
         first = codemap.find_task("alpha implementation", limit=10)
         first_calls = calls
         second = codemap.find_task("alpha implementation", limit=10)
@@ -591,14 +596,14 @@ def test_find_task_cache_is_invalidated_by_codemap_generation(
     with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
         codemap.sync()
         calls = 0
-        original_find = codemap.find
+        original_find = codemap._find_evidence
 
         def counted_find(query: str, *, limit: int = 20):
             nonlocal calls
             calls += 1
             return original_find(query, limit=limit)
 
-        monkeypatch.setattr(codemap, "find", counted_find)
+        monkeypatch.setattr(codemap, "_find_evidence", counted_find)
         codemap.find_task("alpha implementation", limit=10)
         before = calls
         source.write_text("def alpha():\n    return 2\n", encoding="utf-8")
@@ -765,7 +770,7 @@ def test_task_entry_points_reports_test_authority_ambiguity_without_ranking_chan
             for hit in codemap.find_task("service tests AGENTS authority", limit=20)
         ]
     assert before == after
-    assert value["schema"] == "hashmarks.task-entry-points.v3"
+    assert value["schema"] == "hashmarks.task-entry-points.v4"
     assert value["bounds"]["canonical_completeness"] == "complete"
     assert value["ambiguity"]["completeness"] == "complete"
     assert value["ambiguity"]["truncation"] == "complete"
@@ -870,7 +875,7 @@ def test_task_entry_points_distinctive_test_identifier_resolves_role_ambiguity(
             "test_release_checksum_contract checksum contract test", limit=20
         )
     ambiguity = value["ambiguity"]
-    assert ambiguity["schema"] == "hashmarks.entry-point-ambiguity.v3"
+    assert ambiguity["schema"] == "hashmarks.entry-point-ambiguity.v4"
     assert ambiguity["completeness"] == "complete"
     assert ambiguity["truncation"] == "complete"
     assert set(ambiguity["explicit_roles"]) >= {"contract", "verification"}

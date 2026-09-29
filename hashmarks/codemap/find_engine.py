@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
 from .model import EvidenceVisibility, SearchHit
@@ -22,6 +22,13 @@ class _FindContext:
     raw_query: str
     raw_words: tuple[str, ...]
     limit: int
+    bound_reasons: set[str] = field(default_factory=set)
+
+
+@dataclass(frozen=True)
+class _FindEvidence:
+    hits: tuple[SearchHit, ...]
+    bound_reasons: tuple[str, ...]
 
 
 @dataclass
@@ -45,6 +52,9 @@ class FindEngineMixin:
         return route_query(query)
 
     def find(self, query: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
+        return self._find_evidence(query, limit=limit).hits
+
+    def _find_evidence(self, query: str, *, limit: int) -> _FindEvidence:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         self._ensure_map_ready()
@@ -59,7 +69,7 @@ class FindEngineMixin:
             int(limit),
         )
         result, _shared = self._find_flight.run(
-            key, lambda: self._find_impl(query, limit=limit)
+            key, lambda: self._find_compose(query, limit=limit)
         )
         return result
 
@@ -79,9 +89,11 @@ class FindEngineMixin:
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        for row in self._session_exact_symbol_candidates(
-            ctx.terms, limit=max(100, ctx.limit * 8)
-        ):
+        bound = max(100, ctx.limit * 8)
+        rows = self._session_exact_symbol_candidates(ctx.terms, limit=bound)
+        if len(rows) >= bound:
+            ctx.bound_reasons.add("find-exact-symbol-limit")
+        for row in rows:
             key = (str(row.get("path", "")), str(row.get("qualname", "")), "symbol")
             candidates[key] = row
 
@@ -90,9 +102,14 @@ class FindEngineMixin:
     ) -> list[dict[str, object]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
+        bound = max(80, ctx.limit * 6)
+        if len(ctx.terms) > 16:
+            ctx.bound_reasons.add("find-lexical-term-limit")
         lexical_files = self._session_lexical_file_candidates(
-            ctx.terms[:16], limit=max(80, ctx.limit * 6)
+            ctx.terms[:16], limit=bound
         )
+        if len(lexical_files) >= bound:
+            ctx.bound_reasons.add("find-lexical-file-limit")
         term_count = max(1, len(ctx.terms))
         match_by_path: dict[str, int] = {}
         for row in lexical_files:
@@ -121,9 +138,11 @@ class FindEngineMixin:
         candidate_paths = [str(row["path"]) for row in lexical_files]
         bridge_rows: list[dict[str, object]] = []
         bridge_count: dict[str, int] = {}
-        for raw_row in self._session_symbols_for_paths(
-            candidate_paths, limit=max(1000, ctx.limit * 150)
-        ):
+        bound = max(1000, ctx.limit * 150)
+        symbol_rows = self._session_symbols_for_paths(candidate_paths, limit=bound)
+        if len(symbol_rows) >= bound:
+            ctx.bound_reasons.add("find-lexical-symbol-limit")
+        for raw_row in symbol_rows:
             path = str(raw_row.get("path", ""))
             matches = match_by_path.get(path, 0)
             row = dict(raw_row)
@@ -156,21 +175,27 @@ class FindEngineMixin:
         ).lower()
         return any(term in haystack for term in terms)
 
-    def _find_add_path_candidates(
+    def _find_add_path_candidates(  # noqa: C901
         self, ctx: _FindContext, candidates: dict[tuple[str, str, str], dict]
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if ctx.route.path_lookup:
-            for row in self.store.path_candidates(
-                ctx.terms[:8], limit=max(50, ctx.limit * 4)
-            ):
+            bound = max(50, ctx.limit * 4)
+            if len(ctx.terms) > 8:
+                ctx.bound_reasons.add("find-path-term-limit")
+            rows = self.store.path_candidates(ctx.terms[:8], limit=bound)
+            if len(rows) >= bound:
+                ctx.bound_reasons.add("find-path-candidate-limit")
+            for row in rows:
                 key = (str(row.get("path", "")), "", "file")
                 candidates.setdefault(key, row)
         if len(ctx.raw_words) == 1 and not candidates:
-            for row in self.store.search_candidates(
-                ctx.query, limit=max(50, ctx.limit * 5)
-            ):
+            bound = max(50, ctx.limit * 5)
+            rows = self.store.search_candidates(ctx.query, limit=bound)
+            if len(rows) >= bound:
+                ctx.bound_reasons.add("find-search-candidate-limit")
+            for row in rows:
                 key = (
                     str(row.get("path", "")),
                     str(row.get("qualname", "")),
@@ -184,9 +209,11 @@ class FindEngineMixin:
         rows: list[dict] = []
         for term in (ctx.query, *ctx.raw_words):
             if term.strip():
-                rows.extend(
-                    self._fresh_native_definitions(term, limit=max(30, ctx.limit * 3))
-                )
+                bound = max(30, ctx.limit * 3)
+                selected = self._fresh_native_definitions(term, limit=bound)
+                if len(selected) >= bound:
+                    ctx.bound_reasons.add("find-native-definition-limit")
+                rows.extend(selected)
         return list(
             {
                 (
@@ -272,6 +299,8 @@ class FindEngineMixin:
             )
         )
         seed_limit = 12 if ctx.route.intent.value == "relationship" else 8
+        if len(seed_rows) >= seed_limit:
+            ctx.bound_reasons.add("find-caller-seed-limit")
         return self._find_named_seed_names(seed_rows, seed_limit)
 
     @staticmethod
@@ -297,6 +326,8 @@ class FindEngineMixin:
             return
         seed_names = self._find_caller_seed_names(ctx, candidates, bridge_rows)
         refs_by_seed = self._session_refs_many(seed_names, limit_per_target=30)
+        if any(len(rows) >= 30 for rows in refs_by_seed.values()):
+            ctx.bound_reasons.add("find-caller-reference-limit")
         caller_files = self._session_file_rows(self._find_caller_paths(refs_by_seed))
         for seed_name in seed_names:
             self._find_merge_caller_seed(
@@ -362,6 +393,8 @@ class FindEngineMixin:
         seed_limit = (
             12 if ctx.route.intent.value in {"relationship", "structural"} else 8
         )
+        if len(seeds) >= seed_limit:
+            ctx.bound_reasons.add("find-semantic-seed-limit")
         return self._find_seed_keys(seeds, seed_limit)
 
     def _find_add_semantic_candidates(
@@ -369,16 +402,21 @@ class FindEngineMixin:
     ) -> set[tuple[str, str]]:
         type_kinds = {"return-type", "parameter-type", "inherits", "attribute-type"}
         seed_keys = self._find_semantic_seed_keys(ctx, candidates)
-        targets = self._find_semantic_targets(seed_keys, type_kinds)
-        return self._find_merge_semantic_targets(candidates, targets)
+        targets = self._find_semantic_targets(seed_keys, type_kinds, ctx.bound_reasons)
+        return self._find_merge_semantic_targets(candidates, targets, ctx.bound_reasons)
 
     def _find_semantic_targets(
-        self, seed_keys: Sequence[tuple[str, str]], type_kinds: set[str]
+        self,
+        seed_keys: Sequence[tuple[str, str]],
+        type_kinds: set[str],
+        bound_reasons: set[str],
     ) -> set[str]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         targets: set[str] = set()
         edges_by_seed = self._session_edges_from_many(seed_keys, limit_per_seed=24)
+        if any(len(rows) >= 24 for rows in edges_by_seed.values()):
+            bound_reasons.add("find-semantic-edge-limit")
         for seed_key in seed_keys:
             for edge in edges_by_seed.get(seed_key, ()):
                 if str(edge.get("kind") or "") not in type_kinds:
@@ -389,16 +427,23 @@ class FindEngineMixin:
         return targets
 
     def _find_merge_semantic_targets(
-        self, candidates: dict[tuple[str, str, str], dict], targets: set[str]
+        self,
+        candidates: dict[tuple[str, str, str], dict],
+        targets: set[str],
+        bound_reasons: set[str],
     ) -> set[tuple[str, str]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         protected: set[tuple[str, str]] = set()
         if not targets:
             return protected
-        for related in self._session_exact_symbol_candidates(
-            sorted(targets), limit=max(24, len(targets) * 8)
-        ):
+        bound = max(24, len(targets) * 8)
+        related_rows = self._session_exact_symbol_candidates(
+            sorted(targets), limit=bound
+        )
+        if len(related_rows) >= bound:
+            bound_reasons.add("find-semantic-target-limit")
+        for related in related_rows:
             value = {"row_type": "symbol", **related, "_relation_boost": 42.0}
             key = (
                 str(related.get("path", "")),
@@ -457,6 +502,8 @@ class FindEngineMixin:
         rerank_rows = self._bounded_rerank_rows(
             ctx.query, domain_rows, limit=ctx.limit, tokens=ctx.terms
         )
+        if len(rerank_rows) < len(domain_rows):
+            ctx.bound_reasons.add("find-rerank-limit")
         recent = self._recent_changed_paths()
         ranked: list[SearchHit] = []
         for row in rerank_rows:
@@ -601,7 +648,7 @@ class FindEngineMixin:
         state.selected.sort(key=lambda hit: (-hit.score, hit.path, hit.start_line or 0))
         return tuple(state.selected[: ctx.limit])
 
-    def _find_impl(self, query: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
+    def _find_compose(self, query: str, *, limit: int = 20) -> _FindEvidence:
         if not query.strip():
             raise ValueError("query must not be empty")
         ctx = self._find_context(query, limit)
@@ -613,4 +660,7 @@ class FindEngineMixin:
         self._find_add_caller_candidates(ctx, candidates, bridge_rows)
         protected = self._find_add_semantic_candidates(ctx, candidates)
         ranked = self._find_rank_candidates(ctx, candidates)
-        return self._find_select_diverse(ctx, ranked, protected)
+        hits = self._find_select_diverse(ctx, ranked, protected)
+        if len(ranked) > limit:
+            ctx.bound_reasons.add("find-result-limit")
+        return _FindEvidence(hits, tuple(sorted(ctx.bound_reasons)))

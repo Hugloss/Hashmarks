@@ -65,6 +65,7 @@ def test_bounded_plain_identifier_scan_cannot_hide_duplicate_owner(
     assert evidence.search_complete is False
     assert evidence.bound_reasons == ("plain-ambiguity-symbol-index-limit",)
     assert action["exact_identifier_search"] == {
+        "evaluation": "evaluated",
         "completeness": "incomplete",
         "truncation": "truncated",
         "negative_evidence_admissible": False,

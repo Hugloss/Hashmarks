@@ -116,7 +116,7 @@ class TaskActionOwnerResolutionMixin:
     ]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        evidence = _TaskActionExactIdentifierEvidence([], True, ())
+        evidence = _TaskActionExactIdentifierEvidence([], None, ())
         blocked = any(
             (
                 structural_owner is not None,
@@ -144,7 +144,7 @@ class TaskActionOwnerResolutionMixin:
                 )
             if len(exact_identifier_edits) == 1:
                 edit = exact_identifier_edits[0]
-                if not literal_task_path and evidence.search_complete:
+                if not literal_task_path and evidence.search_complete is True:
                     owner_basis = self._task_action_exact_owner_basis(
                         request.task, exact_identifier_edits[0]
                     )
@@ -498,7 +498,7 @@ class TaskActionOwnerResolutionMixin:
         if literal_task_path and selected_edit_path == literal_task_path:
             candidate.basis = "literal-path"
             return self._task_action_owner_state(candidate)
-        if not exact_identifier_evidence.search_complete:
+        if exact_identifier_evidence.search_complete is False:
             candidate.basis = None
             return self._task_action_owner_state(candidate)
         if len(exact_identifier_edits) == 1:

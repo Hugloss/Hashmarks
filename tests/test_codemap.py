@@ -1667,7 +1667,7 @@ def test_find_singleflight_shares_equivalent_concurrent_work(tmp_path: Path):
     _write_repo(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
-        original = codemap._find_impl
+        original = codemap._find_compose
         calls = 0
         calls_lock = threading.Lock()
         barrier = threading.Barrier(5)
@@ -1681,7 +1681,7 @@ def test_find_singleflight_shares_equivalent_concurrent_work(tmp_path: Path):
             time.sleep(0.08)
             return original(query, limit=limit)
 
-        codemap._find_impl = slow_find  # type: ignore[method-assign]
+        codemap._find_compose = slow_find  # type: ignore[method-assign]
 
         def worker():
             try:
