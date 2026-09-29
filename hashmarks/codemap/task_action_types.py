@@ -68,6 +68,7 @@ class _TaskActionConfigState:
 class _TaskActionMapContext:
     hits: Sequence[SearchHit]
     rows: list[dict[str, object]]
+    canonical_retrieval_complete: bool
     failed: set[str]
     cues: _TaskActionCues
     cue_words: set[str]
