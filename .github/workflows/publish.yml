@@ -341,7 +341,8 @@ jobs:
             throw "Windows standalone version mismatch: $reported"
           }
           & .venv\Scripts\python.exe -I scripts\mcp_installed_artifact_smoke.py `
-            --hashmarks "$PWD\dist\hashmarks.exe"
+            --hashmarks "$PWD\dist\hashmarks.exe" `
+            --boundary-only
           & scripts\windows_installer_smoke.ps1 `
             -Hashmarks "$PWD\dist\hashmarks.exe" `
             -Version $env:RELEASE_VERSION

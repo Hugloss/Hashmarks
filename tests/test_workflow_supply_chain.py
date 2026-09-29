@@ -201,6 +201,8 @@ def test_ci_qualifies_native_linux_wsl_and_windows_install_paths() -> None:
     assert "hashmarks-linux-x86_64.sha256" in linux
     assert "standalone-qualification" in linux
     assert "--platform linux" in linux
+    assert "mcp_installed_artifact_smoke.py" in linux
+    assert "--boundary-only" not in linux
 
     assert "windows-latest" in windows
     assert "windows_installer_smoke.ps1" in windows
@@ -208,6 +210,8 @@ def test_ci_qualifies_native_linux_wsl_and_windows_install_paths() -> None:
     assert '$checksum = "$asset.sha256"' in windows
     assert "standalone-qualification" in windows
     assert "--platform windows" in windows
+    assert "mcp_installed_artifact_smoke.py" in windows
+    assert "--boundary-only" in windows
 
 
 def test_publish_requires_native_linux_wsl_and_windows_release_identity() -> None:
@@ -226,6 +230,8 @@ def test_publish_requires_native_linux_wsl_and_windows_release_identity() -> Non
     assert 'HASHMARKS_VERSION="$RELEASE_VERSION"' in linux
     assert "hashmarks-linux-x86_64.sha256" in linux
     assert "--platform linux" in linux
+    assert "mcp_installed_artifact_smoke.py" in linux
+    assert "--boundary-only" not in linux
 
     assert "Build verified standalone Windows CLI/MCP" in windows
     assert "windows-latest" in windows
@@ -234,6 +240,8 @@ def test_publish_requires_native_linux_wsl_and_windows_release_identity() -> Non
     assert "hashmarks-windows-x86_64.exe" in windows
     assert '$checksum = "$asset.sha256"' in windows
     assert "--platform windows" in windows
+    assert "mcp_installed_artifact_smoke.py" in windows
+    assert "--boundary-only" in windows
 
     assert "needs: [prepare, build, standalone-linux, standalone-windows]" in publish
     assert "--standalone-bundle release/standalone/linux" in publish

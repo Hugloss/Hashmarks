@@ -551,6 +551,7 @@ def test_standalone_delegation_executes_the_displayed_native_command(
     argv = seen["argv"]
     assert isinstance(argv, tuple)
     if release_update.os.name == "nt":
+        assert argv[0] == "pwsh.exe"
         assert argv[-1] == displayed
     else:
         assert argv == ("/tools/sh", "-c", displayed)
