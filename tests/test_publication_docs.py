@@ -732,7 +732,10 @@ def test_negative_evidence_admissibility_is_global_and_domain_owned() -> None:
     assert "bounded projection -> semantic filtering -> absence" in agents
     assert "not** a new global negative-evidence manager" in agents
 
-    assert "O8. Negative evidence requires qualified semantic observation scope" in invariants
+    assert (
+        "O8. Negative evidence requires qualified semantic observation scope"
+        in invariants
+    )
     assert "O9. Projection bounds never manufacture negative evidence" in invariants
     assert "Negative evidence admissibility" in architecture
     assert "qualified observation scope" in architecture
@@ -742,5 +745,5 @@ def test_negative_evidence_admissibility_is_global_and_domain_owned() -> None:
 
     # Existing typed owners remain the executable/domain-specific authority.
     assert "Absence is admissible only" in dependency
-    assert "complete, untruncated declared coverage" in declarations
+    assert "Only `complete + complete` coverage" in declarations
     assert "Incomplete change observations never prove" in bindings
