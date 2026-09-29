@@ -22,7 +22,7 @@ def _codemap(root: Path) -> CodeMap:
 
 
 def _install_hidden_same_name_candidate(codemap: CodeMap, monkeypatch) -> None:
-    original = codemap.store.symbols_named
+    original = codemap.store.visible_symbol_candidates
     actual = [dict(row) for row in original("helper", limit=10)]
     assert len(actual) >= 2
     first, hidden = actual[:2]
@@ -30,7 +30,7 @@ def _install_hidden_same_name_candidate(codemap: CodeMap, monkeypatch) -> None:
         {
             **first,
             "path": f"archive/noise_{index:04d}.py",
-            "evidence_visibility": "deny",
+            "evidence_visibility": "source",
         }
         for index in range(_SYMBOL_LIMIT - 1)
     ]
@@ -58,8 +58,9 @@ def helper(value):
     return value + 1
 
 
-def helper(value):
-    return value - 1
+class Alternate:
+    def helper(self, value):
+        return value - 1
 
 
 def authority(value):
@@ -170,7 +171,7 @@ def authority(value):
 
     with _codemap(tmp_path) as codemap:
         codemap.sync()
-        original = codemap.store.symbols_named
+        original = codemap.store.visible_symbol_candidates
         worker_rows = [dict(row) for row in original("Worker", limit=10)]
         assert len(worker_rows) == 1
         worker = worker_rows[0]
@@ -178,7 +179,7 @@ def authority(value):
             {
                 **worker,
                 "path": f"archive/worker_noise_{index:04d}.py",
-                "evidence_visibility": "deny",
+                "evidence_visibility": "source",
             }
             for index in range(_SYMBOL_LIMIT)
         ]
