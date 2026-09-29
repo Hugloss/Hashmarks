@@ -116,6 +116,8 @@ Hashmarks resolves evidence conservatively. Relevant outcomes include:
 
 A path can resolve even when no containing symbol exists. Symbol-only evidence may resolve to multiple candidates. Exact module evidence may resolve only to admitted repository members; an external dependency module therefore remains unresolved unless the repository itself owns that module. Conflicting path/module or line/symbol claims remain conflicts rather than allowing one hint to silently override the other.
 
+Module candidate bounds are presentation/economics bounds, not absence or uniqueness authority. Correlation probes one candidate beyond the returned module-candidate limit before repository-member qualification. If that raw probe fills the bound, post-filtering cannot prove either that no admitted module exists or that the one admitted candidate is unique: the resolution remains bounded (`unresolved` or `resolved-ambiguous`) with `candidate_completeness=bounded`. `module-not-found` and `resolved-unique` are admissible only after the raw module lookup is proven exhausted below that probe bound.
+
 Hashmarks does not perform basename guessing, nearest-symbol guessing, hidden prefix stripping, or other fuzzy repairs that would strengthen a weak external claim.
 
 ## Explicit path mappings
