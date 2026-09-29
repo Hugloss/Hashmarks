@@ -75,13 +75,16 @@ def test_exact_symbol_bound_cannot_manufacture_unique_owner(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         _install_bounded_exact_index(codemap, monkeypatch, visible=True)
-        action = codemap.task_action_map(
-            "Refactor collision_owner without changing behavior",
-            limit=1,
-            per_role=1,
+        task = "Refactor collision_owner without changing behavior"
+        context = codemap._task_action_map_context(task, 1)
+        evidence = codemap._task_action_exact_identifier_edit_candidates(
+            task, context.rows, context.failed
         )
+        action = codemap.task_action_map(task, limit=1, per_role=1)
 
-    assert action["edit"]["path"] == "src/a.py"
+    assert [row["path"] for row in evidence.candidates] == ["src/a.py"]
+    assert evidence.search_complete is False
+    assert evidence.bound_reasons == ("plain-exact-symbol-index-limit",)
     assert action["owner_basis"] is None
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] == "exact-identifier-search-bounded"
@@ -110,12 +113,16 @@ def test_exact_symbol_bound_cannot_become_no_exact_owner_then_structural_fallbac
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         _install_bounded_exact_index(codemap, monkeypatch, visible=False)
-        action = codemap.task_action_map(
-            "Refactor collision_owner without changing behavior",
-            limit=1,
-            per_role=1,
+        task = "Refactor collision_owner without changing behavior"
+        context = codemap._task_action_map_context(task, 1)
+        evidence = codemap._task_action_exact_identifier_edit_candidates(
+            task, context.rows, context.failed
         )
+        action = codemap.task_action_map(task, limit=1, per_role=1)
 
+    assert evidence.candidates == []
+    assert evidence.search_complete is False
+    assert evidence.bound_reasons == ("plain-exact-symbol-index-limit",)
     assert action["owner_basis"] is None
     assert action["ownership_resolution"] is None
     assert action["ambiguity"]["ambiguous"] is True
