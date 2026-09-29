@@ -751,6 +751,24 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         )
         return ambiguous
 
+    def _task_action_exact_identifier_terms_evidence(
+        self,
+        task: str,
+        failed: set[str],
+    ) -> tuple[set[str], tuple[str, ...]]:
+        terms = set(self._task_action_exact_identifier_terms(task))
+        has_explicit_identifier = bool(terms)
+        ambiguous_plain, plain_ambiguity_complete = (
+            self._task_action_ambiguous_plain_identifier_evidence(task, failed)
+        )
+        terms.update(ambiguous_plain)
+        reasons = (
+            ("plain-ambiguity-symbol-index-limit",)
+            if not has_explicit_identifier and not plain_ambiguity_complete
+            else ()
+        )
+        return terms, reasons
+
     @staticmethod
     def _task_action_path_module_aliases(path: str) -> set[str]:
         module_parts = Path(path).with_suffix("").parts
@@ -1069,8 +1087,9 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        terms = set(self._task_action_exact_identifier_terms(task))
-        has_explicit_identifier = bool(terms)
+        terms, term_bound_reasons = self._task_action_exact_identifier_terms_evidence(
+            task, failed
+        )
         qualified_terms = tuple(
             dict.fromkeys(
                 value.lower() for value in _QUALIFIED_IDENTIFIER_RE.findall(task)
@@ -1082,17 +1101,12 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         # already contains at least two live source definitions with that exact
         # symbol name.  This adds no discovery/ranking authority and prevents
         # lexical order from manufacturing a unique edit owner.
-        ambiguous_plain, plain_ambiguity_complete = (
-            self._task_action_ambiguous_plain_identifier_evidence(task, failed)
-        )
-        terms.update(ambiguous_plain)
         if not terms:
-            reasons = (
-                ()
-                if plain_ambiguity_complete
-                else ("plain-ambiguity-symbol-index-limit",)
+            return _TaskActionExactIdentifierEvidence(
+                [],
+                not term_bound_reasons,
+                term_bound_reasons,
             )
-            return _TaskActionExactIdentifierEvidence([], not reasons, reasons)
         candidates: list[dict[str, object]] = []
         for row in rows:
             path = str(row.get("path") or "")
@@ -1175,12 +1189,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         candidates = self._task_action_requested_exact_identifier_edits(
             task, candidates
         )
-        bound_reasons = indexed_evidence.bound_reasons
-        if not has_explicit_identifier and not plain_ambiguity_complete:
-            bound_reasons = (
-                "plain-ambiguity-symbol-index-limit",
-                *bound_reasons,
-            )
+        bound_reasons = (*term_bound_reasons, *indexed_evidence.bound_reasons)
         return _TaskActionExactIdentifierEvidence(
             candidates=candidates,
             search_complete=not bound_reasons,
