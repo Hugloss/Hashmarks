@@ -227,6 +227,42 @@ def _run_round(
         }
 
 
+
+def _failure_details(rounds: list[dict[str, Any]], *, limit: int = 8) -> list[str]:
+    details: list[str] = []
+    for row in rounds:
+        round_number = row["round"]
+        for error in row["errors"]:
+            details.append(f"round {round_number} error: {error}")
+            if len(details) >= limit:
+                return details
+        for failure in row["process_failures"]:
+            rendered = json.dumps(failure, sort_keys=True)
+            details.append(f"round {round_number} process failure: {rendered}")
+            if len(details) >= limit:
+                return details
+    return details
+
+
+def _summary(receipt: dict[str, Any], path: Path) -> str:
+    lines = [
+        "HASHMARKS MCP CONCURRENCY STRESS: " + str(receipt["status"]),
+        (
+            "calls: "
+            f"{receipt['totals']['successful_calls']}/"
+            f"{receipt['totals']['expected_calls']}"
+        ),
+        f"errors: {receipt['totals']['errors']}",
+        f"BUILDING payload leaks: {receipt['totals']['building_payloads']}",
+        f"generation regressions: {receipt['totals']['generation_regressions']}",
+        f"receipt: {path}",
+    ]
+    details = _failure_details(receipt["round_results"])
+    if details:
+        lines.append("failure details:")
+        lines.extend(f"- {detail}" for detail in details)
+    return "\n".join(lines)
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Stress independent Hashmarks MCP-style processes against one changing workspace/state."
@@ -286,15 +322,7 @@ def main(argv: list[str] | None = None) -> int:
     path.write_text(
         json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    log_command_output(
-        logger,
-        "HASHMARKS MCP CONCURRENCY STRESS: " + receipt["status"] + "\n"
-        f"calls: {receipt['totals']['successful_calls']}/{receipt['totals']['expected_calls']}\n"
-        f"errors: {receipt['totals']['errors']}\n"
-        f"BUILDING payload leaks: {receipt['totals']['building_payloads']}\n"
-        f"generation regressions: {receipt['totals']['generation_regressions']}\n"
-        f"receipt: {path}",
-    )
+    log_command_output(logger, _summary(receipt, path))
     return 0 if receipt["status"] == "PASS" else 1
 
 
