@@ -154,5 +154,3 @@ def test_exhausted_verification_search_can_still_authorize_absence(
     assert packet["truncation"] == "complete"
     assert packet["negative_evidence_admissible"] is True
     assert packet["search_bound_reasons"] == []
-
-
