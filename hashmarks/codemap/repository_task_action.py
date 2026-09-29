@@ -21,6 +21,7 @@ from .task_action_projection import TaskActionProjectionMixin
 from .task_action_types import (
     _TaskActionAmbiguityPayloadState,
     _TaskActionDiscriminationState,
+    _TaskActionExactIdentifierEvidence,
     _TaskActionProjectionState,
 )
 
@@ -31,6 +32,7 @@ _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _QUALIFIED_IDENTIFIER_RE = re.compile(
     r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+"
 )
+_EXACT_IDENTIFIER_INDEX_LIMIT = 1024
 
 
 class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
@@ -832,24 +834,30 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         )
         return any(term.lower() in accepted for term in qualified_terms)
 
-    def _task_action_qualified_identifier_index_candidates(
+    def _task_action_exact_symbol_index_window(
+        self,
+        names: Sequence[str],
+    ) -> tuple[list[dict[str, object]], bool]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if not names:
+            return [], True
+        probe = self._session_exact_symbol_candidates(
+            names, limit=_EXACT_IDENTIFIER_INDEX_LIMIT + 1
+        )
+        return (
+            list(probe[:_EXACT_IDENTIFIER_INDEX_LIMIT]),
+            len(probe) <= _EXACT_IDENTIFIER_INDEX_LIMIT,
+        )
+
+    def _task_action_qualified_identifier_index_evidence(
         self,
         qualified_terms: Sequence[str],
         failed: set[str],
         *,
         canonical_rank: int,
-    ) -> list[dict[str, object]]:
-        """Recover explicit qualified symbols from the maintained exact index.
-
-        Canonical lexical retrieval can be saturated by test surfaces. A task that
-        explicitly names module.symbol may therefore recover that exact indexed
-        source without granting arbitrary prose edit authority. Discovery is
-        bounded to exact terminal symbol identities; the existing qualifier
-        predicate then proves module/class locality. Zero or multiple matching
-        owners remain unresolved/ambiguous through the existing machinery.
-        """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+    ) -> tuple[list[dict[str, object]], bool]:
+        """Recover explicit qualified symbols without strengthening a hit bound."""
         terminal_names = tuple(
             dict.fromkeys(
                 term.rsplit(".", 1)[-1].lower()
@@ -857,9 +865,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 if "." in term
             )
         )
-        if not terminal_names:
-            return []
-        indexed = self._session_exact_symbol_candidates(terminal_names, limit=1024)
+        indexed, complete = self._task_action_exact_symbol_index_window(terminal_names)
         candidates: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
         for symbol in indexed:
@@ -884,26 +890,18 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 continue
             seen.add(key)
             candidates.append(candidate)
-        return candidates
+        return candidates, complete
 
-    def _task_action_plain_identifier_index_candidates(
+    def _task_action_plain_identifier_index_evidence(
         self,
         terms: set[str],
         failed: set[str],
         *,
         canonical_rank: int,
-    ) -> list[dict[str, object]]:
-        """Recover strong explicit identifiers omitted by bounded retrieval.
-
-        Only identifiers already admitted by the exact-identifier task parser
-        may use this path. Generic prose therefore gains no discovery authority.
-        Test-shaped rows retain the existing reference-backed production proof,
-        while ordinary source/script symbols may participate directly.
-        """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+    ) -> tuple[list[dict[str, object]], bool]:
+        """Recover exact identifiers without letting a bound prove uniqueness."""
         plain_terms = tuple(sorted(term for term in terms if "." not in term))
-        indexed = self._session_exact_symbol_candidates(plain_terms, limit=1024)
+        indexed, complete = self._task_action_exact_symbol_index_window(plain_terms)
         candidates: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
         for symbol in indexed:
@@ -936,7 +934,69 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
                 continue
             seen.add(key)
             candidates.append(candidate)
+        return candidates, complete
+
+    def _task_action_qualified_identifier_index_candidates(
+        self,
+        qualified_terms: Sequence[str],
+        failed: set[str],
+        *,
+        canonical_rank: int,
+    ) -> list[dict[str, object]]:
+        candidates, _complete = self._task_action_qualified_identifier_index_evidence(
+            qualified_terms,
+            failed,
+            canonical_rank=canonical_rank,
+        )
         return candidates
+
+    def _task_action_plain_identifier_index_candidates(
+        self,
+        terms: set[str],
+        failed: set[str],
+        *,
+        canonical_rank: int,
+    ) -> list[dict[str, object]]:
+        candidates, _complete = self._task_action_plain_identifier_index_evidence(
+            terms,
+            failed,
+            canonical_rank=canonical_rank,
+        )
+        return candidates
+
+    def _task_action_exact_index_evidence(
+        self,
+        terms: set[str],
+        qualified_terms: Sequence[str],
+        failed: set[str],
+        *,
+        canonical_rank: int,
+    ) -> _TaskActionExactIdentifierEvidence:
+        qualified, qualified_complete = (
+            self._task_action_qualified_identifier_index_evidence(
+                qualified_terms,
+                failed,
+                canonical_rank=canonical_rank,
+            )
+        )
+        plain, plain_complete = self._task_action_plain_identifier_index_evidence(
+            terms,
+            failed,
+            canonical_rank=canonical_rank,
+        )
+        reasons = tuple(
+            reason
+            for complete, reason in (
+                (qualified_complete, "qualified-exact-symbol-index-limit"),
+                (plain_complete, "plain-exact-symbol-index-limit"),
+            )
+            if not complete
+        )
+        return _TaskActionExactIdentifierEvidence(
+            candidates=[*qualified, *plain],
+            search_complete=not reasons,
+            bound_reasons=reasons,
+        )
 
     @staticmethod
     def _task_action_requested_edit_span(task: str) -> str:
@@ -992,7 +1052,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         task: str,
         rows: Sequence[dict[str, object]],
         failed: set[str],
-    ) -> list[dict[str, object]]:
+    ) -> _TaskActionExactIdentifierEvidence:
         """Project exact active source symbols already present in canonical task rows.
 
         This is discrimination only: it neither discovers new paths nor reranks
@@ -1015,7 +1075,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         # lexical order from manufacturing a unique edit owner.
         terms.update(self._task_action_ambiguous_plain_identifiers(task, rows, failed))
         if not terms:
-            return []
+            return _TaskActionExactIdentifierEvidence([], True, ())
         candidates: list[dict[str, object]] = []
         for row in rows:
             path = str(row.get("path") or "")
@@ -1073,18 +1133,12 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             )
             + 1
         )
-        indexed = [
-            *self._task_action_qualified_identifier_index_candidates(
-                qualified_terms,
-                failed,
-                canonical_rank=projection_rank,
-            ),
-            *self._task_action_plain_identifier_index_candidates(
-                terms,
-                failed,
-                canonical_rank=projection_rank,
-            ),
-        ]
+        indexed_evidence = self._task_action_exact_index_evidence(
+            terms,
+            qualified_terms,
+            failed,
+            canonical_rank=projection_rank,
+        )
         existing = {
             (
                 str(row.get("path") or ""),
@@ -1094,14 +1148,21 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         }
         candidates.extend(
             row
-            for row in indexed
+            for row in indexed_evidence.candidates
             if (
                 str(row.get("path") or ""),
                 str(row.get("qualname") or row.get("name") or ""),
             )
             not in existing
         )
-        return self._task_action_requested_exact_identifier_edits(task, candidates)
+        candidates = self._task_action_requested_exact_identifier_edits(
+            task, candidates
+        )
+        return _TaskActionExactIdentifierEvidence(
+            candidates=candidates,
+            search_complete=indexed_evidence.search_complete,
+            bound_reasons=indexed_evidence.bound_reasons,
+        )
 
     def _task_action_structural_exact_identifier_owner(
         self,
@@ -1351,12 +1412,14 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         ordered_flags: Sequence[tuple[str, bool]],
         ambiguous: bool,
     ) -> str:
-        if edit is None:
-            return "no-edit-candidate"
         flagged_reason = next(
             (reason for reason, active in ordered_flags if active),
             None,
         )
+        if flagged_reason == "exact-identifier-search-bounded":
+            return flagged_reason
+        if edit is None:
+            return "no-edit-candidate"
         if flagged_reason is not None:
             return flagged_reason
         return "competing-action-roles" if ambiguous else "resolved-by-role"

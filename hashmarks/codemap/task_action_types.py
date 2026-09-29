@@ -90,6 +90,13 @@ class _TaskActionInitialSurfaceState:
     explicit_config_surface_request: bool
 
 
+@dataclass(frozen=True)
+class _TaskActionExactIdentifierEvidence:
+    candidates: list[dict[str, object]]
+    search_complete: bool
+    bound_reasons: tuple[str, ...]
+
+
 @dataclass
 class _TaskActionOwnerResolutionState:
     edit: dict[str, object] | None
@@ -98,6 +105,8 @@ class _TaskActionOwnerResolutionState:
     structural_owner_origin: Mapping[str, object] | None
     archive_live_owner_ambiguity: bool
     exact_identifier_paths: tuple[str, ...]
+    exact_identifier_search_complete: bool
+    exact_identifier_search_bound_reasons: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -117,6 +126,8 @@ class _TaskActionOwnerCandidateState:
     archive_live_owner_ambiguity: bool
     exact_identifier_edits: list[dict[str, object]]
     exact_identifier_paths: tuple[str, ...]
+    exact_identifier_search_complete: bool
+    exact_identifier_search_bound_reasons: tuple[str, ...]
     literal_task_path: str
 
 
@@ -136,6 +147,8 @@ class _TaskActionSelectionState:
     structural_owner_origin: Mapping[str, object] | None
     archive_live_owner_ambiguity: bool
     exact_identifier_paths: tuple[str, ...]
+    exact_identifier_search_complete: bool
+    exact_identifier_search_bound_reasons: tuple[str, ...]
     inspect_rows: list[dict[str, object]]
     related_rows: list[dict[str, object]]
 

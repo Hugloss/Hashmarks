@@ -339,11 +339,13 @@ def test_qualified_module_function_does_not_match_wrong_module(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         context = codemap._task_action_map_context(task, 20)
-        candidates = codemap._task_action_exact_identifier_edit_candidates(
+        evidence = codemap._task_action_exact_identifier_edit_candidates(
             task, context.rows, context.failed
         )
 
-    assert candidates == []
+    assert evidence.candidates == []
+    assert evidence.search_complete is True
+    assert evidence.bound_reasons == ()
 
 
 def test_qualified_target_recovers_from_index_when_canonical_limit_excludes_source(

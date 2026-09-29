@@ -293,6 +293,8 @@ Verification relevance follows the same evidence-admissibility rule. A bounded r
 
 Ownership relation graphs follow the same rule. Bounded positive reachability/corroboration remains useful evidence, but an exhausted edge or symbol-candidate bound may not establish that no structural owner exists or that one observed delegation continuation is unique. The graph must expose incomplete/truncated observation and keep uniqueness inadmissible until the configured graph scope is fully observed.
 
+Exact-symbol ownership is subject to the same rule independently of canonical task retrieval. A bounded exact-symbol index lookup may preserve observed exact candidates, but if its candidate bound is exhausted it may not mint `qualified-symbol`, `unique-exact-symbol`, `exact-symbol`, or weaker structural fallback as repository-global ownership proof. Literal repository-path identity remains an independent authority when the task explicitly names that path.
+
 The general rule is:
 
 > **Consumer experience may trigger a new repository query; it must not silently become repository evidence.**
