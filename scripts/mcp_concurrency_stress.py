@@ -227,7 +227,6 @@ def _run_round(
         }
 
 
-
 def _failure_details(rounds: list[dict[str, Any]], *, limit: int = 8) -> list[str]:
     details: list[str] = []
     for row in rounds:
