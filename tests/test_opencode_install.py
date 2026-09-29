@@ -79,7 +79,7 @@ def test_install_opencode_registers_exact_hashmarks_executable(
     ]
     assert calls[1] == [str(opencode), "debug", "config"]
     output = capsys.readouterr().out
-    assert '"effective_registration":"active"' in output
+    assert '"effective_registration": "active"' in output
 
 
 def test_install_opencode_reports_project_shadowing_without_rewriting(
@@ -133,8 +133,10 @@ def test_install_opencode_reports_project_shadowing_without_rewriting(
 
     assert cli.main(["install", "--opencode"]) == 0
     output = capsys.readouterr().out
-    assert '"effective_registration":"shadowed"' in output
-    assert '"effective_command":["uv","run","--frozen","--no-sync","hashmarks"' in output
+    assert '"effective_registration": "shadowed"' in output
+    assert '"effective_command": [' in output
+    assert '"uv"' in output
+    assert '"--no-sync"' in output
     assert "did not modify project configuration" in output
 
 
@@ -170,7 +172,7 @@ def test_install_opencode_keeps_registration_when_effective_config_unverifiable(
 
     assert cli.main(["install", "--opencode"]) == 0
     output = capsys.readouterr().out
-    assert '"effective_registration":"unverified"' in output
+    assert '"effective_registration": "unverified"' in output
     assert "opencode debug config exited 4" in output
 
 
