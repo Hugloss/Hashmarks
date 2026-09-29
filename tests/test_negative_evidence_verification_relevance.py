@@ -40,9 +40,12 @@ def test_bounded_reference_search_cannot_report_no_verification_candidate(
         codemap.sync()
 
         def refs_many(targets, *, limit_per_target):
-            assert list(targets) == ["target"]
-            assert limit_per_target == _DIRECT_REF_LIMIT + 1
-            return {"target": refs[:limit_per_target]}
+            targets = list(targets)
+            if limit_per_target == _DIRECT_REF_LIMIT + 1:
+                assert targets == ["target"]
+                return {"target": refs[:limit_per_target]}
+            assert limit_per_target == 257
+            return {symbol: [] for symbol in targets}
 
         monkeypatch.setattr(codemap, "_session_refs_many", refs_many)
         monkeypatch.setattr(
@@ -61,7 +64,6 @@ def test_bounded_reference_search_cannot_report_no_verification_candidate(
             edit={"path": "src/owner.py", "name": "target"},
             current_verify=None,
             rows=[],
-            canonical_retrieval_complete=True,
         )
 
     assert packet["selected"] is None
@@ -109,7 +111,6 @@ def test_bounded_reference_search_cannot_manufacture_unique_verifier(
             edit={"path": "src/owner.py", "name": "target"},
             current_verify=None,
             rows=[],
-            canonical_retrieval_complete=True,
         )
 
     assert packet["selected"]["path"] == "tests/test_owner.py"
@@ -145,7 +146,6 @@ def test_exhausted_verification_search_can_still_authorize_absence(
             edit={"path": "src/owner.py", "name": "target"},
             current_verify=None,
             rows=[],
-            canonical_retrieval_complete=True,
         )
 
     assert packet["selected"] is None
@@ -156,34 +156,3 @@ def test_exhausted_verification_search_can_still_authorize_absence(
     assert packet["search_bound_reasons"] == []
 
 
-def test_bounded_task_retrieval_prevents_verification_absence(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    _write_owner(tmp_path)
-
-    with CodeMap(tmp_path) as codemap:
-        codemap.sync()
-
-        def refs_many(targets, *, limit_per_target):
-            return {symbol: [] for symbol in targets}
-
-        monkeypatch.setattr(codemap, "_session_refs_many", refs_many)
-        monkeypatch.setattr(
-            codemap.store,
-            "refs_matching_target_suffix",
-            lambda _short, _suffix, *, limit: [],
-        )
-
-        packet = codemap._verification_relevance(
-            "target",
-            edit={"path": "src/owner.py", "name": "target"},
-            current_verify=None,
-            rows=[],
-            canonical_retrieval_complete=False,
-        )
-
-    assert packet["selected"] is None
-    assert packet["selection_reason"] == "verification-candidate-search-bounded"
-    assert packet["negative_evidence_admissible"] is False
-    assert packet["search_bound_reasons"] == ["task-retrieval-limit"]
