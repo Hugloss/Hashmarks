@@ -661,9 +661,12 @@ def test_automatic_update_eligibility_is_semantic_not_command_named() -> None:
     invariants = _text("docs/reference/INVARIANTS.md")
 
     assert "CLI command declarations own eligibility" in invariants
+    assert "undeclared commands default to no automatic update check" in invariants
+    assert "eligible commands must opt in where they are registered" in invariants
     assert "must not branch on command names" in invariants
+    assert "undeclared commands are ineligible by default" in architecture
+    assert "cannot silently add update-network or prompt behavior" in architecture
     assert "does not know or branch on command names" in architecture
-    assert "parser declarations" in architecture
 
 
 def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() -> None:
