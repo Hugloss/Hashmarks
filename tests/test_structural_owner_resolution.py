@@ -36,6 +36,11 @@ def test_structural_owner_follows_active_test_route_engine_chain(tmp_path: Path)
     assert action["edit"]["path"] == "src/case/engine.py"
     assert action["ownership_resolution"]["depth"] == 2
     assert action["ownership_resolution"]["secret_knowledge_used"] is False
+    assert any(
+        row["start_path"] == "src/case/legacy.py"
+        and row["status"] == "no-selected-owner"
+        for row in action["structural_starts"]["candidates"]
+    )
 
 
 def test_structural_owner_does_not_choose_unreachable_duplicate_legacy_symbol(

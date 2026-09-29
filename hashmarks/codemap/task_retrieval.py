@@ -32,6 +32,22 @@ class _TaskFindFusion:
     selected: list[str]
 
 
+@dataclass(frozen=True)
+class _TaskRetrievalResult:
+    hits: tuple[SearchHit, ...]
+    bound_reasons: tuple[str, ...]
+
+    @property
+    def complete(self) -> bool:
+        return not self.bound_reasons
+
+    @property
+    def truncation(self) -> str:
+        if "task-result-limit" in self.bound_reasons:
+            return "truncated"
+        return "unknown" if self.bound_reasons else "complete"
+
+
 @dataclass(frozen=True, slots=True)
 class _ScoreSurface:
     path: str
@@ -194,9 +210,14 @@ class TaskRetrievalMixin:
             # evidence selection. Task evidence deliberately does not use this path:
             # it owns an independent closing freshness fence and must preserve the
             # selected stale evidence rather than silently reselect it.
-            cached = self._find_task_impl(task, limit=limit, ensure_ready=False)
+            cached = self._find_task_evidence_impl(
+                task, limit=limit, ensure_ready=False
+            )
 
-        active_paths = {*(hit.path for hit in (cached or ())), *authority_paths}
+        active_paths = {
+            *(hit.path for hit in (cached.hits if cached else ())),
+            *authority_paths,
+        }
         active_stale = tuple(
             sorted(
                 path for path in active_paths if not self._indexed_path_current(path)
@@ -489,7 +510,13 @@ class TaskRetrievalMixin:
             bonus += 1.0
         return rarity + bonus, len(term), term
 
-    def _formulate_task_query_base(self, task: str, *, max_terms: int = 10) -> str:
+    def _formulate_task_query_base(
+        self,
+        task: str,
+        *,
+        max_terms: int = 10,
+        bound_reasons: set[str] | None = None,
+    ) -> str:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         raw_tokens = _WORD_RE.findall(task)
@@ -511,6 +538,9 @@ class TaskRetrievalMixin:
             ),
             reverse=True,
         )
+        eligible = ranked if ranked else words
+        if bound_reasons is not None and len(eligible) > max_terms:
+            bound_reasons.add("task-query-base-term-limit")
         selected = ranked[:max_terms]
         return " ".join(selected) if selected else " ".join(words[:max_terms])
 
@@ -528,7 +558,12 @@ class TaskRetrievalMixin:
 
     def task_query_views(self, task: str) -> dict[str, str]:
         """Return deterministic candidate-visible retrieval views for one task."""
-        base = self._formulate_task_query_base(task)
+        return self._task_query_views_evidence(task)
+
+    def _task_query_views_evidence(
+        self, task: str, bound_reasons: set[str] | None = None
+    ) -> dict[str, str]:
+        base = self._formulate_task_query_base(task, bound_reasons=bound_reasons)
         raw_tokens = _WORD_RE.findall(task)
         visible_words = {value.lower() for value in raw_tokens}
         additions: list[str] = []
@@ -547,11 +582,19 @@ class TaskRetrievalMixin:
             if visible_words & cues:
                 additions.extend(values)
         expanded = self._bounded_query_terms(base, additions, limit=16)
+        if bound_reasons is not None and any(
+            value not in expanded for value in additions
+        ):
+            bound_reasons.add("task-query-governance-term-limit")
         evidence_additions: list[str] = []
         for cues, values in _TASK_EVIDENCE_FAMILIES:
             if visible_words & cues:
                 evidence_additions.extend(values)
         evidence = self._bounded_query_terms(base, evidence_additions, limit=18)
+        if bound_reasons is not None and any(
+            value not in evidence for value in evidence_additions
+        ):
+            bound_reasons.add("task-query-evidence-term-limit")
         return {
             "schema": "hashmarks.task-query-views.v2",
             "base": base,
@@ -617,8 +660,8 @@ class TaskRetrievalMixin:
             evidence_visibility=visibility,
         )
 
-    def _rare_task_anchor_hits(
-        self, token: str, *, limit: int
+    def _rare_task_anchor_hits(  # noqa: C901, PLR0912
+        self, token: str, *, limit: int, bound_reasons: set[str] | None = None
     ) -> tuple[SearchHit, ...]:
         """Return exact indexed evidence for one rare task-local identifier.
 
@@ -630,12 +673,13 @@ class TaskRetrievalMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         normalized = token.lower()
-        file_rows = self._session_lexical_file_candidates(
-            [normalized], limit=max(8, min(32, limit * 2))
-        )
-        path_rows = self.store.path_candidates(
-            [normalized], limit=max(8, min(32, limit * 2))
-        )
+        row_limit = max(8, min(32, limit * 2))
+        file_rows = self._session_lexical_file_candidates([normalized], limit=row_limit)
+        path_rows = self.store.path_candidates([normalized], limit=row_limit)
+        if bound_reasons is not None and (
+            len(file_rows) >= row_limit or len(path_rows) >= row_limit
+        ):
+            bound_reasons.add("task-rare-candidate-limit")
         by_path: dict[str, dict[str, object]] = {}
         for row in [*file_rows, *path_rows]:
             path = str(row.get("path") or "")
@@ -643,9 +687,10 @@ class TaskRetrievalMixin:
                 by_path.setdefault(path, dict(row))
         if not by_path:
             return ()
-        symbols = self.store.symbols_for_paths(
-            list(by_path), limit=max(64, min(512, len(by_path) * 16))
-        )
+        symbol_limit = max(64, min(512, len(by_path) * 16))
+        symbols = self.store.symbols_for_paths(list(by_path), limit=symbol_limit)
+        if bound_reasons is not None and len(symbols) >= symbol_limit:
+            bound_reasons.add("task-rare-symbol-limit")
         symbol_by_path = self._rare_symbol_by_path(normalized, symbols)
 
         def locality_order(path: str) -> tuple[int, int, str]:
@@ -662,6 +707,8 @@ class TaskRetrievalMixin:
             )
 
         output: list[SearchHit] = []
+        if bound_reasons is not None and len(by_path) > limit:
+            bound_reasons.add("task-rare-result-limit")
         for path in sorted(by_path, key=locality_order):
             row = by_path[path]
             symbol = symbol_by_path.get(path)
@@ -670,7 +717,9 @@ class TaskRetrievalMixin:
                 break
         return tuple(output)
 
-    def _task_local_island_terms(self, task: str) -> tuple[str, ...]:
+    def _task_local_island_terms(
+        self, task: str, bound_reasons: set[str] | None = None
+    ) -> tuple[str, ...]:
         """Return bounded rare lexical terms eligible for locality evidence."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -710,19 +759,28 @@ class TaskRetrievalMixin:
         rare_terms.sort(
             key=lambda term: (int(frequencies.get(term, 0)), -len(term), term)
         )
+        if bound_reasons is not None and len(rare_terms) > 6:
+            bound_reasons.add("task-island-term-limit")
         return tuple(rare_terms[:6])
 
     def _task_local_island_rows(
-        self, selected_terms: tuple[str, ...], *, limit: int
+        self,
+        selected_terms: tuple[str, ...],
+        *,
+        limit: int,
+        bound_reasons: set[str] | None = None,
     ) -> tuple[list[dict[str, object]], dict[str, set[RepositoryDomain]]] | None:
         """Validate one bounded lexical island and retain its path domains."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if len(selected_terms) < 2:
             return None
+        row_limit = max(32, min(96, limit * 4))
         rows = self._session_lexical_file_candidates(
-            list(selected_terms), limit=max(32, min(96, limit * 4))
+            list(selected_terms), limit=row_limit
         )
+        if bound_reasons is not None and len(rows) >= row_limit:
+            bound_reasons.add("task-island-candidate-limit")
         island = [row for row in rows if int(row.get("matches") or 0) >= 2]
         if not island or len(island) > 16:
             return None
@@ -757,15 +815,19 @@ class TaskRetrievalMixin:
         return island, domains_by_path
 
     def _task_local_island_symbols(
-        self, island: list[dict[str, object]], selected_terms: tuple[str, ...]
+        self,
+        island: list[dict[str, object]],
+        selected_terms: tuple[str, ...],
+        bound_reasons: set[str] | None = None,
     ) -> dict[str, dict[str, object]]:
         """Bind task-local island paths to already-indexed matching symbols."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         paths = [str(row.get("path") or "") for row in island if row.get("path")]
-        symbols = self.store.symbols_for_paths(
-            paths, limit=max(64, min(512, len(paths) * 16))
-        )
+        symbol_limit = max(64, min(512, len(paths) * 16))
+        symbols = self.store.symbols_for_paths(paths, limit=symbol_limit)
+        if bound_reasons is not None and len(symbols) >= symbol_limit:
+            bound_reasons.add("task-island-symbol-limit")
         symbol_by_path: dict[str, dict[str, object]] = {}
         selected_set = set(selected_terms)
         for row in symbols:
@@ -782,7 +844,7 @@ class TaskRetrievalMixin:
         return symbol_by_path
 
     def _task_local_lexical_island_hits(
-        self, task: str, *, limit: int
+        self, task: str, *, limit: int, bound_reasons: set[str] | None = None
     ) -> tuple[SearchHit, ...]:
         """Return a bounded multi-term task-local evidence island when one is unique.
 
@@ -790,12 +852,16 @@ class TaskRetrievalMixin:
         index and activates only for a small island with one test surface and at
         least one actionable source surface; otherwise normal RRF stays authoritative.
         """
-        selected_terms = self._task_local_island_terms(task)
-        island_state = self._task_local_island_rows(selected_terms, limit=limit)
+        selected_terms = self._task_local_island_terms(task, bound_reasons)
+        island_state = self._task_local_island_rows(
+            selected_terms, limit=limit, bound_reasons=bound_reasons
+        )
         if island_state is None:
             return ()
         island, domains_by_path = island_state
-        symbol_by_path = self._task_local_island_symbols(island, selected_terms)
+        symbol_by_path = self._task_local_island_symbols(
+            island, selected_terms, bound_reasons
+        )
 
         def locality_order(row: dict[str, object]) -> tuple[int, int, int, str]:
             path = str(row.get("path") or "")
@@ -854,7 +920,7 @@ class TaskRetrievalMixin:
 
     def _task_find_cache_key(
         self, task: str, limit: int, *, ensure_ready: bool = True
-    ) -> tuple[tuple[int, str, int], tuple[SearchHit, ...] | None]:
+    ) -> tuple[tuple[int, str, int], _TaskRetrievalResult | None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if ensure_ready:
@@ -955,10 +1021,12 @@ class TaskRetrievalMixin:
         return None
 
     def _task_rare_identifier_result(
-        self, token: str, limit: int
+        self, token: str, limit: int, bound_reasons: set[str] | None = None
     ) -> tuple[SearchHit, ...] | None:
         fast_hits = self._rare_task_anchor_hits(
-            token, limit=max(20, min(40, limit * 2))
+            token,
+            limit=max(20, min(40, limit * 2)),
+            bound_reasons=bound_reasons,
         )
         unique_paths = list(dict.fromkeys(hit.path for hit in fast_hits))
         domains = {
@@ -977,11 +1045,17 @@ class TaskRetrievalMixin:
         return None
 
     def _task_local_island_result(
-        self, task: str, limit: int, cue_words: set[str]
+        self,
+        task: str,
+        limit: int,
+        cue_words: set[str],
+        bound_reasons: set[str] | None = None,
     ) -> tuple[SearchHit, ...] | None:
         if cue_words.intersection(self._task_broad_authority_cues()):
             return None
-        hits = self._task_local_lexical_island_hits(task, limit=limit)
+        hits = self._task_local_lexical_island_hits(
+            task, limit=limit, bound_reasons=bound_reasons
+        )
         return hits or None
 
     @staticmethod
@@ -1004,10 +1078,15 @@ class TaskRetrievalMixin:
 
     def _task_find_sequences(
         self, task: str, limit: int
-    ) -> tuple[dict[str, str], tuple[tuple[tuple[SearchHit, ...], float], ...]]:
+    ) -> tuple[
+        dict[str, str],
+        tuple[tuple[tuple[SearchHit, ...], float], ...],
+        tuple[str, ...],
+    ]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        views = self.task_query_views(task)
+        bound_reasons: set[str] = set()
+        views = self._task_query_views_evidence(task, bound_reasons)
         specs = self._task_sequence_specs(views, limit)
         rows: list[tuple[tuple[SearchHit, ...], float]] = []
         session_scope = (
@@ -1017,8 +1096,12 @@ class TaskRetrievalMixin:
         )
         with session_scope:
             for view, weight, view_fetch in specs:
-                rows.append((self.find(view, limit=view_fetch), weight))
-        return views, tuple(rows)
+                evidence = self._find_evidence(view, limit=view_fetch)
+                rows.append((evidence.hits, weight))
+                if len(evidence.hits) >= view_fetch:
+                    bound_reasons.add("task-view-result-limit")
+                bound_reasons.update(evidence.bound_reasons)
+        return views, tuple(rows), tuple(sorted(bound_reasons))
 
     @staticmethod
     def _task_fuse_sequences(
@@ -1061,11 +1144,16 @@ class TaskRetrievalMixin:
         )
 
     def _task_preserve_exact_anchor(
-        self, raw_tokens: Sequence[str], fusion: _TaskFindFusion
+        self,
+        raw_tokens: Sequence[str],
+        fusion: _TaskFindFusion,
+        bound_reasons: set[str],
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         rows = self._session_exact_symbol_candidates(raw_tokens, limit=64)
+        if len(rows) >= 64:
+            bound_reasons.add("task-exact-anchor-limit")
         token_order = {token.lower(): index for index, token in enumerate(raw_tokens)}
         rows.sort(
             key=lambda row: (
@@ -1088,12 +1176,18 @@ class TaskRetrievalMixin:
         )
         fusion.selected.append(anchor_hit.path)
 
-    def _task_component_hits(self, token: str) -> list[SearchHit]:
+    def _task_component_hits(
+        self, token: str, bound_reasons: set[str]
+    ) -> list[SearchHit]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         token_lower = token.lower()
         hits: list[SearchHit] = []
-        for hit in self.find(token, limit=10):
+        evidence = self._find_evidence(token, limit=10)
+        if len(evidence.hits) >= 10:
+            bound_reasons.add("task-component-result-limit")
+        bound_reasons.update(evidence.bound_reasons)
+        for hit in evidence.hits:
             haystack = " ".join(
                 value.lower()
                 for value in (hit.path, hit.name or "", hit.qualname or "")
@@ -1118,10 +1212,15 @@ class TaskRetrievalMixin:
                 fusion.selected.append(hit.path)
 
     def _task_preserve_components(
-        self, raw_tokens: Sequence[str], fusion: _TaskFindFusion
+        self,
+        raw_tokens: Sequence[str],
+        fusion: _TaskFindFusion,
+        bound_reasons: set[str],
     ) -> None:
+        if len(raw_tokens) > 3:
+            bound_reasons.add("task-component-token-limit")
         for token in raw_tokens[:3]:
-            hits = self._task_component_hits(token)
+            hits = self._task_component_hits(token, bound_reasons)
             if not hits or len(hits) > 8:
                 continue
             self._task_preserve_component_hits(hits, fusion)
@@ -1139,7 +1238,10 @@ class TaskRetrievalMixin:
 
     @classmethod
     def _task_omitted_alnum_tokens(
-        cls, task: str, views: Mapping[str, str]
+        cls,
+        task: str,
+        views: Mapping[str, str],
+        bound_reasons: set[str] | None = None,
     ) -> tuple[str, ...]:
         visible_terms = {
             term.lower()
@@ -1151,7 +1253,10 @@ class TaskRetrievalMixin:
             for token in _WORD_RE.findall(task)
             if cls._task_is_omitted_alnum_candidate(token, visible_terms)
         )
-        return tuple(dict.fromkeys(tokens))[:32]
+        eligible = tuple(dict.fromkeys(tokens))
+        if bound_reasons is not None and len(eligible) > 32:
+            bound_reasons.add("task-omitted-component-input-limit")
+        return eligible[:32]
 
     @staticmethod
     def _task_hits_for_token(
@@ -1168,16 +1273,17 @@ class TaskRetrievalMixin:
             )
         )
 
-    def _task_preserve_omitted_alnum_components(
+    def _task_preserve_omitted_alnum_components(  # noqa: C901
         self,
         task: str,
         views: Mapping[str, str],
         cue_words: set[str],
         fusion: _TaskFindFusion,
+        bound_reasons: set[str],
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        tokens = self._task_omitted_alnum_tokens(task, views)
+        tokens = self._task_omitted_alnum_tokens(task, views, bound_reasons)
         if not tokens:
             return
         preserve_limit = (
@@ -1188,8 +1294,12 @@ class TaskRetrievalMixin:
         proven = 0
         for offset in range(0, len(tokens), 8):
             chunk = tokens[offset : offset + 8]
-            hits = self.find(" ".join(chunk), limit=40)
-            for token in chunk:
+            evidence = self._find_evidence(" ".join(chunk), limit=40)
+            hits = evidence.hits
+            if len(hits) >= 40:
+                bound_reasons.add("task-omitted-component-result-limit")
+            bound_reasons.update(evidence.bound_reasons)
+            for token_index, token in enumerate(chunk):
                 local_hits = self._task_hits_for_token(token, hits)
                 if not local_hits or len(local_hits) > 8:
                     continue
@@ -1198,6 +1308,8 @@ class TaskRetrievalMixin:
                 )
                 proven += 1
                 if proven >= 2:
+                    if offset + token_index + 1 < len(tokens):
+                        bound_reasons.add("task-omitted-component-token-limit")
                     return
 
     @staticmethod
@@ -1331,47 +1443,79 @@ class TaskRetrievalMixin:
             self = cast("CodeMap", self)
         return tuple(hit for hit in hits if self._indexed_path_current(hit.path))
 
-    def _find_task_impl(
+    def _find_task_evidence_impl(  # noqa: C901, PLR0912, PLR0914, PLR0915
         self, task: str, *, limit: int = 20, ensure_ready: bool = True
-    ) -> tuple[SearchHit, ...]:
-        """Internal retrieval implementation without opening a decision session."""
+    ) -> _TaskRetrievalResult:
+        """Compose one bounded retrieval result with its completeness evidence."""
         if limit < 1:
             raise ValueError("limit must be >= 1")
         cache_key, cached = self._task_find_cache_key(
             task, limit, ensure_ready=ensure_ready
         )
         if cached is not None:
-            return self._task_current_hits(cached)
+            current = self._task_current_hits(cached.hits)
+            if len(current) != len(cached.hits):
+                return _TaskRetrievalResult(
+                    current,
+                    tuple(sorted({*cached.bound_reasons, "task-stale-cached-hit"})),
+                )
+            return cached
         self._task_find_trim_cache(cache_key[0])
+        bound_reasons: set[str] = set()
         raw_tokens = self._task_raw_identifier_tokens(task)
+        if len(raw_tokens) > 4:
+            bound_reasons.add("task-identifier-token-limit")
         cue_words = self._task_cue_words(task)
         rare_token = self._task_rare_identifier(raw_tokens, cue_words)
         if rare_token is not None:
-            result = self._task_rare_identifier_result(rare_token, max(20, limit))
+            result = self._task_rare_identifier_result(
+                rare_token, max(20, limit), bound_reasons
+            )
             if result is not None:
                 bounded = result[:limit]
-                self._task_result_cache[cache_key] = bounded
-                return bounded
-        island = self._task_local_island_result(task, max(20, limit), cue_words)
+                if len(result) > limit:
+                    bound_reasons.add("task-result-limit")
+                evidence = _TaskRetrievalResult(bounded, tuple(sorted(bound_reasons)))
+                self._task_result_cache[cache_key] = evidence
+                return evidence
+        island = self._task_local_island_result(
+            task, max(20, limit), cue_words, bound_reasons
+        )
         if island is not None:
             bounded = island[:limit]
-            self._task_result_cache[cache_key] = bounded
-            return bounded
-        views, sequences = self._task_find_sequences(task, max(20, limit))
+            if len(island) > limit:
+                bound_reasons.add("task-result-limit")
+            evidence = _TaskRetrievalResult(bounded, tuple(sorted(bound_reasons)))
+            self._task_result_cache[cache_key] = evidence
+            return evidence
+        views, sequences, view_reasons = self._task_find_sequences(task, max(20, limit))
+        bound_reasons.update(view_reasons)
         path_scores, best_hit, ranked_paths = self._task_fuse_sequences(sequences)
         fusion = _TaskFindFusion(path_scores, best_hit, [])
-        self._task_preserve_exact_anchor(raw_tokens, fusion)
-        self._task_preserve_components(raw_tokens, fusion)
-        self._task_preserve_omitted_alnum_components(task, views, cue_words, fusion)
+        self._task_preserve_exact_anchor(raw_tokens, fusion, bound_reasons)
+        self._task_preserve_components(raw_tokens, fusion, bound_reasons)
+        self._task_preserve_omitted_alnum_components(
+            task, views, cue_words, fusion, bound_reasons
+        )
         self._task_fill_ranked_paths(sequences, ranked_paths, max(20, limit), fusion)
         self._task_preserve_scoped_authority(views, sequences, max(20, limit), fusion)
         self._task_preserve_scoped_readme(views, sequences, max(20, limit), fusion)
+        if len(ranked_paths) > max(20, limit) or len(fusion.selected) > limit:
+            bound_reasons.add("task-result-limit")
         result = tuple(
             replace(fusion.best_hit[path], score=fusion.path_scores[path] * 1000.0)
             for path in fusion.selected[:limit]
         )
-        self._task_result_cache[cache_key] = result
-        return result
+        evidence = _TaskRetrievalResult(result, tuple(sorted(bound_reasons)))
+        self._task_result_cache[cache_key] = evidence
+        return evidence
+
+    def _find_task_impl(
+        self, task: str, *, limit: int = 20, ensure_ready: bool = True
+    ) -> tuple[SearchHit, ...]:
+        return self._find_task_evidence_impl(
+            task, limit=limit, ensure_ready=ensure_ready
+        ).hits
 
     @decision_scoped
     def find_task(self, task: str, *, limit: int = 20) -> tuple[SearchHit, ...]:

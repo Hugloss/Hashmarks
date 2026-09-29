@@ -31,7 +31,7 @@ from .evidence_graph import EvidenceGraphMixin
 from .evidence_packet import TaskEvidencePacketMixin
 from .evidence_profiles import EvidenceProfilesMixin
 from .evidence_verification import VerificationMixin
-from .find_engine import FindEngineMixin
+from .find_engine import FindEngineMixin, _FindEvidence
 from .freshness_map import EvidenceFreshnessMapMixin
 from .import_resolution import ImportResolutionMixin
 from .index_watch import IndexWatchMixin
@@ -75,7 +75,7 @@ from .repository_task_action import TaskActionMixin
 from .singleflight import SingleFlight
 from .structural_locality import StructuralLocalityMixin
 from .structural_search import AstGrepSearchProvider
-from .task_retrieval import TaskRetrievalMixin
+from .task_retrieval import TaskRetrievalMixin, _TaskRetrievalResult
 from .typescript_resolver import TypeScriptResolverProvider
 from .verification_explanation import VerificationExplanationMixin
 from .verification_plan import VerificationPlanMixin
@@ -189,7 +189,7 @@ class CodeMap(
             ContextPolicy.load(self.workspace, config),
         )
         self.context_cache = ContextCache(self.state_dir)
-        self._find_flight: SingleFlight[tuple[SearchHit, ...]] = SingleFlight()
+        self._find_flight: SingleFlight[_FindEvidence] = SingleFlight()
         self._context_flight: SingleFlight[ContextPack] = SingleFlight()
         self.max_index_bytes = int(max_index_bytes)
         self._python_import_roots = _python_source_roots(self.workspace)
@@ -206,7 +206,7 @@ class CodeMap(
         # Canonical task retrieval is composed by multiple additive CodeMap surfaces.
         # Keep a small generation-bound result cache so those surfaces reuse the exact
         # same selected evidence instead of replaying 2-3 query lanes each time.
-        self._task_result_cache: dict[tuple[int, str, int], tuple[SearchHit, ...]] = {}
+        self._task_result_cache: dict[tuple[int, str, int], _TaskRetrievalResult] = {}
         # Structural ownership may select an authority path that is not present in
         # the canonical retrieval rows. Remember those selected paths separately
         # so an unsignaled byte change is reconciled before the next decision.

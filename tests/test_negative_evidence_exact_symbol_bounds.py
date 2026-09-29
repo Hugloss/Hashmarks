@@ -90,6 +90,7 @@ def test_exact_symbol_bound_cannot_manufacture_unique_owner(
     assert action["ambiguity"]["reason"] == "exact-identifier-search-bounded"
     assert action["ownership_authority"]["owner_resolved"] is False
     assert action["exact_identifier_search"] == {
+        "evaluation": "evaluated",
         "completeness": "incomplete",
         "truncation": "truncated",
         "negative_evidence_admissible": False,
@@ -158,6 +159,7 @@ def test_complete_exact_symbol_search_can_still_resolve_unique_owner(
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ownership_authority"]["owner_resolved"] is True
     assert action["exact_identifier_search"] == {
+        "evaluation": "evaluated",
         "completeness": "complete",
         "truncation": "complete",
         "negative_evidence_admissible": True,
@@ -190,3 +192,38 @@ def test_literal_path_remains_independent_authority_when_symbol_index_is_bounded
     )
     assert action["exact_identifier_search"]["completeness"] == "incomplete"
     assert action["exact_identifier_search"]["uniqueness_admissible"] is False
+
+
+def test_skipped_exact_identifier_search_cannot_claim_negative_or_unique_evidence(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "owner.py").write_text(
+        "def alpha_owner():\n    return 1\n", encoding="utf-8"
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "demo"\nversion = "0.1"\n', encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        calls = []
+        original = codemap._task_action_exact_identifier_edit_candidates
+
+        def tracked(*args, **kwargs):
+            calls.append(True)
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(
+            codemap, "_task_action_exact_identifier_edit_candidates", tracked
+        )
+        action = codemap.task_action_map("Change configuration for alpha_owner")
+
+    assert not calls
+    assert action["exact_identifier_search"] == {
+        "evaluation": "not-evaluated",
+        "completeness": "unknown",
+        "truncation": "unknown",
+        "negative_evidence_admissible": False,
+        "uniqueness_admissible": False,
+        "bound_reasons": [],
+    }

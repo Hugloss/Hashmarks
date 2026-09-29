@@ -68,6 +68,7 @@ class _TaskActionConfigState:
 class _TaskActionMapContext:
     hits: Sequence[SearchHit]
     rows: list[dict[str, object]]
+    canonical_rows: tuple[dict[str, object], ...]
     failed: set[str]
     cues: _TaskActionCues
     cue_words: set[str]
@@ -93,7 +94,7 @@ class _TaskActionInitialSurfaceState:
 @dataclass(frozen=True)
 class _TaskActionExactIdentifierEvidence:
     candidates: list[dict[str, object]]
-    search_complete: bool
+    search_complete: bool | None
     bound_reasons: tuple[str, ...]
 
 
@@ -102,11 +103,11 @@ class _TaskActionOwnerResolutionState:
     edit: dict[str, object] | None
     basis: str | None
     structural_owner: dict[str, object] | None
-    structural_owner_origin: Mapping[str, object] | None
     archive_live_owner_ambiguity: bool
     exact_identifier_paths: tuple[str, ...]
-    exact_identifier_search_complete: bool
+    exact_identifier_search_complete: bool | None
     exact_identifier_search_bound_reasons: tuple[str, ...]
+    structural_starts: dict[str, object]
 
 
 @dataclass(frozen=True)
@@ -126,7 +127,7 @@ class _TaskActionOwnerCandidateState:
     archive_live_owner_ambiguity: bool
     exact_identifier_edits: list[dict[str, object]]
     exact_identifier_paths: tuple[str, ...]
-    exact_identifier_search_complete: bool
+    exact_identifier_search_complete: bool | None
     exact_identifier_search_bound_reasons: tuple[str, ...]
     literal_task_path: str
 
@@ -144,11 +145,11 @@ class _TaskActionSelectionState:
     explicit_config_surface_request: bool
     owner_basis: str | None
     structural_owner: dict[str, object] | None
-    structural_owner_origin: Mapping[str, object] | None
     archive_live_owner_ambiguity: bool
     exact_identifier_paths: tuple[str, ...]
-    exact_identifier_search_complete: bool
+    exact_identifier_search_complete: bool | None
     exact_identifier_search_bound_reasons: tuple[str, ...]
+    structural_starts: dict[str, object]
     inspect_rows: list[dict[str, object]]
     related_rows: list[dict[str, object]]
 

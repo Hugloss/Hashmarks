@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
 
+from .decision_session import decision_scoped
 from .model import EvidenceVisibility
 from .python_ast import estimate_tokens
 from .query_primitives import _WORD_RE, _query_terms
@@ -102,7 +103,6 @@ class OwnershipGraphMixin:
         hits,
         role_domains: dict[str, tuple[RepositoryDomain, ...]],
         task_terms: set[str],
-        per_role: int,
     ) -> dict[str, list[dict[str, object]]]:
         candidates: dict[str, list[dict[str, object]]] = {
             role: [] for role in role_domains
@@ -134,7 +134,7 @@ class OwnershipGraphMixin:
                     str(row["path"]),
                 )
             )
-            role_rows[role] = rows[:per_role]
+            role_rows[role] = rows
         return role_rows
 
     @staticmethod
@@ -454,12 +454,47 @@ class OwnershipGraphMixin:
             }
         return {"status": "unresolved" if ambiguous else "not-required"}
 
+    def _entry_anchor_resolution(
+        self,
+        task: str,
+        explicit_roles: list[str],
+        role_rows: dict[str, list[dict[str, object]]],
+    ) -> tuple[str | None, dict[str, list[str]]]:
+        distinctive = self._entry_distinctive_tokens(task)
+        if not distinctive:
+            return None, {}
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        self._session_preload_symbols(
+            [str(row["path"]) for role in explicit_roles for row in role_rows[role]]
+        )
+        role_anchor_tokens: dict[str, list[str]] = {}
+        first_row_anchored: set[str] = set()
+        for role in explicit_roles:
+            for index, candidate in enumerate(role_rows[role]):
+                matches = self._entry_anchor_matches(
+                    {"role": role, **candidate}, distinctive
+                )
+                if matches:
+                    role_anchor_tokens[role] = matches
+                    if index == 0:
+                        first_row_anchored.add(role)
+                    break
+        anchored_roles = sorted(role_anchor_tokens)
+        resolved_role = (
+            anchored_roles[0]
+            if len(anchored_roles) == 1 and anchored_roles[0] in first_row_anchored
+            else None
+        )
+        return resolved_role, role_anchor_tokens
+
     def _entry_ambiguity(
         self,
         task: str,
         role_rows: dict[str, list[dict[str, object]]],
         *,
-        retrieval_complete: bool,
+        retrieval_completeness: str,
+        retrieval_truncation: str,
     ) -> dict[str, object]:
         explicit_roles = self._entry_explicit_roles(task, role_rows)
         alternatives = [{"role": role, **role_rows[role][0]} for role in explicit_roles]
@@ -470,13 +505,13 @@ class OwnershipGraphMixin:
                 str(row["path"]),
             )
         )
-        if not retrieval_complete:
+        if retrieval_completeness != "complete":
             return {
-                "schema": "hashmarks.entry-point-ambiguity.v3",
+                "schema": "hashmarks.entry-point-ambiguity.v4",
                 "ambiguous": None,
                 "reason": "canonical-retrieval-bound-not-exhausted",
-                "completeness": "incomplete",
-                "truncation": "truncated",
+                "completeness": retrieval_completeness,
+                "truncation": retrieval_truncation,
                 "explicit_roles": explicit_roles,
                 "alternatives": alternatives,
                 "resolution": {
@@ -487,17 +522,12 @@ class OwnershipGraphMixin:
                 "secret_knowledge_used": False,
             }
 
-        distinctive = self._entry_distinctive_tokens(task)
-        role_anchor_tokens: dict[str, list[str]] = {}
-        for row in alternatives:
-            matches = self._entry_anchor_matches(row, distinctive)
-            if matches:
-                role_anchor_tokens[str(row["role"])] = matches
-        anchored_roles = sorted(role_anchor_tokens)
-        resolved_role = anchored_roles[0] if len(anchored_roles) == 1 else None
+        resolved_role, role_anchor_tokens = self._entry_anchor_resolution(
+            task, explicit_roles, role_rows
+        )
         ambiguous = len(explicit_roles) >= 2 and resolved_role is None
         return {
-            "schema": "hashmarks.entry-point-ambiguity.v3",
+            "schema": "hashmarks.entry-point-ambiguity.v4",
             "ambiguous": ambiguous,
             "reason": self._entry_ambiguity_reason(
                 explicit_roles, resolved_role, ambiguous
@@ -517,6 +547,7 @@ class OwnershipGraphMixin:
             "secret_knowledge_used": False,
         }
 
+    @decision_scoped
     def task_entry_points(
         self, task: str, *, limit: int = 20, per_role: int = 2
     ) -> dict[str, object]:
@@ -529,18 +560,19 @@ class OwnershipGraphMixin:
             raise ValueError("per_role must be >= 1")
         if per_role > 8:
             raise ValueError("per_role must be <= 8")
-        hits = self.find_task(task, limit=limit)
-        probed_hits = self.find_task(task, limit=limit + 1)
-        retrieval_complete = len(probed_hits) <= limit
+        retrieval = self._find_task_evidence_impl(task, limit=limit)
+        hits = retrieval.hits
+        retrieval_completeness = "complete" if retrieval.complete else "incomplete"
         route = route_query(task)
         task_terms = set(_query_terms(task))
         role_domains = self._entry_role_domains()
-        role_rows = self._entry_role_rows(hits, role_domains, task_terms, per_role)
+        all_role_rows = self._entry_role_rows(hits, role_domains, task_terms)
+        role_rows = {role: rows[:per_role] for role, rows in all_role_rows.items()}
         recommended = self._entry_recommended(
             role_rows, self._entry_ordered_roles(route)
         )
         return {
-            "schema": "hashmarks.task-entry-points.v3",
+            "schema": "hashmarks.task-entry-points.v4",
             "task": task,
             "intent": route.intent.value,
             "confidence": route.confidence,
@@ -550,16 +582,16 @@ class OwnershipGraphMixin:
             "recommended": recommended,
             "ambiguity": self._entry_ambiguity(
                 task,
-                role_rows,
-                retrieval_complete=retrieval_complete,
+                all_role_rows,
+                retrieval_completeness=retrieval_completeness,
+                retrieval_truncation=retrieval.truncation,
             ),
             "bounds": {
                 "limit": limit,
                 "per_role": per_role,
-                "probe_limit": limit + 1,
-                "canonical_completeness": (
-                    "complete" if retrieval_complete else "incomplete"
-                ),
+                "canonical_completeness": retrieval_completeness,
+                "canonical_truncation": retrieval.truncation,
+                "bound_reasons": list(retrieval.bound_reasons),
             },
             "ranking_effect": "none",
             "discovery_effect": "none",
@@ -1198,6 +1230,12 @@ class OwnershipGraphMixin:
     ) -> dict[str, object] | None:
         """Project the selected typed ownership relation into the action anchor shape."""
         graph = self.ownership_relation_graph(task, start_path, max_depth=max_depth)
+        return self._structural_owner_from_graph(graph, start_path)
+
+    def _structural_owner_from_graph(
+        self, graph: dict[str, object], start_path: str
+    ) -> dict[str, object] | None:
+        """Retain graph qualification while projecting a selected candidate."""
         selected_path = graph.get("selected")
         if not selected_path:
             return None

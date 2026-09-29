@@ -349,6 +349,10 @@ Do **not** update it for every private helper rename. The goal is stable navigat
 
 `task_action_map()` may use exact active symbol identity already present in canonical task rows to prevent a uniquely proven class/method/function owner from being displaced by a weaker structural continuation. This is discrimination over existing retrieval evidence, not a second ranker or a new discovery path. Multiple exact source owners remain ambiguous, test-only exact symbols never become edit authority, generic task wording still uses structural ownership, and literal repository paths retain their existing authority.
 
+### Structural owner start accounting
+
+When structural ownership is eligible, `task_action_map()` freezes the canonical retrieved rows before role display limits, then observes each distinct task-anchored source or test start and the existing selected start once. The action map exposes filterable `structural_starts` entries with start path, matched anchor terms, graph completeness and bounds, observed owner, and status; the decision packet carries a compact count/status summary. Competing observed owners or incomplete/stale start observations preserve ambiguity. A complete graph with no selected owner stays visible as `no-selected-owner` and does not assert a competing owner. The scope is the returned canonical hits plus the selected start: `retrieval_completeness` remains `unknown`, and `limit_reached` only describes the caller's retrieval bound. Neither the list nor a single observed owner proves repository-wide uniqueness.
+
 ### Decision-session task-action reuse
 
 `task_action_map()` is a derived projection over canonical task evidence. Within one explicit `CodeMap.decision_session()`, the decision-session projection cache may reuse an exact projection keyed by repository generation, task, `limit`, and `per_role`. This is disposable performance state, not evidence authority: the first computation still performs normal authority-path freshness bookkeeping, callers receive deep copies, and a new session or generation recomputes.

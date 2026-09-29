@@ -373,7 +373,12 @@ class TaskActionEvidenceMixin:
     def _is_task_identifier_anchor(token: str) -> bool:
         mixed_or_snake = "_" in token or any(ch.isupper() for ch in token[1:])
         ticket_like = not token.isupper() or any(ch.isdigit() for ch in token)
-        return len(token) >= 3 and mixed_or_snake and ticket_like
+        alphanumeric_ticket = any(ch.isalpha() for ch in token) and any(
+            ch.isdigit() for ch in token
+        )
+        return (
+            len(token) >= 3 and (mixed_or_snake or alphanumeric_ticket) and ticket_like
+        )
 
     @classmethod
     def _task_identifier_anchor_tokens(cls, task: str) -> list[str]:

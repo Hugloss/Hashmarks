@@ -116,7 +116,7 @@ class TaskActionOwnerResolutionMixin:
     ]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        evidence = _TaskActionExactIdentifierEvidence([], True, ())
+        evidence = _TaskActionExactIdentifierEvidence([], None, ())
         blocked = any(
             (
                 structural_owner is not None,
@@ -144,7 +144,7 @@ class TaskActionOwnerResolutionMixin:
                 )
             if len(exact_identifier_edits) == 1:
                 edit = exact_identifier_edits[0]
-                if not literal_task_path and evidence.search_complete:
+                if not literal_task_path and evidence.search_complete is True:
                     owner_basis = self._task_action_exact_owner_basis(
                         request.task, exact_identifier_edits[0]
                     )
@@ -153,31 +153,65 @@ class TaskActionOwnerResolutionMixin:
     @staticmethod
     def _task_action_owner_state(
         candidate: _TaskActionOwnerCandidateState,
-        structural_owner_origin: dict[str, object] | None = None,
+        structural_starts: dict[str, object] | None = None,
     ) -> _TaskActionOwnerResolutionState:
         return _TaskActionOwnerResolutionState(
             edit=candidate.edit,
             basis=candidate.basis,
             structural_owner=candidate.structural_owner,
-            structural_owner_origin=structural_owner_origin,
             archive_live_owner_ambiguity=candidate.archive_live_owner_ambiguity,
             exact_identifier_paths=candidate.exact_identifier_paths,
             exact_identifier_search_complete=candidate.exact_identifier_search_complete,
             exact_identifier_search_bound_reasons=(
                 candidate.exact_identifier_search_bound_reasons
             ),
+            structural_starts=structural_starts
+            or {
+                "scope": "returned-canonical-hits-plus-selected-start",
+                "status": "not-evaluated",
+                "retrieval_completeness": "unknown",
+                "limit_reached": False,
+                "candidates": [],
+                "candidate_count": 0,
+                "observed_owners": [],
+                "observation_complete": False,
+            },
         )
 
     def _task_action_structural_owner_start(
         self,
         request: _TaskActionOwnerResolutionRequest,
         candidate: _TaskActionOwnerCandidateState,
+        resolved_by_path: dict[str, dict[str, object] | None],
+        matched_rows: list[dict[str, object]],
     ) -> str | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        task_specific = self._task_action_specific_entry_candidate(
-            request.task, request.context.rows, request.discrimination
+        test_candidate = self._task_action_specific_test_candidate(
+            getattr(request.context, "canonical_rows", tuple(request.context.rows)),
+            request.discrimination,
         )
+        source_rows = [
+            row
+            for row in matched_rows
+            if "edit" in row.get("roles", []) or "related" in row.get("roles", [])
+        ]
+        source_candidate = max(
+            source_rows,
+            key=lambda row: (
+                resolved_by_path.get(str(row.get("path") or "")) is not None,
+                len(
+                    (resolved_by_path.get(str(row.get("path") or "")) or {}).get(
+                        "corroboration"
+                    )
+                    or []
+                ),
+                self._task_action_specificity(row, request.discrimination),
+                -int(row.get("canonical_rank") or 10_000),
+            ),
+            default=None,
+        )
+        task_specific = test_candidate or source_candidate
         task_local_island = self._task_action_local_island(
             request.task, request.context.hits, request.limit
         )
@@ -196,7 +230,7 @@ class TaskActionOwnerResolutionMixin:
         )
         go_entry = self._task_action_go_entry(
             verify_path,
-            request.context.rows,
+            getattr(request.context, "canonical_rows", tuple(request.context.rows)),
             request.discrimination,
             task_local_island,
         )
@@ -208,6 +242,149 @@ class TaskActionOwnerResolutionMixin:
             return verify_path or str(candidate.edit["path"])
         return verify_path or None
 
+    def _task_action_observe_structural_start(
+        self,
+        request: _TaskActionOwnerResolutionRequest,
+        row: dict[str, object],
+        terms: list[str],
+        origin: str,
+    ) -> tuple[dict[str, object], dict[str, object] | None]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        path = str(row.get("path") or "")
+        entry: dict[str, object] = {
+            "start_path": path,
+            "roles": list(row.get("roles") or []),
+            "canonical_rank": row.get("canonical_rank"),
+            "anchor_terms": terms,
+            "origin": origin,
+            "observed_owner": None,
+            "owner_path": [],
+            "graph_completeness": "unknown",
+            "graph_bound_reasons": [],
+            "status": "unresolved",
+        }
+        if self._task_action_is_archive_path(path):
+            entry["status"] = "excluded-archive"
+            return entry, None
+        if not self._indexed_path_current(path):
+            entry["status"] = "stale"
+            return entry, None
+        graph = self.ownership_relation_graph(request.task, path, max_depth=3)
+        resolved = self._structural_owner_from_graph(graph, path)
+        owner = str((resolved or {}).get("path") or "")
+        current = bool(owner and self._indexed_path_current(owner))
+        entry["graph_completeness"] = graph["completeness"]
+        entry["graph_bound_reasons"] = list(graph.get("search_bound_reasons") or [])
+        entry["owner_path"] = list(graph.get("owner_path") or [])
+        if owner and current and owner not in request.context.failed:
+            entry["observed_owner"] = owner
+            entry["status"] = (
+                "observed-owner"
+                if graph["completeness"] == "complete"
+                else "graph-incomplete"
+            )
+            return entry, resolved
+        entry["status"] = (
+            "stale"
+            if owner and not current
+            else (
+                "graph-incomplete"
+                if graph["completeness"] != "complete"
+                else "no-selected-owner"
+            )
+        )
+        return entry, None
+
+    def _task_action_observe_structural_starts(
+        self,
+        request: _TaskActionOwnerResolutionRequest,
+        candidate: _TaskActionOwnerCandidateState,
+    ) -> tuple[str | None, dict[str, dict[str, object] | None], dict[str, object]]:
+        """Observe each nominated start once before selecting an owner candidate."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        canonical_rows = getattr(
+            request.context, "canonical_rows", tuple(request.context.rows)
+        )
+        nominated = self._task_action_structural_start_rows(
+            request.task, canonical_rows, request.discrimination
+        )
+        resolved_by_path: dict[str, dict[str, object] | None] = {}
+        entries: dict[str, dict[str, object]] = {}
+        for row, terms in nominated:
+            path = str(row.get("path") or "")
+            if path and path not in entries:
+                entries[path], resolved_by_path[path] = (
+                    self._task_action_observe_structural_start(
+                        request, row, terms, "task-term"
+                    )
+                )
+        owner_start = self._task_action_structural_owner_start(
+            request, candidate, resolved_by_path, [row for row, _ in nominated]
+        )
+        if owner_start and owner_start not in entries:
+            selected_row = next(
+                (
+                    row
+                    for row in canonical_rows
+                    if str(row.get("path") or "") == owner_start
+                ),
+                {"path": owner_start, "roles": [], "canonical_rank": None},
+            )
+            entries[owner_start], resolved_by_path[owner_start] = (
+                self._task_action_observe_structural_start(
+                    request, selected_row, [], "selected-start"
+                )
+            )
+        candidates = sorted(
+            entries.values(),
+            key=lambda row: (
+                int(row.get("canonical_rank") or request.limit + 1),
+                str(row["start_path"]),
+            ),
+        )
+        owners = sorted(
+            {
+                str(row["observed_owner"])
+                for row in candidates
+                if row.get("observed_owner")
+            }
+        )
+        for row in candidates:
+            if (
+                row["status"] == "no-selected-owner"
+                and row["start_path"] in owners
+                and "edit" in row["roles"]
+                and row["graph_completeness"] == "complete"
+            ):
+                row["status"] = "self-owner"
+                row["observed_owner"] = row["start_path"]
+        return (
+            owner_start,
+            resolved_by_path,
+            {
+                "scope": "returned-canonical-hits-plus-selected-start",
+                "status": "observed",
+                "retrieval_completeness": "unknown",
+                "limit_reached": len(request.context.hits) >= request.limit,
+                "candidates": candidates,
+                "candidate_count": len(candidates),
+                "observed_owners": owners,
+                "observation_complete": bool(candidates)
+                and all(
+                    row["status"]
+                    in {
+                        "observed-owner",
+                        "self-owner",
+                        "no-selected-owner",
+                        "excluded-archive",
+                    }
+                    for row in candidates
+                ),
+            },
+        )
+
     def _task_action_structural_owner(
         self,
         request: _TaskActionOwnerResolutionRequest,
@@ -215,17 +392,21 @@ class TaskActionOwnerResolutionMixin:
     ) -> _TaskActionOwnerResolutionState:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        owner_start = self._task_action_structural_owner_start(request, candidate)
-        if not owner_start:
-            return self._task_action_owner_state(candidate)
-        resolved = self._structural_owner_candidate(
-            owner_start, max_depth=3, task=request.task
+        owner_start, resolved_by_path, structural_starts = (
+            self._task_action_observe_structural_starts(request, candidate)
         )
+        if not owner_start:
+            return self._task_action_owner_state(
+                candidate, structural_starts=structural_starts
+            )
+        resolved = resolved_by_path.get(owner_start)
         if (
             resolved is None
             or str(resolved.get("path") or "") in request.context.failed
         ):
-            return self._task_action_owner_state(candidate)
+            return self._task_action_owner_state(
+                candidate, structural_starts=structural_starts
+            )
         owner_path = str(resolved["path"])
         if len(candidate.exact_identifier_paths) > 1:
             discriminated_exact_path = (
@@ -235,7 +416,9 @@ class TaskActionOwnerResolutionMixin:
             )
             if discriminated_exact_path is None:
                 candidate.basis = None
-                return self._task_action_owner_state(candidate)
+                return self._task_action_owner_state(
+                    candidate, structural_starts=structural_starts
+                )
             candidate.exact_identifier_paths = (discriminated_exact_path,)
             candidate.basis = "exact-import-owner"
         archive_owner = self._task_action_is_archive_path(owner_path)
@@ -262,12 +445,9 @@ class TaskActionOwnerResolutionMixin:
             )
             if candidate.basis is None:
                 candidate.basis = "structural-owner"
-        origin: dict[str, object] | None = (
-            {"path": owner_start, "resolved": resolved}
-            if candidate.structural_owner is not None
-            else None
+        return self._task_action_owner_state(
+            candidate, structural_starts=structural_starts
         )
-        return self._task_action_owner_state(candidate, origin)
 
     def _task_action_resolve_owner(
         self, request: _TaskActionOwnerResolutionRequest
@@ -318,7 +498,7 @@ class TaskActionOwnerResolutionMixin:
         if literal_task_path and selected_edit_path == literal_task_path:
             candidate.basis = "literal-path"
             return self._task_action_owner_state(candidate)
-        if not exact_identifier_evidence.search_complete:
+        if exact_identifier_evidence.search_complete is False:
             candidate.basis = None
             return self._task_action_owner_state(candidate)
         if len(exact_identifier_edits) == 1:
