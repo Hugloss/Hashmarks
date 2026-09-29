@@ -699,14 +699,14 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             return source_path
         return None
 
-    def _task_action_ambiguous_plain_identifier_evidence(
+    def _task_action_exact_identifier_terms_evidence(
         self,
         task: str,
         failed: set[str],
-    ) -> tuple[set[str], bool]:
-        """Return positive duplicate-name evidence plus index completeness."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+    ) -> tuple[set[str], tuple[str, ...]]:
+        """Return admitted exact terms without strengthening generic-name bounds."""
+        terms = set(self._task_action_exact_identifier_terms(task))
+        explicit = bool(terms)
         masked = task
         for value in _QUALIFIED_IDENTIFIER_RE.findall(task):
             masked = masked.replace(value, " ")
@@ -715,13 +715,11 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             for token in _WORD_RE.findall(masked)
             if len(token) >= 4 and token.lower() not in _TASK_STOPWORDS
         }
-        if not plain_tokens:
-            return set(), True
-        probe = self._session_exact_symbol_candidates(
-            tuple(sorted(plain_tokens)), limit=_EXACT_IDENTIFIER_INDEX_LIMIT + 1
+        indexed, complete = self._task_action_exact_symbol_index_window(
+            tuple(sorted(plain_tokens))
         )
         exact_paths: dict[str, set[str]] = {}
-        for symbol in probe[:_EXACT_IDENTIFIER_INDEX_LIMIT]:
+        for symbol in indexed:
             path = str(symbol.get("path") or "")
             name = str(symbol.get("name") or "").lower()
             if (
@@ -738,33 +736,10 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             }.intersection(domains):
                 continue
             exact_paths.setdefault(name, set()).add(path)
-        ambiguous = {token for token, paths in exact_paths.items() if len(paths) > 1}
-        return ambiguous, len(probe) <= _EXACT_IDENTIFIER_INDEX_LIMIT
-
-    def _task_action_ambiguous_plain_identifiers(
-        self, task: str, rows: Sequence[dict[str, object]], failed: set[str]
-    ) -> set[str]:
-        """Return positively observed ambiguous plain identifiers."""
-        del rows
-        ambiguous, _complete = self._task_action_ambiguous_plain_identifier_evidence(
-            task, failed
-        )
-        return ambiguous
-
-    def _task_action_exact_identifier_terms_evidence(
-        self,
-        task: str,
-        failed: set[str],
-    ) -> tuple[set[str], tuple[str, ...]]:
-        terms = set(self._task_action_exact_identifier_terms(task))
-        has_explicit_identifier = bool(terms)
-        ambiguous_plain, plain_ambiguity_complete = (
-            self._task_action_ambiguous_plain_identifier_evidence(task, failed)
-        )
-        terms.update(ambiguous_plain)
+        terms.update(token for token, paths in exact_paths.items() if len(paths) > 1)
         reasons = (
             ("plain-ambiguity-symbol-index-limit",)
-            if not has_explicit_identifier and not plain_ambiguity_complete
+            if not explicit and not complete
             else ()
         )
         return terms, reasons
