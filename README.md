@@ -19,6 +19,8 @@ curl -fsSL https://github.com/Hugloss/Hashmarks/releases/latest/download/install
 
 The installer downloads checksum-verified, self-contained release bytes from GitHub Releases. The target machine does not need Python, uv, pip, or PyPI access.
 
+For source-development bootstrap only, the repository-maintained script remains available at `https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh`; end-user installs should use the published release installer above.
+
 ### Update awareness and explicit upgrades
 
 Interactive CLI commands may check GitHub's public latest-release metadata at most once every 24 hours. The check sends no repository-derived data and stores only disposable product-update metadata outside repository state. Set `HASHMARKS_NO_UPDATE_CHECK=1` to disable automatic update checks completely. Automatic checks never run in MCP, CI, daemon, or non-interactive use.
