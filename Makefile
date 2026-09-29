@@ -99,10 +99,10 @@ help:
 	  '  make metrics-derived-authority  Measure controlled + uv/Maven explicit-packet economics before retention' \
 	  '  make metrics        Quick 10k repository-intelligence baseline including daemon + impact metrics' \
 	  '  make metrics-scale  100k repository-intelligence baseline' \
-	  '  make benchmark      Native Codex/OpenCode paired smoke (BENCHMARK=matrix or cycle for full suites)' \
-	  '  make benchmark-check  Check all selected native arms before model calls' \
-	  '  make benchmark-show Show selected trial definitions without running agents' \
-	  '  make benchmark-report  Report the latest native run (BENCH_RUN=id selects one)' \
+	  '  make benchmark      Run the agentsCookbook-owned native benchmark against this Hashmarks checkout' \
+	  '  make benchmark-check  Preflight agentsCookbook benchmark arms before model calls' \
+	  '  make benchmark-show Show agentsCookbook-owned trial definitions without running agents' \
+	  '  make benchmark-report  Report the latest agentsCookbook benchmark run (BENCH_RUN=id selects one)' \
 	  '  make evaluation-help  Show external-agent/research evaluation targets' \
 	  '' \
 	  'Override FILES/HOT_REQUESTS, e.g. make metrics FILES=50000 HOT_REQUESTS=50'
