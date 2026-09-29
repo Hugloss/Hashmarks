@@ -125,9 +125,9 @@ Hashmarks keeps one long-lived source authority: `main`. Do not introduce a perm
 
 A public release is an explicit reviewed promotion from `main`:
 
-1. finalize the intended package version and changelog on `main`;
-2. open a focused release pull request that changes `.github/release-request.toml` to that version;
-3. review and merge that pull request;
+1. run `make release-prepare VERSION=X.Y.Z` on a release branch; it updates the package/runtime/README versions, lock, changelog placeholder, and `.github/release-request.toml` together;
+2. replace the changelog placeholder with public notes and run `make release-check`;
+3. review and merge that one release pull request after CI passes;
 4. the merge commit is the release source identity;
 5. the Publish workflow validates the request against that exact merge commit, runs release qualification, creates a draft GitHub Release for `v<version>`, uploads and re-verifies the qualified artifacts, then publishes the release.
 

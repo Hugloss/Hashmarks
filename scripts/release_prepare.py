@@ -74,8 +74,10 @@ def prepare_release(root: Path, version: str) -> None:
         raise ValueError(f"invalid release version: {version!r}")
 
     current = _project_version(root)
-    if current == version:
-        raise ValueError(f"release version is already {version}")
+    if _VERSION.fullmatch(current) is None:
+        raise ValueError(f"current package version is not stable: {current!r}")
+    if tuple(map(int, version.split("."))) <= tuple(map(int, current.split("."))):
+        raise ValueError(f"release version {version} must be greater than {current}")
 
     prepared = _prepared_version_files(root, current, version)
     prepared[root / "CHANGELOG.md"] = _prepared_changelog(root, version)

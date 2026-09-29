@@ -46,7 +46,7 @@ jobs:
   windows:
     name: Published Windows install smoke
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Install and exercise exact published Windows release
         shell: pwsh
@@ -97,3 +97,24 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Published Windows map status failed"
           }
+      - name: Checkout exact published source for interactive upgrade smoke
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: false
+      - run: uv python install 3.14
+      - name: Materialize locked Windows terminal smoke dependency
+        run: uv sync --frozen --only-group release-smoke --python 3.14
+      - name: Exercise prior installed CLI upgrading to exact published Windows bytes
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          & .venv\Scripts\python.exe scripts\windows_published_upgrade_smoke.py `
+            --tag $env:RELEASE_TAG `
+            --repository $env:GITHUB_REPOSITORY `
+            --root (Join-Path $env:RUNNER_TEMP "hashmarks-post-publish")

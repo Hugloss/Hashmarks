@@ -75,17 +75,16 @@ def _render_release(release: ReleaseInfo, *, announce: bool) -> None:
     )
 
 
-def _render_external_upgrade_guidance() -> None:
+def _render_external_upgrade_guidance(latest_version: str) -> None:
+    tag = f"v{latest_version}"
     _text(
         "",
         "This installation is managed outside Hashmarks.",
         "Use the native mechanism that installed or owns this Hashmarks installation.",
         "Hashmarks does not detect, validate, or certify that package-manager state.",
         "",
-        "Examples:",
-        "    uv tool upgrade hashmarks",
-        "    pipx upgrade hashmarks",
-        "    pip install --upgrade hashmarks",
+        "Exact GitHub release (wheel and source distribution):",
+        f"    https://github.com/Hugloss/Hashmarks/releases/tag/{tag}",
         "",
         "No changes were made.",
     )
@@ -140,7 +139,7 @@ def _upgrade(args) -> int:
     command = standalone_upgrade_command(release.latest_version)
     if command is None:
         _render_release(release, announce=False)
-        _render_external_upgrade_guidance()
+        _render_external_upgrade_guidance(release.latest_version)
         return 0
 
     _render_standalone_upgrade(release, command, announce=False)
@@ -167,7 +166,7 @@ def _maybe_offer_periodic_upgrade() -> None:
     upgrade_command = standalone_upgrade_command(release.latest_version)
     if upgrade_command is None:
         _render_release(release, announce=True)
-        _render_external_upgrade_guidance()
+        _render_external_upgrade_guidance(release.latest_version)
         return
 
     _render_standalone_upgrade(release, upgrade_command, announce=True)
@@ -398,17 +397,17 @@ def _add_identity_cli(sub) -> None:
     _add_mode_argument(snapshot)
     snapshot.add_argument("--input", action="append", required=True)
     snapshot.add_argument("--verify", action="store_true")
-    snapshot.set_defaults(func=_snapshot)
+    snapshot.set_defaults(func=_snapshot, automatic_update_check=True)
 
     stats = sub.add_parser("stats")
     _add_common_arguments(stats, inherited=True)
     _add_mode_argument(stats)
-    stats.set_defaults(func=_stats)
+    stats.set_defaults(func=_stats, automatic_update_check=True)
 
     doctor = sub.add_parser("doctor")
     _add_common_arguments(doctor, inherited=True)
     _add_mode_argument(doctor)
-    doctor.set_defaults(func=_doctor)
+    doctor.set_defaults(func=_doctor, automatic_update_check=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -419,7 +418,7 @@ def main(argv: list[str] | None = None) -> int:
         version=f"hashmarks version {__version__}",
     )
     _add_common_arguments(parser)
-    parser.set_defaults(automatic_update_check=True)
+    parser.set_defaults(automatic_update_check=False)
     sub = parser.add_subparsers(dest="command", required=True)
     _add_daemon_cli(sub)
     _add_identity_cli(sub)
@@ -432,7 +431,7 @@ def main(argv: list[str] | None = None) -> int:
         "install", help="register the installed Hashmarks executable with agent hosts"
     )
     install.add_argument("--opencode", action="store_true")
-    install.set_defaults(func=_install)
+    install.set_defaults(func=_install, automatic_update_check=True)
     upgrade = sub.add_parser(
         "upgrade",
         help="check the latest release and explicitly hand standalone installs to the existing installer",

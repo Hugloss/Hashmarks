@@ -8,6 +8,7 @@ import pytest
 
 import hashmarks.cli as cli
 import hashmarks.release_update as release_update
+import hashmarks.repository_cli as repository_cli
 from hashmarks.release_update import ReleaseInfo
 
 
@@ -226,9 +227,10 @@ def test_external_python_upgrade_reports_native_tool_handoff_without_mutation(
     assert "managed outside Hashmarks" in output
     assert "Use the native mechanism that installed or owns" in output
     assert "does not detect, validate, or certify that package-manager state" in output
-    assert "uv tool upgrade hashmarks" in output
-    assert "pipx upgrade hashmarks" in output
-    assert "pip install --upgrade hashmarks" in output
+    assert "https://github.com/Hugloss/Hashmarks/releases/tag/v0.25.0" in output
+    assert "uv tool upgrade hashmarks" not in output
+    assert "pipx upgrade hashmarks" not in output
+    assert "pip install --upgrade hashmarks" not in output
     assert "No changes were made." in output
 
 
@@ -258,18 +260,29 @@ def test_cli_command_semantics_opt_out_of_automatic_update_awareness(
     assert cli.main(argv) == 0
 
 
-def test_ordinary_cli_command_semantics_enable_automatic_update_awareness(
+@pytest.mark.parametrize(
+    ("argv", "module", "handler_name"),
+    [
+        (["doctor"], cli, "_doctor"),
+        (["install"], cli, "_install"),
+        (["orient"], repository_cli, "_map_orient"),
+    ],
+)
+def test_declared_cli_semantics_opt_in_to_automatic_update_awareness(
     monkeypatch,
+    argv: list[str],
+    module,
+    handler_name: str,
 ) -> None:
     calls: list[str] = []
-    monkeypatch.setattr(cli, "_doctor", lambda args: 0)
+    monkeypatch.setattr(module, handler_name, lambda args: 0)
     monkeypatch.setattr(
         cli,
         "_maybe_offer_periodic_upgrade",
         lambda: calls.append("checked"),
     )
 
-    assert cli.main(["doctor"]) == 0
+    assert cli.main(argv) == 0
     assert calls == ["checked"]
 
 
@@ -538,6 +551,7 @@ def test_standalone_delegation_executes_the_displayed_native_command(
     argv = seen["argv"]
     assert isinstance(argv, tuple)
     if release_update.os.name == "nt":
+        assert argv[0] == "pwsh.exe"
         assert argv[-1] == displayed
     else:
         assert argv == ("/tools/sh", "-c", displayed)

@@ -24,6 +24,7 @@ make release-check
 ```
 
 Open the release pull request. Merge only after qualification convergence is green. The release-request merge SHA becomes the default release source authority.
+PR CI checks a changed normal release request against the package, runtime, README, finalized notes, and base-branch version before merge. `make release-prepare` rejects a version that does not increase from the current package version.
 
 ## What pull-request CI proves
 
@@ -59,7 +60,7 @@ For a normal release, the reviewed release-request merge SHA becomes the release
 12. downloads every draft asset back from GitHub and compares it byte-for-byte with the qualified local public bundle;
 13. publishes the draft only after the readback is identical.
 
-Hashmarks publishes these qualified artifacts through GitHub Releases. The release workflow does not automatically publish to PyPI. A failed or cancelled Publish run is not a completed release.
+Hashmarks publishes these qualified artifacts through GitHub Releases. The release workflow does not publish to PyPI. A failed or cancelled Publish run is not a completed release.
 
 The public GitHub Release contains:
 

@@ -116,3 +116,25 @@ def test_prepare_release_rejects_existing_release_before_writing(
         ]
         == "1.2.3"
     )
+
+
+@pytest.mark.parametrize("version", ["1.2.3", "1.2.2", "1.1.9"])
+def test_prepare_release_rejects_nonincreasing_version_before_writing(
+    tmp_path: Path, version: str
+) -> None:
+    root = _release_tree(tmp_path)
+    before = {
+        path: path.read_bytes()
+        for path in (
+            root / "pyproject.toml",
+            root / "hashmarks" / "_version.py",
+            root / "README.md",
+            root / "CHANGELOG.md",
+            root / ".github" / "release-request.toml",
+        )
+    }
+
+    with pytest.raises(ValueError, match="must be greater than 1.2.3"):
+        prepare_release(root, version)
+
+    assert {path: path.read_bytes() for path in before} == before
