@@ -70,7 +70,7 @@ def test_repository_cli_boundary_retries_known_transient_races_once_centrally(
             return False
 
     monkeypatch.setattr(repository_cli, "_codemap", lambda args: FakeCodeMap())
-    monkeypatch.setattr(repository_retry, "_TRANSIENT_RETRY_DELAYS", (0.0, 0.0, 0.0))
+    monkeypatch.setattr(repository_retry.time, "sleep", lambda _delay: None)
     calls = 0
 
     def operation(codemap):
@@ -97,7 +97,7 @@ def test_repository_cli_boundary_translates_exhausted_transient_race(
             return False
 
     monkeypatch.setattr(repository_cli, "_codemap", lambda args: FakeCodeMap())
-    monkeypatch.setattr(repository_retry, "_TRANSIENT_RETRY_DELAYS", (0.0, 0.0))
+    monkeypatch.setattr(repository_retry, "_TRANSIENT_RETRY_BUDGET_SECONDS", 0.0)
 
     with pytest.raises(RepositoryCliError, match="generation is incomplete"):
         repository_cli._call_codemap(

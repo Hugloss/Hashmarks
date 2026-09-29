@@ -5,6 +5,7 @@
 - Keep `hashmarks install --opencode` delegated to OpenCode's native MCP CLI, then inspect OpenCode's effective configuration and report whether the exact installed Hashmarks command is `active`, `shadowed`, or `unverified` without editing project configuration.
 - Detect project-level OpenCode configuration that shadows the installed standalone registration, including source-development commands such as `uv run --frozen --no-sync hashmarks --workspace . mcp`, and surface the conflict instead of silently implying the installed executable is active.
 - Add focused regression coverage and align benchmark/setup documentation with the authority boundary: end-user OpenCode registration remains OpenCode-owned, while benchmark subject selection owns and proves its exact trial executable separately.
+- Harden MCP concurrency under live repository mutation by giving only already-classified recomputable BUILDING/generation races a five-second bounded retry window, and qualify the exact 1440-call stress before publication with durable failure evidence.
 
 ## 0.25.0 — Bounded evidence authority and native update handoff
 

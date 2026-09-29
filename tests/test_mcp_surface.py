@@ -261,9 +261,45 @@ def test_mcp_retry_does_not_hide_unrelated_runtime_failures() -> None:
     assert calls == 1
 
 
+def test_mcp_retry_absorbs_release_scale_transient_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = 0.0
+
+    def monotonic() -> float:
+        return clock
+
+    def sleep(delay: float) -> None:
+        nonlocal clock
+        clock += delay
+
+    monkeypatch.setattr(repository_retry.time, "monotonic", monotonic)
+    monkeypatch.setattr(repository_retry.time, "sleep", sleep)
+
+    def operation() -> str:
+        if clock < 1.0:
+            raise RuntimeError(
+                "CodeMap generation is incomplete (BUILDING); run sync() before querying"
+            )
+        return "fresh"
+
+    assert repository_retry.retry_transient_repository_race(operation) == "fresh"
+    assert 1.0 <= clock < repository_retry._TRANSIENT_RETRY_BUDGET_SECONDS
+
+
 def test_mcp_retry_remains_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = 0
-    monkeypatch.setattr(repository_retry.time, "sleep", lambda _delay: None)
+    clock = 0.0
+
+    def monotonic() -> float:
+        return clock
+
+    def sleep(delay: float) -> None:
+        nonlocal clock
+        clock += delay
+
+    monkeypatch.setattr(repository_retry.time, "monotonic", monotonic)
+    monkeypatch.setattr(repository_retry.time, "sleep", sleep)
 
     def operation() -> None:
         nonlocal calls
@@ -272,7 +308,8 @@ def test_mcp_retry_remains_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(RuntimeError, match="generation changed"):
         repository_retry.retry_transient_repository_race(operation)
-    assert calls == len(repository_retry._TRANSIENT_RETRY_DELAYS)
+    assert clock == pytest.approx(repository_retry._TRANSIENT_RETRY_BUDGET_SECONDS)
+    assert calls > 3
 
 
 def test_mcp_surface_read_centralizes_gate_and_retry(
