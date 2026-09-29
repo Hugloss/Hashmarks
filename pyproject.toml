@@ -65,6 +65,7 @@ test = [
 lint = ["ruff>=0.12.0"]
 typing = [{ include-group = "test" }, "ty", "pyright", "mcp>=2.2.0", "watchdog"]
 hooks = ["pre-commit"]
+release-smoke = ["pywinpty>=3,<4; sys_platform == 'win32'"]
 
 [tool.uv]
 required-version = ">=0.10.0"

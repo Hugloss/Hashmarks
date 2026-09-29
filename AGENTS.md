@@ -38,6 +38,7 @@ A derived, cached, summarized, ranked, or presentation-layer result must never s
 
 Hashmarks does **not** use one global confidence/precedence score. Content identity, freshness, provider qualification, repository relationships, selection, and projections are distinct authority domains. Apply the existing kind-specific rule; if no rule proves a unique resolution, preserve ambiguity/unknown. A new projection or provider must compose existing authority rather than creating a second truth owner.
 
+
 ## Negative evidence is qualified, never inferred from absence
 
 **An empty, missing, or bounded result is not repository-negative evidence by itself.** Hashmarks may expose a repository fact as absent only when the semantic owner can name the required observation scope and prove that scope complete and non-truncated for the exact fact being negated. Source completeness, semantic coverage, freshness, ambiguity, and projection bounds remain independent authority dimensions.

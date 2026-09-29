@@ -172,6 +172,17 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
         assert publication_attempt >= 1
 
 
+def test_changed_release_request_is_checked_before_merge() -> None:
+    text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    fast_gate = text.split("  fast-gate:\n", 1)[1].split(
+        "\n  authority-diagnostics:\n", 1
+    )[0]
+    assert (
+        'git diff --quiet "$BASE_SHA" HEAD -- .github/release-request.toml' in fast_gate
+    )
+    assert 'validate-release-candidate --base-ref "$BASE_SHA"' in fast_gate
+
+
 def test_ci_qualifies_native_linux_wsl_and_windows_install_paths() -> None:
     text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     linux = text.split("  standalone-artifact:\n", 1)[1].split(
@@ -190,6 +201,8 @@ def test_ci_qualifies_native_linux_wsl_and_windows_install_paths() -> None:
     assert "hashmarks-linux-x86_64.sha256" in linux
     assert "standalone-qualification" in linux
     assert "--platform linux" in linux
+    assert "mcp_installed_artifact_smoke.py" in linux
+    assert "--boundary-only" not in linux
 
     assert "windows-latest" in windows
     assert "windows_installer_smoke.ps1" in windows
@@ -197,6 +210,8 @@ def test_ci_qualifies_native_linux_wsl_and_windows_install_paths() -> None:
     assert '$checksum = "$asset.sha256"' in windows
     assert "standalone-qualification" in windows
     assert "--platform windows" in windows
+    assert "mcp_installed_artifact_smoke.py" in windows
+    assert "--boundary-only" in windows
 
 
 def test_publish_requires_native_linux_wsl_and_windows_release_identity() -> None:
@@ -215,6 +230,8 @@ def test_publish_requires_native_linux_wsl_and_windows_release_identity() -> Non
     assert 'HASHMARKS_VERSION="$RELEASE_VERSION"' in linux
     assert "hashmarks-linux-x86_64.sha256" in linux
     assert "--platform linux" in linux
+    assert "mcp_installed_artifact_smoke.py" in linux
+    assert "--boundary-only" not in linux
 
     assert "Build verified standalone Windows CLI/MCP" in windows
     assert "windows-latest" in windows
@@ -223,6 +240,8 @@ def test_publish_requires_native_linux_wsl_and_windows_release_identity() -> Non
     assert "hashmarks-windows-x86_64.exe" in windows
     assert '$checksum = "$asset.sha256"' in windows
     assert "--platform windows" in windows
+    assert "mcp_installed_artifact_smoke.py" in windows
+    assert "--boundary-only" in windows
 
     assert "needs: [prepare, build, standalone-linux, standalone-windows]" in publish
     assert "--standalone-bundle release/standalone/linux" in publish
@@ -302,7 +321,9 @@ def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
     assert "map status" in text
     assert "raw.githubusercontent.com" not in text
     assert "/releases/latest/" not in text
-    assert "actions/checkout@" not in text
+    assert "Checkout exact published source for interactive upgrade smoke" in text
+    assert "ref: ${{ github.event.release.tag_name }}" in text
+    assert "windows_published_upgrade_smoke.py" in text
 
 
 def test_every_release_workflow_job_has_a_bounded_timeout() -> None:

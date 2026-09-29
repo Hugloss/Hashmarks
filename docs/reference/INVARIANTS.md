@@ -42,6 +42,7 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **O7. Serialized freshness has one state vocabulary.** Current public repository-evidence projections use exactly `current`, `stale`, or `unknown` for freshness state. Proof strength such as `proven` is separate provenance; invalidation is a delta consequence, not an alternate freshness-state spelling.
 
+
 **O8. Negative evidence requires qualified semantic observation scope.** Absence is authoritative only when the owner of the fact can identify the required observation universe and prove the relevant semantic coverage complete and non-truncated. Empty results, provider non-detection, partial telemetry, bounded scans, stale evidence, or incomplete source coverage remain unknown/not-admissible unless an independent authority closes the required universe.
 
 **O9. Projection bounds never manufacture negative evidence.** Result limits, retrieval limits, depth/visit limits, provider bounds, compact projections, and presentation sampling may reduce returned evidence, but may not turn an unobserved fact into `absent`, `false`, `none`, `no match`, or any equivalent authoritative negative. Negative facts are derived from qualified evidence before bounded projection; if a bound prevents that proof, the negative fact remains unknown/incomplete/not-admissible.
@@ -182,7 +183,7 @@ The product-admission constitution in [`PRODUCT_BOUNDARY.md`](PRODUCT_BOUNDARY.m
 
 **U1. Update awareness is not repository authority.** Public release metadata, check timestamps, and update prompts are product-lifecycle state only. They must not participate in repository identity, CodeMap generations, semantic observations, evidence history, freshness, or `.hashmarks/` state.
 
-**U2. Automatic release checks are strictly bounded and suppressible.** They may occur only for eligible interactive CLI invocations, at most once per configured check interval. CLI command declarations own eligibility; release-update code must not branch on command names or maintain command-identity allow/deny lists. MCP, daemon, CI, and non-interactive invocations perform no automatic release check. `HASHMARKS_NO_UPDATE_CHECK=1` hard-disables automatic update-related network traffic.
+**U2. Automatic release checks are strictly bounded and suppressible.** They may occur only for explicitly eligible interactive CLI invocations, at most once per configured check interval. CLI command declarations own eligibility; undeclared commands default to no automatic update check, and eligible commands must opt in where they are registered. Release-update code must not branch on command names or maintain command-identity allow/deny lists. MCP, daemon, CI, and non-interactive invocations perform no automatic release check. `HASHMARKS_NO_UPDATE_CHECK=1` hard-disables automatic update-related network traffic.
 
 **U3. Release checks disclose no repository-derived information.** The public latest-release request must not include workspace paths, repository names/remotes, source, content hashes, observations, semantic identities, MCP payloads, or ambient GitHub credentials. Release discovery must not depend on repository state.
 

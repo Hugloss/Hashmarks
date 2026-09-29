@@ -15,7 +15,7 @@ Python 3.11 or newer is required only for the Python API and source development.
 ## Install and try Hashmarks
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh | sh
+curl -fsSL https://github.com/Hugloss/Hashmarks/releases/latest/download/install.sh | sh
 hashmarks --version
 ```
 
@@ -53,15 +53,13 @@ Native upgrade command:
 
 Choosing **Skip for now** leaves the installation unchanged and does not preflight installer prerequisites. Choosing **Upgrade now** resolves the standalone installer requirements once, then replaces the running Hashmarks process with the existing checksum-verifying standalone installer; Hashmarks does not continue repository work with old in-memory code after that handoff.
 
-Python-package and source installations are intentionally different. Hashmarks reports that an update exists but does **not** decide whether uv, pip, pipx, Git, or another native mechanism owns the installation. Use the same native mechanism that already owns it. For example:
+Python-package and source installations are intentionally different. Hashmarks reports that an update exists but does **not** decide whether uv, pip, pipx, Git, or another native mechanism owns the installation. Use the same native mechanism that already owns it. The CLI prints the exact GitHub Release page containing the wheel and source distribution. For a pip-managed installation, an exact release wheel can be installed with:
 
 ```bash
-uv tool upgrade hashmarks
-pipx upgrade hashmarks
-pip install --upgrade hashmarks
+python -m pip install --upgrade https://github.com/Hugloss/Hashmarks/releases/download/vX.Y.Z/hashmarks-X.Y.Z-py3-none-any.whl
 ```
 
-Those commands are examples, not Hashmarks-owned manager selection. Hashmarks does not reconstruct package-manager paths, parse package-manager receipts, or preflight whether those tools consider the installation upgradeable.
+Replace `X.Y.Z` with the version shown by `hashmarks upgrade`. A source checkout should be updated through its existing Git workflow, then use `make init` to materialize the committed lock. Hashmarks does not reconstruct package-manager paths, parse package-manager receipts, or preflight whether those tools consider the installation upgradeable. New versions are published to GitHub Releases, not PyPI.
 
 You can request a fresh release check at any time:
 

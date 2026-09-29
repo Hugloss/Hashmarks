@@ -505,7 +505,7 @@ def test_generated_agent_evaluation_state_is_not_committed() -> None:
 def test_public_onboarding_leads_with_standalone_install_not_source_checkout() -> None:
     readme = _text("README.md")
     getting_started = _text("docs/GETTING_STARTED.md")
-    installer = "raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh"
+    installer = "github.com/Hugloss/Hashmarks/releases/latest/download/install.sh"
     assert installer in readme
     assert readme.index(installer) < readme.index("make init")
     assert installer in getting_started
@@ -527,7 +527,7 @@ def test_public_install_and_release_docs_match_github_release_authority() -> Non
         in releasing
     )
     assert "GitHub Releases" in releasing
-    assert "does not automatically publish to PyPI" in releasing
+    assert "does not publish to PyPI" in releasing
     assert "PyPI Trusted Publishing" not in releasing
     assert "publication_attempt" in releasing
     assert "source_sha" in releasing
@@ -661,9 +661,12 @@ def test_automatic_update_eligibility_is_semantic_not_command_named() -> None:
     invariants = _text("docs/reference/INVARIANTS.md")
 
     assert "CLI command declarations own eligibility" in invariants
+    assert "undeclared commands default to no automatic update check" in invariants
+    assert "eligible commands must opt in where they are registered" in invariants
     assert "must not branch on command names" in invariants
+    assert "undeclared commands are ineligible by default" in architecture
+    assert "cannot silently add update-network or prompt behavior" in architecture
     assert "does not know or branch on command names" in architecture
-    assert "parser declarations" in architecture
 
 
 def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() -> None:
@@ -709,9 +712,8 @@ def test_update_lifecycle_is_explicit_native_and_outside_repository_authority() 
     assert "must not reconstruct uv/pip/pipx filesystem layouts" in invariants
     assert "inspect or certify their receipts/metadata" in invariants
     assert "package-manager detector" in invariants
-    assert "Those commands are examples, not Hashmarks-owned manager selection." in (
-        getting_started
-    )
+    assert "The CLI prints the exact GitHub Release page" in getting_started
+    assert "New versions are published to GitHub Releases" in getting_started
     assert "does not detect/certify uv, pip, pipx" in boundary
     assert "package-manager detection/certification" in boundary
     assert "Narrow product-distribution lifecycle exception" in boundary

@@ -280,7 +280,7 @@ def _standalone_exec_target(command: str) -> tuple[str, tuple[str, ...]]:
         if executable is None:
             raise StandaloneUpgradeError("PowerShell is required for the installer")
         return executable, (
-            executable,
+            Path(executable).name,
             "-NoProfile",
             "-NonInteractive",
             "-Command",

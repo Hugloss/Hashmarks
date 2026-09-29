@@ -43,7 +43,13 @@ def _fixture(root: Path) -> Path:
     return repo
 
 
-async def _exercise(executable: Path, repo: Path, state_dir: Path) -> None:
+async def _exercise(
+    executable: Path,
+    repo: Path,
+    state_dir: Path,
+    *,
+    boundary_only: bool = False,
+) -> None:
     params = StdioServerParameters(
         command=str(executable),
         args=[
@@ -64,85 +70,88 @@ async def _exercise(executable: Path, repo: Path, state_dir: Path) -> None:
             tools = await session.list_tools()
             assert [tool.name for tool in tools.tools] == _EXPECTED_TOOLS
 
-            found = await session.call_tool(
-                "find", arguments={"query": "flare041", "limit": 5}
-            )
-            assert found.is_error is not True
-            assert found.structured_content is not None
-            assert found.structured_content["schema"] == "hashmarks.mcp-find.v1"
-            assert any(
-                row["path"] == "src/feature.py"
-                for row in found.structured_content["results"]
-            )
+            if not boundary_only:
+                found = await session.call_tool(
+                    "find", arguments={"query": "flare041", "limit": 5}
+                )
+                assert found.is_error is not True
+                assert found.structured_content is not None
+                assert found.structured_content["schema"] == "hashmarks.mcp-find.v1"
+                assert any(
+                    row["path"] == "src/feature.py"
+                    for row in found.structured_content["results"]
+                )
 
-            declarations = await session.call_tool(
-                "repository_declarations",
-                arguments={
-                    "groups": [
-                        {
-                            "group_id": "runtime",
-                            "semantic_namespace": "installed-smoke",
-                            "concept": {"kind": "runtime", "identity": "python"},
-                            "scope": {},
-                            "correspondence": {
-                                "state": "declared",
-                                "basis": {"provider": "installed-smoke"},
-                            },
-                            "declarations": [
-                                {
-                                    "declaration_id": "a",
-                                    "semantic_role": {"kind": "project-intent"},
-                                    "value_state": "resolved",
-                                    "value": "3.12",
-                                    "producer": {"kind": "fixture"},
-                                    "evidence": [
-                                        {
-                                            "path": "runtime-a.txt",
-                                            "start_line": 1,
-                                            "end_line": 1,
-                                        }
-                                    ],
-                                },
-                                {
-                                    "declaration_id": "b",
-                                    "semantic_role": {"kind": "container-runtime"},
-                                    "value_state": "resolved",
-                                    "value": "3.12",
-                                    "producer": {"kind": "fixture"},
-                                    "evidence": [
-                                        {
-                                            "path": "runtime-b.txt",
-                                            "start_line": 1,
-                                            "end_line": 1,
-                                        }
-                                    ],
-                                },
-                            ],
-                            "coverage": {
-                                "state": "complete",
-                                "truncation": "complete",
-                                "expected_declaration_ids": ["a", "b"],
+                declarations = await session.call_tool(
+                    "repository_declarations",
+                    arguments={
+                        "groups": [
+                            {
+                                "group_id": "runtime",
+                                "semantic_namespace": "installed-smoke",
+                                "concept": {"kind": "runtime", "identity": "python"},
                                 "scope": {},
-                                "provenance": {"provider": "installed-smoke"},
-                            },
-                        }
+                                "correspondence": {
+                                    "state": "declared",
+                                    "basis": {"provider": "installed-smoke"},
+                                },
+                                "declarations": [
+                                    {
+                                        "declaration_id": "a",
+                                        "semantic_role": {"kind": "project-intent"},
+                                        "value_state": "resolved",
+                                        "value": "3.12",
+                                        "producer": {"kind": "fixture"},
+                                        "evidence": [
+                                            {
+                                                "path": "runtime-a.txt",
+                                                "start_line": 1,
+                                                "end_line": 1,
+                                            }
+                                        ],
+                                    },
+                                    {
+                                        "declaration_id": "b",
+                                        "semantic_role": {"kind": "container-runtime"},
+                                        "value_state": "resolved",
+                                        "value": "3.12",
+                                        "producer": {"kind": "fixture"},
+                                        "evidence": [
+                                            {
+                                                "path": "runtime-b.txt",
+                                                "start_line": 1,
+                                                "end_line": 1,
+                                            }
+                                        ],
+                                    },
+                                ],
+                                "coverage": {
+                                    "state": "complete",
+                                    "truncation": "complete",
+                                    "expected_declaration_ids": ["a", "b"],
+                                    "scope": {},
+                                    "provenance": {"provider": "installed-smoke"},
+                                },
+                            }
+                        ]
+                    },
+                )
+                assert declarations.is_error is not True
+                assert declarations.structured_content is not None
+                assert (
+                    declarations.structured_content["schema"]
+                    == "hashmarks.repository-declarations.v1"
+                )
+                assert (
+                    declarations.structured_content["groups"][0]["comparison"]["state"]
+                    == "equivalent"
+                )
+                assert all(
+                    row["semantic_declaration_identity"].startswith("sha256:")
+                    for row in declarations.structured_content["groups"][0][
+                        "declarations"
                     ]
-                },
-            )
-            assert declarations.is_error is not True
-            assert declarations.structured_content is not None
-            assert (
-                declarations.structured_content["schema"]
-                == "hashmarks.repository-declarations.v1"
-            )
-            assert (
-                declarations.structured_content["groups"][0]["comparison"]["state"]
-                == "equivalent"
-            )
-            assert all(
-                row["semantic_declaration_identity"].startswith("sha256:")
-                for row in declarations.structured_content["groups"][0]["declarations"]
-            )
+                )
 
             invalid = await session.call_tool(
                 "find", arguments={"query": "", "limit": 5}
@@ -158,13 +167,28 @@ def main(argv: list[str] | None = None) -> int:
         description="Smoke the installed Hashmarks MCP console script through the official SDK."
     )
     parser.add_argument("--hashmarks", required=True)
+    parser.add_argument(
+        "--boundary-only",
+        action="store_true",
+        help=(
+            "Exercise the portable MCP protocol/tool boundary without "
+            "daemon-backed repository reads."
+        ),
+    )
     args = parser.parse_args(argv)
     executable = Path(args.hashmarks).absolute()
     if not executable.is_file():
         raise SystemExit(f"installed hashmarks console script not found: {executable}")
     with tempfile.TemporaryDirectory(prefix="hashmarks-mcp-installed-") as raw:
         root = Path(raw)
-        asyncio.run(_exercise(executable, _fixture(root), root / "state"))
+        asyncio.run(
+            _exercise(
+                executable,
+                _fixture(root),
+                root / "state",
+                boundary_only=args.boundary_only,
+            )
+        )
     log_command_output(logger, "Hashmarks installed MCP artifact smoke: PASS")
     return 0
 

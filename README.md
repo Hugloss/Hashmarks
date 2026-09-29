@@ -14,10 +14,12 @@ Use Hashmarks with **Claude Code, Codex, OpenCode, Pi**, other stdio MCP clients
 Install the standalone CLI + MCP server on Linux x86_64 (including WSL2):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh | sh
+curl -fsSL https://github.com/Hugloss/Hashmarks/releases/latest/download/install.sh | sh
 ```
 
 The installer downloads checksum-verified, self-contained release bytes from GitHub Releases. The target machine does not need Python, uv, pip, or PyPI access.
+
+For source-development bootstrap only, the repository-maintained script remains available at `https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh`; end-user installs should use the published release installer above.
 
 ### Update awareness and explicit upgrades
 
@@ -38,6 +40,8 @@ This installation uses the Hashmarks standalone installer.
 ```
 
 `hashmarks upgrade` performs an explicit fresh release check. For the standalone distribution, **Upgrade now** hands control to the existing checksum-verifying installer and the running Hashmarks process exits. For Python-package or source installations, Hashmarks reports the available version and tells you to use the native mechanism that already owns that installation. It does not detect or certify uv/pip/pipx ownership, parse their metadata, or implement its own package-manager semantics.
+
+Python wheel and source-distribution updates are available from the exact GitHub Release linked by `hashmarks upgrade`. This workflow does not publish new versions to PyPI, so a bare package-name upgrade may not obtain the GitHub release. Use the same tool and source that own your installation.
 
 > **Hashmarks may discover update availability. It never owns updating itself.**
 
@@ -85,7 +89,7 @@ Hashmarks has no required third-party runtime dependencies. Its CodeMap is deriv
 Install the standalone Hashmarks CLI + MCP runtime:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh | sh
+curl -fsSL https://github.com/Hugloss/Hashmarks/releases/latest/download/install.sh | sh
 hashmarks --version
 ```
 
@@ -425,7 +429,7 @@ Current package version: **0.24.0**.
 
 Hashmarks is under active development. Current repository-intelligence contracts are documented explicitly; new integrations should use the supported CLI, Python API, and MCP surfaces rather than historical development experiments.
 
-The repository-owned release workflow qualifies the exact reviewed source, builds wheel/sdist plus native Linux/WSL and Windows standalone CLI/MCP artifacts, binds the candidate bytes and bootstrap installers with manifests and SHA-256 checksums, and publishes only the qualified assets through GitHub Releases. End-user platform availability remains defined by the latest published release. Hashmarks does not automatically publish to PyPI.
+The repository-owned release workflow qualifies the exact reviewed source, builds wheel/sdist plus native Linux/WSL and Windows standalone CLI/MCP artifacts, binds the candidate bytes and bootstrap installers with manifests and SHA-256 checksums, and publishes only the qualified assets through GitHub Releases. End-user platform availability remains defined by the latest published release. Hashmarks does not publish to PyPI.
 
 ## Security
 
