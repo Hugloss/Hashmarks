@@ -289,7 +289,7 @@ Hashmarks may expose strong evidence and a uniquely supported repository-derived
 
 For example, Hashmarks may say that one file is the uniquely supported owner under current repository evidence, that several candidates remain ambiguous, or that a set of tests is structurally relevant. It must not reinterpret consumer outcomes as new repository truth unless a corresponding repository change or repository-derived observation supports that conclusion.
 
-Verification relevance follows the same evidence-admissibility rule. A bounded task/reverse-reference/symbol search may return useful candidate tests, but it may not prove that no verifier exists or that one verifier is unique when any relevant search bound was exhausted or import identity remains unresolved. In that case Hashmarks preserves the candidate evidence and reports incomplete/bounded authority rather than strengthening the observed subset into absence or uniqueness.
+Verification relevance follows the same evidence-admissibility rule. A bounded reverse-reference/symbol search may return useful candidate tests, but it may not prove that no verifier exists or that one verifier is unique when any relevant verification-search bound was exhausted or import identity remains unresolved. In that case Hashmarks preserves the candidate evidence and reports incomplete/bounded authority rather than strengthening the observed subset into absence or uniqueness.
 
 The general rule is:
 
