@@ -864,3 +864,168 @@ def test_correspondence_basis_names_never_become_foreign_keys(
         unknown_basis,
         source_restored,
     )
+
+
+def _direction_reversal_packets(
+    tmp_path: Path,
+    *,
+    right_value: str,
+) -> tuple[dict[str, object], dict[str, object]]:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "owner-a.txt").write_text("owner: team-a\n", encoding="utf-8")
+    (repo / "owner-b.txt").write_text(
+        f"owner: {right_value}\n",
+        encoding="utf-8",
+    )
+
+    provider_a = _IndependentOwnerProvider("provider-a", "owner-a.txt")
+    provider_b = _IndependentOwnerProvider("provider-b", "owner-b.txt")
+    forward = _PairCorrespondenceProvider(
+        name="correlation-ab",
+        group_id="correspondence-ab",
+        left_provider="provider-a",
+        right_provider="provider-b",
+        left_path="owner-a.txt",
+        right_path="owner-b.txt",
+    )
+    reversed_pair = _PairCorrespondenceProvider(
+        name="correlation-ab",
+        group_id="correspondence-ab",
+        left_provider="provider-b",
+        right_provider="provider-a",
+        left_path="owner-b.txt",
+        right_path="owner-a.txt",
+    )
+
+    with CodeMap(repo, state_dir=tmp_path / "state") as codemap:
+        codemap.sync()
+        before = codemap.discover_repository_declarations(
+            [provider_a, provider_b, forward]
+        )
+        after = codemap.discover_repository_declarations(
+            [provider_a, provider_b, reversed_pair],
+            previous_observation=before,
+        )
+    return before, after
+
+
+def _role_rows(group: dict[str, object]) -> dict[str, dict[str, object]]:
+    return {
+        row["semantic_role"]["kind"]: row
+        for row in group["declarations"]
+    }
+
+
+def _assert_explicit_pair_reversal(
+    before: dict[str, object],
+    after: dict[str, object],
+    *,
+    values_change: bool,
+) -> None:
+    before_groups = _groups(before)
+    after_groups = _groups(after)
+    assert set(after_groups) == {
+        "provider-a-owner",
+        "provider-b-owner",
+        "correspondence-ab",
+    }
+
+    before_pair = before_groups["correspondence-ab"]
+    after_pair = after_groups["correspondence-ab"]
+    assert (
+        before_pair["semantic_subject_identity"]
+        == after_pair["semantic_subject_identity"]
+    )
+    assert before_pair["semantic_namespace"] == after_pair["semantic_namespace"]
+    assert before_pair["group_id"] == after_pair["group_id"] == "correspondence-ab"
+
+    before_roles = _role_rows(before_pair)
+    after_roles = _role_rows(after_pair)
+    assert set(before_roles) == set(after_roles) == {"left-source", "right-source"}
+    for role in ("left-source", "right-source"):
+        assert (
+            before_roles[role]["semantic_declaration_identity"]
+            == after_roles[role]["semantic_declaration_identity"]
+        )
+
+    assert before_roles["left-source"]["producer"]["source_provider"] == "provider-a"
+    assert before_roles["right-source"]["producer"]["source_provider"] == "provider-b"
+    assert after_roles["left-source"]["producer"]["source_provider"] == "provider-b"
+    assert after_roles["right-source"]["producer"]["source_provider"] == "provider-a"
+
+    delta = after["delta_from_previous"]
+    assert delta["providers"] == {
+        "added": [],
+        "removed": [],
+        "changed": [],
+    }
+    declaration_delta = delta["declarations"]
+    assert declaration_delta["added_group_ids"] == []
+    assert declaration_delta["removed_group_ids"] == []
+    assert [row["group_id"] for row in declaration_delta["changed_groups"]] == [
+        "correspondence-ab"
+    ]
+
+    changed = declaration_delta["changed_groups"][0]
+    assert changed["semantic_subject_changed"] is False
+    assert changed["definition_changed"] is True
+    assert changed["definition_changed_declaration_ids"] == [
+        "left-owner",
+        "right-owner",
+    ]
+    assert changed["correspondence_changed"] is True
+    assert changed["comparison_changed"] is False
+    assert changed["absence_changed"] is False
+    assert changed["value_changed_declaration_ids"] == (
+        ["left-owner", "right-owner"] if values_change else []
+    )
+
+    subjects = declaration_delta["semantic_subjects"]
+    assert subjects["added"] == []
+    assert subjects["removed"] == []
+    assert subjects["ambiguous"] == []
+    assert len(subjects["changed"]) == 1
+    subject_change = subjects["changed"][0]
+    assert (
+        subject_change["semantic_subject_identity"]
+        == before_pair["semantic_subject_identity"]
+    )
+    assert subject_change["group_id_changed"] is False
+
+    semantic_delta = subject_change["semantic_declarations"]
+    assert semantic_delta["added"] == []
+    assert semantic_delta["removed"] == []
+    assert semantic_delta["ambiguous"] == []
+    assert len(semantic_delta["changed"]) == 2
+    assert {
+        row["semantic_role"]["kind"] for row in semantic_delta["changed"]
+    } == {"left-source", "right-source"}
+
+
+def test_explicit_correspondence_reversal_stays_inside_one_producer_owned_subject(
+    tmp_path: Path,
+) -> None:
+    before, after = _direction_reversal_packets(tmp_path, right_value="team-b")
+    _assert_explicit_pair_reversal(before, after, values_change=True)
+
+    before_pair = _groups(before)["correspondence-ab"]
+    after_pair = _groups(after)["correspondence-ab"]
+    assert before_pair["comparison"] == after_pair["comparison"] == {
+        "state": "differing",
+        "distinct_values": ["team-a", "team-b"],
+    }
+
+
+def test_equal_values_do_not_normalize_explicit_pair_reversal_into_symmetry(
+    tmp_path: Path,
+) -> None:
+    before, after = _direction_reversal_packets(tmp_path, right_value="team-a")
+    _assert_explicit_pair_reversal(before, after, values_change=False)
+
+    before_pair = _groups(before)["correspondence-ab"]
+    after_pair = _groups(after)["correspondence-ab"]
+    assert before_pair["comparison"] == after_pair["comparison"] == {
+        "state": "equivalent",
+        "distinct_values": ["team-a"],
+    }
