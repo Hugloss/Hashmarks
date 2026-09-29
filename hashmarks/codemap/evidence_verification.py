@@ -51,6 +51,7 @@ class _VerificationRelevanceState:
     indirect_via_paths: dict[str, set[str]]
     source_ref_paths: set[str]
     unresolved_import_identity_paths: set[str]
+    search_bound_reasons: set[str] = field(default_factory=set)
     reference_indexes: dict[str, _VerificationReferenceIndex | None] = field(
         default_factory=dict
     )
@@ -252,6 +253,7 @@ class VerificationMixin:
             indirect_via_paths={},
             source_ref_paths=set(),
             unresolved_import_identity_paths=set(),
+            search_bound_reasons=set(),
             reference_indexes={},
         )
 
@@ -278,19 +280,20 @@ class VerificationMixin:
         self,
         edit_path: str,
         edit: Mapping[str, object] | None,
-    ) -> list[str]:
+    ) -> tuple[list[str], bool]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         selected_symbols: list[str] = []
         if isinstance(edit, Mapping):
             self._append_verification_symbol_names(selected_symbols, edit)
         if selected_symbols:
-            return selected_symbols
+            return selected_symbols, True
 
+        symbol_rows = self._session_symbols_for_path(edit_path)
         file_symbols: list[str] = []
-        for symbol in self._session_symbols_for_path(edit_path)[:32]:
+        for symbol in symbol_rows[:32]:
             self._append_verification_symbol_names(file_symbols, symbol)
-        return file_symbols
+        return file_symbols, len(symbol_rows) <= 32
 
     @staticmethod
     def _append_verification_symbol_names(
@@ -551,66 +554,106 @@ class VerificationMixin:
             elif RepositoryDomain.SOURCE in domains:
                 state.source_ref_paths.add(path)
 
+    @staticmethod
+    def _verification_ref_identity(
+        ref: Mapping[str, object],
+    ) -> tuple[str, int, str, str]:
+        return (
+            str(ref.get("path") or ""),
+            int(ref.get("line") or 0),
+            str(ref.get("kind") or ""),
+            str(ref.get("target") or ""),
+        )
+
+    def _verification_bounded_direct_refs(
+        self,
+        state: _VerificationRelevanceState,
+        selected_symbols: Sequence[str],
+    ) -> dict[str, list[Mapping[str, object]]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        raw = self._session_refs_many(selected_symbols, limit_per_target=1025)
+        bounded: dict[str, list[Mapping[str, object]]] = {}
+        for symbol in selected_symbols:
+            refs = list(raw.get(symbol, ()))
+            if len(refs) > 1024:
+                state.search_bound_reasons.add("direct-reverse-ref-limit")
+            bounded[symbol] = refs[:1024]
+        return bounded
+
+    def _verification_targeted_direct_refs(
+        self,
+        state: _VerificationRelevanceState,
+        symbol: str,
+        edit_module: str,
+        existing: Sequence[Mapping[str, object]],
+    ) -> list[Mapping[str, object]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        short = symbol.rsplit(".", 1)[-1]
+        suffix = f"{edit_module}.{short}"
+        raw_targeted = list(
+            self.store.refs_matching_target_suffix(short, suffix, limit=1025)
+        )
+        if len(raw_targeted) > 1024:
+            state.search_bound_reasons.add("targeted-reverse-ref-limit")
+        merged: list[Mapping[str, object]] = []
+        seen: set[tuple[str, int, str, str]] = set()
+        for ref in [*raw_targeted[:1024], *existing]:
+            key = self._verification_ref_identity(ref)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(ref)
+            if len(merged) > 1024:
+                state.search_bound_reasons.add("merged-direct-ref-limit")
+                break
+        return merged[:1024]
+
     def _verification_collect_direct_references(
         self,
         state: _VerificationRelevanceState,
         symbol_names: Sequence[str],
     ) -> None:
-        # Explicit scale bound: 16 edit symbols × 1024 reverse refs.
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        direct_symbol_refs = self._session_refs_many(
-            symbol_names[:16], limit_per_target=1024
+        selected_symbols = list(symbol_names[:16])
+        if len(symbol_names) > 16:
+            state.search_bound_reasons.add("edit-symbol-limit")
+        direct_symbol_refs = self._verification_bounded_direct_refs(
+            state, selected_symbols
         )
-
-        # A repository-wide same-short-name prefix can hide the qualified
-        # reference to the current edit once more than 1,024 unrelated refs sort
-        # ahead of it.  Supplement the prefix with owner-targeted candidates,
-        # then keep the same total per-symbol safety bound.  These rows are still
-        # candidates: qualified import resolution below remains authoritative.
+        # Probe owner-targeted evidence before semantic qualification.
         edit_row = self._session_file_row(state.edit_path)
         edit_module = "" if edit_row is None else str(edit_row.get("module_name") or "")
         if edit_module:
-            for symbol in symbol_names[:16]:
-                short = symbol.rsplit(".", 1)[-1]
-                suffix = f"{edit_module}.{short}"
-                targeted = self.store.refs_matching_target_suffix(
-                    short, suffix, limit=1024
+            for symbol in selected_symbols:
+                direct_symbol_refs[symbol] = self._verification_targeted_direct_refs(
+                    state, symbol, edit_module, direct_symbol_refs.get(symbol, ())
                 )
-                existing = list(direct_symbol_refs.get(symbol, ()))
-                merged: list[Mapping[str, object]] = []
-                seen: set[tuple[str, int, str, str]] = set()
-                for ref in [*targeted, *existing]:
-                    key = (
-                        str(ref.get("path") or ""),
-                        int(ref.get("line") or 0),
-                        str(ref.get("kind") or ""),
-                        str(ref.get("target") or ""),
-                    )
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    merged.append(ref)
-                    if len(merged) >= 1024:
-                        break
-                direct_symbol_refs[symbol] = merged
         self._verification_preload_import_resolution(direct_symbol_refs)
-        for symbol in symbol_names[:16]:
+        for symbol in selected_symbols:
             self._verification_collect_direct_symbol_refs(
                 state, symbol, list(direct_symbol_refs.get(symbol, ()))
             )
 
     def _verification_via_symbols(
         self,
-        source_ref_paths: set[str],
+        state: _VerificationRelevanceState,
     ) -> list[tuple[str, str, str]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        via_paths = sorted(source_ref_paths)[:64]
-        via_symbols = self.store.symbols_for_paths_many(via_paths, limit_per_path=16)
+        source_ref_paths = sorted(state.source_ref_paths)
+        if len(source_ref_paths) > 64:
+            state.search_bound_reasons.add("indirect-source-path-limit")
+        via_paths = source_ref_paths[:64]
+        via_symbols = self.store.symbols_for_paths_many(via_paths, limit_per_path=17)
         result: list[tuple[str, str, str]] = []
         for via_path in via_paths:
-            for via_symbol in via_symbols.get(via_path, ()):
+            symbol_rows = list(via_symbols.get(via_path, ()))
+            if len(symbol_rows) > 16:
+                state.search_bound_reasons.add("indirect-symbol-limit")
+            for via_symbol in symbol_rows[:16]:
                 for key in ("name", "qualname"):
                     symbol = str(via_symbol.get(key) or "")
                     if symbol:
@@ -623,14 +666,17 @@ class VerificationMixin:
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        via_symbol_sources = self._verification_via_symbols(state.source_ref_paths)
+        via_symbol_sources = self._verification_via_symbols(state)
         indirect_ref_sets = self._session_refs_many(
             [symbol for _via_path, symbol, _short in via_symbol_sources],
-            limit_per_target=256,
+            limit_per_target=257,
         )
         for via_path, symbol, short in via_symbol_sources:
+            refs = list(indirect_ref_sets.get(symbol, ()))
+            if len(refs) > 256:
+                state.search_bound_reasons.add("indirect-reverse-ref-limit")
             self._verification_collect_indirect_symbol_refs(
-                state, via_path, short, indirect_ref_sets.get(symbol, ())
+                state, via_path, short, refs[:256]
             )
 
     def _verification_collect_indirect_symbol_refs(
@@ -838,6 +884,8 @@ class VerificationMixin:
         cls,
         candidates: Sequence[dict[str, object]],
         current_path: str,
+        *,
+        uniqueness_admissible: bool = True,
     ) -> tuple[dict[str, object] | None, str]:
         selected = next(
             (row for row in candidates if str(row.get("path") or "") == current_path),
@@ -851,8 +899,10 @@ class VerificationMixin:
             row for row in candidates if bool(row.get("direct_reference"))
         ]
         if direct_reference_candidates:
-            unique_reference = len(direct_reference_candidates) == 1 and (
-                selected is None or not bool(selected.get("direct_reference"))
+            unique_reference = (
+                uniqueness_admissible
+                and len(direct_reference_candidates) == 1
+                and (selected is None or not bool(selected.get("direct_reference")))
             )
         else:
             indirect_reference_candidates = [
@@ -866,7 +916,9 @@ class VerificationMixin:
                 )
             )
             unique_reference = (
-                len(indirect_reference_candidates) == 1 and not selected_has_reference
+                uniqueness_admissible
+                and len(indirect_reference_candidates) == 1
+                and not selected_has_reference
             )
         if cls._verification_best_can_replace(
             best, selected, unique_reference, current_path
@@ -982,6 +1034,15 @@ class VerificationMixin:
         identity_ambiguous = bool(state.unresolved_import_identity_paths) and not bool(
             state.refs_by_path
         )
+        search_complete = not state.search_bound_reasons
+        if selected is not None:
+            projected_reason = selection_reason
+        elif not search_complete:
+            projected_reason = "verification-candidate-search-bounded"
+        elif identity_ambiguous:
+            projected_reason = "verification-candidate-identity-ambiguous"
+        else:
+            projected_reason = "no-verification-candidate"
         return {
             "schema": "hashmarks.verification-relevance.v1",
             "selected": selected,
@@ -989,9 +1050,11 @@ class VerificationMixin:
                 candidates, selected_row, limit
             ),
             "candidate_count": len(candidates),
-            "selection_reason": selection_reason
-            if selected is not None
-            else "no-verification-candidate",
+            "selection_reason": projected_reason,
+            "completeness": "complete" if search_complete else "incomplete",
+            "truncation": "complete" if search_complete else "truncated",
+            "negative_evidence_admissible": search_complete and not identity_ambiguous,
+            "search_bound_reasons": sorted(state.search_bound_reasons),
             "selection_changed": bool(
                 selected is not None
                 and state.current_path
@@ -1039,11 +1102,23 @@ class VerificationMixin:
             return self._verification_without_edit_owner(current_path)
 
         state = self._verification_state(task, edit_path, current_path, rows)
-        symbol_names = self._verification_edit_symbols(edit_path, edit)
+        symbol_names, symbol_scope_complete = self._verification_edit_symbols(
+            edit_path, edit
+        )
+        if not symbol_scope_complete:
+            state.search_bound_reasons.add("edit-file-symbol-limit")
         self._verification_collect_direct_references(state, symbol_names)
         self._verification_collect_indirect_references(state)
         candidates = self._verification_candidates(state)
-        selected, reason = self._verification_select_candidate(candidates, current_path)
+        identity_ambiguous = bool(state.unresolved_import_identity_paths) and not bool(
+            state.refs_by_path
+        )
+        selected, reason = self._verification_select_candidate(
+            candidates,
+            current_path,
+            uniqueness_admissible=not state.search_bound_reasons
+            and not identity_ambiguous,
+        )
         return self._verification_relevance_result(
             state, candidates, selected, reason, limit
         )
