@@ -1198,6 +1198,12 @@ class OwnershipGraphMixin:
     ) -> dict[str, object] | None:
         """Project the selected typed ownership relation into the action anchor shape."""
         graph = self.ownership_relation_graph(task, start_path, max_depth=max_depth)
+        return self._structural_owner_from_graph(graph, start_path)
+
+    def _structural_owner_from_graph(
+        self, graph: dict[str, object], start_path: str
+    ) -> dict[str, object] | None:
+        """Retain graph qualification while projecting a selected candidate."""
         selected_path = graph.get("selected")
         if not selected_path:
             return None

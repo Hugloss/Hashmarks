@@ -146,6 +146,23 @@ class DecisionPacketMixin:
             value = action.get("edit")
         return value if isinstance(value, Mapping) else None
 
+    @staticmethod
+    def _decision_packet_structural_start_summary(
+        action: Mapping[str, object],
+    ) -> dict[str, object]:
+        starts = action.get("structural_starts")
+        starts = starts if isinstance(starts, Mapping) else {}
+        candidates = starts.get("candidates")
+        return {
+            "scope": starts.get("scope"),
+            "status": starts.get("status"),
+            "retrieval_completeness": starts.get("retrieval_completeness"),
+            "limit_reached": bool(starts.get("limit_reached")),
+            "candidate_count": len(candidates) if isinstance(candidates, list) else 0,
+            "observed_owners": list(starts.get("observed_owners") or []),
+            "observation_complete": bool(starts.get("observation_complete")),
+        }
+
     def _decision_packet_identity(
         self,
         *,
@@ -293,6 +310,9 @@ class DecisionPacketMixin:
             },
             "contract": action.get("contract"),
             "ownership_resolution": action.get("ownership_resolution"),
+            "structural_start_summary": self._decision_packet_structural_start_summary(
+                action
+            ),
             "ambiguity": action.get("ambiguity"),
             "discrimination": discrimination,
             "evidence_receipt": evidence_receipt,

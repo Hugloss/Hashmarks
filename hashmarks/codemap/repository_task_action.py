@@ -14,7 +14,7 @@ from hashmarks.ownership_decision import (
 )
 
 from .model import EvidenceVisibility, SearchHit
-from .query_primitives import _TASK_STOPWORDS
+from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .task_action_evidence import TaskActionEvidenceMixin
 from .task_action_projection import TaskActionProjectionMixin
@@ -193,48 +193,39 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             default=None,
         )
 
-    def _task_action_specific_source_candidate(
+    def _task_action_structural_start_rows(
         self,
         task: str,
         rows: Sequence[dict[str, object]],
         discrimination: _TaskActionDiscriminationState,
-    ) -> dict[str, object] | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        candidates = [
-            row
-            for row in rows
-            if self._has_distinctive_task_anchor(row, discrimination)
-            and ("edit" in row["roles"] or "related" in row["roles"])
-        ][:8]
-        resolutions = {
-            id(row): self._structural_owner_candidate(
-                str(row.get("path") or ""), max_depth=3, task=task
-            )
-            for row in candidates
-            if row.get("path")
+    ) -> list[tuple[dict[str, object], list[str]]]:
+        """Nominate visible retrieved paths by normalized path/symbol terms."""
+        exact_terms = self._task_action_exact_identifier_terms(task)
+        task_terms = {
+            term
+            for term in _query_terms(task)
+            if len(term) >= 4 and term not in _TASK_STOPWORDS
         }
-        return max(
-            candidates,
-            key=lambda row: (
-                resolutions.get(id(row)) is not None,
-                len((resolutions.get(id(row)) or {}).get("corroboration") or []),
-                self._task_action_specificity(row, discrimination),
-                -int(row.get("canonical_rank") or 10_000),
-            ),
-            default=None,
-        )
-
-    def _task_action_specific_entry_candidate(
-        self,
-        task: str,
-        rows: Sequence[dict[str, object]],
-        discrimination: _TaskActionDiscriminationState,
-    ) -> dict[str, object] | None:
-        test_candidate = self._task_action_specific_test_candidate(rows, discrimination)
-        if test_candidate is not None:
-            return test_candidate
-        return self._task_action_specific_source_candidate(task, rows, discrimination)
+        starts: list[tuple[dict[str, object], list[str]]] = []
+        for row in rows:
+            domains = set(row.get("domains") or ())
+            if not (
+                {RepositoryDomain.SOURCE.value, RepositoryDomain.TEST.value} & domains
+            ):
+                continue
+            text = self._task_action_row_text(row, discrimination)
+            matched = (
+                [
+                    term
+                    for term in exact_terms
+                    if re.search(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", text)
+                ]
+                if exact_terms
+                else sorted(task_terms.intersection(_query_terms(text)))
+            )
+            if matched:
+                starts.append((row, matched))
+        return starts
 
     def _task_action_local_island(
         self, task: str, hits: Sequence[SearchHit], limit: int
@@ -535,94 +526,6 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         return self._task_action_verification_test_symbol(
             selected_row, selected_verification
         )
-
-    def _task_action_local_owner_tests(
-        self,
-        rows: Sequence[dict[str, object]],
-        discrimination: _TaskActionDiscriminationState,
-    ) -> list[dict[str, object]]:
-        identifier_terms = [
-            term
-            for term in discrimination.task_terms
-            if self._is_task_identifier_anchor(term)
-        ]
-        if identifier_terms:
-            identifier_rows = [
-                row
-                for row in rows
-                if RepositoryDomain.TEST.value in row.get("domains", [])
-                and any(
-                    term in self._task_action_row_text(row, discrimination)
-                    for term in identifier_terms
-                )
-            ]
-            if identifier_rows:
-                return identifier_rows[:8]
-        return [
-            row
-            for row in rows
-            if RepositoryDomain.TEST.value in row.get("domains", [])
-            and any(
-                term in self._task_action_row_text(row, discrimination)
-                and discrimination.term_rows.get(term, 0) <= 8
-                for term in discrimination.task_terms
-            )
-        ][:8]
-
-    def _task_action_resolve_local_owner_origin(
-        self,
-        task: str,
-        origin: dict[str, object],
-        failed: set[str],
-        limit: int,
-        primary_origin: Mapping[str, object] | None = None,
-    ) -> tuple[str, dict[str, object], dict[str, object]] | None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        origin_path = str(origin.get("path") or "")
-        if not origin_path:
-            return None
-        primary_path = str(primary_origin.get("path") or "") if primary_origin else ""
-        primary_resolved = primary_origin.get("resolved") if primary_origin else None
-        if origin_path == primary_path and isinstance(primary_resolved, Mapping):
-            resolved = dict(primary_resolved)
-        else:
-            resolved = self._structural_owner_candidate(
-                origin_path, max_depth=3, task=task
-            )
-        if resolved is None:
-            return None
-        owner_path = str(resolved.get("path") or "")
-        if not owner_path or owner_path in failed:
-            return None
-        origin_evidence = {
-            "path": origin_path,
-            "owner_path": owner_path,
-            "canonical_rank": int(origin.get("canonical_rank") or limit + 1),
-        }
-        return owner_path, resolved, origin_evidence
-
-    def _task_action_local_structural_owner_evidence(
-        self,
-        task: str,
-        rows: Sequence[dict[str, object]],
-        failed: set[str],
-        discrimination: _TaskActionDiscriminationState,
-        limit: int,
-        primary_origin: Mapping[str, object] | None = None,
-    ) -> tuple[dict[str, dict[str, object]], list[dict[str, object]]]:
-        owners: dict[str, dict[str, object]] = {}
-        origins: list[dict[str, object]] = []
-        for origin in self._task_action_local_owner_tests(rows, discrimination):
-            resolved = self._task_action_resolve_local_owner_origin(
-                task, origin, failed, limit, primary_origin
-            )
-            if resolved is None:
-                continue
-            owner_path, owner_evidence, origin_evidence = resolved
-            owners.setdefault(owner_path, owner_evidence)
-            origins.append(origin_evidence)
-        return owners, origins
 
     @classmethod
     def _task_action_exact_identifier_terms(cls, task: str) -> list[str]:
@@ -1269,7 +1172,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
     ) -> list[dict[str, object]]:
         return [
             row
-            for row in rows[:8]
+            for row in rows
             if "edit" in row.get("roles", [])
             and RepositoryDomain.TEST.value not in row.get("domains", [])
             and str(row.get("path") or "") not in failed
@@ -1496,7 +1399,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             return []
         return [
             row
-            for row in rows[:5]
+            for row in rows
             if row["path"] != edit["path"]
             and (
                 "edit" in row["roles"]

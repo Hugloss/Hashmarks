@@ -94,6 +94,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         return _TaskActionMapContext(
             hits=hits,
             rows=rows,
+            canonical_rows=tuple(rows),
             failed=failed,
             cues=cues,
             cue_words=set(cues.words),
@@ -139,13 +140,13 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             ),
             owner_basis=owner.basis,
             structural_owner=owner.structural_owner,
-            structural_owner_origin=owner.structural_owner_origin,
             archive_live_owner_ambiguity=owner.archive_live_owner_ambiguity,
             exact_identifier_paths=owner.exact_identifier_paths,
             exact_identifier_search_complete=owner.exact_identifier_search_complete,
             exact_identifier_search_bound_reasons=(
                 owner.exact_identifier_search_bound_reasons
             ),
+            structural_starts=owner.structural_starts,
             inspect_rows=[row for row in context.rows if "inspect" in row["roles"]][
                 :per_role
             ],
@@ -237,7 +238,26 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             self = cast("CodeMap", self)
         edit = self._task_action_promoted_edit(context, selection)
         contract = self._task_action_local_contract(selection, edit)
-        if self._task_action_verification_edit_is_admitted(selection):
+        structural_starts = selection.structural_starts
+        structural_conflict = bool(
+            len(structural_starts.get("observed_owners") or []) > 1
+            or any(
+                row.get("status") in {"graph-incomplete", "stale", "unresolved"}
+                for row in structural_starts.get("candidates") or []
+            )
+        )
+        if self._task_action_verification_edit_is_admitted(selection) and not (
+            structural_conflict
+            and structural_starts.get("status") == "observed"
+            and selection.owner_basis
+            not in {
+                "literal-path",
+                "qualified-symbol",
+                "unique-exact-symbol",
+                "exact-symbol",
+                "exact-import-owner",
+            }
+        ):
             verification_relevance = self._verification_relevance(
                 task,
                 edit=edit,
@@ -354,6 +374,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             "inspect": selection.inspect_rows,
             "related": selection.related_rows,
             "ownership_resolution": final.structural_owner,
+            "structural_starts": selection.structural_starts,
             "owner_basis": selection.owner_basis,
             **ownership,
             "exact_identifier_search": {
@@ -428,6 +449,16 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             )
             if isinstance(row, Mapping) and row.get("path")
         }
+        starts = result.get("structural_starts")
+        if isinstance(starts, Mapping):
+            authority_paths.update(
+                str(row.get("start_path"))
+                for row in starts.get("candidates") or []
+                if isinstance(row, Mapping) and row.get("start_path")
+            )
+            authority_paths.update(
+                str(path) for path in starts.get("observed_owners") or [] if path
+            )
         generation = self.store.generation()
         self._task_authority_paths_cache[(generation, task, int(limit))] = tuple(
             sorted(authority_paths)
@@ -767,16 +798,24 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         selection: _TaskActionSelectionState,
         limit: int,
     ) -> tuple[dict[str, dict[str, object]], list[dict[str, object]]]:
-        if selection.structural_owner is None or selection.localized_config_edit:
+        del task, context, limit
+        starts = selection.structural_starts
+        if starts.get("status") != "observed" or selection.localized_config_edit:
             return {}, []
-        return self._task_action_local_structural_owner_evidence(
-            task,
-            context.rows,
-            context.failed,
-            selection.discrimination,
-            limit,
-            selection.structural_owner_origin,
-        )
+        owners = {
+            str(path): {"path": str(path)}
+            for path in starts.get("observed_owners") or []
+        }
+        origins = [
+            {
+                "path": str(row["start_path"]),
+                "owner_path": str(row["observed_owner"]),
+                "canonical_rank": int(row.get("canonical_rank") or 0),
+            }
+            for row in starts.get("candidates") or []
+            if "verify" in row.get("roles", []) and row.get("observed_owner")
+        ]
+        return owners, origins
 
     @staticmethod
     def _task_action_exact_identifier_search_incomplete(
@@ -785,6 +824,16 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         return bool(
             not selection.exact_identifier_search_complete
             and selection.owner_basis != "literal-path"
+        )
+
+    @staticmethod
+    def _task_action_structural_search_incomplete(
+        selection: _TaskActionSelectionState,
+    ) -> bool:
+        starts = selection.structural_starts
+        return bool(
+            starts.get("status") == "observed"
+            and not starts.get("observation_complete")
         )
 
     def _task_action_projection_ambiguity_state(
@@ -858,6 +907,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 self._task_action_exact_identifier_search_incomplete(selection),
                 selection.archive_live_owner_ambiguity,
                 multi_structural_owner_ambiguity,
+                self._task_action_structural_search_incomplete(selection),
                 verification_identity_ambiguity,
             ),
         )
@@ -887,6 +937,10 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 ),
                 ("multiple-exact-identifier-edit-owners", exact_identifier_ambiguity),
                 ("multiple-identifier-edit-owners", multi_identifier_edit_ambiguity),
+                (
+                    "structural-start-observation-incomplete",
+                    self._task_action_structural_search_incomplete(selection),
+                ),
             ),
             ambiguous,
         )
@@ -900,6 +954,9 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             "structural_owners": task_local_structural_owners,
             "verification_origins": task_local_verification_origins,
             "multi_structural_owner_ambiguity": multi_structural_owner_ambiguity,
+            "structural_search_incomplete": (
+                self._task_action_structural_search_incomplete(selection)
+            ),
             "exact_identifier_search_incomplete": (
                 self._task_action_exact_identifier_search_incomplete(selection)
             ),
