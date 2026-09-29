@@ -850,7 +850,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             len(probe) <= _EXACT_IDENTIFIER_INDEX_LIMIT,
         )
 
-    def _task_action_qualified_identifier_index_candidates(
+    def _task_action_qualified_identifier_index_evidence(
         self,
         qualified_terms: Sequence[str],
         failed: set[str],
@@ -892,7 +892,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             candidates.append(candidate)
         return candidates, complete
 
-    def _task_action_plain_identifier_index_candidates(
+    def _task_action_plain_identifier_index_evidence(
         self,
         terms: set[str],
         failed: set[str],
@@ -936,6 +936,34 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             candidates.append(candidate)
         return candidates, complete
 
+    def _task_action_qualified_identifier_index_candidates(
+        self,
+        qualified_terms: Sequence[str],
+        failed: set[str],
+        *,
+        canonical_rank: int,
+    ) -> list[dict[str, object]]:
+        candidates, _complete = self._task_action_qualified_identifier_index_evidence(
+            qualified_terms,
+            failed,
+            canonical_rank=canonical_rank,
+        )
+        return candidates
+
+    def _task_action_plain_identifier_index_candidates(
+        self,
+        terms: set[str],
+        failed: set[str],
+        *,
+        canonical_rank: int,
+    ) -> list[dict[str, object]]:
+        candidates, _complete = self._task_action_plain_identifier_index_evidence(
+            terms,
+            failed,
+            canonical_rank=canonical_rank,
+        )
+        return candidates
+
     def _task_action_exact_index_evidence(
         self,
         terms: set[str],
@@ -945,13 +973,13 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         canonical_rank: int,
     ) -> _TaskActionExactIdentifierEvidence:
         qualified, qualified_complete = (
-            self._task_action_qualified_identifier_index_candidates(
+            self._task_action_qualified_identifier_index_evidence(
                 qualified_terms,
                 failed,
                 canonical_rank=canonical_rank,
             )
         )
-        plain, plain_complete = self._task_action_plain_identifier_index_candidates(
+        plain, plain_complete = self._task_action_plain_identifier_index_evidence(
             terms,
             failed,
             canonical_rank=canonical_rank,
@@ -1384,12 +1412,14 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         ordered_flags: Sequence[tuple[str, bool]],
         ambiguous: bool,
     ) -> str:
-        if edit is None:
-            return "no-edit-candidate"
         flagged_reason = next(
             (reason for reason, active in ordered_flags if active),
             None,
         )
+        if flagged_reason == "exact-identifier-search-bounded":
+            return flagged_reason
+        if edit is None:
+            return "no-edit-candidate"
         if flagged_reason is not None:
             return flagged_reason
         return "competing-action-roles" if ambiguous else "resolved-by-role"
