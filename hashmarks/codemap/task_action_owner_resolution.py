@@ -7,6 +7,7 @@ from hashmarks.paths import normalize_relative_path
 
 from .model import EvidenceVisibility
 from .task_action_types import (
+    _TaskActionExactIdentifierEvidence,
     _TaskActionOwnerCandidateState,
     _TaskActionOwnerResolutionRequest,
     _TaskActionOwnerResolutionState,
@@ -108,10 +109,14 @@ class TaskActionOwnerResolutionMixin:
         edit: dict[str, object] | None,
         literal_task_path: str,
         structural_owner: dict[str, object] | None,
-    ) -> tuple[list[dict[str, object]], dict[str, object] | None, str | None]:
+    ) -> tuple[
+        _TaskActionExactIdentifierEvidence,
+        dict[str, object] | None,
+        str | None,
+    ]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        exact_identifier_edits: list[dict[str, object]] = []
+        evidence = _TaskActionExactIdentifierEvidence([], True, ())
         blocked = any(
             (
                 structural_owner is not None,
@@ -122,22 +127,28 @@ class TaskActionOwnerResolutionMixin:
         )
         owner_basis = "literal-path" if literal_task_path else None
         if not blocked:
-            exact_identifier_edits = self._task_action_exact_identifier_edit_candidates(
+            evidence = self._task_action_exact_identifier_edit_candidates(
                 request.task, request.context.rows, request.context.failed
             )
+            exact_identifier_edits = evidence.candidates
             if literal_task_path:
                 exact_identifier_edits = [
                     row
                     for row in exact_identifier_edits
                     if str(row.get("path") or "") == literal_task_path
                 ]
+                evidence = _TaskActionExactIdentifierEvidence(
+                    exact_identifier_edits,
+                    evidence.search_complete,
+                    evidence.bound_reasons,
+                )
             if len(exact_identifier_edits) == 1:
                 edit = exact_identifier_edits[0]
-                if not literal_task_path:
+                if not literal_task_path and evidence.search_complete:
                     owner_basis = self._task_action_exact_owner_basis(
                         request.task, exact_identifier_edits[0]
                     )
-        return exact_identifier_edits, edit, owner_basis
+        return evidence, edit, owner_basis
 
     @staticmethod
     def _task_action_owner_state(
@@ -151,6 +162,10 @@ class TaskActionOwnerResolutionMixin:
             structural_owner_origin=structural_owner_origin,
             archive_live_owner_ambiguity=candidate.archive_live_owner_ambiguity,
             exact_identifier_paths=candidate.exact_identifier_paths,
+            exact_identifier_search_complete=candidate.exact_identifier_search_complete,
+            exact_identifier_search_bound_reasons=(
+                candidate.exact_identifier_search_bound_reasons
+            ),
         )
 
     def _task_action_structural_owner_start(
@@ -274,9 +289,10 @@ class TaskActionOwnerResolutionMixin:
             )
         )
         edit, literal_task_path = self._task_action_literal_owner(request, edit)
-        exact_identifier_edits, edit, exact_basis = self._task_action_exact_owner(
+        exact_identifier_evidence, edit, exact_basis = self._task_action_exact_owner(
             request, edit, literal_task_path, structural_owner
         )
+        exact_identifier_edits = exact_identifier_evidence.candidates
         owner_basis = exact_basis or owner_basis
         exact_identifier_paths = tuple(
             sorted(
@@ -294,11 +310,16 @@ class TaskActionOwnerResolutionMixin:
             archive_live_owner_ambiguity=archive_live_owner_ambiguity,
             exact_identifier_edits=exact_identifier_edits,
             exact_identifier_paths=exact_identifier_paths,
+            exact_identifier_search_complete=exact_identifier_evidence.search_complete,
+            exact_identifier_search_bound_reasons=exact_identifier_evidence.bound_reasons,
             literal_task_path=literal_task_path,
         )
         selected_edit_path = str(edit.get("path") or "") if edit else ""
         if literal_task_path and selected_edit_path == literal_task_path:
             candidate.basis = "literal-path"
+            return self._task_action_owner_state(candidate)
+        if not exact_identifier_evidence.search_complete:
+            candidate.basis = None
             return self._task_action_owner_state(candidate)
         if len(exact_identifier_edits) == 1:
             return self._task_action_owner_state(candidate)
