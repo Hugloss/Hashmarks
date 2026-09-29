@@ -136,6 +136,28 @@ consumer/model interpretation stays outside repository authority
 
 The diagram is not a total ordering across unrelated evidence kinds. Each evidence family keeps its existing qualification semantics. The invariant is that a downstream layer cannot silently make its inputs stronger: stale cannot become fresh, unknown cannot become proven, ambiguity cannot become unique, and a summary cannot override the repository evidence it summarizes. Where no kind-specific authority rule resolves disagreement, Hashmarks exposes the disagreement or remains unresolved.
 
+### Negative evidence admissibility
+
+Repository-negative evidence follows the same non-strengthening direction. A missing result becomes an authoritative absence only when the semantic owner has an explicit observation universe and that universe is proven complete and non-truncated for the claim. Physical/source completeness does not substitute for semantic coverage, and freshness or exactness in one evidence dimension does not close another dimension's universe.
+
+The architectural order is:
+
+```text
+qualified observation scope
+    -> semantic fact / qualified absence
+    -> bounded projection
+```
+
+not:
+
+```text
+bounded observation or projection
+    -> filter
+    -> repository-wide absence
+```
+
+Bounds remain important for evidence economics. They may limit returned rows, traversal, provider inputs, or context size without becoming truth authority. If a limit can hide a qualifying fact, the corresponding negative conclusion is incomplete/unknown/not-admissible unless an independent complete index or typed coverage authority proves the absence. This rule is implemented by the existing domain owners rather than a shared negative-evidence subsystem.
+
 Cross-artifact declaration correspondence follows the same rule. Providers may normalize producer-native syntax into scoped declaration claims, but provider provenance, correspondence, normalized values, and coverage do not become a global precedence system. Hashmarks binds those claims to exact repository evidence and may report equivalence, difference, ambiguity, or coverage-qualified absence; it never selects the declaration that should win. See [`REPOSITORY_DECLARATIONS.md`](REPOSITORY_DECLARATIONS.md).
 
 ### Semantic knowledge graph is a permanent non-goal
