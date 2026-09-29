@@ -154,7 +154,9 @@ In practice:
 - when existing authority rules do not establish a unique resolution, Hashmarks preserves ambiguity or unknown rather than choosing by ordering convenience;
 - human/model-generated interpretation and consumer outcomes are outside repository authority and cannot become repository facts merely because a projection repeats them.
 
-This is a non-strengthening contract, not permission to invent a new global precedence engine. Existing evidence-kind authorities remain distinct.
+Negative evidence is subject to the same rule. Hashmarks may own repository-native absence only when the relevant semantic owner can state the required observation scope and prove it complete and non-truncated for that claim. Empty or bounded results, provider detection misses, incomplete change sets, limited traversal, or compact projections do not themselves prove absence. Projection happens after semantic qualification; when the required universe is not closed, the result remains unknown/incomplete/not-admissible rather than being strengthened into `false`, `none`, `no match`, or another authoritative negative.
+
+This is a non-strengthening contract, not permission to invent a new global precedence engine or negative-evidence manager. Existing evidence-kind authorities remain distinct.
 
 ### 3. Consumer-independence test
 
