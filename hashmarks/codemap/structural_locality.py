@@ -201,20 +201,12 @@ class StructuralLocalityMixin:
     ) -> _NamedSymbolCandidateEvidence:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        raw = list(
-            self.store.symbols_named(
-                name, limit=_LOCALITY_SYMBOL_CANDIDATE_LIMIT + 1
-            )
+        probe = self.store.visible_symbol_candidates(
+            name, limit=_LOCALITY_SYMBOL_CANDIDATE_LIMIT + 1
         )
-        rows = [
-            dict(row)
-            for row in raw[:_LOCALITY_SYMBOL_CANDIDATE_LIMIT]
-            if EvidenceVisibility(str(row["evidence_visibility"]))
-            is not EvidenceVisibility.DENY
-        ]
         return _NamedSymbolCandidateEvidence(
-            rows=rows,
-            complete=len(raw) <= _LOCALITY_SYMBOL_CANDIDATE_LIMIT,
+            rows=[dict(row) for row in probe[:_LOCALITY_SYMBOL_CANDIDATE_LIMIT]],
+            complete=len(probe) <= _LOCALITY_SYMBOL_CANDIDATE_LIMIT,
         )
 
     def _python_function_locally_binds(self, path: str, source: str, name: str) -> bool:
