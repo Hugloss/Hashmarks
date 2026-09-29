@@ -765,7 +765,10 @@ def test_task_entry_points_reports_test_authority_ambiguity_without_ranking_chan
             for hit in codemap.find_task("service tests AGENTS authority", limit=20)
         ]
     assert before == after
-    assert value["schema"] == "hashmarks.task-entry-points.v2"
+    assert value["schema"] == "hashmarks.task-entry-points.v3"
+    assert value["bounds"]["canonical_completeness"] == "complete"
+    assert value["ambiguity"]["completeness"] == "complete"
+    assert value["ambiguity"]["truncation"] == "complete"
     assert value["ambiguity"]["ambiguous"] is True
     assert set(value["ambiguity"]["explicit_roles"]) >= {"authority", "verification"}
     assert {row["path"] for row in value["ambiguity"]["alternatives"]} >= {
@@ -867,7 +870,9 @@ def test_task_entry_points_distinctive_test_identifier_resolves_role_ambiguity(
             "test_release_checksum_contract checksum contract test", limit=20
         )
     ambiguity = value["ambiguity"]
-    assert ambiguity["schema"] == "hashmarks.entry-point-ambiguity.v2"
+    assert ambiguity["schema"] == "hashmarks.entry-point-ambiguity.v3"
+    assert ambiguity["completeness"] == "complete"
+    assert ambiguity["truncation"] == "complete"
     assert set(ambiguity["explicit_roles"]) >= {"contract", "verification"}
     assert ambiguity["ambiguous"] is False
     assert ambiguity["reason"] == "resolved-by-distinctive-role-anchor"
