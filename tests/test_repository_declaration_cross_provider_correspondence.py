@@ -911,28 +911,12 @@ def _direction_reversal_packets(
 
 
 def _role_rows(group: dict[str, object]) -> dict[str, dict[str, object]]:
-    return {
-        row["semantic_role"]["kind"]: row
-        for row in group["declarations"]
-    }
+    return {row["semantic_role"]["kind"]: row for row in group["declarations"]}
 
 
-def _assert_explicit_pair_reversal(
-    before: dict[str, object],
-    after: dict[str, object],
-    *,
-    values_change: bool,
+def _assert_pair_identity_and_reversed_roles(
+    before_pair: dict[str, object], after_pair: dict[str, object]
 ) -> None:
-    before_groups = _groups(before)
-    after_groups = _groups(after)
-    assert set(after_groups) == {
-        "provider-a-owner",
-        "provider-b-owner",
-        "correspondence-ab",
-    }
-
-    before_pair = before_groups["correspondence-ab"]
-    after_pair = after_groups["correspondence-ab"]
     assert (
         before_pair["semantic_subject_identity"]
         == after_pair["semantic_subject_identity"]
@@ -953,6 +937,25 @@ def _assert_explicit_pair_reversal(
     assert before_roles["right-source"]["producer"]["source_provider"] == "provider-b"
     assert after_roles["left-source"]["producer"]["source_provider"] == "provider-b"
     assert after_roles["right-source"]["producer"]["source_provider"] == "provider-a"
+
+
+def _assert_explicit_pair_reversal(
+    before: dict[str, object],
+    after: dict[str, object],
+    *,
+    values_change: bool,
+) -> None:
+    before_groups = _groups(before)
+    after_groups = _groups(after)
+    assert set(after_groups) == {
+        "provider-a-owner",
+        "provider-b-owner",
+        "correspondence-ab",
+    }
+
+    before_pair = before_groups["correspondence-ab"]
+    after_pair = after_groups["correspondence-ab"]
+    _assert_pair_identity_and_reversed_roles(before_pair, after_pair)
 
     delta = after["delta_from_previous"]
     assert delta["providers"] == {
@@ -998,9 +1001,10 @@ def _assert_explicit_pair_reversal(
     assert semantic_delta["removed"] == []
     assert semantic_delta["ambiguous"] == []
     assert len(semantic_delta["changed"]) == 2
-    assert {
-        row["semantic_role"]["kind"] for row in semantic_delta["changed"]
-    } == {"left-source", "right-source"}
+    assert {row["semantic_role"]["kind"] for row in semantic_delta["changed"]} == {
+        "left-source",
+        "right-source",
+    }
 
 
 def test_explicit_correspondence_reversal_stays_inside_one_producer_owned_subject(
@@ -1011,10 +1015,14 @@ def test_explicit_correspondence_reversal_stays_inside_one_producer_owned_subjec
 
     before_pair = _groups(before)["correspondence-ab"]
     after_pair = _groups(after)["correspondence-ab"]
-    assert before_pair["comparison"] == after_pair["comparison"] == {
-        "state": "differing",
-        "distinct_values": ["team-a", "team-b"],
-    }
+    assert (
+        before_pair["comparison"]
+        == after_pair["comparison"]
+        == {
+            "state": "differing",
+            "distinct_values": ["team-a", "team-b"],
+        }
+    )
 
 
 def test_equal_values_do_not_normalize_explicit_pair_reversal_into_symmetry(
@@ -1025,7 +1033,11 @@ def test_equal_values_do_not_normalize_explicit_pair_reversal_into_symmetry(
 
     before_pair = _groups(before)["correspondence-ab"]
     after_pair = _groups(after)["correspondence-ab"]
-    assert before_pair["comparison"] == after_pair["comparison"] == {
-        "state": "equivalent",
-        "distinct_values": ["team-a"],
-    }
+    assert (
+        before_pair["comparison"]
+        == after_pair["comparison"]
+        == {
+            "state": "equivalent",
+            "distinct_values": ["team-a"],
+        }
+    )
