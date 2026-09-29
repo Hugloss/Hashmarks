@@ -568,13 +568,21 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         rows = self.store.visible_module_paths(module, limit=_MAX_MODULE_CANDIDATES + 1)
+        raw_bound_exhausted = len(rows) > _MAX_MODULE_CANDIDATES
         admitted: list[str] = []
         for path in rows:
             member, _raw = self._repository_member_observation(path)
             if member.get("state") == "known-present":
                 admitted.append(path)
         candidates = tuple(admitted[:_MAX_MODULE_CANDIDATES])
-        truncated = len(admitted) > _MAX_MODULE_CANDIDATES
+        if raw_bound_exhausted:
+            return _Resolution(
+                "resolved-ambiguous" if admitted else "unresolved",
+                "module-match-bound-exhausted",
+                "module",
+                module_candidates=candidates,
+                candidates_truncated=True,
+            )
         if len(admitted) == 1:
             return _Resolution(
                 "resolved-unique",
@@ -586,14 +594,9 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
         if admitted:
             return _Resolution(
                 "resolved-ambiguous",
-                (
-                    "module-match-bound-exhausted"
-                    if truncated
-                    else "module-matches-multiple-repository-members"
-                ),
+                "module-matches-multiple-repository-members",
                 "module",
                 module_candidates=candidates,
-                candidates_truncated=truncated,
             )
         return _Resolution(
             "unresolved",
