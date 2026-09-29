@@ -310,6 +310,61 @@ def _installed_hashmarks_executable() -> Path:
     return canonical_host_path(resolved)
 
 
+def _opencode_effective_hashmarks_command(
+    opencode: str,
+) -> tuple[list[str] | None, str | None]:
+    result = subprocess.run(
+        [opencode, "debug", "config"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None, f"opencode debug config exited {result.returncode}"
+    try:
+        config = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None, "opencode debug config did not return JSON"
+    if not isinstance(config, dict):
+        return None, "opencode debug config did not return an object"
+    mcp = config.get("mcp")
+    if not isinstance(mcp, dict):
+        return None, "effective OpenCode config has no MCP object"
+    servers = mcp.get("servers")
+    entries = servers if isinstance(servers, dict) else mcp
+    hashmarks = entries.get("hashmarks") if isinstance(entries, dict) else None
+    if not isinstance(hashmarks, dict):
+        return None, "effective OpenCode config has no hashmarks MCP server"
+    command = hashmarks.get("command")
+    if not (
+        isinstance(command, list)
+        and command
+        and all(isinstance(value, str) and value for value in command)
+    ):
+        return None, "effective OpenCode hashmarks MCP command is not inspectable"
+    return list(command), None
+
+
+def _effective_command_uses_installed_hashmarks(
+    command: list[str],
+    executable: Path,
+) -> bool:
+    if command[1:] != ["--workspace", ".", "mcp"]:
+        return False
+    configured = command[0]
+    resolved = (
+        shutil.which(configured)
+        if "/" not in configured and "\\" not in configured
+        else configured
+    )
+    if resolved is None:
+        return False
+    try:
+        return canonical_host_path(resolved).samefile(executable)
+    except OSError:
+        return False
+
+
 def _install(args) -> int:
     if not args.opencode:
         raise UserFacingError("choose a host to register, for example --opencode")
@@ -333,14 +388,29 @@ def _install(args) -> int:
         raise UserFacingError(
             f"OpenCode rejected Hashmarks MCP registration (exit {result.returncode})"
         )
-    _print(
-        {
-            "host": "opencode",
-            "registered": True,
-            "hashmarks": str(executable),
-            "workspace": ".",
-        }
-    )
+    effective_command, diagnostic = _opencode_effective_hashmarks_command(opencode)
+    payload = {
+        "host": "opencode",
+        "registered": True,
+        "hashmarks": str(executable),
+        "workspace": ".",
+    }
+    if effective_command is None:
+        payload["effective_registration"] = "unverified"
+        payload["diagnostic"] = diagnostic
+    elif _effective_command_uses_installed_hashmarks(
+        effective_command,
+        executable,
+    ):
+        payload["effective_registration"] = "active"
+    else:
+        payload["effective_registration"] = "shadowed"
+        payload["effective_command"] = effective_command
+        payload["warning"] = (
+            "OpenCode's effective project configuration shadows the installed "
+            "Hashmarks registration; Hashmarks did not modify project configuration."
+        )
+    _print(payload)
     return 0
 
 
