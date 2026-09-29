@@ -42,7 +42,9 @@ def _install_hidden_same_name_candidate(codemap: CodeMap, monkeypatch) -> None:
             return probe[:limit]
         return original(name, limit=limit)
 
-    monkeypatch.setattr(codemap.store, "symbols_named", symbols_named)
+    monkeypatch.setattr(
+        codemap.store, "visible_symbol_candidates", symbols_named
+    )
 
 
 def test_structural_locality_bound_cannot_manufacture_unique_call_target(
@@ -191,7 +193,9 @@ def authority(value):
                 return probe[:limit]
             return original(name, limit=limit)
 
-        monkeypatch.setattr(codemap.store, "symbols_named", symbols_named)
+        monkeypatch.setattr(
+        codemap.store, "visible_symbol_candidates", symbols_named
+    )
         packet = codemap.structural_locality(
             "pkg/core.py::authority",
             max_depth=2,
