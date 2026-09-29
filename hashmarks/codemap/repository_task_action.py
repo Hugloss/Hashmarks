@@ -699,17 +699,14 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             return source_path
         return None
 
-    def _task_action_ambiguous_plain_identifiers(
-        self, task: str, rows: Sequence[dict[str, object]], failed: set[str]
-    ) -> set[str]:
-        """Return prose identifiers that are repository-globally non-unique.
-
-        Bounded canonical retrieval is presentation evidence only. Duplicate exact
-        symbol identity must therefore be established from the maintained exact
-        index so a small limit cannot manufacture unique ownership.
-        """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
+    def _task_action_exact_identifier_terms_evidence(
+        self,
+        task: str,
+        failed: set[str],
+    ) -> tuple[set[str], tuple[str, ...]]:
+        """Return admitted exact terms without strengthening generic-name bounds."""
+        terms = set(self._task_action_exact_identifier_terms(task))
+        explicit = bool(terms)
         masked = task
         for value in _QUALIFIED_IDENTIFIER_RE.findall(task):
             masked = masked.replace(value, " ")
@@ -718,10 +715,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             for token in _WORD_RE.findall(masked)
             if len(token) >= 4 and token.lower() not in _TASK_STOPWORDS
         }
-        if not plain_tokens:
-            return set()
-        indexed = self._session_exact_symbol_candidates(
-            tuple(sorted(plain_tokens)), limit=1024
+        indexed, complete = self._task_action_exact_symbol_index_window(
+            tuple(sorted(plain_tokens))
         )
         exact_paths: dict[str, set[str]] = {}
         for symbol in indexed:
@@ -741,7 +736,13 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             }.intersection(domains):
                 continue
             exact_paths.setdefault(name, set()).add(path)
-        return {token for token, paths in exact_paths.items() if len(paths) > 1}
+        terms.update(token for token, paths in exact_paths.items() if len(paths) > 1)
+        reasons = (
+            ("plain-ambiguity-symbol-index-limit",)
+            if not explicit and not complete
+            else ()
+        )
+        return terms, reasons
 
     @staticmethod
     def _task_action_path_module_aliases(path: str) -> set[str]:
@@ -1061,7 +1062,9 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        terms = set(self._task_action_exact_identifier_terms(task))
+        terms, term_bound_reasons = self._task_action_exact_identifier_terms_evidence(
+            task, failed
+        )
         qualified_terms = tuple(
             dict.fromkeys(
                 value.lower() for value in _QUALIFIED_IDENTIFIER_RE.findall(task)
@@ -1073,9 +1076,12 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         # already contains at least two live source definitions with that exact
         # symbol name.  This adds no discovery/ranking authority and prevents
         # lexical order from manufacturing a unique edit owner.
-        terms.update(self._task_action_ambiguous_plain_identifiers(task, rows, failed))
         if not terms:
-            return _TaskActionExactIdentifierEvidence([], True, ())
+            return _TaskActionExactIdentifierEvidence(
+                [],
+                not term_bound_reasons,
+                term_bound_reasons,
+            )
         candidates: list[dict[str, object]] = []
         for row in rows:
             path = str(row.get("path") or "")
@@ -1158,10 +1164,11 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         candidates = self._task_action_requested_exact_identifier_edits(
             task, candidates
         )
+        bound_reasons = (*term_bound_reasons, *indexed_evidence.bound_reasons)
         return _TaskActionExactIdentifierEvidence(
             candidates=candidates,
-            search_complete=indexed_evidence.search_complete,
-            bound_reasons=indexed_evidence.bound_reasons,
+            search_complete=not bound_reasons,
+            bound_reasons=bound_reasons,
         )
 
     def _task_action_structural_exact_identifier_owner(
