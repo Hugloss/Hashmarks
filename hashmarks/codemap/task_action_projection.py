@@ -142,6 +142,10 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             structural_owner_origin=owner.structural_owner_origin,
             archive_live_owner_ambiguity=owner.archive_live_owner_ambiguity,
             exact_identifier_paths=owner.exact_identifier_paths,
+            exact_identifier_search_complete=owner.exact_identifier_search_complete,
+            exact_identifier_search_bound_reasons=(
+                owner.exact_identifier_search_bound_reasons
+            ),
             inspect_rows=[row for row in context.rows if "inspect" in row["roles"]][
                 :per_role
             ],
@@ -352,6 +356,25 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             "ownership_resolution": final.structural_owner,
             "owner_basis": selection.owner_basis,
             **ownership,
+            "exact_identifier_search": {
+                "completeness": (
+                    "complete"
+                    if selection.exact_identifier_search_complete
+                    else "incomplete"
+                ),
+                "truncation": (
+                    "complete"
+                    if selection.exact_identifier_search_complete
+                    else "truncated"
+                ),
+                "negative_evidence_admissible": (
+                    selection.exact_identifier_search_complete
+                ),
+                "uniqueness_admissible": selection.exact_identifier_search_complete,
+                "bound_reasons": list(
+                    selection.exact_identifier_search_bound_reasons
+                ),
+            },
             "verification_relevance": final.verification_relevance,
             "ambiguity": self._task_action_ambiguity_payload(
                 _TaskActionAmbiguityPayloadState(
@@ -805,6 +828,10 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             choices,
             decisive_qualified_verification,
         )
+        exact_identifier_search_incomplete = bool(
+            not selection.exact_identifier_search_complete
+            and selection.owner_basis != "literal-path"
+        )
         ambiguous = self._task_action_global_ambiguity(
             choices.edit,
             competing,
@@ -825,6 +852,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 exact_identifier_ambiguity,
                 multi_identifier_edit_ambiguity,
                 weak_contract_anchor_ambiguity,
+                exact_identifier_search_incomplete,
                 selection.archive_live_owner_ambiguity,
                 multi_structural_owner_ambiguity,
                 verification_identity_ambiguity,
@@ -838,6 +866,10 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                     selection.explicit_surface_ambiguity,
                 ),
                 ("weak-task-anchor", weak_contract_anchor_ambiguity),
+                (
+                    "exact-identifier-search-bounded",
+                    exact_identifier_search_incomplete,
+                ),
                 (
                     "multiple-live-owners-behind-archive-hit",
                     selection.archive_live_owner_ambiguity,
@@ -865,4 +897,5 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             "structural_owners": task_local_structural_owners,
             "verification_origins": task_local_verification_origins,
             "multi_structural_owner_ambiguity": multi_structural_owner_ambiguity,
+            "exact_identifier_search_incomplete": exact_identifier_search_incomplete,
         }
