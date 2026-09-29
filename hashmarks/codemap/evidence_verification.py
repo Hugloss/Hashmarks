@@ -554,6 +554,62 @@ class VerificationMixin:
             elif RepositoryDomain.SOURCE in domains:
                 state.source_ref_paths.add(path)
 
+    @staticmethod
+    def _verification_ref_identity(
+        ref: Mapping[str, object],
+    ) -> tuple[str, int, str, str]:
+        return (
+            str(ref.get("path") or ""),
+            int(ref.get("line") or 0),
+            str(ref.get("kind") or ""),
+            str(ref.get("target") or ""),
+        )
+
+    def _verification_bounded_direct_refs(
+        self,
+        state: _VerificationRelevanceState,
+        selected_symbols: Sequence[str],
+    ) -> dict[str, list[Mapping[str, object]]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        raw = self._session_refs_many(selected_symbols, limit_per_target=1025)
+        bounded: dict[str, list[Mapping[str, object]]] = {}
+        for symbol in selected_symbols:
+            refs = list(raw.get(symbol, ()))
+            if len(refs) > 1024:
+                state.search_bound_reasons.add("direct-reverse-ref-limit")
+            bounded[symbol] = refs[:1024]
+        return bounded
+
+    def _verification_targeted_direct_refs(
+        self,
+        state: _VerificationRelevanceState,
+        symbol: str,
+        edit_module: str,
+        existing: Sequence[Mapping[str, object]],
+    ) -> list[Mapping[str, object]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        short = symbol.rsplit(".", 1)[-1]
+        suffix = f"{edit_module}.{short}"
+        raw_targeted = list(
+            self.store.refs_matching_target_suffix(short, suffix, limit=1025)
+        )
+        if len(raw_targeted) > 1024:
+            state.search_bound_reasons.add("targeted-reverse-ref-limit")
+        merged: list[Mapping[str, object]] = []
+        seen: set[tuple[str, int, str, str]] = set()
+        for ref in [*raw_targeted[:1024], *existing]:
+            key = self._verification_ref_identity(ref)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(ref)
+            if len(merged) > 1024:
+                state.search_bound_reasons.add("merged-direct-ref-limit")
+                break
+        return merged[:1024]
+
     def _verification_collect_direct_references(
         self,
         state: _VerificationRelevanceState,
@@ -565,53 +621,22 @@ class VerificationMixin:
         selected_symbols = list(symbol_names[:16])
         if len(symbol_names) > 16:
             state.search_bound_reasons.add("edit-symbol-limit")
-        raw_direct_symbol_refs = self._session_refs_many(
-            selected_symbols, limit_per_target=1025
+        direct_symbol_refs = self._verification_bounded_direct_refs(
+            state, selected_symbols
         )
-        direct_symbol_refs: dict[str, list[Mapping[str, object]]] = {}
-        for symbol in selected_symbols:
-            raw_refs = list(raw_direct_symbol_refs.get(symbol, ()))
-            if len(raw_refs) > 1024:
-                state.search_bound_reasons.add("direct-reverse-ref-limit")
-            direct_symbol_refs[symbol] = raw_refs[:1024]
 
-        # A repository-wide same-short-name prefix can hide the qualified
-        # reference to the current edit once more than 1,024 unrelated refs sort
-        # ahead of it.  Supplement the prefix with owner-targeted candidates,
-        # then keep the same total per-symbol safety bound.  Probe one row past
-        # every bound so truncation cannot become uniqueness/absence authority.
+        # Supplement same-short-name candidates with owner-targeted evidence,
+        # while probing every bound before semantic qualification.
         edit_row = self._session_file_row(state.edit_path)
         edit_module = "" if edit_row is None else str(edit_row.get("module_name") or "")
         if edit_module:
             for symbol in selected_symbols:
-                short = symbol.rsplit(".", 1)[-1]
-                suffix = f"{edit_module}.{short}"
-                raw_targeted = list(
-                    self.store.refs_matching_target_suffix(
-                        short, suffix, limit=1025
-                    )
+                direct_symbol_refs[symbol] = self._verification_targeted_direct_refs(
+                    state,
+                    symbol,
+                    edit_module,
+                    direct_symbol_refs.get(symbol, ()),
                 )
-                if len(raw_targeted) > 1024:
-                    state.search_bound_reasons.add("targeted-reverse-ref-limit")
-                targeted = raw_targeted[:1024]
-                existing = list(direct_symbol_refs.get(symbol, ()))
-                merged: list[Mapping[str, object]] = []
-                seen: set[tuple[str, int, str, str]] = set()
-                for ref in [*targeted, *existing]:
-                    key = (
-                        str(ref.get("path") or ""),
-                        int(ref.get("line") or 0),
-                        str(ref.get("kind") or ""),
-                        str(ref.get("target") or ""),
-                    )
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    merged.append(ref)
-                    if len(merged) > 1024:
-                        state.search_bound_reasons.add("merged-direct-ref-limit")
-                        break
-                direct_symbol_refs[symbol] = merged[:1024]
         self._verification_preload_import_resolution(direct_symbol_refs)
         for symbol in selected_symbols:
             self._verification_collect_direct_symbol_refs(
