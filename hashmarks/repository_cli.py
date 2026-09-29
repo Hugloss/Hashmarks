@@ -421,7 +421,9 @@ def _add_map_ownership_cli(
         action="append",
         help="workspace-relative Python path to inspect; repeatable (default: CodeMap-nominated candidates)",
     )
-    map_import_ownership.set_defaults(func=_map_import_ownership, automatic_update_check=True)
+    map_import_ownership.set_defaults(
+        func=_map_import_ownership, automatic_update_check=True
+    )
     map_cache_ownership = map_sub.add_parser(
         "cache-ownership",
         help="report process-local Python cache owners and invalidation evidence",
@@ -432,7 +434,9 @@ def _add_map_ownership_cli(
         action="append",
         help="workspace-relative Python path to inspect; repeatable (default: CodeMap-nominated candidates)",
     )
-    map_cache_ownership.set_defaults(func=_map_cache_ownership, automatic_update_check=True)
+    map_cache_ownership.set_defaults(
+        func=_map_cache_ownership, automatic_update_check=True
+    )
     map_cache_invalidation = map_sub.add_parser(
         "cache-invalidation-ownership",
         help="resolve static Python cache invalidators to exact repository cache owners",
@@ -443,7 +447,9 @@ def _add_map_ownership_cli(
         action="append",
         help="workspace-relative Python invalidator path to inspect; repeatable (default: all indexed Python)",
     )
-    map_cache_invalidation.set_defaults(func=_map_cache_invalidation_ownership, automatic_update_check=True)
+    map_cache_invalidation.set_defaults(
+        func=_map_cache_invalidation_ownership, automatic_update_check=True
+    )
     map_authority_ownership = map_sub.add_parser(
         "authority-ownership",
         help="compose repository owner/reader/cache/import authority evidence",
@@ -452,7 +458,9 @@ def _add_map_ownership_cli(
     map_authority_ownership.add_argument(
         "--path", action="append", help="workspace-relative path scope; repeatable"
     )
-    map_authority_ownership.set_defaults(func=_map_repository_ownership, automatic_update_check=True)
+    map_authority_ownership.set_defaults(
+        func=_map_repository_ownership, automatic_update_check=True
+    )
     map_concurrency_risk = map_sub.add_parser(
         "concurrency-risk", help="nominate static read-modify-write concurrency risks"
     )
@@ -460,7 +468,9 @@ def _add_map_ownership_cli(
     map_concurrency_risk.add_argument(
         "--path", action="append", help="workspace-relative Python path; repeatable"
     )
-    map_concurrency_risk.set_defaults(func=_map_concurrency_risk, automatic_update_check=True)
+    map_concurrency_risk.set_defaults(
+        func=_map_concurrency_risk, automatic_update_check=True
+    )
     map_verification_ownership = map_sub.add_parser(
         "verification-ownership", help="map task-local verification evidence owners"
     )
@@ -468,7 +478,9 @@ def _add_map_ownership_cli(
     map_verification_ownership.add_argument("task")
     map_verification_ownership.add_argument("--limit", type=int, default=20)
     map_verification_ownership.add_argument("--candidate-limit", type=int, default=8)
-    map_verification_ownership.set_defaults(func=_map_verification_ownership, automatic_update_check=True)
+    map_verification_ownership.set_defaults(
+        func=_map_verification_ownership, automatic_update_check=True
+    )
 
 
 def _add_map_enrichment_cli(
@@ -617,7 +629,9 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     add_common_arguments(locality_delta, inherited=True)
     locality_delta.add_argument("--before", required=True)
     locality_delta.add_argument("--after", required=True)
-    locality_delta.set_defaults(func=_structural_locality_delta_code, automatic_update_check=True)
+    locality_delta.set_defaults(
+        func=_structural_locality_delta_code, automatic_update_check=True
+    )
 
 
 def _add_context_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
@@ -662,7 +676,9 @@ def _add_task_evidence_cli(sub, *, add_common_arguments: Callable[..., None]) ->
     verification_relevance.add_argument("task")
     verification_relevance.add_argument("--limit", type=int, default=20)
     verification_relevance.add_argument("--candidate-limit", type=int, default=8)
-    verification_relevance.set_defaults(func=_verification_relevance_code, automatic_update_check=True)
+    verification_relevance.set_defaults(
+        func=_verification_relevance_code, automatic_update_check=True
+    )
 
 
 def _add_change_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
