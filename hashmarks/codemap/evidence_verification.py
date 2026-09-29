@@ -865,6 +865,8 @@ class VerificationMixin:
         cls,
         candidates: Sequence[dict[str, object]],
         current_path: str,
+        *,
+        uniqueness_admissible: bool = True,
     ) -> tuple[dict[str, object] | None, str]:
         selected = next(
             (row for row in candidates if str(row.get("path") or "") == current_path),
@@ -878,9 +880,9 @@ class VerificationMixin:
             row for row in candidates if bool(row.get("direct_reference"))
         ]
         if direct_reference_candidates:
-            unique_reference = len(direct_reference_candidates) == 1 and (
-                selected is None or not bool(selected.get("direct_reference"))
-            )
+            unique_reference = uniqueness_admissible and len(
+                direct_reference_candidates
+            ) == 1 and (selected is None or not bool(selected.get("direct_reference")))
         else:
             indirect_reference_candidates = [
                 row for row in candidates if bool(row.get("indirect_reference"))
@@ -893,7 +895,9 @@ class VerificationMixin:
                 )
             )
             unique_reference = (
-                len(indirect_reference_candidates) == 1 and not selected_has_reference
+                uniqueness_admissible
+                and len(indirect_reference_candidates) == 1
+                and not selected_has_reference
             )
         if cls._verification_best_can_replace(
             best, selected, unique_reference, current_path
@@ -1009,6 +1013,15 @@ class VerificationMixin:
         identity_ambiguous = bool(state.unresolved_import_identity_paths) and not bool(
             state.refs_by_path
         )
+        search_complete = not state.search_bound_reasons
+        if selected is not None:
+            projected_reason = selection_reason
+        elif not search_complete:
+            projected_reason = "verification-candidate-search-bounded"
+        elif identity_ambiguous:
+            projected_reason = "verification-candidate-identity-ambiguous"
+        else:
+            projected_reason = "no-verification-candidate"
         return {
             "schema": "hashmarks.verification-relevance.v1",
             "selected": selected,
@@ -1016,9 +1029,12 @@ class VerificationMixin:
                 candidates, selected_row, limit
             ),
             "candidate_count": len(candidates),
-            "selection_reason": selection_reason
-            if selected is not None
-            else "no-verification-candidate",
+            "selection_reason": projected_reason,
+            "completeness": "complete" if search_complete else "incomplete",
+            "truncation": "complete" if search_complete else "truncated",
+            "negative_evidence_admissible": search_complete
+            and not identity_ambiguous,
+            "search_bound_reasons": sorted(state.search_bound_reasons),
             "selection_changed": bool(
                 selected is not None
                 and state.current_path
@@ -1050,6 +1066,7 @@ class VerificationMixin:
         edit: Mapping[str, object] | None,
         current_verify: Mapping[str, object] | None,
         rows: Sequence[Mapping[str, object]],
+        canonical_retrieval_complete: bool = True,
         limit: int = 8,
     ) -> dict[str, object]:
         """Rank bounded verification surfaces around an already-selected edit owner."""
@@ -1066,11 +1083,25 @@ class VerificationMixin:
             return self._verification_without_edit_owner(current_path)
 
         state = self._verification_state(task, edit_path, current_path, rows)
-        symbol_names = self._verification_edit_symbols(edit_path, edit)
+        if not canonical_retrieval_complete:
+            state.search_bound_reasons.add("task-retrieval-limit")
+        symbol_names, symbol_scope_complete = self._verification_edit_symbols(
+            edit_path, edit
+        )
+        if not symbol_scope_complete:
+            state.search_bound_reasons.add("edit-file-symbol-limit")
         self._verification_collect_direct_references(state, symbol_names)
         self._verification_collect_indirect_references(state)
         candidates = self._verification_candidates(state)
-        selected, reason = self._verification_select_candidate(candidates, current_path)
+        identity_ambiguous = bool(state.unresolved_import_identity_paths) and not bool(
+            state.refs_by_path
+        )
+        selected, reason = self._verification_select_candidate(
+            candidates,
+            current_path,
+            uniqueness_admissible=not state.search_bound_reasons
+            and not identity_ambiguous,
+        )
         return self._verification_relevance_result(
             state, candidates, selected, reason, limit
         )
