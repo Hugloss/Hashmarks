@@ -38,6 +38,23 @@ A derived, cached, summarized, ranked, or presentation-layer result must never s
 
 Hashmarks does **not** use one global confidence/precedence score. Content identity, freshness, provider qualification, repository relationships, selection, and projections are distinct authority domains. Apply the existing kind-specific rule; if no rule proves a unique resolution, preserve ambiguity/unknown. A new projection or provider must compose existing authority rather than creating a second truth owner.
 
+## Negative evidence is qualified, never inferred from absence
+
+**An empty, missing, or bounded result is not repository-negative evidence by itself.** Hashmarks may expose a repository fact as absent only when the semantic owner can name the required observation scope and prove that scope complete and non-truncated for the exact fact being negated. Source completeness, semantic coverage, freshness, ambiguity, and projection bounds remain independent authority dimensions.
+
+The safe order is:
+
+```text
+observe the required repository scope
+  -> qualify completeness/truncation/freshness for that semantic domain
+  -> derive the repository fact, including qualified absence when authorized
+  -> apply bounded consumer projection
+```
+
+Never reverse that into `bounded projection -> semantic filtering -> absence`. A result limit, retrieval limit, depth limit, provider bound, compact projection, or omitted evidence may reduce what is returned; it must never strengthen unobserved state into `absent`, `false`, `none`, `no match`, or an equivalent authoritative negative. When the required universe is not proven, preserve `unknown`, `incomplete`, `truncated`, ambiguity, or the domain's existing `not-admissible` state.
+
+This is a cross-domain evidence law, **not** a new global negative-evidence manager. Dependency evidence, repository declarations, repository-evidence bindings, task evidence, correlation, and future evidence families keep their existing typed semantic owners and express completeness in their own domain vocabulary.
+
 ## External-library scope is closed by default
 
 **Do not chase remaining findings in external libraries.** Hashmarks analyzes the admitted repository, not every library that repository imports. An import/reference/dependency declaration is repository evidence; it is not permission to recursively inspect the dependency implementation.
