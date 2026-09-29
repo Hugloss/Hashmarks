@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -25,6 +25,7 @@ class _OwnershipGraphState:
     candidates: dict[str, dict[str, object]]
     parents: dict[str, tuple[str, str]]
     seen: set[str]
+    search_bound_reasons: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -588,6 +589,8 @@ class OwnershipGraphMixin:
             return current
         domains = [domain.value for domain in classify_repository_path(path)]
         symbols = self._session_symbols_for_path(path)
+        if len(symbols) > 12:
+            state.search_bound_reasons.add("node-symbol-limit")
         symbol_terms: set[str] = set()
         for symbol in symbols[:12]:
             symbol_terms.update(
@@ -693,7 +696,9 @@ class OwnershipGraphMixin:
 
     @staticmethod
     def _index_ownership_symbols(
-        call_symbols, wanted: set[str]
+        state: _OwnershipGraphState,
+        call_symbols,
+        wanted: set[str],
     ) -> dict[str, list[dict]]:
         symbols_by_short: dict[str, list[dict]] = {}
         for symbol in call_symbols:
@@ -705,19 +710,31 @@ class OwnershipGraphMixin:
                 bucket = symbols_by_short.setdefault(alias, [])
                 if len(bucket) < 12:
                     bucket.append(symbol)
+                else:
+                    state.search_bound_reasons.add("symbol-alias-limit")
         return symbols_by_short
 
-    def _ownership_symbol_map(self, expandable, edge_map) -> dict[str, list[dict]]:
+    def _ownership_symbol_map(
+        self,
+        state: _OwnershipGraphState,
+        expandable,
+        edge_map,
+    ) -> dict[str, list[dict]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         call_shorts = self._ownership_call_shorts(expandable, edge_map)
         if not call_shorts:
             return {}
+        symbol_limit = max(12, min(5000, 12 * len(call_shorts)))
         call_symbols = self._session_exact_symbol_candidates(
-            call_shorts, limit=max(12, min(5000, 12 * len(call_shorts)))
+            call_shorts, limit=symbol_limit + 1
         )
+        if len(call_symbols) > symbol_limit:
+            state.search_bound_reasons.add("symbol-candidate-limit")
         return self._index_ownership_symbols(
-            call_symbols, {value.lower() for value in call_shorts}
+            state,
+            call_symbols[:symbol_limit],
+            {value.lower() for value in call_shorts},
         )
 
     @staticmethod
@@ -914,9 +931,17 @@ class OwnershipGraphMixin:
             return []
         paths = [path for path, _, _ in expandable]
         self._session_file_rows(paths)
-        edge_map = self._session_edges_for_paths_many(paths, limit_per_path=100)
+        probed_edge_map = self._session_edges_for_paths_many(
+            paths, limit_per_path=101
+        )
+        edge_map = {}
+        for path in paths:
+            path_edges = list(probed_edge_map.get(path, ()))
+            if len(path_edges) > 100:
+                state.search_bound_reasons.add("edge-per-path-limit")
+            edge_map[path] = path_edges[:100]
         self._preload_direct_ownership_import_modules(expandable, edge_map)
-        symbols_by_short = self._ownership_symbol_map(expandable, edge_map)
+        symbols_by_short = self._ownership_symbol_map(state, expandable, edge_map)
         frontier: list[tuple[str, int, tuple[str, ...]]] = []
         for item in expandable:
             self._expand_ownership_path(
@@ -1051,14 +1076,22 @@ class OwnershipGraphMixin:
         max_depth: int,
     ) -> tuple[dict[str, object] | None, str]:
         selected = cls._baseline_ownership_candidate(ranked)
+        search_complete = not state.search_bound_reasons
         if selected is None:
-            return None, "unresolved"
+            return (
+                None,
+                "unresolved"
+                if search_complete
+                else "unresolved-search-incomplete",
+            )
         if max_depth < 3:
             return selected, "bounded-two-hop-corroboration"
         targets = cls._delegated_ownership_targets(state, ranked, selected)
         delegated = cls._delegated_candidates(ranked, targets)
-        if len(delegated) == 1:
+        if len(delegated) == 1 and search_complete:
             return delegated[0], "unique-task-local-delegation-continuation"
+        if not search_complete:
+            return selected, "bounded-two-hop-corroboration-search-incomplete"
         return selected, "bounded-two-hop-corroboration"
 
     @staticmethod
@@ -1106,6 +1139,7 @@ class OwnershipGraphMixin:
             state, ranked, max_depth
         )
         owner_path = self._ownership_path(state, selected)
+        search_complete = not state.search_bound_reasons
         return {
             "schema": "hashmarks.ownership-relation-graph.v1",
             "task": task,
@@ -1116,6 +1150,18 @@ class OwnershipGraphMixin:
             "candidates": ranked,
             "selected": self._selected_ownership_path(selected),
             "selection_reason": selection_reason,
+            "completeness": "complete" if search_complete else "incomplete",
+            "truncation": "complete" if search_complete else "truncated",
+            "negative_evidence_admissible": search_complete,
+            "uniqueness_admissible": search_complete,
+            "search_bound_reasons": sorted(state.search_bound_reasons),
+            "bounds": {
+                "max_depth": max_depth,
+                "edges_per_path": 100,
+                "node_symbols": 12,
+                "symbols_per_alias": 12,
+                "symbol_candidates": 5000,
+            },
             "owner_path": owner_path,
             "cycle_count": sum(1 for edge in state.edges if edge["cycle"]),
             "revisit_count": sum(1 for edge in state.edges if edge["revisited"]),
@@ -1178,6 +1224,11 @@ class OwnershipGraphMixin:
             "cycle_count": int(graph.get("cycle_count") or 0),
             "revisit_count": int(graph.get("revisit_count") or 0),
             "relation_graph_schema": graph["schema"],
+            "relation_graph_completeness": graph.get("completeness"),
+            "relation_graph_truncation": graph.get("truncation"),
+            "relation_graph_search_bound_reasons": list(
+                graph.get("search_bound_reasons") or []
+            ),
         }
 
     @staticmethod
