@@ -9,7 +9,37 @@ Canonical synthetic fixture inputs are owned by the evaluation code that materia
 New product behavior must still pass the product-admission contract in `docs/reference/PRODUCT_BOUNDARY.md`; benchmark wins do not authorize moving consumer workflow into Hashmarks.
 
 
-## Native Codex and OpenCode benchmark
+## agentsCookbook-owned native Codex and OpenCode benchmark
+
+### Benchmark ownership
+
+Hashmarks does **not** own or implement this benchmark. Hashmarks is one subject
+under test. The benchmark harness, frozen experiment definitions, admission,
+execution evidence, independent grading, receipts, and reporting are owned by
+the adjacent **agentsCookbook** checkout.
+
+The Hashmarks `make benchmark*` targets are convenience entry points only. They
+delegate to agentsCookbook while binding this Hashmarks checkout as the subject
+source:
+
+```text
+Hashmarks checkout
+    make benchmark*
+         |
+         v
+agentsCookbook
+    benchmark harness / experiment authority
+         |
+         +-- bare
+         +-- exact admitted Hashmarks executable
+         +-- exact admitted Enola executable
+```
+
+For native OpenCode trials, agentsCookbook also supplies the temporary
+trial-scoped MCP exposure for the selected subject. A Hashmarks/OpenCode
+registration in project or user configuration is **not benchmark authority** and
+is not required for the OpenCode benchmark. OpenCode remains authoritative for
+model, provider, authentication, permissions, and user configuration.
 
 Start from this Hashmarks checkout with the adjacent `agentsCookbook` checkout:
 
