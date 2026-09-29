@@ -22,11 +22,11 @@ from .client import (
 from .daemon import IdentityDaemon
 from .errors import UserFacingError
 from .identity import RepositoryIdentity, RepositoryIdentityMode
-from .paths import canonical_host_path
 from .opencode_registration import (
     effective_command_uses_executable,
     inspect_effective_hashmarks_command,
 )
+from .paths import canonical_host_path
 from .release_update import (
     ReleaseCheckError,
     ReleaseInfo,
