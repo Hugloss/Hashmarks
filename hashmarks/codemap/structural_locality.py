@@ -539,7 +539,7 @@ class StructuralLocalityMixin:
                 source_path, targets[0]
             )
             if unresolved:
-                return None, candidate_ids, True
+                return None, candidate_ids, True, True
             owner_paths = set(owners)
             imported_name = targets[0].rsplit(".", 1)[-1]
             root_evidence = self._visible_named_symbol_candidates(imported_name)
@@ -624,14 +624,20 @@ class StructuralLocalityMixin:
                 candidate_search_complete,
             ) = self._resolve_call_target(ref)
             if resolved is None or _symbol_id(resolved) != target_id:
-                if repository_unresolved and target_id in candidates:
+                candidate_ids = list(candidates)
+                if not candidate_search_complete and target_id not in candidate_ids:
+                    candidate_ids.append(target_id)
+                    candidate_ids.sort()
+                if repository_unresolved and (
+                    target_id in candidate_ids or not candidate_search_complete
+                ):
                     unresolved.append(
                         {
                             "path": str(ref.get("path") or ""),
                             "source": ref.get("source"),
                             "line": ref.get("line"),
                             "target": ref.get("target"),
-                            "candidate_symbol_ids": candidates,
+                            "candidate_symbol_ids": candidate_ids,
                             "candidate_search": _candidate_search_contract(
                                 candidate_search_complete
                             ),
