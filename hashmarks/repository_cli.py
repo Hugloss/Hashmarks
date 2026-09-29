@@ -389,10 +389,10 @@ def _add_map_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     map_sync.add_argument(
         "--path", action="append", help="changed path to reindex; repeatable"
     )
-    map_sync.set_defaults(func=_map_sync)
+    map_sync.set_defaults(func=_map_sync, automatic_update_check=True)
     map_status = map_sub.add_parser("status", help="show CodeMap generation/staleness")
     add_common_arguments(map_status, inherited=True)
-    map_status.set_defaults(func=_map_status)
+    map_status.set_defaults(func=_map_status, automatic_update_check=True)
     _add_map_ownership_cli(map_sub, add_common_arguments=add_common_arguments)
     _add_map_enrichment_cli(map_sub, add_common_arguments=add_common_arguments)
 
@@ -410,7 +410,7 @@ def _add_map_ownership_cli(
         action="append",
         help="workspace-relative path scope; repeatable (default: analyzer-nominated repository candidates)",
     )
-    map_findings.set_defaults(func=_map_findings)
+    map_findings.set_defaults(func=_map_findings, automatic_update_check=True)
     map_import_ownership = map_sub.add_parser(
         "import-ownership",
         help="report Python loaders that bypass normal module/cache ownership",
@@ -421,7 +421,7 @@ def _add_map_ownership_cli(
         action="append",
         help="workspace-relative Python path to inspect; repeatable (default: CodeMap-nominated candidates)",
     )
-    map_import_ownership.set_defaults(func=_map_import_ownership)
+    map_import_ownership.set_defaults(func=_map_import_ownership, automatic_update_check=True)
     map_cache_ownership = map_sub.add_parser(
         "cache-ownership",
         help="report process-local Python cache owners and invalidation evidence",
@@ -432,7 +432,7 @@ def _add_map_ownership_cli(
         action="append",
         help="workspace-relative Python path to inspect; repeatable (default: CodeMap-nominated candidates)",
     )
-    map_cache_ownership.set_defaults(func=_map_cache_ownership)
+    map_cache_ownership.set_defaults(func=_map_cache_ownership, automatic_update_check=True)
     map_cache_invalidation = map_sub.add_parser(
         "cache-invalidation-ownership",
         help="resolve static Python cache invalidators to exact repository cache owners",
@@ -443,7 +443,7 @@ def _add_map_ownership_cli(
         action="append",
         help="workspace-relative Python invalidator path to inspect; repeatable (default: all indexed Python)",
     )
-    map_cache_invalidation.set_defaults(func=_map_cache_invalidation_ownership)
+    map_cache_invalidation.set_defaults(func=_map_cache_invalidation_ownership, automatic_update_check=True)
     map_authority_ownership = map_sub.add_parser(
         "authority-ownership",
         help="compose repository owner/reader/cache/import authority evidence",
@@ -452,7 +452,7 @@ def _add_map_ownership_cli(
     map_authority_ownership.add_argument(
         "--path", action="append", help="workspace-relative path scope; repeatable"
     )
-    map_authority_ownership.set_defaults(func=_map_repository_ownership)
+    map_authority_ownership.set_defaults(func=_map_repository_ownership, automatic_update_check=True)
     map_concurrency_risk = map_sub.add_parser(
         "concurrency-risk", help="nominate static read-modify-write concurrency risks"
     )
@@ -460,7 +460,7 @@ def _add_map_ownership_cli(
     map_concurrency_risk.add_argument(
         "--path", action="append", help="workspace-relative Python path; repeatable"
     )
-    map_concurrency_risk.set_defaults(func=_map_concurrency_risk)
+    map_concurrency_risk.set_defaults(func=_map_concurrency_risk, automatic_update_check=True)
     map_verification_ownership = map_sub.add_parser(
         "verification-ownership", help="map task-local verification evidence owners"
     )
@@ -468,7 +468,7 @@ def _add_map_ownership_cli(
     map_verification_ownership.add_argument("task")
     map_verification_ownership.add_argument("--limit", type=int, default=20)
     map_verification_ownership.add_argument("--candidate-limit", type=int, default=8)
-    map_verification_ownership.set_defaults(func=_map_verification_ownership)
+    map_verification_ownership.set_defaults(func=_map_verification_ownership, automatic_update_check=True)
 
 
 def _add_map_enrichment_cli(
@@ -496,19 +496,19 @@ def _add_map_enrichment_cli(
         ),
         help="native/manifest evidence provider to run; repeatable",
     )
-    map_enrich.set_defaults(func=_map_enrich)
+    map_enrich.set_defaults(func=_map_enrich, automatic_update_check=True)
     map_projects = map_sub.add_parser(
         "projects", help="show retained native/manifest package graph"
     )
     add_common_arguments(map_projects, inherited=True)
-    map_projects.set_defaults(func=_map_projects)
+    map_projects.set_defaults(func=_map_projects, automatic_update_check=True)
     map_scip = map_sub.add_parser(
         "import-scip",
         help="import an existing SCIP index/JSON as native code-intelligence evidence",
     )
     add_common_arguments(map_scip, inherited=True)
     map_scip.add_argument("path")
-    map_scip.set_defaults(func=_map_import_scip)
+    map_scip.set_defaults(func=_map_import_scip, automatic_update_check=True)
     map_clean = map_sub.add_parser("clean", help="clear workspace CodeMap state")
     add_common_arguments(map_clean, inherited=True)
     map_clean.add_argument(
@@ -516,32 +516,32 @@ def _add_map_enrichment_cli(
         action="store_true",
         help="also purge content-addressed worktree-shared parse artifacts",
     )
-    map_clean.set_defaults(func=_map_clean)
+    map_clean.set_defaults(func=_map_clean, automatic_update_check=True)
     map_watch = map_sub.add_parser(
         "watch", help="maintain CodeMap from filesystem changes in a separate process"
     )
     add_common_arguments(map_watch, inherited=True)
     map_watch.add_argument("--debounce", type=float, default=0.05)
-    map_watch.set_defaults(func=_map_watch)
+    map_watch.set_defaults(func=_map_watch, automatic_update_check=True)
 
 
 def _add_navigation_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     orient = sub.add_parser("orient", help="compact repository capsule")
     add_common_arguments(orient, inherited=True)
-    orient.set_defaults(func=_map_orient)
+    orient.set_defaults(func=_map_orient, automatic_update_check=True)
 
     outline = sub.add_parser(
         "outline", help="show structure/signatures without full implementation bodies"
     )
     add_common_arguments(outline, inherited=True)
     outline.add_argument("path")
-    outline.set_defaults(func=_outline)
+    outline.set_defaults(func=_outline, automatic_update_check=True)
 
     find_code = sub.add_parser("find", help="search the maintained path/symbol index")
     add_common_arguments(find_code, inherited=True)
     find_code.add_argument("query")
     find_code.add_argument("--limit", type=int, default=20)
-    find_code.set_defaults(func=_find_code)
+    find_code.set_defaults(func=_find_code, automatic_update_check=True)
 
     grep_code = sub.add_parser(
         "grep", help="persistent lexical grep narrowed by CodeMap"
@@ -552,7 +552,7 @@ def _add_navigation_cli(sub, *, add_common_arguments: Callable[..., None]) -> No
     grep_code.add_argument(
         "--context", type=int, default=0, help="source context lines around each match"
     )
-    grep_code.set_defaults(func=_grep_code)
+    grep_code.set_defaults(func=_grep_code, automatic_update_check=True)
 
 
 def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
@@ -563,7 +563,7 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     structural_code.add_argument("pattern")
     structural_code.add_argument("--lang")
     structural_code.add_argument("--limit", type=int, default=100)
-    structural_code.set_defaults(func=_structural_code)
+    structural_code.set_defaults(func=_structural_code, automatic_update_check=True)
 
     for name, help_text, handler in (
         ("symbol", "show matching symbol records", _symbol_code),
@@ -573,7 +573,7 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
         query_command = sub.add_parser(name, help=help_text)
         add_common_arguments(query_command, inherited=True)
         query_command.add_argument("query")
-        query_command.set_defaults(func=handler)
+        query_command.set_defaults(func=handler, automatic_update_check=True)
 
     source_code = sub.add_parser(
         "source", help="return one exact symbol body under an explicit token budget"
@@ -581,7 +581,7 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     add_common_arguments(source_code, inherited=True)
     source_code.add_argument("query", help="symbol name or path::qualname")
     source_code.add_argument("--budget", type=int, default=4000)
-    source_code.set_defaults(func=_source_code)
+    source_code.set_defaults(func=_source_code, automatic_update_check=True)
 
     affected_code = sub.add_parser(
         "affected", help="show reverse file dependents from the CodeMap graph"
@@ -589,7 +589,7 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     add_common_arguments(affected_code, inherited=True)
     affected_code.add_argument("query")
     affected_code.add_argument("--max-depth", type=int, default=12)
-    affected_code.set_defaults(func=_affected_code)
+    affected_code.set_defaults(func=_affected_code, automatic_update_check=True)
 
     tests_code = sub.add_parser(
         "tests", help="show structurally related tests from reverse dependencies"
@@ -597,7 +597,7 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     add_common_arguments(tests_code, inherited=True)
     tests_code.add_argument("query")
     tests_code.add_argument("--max-depth", type=int, default=12)
-    tests_code.set_defaults(func=_tests_code)
+    tests_code.set_defaults(func=_tests_code, automatic_update_check=True)
 
     locality = sub.add_parser(
         "structural-locality",
@@ -608,7 +608,7 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     locality.add_argument("--max-depth", type=int, default=2)
     locality.add_argument("--call-limit", type=int, default=64)
     locality.add_argument("--ref-limit", type=int, default=256)
-    locality.set_defaults(func=_structural_locality_code)
+    locality.set_defaults(func=_structural_locality_code, automatic_update_check=True)
 
     locality_delta = sub.add_parser(
         "structural-locality-delta",
@@ -617,7 +617,7 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     add_common_arguments(locality_delta, inherited=True)
     locality_delta.add_argument("--before", required=True)
     locality_delta.add_argument("--after", required=True)
-    locality_delta.set_defaults(func=_structural_locality_delta_code)
+    locality_delta.set_defaults(func=_structural_locality_delta_code, automatic_update_check=True)
 
 
 def _add_context_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
@@ -634,7 +634,7 @@ def _add_context_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
         default="source",
         help="progressive disclosure level; source preserves the pre-0.10.12 behavior",
     )
-    context_code.set_defaults(func=_context_code)
+    context_code.set_defaults(func=_context_code, automatic_update_check=True)
 
 
 def _add_task_evidence_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
@@ -652,7 +652,7 @@ def _add_task_evidence_cli(sub, *, add_common_arguments: Callable[..., None]) ->
     )
     task_evidence.add_argument("--limit", type=int, default=20)
     task_evidence.add_argument("--per-role", type=int, default=3)
-    task_evidence.set_defaults(func=_task_evidence_code)
+    task_evidence.set_defaults(func=_task_evidence_code, automatic_update_check=True)
 
     verification_relevance = sub.add_parser(
         "verification-relevance",
@@ -662,7 +662,7 @@ def _add_task_evidence_cli(sub, *, add_common_arguments: Callable[..., None]) ->
     verification_relevance.add_argument("task")
     verification_relevance.add_argument("--limit", type=int, default=20)
     verification_relevance.add_argument("--candidate-limit", type=int, default=8)
-    verification_relevance.set_defaults(func=_verification_relevance_code)
+    verification_relevance.set_defaults(func=_verification_relevance_code, automatic_update_check=True)
 
 
 def _add_change_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
@@ -695,7 +695,7 @@ def _add_change_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
         default="verbose",
         help="project provenance transport encoding",
     )
-    change_impact.set_defaults(func=_change_impact_code)
+    change_impact.set_defaults(func=_change_impact_code, automatic_update_check=True)
 
     post_change = sub.add_parser(
         "post-change",
@@ -717,7 +717,7 @@ def _add_change_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     post_change.add_argument("--budget", type=int, default=1536)
     post_change.add_argument("--limit", type=int, default=20)
     post_change.add_argument("--per-role", type=int, default=3)
-    post_change.set_defaults(func=_post_change_code)
+    post_change.set_defaults(func=_post_change_code, automatic_update_check=True)
 
 
 def add_repository_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
