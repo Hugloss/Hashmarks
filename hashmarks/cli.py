@@ -398,17 +398,17 @@ def _add_identity_cli(sub) -> None:
     _add_mode_argument(snapshot)
     snapshot.add_argument("--input", action="append", required=True)
     snapshot.add_argument("--verify", action="store_true")
-    snapshot.set_defaults(func=_snapshot)
+    snapshot.set_defaults(func=_snapshot, automatic_update_check=True)
 
     stats = sub.add_parser("stats")
     _add_common_arguments(stats, inherited=True)
     _add_mode_argument(stats)
-    stats.set_defaults(func=_stats)
+    stats.set_defaults(func=_stats, automatic_update_check=True)
 
     doctor = sub.add_parser("doctor")
     _add_common_arguments(doctor, inherited=True)
     _add_mode_argument(doctor)
-    doctor.set_defaults(func=_doctor)
+    doctor.set_defaults(func=_doctor, automatic_update_check=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -419,7 +419,7 @@ def main(argv: list[str] | None = None) -> int:
         version=f"hashmarks version {__version__}",
     )
     _add_common_arguments(parser)
-    parser.set_defaults(automatic_update_check=True)
+    parser.set_defaults(automatic_update_check=False)
     sub = parser.add_subparsers(dest="command", required=True)
     _add_daemon_cli(sub)
     _add_identity_cli(sub)
@@ -432,7 +432,7 @@ def main(argv: list[str] | None = None) -> int:
         "install", help="register the installed Hashmarks executable with agent hosts"
     )
     install.add_argument("--opencode", action="store_true")
-    install.set_defaults(func=_install)
+    install.set_defaults(func=_install, automatic_update_check=True)
     upgrade = sub.add_parser(
         "upgrade",
         help="check the latest release and explicitly hand standalone installs to the existing installer",
