@@ -529,7 +529,10 @@ def test_maven_simultaneous_variants_preserve_independent_selection_delta(
     assert transition[0]["component_id"] == "example.fixture:dummy-dep"
     assert [row["version"] for row in transition[0]["removed"]] == ["1.0.0"]
     assert [row["version"] for row in transition[0]["added"]] == ["1.0.0"]
-    assert transition[0]["removed"][0]["node_id"] != transition[0]["added"][0]["node_id"]
+    assert (
+        transition[0]["removed"][0]["node_id"]
+        != transition[0]["added"][0]["node_id"]
+    )
     assert transition[0]["changed"] == []
 
 
