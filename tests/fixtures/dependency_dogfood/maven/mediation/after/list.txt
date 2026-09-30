@@ -1,0 +1,10 @@
+The following files have been resolved:
+   org.springframework:spring-context:jar:6.2.0:compile -- module spring.context [auto]
+   org.springframework:spring-aop:jar:6.2.0:compile -- module spring.aop [auto]
+   org.springframework:spring-beans:jar:6.2.0:compile -- module spring.beans [auto]
+   org.springframework:spring-core:jar:6.2.0:compile -- module spring.core [auto]
+   org.springframework:spring-jcl:jar:6.2.0:compile -- module spring.jcl [auto]
+   org.springframework:spring-expression:jar:6.2.0:compile -- module spring.expression [auto]
+   io.micrometer:micrometer-observation:jar:1.14.0:compile -- module micrometer.observation [auto]
+   io.micrometer:micrometer-commons:jar:1.14.0:compile -- module micrometer.commons [auto]
+   org.springframework:spring-web:jar:6.1.13:compile -- module spring.web [auto]

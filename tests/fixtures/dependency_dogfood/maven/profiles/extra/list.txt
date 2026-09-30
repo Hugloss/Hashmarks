@@ -1,0 +1,5 @@
+The following files have been resolved:
+   commons-codec:commons-codec:jar:1.17.1:compile -- module org.apache.commons.codec
+   org.apache.commons:commons-compress:jar:1.27.1:compile -- module org.apache.commons.compress
+   commons-io:commons-io:jar:2.16.1:compile -- module org.apache.commons.io
+   org.apache.commons:commons-lang3:jar:3.16.0:compile -- module org.apache.commons.lang3

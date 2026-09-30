@@ -1,0 +1,19 @@
+The following files have been resolved:
+   com.fasterxml.jackson.core:jackson-databind:jar:2.18.1:compile -- module com.fasterxml.jackson.databind
+   com.fasterxml.jackson.core:jackson-annotations:jar:2.18.1:compile -- module com.fasterxml.jackson.annotation
+   com.fasterxml.jackson.core:jackson-core:jar:2.18.1:compile -- module com.fasterxml.jackson.core
+   io.netty:netty-handler:jar:4.1.115.Final:compile -- module io.netty.handler [auto]
+   io.netty:netty-common:jar:4.1.115.Final:compile -- module io.netty.common [auto]
+   io.netty:netty-resolver:jar:4.1.115.Final:compile -- module io.netty.resolver [auto]
+   io.netty:netty-buffer:jar:4.1.115.Final:compile -- module io.netty.buffer [auto]
+   io.netty:netty-transport:jar:4.1.115.Final:compile -- module io.netty.transport [auto]
+   io.netty:netty-transport-native-unix-common:jar:4.1.115.Final:compile -- module io.netty.transport.unix.common [auto]
+   io.netty:netty-codec:jar:4.1.115.Final:compile -- module io.netty.codec [auto]
+   io.micrometer:micrometer-core:jar:1.14.1:compile -- module micrometer.core [auto]
+   io.micrometer:micrometer-commons:jar:1.14.1:compile -- module micrometer.commons [auto]
+   io.micrometer:micrometer-observation:jar:1.14.1:compile -- module micrometer.observation [auto]
+   org.hdrhistogram:HdrHistogram:jar:2.2.2:runtime -- module HdrHistogram (auto)
+   org.latencyutils:LatencyUtils:jar:2.0.3:runtime -- module LatencyUtils (auto)
+   org.slf4j:slf4j-api:jar:2.0.16:compile -- module org.slf4j
+   org.apache.tomcat.embed:tomcat-embed-core:jar:10.1.33:compile -- module org.apache.tomcat.embed.core
+   org.apache.tomcat:tomcat-annotations-api:jar:10.1.33:compile -- module jakarta.annotation

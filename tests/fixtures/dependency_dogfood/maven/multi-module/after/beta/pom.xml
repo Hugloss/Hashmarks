@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>hashmarks.dogfood</groupId>
+    <artifactId>multi-parent</artifactId>
+    <version>0.1.0</version>
+    <relativePath>..</relativePath>
+  </parent>
+  <artifactId>multi-beta</artifactId>
+  <dependencies>
+    <dependency>
+      <groupId>hashmarks.dogfood</groupId>
+      <artifactId>multi-alpha</artifactId>
+      <version>0.1.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.squareup.okhttp3</groupId>
+      <artifactId>okhttp</artifactId>
+      <version>4.12.0</version>
+    </dependency>
+  </dependencies>
+</project>

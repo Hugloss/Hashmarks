@@ -1,0 +1,7 @@
+The following files have been resolved:
+   com.google.guava:guava:jar:33.4.8-jre:compile -- module com.google.common
+   com.google.guava:failureaccess:jar:1.0.3:compile -- module com.google.common.util.concurrent.internal
+   com.google.guava:listenablefuture:jar:9999.0-empty-to-avoid-conflict-with-guava:compile -- module listenablefuture (auto)
+   org.jspecify:jspecify:jar:1.0.0:compile -- module org.jspecify
+   com.google.errorprone:error_prone_annotations:jar:2.36.0:compile -- module com.google.errorprone.annotations
+   com.google.j2objc:j2objc-annotations:jar:3.0.0:compile -- module com.google.j2objc.annotations
