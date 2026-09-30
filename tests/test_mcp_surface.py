@@ -765,6 +765,12 @@ def test_mcp_dependency_codemap_explain_and_compare_reuse_core_authority(
     assert compared["comparability"] == "comparable"
     assert compared["change_axes"]["semantic_definition"] == "unchanged"
     assert compared["change_axes"]["semantic_resolution"] == "changed"
+    transition = compared["component_selection_transitions"]
+    assert len(transition) == 1
+    assert transition[0]["component_id"] == "lib"
+    assert [row["version"] for row in transition[0]["removed"]] == ["1"]
+    assert [row["version"] for row in transition[0]["added"]] == ["2"]
+    assert transition[0]["changed"] == []
 
 
 def test_mcp_surface_projects_repository_declarations_without_choosing_winner(
