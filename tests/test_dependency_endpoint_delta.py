@@ -110,6 +110,48 @@ def test_dependency_delta_compares_explicit_endpoints_across_generations(
     assert delta["change_axes"]["physical_evidence_content"] == "unchanged"
 
 
+def test_dependency_delta_projects_component_selection_transition(
+    tmp_path: Path,
+) -> None:
+    before_raw = _snapshot()
+    after_raw = copy.deepcopy(before_raw)
+    after_raw["selections"][0]["node_id"] = "example@2"
+    after_raw["selections"][0]["version"] = "2"
+    after_raw["inventory"][0]["node_id"] = "example@2"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = _qualify(codemap, before_raw)
+        after = _qualify(codemap, after_raw)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert delta["component_selection_transitions"] == [
+        {
+            "component_id": "example",
+            "removed": [
+                {
+                    "node_id": "example@1",
+                    "version": "1",
+                    "source": "fixture",
+                    "marker": "",
+                    "contexts": ["runtime"],
+                }
+            ],
+            "added": [
+                {
+                    "node_id": "example@2",
+                    "version": "2",
+                    "source": "fixture",
+                    "marker": "",
+                    "contexts": ["runtime"],
+                }
+            ],
+            "changed": [],
+        }
+    ]
+    assert delta["causation"] == "not-inferred"
+
+
 def test_dependency_delta_separates_adapter_semantics_from_repository_meaning(
     tmp_path: Path,
 ) -> None:
