@@ -25,6 +25,25 @@ def _observation(producer: str, state: str) -> dict[str, object]:
     )
 
 
+def _realworld_maven_observation(state: str) -> dict[str, object]:
+    base = _FIXTURES / "maven" / "transitive-upgrade" / state
+    return maven_dependency_observation(
+        trees={"compile": (base / "tree.json").read_bytes()},
+        inventories={"compile": (base / "list.txt").read_bytes()},
+        complete_tree_contexts=("compile",),
+        complete_inventory_contexts=("compile",),
+    )
+
+
+def _selection_versions(
+    observation: dict[str, object],
+) -> dict[str, set[str]]:
+    versions: dict[str, set[str]] = {}
+    for row in observation["selections"]:
+        versions.setdefault(row["component_id"], set()).add(row["version"])
+    return versions
+
+
 def _query(
     codemap: CodeMap,
     observation: dict[str, object],
@@ -232,6 +251,89 @@ def test_real_producer_dependency_change_dogfood(
         _assert_maven_module_change(
             after, after_module, delta, before_state, after_state
         )
+
+
+def test_real_maven_transitive_upgrade_dogfood_preserves_large_graph_delta(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(
+            _realworld_maven_observation("before")
+        )
+        after = codemap.dependency_resolution_evidence(
+            _realworld_maven_observation("after")
+        )
+        delta = codemap.dependency_resolution_delta(before, after)
+
+        before_okhttp = _dummy_selection(before, "com.squareup.okhttp3:okhttp")
+        after_okhttp = _dummy_selection(after, "com.squareup.okhttp3:okhttp")
+        before_okhttp_graph = _query(
+            codemap,
+            before,
+            {
+                "operation": "dependencies",
+                "node_id": before_okhttp["node_id"],
+                "context": "compile",
+            },
+        )
+        after_okhttp_graph = _query(
+            codemap,
+            after,
+            {
+                "operation": "dependencies",
+                "node_id": after_okhttp["node_id"],
+                "context": "compile",
+            },
+        )
+
+    assert delta["comparability"] == "comparable"
+    assert delta["producer_authority"] == "caller-claimed"
+    assert len(before["inventory"]) == 26
+    assert len(after["inventory"]) == 22
+    assert len(delta["selections_removed"]) == 21
+    assert len(delta["selections_added"]) == 17
+    assert len(delta["relationships_removed"]) == 26
+    assert len(delta["relationships_added"]) == 22
+
+    assert delta["components_added"] == ["org.jspecify:jspecify"]
+    assert delta["components_removed"] == [
+        "com.google.code.findbugs:jsr305",
+        "org.checkerframework:checker-qual",
+        "org.jetbrains.kotlin:kotlin-stdlib-common",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk7",
+        "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
+    ]
+
+    before_versions = _selection_versions(before)
+    after_versions = _selection_versions(after)
+    changed_versions = {
+        component_id: (before_versions[component_id], after_versions[component_id])
+        for component_id in before_versions.keys() & after_versions.keys()
+        if before_versions[component_id] != after_versions[component_id]
+    }
+    assert len(changed_versions) == 16
+    assert changed_versions["io.minio:minio"] == ({"8.5.17"}, {"8.6.0"})
+    assert changed_versions["com.squareup.okhttp3:okhttp"] == (
+        {"4.12.0"},
+        {"5.1.0"},
+    )
+    assert changed_versions["com.squareup.okio:okio-jvm"] == (
+        {"3.6.0"},
+        {"3.15.0"},
+    )
+
+    before_okhttp_components = {
+        row["selection"]["component_id"] for row in before_okhttp_graph["result"]
+    }
+    after_okhttp_components = {
+        row["selection"]["component_id"] for row in after_okhttp_graph["result"]
+    }
+    assert "org.jetbrains.kotlin:kotlin-stdlib-jdk8" in before_okhttp_components
+    assert "org.jetbrains.kotlin:kotlin-stdlib-jdk8" not in after_okhttp_components
+    assert "com.squareup.okio:okio-jvm" in after_okhttp_components
+    assert before_okhttp_graph["completeness"] == "complete"
+    assert after_okhttp_graph["completeness"] == "complete"
 
 
 def test_real_uv_grouped_edges_do_not_duplicate_topology_paths(
