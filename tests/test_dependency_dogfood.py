@@ -35,6 +35,45 @@ def _realworld_maven_observation(state: str) -> dict[str, object]:
     )
 
 
+def _maven_scenario_observation(
+    scenario: str,
+    state: str,
+) -> dict[str, object]:
+    base = _FIXTURES / "maven" / scenario / state
+    return maven_dependency_observation(
+        trees={"compile": (base / "tree.json").read_bytes()},
+        inventories={"compile": (base / "list.txt").read_bytes()},
+        complete_tree_contexts=("compile",),
+        complete_inventory_contexts=("compile",),
+    )
+
+
+def _maven_multi_module_observation(state: str) -> dict[str, object]:
+    base = _FIXTURES / "maven" / "multi-module" / state / "captures"
+    contexts = ("alpha", "beta")
+    return maven_dependency_observation(
+        trees={context: (base / context / "tree.json").read_bytes() for context in contexts},
+        inventories={
+            context: (base / context / "list.txt").read_bytes() for context in contexts
+        },
+        complete_tree_contexts=contexts,
+        complete_inventory_contexts=contexts,
+    )
+
+
+def _maven_profile_observation() -> dict[str, object]:
+    base = _FIXTURES / "maven" / "profiles"
+    contexts = ("default", "extra")
+    return maven_dependency_observation(
+        trees={context: (base / context / "tree.json").read_bytes() for context in contexts},
+        inventories={
+            context: (base / context / "list.txt").read_bytes() for context in contexts
+        },
+        complete_tree_contexts=contexts,
+        complete_inventory_contexts=contexts,
+    )
+
+
 def _selection_versions(
     observation: dict[str, object],
 ) -> dict[str, set[str]]:
@@ -42,6 +81,45 @@ def _selection_versions(
     for row in observation["selections"]:
         versions.setdefault(row["component_id"], set()).add(row["version"])
     return versions
+
+
+def _changed_component_versions(
+    before: dict[str, object],
+    after: dict[str, object],
+) -> dict[str, tuple[set[str], set[str]]]:
+    before_versions = _selection_versions(before)
+    after_versions = _selection_versions(after)
+    return {
+        component_id: (before_versions[component_id], after_versions[component_id])
+        for component_id in before_versions.keys() & after_versions.keys()
+        if before_versions[component_id] != after_versions[component_id]
+    }
+
+
+def _selection(
+    observation: dict[str, object],
+    component_id: str,
+) -> dict[str, object]:
+    selection = _dummy_selection(observation, component_id)
+    assert selection is not None
+    return selection
+
+
+def _root_id(observation: dict[str, object], context: str) -> str:
+    return next(row["node_id"] for row in observation["roots"] if row["context"] == context)
+
+
+def _direct_components(
+    observation: dict[str, object],
+    context: str,
+) -> set[str]:
+    root_id = _root_id(observation, context)
+    selections = {row["node_id"]: row for row in observation["selections"]}
+    return {
+        selections[row["target"]]["component_id"]
+        for row in observation["relationships"]
+        if row["context"] == context and row["source"] == root_id
+    }
 
 
 def _query(
@@ -305,13 +383,7 @@ def test_real_maven_transitive_upgrade_dogfood_preserves_large_graph_delta(
         "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
     ]
 
-    before_versions = _selection_versions(before)
-    after_versions = _selection_versions(after)
-    changed_versions = {
-        component_id: (before_versions[component_id], after_versions[component_id])
-        for component_id in before_versions.keys() & after_versions.keys()
-        if before_versions[component_id] != after_versions[component_id]
-    }
+    changed_versions = _changed_component_versions(before, after)
     assert len(changed_versions) == 16
     assert changed_versions["io.minio:minio"] == ({"8.5.17"}, {"8.6.0"})
     assert changed_versions["com.squareup.okhttp3:okhttp"] == (
@@ -334,6 +406,277 @@ def test_real_maven_transitive_upgrade_dogfood_preserves_large_graph_delta(
     assert "com.squareup.okio:okio-jvm" in after_okhttp_components
     assert before_okhttp_graph["completeness"] == "complete"
     assert after_okhttp_graph["completeness"] == "complete"
+
+
+def test_real_maven_mediation_changes_only_transitive_selections(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(
+            _maven_scenario_observation("mediation", "before")
+        )
+        after = codemap.dependency_resolution_evidence(
+            _maven_scenario_observation("mediation", "after")
+        )
+        delta = codemap.dependency_resolution_delta(before, after)
+        before_graph = _query(
+            codemap,
+            before,
+            {
+                "operation": "dependencies",
+                "node_id": _root_id(before, "compile"),
+                "context": "compile",
+            },
+        )
+        after_graph = _query(
+            codemap,
+            after,
+            {
+                "operation": "dependencies",
+                "node_id": _root_id(after, "compile"),
+                "context": "compile",
+            },
+        )
+
+    before_direct = _direct_components(before, "compile")
+    after_direct = _direct_components(after, "compile")
+    changed_versions = _changed_component_versions(before, after)
+    before_versions = _selection_versions(before)
+    after_versions = _selection_versions(after)
+
+    assert before["definition_identity"] == after["definition_identity"]
+    assert delta["comparability"] == "comparable"
+    assert delta["causation"] == "not-inferred"
+    assert before_direct == after_direct
+    assert len(before_direct) == 2
+    assert all(
+        before_versions[component_id] == after_versions[component_id]
+        for component_id in before_direct
+    )
+    assert len(changed_versions) == 5
+    assert not (set(changed_versions) & before_direct)
+    assert delta["components_added"] == []
+    assert delta["components_removed"] == []
+    assert len(delta["selections_added"]) == 5
+    assert len(delta["selections_removed"]) == 5
+    assert before_graph["completeness"] == "complete"
+    assert after_graph["completeness"] == "complete"
+
+
+def test_real_maven_exclusion_removes_complete_transitive_branch(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(
+            _maven_scenario_observation("exclusion", "before")
+        )
+        after = codemap.dependency_resolution_evidence(
+            _maven_scenario_observation("exclusion", "after")
+        )
+        delta = codemap.dependency_resolution_delta(before, after)
+
+        removed_absence = [
+            _query(
+                codemap,
+                after,
+                {
+                    "operation": "inventory",
+                    "node_id": node_id,
+                    "context": "compile",
+                },
+            )
+            for node_id in delta["selections_removed"]
+        ]
+
+    before_direct = _direct_components(before, "compile")
+    after_direct = _direct_components(after, "compile")
+    direct_component = next(iter(before_direct))
+
+    assert before["definition_identity"] == after["definition_identity"]
+    assert delta["comparability"] == "comparable"
+    assert delta["causation"] == "not-inferred"
+    assert before_direct == after_direct
+    assert len(before_direct) == 1
+    assert _selection(before, direct_component)["version"] == _selection(
+        after, direct_component
+    )["version"]
+    assert delta["components_added"] == []
+    assert len(delta["components_removed"]) == 6
+    assert len(delta["selections_removed"]) == 6
+    assert delta["selections_added"] == []
+    assert len(delta["relationships_removed"]) == 6
+    assert delta["relationships_added"] == []
+    assert all(result["result"] == [] for result in removed_absence)
+    assert all(
+        result["negative_evidence"] == "admissible-within-declared-scope"
+        for result in removed_absence
+    )
+
+
+def test_real_maven_bom_upgrade_changes_many_versions_without_component_churn(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(
+            _maven_scenario_observation("bom-upgrade", "before")
+        )
+        after = codemap.dependency_resolution_evidence(
+            _maven_scenario_observation("bom-upgrade", "after")
+        )
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    direct_components = _direct_components(before, "compile")
+    changed_versions = _changed_component_versions(before, after)
+
+    assert before["definition_identity"] == after["definition_identity"]
+    assert delta["comparability"] == "comparable"
+    assert delta["causation"] == "not-inferred"
+    assert direct_components == _direct_components(after, "compile")
+    assert len(direct_components) == 5
+    assert direct_components <= set(changed_versions)
+    assert len(changed_versions) == 17
+    assert len(before["inventory"]) == 18
+    assert len(after["inventory"]) == 18
+    assert delta["components_added"] == []
+    assert delta["components_removed"] == []
+    assert len(delta["selections_added"]) == 17
+    assert len(delta["selections_removed"]) == 17
+
+
+def test_real_maven_multi_module_change_propagates_across_contexts(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.dependency_resolution_evidence(
+            _maven_multi_module_observation("before")
+        )
+        after = codemap.dependency_resolution_evidence(
+            _maven_multi_module_observation("after")
+        )
+        delta = codemap.dependency_resolution_delta(before, after)
+
+        before_graphs = {
+            context: _query(
+                codemap,
+                before,
+                {
+                    "operation": "dependencies",
+                    "node_id": _root_id(before, context),
+                    "context": context,
+                },
+            )
+            for context in ("alpha", "beta")
+        }
+        after_graphs = {
+            context: _query(
+                codemap,
+                after,
+                {
+                    "operation": "dependencies",
+                    "node_id": _root_id(after, context),
+                    "context": context,
+                },
+            )
+            for context in ("alpha", "beta")
+        }
+
+    changed_versions = _changed_component_versions(before, after)
+
+    assert before["definition_identity"] == after["definition_identity"]
+    assert delta["comparability"] == "comparable"
+    assert before["contexts"] == ["alpha", "beta"]
+    assert after["contexts"] == ["alpha", "beta"]
+    assert len(changed_versions) == 3
+    assert all(
+        _selection(before, component_id)["contexts"] == ["alpha", "beta"]
+        for component_id in changed_versions
+    )
+    assert all(
+        _selection(after, component_id)["contexts"] == ["alpha", "beta"]
+        for component_id in changed_versions
+    )
+    assert len(delta["components_added"]) == 1
+    assert len(delta["components_removed"]) == 2
+    assert all(graph["completeness"] == "complete" for graph in before_graphs.values())
+    assert all(graph["completeness"] == "complete" for graph in after_graphs.values())
+
+
+def test_real_maven_profile_contexts_remain_isolated(
+    tmp_path: Path,
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        observation = codemap.dependency_resolution_evidence(
+            _maven_profile_observation()
+        )
+        root_id = _root_id(observation, "default")
+
+        with pytest.raises(
+            ValueError,
+            match="graph query requires context for multi-context observation",
+        ):
+            _query(
+                codemap,
+                observation,
+                {"operation": "dependencies", "node_id": root_id},
+            )
+
+        default_graph = _query(
+            codemap,
+            observation,
+            {
+                "operation": "dependencies",
+                "node_id": root_id,
+                "context": "default",
+            },
+        )
+        extra_graph = _query(
+            codemap,
+            observation,
+            {
+                "operation": "dependencies",
+                "node_id": root_id,
+                "context": "extra",
+            },
+        )
+
+        default_direct = _direct_components(observation, "default")
+        extra_direct = _direct_components(observation, "extra")
+        extra_only_direct = next(iter(extra_direct - default_direct))
+        extra_only_selection = _selection(observation, extra_only_direct)
+
+        selection_contexts = _query(
+            codemap,
+            observation,
+            {
+                "operation": "contexts",
+                "node_id": extra_only_selection["node_id"],
+            },
+        )
+        default_absence = _query(
+            codemap,
+            observation,
+            {
+                "operation": "inventory",
+                "node_id": extra_only_selection["node_id"],
+                "context": "default",
+            },
+        )
+
+    assert observation["contexts"] == ["default", "extra"]
+    assert _root_id(observation, "default") == _root_id(observation, "extra")
+    assert len(default_direct) == 1
+    assert len(extra_direct - default_direct) == 1
+    assert selection_contexts["result"] == ["extra"]
+    assert default_absence["result"] == []
+    assert default_absence["negative_evidence"] == "admissible-within-declared-scope"
+    assert default_graph["completeness"] == "complete"
+    assert extra_graph["completeness"] == "complete"
+    assert len(extra_graph["result"]) > len(default_graph["result"])
 
 
 def test_real_uv_grouped_edges_do_not_duplicate_topology_paths(
