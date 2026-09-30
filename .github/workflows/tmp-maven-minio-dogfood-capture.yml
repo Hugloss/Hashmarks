@@ -6,7 +6,7 @@ on:
       - dogfood/maven-minio-transitive-upgrade
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   capture:
@@ -53,8 +53,33 @@ jobs:
                 -Dstyle.color=never
             )
           done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: maven-minio-dogfood-capture
-          path: capture
-          if-no-files-found: error
+      - name: Commit captured fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="tests/fixtures/dependency_dogfood/maven/transitive-upgrade"
+          mkdir -p "${target}/before" "${target}/after"
+          cp capture/before/pom.xml capture/before/tree.json capture/before/list.txt "${target}/before/"
+          cp capture/after/pom.xml capture/after/tree.json capture/after/list.txt "${target}/after/"
+          cp capture/maven-version.txt "${target}/maven-version.txt"
+          cat > "${target}/PROVENANCE.md" <<'EOF'
+          # Transitive-upgrade Maven capture provenance
+
+          This is a real native Maven consumer capture used as dependency dogfood.
+          The consumer declares one direct dependency: `io.minio:minio`.
+
+          - before: `8.5.17`
+          - after: `8.6.0`
+          - dependency plugin: `org.apache.maven.plugins:maven-dependency-plugin:3.9.0`
+          - tree: `dependency:tree -DoutputType=json -DoutputFile=tree.json -Dstyle.color=never`
+          - inventory: `dependency:list -DoutputFile=list.txt -Dstyle.color=never`
+
+          MinIO and its dependency names are corpus provenance only. Hashmarks product
+          semantics and assertions must remain producer-neutral and package-neutral.
+          EOF
+          git rm .github/workflows/tmp-maven-minio-dogfood-capture.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${target}"
+          git commit -m "test: add real-world Maven transitive upgrade corpus"
+          git push
