@@ -406,12 +406,10 @@ def test_real_maven_transitive_upgrade_dogfood_preserves_large_graph_delta(
     assert set(transitions) == set(changed_versions)
     assert len(transitions) == 16
     assert [
-        row["version"]
-        for row in transitions["com.squareup.okhttp3:okhttp"]["removed"]
+        row["version"] for row in transitions["com.squareup.okhttp3:okhttp"]["removed"]
     ] == ["4.12.0"]
     assert [
-        row["version"]
-        for row in transitions["com.squareup.okhttp3:okhttp"]["added"]
+        row["version"] for row in transitions["com.squareup.okhttp3:okhttp"]["added"]
     ] == ["5.1.0"]
 
     before_okhttp_components = {
