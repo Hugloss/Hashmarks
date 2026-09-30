@@ -234,6 +234,7 @@ def test_uv_marker_change_is_relationship_only_delta(tmp_path: Path) -> None:
     assert delta["inventory_removed"] == []
     assert len(delta["relationships_added"]) == 1
     assert len(delta["relationships_removed"]) == 1
+    assert delta["component_selection_transitions"] == []
 
 
 def test_maven_classifier_change_is_selection_change_without_component_change(
