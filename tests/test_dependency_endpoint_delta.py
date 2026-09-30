@@ -300,6 +300,7 @@ def test_dependency_delta_marks_definition_change_non_comparable(
 
     assert delta["comparability"] == "not-comparable"
     assert delta["reason"] == "definition-changed"
+    assert "component_selection_transitions" not in delta
     assert delta["change_axes"]["semantic_definition"] == "changed"
     assert delta["change_axes"]["semantic_resolution"] == "not-comparable"
 
