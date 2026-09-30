@@ -204,6 +204,12 @@ def test_uv_source_change_is_a_selection_change_without_component_change(
     assert len(delta["inventory_removed"]) == 1
     assert len(delta["relationships_added"]) == 1
     assert len(delta["relationships_removed"]) == 1
+    transition = delta["component_selection_transitions"][0]
+    assert transition["component_id"] == "dummy-dep"
+    assert [row["version"] for row in transition["removed"]] == ["1.0.0"]
+    assert [row["version"] for row in transition["added"]] == ["1.0.0"]
+    assert transition["removed"][0]["source"] != transition["added"][0]["source"]
+    assert transition["changed"] == []
 
 
 def test_uv_marker_change_is_relationship_only_delta(tmp_path: Path) -> None:
@@ -228,6 +234,7 @@ def test_uv_marker_change_is_relationship_only_delta(tmp_path: Path) -> None:
     assert delta["inventory_removed"] == []
     assert len(delta["relationships_added"]) == 1
     assert len(delta["relationships_removed"]) == 1
+    assert delta["component_selection_transitions"] == []
 
 
 def test_maven_classifier_change_is_selection_change_without_component_change(
@@ -390,6 +397,7 @@ def test_uv_and_maven_dependency_addition_share_delta_semantics(tmp_path: Path) 
         assert delta["inventory_removed"] == []
         assert len(delta["relationships_added"]) == 1
         assert delta["relationships_removed"] == []
+        assert delta["component_selection_transitions"] == []
 
 
 def test_uv_and_maven_dependency_removal_share_delta_semantics(tmp_path: Path) -> None:
@@ -425,6 +433,7 @@ def test_uv_and_maven_dependency_removal_share_delta_semantics(tmp_path: Path) -
         assert len(delta["inventory_removed"]) == 1
         assert delta["relationships_added"] == []
         assert len(delta["relationships_removed"]) == 1
+        assert delta["component_selection_transitions"] == []
 
 
 def test_uv_simultaneous_versions_preserve_independent_selection_delta(
@@ -478,6 +487,12 @@ source = { registry = "https://example.invalid/simple" }
     assert len(delta["selections_added"]) == 1
     assert len(delta["selections_removed"]) == 1
     assert delta["selections_changed"] == []
+    transition = delta["component_selection_transitions"]
+    assert len(transition) == 1
+    assert transition[0]["component_id"] == "shared"
+    assert [row["version"] for row in transition[0]["removed"]] == ["2.0.0"]
+    assert [row["version"] for row in transition[0]["added"]] == ["3.0.0"]
+    assert transition[0]["changed"] == []
 
 
 def test_maven_simultaneous_variants_preserve_independent_selection_delta(
@@ -511,6 +526,15 @@ def test_maven_simultaneous_variants_preserve_independent_selection_delta(
     assert delta["selections_changed"] == []
     assert delta["module_ownership_added"] == ["dummy.windows|runtime"]
     assert delta["module_ownership_removed"] == ["dummy.osx|runtime"]
+    transition = delta["component_selection_transitions"]
+    assert len(transition) == 1
+    assert transition[0]["component_id"] == "example.fixture:dummy-dep"
+    assert [row["version"] for row in transition[0]["removed"]] == ["1.0.0"]
+    assert [row["version"] for row in transition[0]["added"]] == ["1.0.0"]
+    assert (
+        transition[0]["removed"][0]["node_id"] != transition[0]["added"][0]["node_id"]
+    )
+    assert transition[0]["changed"] == []
 
 
 def test_uv_repository_input_change_preserves_resolution_delta(

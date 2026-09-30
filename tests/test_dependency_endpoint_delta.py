@@ -110,6 +110,89 @@ def test_dependency_delta_compares_explicit_endpoints_across_generations(
     assert delta["change_axes"]["physical_evidence_content"] == "unchanged"
 
 
+def test_dependency_delta_projects_component_selection_transition(
+    tmp_path: Path,
+) -> None:
+    before_raw = _snapshot()
+    after_raw = copy.deepcopy(before_raw)
+    after_raw["selections"][0]["node_id"] = "example@2"
+    after_raw["selections"][0]["version"] = "2"
+    after_raw["inventory"][0]["node_id"] = "example@2"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = _qualify(codemap, before_raw)
+        after = _qualify(codemap, after_raw)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert delta["component_selection_transitions"] == [
+        {
+            "component_id": "example",
+            "removed": [
+                {
+                    "node_id": "example@1",
+                    "version": "1",
+                    "source": "fixture",
+                    "marker": "",
+                    "contexts": ["runtime"],
+                }
+            ],
+            "added": [
+                {
+                    "node_id": "example@2",
+                    "version": "2",
+                    "source": "fixture",
+                    "marker": "",
+                    "contexts": ["runtime"],
+                }
+            ],
+            "changed": [],
+        }
+    ]
+    assert delta["causation"] == "not-inferred"
+
+
+def test_dependency_delta_projects_same_node_semantic_change(
+    tmp_path: Path,
+) -> None:
+    before_raw = _snapshot()
+    after_raw = copy.deepcopy(before_raw)
+    after_raw["selections"][0]["source"] = "alternate"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = _qualify(codemap, before_raw)
+        after = _qualify(codemap, after_raw)
+        delta = codemap.dependency_resolution_delta(before, after)
+
+    assert delta["selections_added"] == []
+    assert delta["selections_removed"] == []
+    assert delta["selections_changed"] == ["example@1"]
+    transition = delta["component_selection_transitions"]
+    assert len(transition) == 1
+    assert transition[0]["component_id"] == "example"
+    assert transition[0]["removed"] == []
+    assert transition[0]["added"] == []
+    assert transition[0]["changed"] == [
+        {
+            "before": {
+                "node_id": "example@1",
+                "version": "1",
+                "source": "fixture",
+                "marker": "",
+                "contexts": ["runtime"],
+            },
+            "after": {
+                "node_id": "example@1",
+                "version": "1",
+                "source": "alternate",
+                "marker": "",
+                "contexts": ["runtime"],
+            },
+        }
+    ]
+
+
 def test_dependency_delta_separates_adapter_semantics_from_repository_meaning(
     tmp_path: Path,
 ) -> None:
@@ -258,6 +341,7 @@ def test_dependency_delta_marks_definition_change_non_comparable(
 
     assert delta["comparability"] == "not-comparable"
     assert delta["reason"] == "definition-changed"
+    assert "component_selection_transitions" not in delta
     assert delta["change_axes"]["semantic_definition"] == "changed"
     assert delta["change_axes"]["semantic_resolution"] == "not-comparable"
 

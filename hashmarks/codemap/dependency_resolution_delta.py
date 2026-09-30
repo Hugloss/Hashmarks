@@ -129,6 +129,60 @@ def _semantic_rows(value: object) -> list[dict[str, object]]:
     return rows
 
 
+def _selection_summary(row: Mapping[str, object]) -> dict[str, object]:
+    return {
+        "node_id": str(row.get("node_id") or ""),
+        "version": str(row.get("version") or ""),
+        "source": str(row.get("source") or ""),
+        "marker": str(row.get("marker") or ""),
+        "contexts": [str(value) for value in row.get("contexts", ())],
+    }
+
+
+def _selections_by_component(
+    observation: Mapping[str, object],
+) -> dict[str, dict[str, dict[str, object]]]:
+    grouped: dict[str, dict[str, dict[str, object]]] = {}
+    for row in cast("Sequence[object]", observation.get("selections", ())):
+        if not isinstance(row, Mapping):
+            continue
+        component_id = str(row.get("component_id") or "")
+        node_id = str(row.get("node_id") or "")
+        if not component_id or not node_id:
+            continue
+        grouped.setdefault(component_id, {})[node_id] = _selection_summary(row)
+    return grouped
+
+
+def _component_selection_transitions(
+    before: Mapping[str, object],
+    after: Mapping[str, object],
+) -> list[dict[str, object]]:
+    before_grouped = _selections_by_component(before)
+    after_grouped = _selections_by_component(after)
+    transitions: list[dict[str, object]] = []
+    for component_id in sorted(before_grouped.keys() & after_grouped.keys()):
+        left = before_grouped[component_id]
+        right = after_grouped[component_id]
+        removed = [left[node_id] for node_id in sorted(left.keys() - right.keys())]
+        added = [right[node_id] for node_id in sorted(right.keys() - left.keys())]
+        changed = [
+            {"before": left[node_id], "after": right[node_id]}
+            for node_id in sorted(left.keys() & right.keys())
+            if left[node_id] != right[node_id]
+        ]
+        if removed or added or changed:
+            transitions.append(
+                {
+                    "component_id": component_id,
+                    "removed": removed,
+                    "added": added,
+                    "changed": changed,
+                }
+            )
+    return transitions
+
+
 def _producer_provenance(observation: Mapping[str, object]) -> dict[str, object]:
     return {
         key: value
@@ -218,6 +272,13 @@ class DependencyResolutionDeltaMixin:
         delta = DependencyResolutionEvidenceMixin._dependency_resolution_delta_v3(
             before, after
         )
+        if delta.get("comparability") == "comparable":
+            delta = {
+                **delta,
+                "component_selection_transitions": _component_selection_transitions(
+                    before, after
+                ),
+            }
         return {
             **delta,
             "schema": _contract.DELTA_SCHEMA_V3,

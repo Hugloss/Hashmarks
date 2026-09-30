@@ -1,0 +1,98 @@
+{
+  "groupId": "hashmarks.dogfood",
+  "artifactId": "mediation-consumer",
+  "version": "0.1.0",
+  "type": "jar",
+  "scope": "",
+  "classifier": "",
+  "optional": "false",
+  "children": [
+    {
+      "groupId": "org.springframework",
+      "artifactId": "spring-context",
+      "version": "6.2.0",
+      "type": "jar",
+      "scope": "compile",
+      "classifier": "",
+      "optional": "false",
+      "children": [
+        {
+          "groupId": "org.springframework",
+          "artifactId": "spring-aop",
+          "version": "6.2.0",
+          "type": "jar",
+          "scope": "compile",
+          "classifier": "",
+          "optional": "false"
+        },
+        {
+          "groupId": "org.springframework",
+          "artifactId": "spring-beans",
+          "version": "6.2.0",
+          "type": "jar",
+          "scope": "compile",
+          "classifier": "",
+          "optional": "false"
+        },
+        {
+          "groupId": "org.springframework",
+          "artifactId": "spring-core",
+          "version": "6.2.0",
+          "type": "jar",
+          "scope": "compile",
+          "classifier": "",
+          "optional": "false",
+          "children": [
+            {
+              "groupId": "org.springframework",
+              "artifactId": "spring-jcl",
+              "version": "6.2.0",
+              "type": "jar",
+              "scope": "compile",
+              "classifier": "",
+              "optional": "false"
+            }
+            ]
+        },
+        {
+          "groupId": "org.springframework",
+          "artifactId": "spring-expression",
+          "version": "6.2.0",
+          "type": "jar",
+          "scope": "compile",
+          "classifier": "",
+          "optional": "false"
+        },
+        {
+          "groupId": "io.micrometer",
+          "artifactId": "micrometer-observation",
+          "version": "1.14.0",
+          "type": "jar",
+          "scope": "compile",
+          "classifier": "",
+          "optional": "false",
+          "children": [
+            {
+              "groupId": "io.micrometer",
+              "artifactId": "micrometer-commons",
+              "version": "1.14.0",
+              "type": "jar",
+              "scope": "compile",
+              "classifier": "",
+              "optional": "false"
+            }
+            ]
+        }
+        ]
+    },
+    {
+      "groupId": "org.springframework",
+      "artifactId": "spring-web",
+      "version": "6.1.13",
+      "type": "jar",
+      "scope": "compile",
+      "classifier": "",
+      "optional": "false"
+    }
+    ]
+}

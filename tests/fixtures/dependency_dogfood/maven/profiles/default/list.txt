@@ -1,0 +1,2 @@
+The following files have been resolved:
+   commons-codec:commons-codec:jar:1.17.1:compile -- module org.apache.commons.codec

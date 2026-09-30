@@ -1,0 +1,23 @@
+The following files have been resolved:
+   io.minio:minio:jar:8.6.0:compile -- module minio (auto)
+   com.carrotsearch.thirdparty:simple-xml-safe:jar:2.7.1:compile -- module simple.xml.safe (auto)
+   com.google.guava:guava:jar:33.4.8-jre:compile -- module com.google.common
+   com.google.guava:failureaccess:jar:1.0.3:compile -- module com.google.common.util.concurrent.internal
+   com.google.guava:listenablefuture:jar:9999.0-empty-to-avoid-conflict-with-guava:compile -- module listenablefuture (auto)
+   org.jspecify:jspecify:jar:1.0.0:compile -- module org.jspecify
+   com.google.errorprone:error_prone_annotations:jar:2.36.0:compile -- module com.google.errorprone.annotations
+   com.google.j2objc:j2objc-annotations:jar:3.0.0:compile -- module com.google.j2objc.annotations
+   com.squareup.okhttp3:okhttp:jar:5.1.0:compile -- module okhttp (auto)
+   org.jetbrains.kotlin:kotlin-stdlib:jar:2.2.0:runtime -- module kotlin.stdlib
+   org.jetbrains:annotations:jar:13.0:runtime -- module annotations (auto)
+   com.squareup.okio:okio:jar:3.15.0:runtime -- module okio (auto)
+   com.squareup.okio:okio-jvm:jar:3.15.0:runtime -- module okio [auto]
+   com.fasterxml.jackson.core:jackson-annotations:jar:2.19.1:compile -- module com.fasterxml.jackson.annotation
+   com.fasterxml.jackson.core:jackson-core:jar:2.19.1:compile -- module com.fasterxml.jackson.core
+   com.fasterxml.jackson.core:jackson-databind:jar:2.19.1:compile -- module com.fasterxml.jackson.databind
+   org.bouncycastle:bcprov-jdk18on:jar:1.81:compile -- module org.bouncycastle.provider
+   org.apache.commons:commons-compress:jar:1.28.0:compile -- module org.apache.commons.compress
+   commons-io:commons-io:jar:2.20.0:compile -- module org.apache.commons.io
+   org.apache.commons:commons-lang3:jar:3.18.0:compile -- module org.apache.commons.lang3
+   commons-codec:commons-codec:jar:1.18.0:compile -- module org.apache.commons.codec
+   org.xerial.snappy:snappy-java:jar:1.1.10.7:compile -- module snappy.java (auto)

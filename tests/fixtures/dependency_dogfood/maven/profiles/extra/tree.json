@@ -1,0 +1,49 @@
+{
+  "groupId": "hashmarks.dogfood",
+  "artifactId": "profile-consumer",
+  "version": "0.1.0",
+  "type": "jar",
+  "scope": "",
+  "classifier": "",
+  "optional": "false",
+  "children": [
+    {
+      "groupId": "commons-codec",
+      "artifactId": "commons-codec",
+      "version": "1.17.1",
+      "type": "jar",
+      "scope": "compile",
+      "classifier": "",
+      "optional": "false"
+    },
+    {
+      "groupId": "org.apache.commons",
+      "artifactId": "commons-compress",
+      "version": "1.27.1",
+      "type": "jar",
+      "scope": "compile",
+      "classifier": "",
+      "optional": "false",
+      "children": [
+        {
+          "groupId": "commons-io",
+          "artifactId": "commons-io",
+          "version": "2.16.1",
+          "type": "jar",
+          "scope": "compile",
+          "classifier": "",
+          "optional": "false"
+        },
+        {
+          "groupId": "org.apache.commons",
+          "artifactId": "commons-lang3",
+          "version": "3.16.0",
+          "type": "jar",
+          "scope": "compile",
+          "classifier": "",
+          "optional": "false"
+        }
+        ]
+    }
+    ]
+}

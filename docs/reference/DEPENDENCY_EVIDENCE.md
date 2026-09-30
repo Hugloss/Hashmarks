@@ -151,6 +151,32 @@ Physical evidence topology and content are deliberately independent. Moving from
 
 Repository identity may itself differ between endpoints and is reported factually in `change_axes`. Hashmarks does not infer that the endpoints belong to one Git branch, one worktree lineage, or one causal history; the caller selected the endpoints. Different generations and repository identities are therefore explicit endpoint evidence, not historical storage.
 
+For comparable endpoints, the delta also exposes
+`component_selection_transitions` as a compact producer-neutral projection over
+the same qualified selection facts. Each row is keyed by stable
+`component_id` and contains only semantic selection changes for that surviving
+component:
+
+- `removed` contains before-only selection summaries;
+- `added` contains after-only selection summaries;
+- `changed` contains explicit before/after summaries when the same `node_id`
+  changed semantically.
+
+Selection summaries retain `node_id`, `version`, `source`, `marker`, and
+`contexts`, but omit physical evidence references because the parent delta
+already carries endpoint authority and provenance. Components added or removed
+as a whole remain represented by `components_added` /
+`components_removed`; they are not duplicated as component-selection
+transitions.
+
+This projection is grouping, not interpretation. Hashmarks does not pair several
+old selections with several new selections, choose a winner, compare ecosystem
+version ordering, or label a transition as an upgrade/downgrade. A consumer may
+render the unambiguous one-removed/one-added case as `old -> new`, while
+simultaneous versions, variants, sources, markers, and context changes remain
+explicit lists. Relationship-only changes produce no component-selection
+transition, and non-comparable definitions expose no transition projection.
+
 ### MCP projection modes
 
 The existing read-only `dependency_codemap` MCP tool keeps `result_mode="observation"` as the default and preserves its existing `hashmarks.mcp-dependency-codemap.v1` response shape.

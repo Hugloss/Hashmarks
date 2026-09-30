@@ -1,0 +1,67 @@
+{
+  "groupId": "hashmarks.dogfood",
+  "artifactId": "multi-alpha",
+  "version": "0.1.0",
+  "type": "jar",
+  "scope": "",
+  "classifier": "",
+  "optional": "false",
+  "children": [
+    {
+      "groupId": "com.google.guava",
+      "artifactId": "guava",
+      "version": "33.4.8-jre",
+      "type": "jar",
+      "scope": "compile",
+      "classifier": "",
+      "optional": "false",
+      "children": [
+        {
+          "groupId": "com.google.guava",
+          "artifactId": "failureaccess",
+          "version": "1.0.3",
+          "type": "jar",
+          "scope": "compile",
+          "classifier": "",
+          "optional": "false"
+        },
+        {
+          "groupId": "com.google.guava",
+          "artifactId": "listenablefuture",
+          "version": "9999.0-empty-to-avoid-conflict-with-guava",
+          "type": "jar",
+          "scope": "compile",
+          "classifier": "",
+          "optional": "false"
+        },
+        {
+          "groupId": "org.jspecify",
+          "artifactId": "jspecify",
+          "version": "1.0.0",
+          "type": "jar",
+          "scope": "compile",
+          "classifier": "",
+          "optional": "false"
+        },
+        {
+          "groupId": "com.google.errorprone",
+          "artifactId": "error_prone_annotations",
+          "version": "2.36.0",
+          "type": "jar",
+          "scope": "compile",
+          "classifier": "",
+          "optional": "false"
+        },
+        {
+          "groupId": "com.google.j2objc",
+          "artifactId": "j2objc-annotations",
+          "version": "3.0.0",
+          "type": "jar",
+          "scope": "compile",
+          "classifier": "",
+          "optional": "false"
+        }
+        ]
+    }
+    ]
+}
