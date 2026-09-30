@@ -400,6 +400,17 @@ def test_real_maven_transitive_upgrade_dogfood_preserves_large_graph_delta(
         {"3.6.0"},
         {"3.15.0"},
     )
+    transitions = {
+        row["component_id"]: row for row in delta["component_selection_transitions"]
+    }
+    assert set(transitions) == set(changed_versions)
+    assert len(transitions) == 16
+    assert [row["version"] for row in transitions["com.squareup.okhttp3:okhttp"]["removed"]] == [
+        "4.12.0"
+    ]
+    assert [row["version"] for row in transitions["com.squareup.okhttp3:okhttp"]["added"]] == [
+        "5.1.0"
+    ]
 
     before_okhttp_components = {
         row["selection"]["component_id"] for row in before_okhttp_graph["result"]
@@ -466,6 +477,10 @@ def test_real_maven_mediation_changes_only_transitive_selections(
     assert delta["components_removed"] == []
     assert len(delta["selections_added"]) == 5
     assert len(delta["selections_removed"]) == 5
+    assert {
+        row["component_id"] for row in delta["component_selection_transitions"]
+    } == set(changed_versions)
+    assert len(delta["component_selection_transitions"]) == 5
     assert before_graph["completeness"] == "complete"
     assert after_graph["completeness"] == "complete"
 
@@ -515,6 +530,7 @@ def test_real_maven_exclusion_removes_complete_transitive_branch(
     assert delta["selections_added"] == []
     assert len(delta["relationships_removed"]) == 6
     assert delta["relationships_added"] == []
+    assert delta["component_selection_transitions"] == []
     assert all(result["result"] == [] for result in removed_absence)
     assert all(
         result["negative_evidence"] == "admissible-within-declared-scope"
@@ -551,6 +567,10 @@ def test_real_maven_bom_upgrade_changes_many_versions_without_component_churn(
     assert delta["components_removed"] == []
     assert len(delta["selections_added"]) == 17
     assert len(delta["selections_removed"]) == 17
+    assert {
+        row["component_id"] for row in delta["component_selection_transitions"]
+    } == set(changed_versions)
+    assert len(delta["component_selection_transitions"]) == 17
 
 
 def test_real_maven_multi_module_change_propagates_across_contexts(
@@ -608,6 +628,10 @@ def test_real_maven_multi_module_change_propagates_across_contexts(
     )
     assert len(delta["components_added"]) == 1
     assert len(delta["components_removed"]) == 2
+    assert {
+        row["component_id"] for row in delta["component_selection_transitions"]
+    } == set(changed_versions)
+    assert len(delta["component_selection_transitions"]) == 3
     assert all(graph["completeness"] == "complete" for graph in before_graphs.values())
     assert all(graph["completeness"] == "complete" for graph in after_graphs.values())
 
