@@ -1,0 +1,68 @@
+{
+  "schema": "hashmarks.repository-evaluation-grader.v1",
+  "suite": "heldout-v1-doctor-scheduler-core",
+  "cases": {
+    "doctor-scheduler-core:parse-request-reason": {
+      "expected_edit_path": "src/doctor_scheduler_solver_service/request_intents.py",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "src/doctor_scheduler_solver_service/request_intents.py"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "parse_request_reason"
+    },
+    "doctor-scheduler-core:request-matches-window": {
+      "expected_edit_path": "src/doctor_scheduler_solver_service/request_intents.py",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "src/doctor_scheduler_solver_service/request_intents.py"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "request_matches_window"
+    },
+    "doctor-scheduler-core:weekly-intent-window": {
+      "expected_edit_path": "src/doctor_scheduler_solver_service/request_intents.py",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "src/doctor_scheduler_solver_service/request_intents.py"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "weekly_intent_matches_window"
+    },
+    "doctor-scheduler-core:make-json-safe": {
+      "expected_edit_path": "src/doctor_scheduler_solver_service/utils.py",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "src/doctor_scheduler_solver_service/utils.py"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "make_json_safe"
+    },
+    "doctor-scheduler-core:safe-slug": {
+      "expected_edit_path": "src/doctor_scheduler_solver_service/utils.py",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "src/doctor_scheduler_solver_service/utils.py"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "safe_slug"
+    },
+    "doctor-scheduler-core:ambiguous-draft-repair": {
+      "expected_edit_path": "",
+      "must_be_ambiguous": true,
+      "source_declaration_paths": [
+        "src/doctor_scheduler_solver_service/compute.py",
+        "src/doctor_scheduler_solver_service/workflows/draft_repairs.py",
+        "src/doctor_scheduler_solver_service/processor.py"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "repair_lone_half_days_snapshot"
+    }
+  }
+}

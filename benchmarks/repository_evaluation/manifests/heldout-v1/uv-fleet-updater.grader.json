@@ -1,0 +1,67 @@
+{
+  "schema": "hashmarks.repository-evaluation-grader.v1",
+  "suite": "heldout-v1-uv-fleet-updater",
+  "cases": {
+    "uv-fleet-updater:read-invalidation": {
+      "expected_edit_path": "ux/src/domain/reads/readInvalidation.ts",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "ux/src/domain/reads/readInvalidation.ts"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "readScopesInvalidatedByMutation"
+    },
+    "uv-fleet-updater:resource-invalidation": {
+      "expected_edit_path": "ux/src/domain/reads/readResources.ts",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "ux/src/domain/reads/readResources.ts"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "resourcesInvalidatedByMutation"
+    },
+    "uv-fleet-updater:refresh-outcome": {
+      "expected_edit_path": "ux/src/domain/mutations/WriteCommandResult.ts",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "ux/src/domain/mutations/WriteCommandResult.ts"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "expected_verify_path": "ux/src/domain/mutations/WriteCommandResult.test.ts",
+      "source_symbol": "withRefreshOutcome"
+    },
+    "uv-fleet-updater:fleet-run-terminal": {
+      "expected_edit_path": "ux/src/domain/fleet/runLifecycle.ts",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "ux/src/domain/fleet/runLifecycle.ts"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "isFleetRunTerminal"
+    },
+    "uv-fleet-updater:http-read-request": {
+      "expected_edit_path": "ux/src/app/api/httpTransport.ts",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "ux/src/app/api/httpTransport.ts"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "readRequest"
+    },
+    "uv-fleet-updater:run-poll-delay": {
+      "expected_edit_path": "ux/src/domain/fleet/runLifecycle.ts",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "ux/src/domain/fleet/runLifecycle.ts"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "runPollDelay"
+    }
+  }
+}

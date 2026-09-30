@@ -1,0 +1,68 @@
+{
+  "schema": "hashmarks.repository-evaluation-grader.v1",
+  "suite": "heldout-v1-doctor-scheduler-frontend",
+  "cases": {
+    "doctor-scheduler-frontend:canonical-schedule-scope": {
+      "expected_edit_path": "convex/scheduleRevisionModel.ts",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "convex/scheduleRevisionModel.ts"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "canonicalScheduleScope"
+    },
+    "doctor-scheduler-frontend:schedule-content-hash": {
+      "expected_edit_path": "convex/scheduleRevisionModel.ts",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "convex/scheduleRevisionModel.ts"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "expected_verify_path": "convex/scheduleRevisionModel.test.ts",
+      "source_symbol": "scheduleContentHash"
+    },
+    "doctor-scheduler-frontend:convex-json-overload": {
+      "expected_edit_path": "convex/jsonPayloadEncoding.ts",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "convex/jsonPayloadEncoding.ts"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "encodeConvexJsonPayload"
+    },
+    "doctor-scheduler-frontend:assignment-rows": {
+      "expected_edit_path": "convex/scheduleNormalization.ts",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "convex/scheduleNormalization.ts"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "assignmentRowsForSchedule"
+    },
+    "doctor-scheduler-frontend:normalize-url": {
+      "expected_edit_path": "src/core/urlUtils.ts",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "src/core/urlUtils.ts"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "normalizeUrl"
+    },
+    "doctor-scheduler-frontend:department-selection": {
+      "expected_edit_path": "src/hooks/general/useDepartmentSelectionGuard.ts",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "src/hooks/general/useDepartmentSelectionGuard.ts"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "expected_verify_path": "src/hooks/general/useDepartmentSelectionGuard.dom.test.ts",
+      "source_symbol": "useDepartmentSelectionGuard"
+    }
+  }
+}

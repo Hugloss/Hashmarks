@@ -1,0 +1,44 @@
+{
+  "schema": "hashmarks.repository-evaluation-heldout.v1",
+  "suite": "heldout-v1",
+  "source_kind": "exact-git-archive",
+  "label_basis": "direct source declarations and importing tests, separate from CodeMap outputs",
+  "repositories": {
+    "hashmarks": {
+      "language": "python",
+      "url": "https://github.com/Hugloss/Hashmarks.git",
+      "commit": "85453be578e8ff46b8d79b363f140a915d6804f6",
+      "tree": "667b7066be9ef6cab6e1ce3a28a603481f07387e",
+      "content_identity": "sha256:70e3cac672bd6a2bc5daca5457e80f79cf99980c0cc5ef8777f1921d523a7e46:619",
+      "cases_file": "hashmarks.cases.json",
+      "grader_file": "hashmarks.grader.json"
+    },
+    "doctor-scheduler-core": {
+      "language": "python",
+      "url": "https://github.com/Hugloss/doctor-scheduler-core.git",
+      "commit": "6d1080136d54fb6da142dff2e302b31da69cd345",
+      "tree": "e91dbeaaaf100e2c673308ebca7d0325a314e9a0",
+      "content_identity": "sha256:9dd95a38f6b7cb8047ec5c38c3904432e61feff377389a84858f16b8f356e56f:373",
+      "cases_file": "doctor-scheduler-core.cases.json",
+      "grader_file": "doctor-scheduler-core.grader.json"
+    },
+    "doctor-scheduler-frontend": {
+      "language": "typescript",
+      "url": "https://github.com/Hugloss/doctor-scheduler-frontend.git",
+      "commit": "618bdbdfef1a6a2267433970fd9ff5ffd8af5b10",
+      "tree": "b0a102602cf13f9d45b30ef1b64c1608a9a33ecf",
+      "content_identity": "sha256:96a051d159f4e24945c5d041f5a08c7ecb09467e231a48e631ac61d1a829f7b2:667",
+      "cases_file": "doctor-scheduler-frontend.cases.json",
+      "grader_file": "doctor-scheduler-frontend.grader.json"
+    },
+    "uv-fleet-updater": {
+      "language": "typescript",
+      "url": "https://github.com/Hugloss/uv-fleet-updater.git",
+      "commit": "fbfad7ad14d96d2cb51a6da931b0fb1a60f66e9d",
+      "tree": "3ded8be71da0ac93700dcf3a3af76eb172e75ff8",
+      "content_identity": "sha256:bb9ded57f61328bd506d9d34225a6aadcf3699f503a6e5421273fa9147defdee:529",
+      "cases_file": "uv-fleet-updater.cases.json",
+      "grader_file": "uv-fleet-updater.grader.json"
+    }
+  }
+}

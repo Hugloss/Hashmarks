@@ -86,3 +86,32 @@ def test_incremental_scope_removes_previously_admitted_dependency_rows(
         result = codemap.sync(paths=[dep_rel])
         assert result.discovered == 0
         assert dep_rel not in codemap.store.paths()
+
+
+def test_nested_repository_marker_removes_parent_scope_without_hiding_untracked_files(
+    tmp_path: Path,
+) -> None:
+    parent = tmp_path / "parent"
+    nested = parent / "scratch" / "worker"
+    nested.mkdir(parents=True)
+    (parent / "draft.py").write_text("def draft():\n    return 1\n")
+    (nested / "owner.py").write_text("def owner():\n    return 2\n")
+    state = tmp_path / "state"
+
+    with CodeMap(
+        parent, state_dir=state, artifact_db=state / "artifacts.sqlite3"
+    ) as codemap:
+        assert codemap.sync().discovered == 2
+        assert codemap.store.paths() == {"draft.py", "scratch/worker/owner.py"}
+
+        # A nested Git worktree has a .git file. It is a different repository
+        # even when its files are physically below the selected workspace.
+        (nested / ".git").write_text("gitdir: /some/other/repository\n")
+        assert codemap.sync(paths=["scratch/worker/owner.py"]).discovered == 0
+        assert codemap.store.paths() == {"draft.py"}
+        assert codemap.sync().discovered == 1
+        assert codemap.store.paths() == {"draft.py"}
+
+    with CodeMap(nested, state_dir=tmp_path / "nested-state") as selected:
+        assert selected.sync().discovered == 1
+        assert selected.store.paths() == {"owner.py"}

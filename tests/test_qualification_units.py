@@ -205,6 +205,30 @@ def test_repository_identity_ignores_runtime_materialization_but_binds_source(
     assert repository_content_identity(a) != repository_content_identity(b)
 
 
+def test_repository_identity_excludes_git_metadata_and_nested_checkout(
+    tmp_path: Path,
+) -> None:
+    from hashmarks.test_shards import repository_content_identity
+
+    extracted = tmp_path / "extracted"
+    checkout = tmp_path / "checkout"
+    for root in (extracted, checkout):
+        (root / "src").mkdir(parents=True)
+        (root / "src" / "owner.py").write_text("VALUE = 1\n")
+    baseline = repository_content_identity(extracted)
+    (checkout / ".git" / "objects").mkdir(parents=True)
+    (checkout / ".git" / "objects" / "irrelevant").write_text("host metadata")
+    nested = checkout / "scratch" / "worker"
+    nested.mkdir(parents=True)
+    (nested / ".git").write_text("gitdir: /another/repository\n")
+    (nested / "duplicate.py").write_text("VALUE = 2\n")
+    assert repository_content_identity(checkout) == baseline
+    (nested / "duplicate.py").write_text("VALUE = 3\n")
+    assert repository_content_identity(checkout) == baseline
+    (extracted / ".git").write_text("gitdir: /another/repository\n")
+    assert repository_content_identity(extracted) == baseline
+
+
 def test_repository_identity_can_exclude_declared_runtime_state_path(
     tmp_path: Path,
 ) -> None:

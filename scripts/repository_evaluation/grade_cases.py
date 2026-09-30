@@ -27,9 +27,9 @@ def _classification(
     wrong_resolved_classification: str,
 ) -> str:
     if expected_ambiguous:
-        if not ambiguous:
+        if actual_path and not ambiguous:
             return "FALSE_UNIQUE"
-        return "AMBIGUOUS_EXPECTED"
+        return "AMBIGUOUS_EXPECTED" if ambiguous else "NO_ANSWER"
     if not actual_path:
         return "NO_ANSWER"
     if actual_path == expected_path:
@@ -48,7 +48,29 @@ def _failure_stage(
         return "RETRIEVAL_MISS"
     if classification in {"FALSE_UNIQUE", "WRONG_AMBIGUOUS", "NO_ANSWER"}:
         return "AMBIGUITY_ERROR"
+    if classification == "WRONG_VERIFIER":
+        return "VERIFICATION_PROJECTION_DISPLACEMENT"
+    if classification == "CONSUMER_ACTION_LEAK":
+        return "AUTHORITY_BOUNDARY_ERROR"
     return "ACTION_PROJECTION_DISPLACEMENT"
+
+
+def _observed_action_fields(action: Mapping[str, object]) -> dict[str, object]:
+    edit_value = action.get("edit")
+    ambiguity_value = action.get("ambiguity")
+    verify_value = action.get("verify")
+    authority_value = action.get("ownership_authority")
+    edit = edit_value if isinstance(edit_value, Mapping) else {}
+    ambiguity = ambiguity_value if isinstance(ambiguity_value, Mapping) else {}
+    verify = verify_value if isinstance(verify_value, Mapping) else {}
+    authority = authority_value if isinstance(authority_value, Mapping) else {}
+    return {
+        "path": str(edit.get("path") or ""),
+        "qualname": str(edit.get("qualname") or ""),
+        "ambiguous": bool(ambiguity.get("ambiguous")),
+        "verify_path": str(verify.get("path") or ""),
+        "consumer_action": str(authority.get("consumer_action") or ""),
+    }
 
 
 def _grade_case(
@@ -58,16 +80,13 @@ def _grade_case(
     action = result.get("action") if isinstance(result, Mapping) else None
     if not isinstance(action, Mapping):
         raise ValueError(f"missing task action result for {case_id}")
-    edit_value = action.get("edit")
-    ambiguity_value = action.get("ambiguity")
-    edit = edit_value if isinstance(edit_value, Mapping) else {}
-    ambiguity = ambiguity_value if isinstance(ambiguity_value, Mapping) else {}
-    actual_path = str(edit.get("path") or "")
-    actual_qualname = str(edit.get("qualname") or "")
+    observed = _observed_action_fields(action)
+    actual_path = str(observed["path"])
+    actual_qualname = str(observed["qualname"])
     expected_path = str(rule.get("expected_edit_path") or "")
     expected_qualname = str(rule.get("expected_edit_qualname") or "")
     expected_ambiguous = bool(rule.get("must_be_ambiguous", False))
-    ambiguous = bool(ambiguity.get("ambiguous"))
+    ambiguous = bool(observed["ambiguous"])
     classification = _classification(
         actual_path=actual_path,
         ambiguous=ambiguous,
@@ -83,6 +102,20 @@ def _grade_case(
         and actual_qualname != expected_qualname
     ):
         classification = "OTHER_FAILURE"
+    expected_verify_path = str(rule.get("expected_verify_path") or "")
+    if (
+        classification == "PASS"
+        and expected_verify_path
+        and observed["verify_path"] != expected_verify_path
+    ):
+        classification = "WRONG_VERIFIER"
+    expected_consumer_action = str(rule.get("expected_consumer_action") or "")
+    if (
+        classification in {"PASS", "AMBIGUOUS_EXPECTED"}
+        and expected_consumer_action
+        and observed["consumer_action"] != expected_consumer_action
+    ):
+        classification = "CONSUMER_ACTION_LEAK"
     retrieval = result.get("retrieval") if isinstance(result, Mapping) else None
     retrieval_paths = {
         str(row.get("path") or "")
@@ -99,6 +132,10 @@ def _grade_case(
         "expected_edit_path": expected_path,
         "expected_edit_qualname": expected_qualname,
         "expected_ambiguous": expected_ambiguous,
+        "actual_verify_path": observed["verify_path"],
+        "expected_verify_path": expected_verify_path,
+        "actual_consumer_action": observed["consumer_action"],
+        "expected_consumer_action": expected_consumer_action,
     }
 
 
@@ -117,6 +154,8 @@ def grade_run(
         "WRONG_AMBIGUOUS": 0,
         "NO_ANSWER": 0,
         "OTHER_FAILURE": 0,
+        "WRONG_VERIFIER": 0,
+        "CONSUMER_ACTION_LEAK": 0,
     }
     rows: list[dict[str, object]] = []
     seen: set[str] = set()

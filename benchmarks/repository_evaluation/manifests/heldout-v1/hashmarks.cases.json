@@ -1,0 +1,48 @@
+{
+  "schema": "hashmarks.repository-evaluation-cases.v1",
+  "suite": "heldout-v1-hashmarks",
+  "cases": [
+    {
+      "id": "hashmarks:paths-under",
+      "operation": "task_action_map",
+      "task": "optimize WorkspaceMapStore.paths_under",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "hashmarks:sync-remove-stale",
+      "operation": "task_action_map",
+      "task": "optimize _sync_remove_stale_paths",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "hashmarks:prune-discovery",
+      "operation": "task_action_map",
+      "task": "Change RepositoryFileDiscoveryMixin._prune_discovery_dirs",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "hashmarks:mcp-task-evidence",
+      "operation": "task_action_map",
+      "task": "Change HashmarksMcpSurface.task_evidence",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "hashmarks:repository-content-identity",
+      "operation": "task_action_map",
+      "task": "Change repository_content_identity",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "hashmarks:ambiguous-task-evidence",
+      "operation": "task_action_map",
+      "task": "Inspect task_evidence ownership without editing any files",
+      "limit": 20,
+      "per_role": 3
+    }
+  ]
+}

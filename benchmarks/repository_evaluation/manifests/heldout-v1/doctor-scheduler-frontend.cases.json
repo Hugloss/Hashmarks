@@ -1,0 +1,48 @@
+{
+  "schema": "hashmarks.repository-evaluation-cases.v1",
+  "suite": "heldout-v1-doctor-scheduler-frontend",
+  "cases": [
+    {
+      "id": "doctor-scheduler-frontend:canonical-schedule-scope",
+      "operation": "task_action_map",
+      "task": "Fix canonicalScheduleScope",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "doctor-scheduler-frontend:schedule-content-hash",
+      "operation": "task_action_map",
+      "task": "Fix scheduleContentHash",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "doctor-scheduler-frontend:convex-json-overload",
+      "operation": "task_action_map",
+      "task": "Fix encodeConvexJsonPayload",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "doctor-scheduler-frontend:assignment-rows",
+      "operation": "task_action_map",
+      "task": "Fix assignmentRowsForSchedule",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "doctor-scheduler-frontend:normalize-url",
+      "operation": "task_action_map",
+      "task": "Fix normalizeUrl",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "doctor-scheduler-frontend:department-selection",
+      "operation": "task_action_map",
+      "task": "Fix useDepartmentSelectionGuard",
+      "limit": 20,
+      "per_role": 3
+    }
+  ]
+}

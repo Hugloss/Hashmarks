@@ -256,6 +256,7 @@ def selection_input_identity(root: Path) -> str:
 
 _REPOSITORY_IDENTITY_EXCLUDED_DIRS = frozenset(
     {
+        ".git",
         ".venv",
         ".hashmarks",
         ".pytest_cache",
@@ -289,9 +290,12 @@ def _repository_identity_files(
             name
             for name in dirnames
             if name not in _REPOSITORY_IDENTITY_EXCLUDED_DIRS
+            and not (directory / name / ".git").exists()
             and not _is_excluded_identity_path(directory / name, excluded_roots)
         )
         for name in sorted(filenames):
+            if name == ".git":
+                continue
             path = directory / name
             if path.suffix in _REPOSITORY_IDENTITY_EXCLUDED_SUFFIXES:
                 continue
