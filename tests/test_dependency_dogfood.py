@@ -52,7 +52,9 @@ def _maven_multi_module_observation(state: str) -> dict[str, object]:
     base = _FIXTURES / "maven" / "multi-module" / state / "captures"
     contexts = ("alpha", "beta")
     return maven_dependency_observation(
-        trees={context: (base / context / "tree.json").read_bytes() for context in contexts},
+        trees={
+            context: (base / context / "tree.json").read_bytes() for context in contexts
+        },
         inventories={
             context: (base / context / "list.txt").read_bytes() for context in contexts
         },
@@ -65,7 +67,9 @@ def _maven_profile_observation() -> dict[str, object]:
     base = _FIXTURES / "maven" / "profiles"
     contexts = ("default", "extra")
     return maven_dependency_observation(
-        trees={context: (base / context / "tree.json").read_bytes() for context in contexts},
+        trees={
+            context: (base / context / "tree.json").read_bytes() for context in contexts
+        },
         inventories={
             context: (base / context / "list.txt").read_bytes() for context in contexts
         },
@@ -106,7 +110,9 @@ def _selection(
 
 
 def _root_id(observation: dict[str, object], context: str) -> str:
-    return next(row["node_id"] for row in observation["roots"] if row["context"] == context)
+    return next(
+        row["node_id"] for row in observation["roots"] if row["context"] == context
+    )
 
 
 def _direct_components(
@@ -499,9 +505,10 @@ def test_real_maven_exclusion_removes_complete_transitive_branch(
     assert delta["causation"] == "not-inferred"
     assert before_direct == after_direct
     assert len(before_direct) == 1
-    assert _selection(before, direct_component)["version"] == _selection(
-        after, direct_component
-    )["version"]
+    assert (
+        _selection(before, direct_component)["version"]
+        == _selection(after, direct_component)["version"]
+    )
     assert delta["components_added"] == []
     assert len(delta["components_removed"]) == 6
     assert len(delta["selections_removed"]) == 6
