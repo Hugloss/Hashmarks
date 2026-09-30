@@ -12,7 +12,7 @@ from .python_ast import PYTHON_PARSER, estimate_tokens, lexical_records, parse_p
 if TYPE_CHECKING:
     from .providers import TreeSitterRangeProvider
 
-NODE_PARSER = "hashmarks.ecmascript-outline.v3"
+NODE_PARSER = "hashmarks.ecmascript-outline.v4"
 GO_PARSER = "hashmarks.go-outline.v2"
 RUST_PARSER = "hashmarks.rust-outline.v2"
 PATH_ONLY_PARSER = "hashmarks.path-only.v3"
@@ -84,7 +84,7 @@ def _symbol(
 def _node_declaration(stripped: str, line_no: int) -> SymbolRecord | None:
     """Classify one advisory JS/TS declaration without inferring its RHS."""
     match = re.match(
-        r"^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)",
+        r"^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*(?:<[^()\n]*>\s*)?\(",
         stripped,
     )
     if match:
@@ -179,6 +179,53 @@ def _node_outline(source: str, *, file_digest: str, language: str) -> ParsedArti
         symbols=tuple(symbols),
         edges=tuple(edges),
         lexical=lexical_records(source),
+    )
+
+
+def _typescript_implementation_symbols(
+    symbols: tuple[SymbolRecord, ...], source: str
+) -> tuple[SymbolRecord, ...]:
+    """Join only adjacent same-scope overload signatures to their implementation."""
+    lines = source.splitlines()
+
+    def is_signature(symbol: SymbolRecord) -> bool:
+        if symbol.kind != "function" or not 1 <= symbol.start_line <= len(lines):
+            return False
+        line = lines[symbol.start_line - 1].strip()
+        return line.endswith(";") and "{" not in line
+
+    by_line = {symbol.start_line: symbol for symbol in symbols}
+
+    def has_adjacent_implementation(signature: SymbolRecord) -> bool:
+        for line_number in range(signature.start_line + 1, len(lines) + 1):
+            if not lines[line_number - 1].strip():
+                continue
+            following = by_line.get(line_number)
+            if following is None or (
+                following.qualname,
+                following.parent,
+                following.kind,
+            ) != (signature.qualname, signature.parent, "function"):
+                return False
+            if not is_signature(following):
+                return True
+        return False
+
+    return tuple(
+        symbol
+        for symbol in symbols
+        if not is_signature(symbol) or not has_adjacent_implementation(symbol)
+    )
+
+
+def _normalize_node_symbols(
+    artifact: ParsedArtifact, source: str, language: str
+) -> ParsedArtifact:
+    if language != "typescript":
+        return artifact
+    return replace(
+        artifact,
+        symbols=_typescript_implementation_symbols(artifact.symbols, source),
     )
 
 
@@ -368,6 +415,7 @@ def parse_source(
 
     if range_provider is not None:
         artifact = range_provider.enrich(artifact, source, language)
+    artifact = _normalize_node_symbols(artifact, source, language)
     unique_symbols = _unique_symbol_occurrences(artifact.symbols)
     if unique_symbols != artifact.symbols:
         artifact = replace(artifact, symbols=unique_symbols)

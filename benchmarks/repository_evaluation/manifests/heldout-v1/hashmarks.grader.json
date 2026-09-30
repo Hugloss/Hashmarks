@@ -1,0 +1,73 @@
+{
+  "schema": "hashmarks.repository-evaluation-grader.v1",
+  "suite": "heldout-v1-hashmarks",
+  "cases": {
+    "hashmarks:paths-under": {
+      "expected_edit_path": "hashmarks/codemap/repository_index_store.py",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "hashmarks/codemap/repository_index_store.py"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "expected_verify_path": "tests/test_exact_identifier_owner_preservation.py",
+      "source_symbol": "paths_under"
+    },
+    "hashmarks:sync-remove-stale": {
+      "expected_edit_path": "hashmarks/codemap/indexing_lifecycle.py",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "hashmarks/codemap/indexing_lifecycle.py"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "expected_verify_path": "tests/test_exact_identifier_owner_preservation.py",
+      "source_symbol": "_sync_remove_stale_paths"
+    },
+    "hashmarks:prune-discovery": {
+      "expected_edit_path": "hashmarks/codemap/repository_file_discovery.py",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "hashmarks/codemap/repository_file_discovery.py"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "_prune_discovery_dirs"
+    },
+    "hashmarks:mcp-task-evidence": {
+      "expected_edit_path": "hashmarks/mcp_surface.py",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "hashmarks/mcp_surface.py"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "expected_verify_path": "tests/test_mcp_surface.py",
+      "source_symbol": "task_evidence"
+    },
+    "hashmarks:repository-content-identity": {
+      "expected_edit_path": "hashmarks/test_shards.py",
+      "must_be_ambiguous": false,
+      "source_declaration_paths": [
+        "hashmarks/test_shards.py"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "source_symbol": "repository_content_identity"
+    },
+    "hashmarks:ambiguous-task-evidence": {
+      "expected_edit_path": "",
+      "must_be_ambiguous": true,
+      "source_declaration_paths": [
+        "hashmarks/codemap/evidence_packet.py",
+        "hashmarks/codemap/service.py",
+        "hashmarks/mcp_surface.py",
+        "hashmarks/mcp_server.py"
+      ],
+      "qualification_state": "qualification",
+      "label_basis": "direct source declaration, with test import when expected_verify_path is set",
+      "expected_consumer_action": "external",
+      "source_symbol": "task_evidence"
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "schema": "hashmarks.repository-evaluation-cases.v1",
+  "suite": "heldout-v1-doctor-scheduler-core",
+  "cases": [
+    {
+      "id": "doctor-scheduler-core:parse-request-reason",
+      "operation": "task_action_map",
+      "task": "Fix parse_request_reason",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "doctor-scheduler-core:request-matches-window",
+      "operation": "task_action_map",
+      "task": "Fix request_matches_window",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "doctor-scheduler-core:weekly-intent-window",
+      "operation": "task_action_map",
+      "task": "Fix weekly_intent_matches_window",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "doctor-scheduler-core:make-json-safe",
+      "operation": "task_action_map",
+      "task": "Fix make_json_safe",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "doctor-scheduler-core:safe-slug",
+      "operation": "task_action_map",
+      "task": "Fix safe_slug",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "doctor-scheduler-core:ambiguous-draft-repair",
+      "operation": "task_action_map",
+      "task": "Inspect repair_lone_half_days_snapshot ownership",
+      "limit": 20,
+      "per_role": 3
+    }
+  ]
+}

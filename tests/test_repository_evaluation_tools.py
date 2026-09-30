@@ -62,6 +62,7 @@ def test_repository_evaluation_scripts_are_directly_executable() -> None:
         "profile_cases.py",
         "compare_profiles.py",
         "merge_profiles.py",
+        "run_heldout.py",
     ):
         completed = subprocess.run(
             [
@@ -308,6 +309,90 @@ def test_repository_evaluation_grader_distinguishes_over_and_wrong_ambiguity() -
     report = grade_run(run=wrong, grader=_grader())
     assert report["counters"]["WRONG_AMBIGUOUS"] == 1
     assert report["cases"][0]["failure_stage"] == "AMBIGUITY_ERROR"
+
+
+def test_repository_evaluation_grader_preserves_unknown_and_verifier_failures() -> None:
+    run = {
+        "cases": [
+            {
+                "id": "unknown",
+                "result": {
+                    "retrieval": [],
+                    "action": {"edit": None, "ambiguity": {"ambiguous": False}},
+                },
+            },
+            {
+                "id": "verifier",
+                "result": {
+                    "retrieval": [{"path": "src/owner.py"}],
+                    "action": {
+                        "edit": {"path": "src/owner.py"},
+                        "verify": {"path": "tests/test_other.py"},
+                        "ambiguity": {"ambiguous": False},
+                    },
+                },
+            },
+            {
+                "id": "intent",
+                "result": {
+                    "retrieval": [],
+                    "action": {
+                        "edit": None,
+                        "ambiguity": {"ambiguous": True},
+                        "ownership_authority": {"consumer_action": "edit"},
+                    },
+                },
+            },
+        ]
+    }
+    grader = {
+        "cases": {
+            "unknown": {"must_be_ambiguous": True},
+            "verifier": {
+                "expected_edit_path": "src/owner.py",
+                "expected_verify_path": "tests/test_owner.py",
+            },
+            "intent": {
+                "must_be_ambiguous": True,
+                "expected_consumer_action": "external",
+            },
+        }
+    }
+    rows = {row["id"]: row for row in grade_run(run=run, grader=grader)["cases"]}
+    assert rows["unknown"]["classification"] == "NO_ANSWER"
+    assert rows["verifier"]["classification"] == "WRONG_VERIFIER"
+    assert rows["intent"]["classification"] == "CONSUMER_ACTION_LEAK"
+
+
+def test_heldout_corpus_keeps_answer_blind_cross_language_membership() -> None:
+    root = (
+        Path(__file__).resolve().parents[1]
+        / "benchmarks/repository_evaluation/manifests/heldout-v1"
+    )
+    suite = json.loads((root / "suite.json").read_text(encoding="utf-8"))
+    counts = {"python": 0, "typescript": 0}
+    states: list[str] = []
+    verifier_cases = 0
+    ambiguous_cases = 0
+    for definition in suite["repositories"].values():
+        cases = json.loads(
+            (root / definition["cases_file"]).read_text(encoding="utf-8")
+        )["cases"]
+        grader = json.loads(
+            (root / definition["grader_file"]).read_text(encoding="utf-8")
+        )["cases"]
+        assert {case["id"] for case in cases} == set(grader)
+        assert all("expected_edit_path" not in case for case in cases)
+        counts[definition["language"]] += len(cases)
+        for rule in grader.values():
+            states.append(rule["qualification_state"])
+            verifier_cases += bool(rule.get("expected_verify_path"))
+            ambiguous_cases += bool(rule["must_be_ambiguous"])
+            assert rule["source_declaration_paths"]
+    assert counts == {"python": 12, "typescript": 12}
+    assert states == ["qualification"] * 24
+    assert verifier_cases >= 4
+    assert ambiguous_cases >= 2
 
 
 def test_repository_evaluation_grader_covers_classification_and_failure_stages() -> (

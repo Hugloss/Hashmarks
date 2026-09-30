@@ -53,12 +53,23 @@ class _AdmittedRepositoryFile:
 class RepositoryFileDiscoveryMixin:
     """Canonical admission and traversal for repository-owned file surfaces."""
 
+    def _inside_nested_repository(self, rel: str) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        directory = self.workspace
+        for part in PurePosixPath(rel).parts:
+            directory /= part
+            if (directory / ".git").exists():
+                return True
+        return False
+
     def _path_admitted_for_analysis(self, rel: str) -> bool:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         return (
             not self._internal_path(rel)
             and not _is_pruned_relative_path(rel)
+            and not self._inside_nested_repository(rel)
             and self.policy.decide(rel).index
         )
 
@@ -80,6 +91,7 @@ class RepositoryFileDiscoveryMixin:
             for name in dirs
             if name not in _PRUNE_DIRS
             and not self._internal_path(f"{root_rel}/{name}".strip("/"))
+            and not (root_path / name / ".git").exists()
         )
 
     def _admitted_repository_file(

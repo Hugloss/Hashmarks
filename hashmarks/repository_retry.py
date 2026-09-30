@@ -28,7 +28,7 @@ def is_transient_repository_race(exc: BaseException) -> bool:
     if not isinstance(exc, RuntimeError):
         return False
     message = str(exc)
-    return any(marker in message for marker in _TRANSIENT_RUNTIME_MESSAGES)
+    return message.startswith(_TRANSIENT_RUNTIME_MESSAGES)
 
 
 def retry_transient_repository_race(operation: Callable[[], _T]) -> _T:

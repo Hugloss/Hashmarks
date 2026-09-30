@@ -1,0 +1,48 @@
+{
+  "schema": "hashmarks.repository-evaluation-cases.v1",
+  "suite": "heldout-v1-uv-fleet-updater",
+  "cases": [
+    {
+      "id": "uv-fleet-updater:read-invalidation",
+      "operation": "task_action_map",
+      "task": "Fix readScopesInvalidatedByMutation",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "uv-fleet-updater:resource-invalidation",
+      "operation": "task_action_map",
+      "task": "Fix resourcesInvalidatedByMutation",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "uv-fleet-updater:refresh-outcome",
+      "operation": "task_action_map",
+      "task": "Fix withRefreshOutcome",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "uv-fleet-updater:fleet-run-terminal",
+      "operation": "task_action_map",
+      "task": "Fix isFleetRunTerminal",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "uv-fleet-updater:http-read-request",
+      "operation": "task_action_map",
+      "task": "Fix readRequest",
+      "limit": 20,
+      "per_role": 3
+    },
+    {
+      "id": "uv-fleet-updater:run-poll-delay",
+      "operation": "task_action_map",
+      "task": "Fix runPollDelay",
+      "limit": 20,
+      "per_role": 3
+    }
+  ]
+}

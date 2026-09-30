@@ -293,12 +293,16 @@ def test_release_profile_installs_mcp_before_full_native_qualification() -> None
     assert "Prove MCP concurrency stress before publication" in release_job
     assert "for attempt in 1 2 3; do" in release_job
     assert release_job.count("make mcp-concurrency-stress") == 1
+    assert (
+        'MCP_STRESS_RECEIPT="dist/mcp-concurrency-stress-attempt-$attempt.json"'
+        in release_job
+    )
     assert release_job.index("make test-profile") < release_job.index(
         "make mcp-concurrency-stress"
     )
     assert "Preserve MCP concurrency stress receipt" in release_job
     assert "if: always()" in release_job
-    assert "path: dist/mcp-concurrency-stress.json" in release_job
+    assert "path: dist/mcp-concurrency-stress-attempt-*.json" in release_job
     assert release_job.index("make mcp-concurrency-stress") < release_job.index(
         "Preserve MCP concurrency stress receipt"
     )
@@ -307,8 +311,11 @@ def test_release_profile_installs_mcp_before_full_native_qualification() -> None
 def test_publish_preserves_mcp_concurrency_receipt_before_rebuilding_dist() -> None:
     text = _publish_workflow_text()
     build_job = text.split("  build:\n", 1)[1].split("\n  standalone-linux:\n", 1)[0]
+    makefile = (_root() / "Makefile").read_text(encoding="utf-8")
 
     assert "Run MCP concurrency stress" in build_job
+    assert "MCP_STRESS_RECEIPT ?= dist/mcp-concurrency-stress.json" in makefile
+    assert '--receipt "$(MCP_STRESS_RECEIPT)"' in makefile
     assert "Preserve MCP concurrency stress receipt" in build_job
     assert "if: always()" in build_job
     assert "path: dist/mcp-concurrency-stress.json" in build_job

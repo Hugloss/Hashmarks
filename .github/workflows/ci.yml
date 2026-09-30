@@ -161,14 +161,14 @@ jobs:
         run: |
           for attempt in 1 2 3; do
             echo "MCP concurrency stress attempt $attempt/3"
-            make mcp-concurrency-stress
+            make mcp-concurrency-stress MCP_STRESS_RECEIPT="dist/mcp-concurrency-stress-attempt-$attempt.json"
           done
       - name: Preserve MCP concurrency stress receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hashmarks-mcp-concurrency-stress-${{ github.sha }}
-          path: dist/mcp-concurrency-stress.json
+          path: dist/mcp-concurrency-stress-attempt-*.json
           if-no-files-found: warn
           retention-days: 14
       - name: Smoke artifacts without changing existing dist

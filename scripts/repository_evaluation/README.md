@@ -49,3 +49,30 @@ compares independent cold indexes with an edit/revert ABA history and records
 whether identical repository content can produce a different visible fallback
 retrieval subset. A `STABLE_CONTRACT_REQUIRED` decision is correctness evidence,
 not permission to treat an ordering rewrite as a transparent optimization.
+
+## Pinned Python and TypeScript held-out corpus
+
+`benchmarks/repository_evaluation/manifests/heldout-v1/suite.json` pins four
+repository commits and exact extracted-tree content identities. The public
+case files contain tasks only. Separate grader files contain directly inspected
+source declaration paths, ambiguity labels, and test paths. The corpus has 12
+Python and 12 TypeScript qualification cases.
+
+Extract each pinned commit with `git archive` into a separate directory, without
+its `.git` metadata or local working-copy changes. Then run:
+
+```bash
+uv run --frozen python -m scripts.repository_evaluation.run_heldout \
+  --source hashmarks=/path/to/extracted/hashmarks \
+  --source doctor-scheduler-core=/path/to/extracted/doctor-scheduler-core \
+  --source doctor-scheduler-frontend=/path/to/extracted/doctor-scheduler-frontend \
+  --source uv-fleet-updater=/path/to/extracted/uv-fleet-updater \
+  --output-dir /path/to/heldout-receipts
+```
+
+Run this qualification weekly and before release when the exact source
+archives are available. The runner rejects source drift and incomplete case
+membership, preserves individual receipts and repository reports, and writes
+`summary.json`. A failing qualification case returns a nonzero status.
+Hashmarks' fast, permanent drift checks are in
+`tests/test_repository_quality_drift.py` and run in normal `make test`.
