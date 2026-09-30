@@ -21,4 +21,3 @@ The following files have been resolved:
    org.apache.commons:commons-lang3:jar:3.18.0:compile -- module org.apache.commons.lang3
    commons-codec:commons-codec:jar:1.18.0:compile -- module org.apache.commons.codec
    org.xerial.snappy:snappy-java:jar:1.1.10.7:compile -- module snappy.java (auto)
-
