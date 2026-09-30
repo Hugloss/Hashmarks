@@ -1,0 +1,60 @@
+name: Temporary Maven dogfood capture
+
+on:
+  push:
+    branches:
+      - dogfood/maven-minio-transitive-upgrade
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture native Maven evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p capture
+          mvn --version | tee capture/maven-version.txt
+          for spec in "before:8.5.17" "after:8.6.0"; do
+            state="${spec%%:*}"
+            version="${spec#*:}"
+            dir="capture/${state}"
+            mkdir -p "${dir}"
+            cat > "${dir}/pom.xml" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>hashmarks.dogfood</groupId>
+            <artifactId>minio-consumer</artifactId>
+            <version>0.1.0</version>
+            <dependencies>
+              <dependency>
+                <groupId>io.minio</groupId>
+                <artifactId>minio</artifactId>
+                <version>${version}</version>
+              </dependency>
+            </dependencies>
+          </project>
+          EOF
+            (
+              cd "${dir}"
+              mvn -B -q org.apache.maven.plugins:maven-dependency-plugin:3.9.0:tree \
+                -DoutputType=json \
+                -DoutputFile=tree.json \
+                -Dstyle.color=never
+              mvn -B -q org.apache.maven.plugins:maven-dependency-plugin:3.9.0:list \
+                -DoutputFile=list.txt \
+                -Dstyle.color=never
+            )
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: maven-minio-dogfood-capture
+          path: capture
+          if-no-files-found: error
