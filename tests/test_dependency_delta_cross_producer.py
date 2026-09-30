@@ -397,6 +397,7 @@ def test_uv_and_maven_dependency_addition_share_delta_semantics(tmp_path: Path) 
         assert delta["inventory_removed"] == []
         assert len(delta["relationships_added"]) == 1
         assert delta["relationships_removed"] == []
+        assert delta["component_selection_transitions"] == []
 
 
 def test_uv_and_maven_dependency_removal_share_delta_semantics(tmp_path: Path) -> None:
