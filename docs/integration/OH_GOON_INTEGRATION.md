@@ -105,6 +105,8 @@ Repository-controlled declarations are claims unless the consumer's policy expli
 
 Consumers that need exact loaded-producer binding should use the supported top-level `hashmarks.native_producer_implementation_identity()` API. Verification-selection consumers should use the supported top-level `hashmarks.validate_native_consumer_bundle()` validator. Do not bind integration code to `hashmarks.producer_identity`, `hashmarks.consumer_conformance`, or other implementation submodules merely because they are importable.
 
+Consumers of broader repository-intelligence payloads should use the supported top-level `hashmarks.validate_repository_intelligence_evidence()` validator instead of maintaining a downstream schema allowlist or recreating Hashmarks identity/freshness/authority checks. A validated action map remains repository evidence only; it is not an execution membership contract. Verification plans may describe command intent, but the external execution system still decides whether and how to admit and execute that intent.
+
 ## Dependency strategy
 
 Keep Hashmarks standalone. Oh-Goon should consume a pinned Hashmarks package/version through a thin adapter rather than copying Hashmarks internals into the Oh-Goon tree.
