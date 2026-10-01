@@ -361,6 +361,35 @@ def test_post_publish_smoke_uses_exact_public_release_assets() -> None:
     assert "windows_published_upgrade_smoke.py" in text
 
 
+def test_post_publish_smoke_qualifies_public_python_wheel_consumer_path() -> None:
+    text = _post_publish_workflow_text()
+    python_wheel = text.split("  python-wheel:\n", 1)[1].split(
+        "\n  windows:\n",
+        1,
+    )[0]
+
+    assert "Published Python wheel consumer smoke" in python_wheel
+    assert "uv python install 3.14" in python_wheel
+    assert 'wheel="hashmarks-${version}-py3-none-any.whl"' in python_wheel
+    assert 'curl -fsSL "$base/$wheel" -o "$root/$wheel"' in python_wheel
+    assert 'curl -fsSL "$base/SHA256SUMS.txt"' in python_wheel
+    assert 'awk -v file="$wheel"' in python_wheel
+    assert 'sha256sum "$root/$wheel"' in python_wheel
+    assert 'uv venv --python 3.14 "$root/venv"' in python_wheel
+    assert (
+        'uv pip install --python "$root/venv/bin/python" "$root/$wheel"' in python_wheel
+    )
+    assert '"$root/venv/bin/python" -I -' in python_wheel
+    assert "native_producer_implementation_identity" in python_wheel
+    assert "validate_repository_intelligence_evidence" in python_wheel
+    assert '"schema": "hashmarks.task-context-plan.v1"' in python_wheel
+    assert 'checked["execution_authority"] != "external"' in python_wheel
+    assert 'checked["result_authority"] != "external"' in python_wheel
+    assert 'checked["certification_authority"] != "external"' in python_wheel
+    assert "actions/checkout@" not in python_wheel
+    assert "/releases/latest/" not in python_wheel
+
+
 def test_every_release_workflow_job_has_a_bounded_timeout() -> None:
     job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\n")
     for name in ("ci.yml", "publish.yml", "post-publish-smoke.yml"):
