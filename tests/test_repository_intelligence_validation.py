@@ -128,7 +128,7 @@ def test_public_validator_treats_action_map_as_evidence_not_execution() -> None:
     assert tampered["normalized"]["evidence_kind"] == "action-map"
 
 
-def test_public_validator_requires_executable_shape_only_for_available_verification() -> None:
+def test_public_validator_requires_executable_shape_only_for_available_verification() -> (\n    None\n):
     checked = validate_repository_intelligence_evidence(
         {
             "schema": "hashmarks.verification-plan.v1",
