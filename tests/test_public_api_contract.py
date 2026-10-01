@@ -31,6 +31,8 @@ EXPECTED_PUBLIC = {
     "resolve_inputs",
     "patterns_from_inputs",
     "validate_input_values",
+    "native_producer_implementation_identity",
+    "validate_native_consumer_bundle",
 }
 
 REMOVED_BOUNDARY_DEBT = {
