@@ -94,7 +94,9 @@ def default_base_snapshot(workspace: Path, base_identity: str) -> Path:
     )
 
 
-def _parse_git_overlay_paths(output: bytes) -> set[str] | None:
+def _parse_git_overlay_paths(
+    output: bytes, *, state_rel: str | None = None
+) -> set[str] | None:
     out: set[str] = set()
     records = output.split(b"\0")
     i = 0
@@ -116,15 +118,17 @@ def _parse_git_overlay_paths(output: bytes) -> set[str] | None:
             if origin:
                 out.add(os.fsdecode(origin).replace("\\", "/"))
         out.add(os.fsdecode(raw).replace("\\", "/"))
+    excluded = tuple(value for value in (".hashmarks", state_rel) if value)
     return {
         path
         for path in out
-        if path not in {".hashmarks", ".fastidentity"}
-        and not path.startswith((".hashmarks/", ".fastidentity/"))
+        if not any(path == root or path.startswith(root + "/") for root in excluded)
     }
 
 
-def git_overlay_paths(workspace: Path) -> set[str] | None:
+def git_overlay_paths(
+    workspace: Path, *, state_rel: str | None = None
+) -> set[str] | None:
     """Return paths that differ from HEAD, including staged/untracked/deleted paths.
 
     None means Git could not prove the overlay, so callers must fall back to
@@ -150,7 +154,7 @@ def git_overlay_paths(workspace: Path) -> set[str] | None:
         return None
     if completed.returncode != 0:
         return None
-    return _parse_git_overlay_paths(completed.stdout)
+    return _parse_git_overlay_paths(completed.stdout, state_rel=state_rel)
 
 
 def _symbol_from(value: dict) -> SymbolRecord:

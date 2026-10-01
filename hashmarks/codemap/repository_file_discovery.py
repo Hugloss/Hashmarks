@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 _PRUNE_DIRS = {
     ".git",
     ".hashmarks",
-    ".fastidentity",
     ".venv",
     "venv",
     "node_modules",

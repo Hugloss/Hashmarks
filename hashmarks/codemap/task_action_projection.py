@@ -140,7 +140,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             ),
             owner_basis=owner.basis,
             structural_owner=owner.structural_owner,
-            archive_live_owner_ambiguity=owner.archive_live_owner_ambiguity,
             exact_identifier_paths=owner.exact_identifier_paths,
             exact_identifier_search_complete=owner.exact_identifier_search_complete,
             exact_identifier_search_bound_reasons=(
@@ -525,8 +524,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 explicit_surface_ambiguity = True
 
         explicit_build_tuning = bool(
-            context.cue_words.intersection({"pytest", "test", "tests"})
-            and context.cue_words.intersection({"batch", "batches", "shard", "shards"})
+            context.cue_words.intersection({"batch", "batches", "shard", "shards"})
             and context.cue_words.intersection(
                 {"size", "workers", "timeout", "timeouts"}
             )
@@ -717,10 +715,9 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         context: _TaskActionMapContext,
         selection: _TaskActionSelectionState,
         choices: _TaskActionProjectionChoices,
-        ambiguity_flags: tuple[bool, bool, bool],
+        ambiguity_flags: tuple[bool, bool],
     ) -> tuple[bool, bool, bool]:
         (
-            archive_live_owner_ambiguity,
             multi_structural_owner_ambiguity,
             verification_identity_ambiguity,
         ) = ambiguity_flags
@@ -877,7 +874,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             choices.verification_relevance.get("qualified_identity_ambiguous")
         )
         ambiguity_flags = (
-            selection.archive_live_owner_ambiguity,
             multi_structural_owner_ambiguity,
             verification_identity_ambiguity,
         )
@@ -918,7 +914,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 multi_identifier_edit_ambiguity,
                 weak_contract_anchor_ambiguity,
                 self._task_action_exact_identifier_search_incomplete(selection),
-                selection.archive_live_owner_ambiguity,
                 multi_structural_owner_ambiguity,
                 self._task_action_structural_search_incomplete(selection),
                 verification_identity_ambiguity,
@@ -935,10 +930,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 (
                     "exact-identifier-search-bounded",
                     self._task_action_exact_identifier_search_incomplete(selection),
-                ),
-                (
-                    "multiple-live-owners-behind-archive-hit",
-                    selection.archive_live_owner_ambiguity,
                 ),
                 (
                     "multiple-task-local-structural-owners",

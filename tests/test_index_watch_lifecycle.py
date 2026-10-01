@@ -54,7 +54,7 @@ def test_watch_forever_starts_observer_before_initial_sync_and_stops_cleanly(
             excluded = set(exclude_relative_paths)
             assert ".codemap-state" in excluded
             assert ".git" in excluded
-            assert ".fastidentity" in excluded
+            assert ".fastidentity" not in excluded
             events.append("watcher-factory")
             return _FakeWatcher(events)
 
@@ -166,7 +166,7 @@ def test_watch_forever_incremental_callback_reconciles_observed_paths(
             nonlocal callback
             del root, debounce_seconds, change_tracker
             callback = update_callback
-            assert set(exclude_relative_paths) == {".git", ".fastidentity"}
+            assert set(exclude_relative_paths) == {".git"}
             return _FakeWatcher([])
 
         sync_calls: list[object] = []

@@ -261,9 +261,6 @@ _TASK_EVIDENCE_FAMILIES: tuple[tuple[frozenset[str], tuple[str, ...]], ...] = (
                 "package",
                 "packages",
                 "lockfile",
-                "uv",
-                "npm",
-                "pip",
                 "materialize",
                 "materialization",
                 "resolution",
@@ -272,12 +269,12 @@ _TASK_EVIDENCE_FAMILIES: tuple[tuple[frozenset[str], tuple[str, ...]], ...] = (
         ("dependency", "lockfile", "package", "materialization", "resolution"),
     ),
     (
-        frozenset({"browser", "playwright", "chromium", "firefox", "webkit"}),
-        ("browser", "playwright", "preflight"),
+        frozenset({"browser"}),
+        ("browser", "preflight"),
     ),
     (
-        frozenset({"scout", "observer", "readonly", "read_only", "read-only"}),
-        ("scout", "observer", "readonly"),
+        frozenset({"observer", "readonly", "read_only", "read-only"}),
+        ("observer", "readonly"),
     ),
     (
         frozenset({"snapshot", "snapshots", "content", "workspace", "sandbox"}),

@@ -359,20 +359,52 @@ class IndexingLifecycleMixin:
         if self._refresh_context_policy():
             self.sync()
 
-    def _analysis_scope_conformance_identity(self) -> str:
-        """Bind the inputs that decide whether persisted repository rows are admissible."""
+    def _analysis_scope_conformance_payload(self) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        payload = {
+        return {
             "schema": _ANALYSIS_SCOPE_CONFORMANCE_SCHEMA,
             "pruned_segments": sorted(repository_file_discovery._PRUNE_DIRS),
             "policy_fingerprint": self.policy.fingerprint(),
             "internal_state_path": self._state_rel or "",
         }
+
+    def _analysis_scope_conformance_identity(self) -> str:
+        """Bind the inputs that decide whether persisted repository rows are admissible."""
+        payload = self._analysis_scope_conformance_payload()
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
             "utf-8"
         )
         return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+    def _persisted_analysis_scope_requires_full_discovery(self) -> bool:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        persisted = self.store.meta("analysis_scope_conformance_identity", "")
+        if not persisted or persisted == self._analysis_scope_conformance_identity():
+            return False
+        try:
+            previous = json.loads(
+                self.store.meta("analysis_scope_conformance_payload", "")
+            )
+        except (TypeError, ValueError):
+            return True
+        current = self._analysis_scope_conformance_payload()
+        if not isinstance(previous, dict):
+            return True
+        previous_encoded = json.dumps(
+            previous, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        if persisted != "sha256:" + hashlib.sha256(previous_encoded).hexdigest():
+            return True
+        previous_pruned = previous.pop("pruned_segments", None)
+        current_pruned = current.pop("pruned_segments")
+        return not (
+            previous == current
+            and isinstance(previous_pruned, list)
+            and all(isinstance(part, str) for part in previous_pruned)
+            and set(previous_pruned).issubset(set(current_pruned))
+        )
 
     def _workspace_fingerprint_from_store(self) -> str:
         if TYPE_CHECKING:
@@ -413,6 +445,14 @@ class IndexingLifecycleMixin:
                 "workspace_fingerprint", self._workspace_fingerprint_from_store()
             )
         self.store.set_meta("analysis_scope_conformance_identity", identity)
+        self.store.set_meta(
+            "analysis_scope_conformance_payload",
+            json.dumps(
+                self._analysis_scope_conformance_payload(),
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        )
         return removed
 
     def _indexable_discovered_file(
@@ -765,7 +805,7 @@ class IndexingLifecycleMixin:
             self = cast("CodeMap", self)
         base_identity = git_base_identity(self.workspace) if full else None
         overlay_paths = (
-            git_overlay_paths(self.workspace)
+            git_overlay_paths(self.workspace, state_rel=self._state_rel)
             if full and base_identity is not None
             else None
         )
@@ -1208,6 +1248,11 @@ class IndexingLifecycleMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if self._refresh_context_policy():
+            return self.sync()
+        if (
+            paths is not None
+            and self._persisted_analysis_scope_requires_full_discovery()
+        ):
             return self.sync()
         started = time.perf_counter()
         warnings: list[str] = []

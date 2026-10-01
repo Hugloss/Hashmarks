@@ -175,9 +175,12 @@ def test_query_base_term_limit_invalidates_task_entry_absence(tmp_path: Path) ->
 
 def test_query_view_term_limits_invalidate_task_entry_absence(tmp_path: Path) -> None:
     _write_source_and_test(tmp_path)
+    (tmp_path / "src" / "alpha.py").write_text(
+        "# browser\ndef alpha():\n    return 1\n", encoding="utf-8"
+    )
     task = (
         "alpha owner frontend backend plan make generated schedule privacy "
-        "observe local release lock dependency browser scout snapshot retry capacity"
+        "observe local release lock dependency browser snapshot retry capacity"
     )
 
     with CodeMap(tmp_path) as codemap:

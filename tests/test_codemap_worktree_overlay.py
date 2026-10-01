@@ -93,3 +93,15 @@ def test_git_overlay_paths_includes_rename_origin_and_untracked_file(
     (repo / "new.py").write_text("value = 1\n", encoding="utf-8")
 
     assert git_overlay_paths(repo) == {"a.py", "renamed.py", "new.py"}
+
+
+def test_fastidentity_overlay_is_visible_unless_it_is_the_active_state(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    directory = repo / ".fastidentity"
+    directory.mkdir()
+    (directory / "source.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    assert git_overlay_paths(repo) == {".fastidentity/source.py"}
+    assert git_overlay_paths(repo, state_rel=".fastidentity") == set()

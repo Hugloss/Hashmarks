@@ -75,7 +75,6 @@ class TaskActionEvidenceMixin:
             "package.json",
             "settings",
             "toml",
-            "vite",
             "yaml",
             "yml",
         }
