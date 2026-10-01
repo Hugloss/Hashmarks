@@ -56,6 +56,8 @@ __all__ = [
     "resolve_inputs",
     "patterns_from_inputs",
     "validate_input_values",
+    "native_producer_implementation_identity",
+    "validate_native_consumer_bundle",
 ]
 
 
@@ -65,6 +67,14 @@ def __getattr__(name: str):
         from .codemap import CodeMap
 
         return CodeMap
+    if name == "native_producer_implementation_identity":
+        from .producer_identity import native_producer_implementation_identity
+
+        return native_producer_implementation_identity
+    if name == "validate_native_consumer_bundle":
+        from .consumer_conformance import validate_native_consumer_bundle
+
+        return validate_native_consumer_bundle
     if name in {
         "RepositoryDeclarationProvider",
         "RepositoryDeclarationProviderContext",

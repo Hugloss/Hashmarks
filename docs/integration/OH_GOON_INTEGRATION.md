@@ -103,6 +103,8 @@ A consumer must not convert `unknown` to fresh based on recency or convenience.
 
 Repository-controlled declarations are claims unless the consumer's policy explicitly trusts the producer/source. Hashmarks can validate the structure and identity of evidence; the execution/certification layer decides which producers and evidence classes are trusted for admission or reuse.
 
+Consumers that need exact loaded-producer binding should use the supported top-level `hashmarks.native_producer_implementation_identity()` API. Verification-selection consumers should use the supported top-level `hashmarks.validate_native_consumer_bundle()` validator. Do not bind integration code to `hashmarks.producer_identity`, `hashmarks.consumer_conformance`, or other implementation submodules merely because they are importable.
+
 ## Dependency strategy
 
 Keep Hashmarks standalone. Oh-Goon should consume a pinned Hashmarks package/version through a thin adapter rather than copying Hashmarks internals into the Oh-Goon tree.
