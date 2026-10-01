@@ -377,8 +377,7 @@ def test_post_publish_smoke_qualifies_public_python_wheel_consumer_path() -> Non
     assert 'sha256sum "$root/$wheel"' in python_wheel
     assert 'uv venv --python 3.14 "$root/venv"' in python_wheel
     assert (
-        'uv pip install --python "$root/venv/bin/python" "$root/$wheel"'
-        in python_wheel
+        'uv pip install --python "$root/venv/bin/python" "$root/$wheel"' in python_wheel
     )
     assert '"$root/venv/bin/python" -I -' in python_wheel
     assert "native_producer_implementation_identity" in python_wheel
@@ -389,6 +388,7 @@ def test_post_publish_smoke_qualifies_public_python_wheel_consumer_path() -> Non
     assert 'checked["certification_authority"] != "external"' in python_wheel
     assert "actions/checkout@" not in python_wheel
     assert "/releases/latest/" not in python_wheel
+
 
 def test_every_release_workflow_job_has_a_bounded_timeout() -> None:
     job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\n")
