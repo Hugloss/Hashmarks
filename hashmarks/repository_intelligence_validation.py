@@ -122,12 +122,12 @@ def _decision_brief(
     return {"stale": stale}
 
 
-def _context_plan(payload: Mapping[str, object], reasons: list[str]) -> dict[str, object]:
+def _context_plan(\n    payload: Mapping[str, object], reasons: list[str]\n) -> dict[str, object]:
     if payload.get("ranking_effect") != "none":
         reasons.append("ranking-effect-not-none")
     if not isinstance(payload.get("task"), str) or not str(payload.get("task")).strip():
         reasons.append("invalid-task")
-    if not isinstance(payload.get("query"), str) or not str(payload.get("query")).strip():
+    if (\n        not isinstance(payload.get("query"), str)\n        or not str(payload.get("query")).strip()\n    ):
         reasons.append("invalid-query")
     budget = payload.get("token_budget")
     if type(budget) is not int or budget < 1:
@@ -138,7 +138,7 @@ def _context_plan(payload: Mapping[str, object], reasons: list[str]) -> dict[str
     return {}
 
 
-def _work_context(payload: Mapping[str, object], reasons: list[str]) -> dict[str, object]:
+def _work_context(\n    payload: Mapping[str, object], reasons: list[str]\n) -> dict[str, object]:
     if type(payload.get("safe")) is not bool:
         reasons.append("invalid-safe-state")
     for field in ("required_roles", "missing_roles"):
@@ -147,7 +147,7 @@ def _work_context(payload: Mapping[str, object], reasons: list[str]) -> dict[str
     return {}
 
 
-def _change_impact(payload: Mapping[str, object], reasons: list[str]) -> dict[str, object]:
+def _change_impact(\n    payload: Mapping[str, object], reasons: list[str]\n) -> dict[str, object]:
     generation = payload.get("generation")
     if not _is_generation(generation):
         reasons.append("invalid-generation")
