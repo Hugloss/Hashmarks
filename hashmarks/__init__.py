@@ -58,6 +58,7 @@ __all__ = [
     "validate_input_values",
     "native_producer_implementation_identity",
     "validate_native_consumer_bundle",
+    "validate_repository_intelligence_evidence",
 ]
 
 
@@ -75,6 +76,12 @@ def __getattr__(name: str):
         from .consumer_conformance import validate_native_consumer_bundle
 
         return validate_native_consumer_bundle
+    if name == "validate_repository_intelligence_evidence":
+        from .repository_intelligence_validation import (
+            validate_repository_intelligence_evidence,
+        )
+
+        return validate_repository_intelligence_evidence
     if name in {
         "RepositoryDeclarationProvider",
         "RepositoryDeclarationProviderContext",
