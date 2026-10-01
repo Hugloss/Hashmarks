@@ -69,21 +69,11 @@ def _require_authority(
         reasons.append("execution-effect-not-none")
 
 
-def _decision_packet(
+def _decision_identity_projection(
     payload: Mapping[str, object],
+    identity: Mapping[str, object],
     reasons: list[str],
 ) -> dict[str, object]:
-    normalized: dict[str, object] = {}
-    try:
-        contract = DecisionPacketContract.parse(payload)
-    except (TypeError, ValueError) as exc:
-        reasons.append(f"invalid-decision-packet:{exc}")
-        return normalized
-
-    identity = payload.get("identity")
-    if not isinstance(identity, Mapping):
-        reasons.append("invalid-decision-identity")
-        return normalized
     if identity.get("schema") != "hashmarks.worker-packet-identity.v1":
         reasons.append("unsupported-decision-identity-schema")
     generation = identity.get("codemap_generation")
@@ -94,20 +84,31 @@ def _decision_packet(
     repository_identity = identity.get("repository_identity")
     if not isinstance(repository_identity, str) or not repository_identity:
         reasons.append("missing-repository-identity")
-    decision_generation = identity.get("decision_generation")
-    if not _is_sha256(decision_generation):
+    if not _is_sha256(identity.get("decision_generation")):
         reasons.append("invalid-decision-generation")
+    return {
+        "repository_identity": repository_identity,
+        "codemap_generation": generation,
+    }
+
+
+def _decision_packet(
+    payload: Mapping[str, object],
+    reasons: list[str],
+) -> dict[str, object]:
+    try:
+        contract = DecisionPacketContract.parse(payload)
+    except (TypeError, ValueError) as exc:
+        reasons.append(f"invalid-decision-packet:{exc}")
+        return {}
+    identity = payload.get("identity")
+    if not isinstance(identity, Mapping):
+        reasons.append("invalid-decision-identity")
+        return {}
+    normalized = _decision_identity_projection(payload, identity, reasons)
     if payload.get("authority") != "repository-observation-only":
         reasons.append("authority-mismatch")
-
-    normalized.update(
-        {
-            "repository_identity": repository_identity,
-            "codemap_generation": generation,
-            "stale": contract.stale,
-        }
-    )
-    return normalized
+    return {**normalized, "stale": contract.stale}
 
 
 def _decision_brief(
@@ -228,6 +229,46 @@ def _action_map(payload: Mapping[str, object], reasons: list[str]) -> dict[str, 
     return {}
 
 
+def _validate_observer(
+    observer: object,
+    reasons: list[str],
+) -> None:
+    if not isinstance(observer, Mapping):
+        reasons.append("missing-observer")
+        return
+    if observer.get("schema") != "hashmarks.repository-observer.v1":
+        reasons.append("unsupported-observer-schema")
+    if not _is_sha256(observer.get("identity")):
+        reasons.append("invalid-observer-identity")
+
+
+def _repository_binding(
+    repository: object,
+    reasons: list[str],
+) -> dict[str, object]:
+    if not isinstance(repository, Mapping):
+        reasons.append("missing-repository")
+        return {
+            "repository_identity": None,
+            "codemap_generation": None,
+            "stale": None,
+        }
+    repository_identity = repository.get("repository_identity")
+    generation = repository.get("codemap_generation")
+    stale = repository.get("stale")
+    if not isinstance(repository_identity, str) or not repository_identity:
+        reasons.append("missing-repository-identity")
+    if not _is_generation(generation):
+        reasons.append("invalid-codemap-generation")
+    if type(stale) is not bool:
+        reasons.append("invalid-stale-state")
+    return {
+        "repository_identity": repository_identity,
+        "codemap_generation": generation,
+        "stale": stale,
+    }
+
+
 def _repository_snapshot(
     payload: Mapping[str, object],
     reasons: list[str],
@@ -237,35 +278,8 @@ def _repository_snapshot(
     )
     if not _is_sha256(payload.get("snapshot_identity")):
         reasons.append("invalid-snapshot-identity")
-    observer = payload.get("observer")
-    if not isinstance(observer, Mapping):
-        reasons.append("missing-observer")
-    else:
-        if observer.get("schema") != "hashmarks.repository-observer.v1":
-            reasons.append("unsupported-observer-schema")
-        if not _is_sha256(observer.get("identity")):
-            reasons.append("invalid-observer-identity")
-    repository = payload.get("repository")
-    repository_identity = None
-    generation = None
-    stale = None
-    if not isinstance(repository, Mapping):
-        reasons.append("missing-repository")
-    else:
-        repository_identity = repository.get("repository_identity")
-        generation = repository.get("codemap_generation")
-        stale = repository.get("stale")
-        if not isinstance(repository_identity, str) or not repository_identity:
-            reasons.append("missing-repository-identity")
-        if not _is_generation(generation):
-            reasons.append("invalid-codemap-generation")
-        if type(stale) is not bool:
-            reasons.append("invalid-stale-state")
-    return {
-        "repository_identity": repository_identity,
-        "codemap_generation": generation,
-        "stale": stale,
-    }
+    _validate_observer(payload.get("observer"), reasons)
+    return _repository_binding(payload.get("repository"), reasons)
 
 
 def _repository_delta(
@@ -333,9 +347,7 @@ def _observation_freshness(
     payload: Mapping[str, object],
     reasons: list[str],
 ) -> dict[str, object]:
-    _require_authority(
-        payload, authority="observation-freshness-only", reasons=reasons
-    )
+    _require_authority(payload, authority="observation-freshness-only", reasons=reasons)
     state = payload.get("state")
     if state not in {"current", "stale"}:
         reasons.append("invalid-freshness-state")
