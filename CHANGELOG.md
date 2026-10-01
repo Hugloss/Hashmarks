@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.26.0 — Consumer contracts and dependency transition evidence
+
+- Add producer-neutral `component_selection_transitions` to dependency-resolution deltas, grouping comparable selection changes into compact before/after evidence while preserving ambiguity and keeping package-manager resolution, causation, recommendation, and execution authority external; qualify it against real Maven transitive-upgrade, mediation, exclusion, BOM, multi-module, profile, and uv multi-version cases.
+- Expand held-out repository-quality qualification across Hashmarks plus Python and TypeScript repositories, and harden owner/verifier evidence for exact identifiers, bounded ambiguity, stale-owner removal, TypeScript generic functions and overloads, and consistent core/MCP projections.
+- Promote supported top-level consumer binding through `native_producer_implementation_identity()`, `validate_native_consumer_bundle()`, and `validate_repository_intelligence_evidence()`; Hashmarks now owns current repository-intelligence schema/producer-semantic validation while execution, result, retry, scheduling, and certification authority remain external.
+- Clarify that agentsCookbook owns native agent benchmarking while Hashmarks is a benchmark subject, so project/user OpenCode registration is not treated as benchmark authority.
+- Harden release qualification for embedding consumers by downloading the exact published GitHub Release wheel, verifying it against `SHA256SUMS.txt`, installing it into a clean Python environment with native `uv`, and smoking the supported public producer-binding/validation APIs after publication; retain exact standalone Linux/WSL and Windows qualification alongside it.
+
 ## 0.25.1 — OpenCode effective-registration diagnostics
 
 - Keep `hashmarks install --opencode` delegated to OpenCode's native MCP CLI, then inspect OpenCode's effective configuration and report whether the exact installed Hashmarks command is `active`, `shadowed`, or `unverified` without editing project configuration.
