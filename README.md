@@ -31,7 +31,7 @@ For the canonical standalone installation, a newer stable release offers two exp
 A newer Hashmarks version is available.
 
 Hashmarks 0.25.1
-Latest: 0.26.0
+Latest: 0.26.1
 
 This installation uses the Hashmarks standalone installer.
 
@@ -425,7 +425,7 @@ See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs
 
 ## Project status
 
-Current package version: **0.26.0**.
+Current package version: **0.26.1**.
 
 Hashmarks is under active development. Current repository-intelligence contracts are documented explicitly; new integrations should use the supported CLI, Python API, and MCP surfaces rather than historical development experiments.
 

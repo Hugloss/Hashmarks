@@ -103,7 +103,6 @@ class _TaskActionOwnerResolutionState:
     edit: dict[str, object] | None
     basis: str | None
     structural_owner: dict[str, object] | None
-    archive_live_owner_ambiguity: bool
     exact_identifier_paths: tuple[str, ...]
     exact_identifier_search_complete: bool | None
     exact_identifier_search_bound_reasons: tuple[str, ...]
@@ -124,7 +123,6 @@ class _TaskActionOwnerCandidateState:
     edit: dict[str, object] | None
     basis: str | None
     structural_owner: dict[str, object] | None
-    archive_live_owner_ambiguity: bool
     exact_identifier_edits: list[dict[str, object]]
     exact_identifier_paths: tuple[str, ...]
     exact_identifier_search_complete: bool | None
@@ -145,7 +143,6 @@ class _TaskActionSelectionState:
     explicit_config_surface_request: bool
     owner_basis: str | None
     structural_owner: dict[str, object] | None
-    archive_live_owner_ambiguity: bool
     exact_identifier_paths: tuple[str, ...]
     exact_identifier_search_complete: bool | None
     exact_identifier_search_bound_reasons: tuple[str, ...]

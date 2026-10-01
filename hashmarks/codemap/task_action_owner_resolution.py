@@ -63,6 +63,8 @@ class TaskActionOwnerResolutionMixin:
             if "." in term
         )
         path = str(candidate.get("path") or "")
+        if candidate.get("qualified_import_owner_projection"):
+            return "exact-import-owner"
         if qualified_terms and self._task_action_qualified_identifier_matches_symbol(
             path, candidate, qualified_terms
         ):
@@ -159,7 +161,6 @@ class TaskActionOwnerResolutionMixin:
             edit=candidate.edit,
             basis=candidate.basis,
             structural_owner=candidate.structural_owner,
-            archive_live_owner_ambiguity=candidate.archive_live_owner_ambiguity,
             exact_identifier_paths=candidate.exact_identifier_paths,
             exact_identifier_search_complete=candidate.exact_identifier_search_complete,
             exact_identifier_search_bound_reasons=(
@@ -264,9 +265,6 @@ class TaskActionOwnerResolutionMixin:
             "graph_bound_reasons": [],
             "status": "unresolved",
         }
-        if self._task_action_is_archive_path(path):
-            entry["status"] = "excluded-archive"
-            return entry, None
         if not self._indexed_path_current(path):
             entry["status"] = "stale"
             return entry, None
@@ -378,7 +376,6 @@ class TaskActionOwnerResolutionMixin:
                         "observed-owner",
                         "self-owner",
                         "no-selected-owner",
-                        "excluded-archive",
                     }
                     for row in candidates
                 ),
@@ -421,30 +418,23 @@ class TaskActionOwnerResolutionMixin:
                 )
             candidate.exact_identifier_paths = (discriminated_exact_path,)
             candidate.basis = "exact-import-owner"
-        archive_owner = self._task_action_is_archive_path(owner_path)
-        live_current_edit = self._task_action_live_current_edit(
-            candidate.edit,
-            request.discrimination,
-            request.surface.verification_anchor_tokens,
+        exact_owner_rows = [
+            row
+            for row in candidate.exact_identifier_edits
+            if str(row.get("path") or "") == owner_path
+        ]
+        candidate.edit = (
+            exact_owner_rows[0]
+            if len(exact_owner_rows) == 1
+            else self._task_action_projected_owner_row(
+                owner_path, resolved, request.context.rows, request.limit
+            )
         )
-        if not (archive_owner and live_current_edit):
-            exact_owner_rows = [
-                row
-                for row in candidate.exact_identifier_edits
-                if str(row.get("path") or "") == owner_path
-            ]
-            candidate.edit = (
-                exact_owner_rows[0]
-                if len(exact_owner_rows) == 1
-                else self._task_action_projected_owner_row(
-                    owner_path, resolved, request.context.rows, request.limit
-                )
-            )
-            candidate.structural_owner = self._task_action_structural_owner_evidence(
-                resolved, owner_path
-            )
-            if candidate.basis is None:
-                candidate.basis = "structural-owner"
+        candidate.structural_owner = self._task_action_structural_owner_evidence(
+            resolved, owner_path
+        )
+        if candidate.basis is None:
+            candidate.basis = "structural-owner"
         return self._task_action_owner_state(
             candidate, structural_starts=structural_starts
         )
@@ -459,15 +449,7 @@ class TaskActionOwnerResolutionMixin:
         owner_basis = (
             "literal-reference-owner" if structural_owner is not None else None
         )
-        edit, archive_live_owner_ambiguity = (
-            self._task_action_archive_live_owner_choice(
-                request.surface.edit,
-                request.context.rows,
-                request.context.failed,
-                request.discrimination,
-                request.surface.verification_anchor_tokens,
-            )
-        )
+        edit = request.surface.edit
         edit, literal_task_path = self._task_action_literal_owner(request, edit)
         exact_identifier_evidence, edit, exact_basis = self._task_action_exact_owner(
             request, edit, literal_task_path, structural_owner
@@ -487,7 +469,6 @@ class TaskActionOwnerResolutionMixin:
             edit=edit,
             basis=owner_basis,
             structural_owner=structural_owner,
-            archive_live_owner_ambiguity=archive_live_owner_ambiguity,
             exact_identifier_edits=exact_identifier_edits,
             exact_identifier_paths=exact_identifier_paths,
             exact_identifier_search_complete=exact_identifier_evidence.search_complete,

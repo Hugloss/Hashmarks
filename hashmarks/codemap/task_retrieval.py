@@ -89,10 +89,10 @@ def _path_is_within(candidate: str, parent: str) -> bool:
 
 _TASK_SCOPE_EXPANSIONS: tuple[tuple[frozenset[str], tuple[str, ...]], ...] = (
     (frozenset({"frontend"}), ("frontend", "readme", "agents")),
-    (frozenset({"backend", "fastapi", "api"}), ("backend", "readme", "agents")),
+    (frozenset({"backend", "api"}), ("backend", "readme", "agents")),
     (
-        frozenset({"plan", "plans", "goon", "goons"}),
-        ("plan", "goon", "agents", "readme"),
+        frozenset({"plan", "plans"}),
+        ("plan", "agents", "readme"),
     ),
     (
         frozenset({"make", "certify", "certification", "setup", "bootstrap"}),
@@ -489,25 +489,6 @@ class TaskRetrievalMixin:
             bonus += 2.5
         if any(ch in raw for ch in "_-/"):
             bonus += 1.5
-        if term in {
-            "api",
-            "goon",
-            "plan",
-            "fleet",
-            "uv",
-            "scout",
-            "codemap",
-            "hashmarks",
-            "executor",
-            "certification",
-            "workspace",
-            "runtime",
-            "contract",
-            "identity",
-            "schedule",
-            "repository",
-        }:
-            bonus += 1.0
         return rarity + bonus, len(term), term
 
     def _formulate_task_query_base(
@@ -696,12 +677,9 @@ class TaskRetrievalMixin:
         def locality_order(path: str) -> tuple[int, int, str]:
             domains = set(classify_repository_path(path))
             is_test = RepositoryDomain.TEST in domains
-            parts = {part.lower() for part in Path(path).parts}
-            archive_like = bool(parts.intersection({"archive", "legacy", "deprecated"}))
-            # Verification first gives structural traversal a task-local root;
-            # active source stays ahead of obvious archival/legacy decoys.
+            # Verification first gives structural traversal a task-local root.
             return (
-                0 if is_test else 2 if archive_like else 1,
+                0 if is_test else 1,
                 len(Path(path).parts),
                 path,
             )
@@ -866,13 +844,9 @@ class TaskRetrievalMixin:
         def locality_order(row: dict[str, object]) -> tuple[int, int, int, str]:
             path = str(row.get("path") or "")
             domains = domains_by_path[path]
-            parts = {part.lower() for part in Path(path).parts}
-            archive_like = bool(
-                parts.intersection({"archive", "legacy", "deprecated", "vendor"})
-            )
             is_test = RepositoryDomain.TEST in domains
             return (
-                0 if is_test else 2 if archive_like else 1,
+                0 if is_test else 1,
                 -int(row.get("matches") or 0),
                 len(Path(path).parts),
                 path,

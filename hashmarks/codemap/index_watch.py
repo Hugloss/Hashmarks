@@ -73,7 +73,7 @@ class IndexWatchMixin:
             pass
         else:
             exclude.append(state_rel)
-        exclude.extend([".git", ".fastidentity"])
+        exclude.append(".git")
         watcher = create_default_watcher(
             self.workspace,
             session.reconcile,

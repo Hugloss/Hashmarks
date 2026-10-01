@@ -27,7 +27,7 @@ DEFAULT_WALK_IGNORE_NAMES = frozenset(
         ".ruff_cache",
     }
 )
-DEFAULT_MANDATORY_EXCLUDE_NAMES = frozenset({".hashmarks", ".fastidentity"})
+DEFAULT_MANDATORY_EXCLUDE_NAMES = frozenset({".hashmarks"})
 SYMLINK_DOMAIN = b"fastidentity.symlink.v1\0"
 MANIFEST_DIR_DOMAIN = b"fastidentity.manifest-directory.v1\0"
 _MAX_RECONCILE_ATTEMPTS = 3

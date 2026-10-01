@@ -130,7 +130,7 @@ def test_unique_indirect_active_verifier_overrides_stale_direct_legacy_decoys(
             "def test_ember_snow_regression(): assert ember_snow('x') == 'x-legacy'\n"
         )
 
-    task = "Fix ember_snow accepted response implementation and verify behavior"
+    task = "Fix src.case.engine.ember_snow accepted response implementation and verify behavior"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)
@@ -169,7 +169,7 @@ def test_reexported_active_symbol_keeps_exact_owner_identity(tmp_path: Path) -> 
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(
-            "Fix ember_snow accepted response implementation and verify behavior",
+            "Fix src.case.engine.ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
     assert action["edit"]["path"] == "src/case/engine.py"
@@ -247,7 +247,7 @@ def test_two_hop_reexport_keeps_unique_underlying_owner_identity(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(
-            "Fix ember_snow accepted response implementation and verify behavior",
+            "Fix src.case.engine.ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
     assert action["edit"]["path"] == "src/case/engine.py"
@@ -285,7 +285,7 @@ def test_two_hop_alias_chain_keeps_unique_underlying_owner_identity(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(
-            "Fix ember_snow accepted response implementation and verify behavior",
+            "Fix src.case.engine.ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
     assert action["edit"]["path"] == "src/case/engine.py"
@@ -316,14 +316,14 @@ def test_star_reexport_keeps_name_scoped_unique_owner_identity(tmp_path: Path) -
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(
-            "Fix ember_snow accepted response implementation and verify behavior",
+            "Fix src.case.engine.ember_snow accepted response implementation and verify behavior",
             limit=20,
         )
     assert action["edit"]["path"] == "src/case/engine.py"
     assert action["verify"]["path"] == "tests/contract/test_public_contract.py"
 
 
-def test_same_symbol_across_multiple_live_packages_fails_closed_instead_of_archive_fallback(
+def test_same_symbol_across_multiple_live_packages_fails_closed(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "src/case").mkdir(parents=True)
@@ -363,7 +363,7 @@ def test_same_symbol_across_multiple_live_packages_fails_closed_instead_of_archi
         )
     assert action["ambiguity"]["ambiguous"] is True
     assert action["ambiguity"]["reason"] in {
-        "multiple-live-owners-behind-archive-hit",
+        "multiple-exact-identifier-edit-owners",
         "multiple-task-local-structural-owners",
     }
     assert packet["discrimination"]["needed"] is True
@@ -400,7 +400,7 @@ def test_reexport_chain_beyond_bound_fails_closed_instead_of_stale_verifier(
         path.write_text(
             "from legacy.ember_snow import ember_snow\ndef test_old(): assert ember_snow('x') == 'x-legacy'\n"
         )
-    task = "Fix ember_snow accepted response implementation and verify behavior"
+    task = "Fix src.case.engine.ember_snow accepted response implementation and verify behavior"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)

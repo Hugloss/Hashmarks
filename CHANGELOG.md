@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.26.1 — Repository evidence without hidden name authority
+
+- Remove archive, legacy, deprecated, and vendor directory spellings from retrieval and ownership decisions. Preserve ambiguity for competing owners and follow qualified package re-exports through bounded import evidence.
+- Remove project and framework names from generic task-query boosts, expansions, and plan classification while keeping explicit repository contracts and producer adapters intact.
+- Treat `.fastidentity` as repository content unless it is the configured state directory, including identity, CodeMap, Git overlay, and watcher observations. Rebuild a reopened CodeMap when an admission change makes previously excluded files eligible.
+
 ## 0.26.0 — Consumer contracts and dependency transition evidence
 
 - Add producer-neutral `component_selection_transitions` to dependency-resolution deltas, grouping comparable selection changes into compact before/after evidence while preserving ambiguity and keeping package-manager resolution, causation, recommendation, and execution authority external; qualify it against real Maven transitive-upgrade, mediation, exclusion, BOM, multi-module, profile, and uv multi-version cases.

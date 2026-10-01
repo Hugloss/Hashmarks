@@ -143,6 +143,30 @@ def test_mandatory_hashmarks_exclusion_cannot_be_disabled_by_legacy_ignore_names
         tree.digest_selected([".hashmarks"])
 
 
+def test_fastidentity_directory_is_identity_content_unless_selected_as_state(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "repo"
+    directory = workspace / ".fastidentity"
+    directory.mkdir(parents=True)
+    source = directory / "source.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    store = FileDigestStore(tmp_path / "files.sqlite3")
+    tree = MerkleTree(workspace, store)
+    first = tree.digest_selected([".fastidentity/source.py"])
+    source.write_text("VALUE = 2\n", encoding="utf-8")
+    tree.invalidate(".fastidentity/source.py", kind="file")
+    assert tree.digest_selected([".fastidentity/source.py"]) != first
+
+    state_tree = MerkleTree(
+        workspace,
+        store,
+        path_scope=MerklePathScope(exclude_paths=(directory,)),
+    )
+    with pytest.raises(ValueError, match="excluded"):
+        state_tree.digest_selected([".fastidentity/source.py"])
+
+
 def test_relative_explicit_exclusion_preserves_symlink_leaf(tmp_path: Path):
     workspace = tmp_path / "repo"
     workspace.mkdir()

@@ -48,9 +48,9 @@ def _explicit_control_domains(
         "taskfile.yaml",
     }:
         domains.append(RepositoryDomain.BUILD)
-    if "templates" in parts and ({"plans", "goons"} & parts):
+    if "templates" in parts and "plans" in parts:
         domains.extend((RepositoryDomain.PLAN, RepositoryDomain.CONFIG))
-    if name in {"plan.yml", "plan.yaml", "goon.yml", "goon.yaml"}:
+    if name in {"plan.yml", "plan.yaml"}:
         domains.extend((RepositoryDomain.PLAN, RepositoryDomain.CONFIG))
     return tuple(dict.fromkeys(domains))
 

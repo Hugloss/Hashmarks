@@ -30,7 +30,7 @@ def _bounded_plain_probe(codemap: CodeMap, monkeypatch) -> None:
     first = by_path["src/a.py"]
     hidden = by_path["src/b.py"]
     noise = [
-        {**first, "path": f"archive/noise_{index:04d}.py"}
+        {**first, "path": f"noise/noise_{index:04d}.py"}
         for index in range(_INDEX_LIMIT - 1)
     ]
     probe = [first, *noise, hidden]

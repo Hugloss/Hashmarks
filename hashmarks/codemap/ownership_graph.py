@@ -303,7 +303,6 @@ class OwnershipGraphMixin:
                     "setting",
                     "settings",
                     "toml",
-                    "vite",
                     "yaml",
                     "yml",
                 }
@@ -311,14 +310,11 @@ class OwnershipGraphMixin:
             "verification": frozenset(
                 {
                     "coverage",
-                    "jest",
-                    "pytest",
                     "spec",
                     "specs",
                     "test",
                     "tests",
                     "testing",
-                    "vitest",
                 }
             ),
             "implementation": frozenset(
@@ -1083,14 +1079,12 @@ class OwnershipGraphMixin:
 
     @staticmethod
     def _delegated_candidates(ranked, targets: set[str]) -> list[dict[str, object]]:
-        forbidden = {"archive", "legacy", "deprecated", "vendor"}
         return [
             row
             for row in ranked
             if str(row.get("path") or "") in targets
             and bool(row.get("corroborated"))
             and row.get("task_locality_terms")
-            and set(Path(str(row.get("path") or "")).parts).isdisjoint(forbidden)
         ]
 
     @staticmethod

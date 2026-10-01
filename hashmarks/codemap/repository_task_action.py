@@ -112,67 +112,6 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             for token in verification_anchor_tokens
         )
 
-    @staticmethod
-    def _task_action_archive_parts() -> set[str]:
-        return {"archive", "legacy", "deprecated", "vendor"}
-
-    @classmethod
-    def _task_action_is_archive_path(cls, path: str) -> bool:
-        return bool(
-            set(Path(path).parts).intersection(cls._task_action_archive_parts())
-        )
-
-    def _task_action_is_live_anchored_edit(
-        self,
-        row: dict[str, object],
-        failed: set[str],
-        discrimination: _TaskActionDiscriminationState,
-        verification_anchor_tokens: Sequence[str],
-    ) -> bool:
-        path = str(row.get("path") or "")
-        if (
-            "edit" not in row.get("roles", [])
-            or path in failed
-            or self._task_action_is_archive_path(path)
-        ):
-            return False
-        return self._has_identifier_anchor(
-            row, discrimination, verification_anchor_tokens
-        ) or self._has_distinctive_task_anchor(row, discrimination)
-
-    def _task_action_live_anchored_edits(
-        self,
-        rows: Sequence[dict[str, object]],
-        failed: set[str],
-        discrimination: _TaskActionDiscriminationState,
-        verification_anchor_tokens: Sequence[str],
-    ) -> list[dict[str, object]]:
-        return [
-            row
-            for row in rows
-            if self._task_action_is_live_anchored_edit(
-                row, failed, discrimination, verification_anchor_tokens
-            )
-        ]
-
-    def _task_action_archive_live_owner_choice(
-        self,
-        edit: dict[str, object] | None,
-        rows: Sequence[dict[str, object]],
-        failed: set[str],
-        discrimination: _TaskActionDiscriminationState,
-        verification_anchor_tokens: Sequence[str],
-    ) -> tuple[dict[str, object] | None, bool]:
-        edit_path = str(edit.get("path") or "") if isinstance(edit, dict) else ""
-        if not edit_path or not self._task_action_is_archive_path(edit_path):
-            return edit, False
-        live_edits = self._task_action_live_anchored_edits(
-            rows, failed, discrimination, verification_anchor_tokens
-        )
-        if len(live_edits) == 1:
-            return live_edits[0], False
-        return edit, len(live_edits) > 1
-
     def _task_action_specific_test_candidate(
         self,
         rows: Sequence[dict[str, object]],
@@ -292,21 +231,6 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         if go_entry is None and len(package_rows) == 1 and task_local_island:
             return package_rows[0]
         return go_entry
-
-    def _task_action_live_current_edit(
-        self,
-        edit: dict[str, object] | None,
-        discrimination: _TaskActionDiscriminationState,
-        verification_anchor_tokens: Sequence[str],
-    ) -> bool:
-        if not isinstance(edit, dict):
-            return False
-        path = str(edit.get("path") or "")
-        if not path or self._task_action_is_archive_path(path):
-            return False
-        return self._has_identifier_anchor(
-            edit, discrimination, verification_anchor_tokens
-        ) or self._has_distinctive_task_anchor(edit, discrimination)
 
     def _task_action_projected_owner_row(
         self,
@@ -621,15 +545,19 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         indexed, complete = self._task_action_exact_symbol_index_window(
             tuple(sorted(plain_tokens))
         )
+        indexed_file_rows = self._session_file_rows(
+            str(symbol.get("path") or "") for symbol in indexed
+        )
         exact_paths: dict[str, set[str]] = {}
         for symbol in indexed:
             path = str(symbol.get("path") or "")
             name = str(symbol.get("name") or "").lower()
-            if (
-                name not in plain_tokens
-                or not path
-                or path in failed
-                or self._task_action_is_archive_path(path)
+            if name not in plain_tokens or not path or path in failed:
+                continue
+            file_row = indexed_file_rows.get(path)
+            if file_row is None or (
+                str(file_row.get("evidence_visibility") or "")
+                == EvidenceVisibility.DENY.value
             ):
                 continue
             domains = classify_repository_path(path)
@@ -667,7 +595,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         path = str(symbol.get("path") or "")
-        if not path or path in failed or self._task_action_is_archive_path(path):
+        if not path or path in failed:
             return None
         domains = [domain.value for domain in classify_repository_path(path)]
         if (
@@ -676,9 +604,8 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         ):
             return None
         file_row = self._session_file_row(path)
-        if (
-            isinstance(file_row, Mapping)
-            and str(file_row.get("evidence_visibility") or "")
+        if not isinstance(file_row, Mapping) or (
+            str(file_row.get("evidence_visibility") or "")
             == EvidenceVisibility.DENY.value
         ):
             return None
@@ -693,11 +620,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             "signature": symbol.get("signature"),
             "start_line": symbol.get("start_line"),
             "end_line": symbol.get("end_line"),
-            "evidence_visibility": (
-                str(file_row["evidence_visibility"])
-                if isinstance(file_row, Mapping)
-                else EvidenceVisibility.SOURCE.value
-            ),
+            "evidence_visibility": str(file_row["evidence_visibility"]),
             "exact_identifier_projection": True,
             projection_flag: True,
         }
@@ -772,11 +695,18 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         indexed, complete = self._task_action_exact_symbol_index_window(terminal_names)
         candidates: list[dict[str, object]] = []
         seen: set[tuple[str, str]] = set()
+        direct_terms: set[str] = set()
+        import_complete = True
         for symbol in indexed:
             path = str(symbol.get("path") or "")
-            if not self._task_action_qualified_identifier_matches_symbol(
-                path, symbol, qualified_terms
-            ):
+            matched_terms = {
+                term
+                for term in qualified_terms
+                if self._task_action_qualified_identifier_matches_symbol(
+                    path, symbol, (term,)
+                )
+            }
+            if not matched_terms:
                 continue
             candidate = self._task_action_index_projection(
                 symbol,
@@ -793,8 +723,64 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
             if key in seen:
                 continue
             seen.add(key)
+            direct_terms.update(matched_terms)
             candidates.append(candidate)
-        return candidates, complete
+        for term in qualified_terms:
+            candidate, resolved = self._task_action_qualified_import_candidate(
+                term, failed, canonical_rank, direct=term in direct_terms
+            )
+            import_complete &= resolved
+            if candidate is None:
+                continue
+            key = (
+                str(candidate.get("path") or ""),
+                str(candidate.get("qualname") or candidate.get("name") or ""),
+            )
+            if key not in seen:
+                seen.add(key)
+                candidates.append(candidate)
+        return candidates, complete and import_complete
+
+    def _task_action_qualified_import_candidate(
+        self,
+        term: str,
+        failed: set[str],
+        canonical_rank: int,
+        *,
+        direct: bool,
+    ) -> tuple[dict[str, object] | None, bool]:
+        """Follow one explicit module export through the bounded import owner."""
+        if direct:
+            return None, True
+        module, exported_name = term.rsplit(".", 1)
+        facades = self._session_module_paths(module)
+        if not facades:
+            return None, True
+        if len(facades) != 1:
+            return None, False
+        facade = facades[0]
+        owners, unresolved = self._resolve_import_owner_evidence(facade, term)
+        if unresolved:
+            return None, False
+        leaves = [path for path in owners if path != facade]
+        if len(leaves) != 1:
+            return None, False
+        symbol = next(
+            (
+                row
+                for row in self._session_symbols_for_path(leaves[0])
+                if str(row.get("name") or "").lower() == exported_name.lower()
+            ),
+            None,
+        )
+        candidate = (
+            self._task_action_index_projection(
+                symbol, failed, canonical_rank, "qualified_import_owner_projection"
+            )
+            if symbol is not None
+            else None
+        )
+        return candidate, candidate is not None
 
     def _task_action_plain_identifier_index_evidence(
         self,
@@ -960,7 +946,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         """Project exact active source symbols already present in canonical task rows.
 
         This is discrimination only: it neither discovers new paths nor reranks
-        canonical retrieval. Test-only, archived, failed, lexical/comment-only,
+        canonical retrieval. Test-only, failed, lexical/comment-only,
         and merely substring-related evidence cannot become exact edit authority.
         """
         if TYPE_CHECKING:
@@ -988,7 +974,7 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         candidates: list[dict[str, object]] = []
         for row in rows:
             path = str(row.get("path") or "")
-            if not path or path in failed or self._task_action_is_archive_path(path):
+            if not path or path in failed:
                 continue
             matches = [
                 symbol
