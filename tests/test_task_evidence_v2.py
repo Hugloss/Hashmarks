@@ -127,6 +127,42 @@ def test_task_evidence_v2_keeps_dependency_as_related_evidence_not_owner(
     assert packet["related"]["candidates"] == action["related"]
 
 
+def test_natural_language_prefix_path_owner_does_not_drift_to_query_neighbor(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "hashmarks/codemap/repository_index_store.py",
+        "class WorkspaceMapStore:\n"
+        "    def paths_under(self, prefix: str) -> list[str]:\n"
+        "        return [path for path in self.paths if path.startswith(prefix)]\n",
+    )
+    _write(
+        tmp_path,
+        "hashmarks/codemap/store_queries.py",
+        "def query_paths_for_prefix(store, prefix: str) -> list[str]:\n"
+        "    return store.paths_under(prefix)\n",
+    )
+    _write(
+        tmp_path,
+        "tests/test_store.py",
+        "from hashmarks.codemap.repository_index_store import WorkspaceMapStore\n"
+        "# verifies indexed repository paths under a requested prefix\n",
+    )
+
+    task = (
+        "Change the behavior that enumerates indexed repository paths underneath "
+        "a requested prefix."
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20, per_role=3)
+
+    assert action["ambiguity"]["ambiguous"] is False
+    assert action["edit"]["path"] == "hashmarks/codemap/repository_index_store.py"
+    assert action["edit"]["qualname"].endswith("WorkspaceMapStore.paths_under")
+
+
 def test_task_evidence_projects_same_authority_proof_across_bounds(
     tmp_path: Path,
 ) -> None:
