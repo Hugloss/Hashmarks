@@ -86,7 +86,12 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="repository_context",
-        description="Get compact repository orientation, generation/freshness, languages, areas, and project topology.",
+        description=(
+            "Use for initial repository orientation only: compact generation/freshness, "
+            "languages, areas, and project topology. For a concrete coding task that "
+            "needs ownership, edit, verification, ambiguity, or next-read evidence, "
+            "use task_evidence instead."
+        ),
         annotations=annotations,
     )
     def repository_context(max_areas: int = 12) -> dict[str, object]:
@@ -94,7 +99,11 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="find",
-        description="Find bounded repository paths or symbols relevant to a query without reading full files.",
+        description=(
+            "Use for a direct bounded path or symbol lookup when the search target is "
+            "already known. For a broader coding task that needs owner/edit/verification "
+            "evidence and suggested next reads, use task_evidence instead."
+        ),
         annotations=annotations,
     )
     def find(query: str, limit: int = 20) -> dict[str, object]:
@@ -102,7 +111,12 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="task_evidence",
-        description="Get the compact pre-edit authority, edit, verification, freshness, ambiguity, and next-read evidence for a coding task.",
+        description=(
+            "Use before coding-task localization or editing when you need compact "
+            "repository evidence for likely owners, edit targets, verification, "
+            "freshness, ambiguity, and bounded next reads. This is the task-level "
+            "entrypoint; repository_context is orientation and find is direct lookup."
+        ),
         annotations=annotations,
     )
     def task_evidence(
@@ -119,7 +133,11 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="change_impact",
-        description="Given a task and caller-reported changed repository paths, return bounded structural impact and verification relevance.",
+        description=(
+            "Use after the caller has changed repository paths: return bounded structural "
+            "impact and verification relevance for those explicit changes. For pre-edit "
+            "task evidence, use task_evidence."
+        ),
         annotations=annotations,
     )
     def change_impact(
