@@ -23,7 +23,6 @@ CODEX_HOST_PYTHON ?= $(ARTIFACT_PYTHON)
 CODEX_HOST_RECEIPT ?= dist/codex-mcp-host-gate.json
 CODEX_HOST_DANGEROUS ?= 0
 PI ?= pi
-PI_MODEL ?=
 PI_HOST_PYTHON ?= $(ARTIFACT_PYTHON)
 PI_HOST_RECEIPT ?= dist/pi-mcp-host-gate.json
 MCP_STRESS_RECEIPT ?= dist/mcp-concurrency-stress.json
@@ -474,11 +473,9 @@ mcp-codex-check:
 	  --receipt "$(CODEX_HOST_RECEIPT)"
 
 mcp-pi-check:
-	@test -n "$(PI_MODEL)" || (echo "PI_MODEL is required; choose a model from: pi --list-models" >&2; exit 2)
 	@$(UV_RUN) --offline --no-sync python scripts/host_qualification/pi_mcp_host_gate.py \
 	  --uv "$(UV)" \
 	  --pi "$(PI)" \
-	  --model "$(PI_MODEL)" \
 	  --python "$(PI_HOST_PYTHON)" \
 	  --receipt "$(PI_HOST_RECEIPT)"
 
