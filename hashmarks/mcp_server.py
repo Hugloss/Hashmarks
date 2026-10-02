@@ -86,7 +86,11 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="repository_context",
-        description="Get compact repository orientation, generation/freshness, languages, areas, and project topology.",
+        description=(
+            "Use only for initial repository orientation: freshness, languages, areas, "
+            "and topology. For a coding task needing ownership, edit, verification, or "
+            "next-read evidence, use task_evidence instead."
+        ),
         annotations=annotations,
     )
     def repository_context(max_areas: int = 12) -> dict[str, object]:
@@ -94,7 +98,11 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="find",
-        description="Find bounded repository paths or symbols relevant to a query without reading full files.",
+        description=(
+            "Use for a bounded path or symbol lookup when the target is already known. "
+            "For broader coding-task ownership, edit, verification, or next-read evidence, "
+            "use task_evidence instead."
+        ),
         annotations=annotations,
     )
     def find(query: str, limit: int = 20) -> dict[str, object]:
@@ -102,7 +110,11 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="task_evidence",
-        description="Get the compact pre-edit authority, edit, verification, freshness, ambiguity, and next-read evidence for a coding task.",
+        description=(
+            "Use before coding-task localization or editing for bounded owner, edit-target, "
+            "verification, freshness, ambiguity, and next-read evidence. This is the "
+            "task-level entrypoint."
+        ),
         annotations=annotations,
     )
     def task_evidence(
@@ -119,7 +131,10 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="change_impact",
-        description="Given a task and caller-reported changed repository paths, return bounded structural impact and verification relevance.",
+        description=(
+            "Use after explicit changed paths exist for bounded structural impact and "
+            "verification relevance. For pre-edit evidence, use task_evidence."
+        ),
         annotations=annotations,
     )
     def change_impact(
