@@ -129,11 +129,11 @@ class EvidenceFreshnessMixin:
             or self._manifest_digest(str(rel)) != expected
         )
 
-    def _declared_project_shared_input(self, relpath: str) -> bool:
+    def _project_shared_input(self, relpath: str, producer: str) -> bool:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         for row in self.store.project_nodes():
-            if str(row.get("producer") or "") != "declared-project-links":
+            if str(row.get("producer") or "") != producer:
                 continue
             if str(row.get("kind") or "") != "shared-input":
                 continue
@@ -143,8 +143,8 @@ class EvidenceFreshnessMixin:
                 return True
         return False
 
-    def _rebind_declared_project_freshness(self) -> bool:
-        value = self._evidence_snapshot("project", "declared-project-links")
+    def _rebind_project_freshness(self, producer: str) -> bool:
+        value = self._evidence_snapshot("project", producer)
         if value is None or bool(value.get("bind_generation", False)):
             return False
         manifests = value.get("manifests") or {}
@@ -158,7 +158,7 @@ class EvidenceFreshnessMixin:
             return False
         self._record_evidence_snapshot(
             "project",
-            "declared-project-links",
+            producer,
             bind_generation=False,
             manifests=tuple(str(rel) for rel in manifests),
         )

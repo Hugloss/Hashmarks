@@ -5,6 +5,11 @@ from pathlib import Path
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.project_graph import (
+    ProjectGraphEvidence,
+    ProjectGraphProvider,
+    ProjectNode,
+)
 from hashmarks.codemap.repository_domains import (
     RepositoryDomain,
     classify_repository_path,
@@ -157,3 +162,108 @@ def test_configured_fastidentity_state_is_excluded_from_codemap(
         assert not any(
             path.startswith(".fastidentity/") for path in codemap.store.paths()
         )
+
+
+class _SemanticProjectProvider(ProjectGraphProvider):
+    def __init__(self, name: str, *, bind_generation: bool) -> None:
+        super().__init__()
+        self.name = name
+        self.bind_generation = bind_generation
+
+    def detect(self, workspace: Path) -> bool:
+        return (workspace / "project.meta").is_file()
+
+    def collect(self, workspace: Path) -> ProjectGraphEvidence:
+        del workspace
+        node = ProjectNode(
+            project_id="semantic:root",
+            kind="semantic-test",
+            root=".",
+            manifest="project.meta",
+            producer=self.name,
+        )
+        return ProjectGraphEvidence(self.name, nodes=(node,))
+
+
+@pytest.mark.parametrize(
+    ("provider_name", "bind_generation", "expected_fresh"),
+    [
+        ("go-list", True, False),
+        ("renamed-native-provider", True, False),
+        ("manifest-only-provider", False, True),
+    ],
+)
+def test_project_provider_name_does_not_decide_generation_freshness(
+    tmp_path: Path,
+    provider_name: str,
+    bind_generation: bool,
+    expected_fresh: bool,
+) -> None:
+    _write(tmp_path, "project.meta", "semantic project\n")
+    _write(tmp_path, "source.py", "VALUE = 1\n")
+    provider = _SemanticProjectProvider(provider_name, bind_generation=bind_generation)
+    with CodeMap(tmp_path) as codemap:
+        codemap.project_graph_providers = (provider,)
+        codemap.sync()
+        codemap.enrich_projects((provider_name,))
+        assert codemap._evidence_fresh("project", provider_name) == (True, None)
+
+        _write(tmp_path, "source.py", "VALUE = 2\n")
+        codemap.sync(["source.py"])
+        fresh, reason = codemap._evidence_fresh("project", provider_name)
+
+    assert fresh is expected_fresh
+    if bind_generation:
+        assert reason is not None and reason.startswith("CodeMap generation changed")
+    else:
+        assert reason is None
+
+
+@pytest.mark.parametrize(
+    "provider_name", ["declared-project-links", "renamed-declared-links"]
+)
+def test_declared_project_capabilities_survive_provider_rename(
+    tmp_path: Path, provider_name: str
+) -> None:
+    _write(tmp_path, "backend/package.json", '{"name":"backend"}\n')
+    _write(tmp_path, "frontend/package.json", '{"name":"frontend"}\n')
+    _write(tmp_path, "backend/value.ts", "export const value = 1\n")
+    _write(tmp_path, "contract.json", '{"v":1}\n')
+    links = (
+        "[[shared_input]]\n"
+        "path='contract.json'\n"
+        "projects=['npm:backend','npm:frontend']\n"
+        "kind='contract'\n"
+    )
+    _write(tmp_path, ".hashmarks-project-links.toml", links)
+
+    with CodeMap(tmp_path) as codemap:
+        provider = next(
+            candidate
+            for candidate in codemap.project_graph_providers
+            if candidate.supports_shared_input_freshness_rebind
+            and candidate.topology_manifest == ".hashmarks-project-links.toml"
+        )
+        provider.name = provider_name
+        codemap.sync()
+        codemap.enrich_projects(("npm-package-graph", provider_name))
+
+        _write(tmp_path, "contract.json", '{"v":2}\n')
+        shared = codemap.task_change_impact("contract changed", ["contract.json"])
+
+        _write(
+            tmp_path,
+            ".hashmarks-project-links.toml",
+            links + "[[link]]\n"
+            "source='npm:frontend'\n"
+            "target='npm:backend'\n"
+            "kind='consumer'\n",
+        )
+        topology = codemap.task_change_impact(
+            "declared topology changed", [".hashmarks-project-links.toml"]
+        )
+
+    assert shared["project_refresh"]["producer"] == provider_name
+    assert shared["project_refresh"]["mode"] == "freshness-rebind"
+    assert topology["project_refresh"]["producer"] == provider_name
+    assert topology["project_refresh"]["mode"] == "topology-recollect"

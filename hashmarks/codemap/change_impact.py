@@ -228,29 +228,37 @@ class ChangeImpactMixin:
     ) -> dict[str, object] | None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        fresh, freshness_reason = self._evidence_fresh(
-            "project", "declared-project-links"
+        provider = next(
+            (
+                candidate
+                for candidate in self.project_graph_providers
+                if candidate.supports_shared_input_freshness_rebind
+                and candidate.topology_manifest is not None
+            ),
+            None,
         )
+        if provider is None:
+            return None
+        producer = provider.name
+        declared_file = provider.topology_manifest
+        fresh, freshness_reason = self._evidence_fresh("project", producer)
         if (
             fresh
             or not freshness_reason
             or not freshness_reason.startswith("manifest changed: ")
         ):
             return None
-        changed_manifests = self._evidence_manifest_changes(
-            "project", "declared-project-links"
-        )
-        declared_file = ".hashmarks-project-links.toml"
+        changed_manifests = self._evidence_manifest_changes("project", producer)
         reported = set(normalized)
         shared_only = bool(changed_manifests) and all(
             rel != declared_file
             and rel in reported
-            and self._declared_project_shared_input(rel)
+            and self._project_shared_input(rel, producer)
             for rel in changed_manifests
         )
-        if shared_only and self._rebind_declared_project_freshness():
+        if shared_only and self._rebind_project_freshness(producer):
             return {
-                "producer": "declared-project-links",
+                "producer": producer,
                 "reason": "caller-reported-shared-input-changed",
                 "changed": changed_manifests[0],
                 "changed_manifests": list(changed_manifests),
@@ -259,21 +267,18 @@ class ChangeImpactMixin:
             }
         if declared_file not in changed_manifests or declared_file not in reported:
             return None
-        for provider in self.project_graph_providers:
-            if provider.name == "declared-project-links" and provider.detect(
-                self.workspace
-            ):
-                refreshed = self.enrich_projects(("declared-project-links",))
-                return {
-                    "producer": "declared-project-links",
-                    "reason": "caller-reported-declaration-changed",
-                    "changed": declared_file,
-                    "changed_manifests": list(changed_manifests),
-                    "mode": "topology-recollect",
-                    "warnings": list(
-                        cast("Sequence[object]", refreshed.get("warnings") or ())
-                    ),
-                }
+        if provider.detect(self.workspace):
+            refreshed = self.enrich_projects((producer,))
+            return {
+                "producer": producer,
+                "reason": "caller-reported-declaration-changed",
+                "changed": declared_file,
+                "changed_manifests": list(changed_manifests),
+                "mode": "topology-recollect",
+                "warnings": list(
+                    cast("Sequence[object]", refreshed.get("warnings") or ())
+                ),
+            }
         return None
 
     def _change_impact_surface_state(

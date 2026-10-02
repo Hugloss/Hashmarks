@@ -381,9 +381,8 @@ class EvidenceGraphMixin:
                 evidence.edges,
             )
             if (
-                provider.name == "declared-project-links"
-                and self._visible_repository_file(".hashmarks-project-links.toml")
-                is None
+                provider.topology_manifest is not None
+                and self._visible_repository_file(provider.topology_manifest) is None
             ):
                 nodes = ()
                 edges = ()
@@ -398,17 +397,14 @@ class EvidenceGraphMixin:
                     *(node.metadata.get("freshness_manifests") or ()),
                 )
             ]
-            # Declared links can contain only edges and therefore no provider-
-            # owned nodes. The declaration file still owns that topology.
-            if provider.name == "declared-project-links":
-                project_manifests.insert(0, ".hashmarks-project-links.toml")
+            # A provider topology manifest can own edge-only graph evidence even
+            # when the provider contributes no project nodes.
+            if provider.topology_manifest is not None:
+                project_manifests.insert(0, provider.topology_manifest)
             self._record_evidence_snapshot(
                 "project",
                 provider.name,
-                bind_generation=(
-                    provider.name
-                    in {"go-list", "nx-project-graph", "pants-target-graph"}
-                ),
+                bind_generation=provider.bind_generation,
                 manifests=project_manifests,
             )
             results.append(

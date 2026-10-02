@@ -63,6 +63,9 @@ ManifestFinder = Callable[[str], tuple[Path, ...]]
 
 class ProjectGraphProvider:
     name = "project-graph"
+    bind_generation = False
+    topology_manifest: str | None = None
+    supports_shared_input_freshness_rebind = False
 
     def __init__(self, manifest_finder: ManifestFinder | None = None) -> None:
         self._manifest_finder = manifest_finder
@@ -191,6 +194,7 @@ class NxProjectGraphProvider(ProjectGraphProvider):
     """Native Nx project graph provider in the derived CodeMap lane."""
 
     name = "nx-project-graph"
+    bind_generation = True
 
     @staticmethod
     def _executable(workspace: Path) -> str | None:
@@ -254,6 +258,7 @@ class NxProjectGraphProvider(ProjectGraphProvider):
 
 class PantsProjectGraphProvider(ProjectGraphProvider):
     name = "pants-target-graph"
+    bind_generation = True
 
     def detect(self, workspace: Path) -> bool:
         return bool(self._manifest_paths(workspace, "pants.toml"))
@@ -421,6 +426,7 @@ class GradleProjectGraphProvider(ProjectGraphProvider):
 
 class GoProjectGraphProvider(ProjectGraphProvider):
     name = "go-list"
+    bind_generation = True
 
     def detect(self, workspace: Path) -> bool:
         return bool(self._manifest_paths(workspace, "go.mod"))
@@ -740,6 +746,8 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
 
     name = "declared-project-links"
     filename = ".hashmarks-project-links.toml"
+    topology_manifest = filename
+    supports_shared_input_freshness_rebind = True
 
     def detect(self, workspace: Path) -> bool:
         return bool(self._manifest_paths(workspace, self.filename))
