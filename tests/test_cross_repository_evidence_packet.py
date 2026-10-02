@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _repo(root: Path) -> tuple[str, str, str]:
+def _repo(root: Path, fake_maven_wrapper) -> tuple[str, str, str]:
     backend = "maven:com.example:api"
     web = "npm:@demo/web"
     mobile = "npm:@demo/mobile"
@@ -33,6 +33,7 @@ def _repo(root: Path) -> tuple[str, str, str]:
         f"[[link]]\nsource='{mobile}'\ntarget='{web}'\nkind='mobile-shell'\n"
         f"[[shared_input]]\npath='contracts/api.yaml'\nprojects=['{web}','{backend}']\nkind='contract'\n"
     )
+    fake_maven_wrapper(root)
     return backend, web, mobile
 
 
@@ -44,9 +45,9 @@ def _prepare(codemap: CodeMap) -> None:
 
 
 def test_cross_repository_packet_preserves_provenance_and_freshness(
-    tmp_path: Path,
+    tmp_path: Path, fake_maven_wrapper
 ) -> None:
-    backend, web, mobile = _repo(tmp_path)
+    backend, web, mobile = _repo(tmp_path, fake_maven_wrapper)
     with CodeMap(tmp_path) as codemap:
         _prepare(codemap)
         packet = codemap.cross_repository_evidence_packet(
@@ -79,8 +80,10 @@ def test_cross_repository_packet_preserves_provenance_and_freshness(
     assert packet["execution_effect"] == "none"
 
 
-def test_shared_input_packet_reports_all_affected_projects(tmp_path: Path) -> None:
-    backend, web, mobile = _repo(tmp_path)
+def test_shared_input_packet_reports_all_affected_projects(
+    tmp_path: Path, fake_maven_wrapper
+) -> None:
+    backend, web, mobile = _repo(tmp_path, fake_maven_wrapper)
     with CodeMap(tmp_path) as codemap:
         _prepare(codemap)
         packet = codemap.cross_repository_evidence_packet(
@@ -109,8 +112,10 @@ def test_no_cross_repository_evidence_is_explicitly_unresolved(tmp_path: Path) -
     assert packet["freshness"]["state"] == "unknown"
 
 
-def test_cross_repository_packet_service_roundtrip(tmp_path: Path) -> None:
-    _repo(tmp_path)
+def test_cross_repository_packet_service_roundtrip(
+    tmp_path: Path, fake_maven_wrapper
+) -> None:
+    _repo(tmp_path, fake_maven_wrapper)
     socket_path = tmp_path / "cross-repo.sock"
     service = CodeMapService(tmp_path, socket_path=socket_path)
     thread = threading.Thread(target=service.serve_forever, daemon=True)
