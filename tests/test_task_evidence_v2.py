@@ -163,6 +163,96 @@ def test_natural_language_prefix_path_owner_does_not_drift_to_query_neighbor(
     assert action["edit"]["qualname"].endswith("WorkspaceMapStore.paths_under")
 
 
+def test_behavioral_owner_discovery_stays_on_semantic_owner(tmp_path: Path) -> None:
+    cases = [
+        (
+            "stale",
+            "Change the behavior that removes stale indexed paths during a full CodeMap sync.",
+            "hashmarks/codemap/indexing_lifecycle.py",
+            {
+                "hashmarks/codemap/indexing_lifecycle.py": (
+                    "def _sync_remove_stale_paths(store, live_paths):\n"
+                    "    stale = store.paths() - live_paths\n"
+                    "    return store.delete_paths(stale)\n"
+                ),
+                "hashmarks/codemap/service.py": (
+                    "from hashmarks.codemap.indexing_lifecycle import _sync_remove_stale_paths\n"
+                    "def full_sync(store, live_paths):\n"
+                    "    return _sync_remove_stale_paths(store, live_paths)\n"
+                ),
+            },
+        ),
+        (
+            "prune",
+            "Change the behavior that prunes directory names before repository file discovery descends into them.",
+            "hashmarks/codemap/repository_file_discovery.py",
+            {
+                "hashmarks/codemap/repository_file_discovery.py": (
+                    "def _prune_discovery_dirs(names):\n"
+                    "    names[:] = [name for name in names if not name.startswith('.')]\n"
+                ),
+                "hashmarks/codemap/service.py": (
+                    "from hashmarks.codemap.repository_file_discovery import _prune_discovery_dirs\n"
+                    "def discover(names):\n"
+                    "    _prune_discovery_dirs(names)\n"
+                ),
+            },
+        ),
+        (
+            "mcp",
+            "Change the MCP surface behavior that returns task evidence to a consumer.",
+            "hashmarks/mcp_surface.py",
+            {
+                "hashmarks/mcp_surface.py": (
+                    "class HashmarksMcpSurface:\n"
+                    "    def task_evidence(self, task):\n"
+                    "        return {'task': task}\n"
+                ),
+                "hashmarks/mcp_server.py": (
+                    "from hashmarks.mcp_surface import HashmarksMcpSurface\n"
+                    "def serve_task(surface: HashmarksMcpSurface, task):\n"
+                    "    return surface.task_evidence(task)\n"
+                ),
+            },
+        ),
+        (
+            "identity",
+            (
+                "Change the function used by the test-selection work-selection "
+                "envelope and its repository-binding validation to compute "
+                "extraction-stable repository content identity from repository bytes."
+            ),
+            "hashmarks/test_shards.py",
+            {
+                "hashmarks/test_shards.py": (
+                    "def repository_content_identity(root):\n"
+                    "    return 'content-bytes'\n\n"
+                    "def work_selection_envelope(root):\n"
+                    "    return {'repository': repository_content_identity(root)}\n\n"
+                    "def validate_work_selection_repository_binding(root, expected):\n"
+                    "    return repository_content_identity(root) == expected\n"
+                ),
+                "hashmarks/engine.py": (
+                    "class IdentityEngine:\n"
+                    "    def repository_identity(self, root):\n"
+                    "        return 'merkle-identity'\n"
+                ),
+            },
+        ),
+    ]
+
+    for case_id, task, expected_path, files in cases:
+        root = tmp_path / case_id
+        root.mkdir()
+        for rel, content in files.items():
+            _write(root, rel, content)
+        with CodeMap(root) as codemap:
+            codemap.sync()
+            action = codemap.task_action_map(task, limit=20, per_role=3)
+        assert action["ambiguity"]["ambiguous"] is False, case_id
+        assert action["edit"]["path"] == expected_path, case_id
+
+
 def test_task_evidence_projects_same_authority_proof_across_bounds(
     tmp_path: Path,
 ) -> None:
