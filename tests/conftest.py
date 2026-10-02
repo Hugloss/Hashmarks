@@ -13,6 +13,28 @@ if str(ROOT) not in sys.path:
 import pytest  # noqa: E402 - import follows standalone script path setup
 
 
+@pytest.fixture
+def fake_maven_wrapper():
+    """Install a deterministic test Maven boundary that emits the requested effective POM."""
+
+    def install(root: Path) -> Path:
+        wrapper = root / "mvnw"
+        wrapper.write_text(
+            "#!/usr/bin/env python3\n"
+            "from pathlib import Path\n"
+            "import sys\n"
+            "args = sys.argv[1:]\n"
+            "manifest = Path(args[args.index('-f') + 1])\n"
+            "output = Path(next(value.split('=', 1)[1] for value in args if value.startswith('-Doutput=')))\n"
+            "output.write_bytes(manifest.read_bytes())\n",
+            encoding="utf-8",
+        )
+        wrapper.chmod(0o755)
+        return wrapper
+
+    return install
+
+
 @pytest.fixture(scope="session")
 def repository_qualification_plan():
     """One immutable repository qualification snapshot for read-only contract tests."""
