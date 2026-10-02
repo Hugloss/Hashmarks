@@ -235,9 +235,7 @@ class TaskActionOwnerResolutionMixin:
         )
         candidates: list[dict[str, object]] = []
         for row in rows:
-            if not self._task_action_is_test_shaped_source(
-                row, request.context.failed
-            ):
+            if not self._task_action_is_test_shaped_source(row, request.context.failed):
                 continue
             candidate = self._task_action_behavioral_reference_candidate(
                 row,
