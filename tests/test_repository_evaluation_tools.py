@@ -395,6 +395,25 @@ def test_heldout_corpus_keeps_answer_blind_cross_language_membership() -> None:
     assert ambiguous_cases >= 2
 
 
+def test_hashmarks_paths_under_heldout_case_is_answer_blind() -> None:
+    root = (
+        Path(__file__).resolve().parents[1]
+        / "benchmarks/repository_evaluation/manifests/heldout-v1"
+    )
+    cases = json.loads((root / "hashmarks.cases.json").read_text(encoding="utf-8"))[
+        "cases"
+    ]
+    grader = json.loads(
+        (root / "hashmarks.grader.json").read_text(encoding="utf-8")
+    )["cases"]
+    case = next(row for row in cases if row["id"] == "hashmarks:paths-under")
+    task = case["task"]
+    assert "paths_under" not in task
+    assert "WorkspaceMapStore" not in task
+    assert "requested prefix" in task
+    assert grader["hashmarks:paths-under"]["source_symbol"] == "paths_under"
+
+
 def test_repository_evaluation_grader_covers_classification_and_failure_stages() -> (
     None
 ):
