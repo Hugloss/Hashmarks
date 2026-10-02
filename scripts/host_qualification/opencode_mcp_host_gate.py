@@ -283,7 +283,6 @@ def _opencode_run(
     opencode: str,
     *,
     repo: Path,
-    model: str,
     prompt: str,
     env: dict[str, str],
     session_id: str | None = None,
@@ -294,8 +293,6 @@ def _opencode_run(
         "--dangerously-skip-permissions",
         "--dir",
         str(repo),
-        "--model",
-        model,
         "--format",
         "json",
     ]
@@ -436,7 +433,6 @@ def _run_phase_one(
     completed = _opencode_run(
         args.opencode,
         repo=runtime.repo,
-        model=args.model,
         prompt=_phase1_prompt(),
         env=runtime.opencode_env,
     )
@@ -503,7 +499,6 @@ def _run_phase_two(
     completed = _opencode_run(
         args.opencode,
         repo=runtime.repo,
-        model=args.model,
         prompt=_phase2_prompt(phase_one.evidence),
         env=runtime.opencode_env,
         session_id=phase_one.session_id,
@@ -569,7 +564,7 @@ def _gate_receipt(
         },
         "host": {"name": "opencode", "version": source.opencode_version},
         "opencode_version": source.opencode_version,
-        "model": args.model,
+        "model_authority": "opencode-native-config",
         "python_selector": args.python,
         "installed_versions": runtime.versions,
         "wheel": {"name": runtime.wheel.name, "sha256": _sha256(runtime.wheel)},
@@ -631,9 +626,6 @@ def _host_gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Qualify the installed Hashmarks MCP wheel through a real OpenCode host."
-    )
-    parser.add_argument(
-        "--model", required=True, help="OpenCode provider/model with tool calling"
     )
     parser.add_argument(
         "--python",
