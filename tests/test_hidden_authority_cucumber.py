@@ -6,6 +6,7 @@ import pytest
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.project_graph import (
+    NpmProjectGraphProvider,
     ProjectGraphEvidence,
     ProjectGraphProvider,
     ProjectNode,
@@ -166,7 +167,7 @@ def test_configured_fastidentity_state_is_excluded_from_codemap(
 
 class _SemanticProjectProvider(ProjectGraphProvider):
     def __init__(self, name: str, *, bind_generation: bool) -> None:
-        super().__init__()
+        super().__init__(lambda _filename: ())
         self.name = name
         self.bind_generation = bind_generation
 
@@ -183,6 +184,30 @@ class _SemanticProjectProvider(ProjectGraphProvider):
             producer=self.name,
         )
         return ProjectGraphEvidence(self.name, nodes=(node,))
+
+
+def test_project_provider_uses_only_injected_manifest_discovery(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "package.json", '{"name":"workspace-root"}\n')
+    calls: list[str] = []
+
+    def no_visible_manifests(filename: str) -> tuple[Path, ...]:
+        calls.append(filename)
+        return ()
+
+    provider = NpmProjectGraphProvider(no_visible_manifests)
+    assert provider.detect(tmp_path) is False
+    assert calls == ["package.json"]
+
+    def visible_manifests(filename: str) -> tuple[Path, ...]:
+        assert filename == "package.json"
+        return (tmp_path / "package.json",)
+
+    provider = NpmProjectGraphProvider(visible_manifests)
+    assert provider.detect(tmp_path) is True
+    evidence = provider.collect(tmp_path)
+    assert [node.manifest for node in evidence.nodes] == ["package.json"]
 
 
 @pytest.mark.parametrize(
