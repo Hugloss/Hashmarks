@@ -393,7 +393,7 @@ def test_exact_import_resolution_avoids_whole_file_map_materialization(
 
 
 def test_task_change_impact_declared_project_provenance_and_shared_input_refresh(
-    tmp_path: Path,
+    tmp_path: Path, fake_maven_wrapper
 ) -> None:
     (tmp_path / "backend/src").mkdir(parents=True)
     (tmp_path / "frontend/src").mkdir(parents=True)
@@ -422,6 +422,7 @@ def test_task_change_impact_declared_project_provenance_and_shared_input_refresh
         "[[shared_input]]\npath='openapi.yaml'\nprojects=['npm:@demo/web','maven:com.example:api']\nkind='contract'\n",
         encoding="utf-8",
     )
+    fake_maven_wrapper(tmp_path)
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         codemap.enrich_projects(
@@ -493,7 +494,9 @@ def test_task_change_impact_project_provenance_is_bounded(tmp_path: Path) -> Non
     assert len(impact["projects"]) == 8
 
 
-def test_cross_repository_impact_qualification_small_smoke(tmp_path: Path) -> None:
+def test_cross_repository_impact_qualification_small_smoke(
+    tmp_path: Path, fake_maven_wrapper
+) -> None:
     from scripts.score_cross_repository_impact import generate, run
 
     base = tmp_path / "cross"
@@ -501,6 +504,7 @@ def test_cross_repository_impact_qualification_small_smoke(tmp_path: Path) -> No
     secret = tmp_path / "secret.json"
     output = tmp_path / "result.json"
     generate(base, public, secret, scenarios=1, decoys=2)
+    fake_maven_wrapper(base)
     payload = run(base, public, secret, output)
     assert payload["summary"]["tasks"] == 2
     assert payload["summary"]["fully_correct"] == 2
