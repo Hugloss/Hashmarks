@@ -403,9 +403,9 @@ def test_hashmarks_paths_under_heldout_case_is_answer_blind() -> None:
     cases = json.loads((root / "hashmarks.cases.json").read_text(encoding="utf-8"))[
         "cases"
     ]
-    grader = json.loads(
-        (root / "hashmarks.grader.json").read_text(encoding="utf-8")
-    )["cases"]
+    grader = json.loads((root / "hashmarks.grader.json").read_text(encoding="utf-8"))[
+        "cases"
+    ]
     case = next(row for row in cases if row["id"] == "hashmarks:paths-under")
     task = case["task"]
     assert "paths_under" not in task
