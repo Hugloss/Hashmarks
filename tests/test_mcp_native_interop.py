@@ -50,10 +50,14 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         tools = await server.list_tools()
         assert [tool.name for tool in tools] == _EXPECTED_TOOLS
         descriptions = {tool.name: tool.description or "" for tool in tools}
-        assert "initial repository orientation only" in descriptions["repository_context"]
-        assert "direct bounded path or symbol lookup" in descriptions["find"]
+        assert (
+            "initial repository orientation" in descriptions["repository_context"]
+        )
+        assert "bounded path or symbol lookup" in descriptions["find"]
         assert "task-level entrypoint" in descriptions["task_evidence"]
-        assert "Use after the caller has changed repository paths" in descriptions["change_impact"]
+        assert (
+            "Use after explicit changed paths exist" in descriptions["change_impact"]
+        )
         assert "use task_evidence instead" in descriptions["repository_context"]
         assert "use task_evidence instead" in descriptions["find"]
         for tool in tools:
