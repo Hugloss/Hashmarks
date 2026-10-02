@@ -337,14 +337,17 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
                             ids[row.module_id],
                             ids[target_id],
                             "dependency",
-                            "manifest",
+                            "native",
                             self.name,
                         )
                     )
         return tuple(edges)
 
     def collect(self, workspace: Path) -> ProjectGraphEvidence:
-        snapshot = collect_maven_modules(workspace)
+        snapshot = collect_maven_modules(
+            workspace,
+            self._manifest_paths("pom.xml"),
+        )
         ids, by_ga, by_artifact = self._module_indexes(snapshot.modules)
         nodes = self._maven_nodes(snapshot.modules, ids)
         edges = self._maven_edges(snapshot.modules, ids, by_ga, by_artifact)
