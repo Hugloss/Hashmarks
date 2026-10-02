@@ -504,7 +504,7 @@ def test_cross_repository_impact_qualification_small_smoke(
     secret = tmp_path / "secret.json"
     output = tmp_path / "result.json"
     generate(base, public, secret, scenarios=1, decoys=2)
-    fake_maven_wrapper(base)
+    fake_maven_wrapper(base / "scenario-000")
     payload = run(base, public, secret, output)
     assert payload["summary"]["tasks"] == 2
     assert payload["summary"]["fully_correct"] == 2
