@@ -5,7 +5,7 @@
     {
       "id": "hashmarks:paths-under",
       "operation": "task_action_map",
-      "task": "optimize WorkspaceMapStore.paths_under",
+      "task": "Change the behavior that enumerates indexed repository paths underneath a requested prefix.",
       "limit": 20,
       "per_role": 3
     },
