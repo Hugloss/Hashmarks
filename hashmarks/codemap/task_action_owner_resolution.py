@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.paths import normalize_relative_path
 
 from .model import EvidenceVisibility
+from .query_primitives import _TASK_STOPWORDS, _query_terms
+from .repository_domains import RepositoryDomain
 from .task_action_types import (
     _TaskActionExactIdentifierEvidence,
     _TaskActionOwnerCandidateState,
@@ -151,6 +153,81 @@ class TaskActionOwnerResolutionMixin:
                         request.task, exact_identifier_edits[0]
                     )
         return evidence, edit, owner_basis
+
+    def _task_action_reference_backed_behavioral_owner(
+        self,
+        request: _TaskActionOwnerResolutionRequest,
+    ) -> dict[str, object] | None:
+        """Promote one test-shaped source only with task-local production-use proof."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        task_terms = {
+            term
+            for term in _query_terms(request.task)
+            if len(term) >= 4 and term not in _TASK_STOPWORDS
+        }
+        if not task_terms:
+            return None
+
+        candidates: list[dict[str, object]] = []
+        rows = getattr(
+            request.context,
+            "canonical_rows",
+            tuple(request.context.rows),
+        )
+        for row in rows:
+            path = str(row.get("path") or "")
+            domains = set(map(str, row.get("domains") or ()))
+            if (
+                not path
+                or path in request.context.failed
+                or RepositoryDomain.TEST.value not in domains
+                or RepositoryDomain.SOURCE.value not in domains
+            ):
+                continue
+            best: tuple[int, dict[str, object], dict[str, object]] | None = None
+            for symbol in self._session_symbols_for_path(path):
+                name = str(symbol.get("name") or "")
+                if not name:
+                    continue
+                symbol_terms = set(
+                    _query_terms(
+                        " ".join(
+                            str(symbol.get(key) or "")
+                            for key in ("name", "qualname", "signature")
+                        )
+                    )
+                )
+                anchors = task_terms.intersection(symbol_terms)
+                if len(anchors) < 2:
+                    continue
+                projected = self._task_action_reference_backed_source_projection(
+                    row,
+                    {name},
+                )
+                if projected is None:
+                    continue
+                score = len(anchors)
+                if best is None or score > best[0]:
+                    best = (score, projected, symbol)
+            if best is None:
+                continue
+            _score, projected, symbol = best
+            candidates.append(
+                {
+                    **projected,
+                    "name": symbol.get("name"),
+                    "qualname": symbol.get("qualname"),
+                    "signature": symbol.get("signature"),
+                    "start_line": symbol.get("start_line"),
+                    "end_line": symbol.get("end_line"),
+                    "behavioral_reference_owner_projection": True,
+                }
+            )
+        by_path = {
+            str(candidate.get("path") or ""): candidate for candidate in candidates
+        }
+        return next(iter(by_path.values())) if len(by_path) == 1 else None
 
     @staticmethod
     def _task_action_owner_state(
@@ -456,6 +533,18 @@ class TaskActionOwnerResolutionMixin:
         )
         exact_identifier_edits = exact_identifier_evidence.candidates
         owner_basis = exact_basis or owner_basis
+        behavioral_owner = None
+        if (
+            not exact_identifier_edits
+            and not literal_task_path
+            and structural_owner is None
+        ):
+            behavioral_owner = self._task_action_reference_backed_behavioral_owner(
+                request
+            )
+            if behavioral_owner is not None:
+                edit = behavioral_owner
+                owner_basis = "reference-backed-behavioral-owner"
         exact_identifier_paths = tuple(
             sorted(
                 {
@@ -478,6 +567,8 @@ class TaskActionOwnerResolutionMixin:
         selected_edit_path = str(edit.get("path") or "") if edit else ""
         if literal_task_path and selected_edit_path == literal_task_path:
             candidate.basis = "literal-path"
+            return self._task_action_owner_state(candidate)
+        if behavioral_owner is not None:
             return self._task_action_owner_state(candidate)
         if exact_identifier_evidence.search_complete is False:
             candidate.basis = None
