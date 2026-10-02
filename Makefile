@@ -10,7 +10,6 @@ DEV_BATCH_SIZE ?= 4
 DEV_BATCH_START ?= 0
 ARTIFACT_PYTHON ?= 3.14
 OPENCODE ?= opencode
-OPENCODE_MODEL ?=
 OPENCODE_HOST_PYTHON ?= $(ARTIFACT_PYTHON)
 OPENCODE_HOST_RECEIPT ?= dist/opencode-mcp-host-gate.json
 CLAUDE ?= claude
@@ -448,11 +447,9 @@ mcp-concurrency-stress:
 	@$(UV_RUN) --offline --no-sync python scripts/mcp_concurrency_stress.py --receipt "$(MCP_STRESS_RECEIPT)"
 
 mcp-opencode-check:
-	@test -n "$(OPENCODE_MODEL)" || (echo "OPENCODE_MODEL is required; choose a tool-capable model from: opencode models" >&2; exit 2)
 	@$(UV_RUN) --offline --no-sync python scripts/host_qualification/opencode_mcp_host_gate.py \
 	  --uv "$(UV)" \
 	  --opencode "$(OPENCODE)" \
-	  --model "$(OPENCODE_MODEL)" \
 	  --python "$(OPENCODE_HOST_PYTHON)" \
 	  --receipt "$(OPENCODE_HOST_RECEIPT)"
 
