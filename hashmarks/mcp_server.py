@@ -87,10 +87,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="repository_context",
         description=(
-            "Use for initial repository orientation only: compact generation/freshness, "
-            "languages, areas, and project topology. For a concrete coding task that "
-            "needs ownership, edit, verification, ambiguity, or next-read evidence, "
-            "use task_evidence instead."
+            "Use only for initial repository orientation: freshness, languages, areas, "
+            "and topology. For a coding task needing ownership, edit, verification, or "
+            "next-read evidence, use task_evidence instead."
         ),
         annotations=annotations,
     )
@@ -100,9 +99,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="find",
         description=(
-            "Use for a direct bounded path or symbol lookup when the search target is "
-            "already known. For a broader coding task that needs owner/edit/verification "
-            "evidence and suggested next reads, use task_evidence instead."
+            "Use for a bounded path or symbol lookup when the target is already known. "
+            "For broader coding-task ownership, edit, verification, or next-read evidence, "
+            "use task_evidence instead."
         ),
         annotations=annotations,
     )
@@ -112,10 +111,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="task_evidence",
         description=(
-            "Use before coding-task localization or editing when you need compact "
-            "repository evidence for likely owners, edit targets, verification, "
-            "freshness, ambiguity, and bounded next reads. This is the task-level "
-            "entrypoint; repository_context is orientation and find is direct lookup."
+            "Use before coding-task localization or editing for bounded owner, edit-target, "
+            "verification, freshness, ambiguity, and next-read evidence. This is the "
+            "task-level entrypoint."
         ),
         annotations=annotations,
     )
@@ -134,9 +132,8 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="change_impact",
         description=(
-            "Use after the caller has changed repository paths: return bounded structural "
-            "impact and verification relevance for those explicit changes. For pre-edit "
-            "task evidence, use task_evidence."
+            "Use after explicit changed paths exist for bounded structural impact and "
+            "verification relevance. For pre-edit evidence, use task_evidence."
         ),
         annotations=annotations,
     )
