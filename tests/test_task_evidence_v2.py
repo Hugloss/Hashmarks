@@ -163,6 +163,25 @@ def test_natural_language_prefix_path_owner_does_not_drift_to_query_neighbor(
     assert action["edit"]["qualname"].endswith("WorkspaceMapStore.paths_under")
 
 
+def test_behavioral_test_shaped_source_requires_production_reference(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "pkg/test_support.py",
+        "def runtime_probe_state():\n    return 'ready'\n",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(
+            "Change the behavior that reports runtime probe state."
+        )
+
+    assert action["edit"] is None
+    assert action["ambiguity"]["ambiguous"] is True
+    assert action["ownership_authority"]["owner_resolved"] is False
+
+
 def test_behavioral_owner_discovery_stays_on_semantic_owner(tmp_path: Path) -> None:
     cases = [
         (
