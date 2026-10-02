@@ -59,7 +59,7 @@ def _is_test_surface(name: str, parts: set[str]) -> bool:
     """Keep test role independent of test-shaped production source names."""
     if "test" in parts or "tests" in parts:
         return True
-    if name.startswith("test_") and not parts.intersection({"src", "lib", "app"}):
+    if name.startswith("test_") and parts == {name}:
         return True
     if "checks" in parts and name.endswith("_spec.py"):
         return True
@@ -107,16 +107,10 @@ def _document_contract_domains(
 @lru_cache(maxsize=32768)
 def is_test_path(path: str) -> bool:
     """Return pure path-only test classification with bounded process-local reuse."""
-    name = path.rsplit("/", 1)[-1]
-    lowered = path.lower()
-    return (
-        lowered.startswith("tests/")
-        or "/tests/" in lowered
-        or name.startswith("test_")
-        or name.endswith("_test.py")
-        or ".test." in name
-        or ".spec." in name
-    )
+    rel = PurePosixPath(path)
+    name = rel.name.lower()
+    parts = {part.lower() for part in rel.parts}
+    return _is_test_surface(name, parts)
 
 
 @lru_cache(maxsize=32768)
