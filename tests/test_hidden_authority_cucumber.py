@@ -201,9 +201,7 @@ def test_project_provider_name_does_not_decide_generation_freshness(
 ) -> None:
     _write(tmp_path, "project.meta", "semantic project\n")
     _write(tmp_path, "source.py", "VALUE = 1\n")
-    provider = _SemanticProjectProvider(
-        provider_name, bind_generation=bind_generation
-    )
+    provider = _SemanticProjectProvider(provider_name, bind_generation=bind_generation)
     with CodeMap(tmp_path) as codemap:
         codemap.project_graph_providers = (provider,)
         codemap.sync()
@@ -256,8 +254,7 @@ def test_declared_project_capabilities_survive_provider_rename(
         _write(
             tmp_path,
             ".hashmarks-project-links.toml",
-            links
-            + "[[link]]\n"
+            links + "[[link]]\n"
             "source='npm:frontend'\n"
             "target='npm:backend'\n"
             "kind='consumer'\n",
