@@ -237,6 +237,11 @@ def test_behavioral_owner_discovery_stays_on_semantic_owner(tmp_path: Path) -> N
                     "    def repository_identity(self, root):\n"
                     "        return 'merkle-identity'\n"
                 ),
+                "scripts/repository_probe.py": (
+                    "from hashmarks.test_shards import repository_content_identity\n"
+                    "def observe_repository(root):\n"
+                    "    return repository_content_identity(root)\n"
+                ),
             },
         ),
     ]
