@@ -12,28 +12,28 @@
     {
       "id": "hashmarks:sync-remove-stale",
       "operation": "task_action_map",
-      "task": "optimize _sync_remove_stale_paths",
+      "task": "Change the behavior that removes stale indexed paths during a full CodeMap sync.",
       "limit": 20,
       "per_role": 3
     },
     {
       "id": "hashmarks:prune-discovery",
       "operation": "task_action_map",
-      "task": "Change RepositoryFileDiscoveryMixin._prune_discovery_dirs",
+      "task": "Change the behavior that prunes directory names before repository file discovery descends into them.",
       "limit": 20,
       "per_role": 3
     },
     {
       "id": "hashmarks:mcp-task-evidence",
       "operation": "task_action_map",
-      "task": "Change HashmarksMcpSurface.task_evidence",
+      "task": "Change the MCP surface behavior that returns task evidence to a consumer.",
       "limit": 20,
       "per_role": 3
     },
     {
       "id": "hashmarks:repository-content-identity",
       "operation": "task_action_map",
-      "task": "Change repository_content_identity",
+      "task": "Change the function used by the test-selection work-selection envelope and its repository-binding validation to compute extraction-stable repository content identity from repository bytes.",
       "limit": 20,
       "per_role": 3
     },

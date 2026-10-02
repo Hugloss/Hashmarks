@@ -395,7 +395,7 @@ def test_heldout_corpus_keeps_answer_blind_cross_language_membership() -> None:
     assert ambiguous_cases >= 2
 
 
-def test_hashmarks_paths_under_heldout_case_is_answer_blind() -> None:
+def test_hashmarks_heldout_owner_cases_are_answer_blind() -> None:
     root = (
         Path(__file__).resolve().parents[1]
         / "benchmarks/repository_evaluation/manifests/heldout-v1"
@@ -406,12 +406,23 @@ def test_hashmarks_paths_under_heldout_case_is_answer_blind() -> None:
     grader = json.loads((root / "hashmarks.grader.json").read_text(encoding="utf-8"))[
         "cases"
     ]
-    case = next(row for row in cases if row["id"] == "hashmarks:paths-under")
-    task = case["task"]
-    assert "paths_under" not in task
-    assert "WorkspaceMapStore" not in task
-    assert "requested prefix" in task
-    assert grader["hashmarks:paths-under"]["source_symbol"] == "paths_under"
+    by_id = {row["id"]: row for row in cases}
+    for case_id, rule in grader.items():
+        if rule["must_be_ambiguous"]:
+            continue
+        symbol = rule["source_symbol"]
+        assert symbol not in by_id[case_id]["task"]
+
+    paths_task = by_id["hashmarks:paths-under"]["task"]
+    assert "WorkspaceMapStore" not in paths_task
+    assert "requested prefix" in paths_task
+    assert "full CodeMap sync" in by_id["hashmarks:sync-remove-stale"]["task"]
+    assert "repository file discovery" in by_id["hashmarks:prune-discovery"]["task"]
+    assert "MCP surface" in by_id["hashmarks:mcp-task-evidence"]["task"]
+    assert (
+        "test-selection work-selection envelope"
+        in by_id["hashmarks:repository-content-identity"]["task"]
+    )
 
 
 def test_repository_evaluation_grader_covers_classification_and_failure_stages() -> (
