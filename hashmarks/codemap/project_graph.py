@@ -18,18 +18,6 @@ from hashmarks.native_pants import collect_pants_targets
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-_PRUNE = {
-    ".git",
-    ".hashmarks",
-    ".venv",
-    "venv",
-    "node_modules",
-    "target",
-    "dist",
-    "build",
-    ".next",
-}
-
 
 @dataclass(frozen=True)
 class ProjectNode:
@@ -67,30 +55,17 @@ class ProjectGraphProvider:
     topology_manifest: str | None = None
     supports_shared_input_freshness_rebind = False
 
-    def __init__(self, manifest_finder: ManifestFinder | None = None) -> None:
+    def __init__(self, manifest_finder: ManifestFinder) -> None:
         self._manifest_finder = manifest_finder
 
-    def _manifest_paths(self, workspace: Path, filename: str) -> tuple[Path, ...]:
-        if self._manifest_finder is not None:
-            return self._manifest_finder(filename)
-        return tuple(_walk_manifests(workspace, filename))
+    def _manifest_paths(self, filename: str) -> tuple[Path, ...]:
+        return self._manifest_finder(filename)
 
     def detect(self, workspace: Path) -> bool:
         raise NotImplementedError
 
     def collect(self, workspace: Path) -> ProjectGraphEvidence:
         raise NotImplementedError
-
-
-def _walk_manifests(workspace: Path, filename: str) -> list[Path]:
-    out: list[Path] = []
-    for root, dirs, files in os.walk(workspace, topdown=True, followlinks=False):
-        dirs[:] = sorted(name for name in dirs if name not in _PRUNE)
-        if filename in files:
-            path = Path(root) / filename
-            if not path.is_symlink():
-                out.append(path)
-    return out
 
 
 def _rel(workspace: Path, path: Path) -> str:
@@ -101,14 +76,14 @@ class NpmProjectGraphProvider(ProjectGraphProvider):
     name = "npm-package-graph"
 
     def detect(self, workspace: Path) -> bool:
-        return bool(self._manifest_paths(workspace, "package.json"))
+        return bool(self._manifest_paths("package.json"))
 
     def _package_rows(
         self, workspace: Path
     ) -> tuple[list[tuple[Path, dict[str, Any]]], list[str]]:
         rows: list[tuple[Path, dict[str, Any]]] = []
         warnings: list[str] = []
-        for manifest in self._manifest_paths(workspace, "package.json"):
+        for manifest in self._manifest_paths("package.json"):
             try:
                 value = json.loads(manifest.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
@@ -201,7 +176,7 @@ class NxProjectGraphProvider(ProjectGraphProvider):
         return find_nx(workspace)
 
     def detect(self, workspace: Path) -> bool:
-        return bool(self._manifest_paths(workspace, "nx.json"))
+        return bool(self._manifest_paths("nx.json"))
 
     @staticmethod
     def _node_manifest(workspace: Path, root: str) -> str:
@@ -261,7 +236,7 @@ class PantsProjectGraphProvider(ProjectGraphProvider):
     bind_generation = True
 
     def detect(self, workspace: Path) -> bool:
-        return bool(self._manifest_paths(workspace, "pants.toml"))
+        return bool(self._manifest_paths("pants.toml"))
 
     @staticmethod
     def _root(address: str, sources: tuple[str, ...]) -> str:
@@ -311,7 +286,7 @@ class MavenProjectGraphProvider(ProjectGraphProvider):
     name = "maven-pom-graph"
 
     def detect(self, workspace: Path) -> bool:
-        return bool(self._manifest_paths(workspace, "pom.xml"))
+        return bool(self._manifest_paths("pom.xml"))
 
     @staticmethod
     def _module_indexes(modules):
@@ -381,7 +356,7 @@ class GradleProjectGraphProvider(ProjectGraphProvider):
 
     def detect(self, workspace: Path) -> bool:
         return any(
-            self._manifest_paths(workspace, name)
+            self._manifest_paths(name)
             for name in (
                 "settings.gradle",
                 "settings.gradle.kts",
@@ -429,7 +404,7 @@ class GoProjectGraphProvider(ProjectGraphProvider):
     bind_generation = True
 
     def detect(self, workspace: Path) -> bool:
-        return bool(self._manifest_paths(workspace, "go.mod"))
+        return bool(self._manifest_paths("go.mod"))
 
     @staticmethod
     def _json_stream(text: str) -> Iterable[dict[str, Any]]:
@@ -558,14 +533,14 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
     name = "cargo-metadata"
 
     def detect(self, workspace: Path) -> bool:
-        return bool(self._manifest_paths(workspace, "Cargo.toml"))
+        return bool(self._manifest_paths("Cargo.toml"))
 
     def _fallback_rows(
         self, workspace: Path
     ) -> tuple[list[tuple[Path, dict[str, Any]]], list[str]]:
         rows: list[tuple[Path, dict[str, Any]]] = []
         warnings: list[str] = []
-        for manifest in self._manifest_paths(workspace, "Cargo.toml"):
+        for manifest in self._manifest_paths("Cargo.toml"):
             try:
                 value = tomllib.loads(manifest.read_text(encoding="utf-8"))
             except (OSError, tomllib.TOMLDecodeError) as exc:
@@ -750,12 +725,12 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
     supports_shared_input_freshness_rebind = True
 
     def detect(self, workspace: Path) -> bool:
-        return bool(self._manifest_paths(workspace, self.filename))
+        return bool(self._manifest_paths(self.filename))
 
     def _read_links(
         self, workspace: Path
     ) -> tuple[dict[str, Any] | None, tuple[str, ...]]:
-        paths = self._manifest_paths(workspace, self.filename)
+        paths = self._manifest_paths(self.filename)
         if not paths:
             return None, ()
         path = paths[0]
@@ -885,7 +860,7 @@ class DeclaredProjectLinksProvider(ProjectGraphProvider):
 
 
 def default_project_graph_providers(
-    manifest_finder: ManifestFinder | None = None,
+    manifest_finder: ManifestFinder,
 ) -> tuple[ProjectGraphProvider, ...]:
     return (
         NxProjectGraphProvider(manifest_finder),

@@ -17,10 +17,11 @@ class _NativeProjectProvider(ProjectGraphProvider):
 
     def __init__(
         self,
+        manifest_finder,
         *,
         include_denied_freshness: bool = False,
     ) -> None:
-        super().__init__()
+        super().__init__(manifest_finder)
         self.include_denied_freshness = include_denied_freshness
 
     def detect(self, workspace: Path) -> bool:
@@ -127,7 +128,9 @@ def test_native_project_nodes_and_edges_are_filtered_by_repository_admission(
 
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
-        codemap.project_graph_providers = (_NativeProjectProvider(),)
+        codemap.project_graph_providers = (
+            _NativeProjectProvider(codemap._visible_repository_manifests),
+        )
         enriched = codemap.enrich_projects(("fixture-native-projects",))
         stored_ids = {
             str(row["project_id"])
@@ -163,7 +166,10 @@ def test_denied_support_manifest_prevents_project_evidence_persistence(
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         codemap.project_graph_providers = (
-            _NativeProjectProvider(include_denied_freshness=True),
+            _NativeProjectProvider(
+                codemap._visible_repository_manifests,
+                include_denied_freshness=True,
+            ),
         )
         enriched = codemap.enrich_projects(("fixture-native-projects",))
         stored = [
