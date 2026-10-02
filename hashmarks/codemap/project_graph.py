@@ -18,6 +18,7 @@ from hashmarks.native_pants import collect_pants_targets
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+
 @dataclass(frozen=True)
 class ProjectNode:
     project_id: str
