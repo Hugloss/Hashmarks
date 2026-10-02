@@ -79,6 +79,22 @@ def test_pi_event_validation_rejects_error_and_missing_schema() -> None:
         )
 
 
+def test_pi_run_uses_native_model_authority() -> None:
+    argv = pi_gate._pi_run_argv("pi", "qualify")
+    assert "--model" not in argv
+    assert argv == [
+        "pi",
+        "--mode",
+        "json",
+        "--no-session",
+        "--approve",
+        "--no-builtin-tools",
+        "--tools",
+        "mcp",
+        "qualify",
+    ]
+
+
 def test_pi_config_binds_absolute_installed_hashmarks(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
