@@ -1,21 +1,11 @@
 from __future__ import annotations
 
-import os
 import shutil
+import subprocess
+import tempfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-
-_PRUNE = {
-    ".git",
-    ".hashmarks",
-    ".venv",
-    "venv",
-    "node_modules",
-    "target",
-    "build",
-    "dist",
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,9 +26,10 @@ class MavenSnapshot:
 
 
 def find_maven(workspace: Path) -> str | None:
-    wrapper = workspace / "mvnw"
-    if wrapper.is_file():
-        return str(wrapper)
+    for name in ("mvnw", "mvnw.cmd"):
+        wrapper = workspace / name
+        if wrapper.is_file():
+            return str(wrapper)
     return shutil.which("mvn")
 
 
@@ -62,18 +53,6 @@ def _child(parent: ET.Element | None, name: str) -> ET.Element | None:
     )
 
 
-def _maven_manifests(workspace: Path) -> list[Path]:
-    """Find repository-owned POMs without descending into generated trees."""
-    manifests: list[Path] = []
-    for current, dirs, files in os.walk(workspace, topdown=True, followlinks=False):
-        dirs[:] = sorted(name for name in dirs if name not in _PRUNE)
-        if "pom.xml" in files:
-            manifest = Path(current) / "pom.xml"
-            if not manifest.is_symlink():
-                manifests.append(manifest)
-    return sorted(manifests)
-
-
 def _maven_dependencies(root: ET.Element) -> tuple[tuple[str, str], ...]:
     deps_parent = _child(root, "dependencies")
     if deps_parent is None:
@@ -92,8 +71,7 @@ def _maven_dependencies(root: ET.Element) -> tuple[tuple[str, str], ...]:
 def _maven_module(
     root: ET.Element, manifest: Path, workspace: Path
 ) -> MavenModuleData | None:
-    parent = _child(root, "parent")
-    group_id = _text(root, "groupId") or _text(parent, "groupId") or ""
+    group_id = _text(root, "groupId") or ""
     artifact_id = _text(root, "artifactId") or ""
     if not artifact_id:
         return None
@@ -110,18 +88,83 @@ def _maven_module(
     )
 
 
-def collect_maven_modules(workspace: Path) -> MavenSnapshot:
+def _effective_pom(
+    workspace: Path,
+    manifest: Path,
+    maven: str,
+    *,
+    timeout: float,
+) -> tuple[ET.Element | None, str | None]:
+    with tempfile.TemporaryDirectory(prefix="hashmarks-maven-") as temp_dir:
+        output = Path(temp_dir) / "effective-pom.xml"
+        command = [
+            maven,
+            "-q",
+            "-N",
+            "-f",
+            str(manifest),
+            "help:effective-pom",
+            f"-Doutput={output}",
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return None, f"Maven effective POM failed for {manifest}: {exc}"
+        if completed.returncode != 0:
+            detail = (
+                completed.stderr.strip().splitlines()[-1]
+                if completed.stderr.strip()
+                else f"exit {completed.returncode}"
+            )
+            return None, f"Maven effective POM failed for {manifest}: {detail}"
+        if not output.is_file():
+            return None, f"Maven effective POM was not produced for {manifest}"
+        try:
+            return ET.parse(output).getroot(), None
+        except (ET.ParseError, OSError) as exc:
+            return None, f"Maven effective POM is invalid for {manifest}: {exc}"
+
+
+def collect_maven_modules(
+    workspace: Path,
+    manifests: tuple[Path, ...],
+    *,
+    executable: str | None = None,
+    timeout: float = 60.0,
+) -> MavenSnapshot:
+    maven = executable or find_maven(workspace)
+    if maven is None:
+        return MavenSnapshot(
+            None,
+            (),
+            ("Maven POMs detected but mvn/mvnw is unavailable",),
+        )
     warnings: list[str] = []
     modules: list[MavenModuleData] = []
-    for manifest in _maven_manifests(workspace):
-        try:
-            root = ET.parse(manifest).getroot()
-        except (ET.ParseError, OSError) as exc:
-            warnings.append(
-                f"cannot parse {manifest.relative_to(workspace).as_posix()}: {exc}"
-            )
+    for manifest in manifests:
+        root, warning = _effective_pom(
+            workspace,
+            manifest,
+            maven,
+            timeout=timeout,
+        )
+        if root is None:
+            if warning is not None:
+                warnings.append(warning)
             continue
         module = _maven_module(root, manifest, workspace)
-        if module is not None:
-            modules.append(module)
-    return MavenSnapshot(find_maven(workspace), tuple(modules), tuple(warnings))
+        if module is None:
+            warnings.append(
+                f"Maven effective POM has no artifactId: "
+                f"{manifest.relative_to(workspace).as_posix()}"
+            )
+            continue
+        modules.append(module)
+    return MavenSnapshot(maven, tuple(modules), tuple(warnings))

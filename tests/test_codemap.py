@@ -890,7 +890,9 @@ def test_pants_native_target_graph_enrichment_and_generation_freshness(tmp_path:
         assert codemap.projects()["projects"] == []
 
 
-def test_maven_project_graph_enrichment_and_reverse_impact(tmp_path: Path):
+def test_maven_project_graph_enrichment_and_reverse_impact(
+    tmp_path: Path, fake_maven_wrapper
+):
     (tmp_path / "core" / "src" / "main" / "java").mkdir(parents=True)
     (tmp_path / "app" / "src" / "main" / "java").mkdir(parents=True)
     (tmp_path / "pom.xml").write_text(
@@ -913,6 +915,7 @@ def test_maven_project_graph_enrichment_and_reverse_impact(tmp_path: Path):
     (tmp_path / "app" / "src" / "main" / "java" / "App.java").write_text(
         "class App {}\n", encoding="utf-8"
     )
+    fake_maven_wrapper(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         enriched = codemap.enrich_projects(("maven-pom-graph",))
@@ -1016,7 +1019,7 @@ def test_cli_accepts_every_codemap_enrichment_provider(tmp_path: Path, capsys):
 
 
 def test_declared_cross_ecosystem_links_compose_native_projects_and_shared_inputs(
-    tmp_path: Path,
+    tmp_path: Path, fake_maven_wrapper
 ):
     (tmp_path / "backend" / "src").mkdir(parents=True)
     (tmp_path / "frontend" / "src").mkdir(parents=True)
@@ -1045,6 +1048,7 @@ def test_declared_cross_ecosystem_links_compose_native_projects_and_shared_input
         "kind='contract'\n",
         encoding="utf-8",
     )
+    fake_maven_wrapper(tmp_path)
     with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
         codemap.sync()
         codemap.enrich_projects(
