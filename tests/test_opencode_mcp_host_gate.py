@@ -207,6 +207,34 @@ def test_opencode_version_gate_accepts_stable_v1_and_v2() -> None:
         host_gate._opencode_version("opencode 1.17.9")
 
 
+def test_opencode_run_uses_native_model_authority(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[str] = []
+
+    def fake_run(argv, *, cwd, env=None, timeout=600):
+        del cwd, env, timeout
+        captured.extend(argv)
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr(host_gate, "_run", fake_run)
+    host_gate._opencode_run(
+        "opencode",
+        repo=tmp_path,
+        prompt="qualify",
+        env={},
+    )
+
+    assert "--model" not in captured
+    assert captured[:5] == [
+        "opencode",
+        "run",
+        "--dangerously-skip-permissions",
+        "--dir",
+        str(tmp_path),
+    ]
+
+
 def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -218,7 +246,6 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
         opencode="opencode",
         uv="uv",
         python="3.14",
-        model="provider/model",
         receipt=str(receipt_path),
     )
     monkeypatch.setattr(host_gate.shutil, "which", lambda _name: "/bin/opencode")
@@ -295,8 +322,8 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
     ]
     calls = []
 
-    def fake_opencode_run(opencode, *, repo, model, prompt, env, session_id=None):
-        del opencode, repo, model, prompt
+    def fake_opencode_run(opencode, *, repo, prompt, env, session_id=None):
+        del opencode, repo, prompt
         calls.append((env, session_id))
         events = phase1_events if session_id is None else phase2_events
         return subprocess.CompletedProcess(
@@ -309,6 +336,8 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
 
     assert receipt["status"] == "PASS"
     assert receipt["host"] == {"name": "opencode", "version": "opencode 2.0.4"}
+    assert receipt["model_authority"] == "opencode-native-config"
+    assert "model" not in receipt
     assert receipt["phase1"]["generation"] == 1
     assert receipt["phase2"]["generation_after"] == 2
     assert calls == [(registration_env, None), (registration_env, "ses_123")]
