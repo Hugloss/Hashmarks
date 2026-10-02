@@ -158,6 +158,20 @@ def _adapter_installed(pi: str, project_root: Path) -> bool:
     return any("pi-mcp-adapter" in line for line in lines)
 
 
+def _pi_run_argv(pi: str, prompt: str) -> list[str]:
+    return [
+        pi,
+        "--mode",
+        "json",
+        "--no-session",
+        "--approve",
+        "--no-builtin-tools",
+        "--tools",
+        "mcp",
+        prompt,
+    ]
+
+
 def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
     if shutil.which(args.pi) is None:
         raise HostGateEnvironmentBlocked(f"{args.pi!r} is not installed")
@@ -185,19 +199,7 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
         write_fixture(repo)
         config_path = _write_pi_config(repo, hashmarks)
 
-        argv = [
-            args.pi,
-            "--mode",
-            "json",
-            "--no-session",
-            "--approve",
-            "--no-builtin-tools",
-            "--tools",
-            "mcp",
-            "--model",
-            args.model,
-            _prompt(),
-        ]
+        argv = _pi_run_argv(args.pi, _prompt())
         result = subprocess.run(
             argv,
             cwd=repo,
@@ -219,7 +221,7 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
             "completed_at": completed_at(),
             **source,
             "host": {"name": "pi", "version": version},
-            "model": args.model,
+            "model_authority": "pi-native-config",
             "python_selector": args.python,
             "installed_versions": versions,
             "wheel": {"name": wheel.name, "sha256": sha256(wheel)},
@@ -236,7 +238,6 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Qualify the installed Hashmarks MCP wheel through Pi + pi-mcp-adapter."
     )
-    parser.add_argument("--model", required=True)
     parser.add_argument("--python", default="3.14")
     parser.add_argument("--uv", default="uv")
     parser.add_argument("--pi", default="pi")
