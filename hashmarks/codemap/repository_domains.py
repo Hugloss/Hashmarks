@@ -107,10 +107,16 @@ def _document_contract_domains(
 @lru_cache(maxsize=32768)
 def is_test_path(path: str) -> bool:
     """Return pure path-only test classification with bounded process-local reuse."""
-    rel = PurePosixPath(path)
-    name = rel.name.lower()
-    parts = {part.lower() for part in rel.parts}
-    return _is_test_surface(name, parts)
+    name = path.rsplit("/", 1)[-1]
+    lowered = path.lower()
+    return (
+        lowered.startswith("tests/")
+        or "/tests/" in lowered
+        or name.startswith("test_")
+        or name.endswith("_test.py")
+        or ".test." in name
+        or ".spec." in name
+    )
 
 
 @lru_cache(maxsize=32768)
