@@ -535,90 +535,6 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
     def detect(self, workspace: Path) -> bool:
         return bool(self._manifest_paths("Cargo.toml"))
 
-    def _fallback_rows(
-        self, workspace: Path
-    ) -> tuple[list[tuple[Path, dict[str, Any]]], list[str]]:
-        rows: list[tuple[Path, dict[str, Any]]] = []
-        warnings: list[str] = []
-        for manifest in self._manifest_paths("Cargo.toml"):
-            try:
-                value = tomllib.loads(manifest.read_text(encoding="utf-8"))
-            except (OSError, tomllib.TOMLDecodeError) as exc:
-                warnings.append(f"cannot parse {_rel(workspace, manifest)}: {exc}")
-                continue
-            package = value.get("package")
-            if isinstance(package, dict) and package.get("name"):
-                rows.append((manifest, value))
-        return rows, warnings
-
-    def _fallback_nodes(
-        self, workspace: Path, rows
-    ) -> tuple[list[ProjectNode], dict[str, str]]:
-        nodes: list[ProjectNode] = []
-        names: dict[str, str] = {}
-        for manifest, value in rows:
-            package = value["package"]
-            name = str(package["name"])
-            project_id = f"cargo:{name}"
-            root = (
-                _rel(workspace, manifest.parent)
-                if manifest.parent != workspace
-                else "."
-            )
-            nodes.append(
-                ProjectNode(
-                    project_id,
-                    "cargo",
-                    root,
-                    _rel(workspace, manifest),
-                    self.name,
-                    {"name": name},
-                )
-            )
-            names[name] = project_id
-        return nodes, names
-
-    @staticmethod
-    def _cargo_dependency_name(dep_name: object, dep_value: object) -> str:
-        if isinstance(dep_value, dict) and dep_value.get("package"):
-            return str(dep_value["package"])
-        return str(dep_name)
-
-    def _fallback_edges(self, rows, names: dict[str, str]) -> list[ProjectEdge]:
-        edges: list[ProjectEdge] = []
-        for _manifest, value in rows:
-            source = names.get(str(value["package"].get("name")))
-            if source is None:
-                continue
-            for field_name in (
-                "dependencies",
-                "dev-dependencies",
-                "build-dependencies",
-            ):
-                deps = value.get(field_name)
-                if not isinstance(deps, dict):
-                    continue
-                for dep_name, dep_value in deps.items():
-                    target = names.get(self._cargo_dependency_name(dep_name, dep_value))
-                    if target is not None and target != source:
-                        edges.append(
-                            ProjectEdge(
-                                source, target, field_name, "manifest", self.name
-                            )
-                        )
-        return edges
-
-    def _fallback(
-        self, workspace: Path, warning: str | None = None
-    ) -> ProjectGraphEvidence:
-        rows, parse_warnings = self._fallback_rows(workspace)
-        warnings = ([warning] if warning else []) + parse_warnings
-        nodes, names = self._fallback_nodes(workspace, rows)
-        edges = self._fallback_edges(rows, names)
-        return ProjectGraphEvidence(
-            self.name, tuple(nodes), tuple(edges), tuple(warnings)
-        )
-
     @staticmethod
     def _run_cargo_metadata(
         workspace: Path, cargo: str
@@ -633,9 +549,9 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
                 check=False,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
-            return None, f"cargo metadata failed; using manifest graph: {exc}"
+            return None, f"cargo metadata failed: {exc}"
         if completed.returncode != 0:
-            return None, "cargo metadata failed; using Cargo.toml manifest graph"
+            return None, "cargo metadata failed"
         return completed, None
 
     @staticmethod
@@ -643,7 +559,7 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
         try:
             value = json.loads(stdout)
         except json.JSONDecodeError:
-            return None, "cargo metadata returned invalid JSON; using manifest graph"
+            return None, "cargo metadata returned invalid JSON"
         packages = value.get("packages") if isinstance(value, dict) else None
         return (packages if isinstance(packages, list) else []), None
 
@@ -696,16 +612,22 @@ class CargoProjectGraphProvider(ProjectGraphProvider):
     def collect(self, workspace: Path) -> ProjectGraphEvidence:
         cargo = shutil.which("cargo")
         if cargo is None:
-            return self._fallback(
-                workspace,
-                "cargo executable unavailable; using Cargo.toml manifest graph",
+            return ProjectGraphEvidence(
+                self.name,
+                warnings=(
+                    "cargo executable unavailable; native Cargo project graph not collected",
+                ),
             )
         completed, error = self._run_cargo_metadata(workspace, cargo)
         if completed is None:
-            return self._fallback(workspace, error)
+            return ProjectGraphEvidence(
+                self.name, warnings=(error or "cargo metadata failed",)
+            )
         packages, error = self._cargo_packages(completed.stdout)
         if packages is None:
-            return self._fallback(workspace, error)
+            return ProjectGraphEvidence(
+                self.name, warnings=(error or "cargo metadata unavailable",)
+            )
         nodes, edges = self._cargo_native_graph(workspace, packages)
         return ProjectGraphEvidence(self.name, tuple(nodes), tuple(edges))
 
