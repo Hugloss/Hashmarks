@@ -59,7 +59,7 @@ def _is_test_surface(name: str, parts: set[str]) -> bool:
     """Keep test role independent of test-shaped production source names."""
     if "test" in parts or "tests" in parts:
         return True
-    if name.startswith("test_") and parts == {name}:
+    if name.startswith("test_") and not parts.intersection({"src", "lib", "app"}):
         return True
     if "checks" in parts and name.endswith("_spec.py"):
         return True
