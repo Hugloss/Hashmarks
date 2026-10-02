@@ -60,6 +60,8 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 
 The tools are read-only from the repository consumer's perspective. Hashmarks may update its own disposable derived cache while answering them.
 
+Tool selection is intentionally phase-specific rather than interchangeable: use `repository_context` for orientation, `find` for an already-bounded direct path/symbol lookup, `task_evidence` as the pre-edit task-level entrypoint when ownership/edit/verification/ambiguity evidence is needed, and `change_impact` after explicit changed paths exist. These descriptions are exposed through the native MCP catalog so hosts can choose the existing semantic owner without a Hashmarks-owned planner or workflow layer.
+
 `task_evidence` uses `hashmarks.task-evidence.v2`. Retrieval order is relevance evidence only and carries no ownership authority. Ownership resolution, ambiguity, verification, and freshness are separate fields; current freshness never implies a uniquely resolved owner. The consumer remains responsible for deciding whether and how to act on the evidence.
 
 `correlate_evidence` accepts structured evidence bundles, not raw log streams. Producer-specific parsing/ingestion remains outside the MCP adapter. The tool preserves external claims, ambiguity, completeness, source equivalence, and repository deltas; interpretation and action remain consumer-owned. See [Evidence correlation](../reference/EVIDENCE_CORRELATION.md).
