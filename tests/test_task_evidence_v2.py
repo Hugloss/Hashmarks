@@ -295,3 +295,88 @@ def test_task_evidence_projects_same_authority_proof_across_bounds(
     assert wide["ownership"]["owner"]["path"] == "src/owner.py"
     assert narrow["ownership"]["proof_scope_complete"] is True
     assert wide["ownership"]["proof_scope_complete"] is True
+
+def test_task_evidence_preserves_dense_natural_language_owner_candidates(
+    tmp_path: Path,
+) -> None:
+    cases = (
+        (
+            "prefix",
+            (
+                "Without editing files, identify the single function that enumerates "
+                "indexed repository paths underneath a requested prefix."
+            ),
+            "hashmarks/codemap/repository_index_store.py",
+            (
+                "class WorkspaceMapStore:\n"
+                "    def paths_under(self, prefix: str) -> list[str]:\n"
+                "        return [path for path in self.paths if path.startswith(prefix)]\n"
+            ),
+            (
+                "def enumerate_indexed_repository_paths_{index}():\n"
+                "    # indexed repository paths requested by repository callers\n"
+                "    return []\n"
+            ),
+        ),
+        (
+            "prune",
+            (
+                "Without editing files, identify the function that prunes directory "
+                "names before repository file discovery descends into them."
+            ),
+            "hashmarks/codemap/repository_file_discovery.py",
+            (
+                "def _prune_discovery_dirs(names: list[str]) -> None:\n"
+                "    names[:] = [name for name in names if not name.startswith('.')]\n"
+            ),
+            (
+                "def repository_file_discovery_{index}(names):\n"
+                "    # directory names repository file discovery descends here\n"
+                "    return names\n"
+            ),
+        ),
+        (
+            "identity",
+            (
+                "Without editing files, identify the function used by the test-selection "
+                "work-selection envelope and its repository-binding validation to compute "
+                "the extraction-stable repository content identity from repository bytes."
+            ),
+            "hashmarks/test_shards.py",
+            (
+                "def repository_content_identity(root):\n"
+                "    return 'content-bytes'\n\n"
+                "def work_selection_envelope(root):\n"
+                "    return {'repository': repository_content_identity(root)}\n\n"
+                "def validate_work_selection_repository_binding(root, expected):\n"
+                "    return repository_content_identity(root) == expected\n"
+            ),
+            (
+                "def repository_identity_{index}(value):\n"
+                "    # repository content identity bytes validation\n"
+                "    return value\n"
+            ),
+        ),
+    )
+
+    for case_id, task, expected_path, owner_source, decoy_source in cases:
+        root = tmp_path / case_id
+        root.mkdir()
+        _write(root, expected_path, owner_source)
+        for index in range(32):
+            _write(
+                root,
+                f"hashmarks/codemap/decoy_{index:02d}.py",
+                decoy_source.format(index=index),
+            )
+
+        with CodeMap(root) as codemap:
+            codemap.sync()
+            packet = codemap.task_evidence(task, limit=20, token_budget=256)
+
+        retrieval_paths = {
+            str(row["path"]) for row in packet["retrieval"]["results"]
+        }
+        assert expected_path in retrieval_paths, case_id
+        assert packet["ownership"]["candidate"]["path"] == expected_path, case_id
+
