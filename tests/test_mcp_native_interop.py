@@ -62,9 +62,9 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
                 "use task_evidence instead."
             ),
             "task_evidence": (
-                "Use for a repository task or behavior when its exact owner, path, or symbol "
-                "is not yet known, including read-only localization. Returns bounded "
-                "candidates, ambiguity, verification, freshness, and next-read evidence."
+                "Prefer before broad grep/glob/read when a repository task's exact "
+                "owner/path/symbol is unknown, including read-only localization. Returns "
+                "bounded candidates, ambiguity, verification, freshness, and next-read evidence."
             ),
             "change_impact": (
                 "Use after explicit changed paths exist for bounded structural impact and "
