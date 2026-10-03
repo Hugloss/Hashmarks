@@ -50,12 +50,25 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         tools = await server.list_tools()
         assert [tool.name for tool in tools] == _EXPECTED_TOOLS
         descriptions = {tool.name: tool.description or "" for tool in tools}
-        assert "initial repository orientation" in descriptions["repository_context"]
-        assert "bounded path or symbol lookup" in descriptions["find"]
-        assert "task-level entrypoint" in descriptions["task_evidence"]
-        assert "Use after explicit changed paths exist" in descriptions["change_impact"]
+        first = {
+            name: description.split(".", 1)[0].lower()
+            for name, description in descriptions.items()
+        }
+        assert "initial repository orientation" in first["repository_context"]
+        assert "target is already known" in first["find"]
+        assert "repository task or behavior" in first["task_evidence"]
+        assert "not yet known" in first["task_evidence"]
+        assert "read-only localization" in first["task_evidence"]
+        assert "explicit changed paths" in first["change_impact"]
         assert "use task_evidence instead" in descriptions["repository_context"]
         assert "use task_evidence instead" in descriptions["find"]
+        schemas = {tool.name: tool.input_schema for tool in tools}
+        assert schemas["task_evidence"]["required"] == ["task"]
+        assert schemas["find"]["required"] == ["query"]
+        assert schemas["change_impact"]["required"] == ["task", "changed_paths"]
+        assert schemas["task_evidence"]["properties"]["limit"]["default"] == 20
+        assert schemas["task_evidence"]["properties"]["per_role"]["default"] == 3
+        assert schemas["task_evidence"]["properties"]["token_budget"]["default"] == 1536
         for tool in tools:
             assert tool.annotations is not None
             assert tool.annotations.read_only_hint is True

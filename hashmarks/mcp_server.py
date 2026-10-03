@@ -111,9 +111,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="task_evidence",
         description=(
-            "Use before coding-task localization or editing for bounded owner, edit-target, "
-            "verification, freshness, ambiguity, and next-read evidence. This is the "
-            "task-level entrypoint."
+            "Use for a repository task or behavior when its exact owner, path, or symbol "
+            "is not yet known, including read-only localization. Returns bounded "
+            "candidates, ambiguity, verification, freshness, and next-read evidence."
         ),
         annotations=annotations,
     )
