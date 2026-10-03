@@ -810,6 +810,140 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "consumer_action": "external",
         }
 
+    def _task_evidence_natural_candidate_paths(
+        self,
+        task: str,
+        bound_reasons: set[str],
+    ) -> list[str]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        salient = self._task_salient_natural_terms(
+            task,
+            limit=6,
+            bound_reasons=bound_reasons,
+        )
+        paths: list[str] = []
+        for term in salient:
+            hits = self._task_component_hits(
+                term,
+                bound_reasons,
+                include_signature=True,
+            )
+            if not hits or len(hits) > 8:
+                continue
+            for hit in hits[:2]:
+                if (
+                    self.policy.decide(hit.path).evidence_visibility
+                    is EvidenceVisibility.DENY
+                ):
+                    continue
+                if hit.path not in paths:
+                    paths.append(hit.path)
+            if len(paths) >= 4:
+                break
+        return paths[:4]
+
+    def _task_evidence_scored_symbols(
+        self,
+        path: str,
+        terms: Sequence[str],
+    ) -> list[Mapping[str, object]]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        scored: list[tuple[int, str, Mapping[str, object]]] = []
+        for symbol in self._session_symbols_for_path(path):
+            haystack = " ".join(
+                str(symbol.get(key) or "").lower()
+                for key in ("name", "qualname", "signature")
+            )
+            score = sum(term in haystack for term in terms)
+            if score:
+                scored.append(
+                    (
+                        score,
+                        str(symbol.get("qualname") or symbol.get("name") or ""),
+                        symbol,
+                    )
+                )
+        scored.sort(key=lambda row: (-row[0], row[1]))
+        return [row[2] for row in scored[:2]]
+
+    @staticmethod
+    def _task_evidence_supplement_row(
+        path: str,
+        symbol: Mapping[str, object],
+    ) -> dict[str, object]:
+        return {
+            "path": path,
+            "name": symbol.get("name"),
+            "qualname": symbol.get("qualname"),
+            "signature": symbol.get("signature"),
+            "start_line": symbol.get("start_line"),
+            "end_line": symbol.get("end_line"),
+            "retrieval_supplement": "bounded-natural-language",
+        }
+
+    def _task_evidence_natural_retrieval_supplements(
+        self,
+        task: str,
+        existing: Sequence[Mapping[str, object]],
+        *,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        """Add bounded retrieval-only evidence without changing action authority."""
+        if limit < 10:
+            return []
+        existing_keys = {
+            (
+                str(row.get("path") or ""),
+                str(row.get("qualname") or row.get("name") or ""),
+            )
+            for row in existing
+        }
+        terms, _truncated = self._task_natural_term_candidates(task)
+        bound_reasons: set[str] = set()
+        paths = self._task_evidence_natural_candidate_paths(task, bound_reasons)
+        rows: list[dict[str, object]] = []
+        for path in paths:
+            for symbol in self._task_evidence_scored_symbols(path, terms):
+                key = (
+                    path,
+                    str(symbol.get("qualname") or symbol.get("name") or ""),
+                )
+                if key in existing_keys:
+                    continue
+                existing_keys.add(key)
+                rows.append(self._task_evidence_supplement_row(path, symbol))
+                if len(rows) == 2:
+                    return rows
+        return rows
+
+    def _task_evidence_attach_retrieval_supplements(
+        self,
+        result: dict[str, object],
+        task: str,
+        *,
+        limit: int,
+    ) -> None:
+        retrieval = result.get("retrieval")
+        if not isinstance(retrieval, dict):
+            return
+        current = retrieval.get("results")
+        if not isinstance(current, list):
+            return
+        rows = [row for row in current if isinstance(row, Mapping)]
+        supplements = self._task_evidence_natural_retrieval_supplements(
+            task,
+            rows,
+            limit=limit,
+        )
+        if not supplements:
+            return
+        keep = max(0, limit - len(supplements))
+        retrieval["results"] = [*current[:keep], *supplements]
+        retrieval["supplemental_results"] = len(supplements)
+        retrieval["supplemental_authority"] = False
+
     @staticmethod
     def _task_evidence_compact_evidence(
         item: Mapping[str, object] | None,
@@ -964,6 +1098,11 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 action,
                 evidence_receipt,
                 verification_plan,
+            )
+            self._task_evidence_attach_retrieval_supplements(
+                result,
+                task,
+                limit=limit,
             )
 
         self._task_evidence_attach_owner_source(

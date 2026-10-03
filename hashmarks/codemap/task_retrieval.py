@@ -1151,7 +1151,11 @@ class TaskRetrievalMixin:
         fusion.selected.append(anchor_hit.path)
 
     def _task_component_hits(
-        self, token: str, bound_reasons: set[str]
+        self,
+        token: str,
+        bound_reasons: set[str],
+        *,
+        include_signature: bool = False,
     ) -> list[SearchHit]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -1162,10 +1166,10 @@ class TaskRetrievalMixin:
             bound_reasons.add("task-component-result-limit")
         bound_reasons.update(evidence.bound_reasons)
         for hit in evidence.hits:
-            haystack = " ".join(
-                value.lower()
-                for value in (hit.path, hit.name or "", hit.qualname or "")
-            )
+            values = [hit.path, hit.name or "", hit.qualname or ""]
+            if include_signature:
+                values.append(hit.signature or "")
+            haystack = " ".join(value.lower() for value in values)
             if token_lower in haystack:
                 hits.append(hit)
         return hits
@@ -1198,6 +1202,69 @@ class TaskRetrievalMixin:
             if not hits or len(hits) > 8:
                 continue
             self._task_preserve_component_hits(hits, fusion)
+
+    @staticmethod
+    def _task_natural_term_variants(token: str) -> tuple[str, ...]:
+        """Return conservative identifier-like forms for one natural-language token."""
+        value = token.lower().strip("_-")
+        variants = [value]
+        if len(value) >= 5 and value.endswith("ies"):
+            variants.append(value[:-3] + "y")
+        elif len(value) >= 5 and value.endswith("es"):
+            variants.extend((value[:-1], value[:-2]))
+        elif len(value) >= 5 and value.endswith("s"):
+            variants.append(value[:-1])
+        if len(value) >= 6 and value.endswith("ed"):
+            variants.append(value[:-2])
+        if len(value) >= 7 and value.endswith("ing"):
+            stem = value[:-3]
+            variants.extend((stem, stem + "e"))
+        return tuple(dict.fromkeys(item for item in variants if len(item) >= 3))
+
+    @classmethod
+    def _task_natural_term_candidates(cls, task: str) -> tuple[tuple[str, ...], bool]:
+        candidates: list[str] = []
+        for raw in _WORD_RE.findall(task):
+            lowered = raw.lower().strip("_-")
+            if len(lowered) < 4 or lowered in _TASK_STOPWORDS:
+                continue
+            for variant in cls._task_natural_term_variants(lowered):
+                if variant not in candidates:
+                    candidates.append(variant)
+            if len(candidates) >= 32:
+                return tuple(candidates[:32]), True
+        return tuple(candidates), False
+
+    def _task_salient_natural_terms(
+        self,
+        task: str,
+        *,
+        limit: int = 6,
+        bound_reasons: set[str] | None = None,
+    ) -> tuple[str, ...]:
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        candidates, truncated = self._task_natural_term_candidates(task)
+        if truncated and bound_reasons is not None:
+            bound_reasons.add("task-natural-term-input-limit")
+        if not candidates:
+            return ()
+        total, frequencies = self._session_lexical_document_frequencies(
+            list(candidates)
+        )
+        ranked = sorted(
+            (term for term in candidates if 0 < int(frequencies.get(term, 0)) <= 8),
+            key=lambda term: self._task_query_term_score(
+                term,
+                total,
+                frequencies,
+                {item: item for item in candidates},
+            ),
+            reverse=True,
+        )
+        if bound_reasons is not None and len(ranked) > limit:
+            bound_reasons.add("task-natural-term-limit")
+        return tuple(ranked[:limit])
 
     @staticmethod
     def _task_is_omitted_alnum_candidate(token: str, visible_terms: set[str]) -> bool:

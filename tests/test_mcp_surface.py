@@ -406,8 +406,10 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             self.values = kwargs
 
     class FakeMCPServer:
-        def __init__(self, name: str):
+        def __init__(self, name: str, **kwargs):
             self.name = name
+            self.description = kwargs.get("description")
+            self.instructions = kwargs.get("instructions")
 
         def tool(self, **metadata):
             def decorate(fn):
@@ -443,6 +445,13 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
     server = build_server(_repo(tmp_path), state_dir=tmp_path / "state")
     try:
         names = [str(row["name"]) for row in registered]
+        assert (
+            server.description == "Read-only repository intelligence for coding agents"
+            and server.instructions == mcp_server._SERVER_INSTRUCTIONS
+            and "prefer task_evidence as the first repository-discovery call"
+            in server.instructions
+            and "before broad grep/glob or exploratory reads" in server.instructions
+        )
         assert names == [
             "repository_context",
             "find",
@@ -500,8 +509,10 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             self.values = kwargs
 
     class FakeMCPServer:
-        def __init__(self, name: str):
+        def __init__(self, name: str, **kwargs):
             self.name = name
+            self.description = kwargs.get("description")
+            self.instructions = kwargs.get("instructions")
 
         def tool(self, **metadata):
             def decorate(fn):
