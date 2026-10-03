@@ -15,6 +15,18 @@ _INSTALL_HINT = (
     'Hashmarks MCP support requires the optional extra: pip install "hashmarks[mcp]"'
 )
 
+_SERVER_INSTRUCTIONS = (
+    "Hashmarks is read-only repository intelligence. When a coding or repository task "
+    "asks where behavior is implemented, which code owns it, or what to read or verify "
+    "and the exact owner/path/symbol is not already known, prefer task_evidence as the "
+    "first repository-discovery call before broad grep/glob or exploratory reads. Use "
+    "its bounded candidates, ambiguity, verification, freshness, and next-read evidence "
+    "to choose targeted native reads; retrieval ranking is evidence, not ownership "
+    "authority. If the exact path or symbol is already known, use find or a native read. "
+    "After explicit changed paths exist, use change_impact or post_change when relevant. "
+    "Hashmarks does not replace editing, shell, tests, or git."
+)
+
 _T = TypeVar("_T")
 
 
@@ -76,7 +88,11 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     surface = HashmarksMcpSurface(
         str(workspace), state_dir=None if state_dir is None else str(state_dir)
     )
-    server = MCPServer("Hashmarks")
+    server = MCPServer(
+        "Hashmarks",
+        description="Read-only repository intelligence for coding agents",
+        instructions=_SERVER_INSTRUCTIONS,
+    )
     annotations = ToolAnnotations(
         read_only_hint=True,
         destructive_hint=False,
@@ -111,9 +127,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="task_evidence",
         description=(
-            "Use for a repository task or behavior when its exact owner, path, or symbol "
-            "is not yet known, including read-only localization. Returns bounded "
-            "candidates, ambiguity, verification, freshness, and next-read evidence."
+            "Prefer before broad grep/glob/read when a repository task's exact "
+            "owner/path/symbol is unknown, including read-only localization. Returns "
+            "bounded candidates, ambiguity, verification, freshness, and next-read evidence."
         ),
         annotations=annotations,
     )
