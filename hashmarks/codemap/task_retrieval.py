@@ -1223,9 +1223,7 @@ class TaskRetrievalMixin:
         return tuple(dict.fromkeys(item for item in variants if len(item) >= 3))
 
     @classmethod
-    def _task_natural_term_candidates(
-        cls, task: str
-    ) -> tuple[tuple[str, ...], bool]:
+    def _task_natural_term_candidates(cls, task: str) -> tuple[tuple[str, ...], bool]:
         candidates: list[str] = []
         for raw in _WORD_RE.findall(task):
             lowered = raw.lower().strip("_-")
@@ -1252,7 +1250,9 @@ class TaskRetrievalMixin:
             bound_reasons.add("task-natural-term-input-limit")
         if not candidates:
             return ()
-        total, frequencies = self._session_lexical_document_frequencies(list(candidates))
+        total, frequencies = self._session_lexical_document_frequencies(
+            list(candidates)
+        )
         ranked = sorted(
             (term for term in candidates if 0 < int(frequencies.get(term, 0)) <= 8),
             key=lambda term: self._task_query_term_score(
