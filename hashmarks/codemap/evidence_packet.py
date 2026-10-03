@@ -832,6 +832,11 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             if not hits or len(hits) > 8:
                 continue
             for hit in hits[:2]:
+                if (
+                    self.policy.decide(hit.path).evidence_visibility
+                    is EvidenceVisibility.DENY
+                ):
+                    continue
                 if hit.path not in paths:
                     paths.append(hit.path)
             if len(paths) >= 4:
