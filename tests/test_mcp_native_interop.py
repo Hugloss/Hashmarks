@@ -50,18 +50,34 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         tools = await server.list_tools()
         assert [tool.name for tool in tools] == _EXPECTED_TOOLS
         descriptions = {tool.name: tool.description or "" for tool in tools}
-        first = {
-            name: description.split(".", 1)[0].lower()
-            for name, description in descriptions.items()
+        selection_contract = {
+            "repository_context": (
+                "Use only for initial repository orientation: freshness, languages, areas, "
+                "and topology. For a coding task needing ownership, edit, verification, or "
+                "next-read evidence, use task_evidence instead."
+            ),
+            "find": (
+                "Use for a bounded path or symbol lookup when the target is already known. "
+                "For broader coding-task ownership, edit, verification, or next-read evidence, "
+                "use task_evidence instead."
+            ),
+            "task_evidence": (
+                "Use for a repository task or behavior when its exact owner, path, or symbol "
+                "is not yet known, including read-only localization. Returns bounded "
+                "candidates, ambiguity, verification, freshness, and next-read evidence."
+            ),
+            "change_impact": (
+                "Use after explicit changed paths exist for bounded structural impact and "
+                "verification relevance. For pre-edit evidence, use task_evidence."
+            ),
+            "post_change": (
+                "Refresh caller-reported changed paths against a previous task_evidence "
+                "packet and return only invalidated/reused/replacement evidence."
+            ),
         }
-        assert "initial repository orientation" in first["repository_context"]
-        assert "target is already known" in first["find"]
-        assert "repository task or behavior" in first["task_evidence"]
-        assert "not yet known" in first["task_evidence"]
-        assert "read-only localization" in first["task_evidence"]
-        assert "explicit changed paths" in first["change_impact"]
-        assert "use task_evidence instead" in descriptions["repository_context"]
-        assert "use task_evidence instead" in descriptions["find"]
+        assert {
+            name: descriptions[name] for name in selection_contract
+        } == selection_contract
         schemas = {tool.name: tool.input_schema for tool in tools}
         assert schemas["task_evidence"]["required"] == ["task"]
         assert schemas["find"]["required"] == ["query"]

@@ -238,7 +238,11 @@ def test_opencode_run_uses_native_model_authority(
 
 def test_selection_scenarios_are_neutral_and_keep_negative_controls(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from hashmarks.mcp_surface import HashmarksMcpSurface
+
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     names = {row.name for row in host_gate.SELECTION_SCENARIOS}
     assert names == {
         "unresolved-task",
@@ -259,7 +263,33 @@ def test_selection_scenarios_are_neutral_and_keep_negative_controls(
         in (tmp_path / "src/checkout/handler.py").read_text()
     )
     assert "def apply_discount" in (tmp_path / "src/legacy/pricing.py").read_text()
+    assert len(host_gate._selection_fixture_sources()) == 23
     assert len(host_gate._selection_manifest_identity()) == 64
+    assert len(host_gate._selection_fixture_identity()) == 64
+    surface = HashmarksMcpSurface(str(tmp_path), state_dir=str(tmp_path / "state"))
+    try:
+        matches = surface.find("apply_discount")["results"]
+        assert (
+            len({row["path"] for row in matches if row["name"] == "apply_discount"})
+            >= 5
+        )
+        expected = (
+            ("unresolved-task", "src/checkout/pricing.py", "tests/test_checkout.py"),
+            ("ambiguous-owner", "src/checkout/pricing.py", "tests/test_checkout.py"),
+            ("read-only-owner", "src/checkout/pricing.py", "tests/test_checkout.py"),
+        )
+        for name, owner, verification in expected:
+            scenario = next(
+                row for row in host_gate.SELECTION_SCENARIOS if row.name == name
+            )
+            packet = surface.task_evidence(scenario.prompt)
+            assert packet["ownership"]["candidate"]["path"] == owner
+            assert packet["verification"]["selected"]["path"] == verification
+        ambiguous = surface.task_evidence(host_gate.SELECTION_SCENARIOS[1].prompt)
+        assert ambiguous["ownership"]["basis"] == "exact-import-owner"
+        assert ambiguous["ownership"]["owner"]["path"] == "src/checkout/pricing.py"
+    finally:
+        surface.close()
 
 
 def test_selection_result_keeps_native_calls_and_validates_hashmarks() -> None:
@@ -285,6 +315,104 @@ def test_selection_result_keeps_native_calls_and_validates_hashmarks() -> None:
         host_gate._selection_result(
             [_tool_event("hashmarks_task_evidence", {"unexpected": True})], scenario
         )
+    failed = _tool_event("hashmarks_task_evidence", {})
+    failed["part"]["state"]["status"] = "error"
+    with pytest.raises(host_gate.HostGateError, match="did not complete"):
+        host_gate._selection_result([failed], scenario)
+
+
+def test_selection_error_distinguishes_provider_from_host_failure() -> None:
+    provider_error = {
+        "type": "error",
+        "error": {
+            "name": "APIError",
+            "data": {"message": "User not found.", "statusCode": 401},
+        },
+    }
+    assert host_gate._selection_error([provider_error]) == (
+        "ENVIRONMENT_BLOCKED",
+        "User not found.",
+    )
+    host_error = {
+        "type": "error",
+        "error": {"name": "ToolError", "data": {"message": "tool failed"}},
+    }
+    assert host_gate._selection_error([host_error]) == ("FAIL", "tool failed")
+
+
+def test_selection_receipt_binds_fixture_runner_and_installed_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "hashmarks"
+    executable.write_text("entrypoint", encoding="utf-8")
+    monkeypatch.setattr(host_gate, "_selection_executable", lambda *_args: executable)
+    monkeypatch.setattr(
+        host_gate,
+        "_opencode_model_catalog",
+        lambda *_args, **_kwargs: {"status": "captured", "tools": [{"name": "find"}]},
+    )
+    monkeypatch.setattr(
+        host_gate,
+        "_installed_hashmarks_source",
+        lambda *_args: {"path": "/installed/mcp_server.py", "sha256": "source-digest"},
+    )
+    monkeypatch.setattr(
+        host_gate,
+        "_run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            [], 0, "opencode 1.18.34\n", ""
+        ),
+    )
+    receipt = host_gate._selection_diagnostic(
+        Namespace(
+            opencode="opencode",
+            model=None,
+            catalog_only=True,
+            receipt=str(tmp_path / "receipt.json"),
+        ),
+        ROOT,
+    )
+    assert receipt["fixture_sha256"] == host_gate._selection_fixture_identity()
+    assert receipt["runner_sha256"] == host_gate._sha256(SCRIPT)
+    assert receipt["hashmarks_executable_sha256"] == host_gate._sha256(executable)
+    assert receipt["hashmarks_mcp_source"]["sha256"] == "source-digest"
+    assert len(receipt["catalog_sha256"]) == 64
+
+
+def test_selection_trial_keeps_provider_error_unmeasured(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        host_gate,
+        "_configure_opencode_mcp",
+        lambda *_args, **_kwargs: (None, "opencode.json", {}),
+    )
+    error = {
+        "type": "error",
+        "error": {
+            "name": "APIError",
+            "data": {"message": "User not found.", "statusCode": 401},
+        },
+    }
+    monkeypatch.setattr(
+        host_gate,
+        "_opencode_run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(
+            [], 1, json.dumps(error) + "\n", ""
+        ),
+    )
+    result = host_gate._selection_trial(
+        Namespace(opencode="opencode", model="provider/model"),
+        tmp_path / "hashmarks",
+        tmp_path,
+        tmp_path / "receipt.json",
+        host_gate.SELECTION_SCENARIOS[0],
+        0,
+    )
+    assert result["trial_status"] == "ENVIRONMENT_BLOCKED"
+    assert result["semantic_outcome"] == "unavailable"
+    assert result["tool_calls"] == []
+    assert Path(result["event_log"]).is_file()
 
 
 def test_catalog_rows_selects_actual_tool_bearing_model_request() -> None:
@@ -344,7 +472,7 @@ def test_selection_stops_after_model_environment_failure(
 
     def fake_trial(*args):
         calls.append(args)
-        return {"host_error": "provider unavailable", "host_exit_code": 1}
+        return {"trial_status": "ENVIRONMENT_BLOCKED"}
 
     monkeypatch.setattr(host_gate, "_selection_trial", fake_trial)
     status, rows = host_gate._selection_trials(
@@ -381,6 +509,7 @@ def test_selection_timeout_keeps_partial_event_log_as_incomplete(
         0,
     )
     assert result["semantic_outcome"] == "incomplete"
+    assert result["trial_status"] == "INCOMPLETE"
     assert result["host_error"] == "OpenCode model call timed out"
     assert Path(result["event_log"]).read_text() == '{"type":"text"}\n'
 
@@ -400,6 +529,23 @@ def test_main_retains_environment_blocked_receipt(
     receipt = tmp_path / "blocked.json"
     assert host_gate.main(["--selection-diagnostic", "--receipt", str(receipt)]) == 2
     assert json.loads(receipt.read_text())["status"] == "ENVIRONMENT_BLOCKED"
+
+
+@pytest.mark.parametrize("status", ["FAIL", "INCOMPLETE"])
+def test_main_does_not_accept_failed_or_incomplete_selection(
+    status: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        host_gate,
+        "_selection_diagnostic",
+        lambda *_args: {
+            "schema": "hashmarks.opencode-selection-diagnostic.v1",
+            "status": status,
+        },
+    )
+    receipt = tmp_path / "failed.json"
+    assert host_gate.main(["--selection-diagnostic", "--receipt", str(receipt)]) == 1
+    assert json.loads(receipt.read_text())["status"] == status
 
 
 def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
