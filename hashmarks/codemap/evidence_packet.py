@@ -820,6 +820,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         """Add bounded retrieval-only evidence without changing action authority."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
+        if limit < 10:
+            return []
         existing_keys = {
             (
                 str(row.get("path") or ""),
@@ -882,7 +884,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                         "retrieval_supplement": "bounded-natural-language",
                     }
                 )
-                if len(rows) >= min(4, limit):
+                if len(rows) >= 2:
                     return rows
         return rows
 
