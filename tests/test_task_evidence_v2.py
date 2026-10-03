@@ -390,8 +390,7 @@ def test_task_evidence_preserves_dense_natural_language_owner_candidates(
             row["path"] == expected_path
             and (
                 row.get("name") == expected_symbol
-                or str(row.get("qualname") or "").rsplit(".", 1)[-1]
-                == expected_symbol
+                or str(row.get("qualname") or "").rsplit(".", 1)[-1] == expected_symbol
             )
             for row in retrieval
         ), case_id
