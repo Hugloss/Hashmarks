@@ -1151,7 +1151,11 @@ class TaskRetrievalMixin:
         fusion.selected.append(anchor_hit.path)
 
     def _task_component_hits(
-        self, token: str, bound_reasons: set[str]
+        self,
+        token: str,
+        bound_reasons: set[str],
+        *,
+        include_signature: bool = False,
     ) -> list[SearchHit]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -1162,15 +1166,10 @@ class TaskRetrievalMixin:
             bound_reasons.add("task-component-result-limit")
         bound_reasons.update(evidence.bound_reasons)
         for hit in evidence.hits:
-            haystack = " ".join(
-                value.lower()
-                for value in (
-                    hit.path,
-                    hit.name or "",
-                    hit.qualname or "",
-                    hit.signature or "",
-                )
-            )
+            values = [hit.path, hit.name or "", hit.qualname or ""]
+            if include_signature:
+                values.append(hit.signature or "")
+            haystack = " ".join(value.lower() for value in values)
             if token_lower in haystack:
                 hits.append(hit)
         return hits
