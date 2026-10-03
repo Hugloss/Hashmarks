@@ -296,6 +296,7 @@ def test_task_evidence_projects_same_authority_proof_across_bounds(
     assert narrow["ownership"]["proof_scope_complete"] is True
     assert wide["ownership"]["proof_scope_complete"] is True
 
+
 def test_task_evidence_preserves_dense_natural_language_owner_candidates(
     tmp_path: Path,
 ) -> None:
@@ -374,9 +375,6 @@ def test_task_evidence_preserves_dense_natural_language_owner_candidates(
             codemap.sync()
             packet = codemap.task_evidence(task, limit=20, token_budget=256)
 
-        retrieval_paths = {
-            str(row["path"]) for row in packet["retrieval"]["results"]
-        }
+        retrieval_paths = {str(row["path"]) for row in packet["retrieval"]["results"]}
         assert expected_path in retrieval_paths, case_id
         assert packet["ownership"]["candidate"]["path"] == expected_path, case_id
-
