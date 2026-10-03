@@ -1267,27 +1267,6 @@ class TaskRetrievalMixin:
             bound_reasons.add("task-natural-term-limit")
         return tuple(ranked[:limit])
 
-    def _task_preserve_salient_natural_terms(
-        self,
-        task: str,
-        fusion: _TaskFindFusion,
-        bound_reasons: set[str],
-    ) -> None:
-        terms = self._task_salient_natural_terms(
-            task,
-            limit=6,
-            bound_reasons=bound_reasons,
-        )
-        preserved_terms = 0
-        for term in terms:
-            hits = self._task_component_hits(term, bound_reasons)
-            if not hits or len(hits) > 8:
-                continue
-            self._task_preserve_component_hits(hits, fusion, limit=1)
-            preserved_terms += 1
-            if preserved_terms >= 2:
-                return
-
     @staticmethod
     def _task_is_omitted_alnum_candidate(token: str, visible_terms: set[str]) -> bool:
         lowered = token.lower()
@@ -1557,7 +1536,6 @@ class TaskRetrievalMixin:
         fusion = _TaskFindFusion(path_scores, best_hit, [])
         self._task_preserve_exact_anchor(raw_tokens, fusion, bound_reasons)
         self._task_preserve_components(raw_tokens, fusion, bound_reasons)
-        self._task_preserve_salient_natural_terms(task, fusion, bound_reasons)
         self._task_preserve_omitted_alnum_components(
             task, views, cue_words, fusion, bound_reasons
         )
