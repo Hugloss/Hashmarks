@@ -404,6 +404,14 @@ make mcp-host-status
 make mcp-opencode-check
 ```
 
+`make init` materializes the locked source-development environment, including the optional MCP runtime required by the repository's local `.venv/bin/hashmarks`. The equivalent direct uv command is:
+
+```bash
+uv sync --frozen --extra mcp --group test
+```
+
+Use that direct command when repairing or materializing the project environment without Make. The same MCP-capable `.venv` is required when this checkout is used as the Hashmarks subject by an external benchmark harness.
+
 The normal OSS test surface does not require an external coding-agent host. `make mcp-host-status` inspects project-local MCP registration/readiness; `make mcp-opencode-check` is the real OpenCode release host gate. Native release qualification and the other real-host MCP gates are documented separately.
 
 See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs/integration/MCP.md).
