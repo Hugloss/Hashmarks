@@ -135,6 +135,7 @@ def test_configure_opencode_mcp_uses_natural_project_config_discovery(
         assert argv == ["opencode", "mcp", "list"]
         assert cwd == repo
         assert env is not None
+        assert env["PWD"] == str(repo)
         assert "OPENCODE_CONFIG" not in env
         assert "OPENCODE_CONFIG_CONTENT" not in env
         config_path = repo / "opencode.json"
@@ -229,10 +230,176 @@ def test_opencode_run_uses_native_model_authority(
     assert captured[:5] == [
         "opencode",
         "run",
-        "--dangerously-skip-permissions",
+        "--auto",
         "--dir",
         str(tmp_path),
     ]
+
+
+def test_selection_scenarios_are_neutral_and_keep_negative_controls(
+    tmp_path: Path,
+) -> None:
+    names = {row.name for row in host_gate.SELECTION_SCENARIOS}
+    assert names == {
+        "unresolved-task",
+        "ambiguous-owner",
+        "read-only-owner",
+        "exact-lookup",
+        "orientation",
+        "changed-paths",
+    }
+    forbidden = ("hashmarks", "mcp", "task_evidence", "repository_context")
+    assert all(
+        not any(word in row.prompt.lower() for word in forbidden)
+        for row in host_gate.SELECTION_SCENARIOS
+    )
+    host_gate._write_selection_fixture(tmp_path)
+    assert (
+        "from src.checkout.pricing import apply_discount"
+        in (tmp_path / "src/checkout/handler.py").read_text()
+    )
+    assert "def apply_discount" in (tmp_path / "src/legacy/pricing.py").read_text()
+    assert len(host_gate._selection_manifest_identity()) == 64
+
+
+def test_selection_result_keeps_native_calls_and_validates_hashmarks() -> None:
+    scenario = host_gate.SELECTION_SCENARIOS[0]
+    events = [
+        _tool_event("grep", {"matches": 2}),
+        _tool_event(
+            "hashmarks_task_evidence", {"schema": "hashmarks.task-evidence.v2"}
+        ),
+        {
+            "type": "text",
+            "part": {"text": "src/checkout/pricing.py tests/test_checkout.py"},
+        },
+    ]
+    result = host_gate._selection_result(events, scenario)
+    assert [row["tool"] for row in result["tool_calls"]] == [
+        "grep",
+        "hashmarks_task_evidence",
+    ]
+    assert result["task_evidence_invoked"] is True
+    assert all(result["expected_paths_mentioned"].values())
+    with pytest.raises(host_gate.HostGateError, match="unexpected schema"):
+        host_gate._selection_result(
+            [_tool_event("hashmarks_task_evidence", {"unexpected": True})], scenario
+        )
+
+
+def test_catalog_rows_selects_actual_tool_bearing_model_request() -> None:
+    rows = host_gate._catalog_rows(
+        [
+            {"messages": []},
+            {
+                "tools": [
+                    {
+                        "function": {
+                            "name": "hashmarks_task_evidence",
+                            "description": "task",
+                            "parameters": {"required": ["task"]},
+                        }
+                    }
+                ]
+            },
+        ]
+    )
+    assert rows == [
+        {
+            "name": "hashmarks_task_evidence",
+            "description": "task",
+            "parameters": {"required": ["task"]},
+        }
+    ]
+
+
+def test_main_resolves_repository_root_for_diagnostic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    roots = []
+
+    def fake_diagnostic(args, project_root):
+        roots.append(project_root)
+        return {
+            "schema": "hashmarks.opencode-selection-diagnostic.v1",
+            "status": "CATALOG_ONLY",
+        }
+
+    monkeypatch.setattr(host_gate, "_selection_diagnostic", fake_diagnostic)
+    receipt = tmp_path / "receipt.json"
+    assert (
+        host_gate.main(
+            ["--selection-diagnostic", "--catalog-only", "--receipt", str(receipt)]
+        )
+        == 0
+    )
+    assert roots == [ROOT]
+    assert json.loads(receipt.read_text())["status"] == "CATALOG_ONLY"
+
+
+def test_selection_stops_after_model_environment_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = []
+
+    def fake_trial(*args):
+        calls.append(args)
+        return {"host_error": "provider unavailable", "host_exit_code": 1}
+
+    monkeypatch.setattr(host_gate, "_selection_trial", fake_trial)
+    status, rows = host_gate._selection_trials(
+        Namespace(opencode="opencode", model="provider/model", repeats=2),
+        tmp_path / "hashmarks",
+        tmp_path,
+        tmp_path / "receipt.json",
+    )
+    assert status == "ENVIRONMENT_BLOCKED"
+    assert len(calls) == len(rows) == 1
+
+
+def test_selection_timeout_keeps_partial_event_log_as_incomplete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        host_gate,
+        "_configure_opencode_mcp",
+        lambda *_args, **_kwargs: (None, "opencode.json", {}),
+    )
+
+    def timed_out(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(
+            ["opencode", "run"], 120, output=b'{"type":"text"}\n'
+        )
+
+    monkeypatch.setattr(host_gate, "_opencode_run", timed_out)
+    result = host_gate._selection_trial(
+        Namespace(opencode="opencode", model="provider/model"),
+        tmp_path / "hashmarks",
+        tmp_path,
+        tmp_path / "receipt.json",
+        host_gate.SELECTION_SCENARIOS[0],
+        0,
+    )
+    assert result["semantic_outcome"] == "incomplete"
+    assert result["host_error"] == "OpenCode model call timed out"
+    assert Path(result["event_log"]).read_text() == '{"type":"text"}\n'
+
+
+def test_main_retains_environment_blocked_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        host_gate,
+        "_selection_diagnostic",
+        lambda *_args: {
+            "schema": "hashmarks.opencode-selection-diagnostic.v1",
+            "status": "ENVIRONMENT_BLOCKED",
+            "results": [],
+        },
+    )
+    receipt = tmp_path / "blocked.json"
+    assert host_gate.main(["--selection-diagnostic", "--receipt", str(receipt)]) == 2
+    assert json.loads(receipt.read_text())["status"] == "ENVIRONMENT_BLOCKED"
 
 
 def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
@@ -290,8 +457,11 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
         _tool_event(
             "hashmarks_task_evidence",
             {
-                "schema": "hashmarks.task-evidence.v1",
-                "edit": host_gate.CHANGED_PATH,
+                "schema": "hashmarks.task-evidence.v2",
+                "ownership": {
+                    "status": "resolved",
+                    "owner": {"path": host_gate.CHANGED_PATH},
+                },
                 "evidence_receipt": {
                     "codemap_generation": 1,
                     "evidence_identity": "sha256:evidence",
