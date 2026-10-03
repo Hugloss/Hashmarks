@@ -445,10 +445,13 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
     server = build_server(_repo(tmp_path), state_dir=tmp_path / "state")
     try:
         names = [str(row["name"]) for row in registered]
-        assert server.description == "Read-only repository intelligence for coding agents"
-        assert server.instructions == mcp_server._SERVER_INSTRUCTIONS
-        assert "prefer task_evidence as the first repository-discovery call" in server.instructions
-        assert "before broad grep/glob or exploratory reads" in server.instructions
+        assert (
+            server.description == "Read-only repository intelligence for coding agents"
+            and server.instructions == mcp_server._SERVER_INSTRUCTIONS
+            and "prefer task_evidence as the first repository-discovery call"
+            in server.instructions
+            and "before broad grep/glob or exploratory reads" in server.instructions
+        )
         assert names == [
             "repository_context",
             "find",
