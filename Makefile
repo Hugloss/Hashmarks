@@ -1,6 +1,7 @@
 SHELL := /bin/sh
 UV ?= uv
 UV_SYNC := $(UV) sync --frozen
+DEV_SYNC := $(UV_SYNC) --extra mcp --group test
 UV_RUN := $(UV) run --frozen
 RUFF_RUN := UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --offline --only-group lint ruff
 FILES ?= 10000
@@ -50,7 +51,7 @@ help:
 	  '' \
 	  '  make lock           Intentionally refresh committed uv.lock and sync the test environment' \
 	  '  make lock-check     Check pyproject.toml ↔ committed uv.lock convergence without rewriting' \
-	  '  make init           Materialize the test environment from committed uv.lock' \
+	  '  make init           Materialize the locked test + MCP development environment' \
 	  '  make setup          Prepare local test environment and runtime doctor' \
 	  '  make test           Run authoritative normal OSS tests; HASHMARKS_CONSTRAINED_HOST=1 selects hosted diagnostics' \
 	  '  make test-diagnostic  Run all capability-aware hosted diagnostic shards (never release authority)' \
@@ -198,16 +199,16 @@ evaluation-help:
 
 lock:
 	@$(UV) lock
-	@$(UV_SYNC) --group test
-	@printf '%s\n' 'Hashmarks committed uv.lock refreshed and test environment synced.'
+	@$(DEV_SYNC)
+	@printf '%s\n' 'Hashmarks committed uv.lock refreshed and test + MCP environment synced.'
 
 lock-check:
 	@$(UV) lock --check
 	@printf '%s\n' 'Hashmarks pyproject.toml and committed uv.lock are converged.'
 
 init:
-	@$(UV_SYNC) --group test
-	@printf '%s\n' 'Hashmarks dependency environment ready from committed uv.lock.'
+	@$(DEV_SYNC)
+	@printf '%s\n' 'Hashmarks dependency environment ready from committed uv.lock (test + MCP).'
 
 setup: init
 	@$(MAKE) --no-print-directory doctor >/dev/null
@@ -215,7 +216,7 @@ setup: init
 
 bootstrap:
 	@test -f uv.lock || (echo "committed uv.lock is missing; restore the repository checkout before bootstrap" >&2; exit 2)
-	@$(UV_SYNC) --offline --group test
+	@$(DEV_SYNC) --offline
 	@$(MAKE) --no-print-directory doctor >/dev/null
 	@printf '%s\n' 'Hashmarks bootstrap ready (offline, committed locked supply).'
 
