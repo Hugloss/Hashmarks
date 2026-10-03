@@ -60,7 +60,7 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 
 The tools are read-only from the repository consumer's perspective. Hashmarks may update its own disposable derived cache while answering them.
 
-Tool selection is intentionally phase-specific rather than interchangeable: use `repository_context` for orientation, `find` for an already-bounded direct path/symbol lookup, `task_evidence` as the pre-edit task-level entrypoint when ownership/edit/verification/ambiguity evidence is needed, and `change_impact` after explicit changed paths exist. These descriptions are exposed through the native MCP catalog so hosts can choose the existing semantic owner without a Hashmarks-owned planner or workflow layer.
+Tool selection is intentionally phase-specific rather than interchangeable: use `repository_context` for initial orientation, `find` when the exact path/symbol/name is already known, `task_evidence` when a task or behavior needs owner and next-read localization (including read-only work), and `change_impact` after explicit changed paths exist. These descriptions are exposed through the native MCP catalog so hosts can choose the existing semantic owner without a Hashmarks-owned planner or workflow layer.
 
 `task_evidence` uses `hashmarks.task-evidence.v2`. Retrieval order is relevance evidence only and carries no ownership authority. Ownership resolution, ambiguity, verification, and freshness are separate fields; current freshness never implies a uniquely resolved owner. The consumer remains responsible for deciding whether and how to act on the evidence.
 
@@ -160,6 +160,18 @@ The selected model must support tool calling and already have the provider crede
 The qualification registration uses absolute paths for the installed Hashmarks executable and disposable workspace. It does not depend on global OpenCode configuration.
 
 On success the command prints `HASHMARKS OPENCODE MCP HOST GATE: PASS` and persists the canonical receipt plus diagnostic OpenCode JSONL event streams under `dist/`. A missing host or missing native MCP environment is `ENVIRONMENT_BLOCKED`; neither counts as release PASS evidence.
+
+### Voluntary OpenCode selection dogfood
+
+The same host qualification script also offers a non-gating diagnostic with six neutral repository tasks. It leaves OpenCode's native tools available, asks for no named tool, and records the ordered `tool_use` stream, Hashmarks response schemas, host-reported token data when present, and duration. Each trial uses a fresh disposable repository and session. Run the same model and repeat count before and after a native MCP catalog change:
+
+```bash
+uv sync --frozen --extra mcp --group test
+python scripts/host_qualification/opencode_mcp_host_gate.py --selection-diagnostic --model provider/model --repeats 2 --receipt dist/opencode-selection-baseline.json
+python scripts/host_qualification/opencode_mcp_host_gate.py --selection-diagnostic --model provider/model --repeats 2 --receipt dist/opencode-selection-candidate.json
+```
+
+The receipt includes a catalog captured from an actual OpenCode model request sent to a local non-reasoning endpoint. `--catalog-only` captures that wire catalog without an external model call. The catalog probe does not measure model choice; only completed real-model trials can do that. A model connection or authentication failure is recorded as `ENVIRONMENT_BLOCKED`, not as a selection result. This diagnostic is not a release gate.
 
 ## Claude Code real-call qualification
 
