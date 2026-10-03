@@ -308,6 +308,7 @@ def test_task_evidence_preserves_dense_natural_language_owner_candidates(
                 "indexed repository paths underneath a requested prefix."
             ),
             "hashmarks/codemap/repository_index_store.py",
+            "paths_under",
             (
                 "class WorkspaceMapStore:\n"
                 "    def paths_under(self, prefix: str) -> list[str]:\n"
@@ -326,6 +327,7 @@ def test_task_evidence_preserves_dense_natural_language_owner_candidates(
                 "names before repository file discovery descends into them."
             ),
             "hashmarks/codemap/repository_file_discovery.py",
+            "_prune_discovery_dirs",
             (
                 "def _prune_discovery_dirs(names: list[str]) -> None:\n"
                 "    names[:] = [name for name in names if not name.startswith('.')]\n"
@@ -344,6 +346,7 @@ def test_task_evidence_preserves_dense_natural_language_owner_candidates(
                 "the extraction-stable repository content identity from repository bytes."
             ),
             "hashmarks/test_shards.py",
+            "repository_content_identity",
             (
                 "def repository_content_identity(root):\n"
                 "    return 'content-bytes'\n\n"
@@ -360,7 +363,14 @@ def test_task_evidence_preserves_dense_natural_language_owner_candidates(
         ),
     )
 
-    for case_id, task, expected_path, owner_source, decoy_source in cases:
+    for (
+        case_id,
+        task,
+        expected_path,
+        expected_symbol,
+        owner_source,
+        decoy_source,
+    ) in cases:
         root = tmp_path / case_id
         root.mkdir()
         _write(root, expected_path, owner_source)
@@ -375,6 +385,14 @@ def test_task_evidence_preserves_dense_natural_language_owner_candidates(
             codemap.sync()
             packet = codemap.task_evidence(task, limit=20, token_budget=256)
 
-        retrieval_paths = {str(row["path"]) for row in packet["retrieval"]["results"]}
-        assert expected_path in retrieval_paths, case_id
-        assert packet["ownership"]["candidate"]["path"] == expected_path, case_id
+        retrieval = packet["retrieval"]["results"]
+        assert any(
+            row["path"] == expected_path
+            and (
+                row.get("name") == expected_symbol
+                or str(row.get("qualname") or "").rsplit(".", 1)[-1]
+                == expected_symbol
+            )
+            for row in retrieval
+        ), case_id
+        assert packet["retrieval"]["ownership_authority"] is False
