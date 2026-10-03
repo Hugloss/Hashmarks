@@ -395,3 +395,42 @@ def test_task_evidence_preserves_dense_natural_language_owner_candidates(
             for row in retrieval
         ), case_id
         assert packet["retrieval"]["ownership_authority"] is False
+
+
+def test_task_evidence_natural_supplements_respect_deny_visibility(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "hidden/engine.py",
+        "def cobalt_owner() -> str:\n    return 'implementation-secret'\n",
+    )
+    _write(
+        tmp_path,
+        "src/route.py",
+        "from hidden.engine import cobalt_owner\n\n"
+        "def cobalt_route() -> str:\n    return cobalt_owner()\n",
+    )
+    _write(
+        tmp_path,
+        "tests/test_route.py",
+        "from src.route import cobalt_route\n\n"
+        "def test_cobalt_route():\n    assert cobalt_route() == 'new'\n",
+    )
+    _write(
+        tmp_path,
+        ".hashmarks-context.toml",
+        '[[rule]]\npattern = "hidden/**"\nvisibility = "deny"\n',
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence(
+            "Change cobalt route behavior and verify it",
+            limit=20,
+            token_budget=256,
+        )
+
+    retrieval = packet["retrieval"]["results"]
+    assert all(row.get("path") != "hidden/engine.py" for row in retrieval)
+    assert all(row.get("qualname") != "cobalt_owner" for row in retrieval)
