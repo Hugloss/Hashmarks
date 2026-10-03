@@ -163,15 +163,15 @@ On success the command prints `HASHMARKS OPENCODE MCP HOST GATE: PASS` and persi
 
 ### Voluntary OpenCode selection dogfood
 
-The same host qualification script also offers a non-gating diagnostic with six neutral repository tasks. It leaves OpenCode's native tools available, asks for no named tool, and records the ordered `tool_use` stream, Hashmarks response schemas, host-reported token data when present, and duration. Each trial uses a fresh disposable repository and session. Run the same model and repeat count before and after a native MCP catalog change:
+The same host qualification script also offers a non-gating diagnostic with six neutral repository tasks. Its disposable commerce repository includes several similarly named implementations and an import-backed checkout owner. It leaves OpenCode's native tools available, asks for no named tool, and records the ordered `tool_use` stream, Hashmarks response schemas, host-reported token data when present, and duration. Each trial uses a fresh disposable repository and session. Run the same runner, model, and repeat count against separately installed baseline and candidate Hashmarks executables:
 
 ```bash
 uv sync --frozen --extra mcp --group test
-python scripts/host_qualification/opencode_mcp_host_gate.py --selection-diagnostic --model provider/model --repeats 2 --receipt dist/opencode-selection-baseline.json
-python scripts/host_qualification/opencode_mcp_host_gate.py --selection-diagnostic --model provider/model --repeats 2 --receipt dist/opencode-selection-candidate.json
+python scripts/host_qualification/opencode_mcp_host_gate.py --selection-diagnostic --model provider/model --repeats 3 --hashmarks-executable /absolute/baseline/bin/hashmarks --receipt dist/opencode-selection-baseline.json
+python scripts/host_qualification/opencode_mcp_host_gate.py --selection-diagnostic --model provider/model --repeats 3 --hashmarks-executable /absolute/candidate/bin/hashmarks --receipt dist/opencode-selection-candidate.json
 ```
 
-The receipt includes a catalog captured from an actual OpenCode model request sent to a local non-reasoning endpoint. `--catalog-only` captures that wire catalog without an external model call. The catalog probe does not measure model choice; only completed real-model trials can do that. A model connection or authentication failure is recorded as `ENVIRONMENT_BLOCKED`, not as a selection result. This diagnostic is not a release gate.
+The receipt binds the prompt manifest, fixture content, runner, executable, installed MCP source, and captured catalog by SHA-256. The catalog comes from an actual OpenCode model request sent to a local non-reasoning endpoint. `--catalog-only` captures that wire catalog without an external model call. The catalog probe does not measure model choice; only completed real-model trials can do that. Provider authentication or connection failure is `ENVIRONMENT_BLOCKED`; timeouts are `INCOMPLETE`, and tool or host failures are `FAIL`. None counts as a selection outcome. Review the JSONL events and source-backed answers before judging use or cost; path mentions and invocation counts alone are not correctness measures. This diagnostic is not a release gate.
 
 ## Claude Code real-call qualification
 

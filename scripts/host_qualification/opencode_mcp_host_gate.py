@@ -344,7 +344,7 @@ SELECTION_SCENARIOS = (
     ),
     SelectionScenario(
         "ambiguous-owner",
-        "Two functions named apply_discount exist. Determine which one the checkout "
+        "Several functions named apply_discount exist. Determine which one the checkout "
         "handler uses and cite the repository link that distinguishes them. "
         "Do not change files.",
         ("src/checkout/pricing.py", "src/checkout/handler.py"),
@@ -376,8 +376,14 @@ SELECTION_SCENARIOS = (
 )
 
 
-def _write_selection_fixture(repo: Path) -> None:
+def _selection_fixture_sources() -> dict[str, str]:
     sources = {
+        "README.md": (
+            "# Commerce service\n"
+            "Python packages implement checkout, billing, returns, rewards, and older flows.\n"
+        ),
+        "pyproject.toml": "[tool.pytest.ini_options]\ntestpaths = ['tests']\n",
+        "src/__init__.py": "",
         "src/checkout/__init__.py": "",
         "src/checkout/pricing.py": (
             "def apply_discount(subtotal: int) -> int:\n"
@@ -388,21 +394,38 @@ def _write_selection_fixture(repo: Path) -> None:
             "def checkout_total(subtotal: int) -> int:\n"
             "    return apply_discount(subtotal)\n"
         ),
-        "src/legacy/__init__.py": "",
-        "src/legacy/pricing.py": (
-            "def apply_discount(subtotal: int) -> int:\n    return subtotal - 5\n"
-        ),
         "tests/test_checkout.py": (
             "from src.checkout.handler import checkout_total\n\n"
             "def test_checkout_discount():\n"
             "    assert checkout_total(100) == 90\n"
         ),
-        "tests/test_legacy_pricing.py": (
-            "from src.legacy.pricing import apply_discount\n\n"
-            "def test_legacy_discount():\n"
-            "    assert apply_discount(100) == 95\n"
-        ),
     }
+    for area, reduction in (
+        ("billing", 3),
+        ("returns", 7),
+        ("rewards", 2),
+        ("legacy", 5),
+    ):
+        sources[f"src/{area}/__init__.py"] = ""
+        sources[f"src/{area}/pricing.py"] = (
+            "def apply_discount(subtotal: int) -> int:\n"
+            f"    return subtotal - {reduction}\n"
+        )
+        sources[f"src/{area}/handler.py"] = (
+            f"from src.{area}.pricing import apply_discount\n\n"
+            f"def {area}_total(subtotal: int) -> int:\n"
+            "    return apply_discount(subtotal)\n"
+        )
+        sources[f"tests/test_{area}.py"] = (
+            f"from src.{area}.handler import {area}_total\n\n"
+            f"def test_{area}_discount():\n"
+            f"    assert {area}_total(100) == {100 - reduction}\n"
+        )
+    return sources
+
+
+def _write_selection_fixture(repo: Path) -> None:
+    sources = _selection_fixture_sources()
     for relative, content in sources.items():
         path = repo / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -417,6 +440,12 @@ def _selection_manifest_identity() -> str:
     return hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
 
 
+def _selection_fixture_identity() -> str:
+    return hashlib.sha256(
+        json.dumps(_selection_fixture_sources(), sort_keys=True).encode()
+    ).hexdigest()
+
+
 def _selection_result(
     events: list[dict[str, Any]], scenario: SelectionScenario
 ) -> dict[str, Any]:
@@ -427,7 +456,9 @@ def _selection_result(
         state = part.get("state")
         status = state.get("status") if isinstance(state, dict) else None
         payload_schema = None
-        if tool.startswith("hashmarks_") and status == "completed":
+        if tool.startswith("hashmarks_") and status != "completed":
+            raise HostGateError(f"Hashmarks tool did not complete: {tool}: {status}")
+        if tool.startswith("hashmarks_"):
             expected_schema = SELECTION_RESPONSE_SCHEMAS.get(tool)
             if expected_schema is not None:
                 payload = _tool_payload(part, expected_schema)
@@ -590,6 +621,41 @@ def _opencode_model_catalog(
     return {"status": "captured", "provider": "local-catalog-probe", "tools": rows}
 
 
+def _selection_error(events: list[dict[str, Any]]) -> tuple[str | None, str | None]:
+    errors = [event.get("error") for event in events if event.get("type") == "error"]
+    if not errors:
+        return None, None
+    error = errors[-1]
+    if not isinstance(error, dict):
+        return "FAIL", "OpenCode emitted an unstructured error"
+    data = error.get("data")
+    if not isinstance(data, dict):
+        data = {}
+    message = data.get("message")
+    detail = str(message) if isinstance(message, str) else str(error.get("name"))
+    metadata = data.get("metadata")
+    provider_url = metadata.get("url") if isinstance(metadata, dict) else None
+    provider_failure = error.get("name") == "APIError" and (
+        isinstance(data.get("statusCode"), int) or isinstance(provider_url, str)
+    )
+    return ("ENVIRONMENT_BLOCKED" if provider_failure else "FAIL"), detail
+
+
+def _installed_hashmarks_source(executable: Path, project_root: Path) -> dict[str, str]:
+    python = _venv_executable(executable.parent.parent, "python")
+    if not python.is_file():
+        raise HostGateEnvironmentBlocked(
+            f"Hashmarks executable has no adjacent Python environment: {executable}"
+        )
+    code = "import hashmarks.mcp_server as m; print(m.__file__)"
+    source = Path(
+        _run([str(python), "-I", "-c", code], cwd=project_root).stdout.strip()
+    )
+    if not source.is_file():
+        raise HostGateError(f"installed Hashmarks MCP source is missing: {source}")
+    return {"path": str(source), "sha256": _sha256(source)}
+
+
 def _selection_trial(
     args: argparse.Namespace,
     executable: Path,
@@ -622,21 +688,33 @@ def _selection_trial(
             "event_log": str(log),
             "event_log_sha256": _sha256(log),
             "tool_calls": [],
+            "trial_status": "INCOMPLETE",
             "semantic_outcome": "incomplete",
         }
     log.write_text(completed.stdout, encoding="utf-8")
-    events = _parse_jsonl(completed.stdout)
-    errors = [event for event in events if event.get("type") == "error"]
-    result = _selection_result(events, scenario)
+    try:
+        events = _parse_jsonl(completed.stdout)
+        failure_status, failure_detail = _selection_error(events)
+        if failure_status is None and completed.returncode != 0:
+            failure_status = "FAIL"
+            failure_detail = f"OpenCode exited with status {completed.returncode}"
+        result = _selection_result(events, scenario)
+    except HostGateError as exc:
+        failure_status, failure_detail = "FAIL", str(exc)
+        result = {
+            "scenario": scenario.name,
+            "prompt": scenario.prompt,
+            "tool_calls": [],
+        }
     result.update(
         {
             "repeat": repeat,
             "duration_seconds": round(time.monotonic() - started, 3),
             "host_exit_code": completed.returncode,
-            "host_error": (
-                str(errors[-1].get("error", {}).get("data", {}).get("message"))
-                if errors
-                else None
+            "host_error": failure_detail,
+            "trial_status": failure_status or "OBSERVED",
+            "semantic_outcome": (
+                "needs-manual-review" if failure_status is None else "unavailable"
             ),
             "event_log": str(log),
             "event_log_sha256": _sha256(log),
@@ -674,8 +752,8 @@ def _selection_trials(
                 args, executable, root, receipt_path, scenario, repeat
             )
             results.append(result)
-            if result["host_error"] or result["host_exit_code"] != 0:
-                return "ENVIRONMENT_BLOCKED", results
+            if result["trial_status"] != "OBSERVED":
+                return str(result["trial_status"]), results
     return "OBSERVED", results
 
 
@@ -708,7 +786,14 @@ def _selection_diagnostic(
         ).stdout.strip(),
         "model": args.model,
         "manifest_sha256": _selection_manifest_identity(),
+        "fixture_sha256": _selection_fixture_identity(),
+        "runner_sha256": _sha256(Path(__file__)),
         "hashmarks_executable": str(executable),
+        "hashmarks_executable_sha256": _sha256(executable),
+        "hashmarks_mcp_source": _installed_hashmarks_source(executable, project_root),
+        "catalog_sha256": hashlib.sha256(
+            json.dumps(catalog["tools"], sort_keys=True).encode()
+        ).hexdigest(),
         "catalog": catalog,
         "results": results,
     }
@@ -1132,6 +1217,13 @@ def main(argv: list[str] | None = None) -> int:
             file=os.sys.stderr,
         )
         return 2
+    if receipt.get("status") in {"FAIL", "INCOMPLETE"}:
+        log_command_output(
+            logger,
+            f"{label}: {receipt['status']}\nreceipt: {receipt_path}",
+            file=os.sys.stderr,
+        )
+        return 1
     log_command_output(
         logger,
         f"{label}: {receipt.get('status')}\nreceipt: {receipt_path}",
