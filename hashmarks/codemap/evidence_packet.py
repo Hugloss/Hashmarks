@@ -838,7 +838,11 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         )
         candidate_paths: list[str] = []
         for term in salient:
-            hits = self._task_component_hits(term, bound_reasons)
+            hits = self._task_component_hits(
+                term,
+                bound_reasons,
+                include_signature=True,
+            )
             if not hits or len(hits) > 8:
                 continue
             for hit in hits[:2]:
