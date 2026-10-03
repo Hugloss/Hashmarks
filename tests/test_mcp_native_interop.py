@@ -128,6 +128,15 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
             async with ClientSession(read, write) as session:
                 initialized = await session.initialize()
                 assert initialized.server_info.name == "Hashmarks"
+                assert initialized.instructions is not None
+                assert (
+                    "prefer task_evidence as the first repository-discovery call"
+                    in initialized.instructions
+                )
+                assert (
+                    "before broad grep/glob or exploratory reads"
+                    in initialized.instructions
+                )
 
                 prompts = await session.list_prompts()
                 resources = await session.list_resources()
