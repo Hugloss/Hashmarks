@@ -1222,6 +1222,22 @@ class TaskRetrievalMixin:
             variants.extend((stem, stem + "e"))
         return tuple(dict.fromkeys(item for item in variants if len(item) >= 3))
 
+    @classmethod
+    def _task_natural_term_candidates(
+        cls, task: str
+    ) -> tuple[tuple[str, ...], bool]:
+        candidates: list[str] = []
+        for raw in _WORD_RE.findall(task):
+            lowered = raw.lower().strip("_-")
+            if len(lowered) < 4 or lowered in _TASK_STOPWORDS:
+                continue
+            for variant in cls._task_natural_term_variants(lowered):
+                if variant not in candidates:
+                    candidates.append(variant)
+            if len(candidates) >= 32:
+                return tuple(candidates[:32]), True
+        return tuple(candidates), False
+
     def _task_salient_natural_terms(
         self,
         task: str,
@@ -1231,27 +1247,14 @@ class TaskRetrievalMixin:
     ) -> tuple[str, ...]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        candidates: list[str] = []
-        for raw in _WORD_RE.findall(task):
-            lowered = raw.lower().strip("_-")
-            if len(lowered) < 4 or lowered in _TASK_STOPWORDS:
-                continue
-            for variant in self._task_natural_term_variants(lowered):
-                if variant not in candidates:
-                    candidates.append(variant)
-            if len(candidates) >= 32:
-                if bound_reasons is not None:
-                    bound_reasons.add("task-natural-term-input-limit")
-                break
+        candidates, truncated = self._task_natural_term_candidates(task)
+        if truncated and bound_reasons is not None:
+            bound_reasons.add("task-natural-term-input-limit")
         if not candidates:
             return ()
-        total, frequencies = self._session_lexical_document_frequencies(candidates)
+        total, frequencies = self._session_lexical_document_frequencies(list(candidates))
         ranked = sorted(
-            (
-                term
-                for term in candidates
-                if 0 < int(frequencies.get(term, 0)) <= 8
-            ),
+            (term for term in candidates if 0 < int(frequencies.get(term, 0)) <= 8),
             key=lambda term: self._task_query_term_score(
                 term,
                 total,
