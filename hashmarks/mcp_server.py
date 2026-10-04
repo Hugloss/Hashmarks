@@ -1,10 +1,18 @@
 from __future__ import annotations
 
 import argparse
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from .errors import OptionalFeatureError, UserFacingError
 from .mcp_surface import HashmarksMcpSurface, McpSurfaceError
+from .mcp_transport import (
+    DEFAULT_HTTP_HOST,
+    DEFAULT_HTTP_PATH,
+    DEFAULT_HTTP_PORT,
+    McpTransport,
+    add_transport_arguments,
+    validate_streamable_http,
+)
 from .paths import canonical_host_path
 
 if TYPE_CHECKING:
@@ -28,53 +36,6 @@ _SERVER_INSTRUCTIONS = (
 )
 
 _T = TypeVar("_T")
-
-McpTransport = Literal["stdio", "streamable-http"]
-_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
-_DEFAULT_HTTP_HOST = "127.0.0.1"
-_DEFAULT_HTTP_PORT = 8000
-_DEFAULT_HTTP_PATH = "/mcp"
-
-
-def add_transport_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--transport",
-        choices=("stdio", "streamable-http"),
-        default="stdio",
-        help=(
-            "stdio is the local subprocess transport; streamable-http serves the "
-            "same read-only MCP surface on loopback for a secure tunnel or local client"
-        ),
-    )
-    parser.add_argument("--host", default=_DEFAULT_HTTP_HOST)
-    parser.add_argument("--port", type=int, default=_DEFAULT_HTTP_PORT)
-    parser.add_argument("--path", default=_DEFAULT_HTTP_PATH)
-
-
-def _validate_streamable_http(
-    *, host: str, port: int, path: str
-) -> tuple[str, int, str]:
-    if host not in _LOOPBACK_HOSTS:
-        raise UserFacingError(
-            "Hashmarks streamable HTTP is loopback-only; use 127.0.0.1, ::1, "
-            "or localhost and place an authenticated/tunneled boundary in front "
-            "of Hashmarks when remote access is required"
-        )
-    if not 1 <= port <= 65535:
-        raise UserFacingError("MCP HTTP port must be between 1 and 65535")
-    if (
-        not path.startswith("/")
-        or path.startswith("//")
-        or "?" in path
-        or "#" in path
-        or any(character.isspace() for character in path)
-    ):
-        raise UserFacingError(
-            "MCP HTTP path must be one absolute URL path without query, fragment, "
-            "whitespace, or a leading //"
-        )
-    return host, port, path
-
 
 def _sdk():
     try:
@@ -281,12 +242,12 @@ def run_server(
     *,
     state_dir: str | Path | None = None,
     transport: McpTransport = "stdio",
-    host: str = _DEFAULT_HTTP_HOST,
-    port: int = _DEFAULT_HTTP_PORT,
-    path: str = _DEFAULT_HTTP_PATH,
+    host: str = DEFAULT_HTTP_HOST,
+    port: int = DEFAULT_HTTP_PORT,
+    path: str = DEFAULT_HTTP_PATH,
 ) -> None:
     if transport == "streamable-http":
-        host, port, path = _validate_streamable_http(
+        host, port, path = validate_streamable_http(
             host=host,
             port=port,
             path=path,
