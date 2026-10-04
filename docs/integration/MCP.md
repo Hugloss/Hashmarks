@@ -59,8 +59,9 @@ The default receipt is `dist/chatgpt-secure-mcp-tunnel-handoff.json`. It binds:
 
 - the canonical workspace;
 - the exact Hashmarks executable path, SHA-256, and version;
+- for source-managed handoffs, the actual imported Hashmarks source root and canonical repository content identity;
 - the exact stdio `mcp_command_argv` and shell-safe `mcp_command`;
-- the negotiated MCP protocol/server identity and server instructions;
+- the negotiated MCP protocol/server identity/version and server instructions, with CLI and MCP versions required to agree;
 - the exact eight-tool read-only catalog and annotations;
 - explicit authority that Secure MCP Tunnel, ChatGPT configuration, and credentials remain external.
 
