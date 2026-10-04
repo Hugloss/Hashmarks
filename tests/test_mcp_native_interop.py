@@ -54,18 +54,23 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         descriptions = {tool.name: tool.description or "" for tool in tools}
         selection_contract = {
             "repository_context": (
-                "Use only for initial repository orientation: freshness, languages, areas, "
-                "and topology. For a coding task needing ownership, edit, verification, or "
-                "next-read evidence, use task_evidence instead."
+                "Use only for broad repository orientation: freshness, languages, areas, and "
+                "topology. Do not use this to localize a behavior owner. For implementation "
+                "ownership, source/next-read, or verification evidence, use task_evidence."
             ),
             "find": (
-                "Look up a known exact path or symbol. If the task only describes behavior "
-                "and its implementation path is unknown, call task_evidence first."
+                "Exact lookup for a path or symbol you already know by name. Do not use as a "
+                "behavior-localization substitute: when the task describes behavior and the "
+                "implementation path is unknown, use task_evidence first."
             ),
             "task_evidence": (
-                "First discovery tool for a behavior description with unknown implementation "
-                "path. Call before exploratory grep, glob, or read, including read-only "
-                "'which function?' tasks. Returns bounded candidates and next reads."
+                "Primary semantic discovery tool when a task describes behavior but the exact "
+                "implementation path is not already known. Prefer this before exploratory "
+                "grep/glob/read: one bounded call separates supporting retrieval from ownership "
+                "authority, resolves a unique owner when admissible or preserves ambiguity, "
+                "returns source evidence or an exact next-read, selects verification evidence/"
+                "plan, and reports freshness. Native read is for the targeted path/range after "
+                "this reduction, not for reconstructing ownership by repeated exploration."
             ),
             "change_impact": (
                 "Use after explicit changed paths exist for bounded structural impact and "
@@ -79,6 +84,17 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         assert {
             name: descriptions[name] for name in selection_contract
         } == selection_contract
+        task_description = descriptions["task_evidence"]
+        for phrase in (
+            "Primary semantic discovery tool",
+            "supporting retrieval from ownership authority",
+            "preserves ambiguity",
+            "source evidence or an exact next-read",
+            "verification evidence/plan",
+            "reports freshness",
+            "not for reconstructing ownership",
+        ):
+            assert phrase in task_description
         schemas = {tool.name: tool.input_schema for tool in tools}
         assert schemas["task_evidence"]["required"] == ["task"]
         assert schemas["find"]["required"] == ["query"]
@@ -131,8 +147,13 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
                 assert initialized.server_info.name == "Hashmarks"
                 assert initialized.server_info.version == __version__
                 assert initialized.instructions is not None
-                assert "call task_evidence before the first" in initialized.instructions
-                assert "exploratory grep, glob, or read" in initialized.instructions
+                assert "semantic repository-intelligence layer" in initialized.instructions
+                assert "call task_evidence before exploratory" in initialized.instructions
+                assert "supporting retrieval from ownership authority" in initialized.instructions
+                assert "preserve ambiguity" in initialized.instructions
+                assert "verification plan" in initialized.instructions
+                assert "report freshness" in initialized.instructions
+                assert "repeated native search/read calls" in initialized.instructions
 
                 prompts = await session.list_prompts()
                 resources = await session.list_resources()
