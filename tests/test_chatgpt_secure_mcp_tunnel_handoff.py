@@ -4,7 +4,6 @@ import asyncio
 import importlib.util
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -16,6 +15,7 @@ from scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff import (
     _observe_mcp,
     _validate_observation,
     build_handoff,
+    qualify_handoff,
 )
 
 _MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
@@ -76,27 +76,22 @@ def test_handoff_receipt_preserves_external_tunnel_authority(tmp_path: Path) -> 
     executable.write_bytes(b"candidate")
     workspace = tmp_path / "repo"
     workspace.mkdir()
-    with (
-        mock.patch(
-            "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.run",
-            return_value=SimpleNamespace(stdout="hashmarks version 0.26.1\n"),
-        ),
-        mock.patch(
-            "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.sha256",
-            return_value="a" * 64,
-        ),
-        mock.patch(
-            "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.completed_at",
-            return_value="2026-10-04T15:00:00Z",
-        ),
+    with mock.patch(
+        "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.completed_at",
+        return_value="2026-10-04T15:00:00Z",
     ):
         receipt = build_handoff(
             executable=executable,
             workspace=workspace,
             state_dir=None,
-            source={
-                "root": "/source",
-                "repository_content_identity": "sha256:" + "b" * 64 + ":10",
+            implementation={
+                "executable": str(executable),
+                "executable_sha256": "a" * 64,
+                "version": "hashmarks version 0.26.1",
+                "source": {
+                    "root": "/source",
+                    "repository_content_identity": "sha256:" + "b" * 64 + ":10",
+                },
             },
             observation=_observation(),
         )
@@ -126,23 +121,59 @@ def test_handoff_rejects_cli_mcp_version_split_brain(tmp_path: Path) -> None:
     workspace.mkdir()
     observation = _observation()
     observation["server"]["version"] = "0.25.0"
+    with pytest.raises(HostGateError, match="CLI/MCP version authority differs"):
+        build_handoff(
+            executable=executable,
+            workspace=workspace,
+            state_dir=None,
+            implementation={
+                "executable": str(executable),
+                "executable_sha256": "a" * 64,
+                "version": "hashmarks version 0.26.1",
+                "source": None,
+            },
+            observation=observation,
+        )
+
+
+def test_handoff_rejects_implementation_generation_change(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "hashmarks"
+    executable.write_bytes(b"candidate")
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    before = {
+        "executable": str(executable),
+        "executable_sha256": "a" * 64,
+        "version": "hashmarks version 0.26.1",
+        "source": None,
+    }
+    after = {
+        **before,
+        "executable_sha256": "b" * 64,
+    }
     with (
         mock.patch(
-            "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.run",
-            return_value=SimpleNamespace(stdout="hashmarks version 0.26.1\n"),
+            "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff._implementation_identity",
+            side_effect=(before, after),
         ),
         mock.patch(
-            "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.sha256",
-            return_value="a" * 64,
+            "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff._observe_mcp",
+            return_value=_observation(),
         ),
     ):
-        with pytest.raises(HostGateError, match="CLI/MCP version authority differs"):
-            build_handoff(
-                executable=executable,
-                workspace=workspace,
-                state_dir=None,
-                source=None,
-                observation=observation,
+        with pytest.raises(
+            HostGateError,
+            match="implementation changed while MCP handoff was being qualified",
+        ):
+            asyncio.run(
+                qualify_handoff(
+                    executable=executable,
+                    workspace=workspace,
+                    state_dir=None,
+                    source_root=None,
+                )
             )
 
 
