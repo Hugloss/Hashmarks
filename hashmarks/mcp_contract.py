@@ -184,9 +184,7 @@ def _canonical_annotations(value: object) -> dict[str, bool]:
         for key in MCP_READ_ONLY_ANNOTATIONS
     }
     if normalized != MCP_READ_ONLY_ANNOTATIONS:
-        raise ValueError(
-            "Hashmarks MCP tool annotations differ from the read-only contract"
-        )
+        raise ValueError("Hashmarks MCP tool annotations are not read-only")
     return dict(MCP_READ_ONLY_ANNOTATIONS)
 
 
@@ -218,7 +216,7 @@ def qualify_mcp_observation(observation: dict[str, Any]) -> dict[str, object]:
     if not isinstance(version, str) or not version:
         raise ValueError("Hashmarks MCP server version is unavailable")
     if server.get("instructions") != MCP_SERVER_INSTRUCTIONS:
-        raise ValueError("Hashmarks MCP server instructions differ from the contract")
+        raise ValueError("Hashmarks MCP routing instructions differ from the contract")
 
     raw_tools = observation.get("tools")
     if not isinstance(raw_tools, list):
