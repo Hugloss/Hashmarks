@@ -3,11 +3,14 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import socket
+import subprocess
 import tempfile
 from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.client.streamable_http import streamable_http_client
 
 from hashmarks._command_output import log_command_output
 
@@ -43,34 +46,20 @@ def _fixture(root: Path) -> Path:
     return repo
 
 
-async def _exercise(
-    executable: Path,
-    repo: Path,
-    state_dir: Path,
+async def _exercise_session(
+    session: ClientSession,
     *,
-    boundary_only: bool = False,
+    boundary_only: bool,
 ) -> None:
-    params = StdioServerParameters(
-        command=str(executable),
-        args=[
-            "--workspace",
-            str(repo),
-            "--state-dir",
-            str(state_dir),
-            "mcp",
-        ],
-    )
-    async with stdio_client(params) as (read, write):
-        async with ClientSession(read, write) as session:
-            initialized = await session.initialize()
-            assert initialized.server_info.name == "Hashmarks"
-            assert (await session.list_prompts()).prompts == []
-            assert (await session.list_resources()).resources == []
+    initialized = await session.initialize()
+    assert initialized.server_info.name == "Hashmarks"
+    assert (await session.list_prompts()).prompts == []
+    assert (await session.list_resources()).resources == []
 
-            tools = await session.list_tools()
-            assert [tool.name for tool in tools.tools] == _EXPECTED_TOOLS
+    tools = await session.list_tools()
+    assert [tool.name for tool in tools.tools] == _EXPECTED_TOOLS
 
-            if not boundary_only:
+    if not boundary_only:
                 found = await session.call_tool(
                     "find", arguments={"query": "flare041", "limit": 5}
                 )
@@ -153,13 +142,107 @@ async def _exercise(
                     ]
                 )
 
-            invalid = await session.call_tool(
-                "find", arguments={"query": "", "limit": 5}
-            )
-            assert invalid.is_error is True
-            text = "\n".join(getattr(block, "text", "") for block in invalid.content)
-            assert "query must not be empty" in text
-            assert "Traceback" not in text
+    invalid = await session.call_tool(
+        "find", arguments={"query": "", "limit": 5}
+    )
+    assert invalid.is_error is True
+    text = "\n".join(getattr(block, "text", "") for block in invalid.content)
+    assert "query must not be empty" in text
+    assert "Traceback" not in text
+
+
+async def _exercise_stdio(
+    executable: Path,
+    repo: Path,
+    state_dir: Path,
+    *,
+    boundary_only: bool,
+) -> None:
+    params = StdioServerParameters(
+        command=str(executable),
+        args=[
+            "--workspace",
+            str(repo),
+            "--state-dir",
+            str(state_dir),
+            "mcp",
+        ],
+    )
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await _exercise_session(session, boundary_only=boundary_only)
+
+
+def _free_loopback_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        return int(listener.getsockname()[1])
+
+
+async def _exercise_http(
+    executable: Path,
+    repo: Path,
+    state_dir: Path,
+    *,
+    boundary_only: bool,
+) -> None:
+    port = _free_loopback_port()
+    endpoint = f"http://127.0.0.1:{port}/mcp"
+    process = subprocess.Popen(
+        [
+            str(executable),
+            "--workspace",
+            str(repo),
+            "--state-dir",
+            str(state_dir),
+            "mcp",
+            "--transport",
+            "streamable-http",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--path",
+            "/mcp",
+        ],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        last_error: Exception | None = None
+        for _ in range(100):
+            if process.poll() is not None:
+                stdout, stderr = process.communicate()
+                raise AssertionError(
+                    "Hashmarks HTTP MCP exited before readiness: "
+                    f"stdout={stdout!r} stderr={stderr!r}"
+                )
+            initialized = False
+            try:
+                async with streamable_http_client(endpoint) as (read, write):
+                    async with ClientSession(read, write) as session:
+                        initialized = True
+                        await _exercise_session(
+                            session,
+                            boundary_only=boundary_only,
+                        )
+                        return
+            except Exception as exc:
+                if initialized:
+                    raise
+                last_error = exc
+                await asyncio.sleep(0.05)
+        raise AssertionError(f"Hashmarks HTTP MCP did not become ready: {last_error}")
+    finally:
+        if process.poll() is None:
+            process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -181,11 +264,20 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"installed hashmarks console script not found: {executable}")
     with tempfile.TemporaryDirectory(prefix="hashmarks-mcp-installed-") as raw:
         root = Path(raw)
+        repo = _fixture(root)
         asyncio.run(
-            _exercise(
+            _exercise_stdio(
                 executable,
-                _fixture(root),
-                root / "state",
+                repo,
+                root / "stdio-state",
+                boundary_only=args.boundary_only,
+            )
+        )
+        asyncio.run(
+            _exercise_http(
+                executable,
+                repo,
+                root / "http-state",
                 boundary_only=args.boundary_only,
             )
         )
