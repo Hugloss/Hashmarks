@@ -243,18 +243,13 @@ def test_mcp_find_qualifies_absence_and_uniqueness_against_freshness(
         assert missing["observed_exact_match_count"] == 0
         assert missing["freshness"] == "current"
         assert missing["completeness"] == "complete"
-        assert (
-            missing["negative_evidence"] == "admissible-within-declared-scope"
-        )
+        assert missing["negative_evidence"] == "admissible-within-declared-scope"
         assert missing["admissibility_reasons"] == []
 
         unique_path = surface.find("src/feature.py", limit=10)
         assert unique_path["query_intent"] == "path"
         assert unique_path["observed_exact_match_count"] == 1
-        assert (
-            unique_path["uniqueness_evidence"]
-            == "admissible-within-declared-scope"
-        )
+        assert unique_path["uniqueness_evidence"] == "admissible-within-declared-scope"
 
         conceptual = surface.find("where is definitely_missing behavior", limit=10)
         assert conceptual["negative_evidence"] == "not-admissible"
