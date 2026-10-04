@@ -1296,11 +1296,6 @@ def test_v3_dependency_query_refuses_unknown_request_field(
             "target_id",
         ),
         (
-            {"operation": "contexts", "node_id": "library@1", "context": "compile"},
-            "contexts",
-            "context",
-        ),
-        (
             {
                 "operation": "module-owners",
                 "module": "library",
@@ -2395,25 +2390,26 @@ def test_v3_dependency_query_reports_result_bound_when_result_is_omitted(
     assert result["omissions"] == [{"reason": "result-limit"}]
 
 
-def test_v3_context_query_reports_observed_contexts_despite_context_argument(
+def test_v3_context_query_rejects_context_argument_instead_of_ignoring_it(
     tmp_path: Path,
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
-        packet = codemap.dependency_resolution_queries(
-            observation,
-            [
-                {
-                    "operation": "contexts",
-                    "node_id": "library@1",
-                    "context": "compile",
-                }
-            ],
-        )
-
-    result = packet["results"][0]
-    assert result["result"] == ["compile", "runtime"]
+        with pytest.raises(
+            ValueError,
+            match="dependency query field is not valid for contexts: context",
+        ):
+            codemap.dependency_resolution_queries(
+                observation,
+                [
+                    {
+                        "operation": "contexts",
+                        "node_id": "library@1",
+                        "context": "compile",
+                    }
+                ],
+            )
 
 
 def test_v3_context_query_includes_selection_context_without_inventory_or_edge(
