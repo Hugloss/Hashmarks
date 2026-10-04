@@ -10,6 +10,7 @@ import pytest
 from hashmarks._version import __version__
 from hashmarks.mcp_contract import (
     MCP_SERVER_INSTRUCTIONS,
+    MCP_SERVER_NAME,
     MCP_TOOL_NAMES,
     contract_from_tool_models,
     tool_description,
@@ -124,7 +125,7 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
                 initialized = await session.initialize()
-                assert initialized.server_info.name == "Hashmarks"
+                assert initialized.server_info.name == MCP_SERVER_NAME
                 assert initialized.server_info.version == __version__
                 assert initialized.instructions == MCP_SERVER_INSTRUCTIONS
 
