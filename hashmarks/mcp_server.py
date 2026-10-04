@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 from .errors import OptionalFeatureError, UserFacingError
 from .mcp_surface import HashmarksMcpSurface, McpSurfaceError
@@ -28,6 +28,52 @@ _SERVER_INSTRUCTIONS = (
 )
 
 _T = TypeVar("_T")
+
+McpTransport = Literal["stdio", "streamable-http"]
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+_DEFAULT_HTTP_HOST = "127.0.0.1"
+_DEFAULT_HTTP_PORT = 8000
+_DEFAULT_HTTP_PATH = "/mcp"
+
+
+def add_transport_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--transport",
+        choices=("stdio", "streamable-http"),
+        default="stdio",
+        help=(
+            "stdio is the local subprocess transport; streamable-http serves the "
+            "same read-only MCP surface on loopback for a secure tunnel or local client"
+        ),
+    )
+    parser.add_argument("--host", default=_DEFAULT_HTTP_HOST)
+    parser.add_argument("--port", type=int, default=_DEFAULT_HTTP_PORT)
+    parser.add_argument("--path", default=_DEFAULT_HTTP_PATH)
+
+
+def _validate_streamable_http(
+    *, host: str, port: int, path: str
+) -> tuple[str, int, str]:
+    if host not in _LOOPBACK_HOSTS:
+        raise UserFacingError(
+            "Hashmarks streamable HTTP is loopback-only; use 127.0.0.1, ::1, "
+            "or localhost and place an authenticated/tunneled boundary in front "
+            "of Hashmarks when remote access is required"
+        )
+    if not 1 <= port <= 65535:
+        raise UserFacingError("MCP HTTP port must be between 1 and 65535")
+    if (
+        not path.startswith("/")
+        or path.startswith("//")
+        or "?" in path
+        or "#" in path
+        or any(character.isspace() for character in path)
+    ):
+        raise UserFacingError(
+            "MCP HTTP path must be one absolute URL path without query, fragment, "
+            "whitespace, or a leading //"
+        )
+    return host, port, path
 
 
 def _sdk():
@@ -230,30 +276,70 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     return server
 
 
-def run_stdio(
-    workspace: str | Path = ".", *, state_dir: str | Path | None = None
+def run_server(
+    workspace: str | Path = ".",
+    *,
+    state_dir: str | Path | None = None,
+    transport: McpTransport = "stdio",
+    host: str = _DEFAULT_HTTP_HOST,
+    port: int = _DEFAULT_HTTP_PORT,
+    path: str = _DEFAULT_HTTP_PATH,
 ) -> None:
     server = build_server(workspace, state_dir=state_dir)
     try:
-        server.run(transport="stdio")
+        if transport == "stdio":
+            server.run(transport="stdio")
+            return
+        if transport != "streamable-http":
+            raise UserFacingError(f"unsupported MCP transport: {transport}")
+        host, port, path = _validate_streamable_http(
+            host=host,
+            port=port,
+            path=path,
+        )
+        server.run(
+            transport="streamable-http",
+            host=host,
+            port=port,
+            streamable_http_path=path,
+            json_response=True,
+            stateless_http=True,
+        )
     finally:
         surface = getattr(server, "_hashmarks_surface", None)
         if surface is not None:
             surface.close()
 
 
+def run_stdio(
+    workspace: str | Path = ".", *, state_dir: str | Path | None = None
+) -> None:
+    run_server(workspace, state_dir=state_dir, transport="stdio")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="hashmarks mcp",
-        description="Serve one Hashmarks workspace over local MCP stdio",
+        description=(
+            "Serve one Hashmarks workspace over local MCP stdio or loopback "
+            "Streamable HTTP"
+        ),
     )
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--state-dir", default=None)
+    add_transport_arguments(parser)
     args = parser.parse_args(argv)
     workspace = canonical_host_path(args.workspace)
     state_dir = None if args.state_dir is None else canonical_host_path(args.state_dir)
     try:
-        run_stdio(workspace, state_dir=state_dir)
+        run_server(
+            workspace,
+            state_dir=state_dir,
+            transport=args.transport,
+            host=args.host,
+            port=args.port,
+            path=args.path,
+        )
     except (UserFacingError, McpSurfaceError) as exc:
         raise SystemExit(str(exc)) from exc
     return 0
