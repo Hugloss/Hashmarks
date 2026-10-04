@@ -1,6 +1,6 @@
 # Hashmarks MCP server for coding agents
 
-Hashmarks exposes an optional **local, read-only stdio Model Context Protocol (MCP) server** for coding agents and developer tools, including Claude Code, Codex, OpenCode, and Pi through an MCP adapter. It gives MCP clients bounded codebase search, repository context, ownership and verification evidence, and change impact analysis from the same local repository-intelligence layer. MCP is only a transport adapter over existing Hashmarks repository intelligence; it does not add planning, editing, shell execution, git ownership, retries, model routing, or workflow orchestration.
+Hashmarks exposes an optional **local, read-only Model Context Protocol (MCP) server** over stdio or loopback Streamable HTTP for coding agents and developer tools, including Claude Code, Codex, OpenCode, Pi through an MCP adapter, and remote MCP consumers reached through an external secure tunnel. It gives MCP clients bounded codebase search, repository context, ownership and verification evidence, and change impact analysis from the same local repository-intelligence layer. MCP is only a transport adapter over existing Hashmarks repository intelligence; it does not add planning, editing, shell execution, git ownership, retries, model routing, or workflow orchestration.
 
 ## Install
 
@@ -35,11 +35,27 @@ A `shadowed` result is diagnostic, not a request for Hashmarks to rewrite the pr
 
 ## Run
 
-From a repository:
+From a repository, local subprocess hosts keep using stdio:
 
 ```bash
 hashmarks --workspace . mcp
 ```
+
+For a remote MCP consumer reached through a local/private tunnel, serve the **same** MCP surface over loopback Streamable HTTP:
+
+```bash
+hashmarks --workspace . mcp \
+  --transport streamable-http \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --path /mcp
+```
+
+The endpoint is then `http://127.0.0.1:8000/mcp`. Hashmarks deliberately rejects non-loopback HTTP binds. Public exposure, TLS, OAuth, mTLS, reverse-proxy policy, and tunnel lifecycle remain external authorities rather than becoming a second Hashmarks security/deployment system.
+
+ChatGPT does not connect directly to a local MCP server. For ChatGPT developer-mode testing, keep Hashmarks bound to loopback and place OpenAI Secure MCP Tunnel (or another organization-approved authenticated remote boundary) in front of that endpoint. The tunnel is transport infrastructure only; Hashmarks still owns exactly one canonical workspace and the same read-only tool catalog/instructions.
+
+The Streamable HTTP server uses stateless MCP requests with JSON responses. Hashmarks does not use MCP sampling, elicitation, or other client back-channel operations, so this changes transport only, not repository-intelligence semantics or workflow ownership.
 
 One server process binds one canonical workspace. Start another process for another repository. The first repository-intelligence tool call may build or reconcile the CodeMap; MCP discovery itself does not pre-index the repository.
 
@@ -215,4 +231,4 @@ MCP must not add tools for:
 - agent prompts/workflows;
 - remote repository tenancy.
 
-Those responsibilities remain with the external consumer. Local stdio is the only supported Hashmarks MCP transport in the initial contract; remote HTTP is a separate future product decision.
+Those responsibilities remain with the external consumer. Hashmarks supports local stdio and **loopback-only Streamable HTTP** over the same MCP surface. Direct public HTTP serving, authentication, TLS termination, remote repository tenancy, and tunnel management remain separate external product/deployment decisions.
