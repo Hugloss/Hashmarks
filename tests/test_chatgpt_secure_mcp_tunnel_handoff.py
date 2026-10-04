@@ -8,6 +8,12 @@ from unittest import mock
 
 import pytest
 
+from hashmarks.mcp_contract import (
+    MCP_READ_ONLY_ANNOTATIONS,
+    MCP_SERVER_INSTRUCTIONS,
+    MCP_SERVER_NAME,
+    MCP_TOOL_CONTRACTS,
+)
 from scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff import (
     EXPECTED_TOOLS,
     HostGateError,
@@ -23,35 +29,24 @@ _MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
 
 def _observation() -> dict[str, object]:
-    annotations = {
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False,
-    }
     return {
         "protocol_version": "2026-07-28",
         "server": {
-            "name": "Hashmarks",
+            "name": MCP_SERVER_NAME,
             "version": "0.26.1",
-            "instructions": (
-                "For unknown behavior call task_evidence before exploratory search. "
-                "It separates supporting retrieval from ownership authority. "
-                "Read a unique known path directly."
-            ),
+            "instructions": MCP_SERVER_INSTRUCTIONS,
         },
         "tools": [
             {
-                "name": name,
-                "description": f"{name} description",
-                "input_schema": {"type": "object"},
+                "name": contract.name,
+                "description": contract.description,
+                "input_schema": {"type": "object", "properties": {}},
                 "output_schema": {"type": "object"},
-                "annotations": annotations,
+                "annotations": dict(MCP_READ_ONLY_ANNOTATIONS),
             }
-            for name in EXPECTED_TOOLS
+            for contract in MCP_TOOL_CONTRACTS
         ],
     }
-
 
 def test_handoff_command_is_exact_workspace_bound_stdio(tmp_path: Path) -> None:
     executable = tmp_path / "bin" / "hashmarks"
@@ -114,6 +109,9 @@ def test_handoff_receipt_preserves_external_tunnel_authority(tmp_path: Path) -> 
     assert receipt["hashmarks"]["executable_sha256"] == "a" * 64
     assert receipt["source"]["repository_content_identity"].startswith("sha256:")
     assert receipt["mcp"]["tools"][0]["name"] == "repository_context"
+    assert receipt["mcp_contract"]["schema"] == "hashmarks.mcp-contract.v1"
+    assert receipt["mcp_contract"]["contract_identity"].startswith("sha256:")
+    assert receipt["mcp_contract"]["tools"] == list(EXPECTED_TOOLS)
 
 
 def test_handoff_rejects_cli_mcp_version_split_brain(tmp_path: Path) -> None:
@@ -230,6 +228,10 @@ def test_handoff_rejects_implementation_generation_change(
                 {"readOnlyHint": False}
             ),
             "annotations are not read-only",
+        ),
+        (
+            lambda value: value["tools"][0].update({"description": "drifted"}),
+            "tool description differs",
         ),
     ],
 )
