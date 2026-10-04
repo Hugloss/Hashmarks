@@ -62,7 +62,11 @@ The tools are read-only from the repository consumer's perspective. Hashmarks ma
 
 Tool selection is intentionally phase-specific rather than interchangeable: use `repository_context` for initial orientation, `find` when the exact path/symbol/name is already known, `task_evidence` when a task or behavior needs owner and next-read localization (including read-only work), and `change_impact` after explicit changed paths exist. These descriptions are exposed through the native MCP catalog so hosts can choose the existing semantic owner without a Hashmarks-owned planner or workflow layer.
 
+The MCP initialization also exposes concise server instructions for hosts that support them. For repository-localization work where the exact owner/path/symbol is not yet known, those instructions tell the coding agent to prefer one bounded `task_evidence` call before broad grep/glob or exploratory reads, then use native reads against the returned evidence. This is routing guidance rather than workflow ownership: it does not force a call when the target is already known, and it does not replace editing, shell, test, or git tools.
+
 `task_evidence` uses `hashmarks.task-evidence.v2`. Retrieval order is relevance evidence only and carries no ownership authority. Ownership resolution, ambiguity, verification, and freshness are separate fields; current freshness never implies a uniquely resolved owner. The consumer remains responsible for deciding whether and how to act on the evidence.
+
+For natural-language localization, the bounded retrieval list can include up to two current, visible symbol supplements after canonical hits. Each supplement has the normal search-hit shape plus `retrieval_supplement` and `score_basis`; its match-count score is not comparable with canonical relevance scores. The result limit remains strict, and `canonical_omitted_results` counts canonical hits displaced by supplements. These rows do not change ownership or verification selection.
 
 `correlate_evidence` accepts structured evidence bundles, not raw log streams. Producer-specific parsing/ingestion remains outside the MCP adapter. The tool preserves external claims, ambiguity, completeness, source equivalence, and repository deltas; interpretation and action remain consumer-owned. See [Evidence correlation](../reference/EVIDENCE_CORRELATION.md).
 

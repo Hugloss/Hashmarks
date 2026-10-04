@@ -15,6 +15,18 @@ _INSTALL_HINT = (
     'Hashmarks MCP support requires the optional extra: pip install "hashmarks[mcp]"'
 )
 
+_SERVER_INSTRUCTIONS = (
+    "Hashmarks is read-only repository intelligence. For a task describing behavior "
+    "without a unique known implementation path, call task_evidence before the first "
+    "exploratory grep, glob, or read. This includes read-only questions asking which "
+    "function implements a behavior. Use its bounded candidates, ambiguity, freshness, "
+    "and next-read evidence to choose targeted native reads; retrieval ranking is "
+    "evidence, not ownership authority. Read a unique known path directly. For a known "
+    "exact symbol whose path is unknown, use find. "
+    "After explicit changed paths exist, use change_impact or post_change when relevant. "
+    "Hashmarks does not replace editing, shell, tests, or git."
+)
+
 _T = TypeVar("_T")
 
 
@@ -76,7 +88,11 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     surface = HashmarksMcpSurface(
         str(workspace), state_dir=None if state_dir is None else str(state_dir)
     )
-    server = MCPServer("Hashmarks")
+    server = MCPServer(
+        "Hashmarks",
+        description="Read-only repository intelligence for coding agents",
+        instructions=_SERVER_INSTRUCTIONS,
+    )
     annotations = ToolAnnotations(
         read_only_hint=True,
         destructive_hint=False,
@@ -99,9 +115,8 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="find",
         description=(
-            "Use for a bounded path or symbol lookup when the target is already known. "
-            "For broader coding-task ownership, edit, verification, or next-read evidence, "
-            "use task_evidence instead."
+            "Look up a known exact path or symbol. If the task only describes behavior "
+            "and its implementation path is unknown, call task_evidence first."
         ),
         annotations=annotations,
     )
@@ -111,9 +126,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="task_evidence",
         description=(
-            "Use for a repository task or behavior when its exact owner, path, or symbol "
-            "is not yet known, including read-only localization. Returns bounded "
-            "candidates, ambiguity, verification, freshness, and next-read evidence."
+            "First discovery tool for a behavior description with unknown implementation "
+            "path. Call before exploratory grep, glob, or read, including read-only "
+            "'which function?' tasks. Returns bounded candidates and next reads."
         ),
         annotations=annotations,
     )

@@ -57,14 +57,13 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
                 "next-read evidence, use task_evidence instead."
             ),
             "find": (
-                "Use for a bounded path or symbol lookup when the target is already known. "
-                "For broader coding-task ownership, edit, verification, or next-read evidence, "
-                "use task_evidence instead."
+                "Look up a known exact path or symbol. If the task only describes behavior "
+                "and its implementation path is unknown, call task_evidence first."
             ),
             "task_evidence": (
-                "Use for a repository task or behavior when its exact owner, path, or symbol "
-                "is not yet known, including read-only localization. Returns bounded "
-                "candidates, ambiguity, verification, freshness, and next-read evidence."
+                "First discovery tool for a behavior description with unknown implementation "
+                "path. Call before exploratory grep, glob, or read, including read-only "
+                "'which function?' tasks. Returns bounded candidates and next reads."
             ),
             "change_impact": (
                 "Use after explicit changed paths exist for bounded structural impact and "
@@ -128,6 +127,9 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
             async with ClientSession(read, write) as session:
                 initialized = await session.initialize()
                 assert initialized.server_info.name == "Hashmarks"
+                assert initialized.instructions is not None
+                assert "call task_evidence before the first" in initialized.instructions
+                assert "exploratory grep, glob, or read" in initialized.instructions
 
                 prompts = await session.list_prompts()
                 resources = await session.list_resources()

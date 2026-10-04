@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
@@ -295,3 +297,270 @@ def test_task_evidence_projects_same_authority_proof_across_bounds(
     assert wide["ownership"]["owner"]["path"] == "src/owner.py"
     assert narrow["ownership"]["proof_scope_complete"] is True
     assert wide["ownership"]["proof_scope_complete"] is True
+
+
+def test_task_evidence_preserves_dense_natural_language_owner_candidates(
+    tmp_path: Path,
+) -> None:
+    cases = (
+        (
+            "prefix",
+            (
+                "Without editing files, identify the single function that enumerates "
+                "indexed repository paths underneath a requested prefix."
+            ),
+            "hashmarks/codemap/repository_index_store.py",
+            "paths_under",
+            (
+                "class WorkspaceMapStore:\n"
+                "    def paths_under(self, prefix: str) -> list[str]:\n"
+                "        return [path for path in self.paths if path.startswith(prefix)]\n"
+            ),
+            (
+                "def enumerate_indexed_repository_paths_{index}():\n"
+                "    # indexed repository paths requested by repository callers\n"
+                "    return []\n"
+            ),
+        ),
+        (
+            "prune",
+            (
+                "Without editing files, identify the function that prunes directory "
+                "names before repository file discovery descends into them."
+            ),
+            "hashmarks/codemap/repository_file_discovery.py",
+            "_prune_discovery_dirs",
+            (
+                "def _prune_discovery_dirs(names: list[str]) -> None:\n"
+                "    names[:] = [name for name in names if not name.startswith('.')]\n"
+            ),
+            (
+                "def repository_file_discovery_{index}(names):\n"
+                "    # directory names repository file discovery descends here\n"
+                "    return names\n"
+            ),
+        ),
+        (
+            "identity",
+            (
+                "Without editing files, identify the function used by the test-selection "
+                "work-selection envelope and its repository-binding validation to compute "
+                "the extraction-stable repository content identity from repository bytes."
+            ),
+            "hashmarks/test_shards.py",
+            "repository_content_identity",
+            (
+                "def repository_content_identity(root):\n"
+                "    return 'content-bytes'\n\n"
+                "def work_selection_envelope(root):\n"
+                "    return {'repository': repository_content_identity(root)}\n\n"
+                "def validate_work_selection_repository_binding(root, expected):\n"
+                "    return repository_content_identity(root) == expected\n"
+            ),
+            (
+                "def repository_identity_{index}(value):\n"
+                "    # repository content identity bytes validation\n"
+                "    return value\n"
+            ),
+        ),
+    )
+
+    for (
+        case_id,
+        task,
+        expected_path,
+        expected_symbol,
+        owner_source,
+        decoy_source,
+    ) in cases:
+        root = tmp_path / case_id
+        root.mkdir()
+        _write(root, expected_path, owner_source)
+        for index in range(32):
+            _write(
+                root,
+                f"hashmarks/codemap/decoy_{index:02d}.py",
+                decoy_source.format(index=index),
+            )
+
+        with CodeMap(root) as codemap:
+            codemap.sync()
+            for query in (
+                task,
+                task + " Return exactly one JSON object with keys path and symbol, "
+                "and nothing else.",
+            ):
+                packet = codemap.task_evidence(query, limit=20, token_budget=256)
+                retrieval = packet["retrieval"]["results"]
+                assert any(
+                    row["path"] == expected_path
+                    and (
+                        row.get("name") == expected_symbol
+                        or str(row.get("qualname") or "").rsplit(".", 1)[-1]
+                        == expected_symbol
+                    )
+                    for row in retrieval
+                ), (case_id, query)
+                assert packet["retrieval"]["ownership_authority"] is False
+
+
+def test_task_evidence_natural_supplements_respect_deny_visibility(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "hidden/engine.py",
+        "def cobalt_owner() -> str:\n    return 'implementation-secret'\n",
+    )
+    _write(
+        tmp_path,
+        "src/route.py",
+        "from hidden.engine import cobalt_owner\n\n"
+        "def cobalt_route() -> str:\n    return cobalt_owner()\n",
+    )
+    _write(
+        tmp_path,
+        "tests/test_route.py",
+        "from src.route import cobalt_route\n\n"
+        "def test_cobalt_route():\n    assert cobalt_route() == 'new'\n",
+    )
+    _write(
+        tmp_path,
+        ".hashmarks-context.toml",
+        '[[rule]]\npattern = "hidden/**"\nvisibility = "deny"\n',
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence(
+            "Change cobalt route behavior and verify it",
+            limit=20,
+            token_budget=256,
+        )
+
+    retrieval = packet["retrieval"]["results"]
+    assert all(row.get("path") != "hidden/engine.py" for row in retrieval)
+    assert all(row.get("qualname") != "cobalt_owner" for row in retrieval)
+
+
+def _dense_prefix_repository(root: Path) -> tuple[Path, str]:
+    owner = root / "hashmarks/codemap/repository_index_store.py"
+    _write(
+        root,
+        "hashmarks/codemap/repository_index_store.py",
+        "class WorkspaceMapStore:\n"
+        "    def paths_under(self, prefix: str) -> list[str]:\n"
+        "        return [path for path in self.paths if path.startswith(prefix)]\n",
+    )
+    for index in range(32):
+        _write(
+            root,
+            f"hashmarks/codemap/decoy_{index:02d}.py",
+            f"def enumerate_indexed_repository_paths_{index}():\n"
+            "    # indexed repository paths requested by repository callers\n"
+            "    return []\n",
+        )
+    task = (
+        "Without editing files, identify the single function that enumerates "
+        "indexed repository paths underneath a requested prefix."
+    )
+    return owner, task
+
+
+def test_task_evidence_supplements_account_for_displaced_canonical_hits(
+    tmp_path: Path,
+) -> None:
+    owner, task = _dense_prefix_repository(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20)
+        packet = codemap.task_evidence(task, limit=20, token_budget=256)
+        tight = codemap.task_evidence(task, limit=9, token_budget=256)
+        delta = codemap.task_post_change_delta(
+            task, [owner.relative_to(tmp_path)], previous_evidence=packet
+        )
+
+    retrieval = packet["retrieval"]
+    results = retrieval["results"]
+    supplements = [row for row in results if row.get("retrieval_supplement")]
+    assert 1 <= len(supplements) <= 2
+    assert len(results) <= 20
+    canonical_prefix = results[: -len(supplements)]
+    assert canonical_prefix == action["canonical"][: len(canonical_prefix)]
+    assert retrieval["canonical_omitted_results"] == len(action["canonical"]) - len(
+        canonical_prefix
+    )
+    assert retrieval["canonical_omitted_results"] > 0
+    assert retrieval["supplemental_results"] == len(supplements)
+    assert retrieval["supplemental_authority"] is False
+    assert retrieval["ordering"] == "canonical-then-bounded-natural-language"
+    assert any(row["name"] == "paths_under" for row in supplements)
+    assert all(set(action["canonical"][0]).issubset(row) for row in supplements)
+    assert all(
+        row["score_basis"] == "natural-identifier-phrase-relevance"
+        for row in supplements
+    )
+    assert all(
+        isinstance(row["score"], float) and row["score"] > 0 for row in supplements
+    )
+    assert all(row["evidence_visibility"] == "source" for row in supplements)
+    assert all("start_line" not in row and "end_line" not in row for row in supplements)
+    assert all(
+        not row.get("retrieval_supplement") for row in tight["retrieval"]["results"]
+    )
+    assert "canonical_omitted_results" not in tight["retrieval"]
+    assert packet["ownership"]["candidate"]["path"] == action["edit"]["path"]
+    assert delta["schema"] == "hashmarks.task-post-change-delta.v2"
+
+
+@pytest.mark.parametrize("mutation", ("rewrite", "delete"))
+def test_task_evidence_supplement_excludes_unsignaled_stale_symbol(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    owner, task = _dense_prefix_repository(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.task_evidence(task, limit=20, token_budget=256)
+        assert any(
+            row.get("retrieval_supplement") and row.get("name") == "paths_under"
+            for row in before["retrieval"]["results"]
+        )
+        if mutation == "rewrite":
+            owner.write_text(
+                "class WorkspaceMapStore:\n"
+                "    def unrelated(self):\n"
+                "        return 0\n",
+                encoding="utf-8",
+            )
+        else:
+            owner.unlink()
+        after = codemap.task_evidence(task, limit=20, token_budget=256)
+
+    assert all(
+        row.get("name") != "paths_under" for row in after["retrieval"]["results"]
+    )
+
+
+def test_task_evidence_supplement_preserves_outline_visibility(
+    tmp_path: Path,
+) -> None:
+    owner, task = _dense_prefix_repository(tmp_path)
+    _write(
+        tmp_path,
+        ".hashmarks-context.toml",
+        '[[rule]]\npattern = "hashmarks/codemap/repository_index_store.py"\n'
+        'visibility = "outline"\n',
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence(task, limit=20, token_budget=256)
+
+    supplements = [
+        row
+        for row in packet["retrieval"]["results"]
+        if row.get("retrieval_supplement")
+        and row["path"] == owner.relative_to(tmp_path).as_posix()
+    ]
+    assert supplements
+    assert all(row["evidence_visibility"] == "outline" for row in supplements)
