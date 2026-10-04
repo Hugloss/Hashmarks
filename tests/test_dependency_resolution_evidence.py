@@ -1301,7 +1301,11 @@ def test_v3_dependency_query_refuses_unknown_request_field(
             "context",
         ),
         (
-            {"operation": "module-owners", "module": "library", "component_id": "library"},
+            {
+                "operation": "module-owners",
+                "module": "library",
+                "component_id": "library",
+            },
             "module-owners",
             "component_id",
         ),
@@ -1340,30 +1344,57 @@ def test_v3_dependency_query_rejects_operation_irrelevant_fields(
 
 
 @pytest.mark.parametrize(
-    ("field", "value"),
+    ("request", "field"),
     [
-        ("operation", True),
-        ("node_id", 7),
-        ("target_id", False),
-        ("component_id", ["library"]),
-        ("context", 1),
-        ("module", {"name": "library"}),
+        ({"operation": True}, "operation"),
+        (
+            {
+                "operation": "dependencies",
+                "node_id": 7,
+                "context": "compile",
+            },
+            "node_id",
+        ),
+        (
+            {
+                "operation": "reachability",
+                "node_id": "app@1",
+                "target_id": False,
+                "context": "compile",
+            },
+            "target_id",
+        ),
+        (
+            {
+                "operation": "component",
+                "component_id": ["library"],
+            },
+            "component_id",
+        ),
+        (
+            {
+                "operation": "dependencies",
+                "node_id": "app@1",
+                "context": 1,
+            },
+            "context",
+        ),
+        (
+            {
+                "operation": "module-owners",
+                "module": {"name": "library"},
+            },
+            "module",
+        ),
     ],
 )
 def test_v3_dependency_query_rejects_non_string_identifiers(
-    tmp_path: Path, field: str, value: object
+    tmp_path: Path, request: dict[str, object], field: str
 ) -> None:
-    request: dict[str, object] = {
-        "operation": "dependencies",
-        "node_id": "app@1",
-        "context": "compile",
-    }
-    request[field] = value
-
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
-        with pytest.raises(ValueError, match="must be a string"):
+        with pytest.raises(ValueError, match=f"{field} must be a string"):
             codemap.dependency_resolution_queries(observation, [request])
 
 
