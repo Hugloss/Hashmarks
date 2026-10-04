@@ -979,14 +979,20 @@ def _run_phase_one(
         },
     )
     context = _tool_payload(
-        tools["hashmarks_repository_context"], SELECTION_RESPONSE_SCHEMAS["hashmarks_repository_context"]
+        tools["hashmarks_repository_context"],
+        SELECTION_RESPONSE_SCHEMAS["hashmarks_repository_context"],
     )
-    find = _tool_payload(tools["hashmarks_find"], SELECTION_RESPONSE_SCHEMAS["hashmarks_find"])
+    find = _tool_payload(
+        tools["hashmarks_find"],
+        SELECTION_RESPONSE_SCHEMAS["hashmarks_find"],
+    )
     evidence = _tool_payload(
-        tools["hashmarks_task_evidence"], SELECTION_RESPONSE_SCHEMAS["hashmarks_task_evidence"]
+        tools["hashmarks_task_evidence"],
+        SELECTION_RESPONSE_SCHEMAS["hashmarks_task_evidence"],
     )
     impact = _tool_payload(
-        tools["hashmarks_change_impact"], SELECTION_RESPONSE_SCHEMAS["hashmarks_change_impact"]
+        tools["hashmarks_change_impact"],
+        SELECTION_RESPONSE_SCHEMAS["hashmarks_change_impact"],
     )
     found_paths = {
         str(row.get("path")) for row in find.get("results", []) if isinstance(row, dict)
@@ -1044,10 +1050,12 @@ def _run_phase_two(
         events, {"hashmarks_post_change", "hashmarks_repository_context"}
     )
     post = _tool_payload(
-        tools["hashmarks_post_change"], SELECTION_RESPONSE_SCHEMAS["hashmarks_post_change"]
+        tools["hashmarks_post_change"],
+        SELECTION_RESPONSE_SCHEMAS["hashmarks_post_change"],
     )
     context = _tool_payload(
-        tools["hashmarks_repository_context"], SELECTION_RESPONSE_SCHEMAS["hashmarks_repository_context"]
+        tools["hashmarks_repository_context"],
+        SELECTION_RESPONSE_SCHEMAS["hashmarks_repository_context"],
     )
     generation = context.get("generation")
     if post.get("status") != "changed":
