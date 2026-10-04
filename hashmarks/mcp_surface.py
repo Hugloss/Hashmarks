@@ -186,7 +186,7 @@ class HashmarksMcpSurface:
         query = _bounded_text(query, name="query", maximum=_MAX_QUERY_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
 
-        def project() -> tuple[object, object, int, int, bool | None]:
+        def project() -> tuple[Any, Any, int, int, bool | None]:
             evidence = self._map._find_evidence(query, limit=limit + 1)
             route = self._map.query_route(query)
             generation, identity_generation, stale = self._map._generation_status()
@@ -215,16 +215,34 @@ class HashmarksMcpSurface:
         if freshness != "current":
             admissibility_reasons.append(f"repository-freshness-{freshness}")
 
+        exact_targets: set[tuple[object, ...]] = set()
+        if route.intent.value == "identifier":
+            for hit in hits:
+                if query in {hit.name, hit.qualname}:
+                    exact_targets.add(
+                        (hit.path, hit.qualname or hit.name, hit.start_line)
+                    )
+        elif route.intent.value == "path":
+            normalized_query = query[2:] if query.startswith("./") else query
+            for hit in hits:
+                if hit.path == normalized_query or (
+                    "/" not in normalized_query
+                    and hit.path.rsplit("/", 1)[-1] == normalized_query
+                ):
+                    exact_targets.add((hit.path,))
+
         negative_evidence = "not-applicable"
-        if not visible:
+        if exact_query and not exact_targets:
             negative_evidence = (
                 "admissible-within-declared-scope"
                 if claims_admissible
                 else "not-admissible"
             )
+        elif not exact_query and not visible:
+            negative_evidence = "not-admissible"
 
         uniqueness_evidence = "not-applicable"
-        if len(visible) == 1:
+        if len(exact_targets) == 1:
             uniqueness_evidence = (
                 "admissible-within-declared-scope"
                 if claims_admissible and not transport_truncated
@@ -242,6 +260,7 @@ class HashmarksMcpSurface:
             "freshness": freshness,
             "scope": "admitted-visible-repository",
             "completeness": "complete" if search_complete else "incomplete",
+            "exact_match_count": len(exact_targets),
             "negative_evidence": negative_evidence,
             "uniqueness_evidence": uniqueness_evidence,
             "omissions": omissions,
