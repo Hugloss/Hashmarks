@@ -28,6 +28,7 @@ PI_HOST_RECEIPT ?= dist/pi-mcp-host-gate.json
 MCP_STRESS_RECEIPT ?= dist/mcp-concurrency-stress.json
 CHATGPT_MCP_HASHMARKS ?= $(abspath .venv/bin/hashmarks)
 CHATGPT_MCP_WORKSPACE ?= $(CURDIR)
+CHATGPT_MCP_SOURCE_ROOT ?= $(CURDIR)
 CHATGPT_MCP_HANDOFF_RECEIPT ?= dist/chatgpt-secure-mcp-tunnel-handoff.json
 DIAGNOSTIC_PYTHON ?= python3
 DIAGNOSTIC_SHARDS ?= 64
@@ -489,7 +490,7 @@ mcp-chatgpt-handoff:
 	@$(UV_RUN) --offline --no-sync python scripts/host_qualification/chatgpt_secure_mcp_tunnel_handoff.py \
 	  --hashmarks "$(CHATGPT_MCP_HASHMARKS)" \
 	  --workspace "$(CHATGPT_MCP_WORKSPACE)" \
-	  --source-root "$(CURDIR)" \
+	  $(if $(strip $(CHATGPT_MCP_SOURCE_ROOT)),--source-root "$(CHATGPT_MCP_SOURCE_ROOT)",) \
 	  --output "$(CHATGPT_MCP_HANDOFF_RECEIPT)"
 
 release-prepare:
