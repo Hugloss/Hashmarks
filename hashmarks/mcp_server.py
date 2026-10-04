@@ -136,13 +136,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="task_evidence",
         description=(
-            "Primary semantic discovery tool when a task describes behavior but the exact "
-            "implementation path is not already known. Prefer this before exploratory "
-            "grep/glob/read: one bounded call separates supporting retrieval from ownership "
-            "authority, resolves a unique owner when admissible or preserves ambiguity, "
-            "returns source evidence or an exact next-read, selects verification evidence/"
-            "plan, and reports freshness. Native read is for the targeted path/range after "
-            "this reduction, not for reconstructing ownership by repeated exploration."
+            "Semantic first choice for behavior localization when the path is unknown. "
+            "Prefer before exploratory grep/read: separates retrieval from ownership, "
+            "resolves owner/ambiguity, and returns source/next-read, verification, freshness."
         ),
         annotations=annotations,
     )
