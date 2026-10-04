@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -338,11 +339,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--workspace", default=".")
     args = parser.parse_args(argv)
-    print(
+    sys.stdout.write(
         json.dumps(
             asyncio.run(_current_contract_summary(args.workspace)),
             sort_keys=True,
         )
+        + "\n"
     )
     return 0
 
