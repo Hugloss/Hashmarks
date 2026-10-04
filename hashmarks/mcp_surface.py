@@ -185,13 +185,67 @@ class HashmarksMcpSurface:
     def find(self, query: str, *, limit: int = 20) -> dict[str, object]:
         query = _bounded_text(query, name="query", maximum=_MAX_QUERY_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
-        hits = self._read(lambda: self._map.find(query, limit=limit + 1))
+
+        def project() -> tuple[object, object, int, int, bool | None]:
+            evidence = self._map._find_evidence(query, limit=limit + 1)
+            route = self._map.query_route(query)
+            generation, identity_generation, stale = self._map._generation_status()
+            return evidence, route, generation, identity_generation, stale
+
+        evidence, route, generation, identity_generation, stale = self._read(project)
+        hits = evidence.hits
         visible = hits[:limit]
+        transport_truncated = len(hits) > limit
+        omissions = list(evidence.bound_reasons)
+        if transport_truncated:
+            omissions.append("mcp-result-limit")
+        omissions = sorted(set(omissions))
+
+        freshness = (
+            "stale" if stale is True else "current" if stale is False else "unknown"
+        )
+        exact_query = route.intent.value in {"identifier", "path"}
+        search_complete = exact_query and not omissions
+        claims_admissible = search_complete and freshness == "current"
+        admissibility_reasons: list[str] = []
+        if not exact_query:
+            admissibility_reasons.append("query-intent-not-exact")
+        if omissions:
+            admissibility_reasons.append("bounded-search-omission")
+        if freshness != "current":
+            admissibility_reasons.append(f"repository-freshness-{freshness}")
+
+        negative_evidence = "not-applicable"
+        if not visible:
+            negative_evidence = (
+                "admissible-within-declared-scope"
+                if claims_admissible
+                else "not-admissible"
+            )
+
+        uniqueness_evidence = "not-applicable"
+        if len(visible) == 1:
+            uniqueness_evidence = (
+                "admissible-within-declared-scope"
+                if claims_admissible and not transport_truncated
+                else "not-admissible"
+            )
+
         return {
             "schema": "hashmarks.mcp-find.v1",
             "query": query,
+            "query_intent": route.intent.value,
             "results": [hit.as_dict() for hit in visible],
-            "truncated": len(hits) > limit,
+            "truncated": transport_truncated,
+            "generation": generation,
+            "identity_generation": identity_generation,
+            "freshness": freshness,
+            "scope": "admitted-visible-repository",
+            "completeness": "complete" if search_complete else "incomplete",
+            "negative_evidence": negative_evidence,
+            "uniqueness_evidence": uniqueness_evidence,
+            "omissions": omissions,
+            "admissibility_reasons": admissibility_reasons,
         }
 
     def task_evidence(
