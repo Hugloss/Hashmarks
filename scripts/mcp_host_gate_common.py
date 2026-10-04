@@ -130,6 +130,7 @@ def installed_mcp_contract(
         )
     return value
 
+
 def write_fixture(repo: Path) -> None:
     (repo / "src").mkdir(parents=True)
     (repo / "tests").mkdir()
