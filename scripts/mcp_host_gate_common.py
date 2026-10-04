@@ -104,28 +104,15 @@ def installed_mcp_contract(
     *,
     expected_version: str | None = None,
 ) -> dict[str, Any]:
-    code = """
-import asyncio
-import json
-import sys
-
-from hashmarks._version import __version__
-from hashmarks.mcp_contract import contract_from_tool_models, contract_summary
-from hashmarks.mcp_server import build_server
-
-server = build_server(sys.argv[1])
-
-async def observe():
-    tools = await server.list_tools()
-    return contract_summary(contract_from_tool_models(__version__, tools))
-
-try:
-    print(json.dumps(asyncio.run(observe()), sort_keys=True))
-finally:
-    server._hashmarks_surface.close()
-"""
     output = run(
-        [str(python), "-I", "-c", code, str(workspace)],
+        [
+            str(python),
+            "-I",
+            "-m",
+            "hashmarks.mcp_contract",
+            "--workspace",
+            str(workspace),
+        ],
         cwd=workspace,
     ).stdout
     try:
@@ -142,7 +129,6 @@ finally:
             f"package={expected_version!r} mcp={value.get('server_version')!r}"
         )
     return value
-
 
 def write_fixture(repo: Path) -> None:
     (repo / "src").mkdir(parents=True)
