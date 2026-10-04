@@ -200,8 +200,9 @@ def _validate_observation(observation: dict[str, Any]) -> None:
         raise HostGateError("MCP handoff did not initialize the Hashmarks server")
     instructions = server.get("instructions")
     if not isinstance(instructions, str) or (
-        "call task_evidence before the first" not in instructions
-        or "exploratory grep, glob, or read" not in instructions
+        "call task_evidence before exploratory" not in instructions
+        or "supporting retrieval from ownership authority" not in instructions
+        or "unique known path" not in instructions
     ):
         raise HostGateError(
             "Hashmarks MCP routing instructions are unavailable or stale"

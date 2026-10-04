@@ -54,18 +54,19 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         descriptions = {tool.name: tool.description or "" for tool in tools}
         selection_contract = {
             "repository_context": (
-                "Use only for initial repository orientation: freshness, languages, areas, "
-                "and topology. For a coding task needing ownership, edit, verification, or "
-                "next-read evidence, use task_evidence instead."
+                "Broad orientation only: freshness, languages, areas, and topology. "
+                "Do not use for behavior ownership; use task_evidence for owner, "
+                "source/next-read, or verification evidence."
             ),
             "find": (
-                "Look up a known exact path or symbol. If the task only describes behavior "
-                "and its implementation path is unknown, call task_evidence first."
+                "Exact lookup for a path or symbol you already know by name. Do not use as a "
+                "behavior-localization substitute: when the task describes behavior and the "
+                "implementation path is unknown, use task_evidence first."
             ),
             "task_evidence": (
-                "First discovery tool for a behavior description with unknown implementation "
-                "path. Call before exploratory grep, glob, or read, including read-only "
-                "'which function?' tasks. Returns bounded candidates and next reads."
+                "Semantic first choice for unknown-path behavior. Prefer before exploratory "
+                "grep/read: separates retrieval from ownership, resolves owner/ambiguity, "
+                "and returns source/next-read, verification, freshness."
             ),
             "change_impact": (
                 "Use after explicit changed paths exist for bounded structural impact and "
@@ -79,6 +80,17 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         assert {
             name: descriptions[name] for name in selection_contract
         } == selection_contract
+        task_description = descriptions["task_evidence"]
+        for phrase in (
+            "Semantic first choice",
+            "exploratory grep/read",
+            "retrieval from ownership",
+            "owner/ambiguity",
+            "source/next-read",
+            "verification",
+            "freshness",
+        ):
+            assert phrase in task_description
         schemas = {tool.name: tool.input_schema for tool in tools}
         assert schemas["task_evidence"]["required"] == ["task"]
         assert schemas["find"]["required"] == ["query"]
@@ -131,8 +143,20 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
                 assert initialized.server_info.name == "Hashmarks"
                 assert initialized.server_info.version == __version__
                 assert initialized.instructions is not None
-                assert "call task_evidence before the first" in initialized.instructions
-                assert "exploratory grep, glob, or read" in initialized.instructions
+                assert (
+                    "semantic repository-intelligence layer" in initialized.instructions
+                )
+                assert (
+                    "call task_evidence before exploratory" in initialized.instructions
+                )
+                assert (
+                    "supporting retrieval from ownership authority"
+                    in initialized.instructions
+                )
+                assert "preserve ambiguity" in initialized.instructions
+                assert "verification plan" in initialized.instructions
+                assert "report freshness" in initialized.instructions
+                assert "repeated native search/read calls" in initialized.instructions
 
                 prompts = await session.list_prompts()
                 resources = await session.list_resources()
