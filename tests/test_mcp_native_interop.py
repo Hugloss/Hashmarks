@@ -54,9 +54,16 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
             for name in MCP_TOOL_NAMES
         }
         manifest = contract_from_tool_models(__version__, tools)
+        identity = manifest["contract_identity"]
+        contract_tools = manifest["tools"]
+        assert isinstance(identity, str)
+        assert isinstance(contract_tools, list)
         assert manifest["schema"] == "hashmarks.mcp-contract.v1"
-        assert manifest["contract_identity"].startswith("sha256:")
-        assert [row["name"] for row in manifest["tools"]] == _EXPECTED_TOOLS
+        assert identity.startswith("sha256:")
+        assert all(isinstance(row, dict) for row in contract_tools)
+        assert [
+            row["name"] for row in contract_tools if isinstance(row, dict)
+        ] == _EXPECTED_TOOLS
         task_description = descriptions["task_evidence"]
         for phrase in (
             "Semantic first choice",
