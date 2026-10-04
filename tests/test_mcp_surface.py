@@ -219,7 +219,7 @@ def test_mcp_find_truncated_only_when_an_extra_hit_exists(tmp_path: Path) -> Non
         exact = surface.find("feature_two.py", limit=10)
         assert exact["truncated"] is False
         assert exact["query_intent"] == "path"
-        assert exact["exact_match_count"] == 1
+        assert exact["observed_exact_match_count"] == 1
     finally:
         surface.close()
 
@@ -240,7 +240,7 @@ def test_mcp_find_qualifies_absence_and_uniqueness_against_freshness(
 
         missing = surface.find("definitely_missing_symbol", limit=10)
         assert missing["query_intent"] == "identifier"
-        assert missing["exact_match_count"] == 0
+        assert missing["observed_exact_match_count"] == 0
         assert missing["freshness"] == "current"
         assert missing["completeness"] == "complete"
         assert (
@@ -250,7 +250,7 @@ def test_mcp_find_qualifies_absence_and_uniqueness_against_freshness(
 
         unique_path = surface.find("src/feature.py", limit=10)
         assert unique_path["query_intent"] == "path"
-        assert unique_path["exact_match_count"] == 1
+        assert unique_path["observed_exact_match_count"] == 1
         assert (
             unique_path["uniqueness_evidence"]
             == "admissible-within-declared-scope"
