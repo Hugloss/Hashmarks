@@ -136,9 +136,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="task_evidence",
         description=(
-            "Semantic first choice for behavior localization when the path is unknown. "
-            "Prefer before exploratory grep/read: separates retrieval from ownership, "
-            "resolves owner/ambiguity, and returns source/next-read, verification, freshness."
+            "Semantic first choice for unknown-path behavior. Prefer before exploratory "
+            "grep/read: separates retrieval from ownership, resolves owner/ambiguity, "
+            "and returns source/next-read, verification, freshness."
         ),
         annotations=annotations,
     )
