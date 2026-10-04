@@ -48,6 +48,7 @@ def _observation() -> dict[str, object]:
         ],
     }
 
+
 def test_handoff_command_is_exact_workspace_bound_stdio(tmp_path: Path) -> None:
     executable = tmp_path / "bin" / "hashmarks"
     workspace = tmp_path / "repo"
