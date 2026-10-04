@@ -74,6 +74,16 @@ def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
     }
 
 
+def test_mcp_contract_summary_rejects_tampered_manifest() -> None:
+    manifest = qualify_mcp_observation(_observation())
+    server = manifest["server"]
+    assert isinstance(server, dict)
+    server["version"] = "forged"
+
+    with pytest.raises(ValueError, match="contract identity mismatch"):
+        contract_summary(manifest)
+
+
 def test_mcp_contract_identity_binds_wire_schema_and_server_version() -> None:
     original = qualify_mcp_observation(_observation())
 
