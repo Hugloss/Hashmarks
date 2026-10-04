@@ -237,6 +237,39 @@ def test_mcp_native_streamable_http_initialize_catalog_and_call(tmp_path: Path) 
                             row["path"] == "src/feature.py"
                             for row in result.structured_content["results"]
                         )
+
+                        async def parallel_find(query: str) -> dict[str, object]:
+                            async with streamable_http_client(endpoint) as (
+                                sibling_read,
+                                sibling_write,
+                            ):
+                                async with ClientSession(
+                                    sibling_read,
+                                    sibling_write,
+                                ) as sibling:
+                                    await sibling.initialize()
+                                    response = await sibling.call_tool(
+                                        "find",
+                                        arguments={"query": query, "limit": 5},
+                                    )
+                                    assert response.is_error is not True
+                                    assert response.structured_content is not None
+                                    return response.structured_content
+
+                        first, second = await asyncio.gather(
+                            parallel_find("flare041"),
+                            parallel_find("feature"),
+                        )
+                        assert first["schema"] == "hashmarks.mcp-find.v1"
+                        assert second["schema"] == "hashmarks.mcp-find.v1"
+                        assert any(
+                            row["path"] == "src/feature.py"
+                            for row in first["results"]
+                        )
+                        assert any(
+                            row["path"] == "src/feature.py"
+                            for row in second["results"]
+                        )
                         return
             except Exception as exc:
                 if initialized_session:
