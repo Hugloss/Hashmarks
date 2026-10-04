@@ -106,7 +106,7 @@ For routing benchmarking, do not count a missing Hashmarks app as a tool-selecti
   --subject hashmarks
 ```
 
-Only a `READY` catalog can answer whether ChatGPT voluntarily chooses `task_evidence` before native repository search/read. `ENVIRONMENT_BLOCKED: required-subject-tool-missing` means the host integration is unavailable, not that Hashmarks lost the routing decision.
+Only a `READY` catalog can support a routing decision. For unknown-path semantic localization, healthy routing chooses `task_evidence` before exploratory native search/read; for an exact known-path inspection, healthy routing chooses native read directly. `ENVIRONMENT_BLOCKED: required-subject-tool-missing` means the host integration is unavailable, not that Hashmarks lost the routing decision.
 
 ## Tool surface
 
