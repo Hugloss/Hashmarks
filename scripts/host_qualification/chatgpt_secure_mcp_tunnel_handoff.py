@@ -22,6 +22,7 @@ from mcp_host_gate_common import (  # noqa: E402 - standalone script path setup
     completed_at,
     run,
     sha256,
+    venv_executable,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,44 @@ def _command_text(argv: list[str]) -> str:
     if os.name == "nt":
         return subprocess.list2cmdline(argv)
     return shlex.join(argv)
+
+
+def _source_binding(
+    executable: Path,
+    source_root: Path | None,
+    *,
+    workspace: Path,
+) -> dict[str, str] | None:
+    if source_root is None:
+        return None
+    python = venv_executable(executable.parent.parent, "python")
+    if not python.is_file():
+        raise HostGateError(
+            "source-root binding requires a Hashmarks virtual-environment executable "
+            "with an adjacent Python interpreter"
+        )
+    code = (
+        "from pathlib import Path; import hashmarks; "
+        "print(Path(hashmarks.__file__).resolve().parents[1])"
+    )
+    imported_root = Path(
+        run([str(python), "-I", "-c", code], cwd=workspace).stdout.strip()
+    ).resolve()
+    source_root = source_root.resolve()
+    if imported_root != source_root:
+        raise HostGateError(
+            "Hashmarks executable imports a different source root: "
+            f"expected {source_root}, got {imported_root}"
+        )
+    from hashmarks.test_shards import repository_content_identity
+
+    return {
+        "root": str(source_root),
+        "repository_content_identity": repository_content_identity(
+            source_root,
+            excluded_paths=(source_root / "dist",),
+        ),
+    }
 
 
 def _json_model(value: object | None) -> object | None:
@@ -155,6 +194,7 @@ def build_handoff(
     executable: Path,
     workspace: Path,
     state_dir: Path | None,
+    source: dict[str, str] | None,
     observation: dict[str, Any],
 ) -> dict[str, Any]:
     _validate_observation(observation)
@@ -162,6 +202,14 @@ def build_handoff(
     version = run([str(executable), "--version"], cwd=workspace).stdout.strip()
     if not version.startswith("hashmarks version "):
         raise HostGateError(f"unexpected Hashmarks version output: {version!r}")
+    expected_server_version = version.removeprefix("hashmarks version ")
+    server = observation.get("server")
+    server_version = server.get("version") if isinstance(server, dict) else None
+    if server_version != expected_server_version:
+        raise HostGateError(
+            "Hashmarks CLI/MCP version authority differs: "
+            f"cli={expected_server_version!r} mcp={server_version!r}"
+        )
     return {
         "schema": "hashmarks.chatgpt-secure-mcp-tunnel-handoff.v1",
         "status": "READY",
@@ -174,6 +222,7 @@ def build_handoff(
         },
         "workspace": str(workspace),
         "state_dir": None if state_dir is None else str(state_dir),
+        "source": source,
         "hashmarks": {
             "executable": str(executable),
             "executable_sha256": sha256(executable),
@@ -196,6 +245,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workspace", required=True)
     parser.add_argument("--state-dir")
     parser.add_argument(
+        "--source-root",
+        help=(
+            "optional clean/source-managed Hashmarks root to bind when the executable "
+            "is a virtual-environment console script"
+        ),
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=Path("dist/chatgpt-secure-mcp-tunnel-handoff.json"),
@@ -214,13 +270,26 @@ def main(argv: list[str] | None = None) -> int:
         if not state_dir.is_absolute():
             state_dir = workspace / state_dir
         state_dir = state_dir.resolve()
+    source_root = (
+        None
+        if args.source_root is None
+        else Path(args.source_root).expanduser().resolve()
+    )
+    if source_root is not None and not source_root.is_dir():
+        raise SystemExit(f"Hashmarks source root does not exist: {source_root}")
 
     try:
+        source = _source_binding(
+            executable,
+            source_root,
+            workspace=workspace,
+        )
         observation = asyncio.run(_observe_mcp(executable, workspace, state_dir))
         receipt = build_handoff(
             executable=executable,
             workspace=workspace,
             state_dir=state_dir,
+            source=source,
             observation=observation,
         )
     except HostGateError as exc:
