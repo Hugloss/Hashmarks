@@ -303,16 +303,24 @@ def contract_from_tool_models(
 def contract_summary(manifest: dict[str, object]) -> dict[str, object]:
     server = manifest.get("server")
     tools = manifest.get("tools")
+    identity = manifest.get("contract_identity")
     if (
         manifest.get("schema") != MCP_CONTRACT_SCHEMA
         or not isinstance(server, dict)
         or not isinstance(tools, list)
-        or not isinstance(manifest.get("contract_identity"), str)
+        or not isinstance(identity, str)
     ):
         raise ValueError("invalid Hashmarks MCP contract manifest")
+    identity_payload = {
+        key: value
+        for key, value in manifest.items()
+        if key != "contract_identity"
+    }
+    if identity != _contract_identity(identity_payload):
+        raise ValueError("Hashmarks MCP contract identity mismatch")
     return {
         "schema": MCP_CONTRACT_SCHEMA,
-        "contract_identity": manifest["contract_identity"],
+        "contract_identity": identity,
         "server_version": server.get("version"),
         "tools": [str(row.get("name")) for row in tools if isinstance(row, dict)],
     }
