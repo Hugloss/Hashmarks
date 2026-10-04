@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from hashmarks._command_output import log_command_output
+from hashmarks.mcp_contract import (
+    MCP_BASIC_HOST_QUALIFICATION_TOOLS,
+    qualification_response_schemas,
+)
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(SCRIPTS_DIR) not in sys.path:
@@ -21,6 +25,7 @@ from mcp_host_gate_common import (  # noqa: E402 - import follows standalone scr
     HostGateError,
     build_installed_wheel,
     completed_at,
+    installed_mcp_contract,
     parse_jsonl,
     run,
     sha256,
@@ -30,10 +35,10 @@ from mcp_host_gate_common import (  # noqa: E402 - import follows standalone scr
 
 logger = logging.getLogger(__name__)
 
-EXPECTED = {
-    "mcp__hashmarks__repository_context": "hashmarks.repository-capsule.v1",
-    "mcp__hashmarks__find": "hashmarks.mcp-find.v1",
-}
+EXPECTED = qualification_response_schemas(
+    MCP_BASIC_HOST_QUALIFICATION_TOOLS,
+    name_prefix="mcp__hashmarks__",
+)
 
 
 def _write_claude_config(repo: Path, hashmarks: Path) -> Path:
@@ -201,7 +206,7 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
 
     with tempfile.TemporaryDirectory(prefix="hashmarks-claude-host-gate-") as tmp_text:
         tmp = Path(tmp_text)
-        wheel, _python, hashmarks, versions = build_installed_wheel(
+        wheel, python, hashmarks, versions = build_installed_wheel(
             project_root=project_root,
             tmp=tmp,
             uv=args.uv,
@@ -210,6 +215,11 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
         repo = tmp / "repo"
         repo.mkdir()
         write_fixture(repo)
+        mcp_contract = installed_mcp_contract(
+            python,
+            repo,
+            expected_version=versions["hashmarks"],
+        )
         config_path = _write_claude_config(repo, hashmarks)
 
         argv = [
@@ -250,6 +260,7 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
             "model": args.model or "configured-default",
             "python_selector": args.python,
             "installed_versions": versions,
+            "mcp_contract": mcp_contract,
             "wheel": {"name": wheel.name, "sha256": sha256(wheel)},
             "qualified_registration": {
                 "path": str(config_path.relative_to(repo)),
