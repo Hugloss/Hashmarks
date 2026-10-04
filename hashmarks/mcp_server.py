@@ -17,15 +17,19 @@ _INSTALL_HINT = (
 )
 
 _SERVER_INSTRUCTIONS = (
-    "Hashmarks is read-only repository intelligence. For a task describing behavior "
-    "without a unique known implementation path, call task_evidence before the first "
-    "exploratory grep, glob, or read. This includes read-only questions asking which "
-    "function implements a behavior. Use its bounded candidates, ambiguity, freshness, "
-    "and next-read evidence to choose targeted native reads; retrieval ranking is "
-    "evidence, not ownership authority. Read a unique known path directly. For a known "
-    "exact symbol whose path is unknown, use find. "
-    "After explicit changed paths exist, use change_impact or post_change when relevant. "
-    "Hashmarks does not replace editing, shell, tests, or git."
+    "Hashmarks is the semantic repository-intelligence layer, not a text-search shortcut. "
+    "For a task asking where behavior is implemented, which file or function owns it, "
+    "what should be inspected next, or what verification is relevant when the exact "
+    "implementation path is not already known, call task_evidence before exploratory "
+    "grep, glob, or read. task_evidence can separate supporting retrieval from ownership "
+    "authority, resolve a unique owner when admissible, preserve ambiguity when it cannot, "
+    "return bounded source evidence or an exact next-read, select verification evidence "
+    "and a verification plan, and report freshness. Prefer that semantic reduction over "
+    "reconstructing ownership from repeated native search/read calls. Use native read for "
+    "a unique known path or for the targeted next-read returned by Hashmarks. For a known "
+    "exact symbol whose path is unknown, use find. After explicit changed paths exist, "
+    "use change_impact or post_change when relevant. Hashmarks does not replace editing, "
+    "shell, tests, or git."
 )
 
 _T = TypeVar("_T")
@@ -91,7 +95,10 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     )
     server = MCPServer(
         "Hashmarks",
-        description="Read-only repository intelligence for coding agents",
+        description=(
+            "Semantic read-only repository intelligence for behavior localization, "
+            "ownership, impact, freshness, and verification evidence"
+        ),
         instructions=_SERVER_INSTRUCTIONS,
         version=__version__,
     )
@@ -105,9 +112,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="repository_context",
         description=(
-            "Use only for initial repository orientation: freshness, languages, areas, "
-            "and topology. For a coding task needing ownership, edit, verification, or "
-            "next-read evidence, use task_evidence instead."
+            "Use only for broad repository orientation: freshness, languages, areas, and "
+            "topology. Do not use this to localize a behavior owner. For implementation "
+            "ownership, source/next-read, or verification evidence, use task_evidence."
         ),
         annotations=annotations,
     )
@@ -117,8 +124,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="find",
         description=(
-            "Look up a known exact path or symbol. If the task only describes behavior "
-            "and its implementation path is unknown, call task_evidence first."
+            "Exact lookup for a path or symbol you already know by name. Do not use as a "
+            "behavior-localization substitute: when the task describes behavior and the "
+            "implementation path is unknown, use task_evidence first."
         ),
         annotations=annotations,
     )
@@ -128,9 +136,13 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="task_evidence",
         description=(
-            "First discovery tool for a behavior description with unknown implementation "
-            "path. Call before exploratory grep, glob, or read, including read-only "
-            "'which function?' tasks. Returns bounded candidates and next reads."
+            "Primary semantic discovery tool when a task describes behavior but the exact "
+            "implementation path is not already known. Prefer this before exploratory "
+            "grep/glob/read: one bounded call separates supporting retrieval from ownership "
+            "authority, resolves a unique owner when admissible or preserves ambiguity, "
+            "returns source evidence or an exact next-read, selects verification evidence/"
+            "plan, and reports freshness. Native read is for the targeted path/range after "
+            "this reduction, not for reconstructing ownership by repeated exploration."
         ),
         annotations=annotations,
     )
