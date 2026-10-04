@@ -205,6 +205,10 @@ class HashmarksMcpSurface:
             "stale" if stale is True else "current" if stale is False else "unknown"
         )
         exact_query = route.intent.value in {"identifier", "path"}
+        claim_scope = {
+            "identifier": "indexed-visible-symbol-surface",
+            "path": "admitted-repository-path-index",
+        }.get(route.intent.value, "bounded-retrieval-only")
         search_complete = exact_query and not omissions
         claims_admissible = search_complete and freshness == "current"
         admissibility_reasons: list[str] = []
@@ -258,7 +262,7 @@ class HashmarksMcpSurface:
             "generation": generation,
             "identity_generation": identity_generation,
             "freshness": freshness,
-            "scope": "admitted-visible-repository",
+            "scope": claim_scope,
             "completeness": "complete" if search_complete else "incomplete",
             "exact_match_count": len(exact_targets),
             "negative_evidence": negative_evidence,
