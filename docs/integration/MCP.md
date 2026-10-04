@@ -55,6 +55,15 @@ make mcp-chatgpt-handoff \
   CHATGPT_MCP_WORKSPACE=/absolute/path/to/repository
 ```
 
+For a standalone Hashmarks binary rather than this source checkout, override the executable and disable source-root binding explicitly:
+
+```bash
+make mcp-chatgpt-handoff \
+  CHATGPT_MCP_HASHMARKS=/absolute/path/to/hashmarks \
+  CHATGPT_MCP_WORKSPACE=/absolute/path/to/repository \
+  CHATGPT_MCP_SOURCE_ROOT=
+```
+
 The default receipt is `dist/chatgpt-secure-mcp-tunnel-handoff.json`. It binds:
 
 - the canonical workspace;
