@@ -48,10 +48,10 @@ def _fixture(root: Path) -> Path:
 
 async def _exercise_session(
     session: ClientSession,
+    initialized,
     *,
     boundary_only: bool,
 ) -> None:
-    initialized = await session.initialize()
     assert initialized.server_info.name == "Hashmarks"
     assert (await session.list_prompts()).prompts == []
     assert (await session.list_resources()).resources == []
@@ -166,7 +166,12 @@ async def _exercise_stdio(
     )
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
-            await _exercise_session(session, boundary_only=boundary_only)
+            initialized = await session.initialize()
+            await _exercise_session(
+                session,
+                initialized,
+                boundary_only=boundary_only,
+            )
 
 
 def _free_loopback_port() -> int:
@@ -219,9 +224,11 @@ async def _exercise_http(
             try:
                 async with streamable_http_client(endpoint) as (read, write):
                     async with ClientSession(read, write) as session:
+                        initialization = await session.initialize()
                         initialized = True
                         await _exercise_session(
                             session,
+                            initialization,
                             boundary_only=boundary_only,
                         )
                         return
