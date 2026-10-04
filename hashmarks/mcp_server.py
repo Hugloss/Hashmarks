@@ -112,9 +112,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="repository_context",
         description=(
-            "Use only for broad repository orientation: freshness, languages, areas, and "
-            "topology. Do not use this to localize a behavior owner. For implementation "
-            "ownership, source/next-read, or verification evidence, use task_evidence."
+            "Broad orientation only: freshness, languages, areas, and topology. "
+            "Do not use for behavior ownership; use task_evidence for owner, "
+            "source/next-read, or verification evidence."
         ),
         annotations=annotations,
     )
