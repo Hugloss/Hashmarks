@@ -272,6 +272,7 @@ def qualify_mcp_observation(observation: dict[str, Any]) -> dict[str, object]:
     manifest["contract_identity"] = _contract_identity(manifest)
     return manifest
 
+
 def contract_from_tool_models(
     version: str,
     tools: list[object] | tuple[object, ...],
