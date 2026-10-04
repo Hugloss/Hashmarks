@@ -50,10 +50,7 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         tools = await server.list_tools()
         assert [tool.name for tool in tools] == _EXPECTED_TOOLS
         descriptions = {tool.name: tool.description or "" for tool in tools}
-        assert descriptions == {
-            name: tool_description(name)
-            for name in MCP_TOOL_NAMES
-        }
+        assert descriptions == {name: tool_description(name) for name in MCP_TOOL_NAMES}
         manifest = contract_from_tool_models(__version__, tools)
         identity = manifest["contract_identity"]
         contract_tools = manifest["tools"]
