@@ -285,18 +285,20 @@ def run_server(
     port: int = _DEFAULT_HTTP_PORT,
     path: str = _DEFAULT_HTTP_PATH,
 ) -> None:
-    server = build_server(workspace, state_dir=state_dir)
-    try:
-        if transport == "stdio":
-            server.run(transport="stdio")
-            return
-        if transport != "streamable-http":
-            raise UserFacingError(f"unsupported MCP transport: {transport}")
+    if transport == "streamable-http":
         host, port, path = _validate_streamable_http(
             host=host,
             port=port,
             path=path,
         )
+    elif transport != "stdio":
+        raise UserFacingError(f"unsupported MCP transport: {transport}")
+
+    server = build_server(workspace, state_dir=state_dir)
+    try:
+        if transport == "stdio":
+            server.run(transport="stdio")
+            return
         server.run(
             transport="streamable-http",
             host=host,
