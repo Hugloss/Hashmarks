@@ -11,7 +11,7 @@ DEFAULT_HTTP_HOST = "127.0.0.1"
 DEFAULT_HTTP_PORT = 8000
 DEFAULT_HTTP_PATH = "/mcp"
 
-_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1"})
 
 
 def add_transport_arguments(parser: argparse.ArgumentParser) -> None:
@@ -34,8 +34,8 @@ def validate_streamable_http(
 ) -> tuple[str, int, str]:
     if host not in _LOOPBACK_HOSTS:
         raise UserFacingError(
-            "Hashmarks streamable HTTP is loopback-only; use 127.0.0.1, ::1, "
-            "or localhost and place an authenticated/tunneled boundary in front "
+            "Hashmarks streamable HTTP is loopback-only; use 127.0.0.1 or ::1 and "
+            "place an authenticated/tunneled boundary in front "
             "of Hashmarks when remote access is required"
         )
     if not 1 <= port <= 65535:
