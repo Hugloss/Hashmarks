@@ -202,11 +202,6 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
         repo = tmp / "repo"
         repo.mkdir()
         write_fixture(repo)
-        mcp_contract = installed_mcp_contract(
-            python,
-            repo,
-            expected_version=versions["hashmarks"],
-        )
         config_path = _write_pi_config(repo, hashmarks)
 
         argv = _pi_run_argv(args.pi, _prompt())
@@ -234,7 +229,11 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
             "model_authority": "pi-native-config",
             "python_selector": args.python,
             "installed_versions": versions,
-            "mcp_contract": mcp_contract,
+            "mcp_contract": installed_mcp_contract(
+                python,
+                repo,
+                expected_version=versions["hashmarks"],
+            ),
             "wheel": {"name": wheel.name, "sha256": sha256(wheel)},
             "qualified_registration": {
                 "path": str(config_path.relative_to(repo)),
