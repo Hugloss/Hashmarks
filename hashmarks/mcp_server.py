@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from ._version import __version__
 from .errors import OptionalFeatureError, UserFacingError
 from .mcp_surface import HashmarksMcpSurface, McpSurfaceError
 from .paths import canonical_host_path
@@ -92,6 +93,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         "Hashmarks",
         description="Read-only repository intelligence for coding agents",
         instructions=_SERVER_INSTRUCTIONS,
+        version=__version__,
     )
     annotations = ToolAnnotations(
         read_only_hint=True,

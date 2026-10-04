@@ -26,6 +26,10 @@ PI ?= pi
 PI_HOST_PYTHON ?= $(ARTIFACT_PYTHON)
 PI_HOST_RECEIPT ?= dist/pi-mcp-host-gate.json
 MCP_STRESS_RECEIPT ?= dist/mcp-concurrency-stress.json
+CHATGPT_MCP_HASHMARKS ?= $(abspath .venv/bin/hashmarks)
+CHATGPT_MCP_WORKSPACE ?= $(CURDIR)
+CHATGPT_MCP_SOURCE_ROOT ?= $(CURDIR)
+CHATGPT_MCP_HANDOFF_RECEIPT ?= dist/chatgpt-secure-mcp-tunnel-handoff.json
 DIAGNOSTIC_PYTHON ?= python3
 DIAGNOSTIC_SHARDS ?= 64
 DIAGNOSTIC_BATCH ?= 0
@@ -43,7 +47,7 @@ export BENCH_RUN BENCH_AGENT BENCH_PARTIAL
 RUFF_DEBT_PREVIOUS_BASELINE ?=
 RUFF_AUTOFIX_SELECT ?= E4,E7,E9,I,T201
 
-.PHONY: help benchmark benchmark-check benchmark-show benchmark-report evaluation-help lock lock-check init setup bootstrap check start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-host-status mcp-concurrency-stress release-prepare release-check metrics metrics-fast metrics-scale metrics-500k metrics-derived-authority metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
+.PHONY: help benchmark benchmark-check benchmark-show benchmark-report evaluation-help lock lock-check init setup bootstrap check start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-chatgpt-handoff mcp-host-status mcp-concurrency-stress release-prepare release-check metrics metrics-fast metrics-scale metrics-500k metrics-derived-authority metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
 
 help:
 	@printf '%s\n' \
@@ -90,6 +94,7 @@ help:
 	  '  make mcp-claude-check  Qualify the installed MCP wheel through Claude Code' \
 	  '  make mcp-codex-check  Qualify the installed MCP wheel through Codex CLI' \
 	  '  make mcp-pi-check  Qualify the installed MCP wheel through Pi + pi-mcp-adapter' \
+	  '  make mcp-chatgpt-handoff  Qualify exact stdio MCP command/catalog for Secure MCP Tunnel' \
 	  '  make mcp-host-status  Inspect project-local OpenCode/Claude/Codex/Pi MCP integration state' \
 	  '  make mcp-concurrency-stress  Stress concurrent MCP-style readers during live repository mutation' \
 	  '  make release-prepare VERSION=X.Y.Z  Prepare normal release version/request files and refresh uv.lock' \
@@ -476,6 +481,17 @@ mcp-pi-check:
 	  --pi "$(PI)" \
 	  --python "$(PI_HOST_PYTHON)" \
 	  --receipt "$(PI_HOST_RECEIPT)"
+
+mcp-chatgpt-handoff:
+	@test -x "$(CHATGPT_MCP_HASHMARKS)" || { \
+	  echo "Hashmarks executable is not available: $(CHATGPT_MCP_HASHMARKS); run make init or override CHATGPT_MCP_HASHMARKS" >&2; \
+	  exit 2; \
+	}
+	@$(UV_RUN) --offline --no-sync python scripts/host_qualification/chatgpt_secure_mcp_tunnel_handoff.py \
+	  --hashmarks "$(CHATGPT_MCP_HASHMARKS)" \
+	  --workspace "$(CHATGPT_MCP_WORKSPACE)" \
+	  $(if $(strip $(CHATGPT_MCP_SOURCE_ROOT)),--source-root "$(CHATGPT_MCP_SOURCE_ROOT)",) \
+	  --output "$(CHATGPT_MCP_HANDOFF_RECEIPT)"
 
 release-prepare:
 	@test -n "$(VERSION)" || (echo "VERSION is required, e.g. make release-prepare VERSION=X.Y.Z" >&2; exit 2)

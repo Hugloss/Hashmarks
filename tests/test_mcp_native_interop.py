@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from hashmarks._version import __version__
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -127,6 +129,7 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
             async with ClientSession(read, write) as session:
                 initialized = await session.initialize()
                 assert initialized.server_info.name == "Hashmarks"
+                assert initialized.server_info.version == __version__
                 assert initialized.instructions is not None
                 assert "call task_evidence before the first" in initialized.instructions
                 assert "exploratory grep, glob, or read" in initialized.instructions
