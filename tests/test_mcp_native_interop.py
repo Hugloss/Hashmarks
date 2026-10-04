@@ -213,10 +213,12 @@ def test_mcp_native_streamable_http_initialize_catalog_and_call(tmp_path: Path) 
                     "Hashmarks HTTP MCP exited before readiness: "
                     f"stdout={stdout!r} stderr={stderr!r}"
                 )
+            initialized_session = False
             try:
                 async with streamable_http_client(endpoint) as (read, write):
                     async with ClientSession(read, write) as session:
                         initialized = await session.initialize()
+                        initialized_session = True
                         assert initialized.server_info.name == "Hashmarks"
                         assert initialized.instructions is not None
                         assert "call task_evidence before the first" in initialized.instructions
@@ -236,7 +238,9 @@ def test_mcp_native_streamable_http_initialize_catalog_and_call(tmp_path: Path) 
                             for row in result.structured_content["results"]
                         )
                         return
-            except Exception as exc:  # server startup is the only retried boundary
+            except Exception as exc:
+                if initialized_session:
+                    raise
                 last_error = exc
                 await asyncio.sleep(0.05)
         raise AssertionError(f"Hashmarks HTTP MCP did not become ready: {last_error}")
