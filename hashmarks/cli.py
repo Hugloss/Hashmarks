@@ -297,9 +297,16 @@ def _doctor(args) -> int:
 
 
 def _mcp(args) -> int:
-    from .mcp_server import run_stdio
+    from .mcp_server import run_server
 
-    run_stdio(args.workspace, state_dir=args.state_dir)
+    run_server(
+        args.workspace,
+        state_dir=args.state_dir,
+        transport=args.transport,
+        host=args.host,
+        port=args.port,
+        path=args.path,
+    )
     return 0
 
 
@@ -439,9 +446,16 @@ def main(argv: list[str] | None = None) -> int:
     _add_daemon_cli(sub)
     _add_identity_cli(sub)
     mcp = sub.add_parser(
-        "mcp", help="serve this workspace as a local read-only MCP stdio server"
+        "mcp",
+        help=(
+            "serve this workspace as a read-only MCP server over stdio or "
+            "loopback Streamable HTTP"
+        ),
     )
     _add_common_arguments(mcp, inherited=True)
+    from .mcp_server import add_transport_arguments
+
+    add_transport_arguments(mcp)
     mcp.set_defaults(func=_mcp, automatic_update_check=False)
     install = sub.add_parser(
         "install", help="register the installed Hashmarks executable with agent hosts"
