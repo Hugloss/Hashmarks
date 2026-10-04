@@ -35,8 +35,9 @@ def _observation() -> dict[str, object]:
             "name": "Hashmarks",
             "version": "0.26.1",
             "instructions": (
-                "For unknown behavior call task_evidence before the first "
-                "exploratory grep, glob, or read."
+                "For unknown behavior call task_evidence before exploratory search. "
+                "It separates supporting retrieval from ownership authority. "
+                "Read a unique known path directly."
             ),
         },
         "tools": [
