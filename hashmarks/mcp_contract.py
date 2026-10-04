@@ -312,9 +312,7 @@ def contract_summary(manifest: dict[str, object]) -> dict[str, object]:
     ):
         raise ValueError("invalid Hashmarks MCP contract manifest")
     identity_payload = {
-        key: value
-        for key, value in manifest.items()
-        if key != "contract_identity"
+        key: value for key, value in manifest.items() if key != "contract_identity"
     }
     if identity != _contract_identity(identity_payload):
         raise ValueError("Hashmarks MCP contract identity mismatch")
