@@ -64,9 +64,9 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
                 "implementation path is unknown, use task_evidence first."
             ),
             "task_evidence": (
-                "Semantic first choice for behavior localization when the path is unknown. "
-                "Prefer before exploratory grep/read: separates retrieval from ownership, "
-                "resolves owner/ambiguity, and returns source/next-read, verification, freshness."
+                "Semantic first choice for unknown-path behavior. Prefer before exploratory "
+                "grep/read: separates retrieval from ownership, resolves owner/ambiguity, "
+                "and returns source/next-read, verification, freshness."
             ),
             "change_impact": (
                 "Use after explicit changed paths exist for bounded structural impact and "
