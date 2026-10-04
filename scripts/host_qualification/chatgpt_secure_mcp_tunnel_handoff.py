@@ -196,6 +196,7 @@ def _validate_observation(observation: dict[str, Any]) -> dict[str, object]:
     except ValueError as exc:
         raise HostGateError(str(exc)) from exc
 
+
 def build_handoff(
     *,
     executable: Path,
