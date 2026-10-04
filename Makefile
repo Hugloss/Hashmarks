@@ -489,6 +489,7 @@ mcp-chatgpt-handoff:
 	@$(UV_RUN) --offline --no-sync python scripts/host_qualification/chatgpt_secure_mcp_tunnel_handoff.py \
 	  --hashmarks "$(CHATGPT_MCP_HASHMARKS)" \
 	  --workspace "$(CHATGPT_MCP_WORKSPACE)" \
+	  --source-root "$(CURDIR)" \
 	  --output "$(CHATGPT_MCP_HANDOFF_RECEIPT)"
 
 release-prepare:
