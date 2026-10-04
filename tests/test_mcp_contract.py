@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from typing import Any
 
 import pytest
 
@@ -17,7 +18,7 @@ from hashmarks.mcp_contract import (
 )
 
 
-def _observation() -> dict[str, object]:
+def _observation() -> dict[str, Any]:
     return {
         "server": {
             "name": MCP_SERVER_NAME,
