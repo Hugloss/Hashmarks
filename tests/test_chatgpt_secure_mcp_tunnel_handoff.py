@@ -13,6 +13,7 @@ from scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff import (
     HostGateError,
     _command_argv,
     _observe_mcp,
+    _source_binding,
     _validate_observation,
     build_handoff,
     qualify_handoff,
@@ -134,6 +135,37 @@ def test_handoff_rejects_cli_mcp_version_split_brain(tmp_path: Path) -> None:
             },
             observation=observation,
         )
+
+
+def test_source_binding_rejects_generation_change(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    venv = tmp_path / "venv"
+    executable = venv / "bin" / "hashmarks"
+    python = venv / "bin" / "python"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"launcher")
+    python.write_bytes(b"python")
+
+    with (
+        mock.patch(
+            "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.run",
+            return_value=type("Result", (), {"stdout": str(source) + "\n"})(),
+        ),
+        mock.patch(
+            "hashmarks.test_shards.repository_content_identity",
+            side_effect=("sha256:" + "a" * 64 + ":1", "sha256:" + "b" * 64 + ":1"),
+        ),
+    ):
+        with pytest.raises(
+            HostGateError,
+            match="source changed during handoff identity observation",
+        ):
+            _source_binding(
+                executable,
+                source,
+                workspace=source,
+            )
 
 
 def test_handoff_rejects_implementation_generation_change(
