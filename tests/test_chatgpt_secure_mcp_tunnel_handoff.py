@@ -94,6 +94,10 @@ def test_handoff_receipt_preserves_external_tunnel_authority(tmp_path: Path) -> 
             executable=executable,
             workspace=workspace,
             state_dir=None,
+            source={
+                "root": "/source",
+                "repository_content_identity": "sha256:" + "b" * 64 + ":10",
+            },
             observation=_observation(),
         )
 
@@ -111,7 +115,32 @@ def test_handoff_receipt_preserves_external_tunnel_authority(tmp_path: Path) -> 
         "mcp",
     ]
     assert receipt["hashmarks"]["executable_sha256"] == "a" * 64
+    assert receipt["source"]["repository_content_identity"].startswith("sha256:")
     assert receipt["mcp"]["tools"][0]["name"] == "repository_context"
+
+
+def test_handoff_rejects_cli_mcp_version_split_brain(tmp_path: Path) -> None:
+    executable = tmp_path / "hashmarks"
+    executable.write_bytes(b"candidate")
+    workspace = tmp_path / "repo"
+    workspace.mkdir()
+    observation = _observation()
+    observation["server"]["version"] = "0.25.0"
+    with mock.patch(
+        "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.run",
+        return_value=SimpleNamespace(stdout="hashmarks version 0.26.1\n"),
+    ), mock.patch(
+        "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.sha256",
+        return_value="a" * 64,
+    ):
+        with pytest.raises(HostGateError, match="CLI/MCP version authority differs"):
+            build_handoff(
+                executable=executable,
+                workspace=workspace,
+                state_dir=None,
+                source=None,
+                observation=observation,
+            )
 
 
 @pytest.mark.parametrize(
