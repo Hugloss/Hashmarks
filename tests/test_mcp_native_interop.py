@@ -8,6 +8,12 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks._version import __version__
+from hashmarks.mcp_contract import (
+    MCP_SERVER_INSTRUCTIONS,
+    MCP_TOOL_NAMES,
+    contract_from_tool_models,
+    tool_description,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -16,16 +22,7 @@ pytestmark = pytest.mark.host_mcp_sdk
 
 _MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 _NATIVE_REASON = "Hashmarks MCP interop requires the optional mcp extra"
-_EXPECTED_TOOLS = [
-    "repository_context",
-    "find",
-    "task_evidence",
-    "change_impact",
-    "correlate_evidence",
-    "dependency_codemap",
-    "repository_declarations",
-    "post_change",
-]
+_EXPECTED_TOOLS = list(MCP_TOOL_NAMES)
 
 
 def _repo(tmp_path: Path) -> Path:
@@ -52,34 +49,14 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         tools = await server.list_tools()
         assert [tool.name for tool in tools] == _EXPECTED_TOOLS
         descriptions = {tool.name: tool.description or "" for tool in tools}
-        selection_contract = {
-            "repository_context": (
-                "Broad orientation only: freshness, languages, areas, and topology. "
-                "Do not use for behavior ownership; use task_evidence for owner, "
-                "source/next-read, or verification evidence."
-            ),
-            "find": (
-                "Exact lookup for a path or symbol you already know by name. Do not use as a "
-                "behavior-localization substitute: when the task describes behavior and the "
-                "implementation path is unknown, use task_evidence first."
-            ),
-            "task_evidence": (
-                "Semantic first choice for unknown-path behavior. Prefer before exploratory "
-                "grep/read: separates retrieval from ownership, resolves owner/ambiguity, "
-                "and returns source/next-read, verification, freshness."
-            ),
-            "change_impact": (
-                "Use after explicit changed paths exist for bounded structural impact and "
-                "verification relevance. For pre-edit evidence, use task_evidence."
-            ),
-            "post_change": (
-                "Refresh caller-reported changed paths against a previous task_evidence "
-                "packet and return only invalidated/reused/replacement evidence."
-            ),
+        assert descriptions == {
+            name: tool_description(name)
+            for name in MCP_TOOL_NAMES
         }
-        assert {
-            name: descriptions[name] for name in selection_contract
-        } == selection_contract
+        manifest = contract_from_tool_models(__version__, tools)
+        assert manifest["schema"] == "hashmarks.mcp-contract.v1"
+        assert manifest["contract_identity"].startswith("sha256:")
+        assert [row["name"] for row in manifest["tools"]] == _EXPECTED_TOOLS
         task_description = descriptions["task_evidence"]
         for phrase in (
             "Semantic first choice",
@@ -142,21 +119,7 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
                 initialized = await session.initialize()
                 assert initialized.server_info.name == "Hashmarks"
                 assert initialized.server_info.version == __version__
-                assert initialized.instructions is not None
-                assert (
-                    "semantic repository-intelligence layer" in initialized.instructions
-                )
-                assert (
-                    "call task_evidence before exploratory" in initialized.instructions
-                )
-                assert (
-                    "supporting retrieval from ownership authority"
-                    in initialized.instructions
-                )
-                assert "preserve ambiguity" in initialized.instructions
-                assert "verification plan" in initialized.instructions
-                assert "report freshness" in initialized.instructions
-                assert "repeated native search/read calls" in initialized.instructions
+                assert initialized.instructions == MCP_SERVER_INSTRUCTIONS
 
                 prompts = await session.list_prompts()
                 resources = await session.list_resources()
