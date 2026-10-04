@@ -18,23 +18,18 @@ from threading import Thread
 from typing import Any
 
 from hashmarks._command_output import log_command_output
+from hashmarks.mcp_contract import (
+    MCP_WORKFLOW_HOST_QUALIFICATION_TOOLS,
+    qualification_response_schemas,
+)
 
 logger = logging.getLogger(__name__)
 
-EXPECTED_HASHMARKS_TOOLS = {
-    "hashmarks_repository_context",
-    "hashmarks_find",
-    "hashmarks_task_evidence",
-    "hashmarks_change_impact",
-    "hashmarks_post_change",
-}
-SELECTION_RESPONSE_SCHEMAS = {
-    "hashmarks_repository_context": "hashmarks.repository-capsule.v1",
-    "hashmarks_find": "hashmarks.mcp-find.v1",
-    "hashmarks_task_evidence": "hashmarks.task-evidence.v2",
-    "hashmarks_change_impact": "hashmarks.task-change-impact.v1",
-    "hashmarks_post_change": "hashmarks.task-post-change-delta.v1",
-}
+SELECTION_RESPONSE_SCHEMAS = qualification_response_schemas(
+    MCP_WORKFLOW_HOST_QUALIFICATION_TOOLS,
+    name_prefix="hashmarks_",
+)
+EXPECTED_HASHMARKS_TOOLS = set(SELECTION_RESPONSE_SCHEMAS)
 TASK = "change flare041 behavior and verify it"
 CHANGED_PATH = "src/feature.py"
 
@@ -799,6 +794,39 @@ def _selection_diagnostic(
     }
 
 
+def _installed_mcp_contract(
+    python: Path,
+    workspace: Path,
+    *,
+    expected_version: str,
+) -> dict[str, Any]:
+    output = _run(
+        [
+            str(python),
+            "-I",
+            "-m",
+            "hashmarks.mcp_contract",
+            "--workspace",
+            str(workspace),
+        ],
+        cwd=workspace,
+    ).stdout
+    try:
+        value = json.loads(output)
+    except json.JSONDecodeError as exc:
+        raise HostGateError(
+            f"installed Hashmarks MCP contract was not JSON: {output!r}"
+        ) from exc
+    if not isinstance(value, dict):
+        raise HostGateError("installed Hashmarks MCP contract is not an object")
+    if value.get("server_version") != expected_version:
+        raise HostGateError(
+            "installed Hashmarks package/MCP contract version differs: "
+            f"package={expected_version!r} mcp={value.get('server_version')!r}"
+        )
+    return value
+
+
 def _package_versions(python: Path) -> dict[str, str]:
     code = (
         "import importlib.metadata as m,json;"
@@ -834,6 +862,7 @@ class SourceBinding:
 class HostRuntime:
     wheel: Path
     versions: dict[str, str]
+    mcp_contract: dict[str, Any]
     repo: Path
     mcp_list: subprocess.CompletedProcess[str]
     mcp_config_path: str
@@ -909,12 +938,19 @@ def _build_host_runtime(
     repo = tmp / "repo"
     repo.mkdir()
     _write_fixture(repo)
+    versions = _package_versions(python)
+    mcp_contract = _installed_mcp_contract(
+        python,
+        repo,
+        expected_version=versions["hashmarks"],
+    )
     mcp_list, config_path, opencode_env = _configure_opencode_mcp(
         args.opencode, repo=repo, hashmarks=hashmarks
     )
     return HostRuntime(
         wheel=wheel,
-        versions=_package_versions(python),
+        versions=versions,
+        mcp_contract=mcp_contract,
         repo=repo,
         mcp_list=mcp_list,
         mcp_config_path=config_path,
@@ -943,14 +979,14 @@ def _run_phase_one(
         },
     )
     context = _tool_payload(
-        tools["hashmarks_repository_context"], "hashmarks.repository-capsule.v1"
+        tools["hashmarks_repository_context"], SELECTION_RESPONSE_SCHEMAS["hashmarks_repository_context"]
     )
-    find = _tool_payload(tools["hashmarks_find"], "hashmarks.mcp-find.v1")
+    find = _tool_payload(tools["hashmarks_find"], SELECTION_RESPONSE_SCHEMAS["hashmarks_find"])
     evidence = _tool_payload(
-        tools["hashmarks_task_evidence"], "hashmarks.task-evidence.v2"
+        tools["hashmarks_task_evidence"], SELECTION_RESPONSE_SCHEMAS["hashmarks_task_evidence"]
     )
     impact = _tool_payload(
-        tools["hashmarks_change_impact"], "hashmarks.task-change-impact.v1"
+        tools["hashmarks_change_impact"], SELECTION_RESPONSE_SCHEMAS["hashmarks_change_impact"]
     )
     found_paths = {
         str(row.get("path")) for row in find.get("results", []) if isinstance(row, dict)
@@ -1008,10 +1044,10 @@ def _run_phase_two(
         events, {"hashmarks_post_change", "hashmarks_repository_context"}
     )
     post = _tool_payload(
-        tools["hashmarks_post_change"], "hashmarks.task-post-change-delta.v1"
+        tools["hashmarks_post_change"], SELECTION_RESPONSE_SCHEMAS["hashmarks_post_change"]
     )
     context = _tool_payload(
-        tools["hashmarks_repository_context"], "hashmarks.repository-capsule.v1"
+        tools["hashmarks_repository_context"], SELECTION_RESPONSE_SCHEMAS["hashmarks_repository_context"]
     )
     generation = context.get("generation")
     if post.get("status") != "changed":
@@ -1064,6 +1100,7 @@ def _gate_receipt(
         "model_authority": "opencode-native-config",
         "python_selector": args.python,
         "installed_versions": runtime.versions,
+        "mcp_contract": runtime.mcp_contract,
         "wheel": {"name": runtime.wheel.name, "sha256": _sha256(runtime.wheel)},
         "mcp_list": runtime.mcp_list.stdout.strip() or runtime.mcp_list.stderr.strip(),
         "opencode_mcp_config_path": runtime.mcp_config_path,
