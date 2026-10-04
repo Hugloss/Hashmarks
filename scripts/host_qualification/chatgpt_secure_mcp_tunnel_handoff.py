@@ -80,10 +80,15 @@ async def _observe_mcp(
 
     command = _command_argv(executable, workspace, state_dir)
     params = StdioServerParameters(command=command[0], args=command[1:])
-    async with stdio_client(params) as (read, write):
-        async with ClientSession(read, write) as session:
-            initialized = await session.initialize()
-            tools = await session.list_tools()
+    try:
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write) as session:
+                initialized = await session.initialize()
+                tools = await session.list_tools()
+    except Exception as exc:
+        raise HostGateError(
+            f"Hashmarks stdio MCP command could not initialize: {exc}"
+        ) from exc
 
     catalog = []
     for tool in tools.tools:
