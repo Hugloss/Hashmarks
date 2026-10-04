@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 
 if TYPE_CHECKING:
@@ -434,3 +436,123 @@ def test_task_evidence_natural_supplements_respect_deny_visibility(
     retrieval = packet["retrieval"]["results"]
     assert all(row.get("path") != "hidden/engine.py" for row in retrieval)
     assert all(row.get("qualname") != "cobalt_owner" for row in retrieval)
+
+
+def _dense_prefix_repository(root: Path) -> tuple[Path, str]:
+    owner = root / "hashmarks/codemap/repository_index_store.py"
+    _write(
+        root,
+        "hashmarks/codemap/repository_index_store.py",
+        "class WorkspaceMapStore:\n"
+        "    def paths_under(self, prefix: str) -> list[str]:\n"
+        "        return [path for path in self.paths if path.startswith(prefix)]\n",
+    )
+    for index in range(32):
+        _write(
+            root,
+            f"hashmarks/codemap/decoy_{index:02d}.py",
+            f"def enumerate_indexed_repository_paths_{index}():\n"
+            "    # indexed repository paths requested by repository callers\n"
+            "    return []\n",
+        )
+    task = (
+        "Without editing files, identify the single function that enumerates "
+        "indexed repository paths underneath a requested prefix."
+    )
+    return owner, task
+
+
+def test_task_evidence_supplements_account_for_displaced_canonical_hits(
+    tmp_path: Path,
+) -> None:
+    owner, task = _dense_prefix_repository(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20)
+        packet = codemap.task_evidence(task, limit=20, token_budget=256)
+        tight = codemap.task_evidence(task, limit=9, token_budget=256)
+        delta = codemap.task_post_change_delta(
+            task, [owner.relative_to(tmp_path)], previous_evidence=packet
+        )
+
+    retrieval = packet["retrieval"]
+    results = retrieval["results"]
+    supplements = [row for row in results if row.get("retrieval_supplement")]
+    assert 1 <= len(supplements) <= 2
+    assert len(results) <= 20
+    canonical_prefix = results[: -len(supplements)]
+    assert canonical_prefix == action["canonical"][: len(canonical_prefix)]
+    assert retrieval["canonical_omitted_results"] == len(action["canonical"]) - len(
+        canonical_prefix
+    )
+    assert retrieval["canonical_omitted_results"] > 0
+    assert retrieval["supplemental_results"] == len(supplements)
+    assert retrieval["supplemental_authority"] is False
+    assert retrieval["ordering"] == "canonical-then-bounded-natural-language"
+    assert any(row["name"] == "paths_under" for row in supplements)
+    assert all(set(action["canonical"][0]).issubset(row) for row in supplements)
+    assert all(row["score_basis"] == "natural-term-match-count" for row in supplements)
+    assert all(
+        isinstance(row["score"], float) and row["score"] > 0 for row in supplements
+    )
+    assert all(row["evidence_visibility"] == "source" for row in supplements)
+    assert all("start_line" not in row and "end_line" not in row for row in supplements)
+    assert all(
+        not row.get("retrieval_supplement") for row in tight["retrieval"]["results"]
+    )
+    assert "canonical_omitted_results" not in tight["retrieval"]
+    assert packet["ownership"]["candidate"]["path"] == action["edit"]["path"]
+    assert delta["schema"] == "hashmarks.task-post-change-delta.v2"
+
+
+@pytest.mark.parametrize("mutation", ("rewrite", "delete"))
+def test_task_evidence_supplement_excludes_unsignaled_stale_symbol(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    owner, task = _dense_prefix_repository(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.task_evidence(task, limit=20, token_budget=256)
+        assert any(
+            row.get("retrieval_supplement") and row.get("name") == "paths_under"
+            for row in before["retrieval"]["results"]
+        )
+        if mutation == "rewrite":
+            owner.write_text(
+                "class WorkspaceMapStore:\n"
+                "    def unrelated(self):\n"
+                "        return 0\n",
+                encoding="utf-8",
+            )
+        else:
+            owner.unlink()
+        after = codemap.task_evidence(task, limit=20, token_budget=256)
+
+    assert all(
+        row.get("name") != "paths_under" for row in after["retrieval"]["results"]
+    )
+
+
+def test_task_evidence_supplement_preserves_outline_visibility(
+    tmp_path: Path,
+) -> None:
+    owner, task = _dense_prefix_repository(tmp_path)
+    _write(
+        tmp_path,
+        ".hashmarks-context.toml",
+        '[[rule]]\npattern = "hashmarks/codemap/repository_index_store.py"\n'
+        'visibility = "outline"\n',
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence(task, limit=20, token_budget=256)
+
+    supplements = [
+        row
+        for row in packet["retrieval"]["results"]
+        if row.get("retrieval_supplement")
+        and row["path"] == owner.relative_to(tmp_path).as_posix()
+    ]
+    assert supplements
+    assert all(row["evidence_visibility"] == "outline" for row in supplements)

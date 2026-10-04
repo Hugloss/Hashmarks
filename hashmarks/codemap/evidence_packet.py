@@ -12,7 +12,7 @@ from .configuration_evidence import ConfigurationEvidenceMixin
 from .decision_session import decision_scoped
 from .evidence_decision_packet import DecisionPacketMixin
 from .evidence_freshness import freshness_state
-from .model import EvidenceVisibility
+from .model import EvidenceVisibility, SearchHit
 from .python_ast import estimate_tokens
 
 if TYPE_CHECKING:
@@ -847,7 +847,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         self,
         path: str,
         terms: Sequence[str],
-    ) -> list[Mapping[str, object]]:
+    ) -> list[tuple[int, Mapping[str, object]]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         scored: list[tuple[int, str, Mapping[str, object]]] = []
@@ -866,22 +866,38 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                     )
                 )
         scored.sort(key=lambda row: (-row[0], row[1]))
-        return [row[2] for row in scored[:2]]
+        return [(row[0], row[2]) for row in scored[:2]]
 
     @staticmethod
     def _task_evidence_supplement_row(
         path: str,
         symbol: Mapping[str, object],
+        *,
+        score: int,
+        visibility: EvidenceVisibility,
     ) -> dict[str, object]:
-        return {
-            "path": path,
-            "name": symbol.get("name"),
-            "qualname": symbol.get("qualname"),
-            "signature": symbol.get("signature"),
-            "start_line": symbol.get("start_line"),
-            "end_line": symbol.get("end_line"),
-            "retrieval_supplement": "bounded-natural-language",
-        }
+        def optional_text(key: str) -> str | None:
+            value = symbol.get(key)
+            return None if value is None else str(value)
+
+        def optional_line(key: str) -> int | None:
+            value = symbol.get(key)
+            return value if isinstance(value, int) and value > 0 else None
+
+        row = SearchHit(
+            path=path,
+            score=float(score),
+            kind=str(symbol.get("kind") or "symbol"),
+            name=optional_text("name"),
+            qualname=optional_text("qualname"),
+            signature=optional_text("signature"),
+            start_line=optional_line("start_line"),
+            end_line=optional_line("end_line"),
+            evidence_visibility=visibility,
+        ).as_dict()
+        row["retrieval_supplement"] = "bounded-natural-language"
+        row["score_basis"] = "natural-term-match-count"
+        return row
 
     def _task_evidence_natural_retrieval_supplements(
         self,
@@ -905,7 +921,16 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         paths = self._task_evidence_natural_candidate_paths(task, bound_reasons)
         rows: list[dict[str, object]] = []
         for path in paths:
-            for symbol in self._task_evidence_scored_symbols(path, terms):
+            visibility = self._task_evidence_visibility(path)
+            if (
+                visibility is None
+                or visibility is EvidenceVisibility.DENY
+                or self.policy.decide(path).evidence_visibility
+                is EvidenceVisibility.DENY
+                or not self._indexed_path_current(path)
+            ):
+                continue
+            for score, symbol in self._task_evidence_scored_symbols(path, terms):
                 key = (
                     path,
                     str(symbol.get("qualname") or symbol.get("name") or ""),
@@ -913,7 +938,11 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 if key in existing_keys:
                     continue
                 existing_keys.add(key)
-                rows.append(self._task_evidence_supplement_row(path, symbol))
+                rows.append(
+                    self._task_evidence_supplement_row(
+                        path, symbol, score=score, visibility=visibility
+                    )
+                )
                 if len(rows) == 2:
                     return rows
         return rows
@@ -941,8 +970,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             return
         keep = max(0, limit - len(supplements))
         retrieval["results"] = [*current[:keep], *supplements]
+        retrieval["canonical_omitted_results"] = max(0, len(current) - keep)
         retrieval["supplemental_results"] = len(supplements)
         retrieval["supplemental_authority"] = False
+        retrieval["ordering"] = "canonical-then-bounded-natural-language"
 
     @staticmethod
     def _task_evidence_compact_evidence(
