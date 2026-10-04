@@ -170,7 +170,7 @@ def _find_freshness_state(stale: bool | None) -> str:
 def _find_claim_scope(intent: str) -> str:
     return {
         "identifier": "indexed-visible-symbol-surface",
-        "path": "admitted-repository-path-index",
+        "path": "admitted-visible-repository-path-index",
     }.get(intent, "bounded-retrieval-only")
 
 
