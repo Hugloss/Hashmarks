@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import math
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
@@ -810,19 +812,40 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "consumer_action": "external",
         }
 
+    @staticmethod
+    def _task_evidence_retrieval_query(task: str) -> str:
+        """Exclude a separate output-format sentence from retrieval vocabulary."""
+        directive = re.search(
+            r"[.!?]\s+(?:return|output|respond with)\s+exactly\s+"
+            r"(?:(?:one|an?|the)\s+)?"
+            r"(?:JSON|YAML|XML|Markdown)\b",
+            task,
+            flags=re.IGNORECASE,
+        )
+        return task[: directive.start()].strip() if directive else task
+
     def _task_evidence_natural_candidate_paths(
         self,
         task: str,
+        existing: Sequence[Mapping[str, object]],
+        terms: Sequence[str],
         bound_reasons: set[str],
     ) -> list[str]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
+        paths = list(
+            dict.fromkeys(
+                str(row.get("path"))
+                for row in existing
+                if isinstance(row.get("path"), str) and row.get("path")
+            )
+        )[:16]
         salient = self._task_salient_natural_terms(
             task,
             limit=6,
             bound_reasons=bound_reasons,
         )
-        paths: list[str] = []
+        rare_paths: list[str] = []
         for term in salient:
             hits = self._task_component_hits(
                 term,
@@ -837,27 +860,116 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                     is EvidenceVisibility.DENY
                 ):
                     continue
-                if hit.path not in paths:
-                    paths.append(hit.path)
-            if len(paths) >= 4:
+                if hit.path not in rare_paths:
+                    rare_paths.append(hit.path)
+            if len(rare_paths) >= 4:
                 break
-        return paths[:4]
+        paths.extend(path for path in rare_paths[:4] if path not in paths)
+        lexical = self._session_lexical_file_candidates(terms, limit=64)
+        code_paths = [
+            str(row["path"])
+            for row in lexical
+            if row.get("path") and row.get("language") not in {"text", "markdown"}
+        ][:12]
+        paths.extend(path for path in code_paths if path not in paths)
+        return paths
+
+    @staticmethod
+    def _task_evidence_identifier_parts(name: str) -> tuple[str, ...]:
+        parts: list[str] = []
+        for piece in name.replace("-", "_").split("_"):
+            parts.extend(
+                part.lower()
+                for part in re.findall(
+                    r"[A-Z]+(?=[A-Z][a-z]|\d|$)|[A-Z]?[a-z]+|\d+", piece
+                )
+                if len(part) >= 2
+            )
+        return tuple(parts)
+
+    @staticmethod
+    def _task_evidence_phrase_relevance(
+        parts: Sequence[str], query_tokens: Sequence[tuple[str, ...]]
+    ) -> float:
+        def matches(part: str, variant: str) -> bool:
+            return variant == part or (len(part) >= 5 and variant.startswith(part))
+
+        phrase_length = 0
+        phrase_position = 0
+        for start in range(len(parts)):
+            for position in range(len(query_tokens)):
+                length = 0
+                while (
+                    start + length < len(parts)
+                    and position + length < len(query_tokens)
+                    and any(
+                        matches(parts[start + length], variant)
+                        for variant in query_tokens[position + length]
+                    )
+                ):
+                    length += 1
+                if length > phrase_length or (
+                    length == phrase_length and position > phrase_position
+                ):
+                    phrase_length, phrase_position = length, position
+        return 2 * phrase_length + (
+            12 * phrase_position / len(query_tokens) if phrase_length >= 2 else 0
+        )
+
+    @classmethod
+    def _task_evidence_symbol_relevance(
+        cls,
+        name: str,
+        query_tokens: Sequence[tuple[str, ...]],
+        frequencies: Mapping[str, int],
+        total: int,
+    ) -> float:
+        parts = cls._task_evidence_identifier_parts(name)
+        if not parts:
+            return 0.0
+
+        def matches(part: str, variant: str) -> bool:
+            return variant == part or (len(part) >= 5 and variant.startswith(part))
+
+        weighted = 0.0
+        matched_parts = 0
+        for part in parts:
+            options = [
+                (variant, position)
+                for position, variants in enumerate(query_tokens)
+                for variant in variants
+                if matches(part, variant)
+            ]
+            if not options:
+                continue
+            variant, position = max(options, key=lambda row: row[1])
+            matched_parts += 1
+            weighted += math.log((total + 1) / (frequencies.get(variant, 0) + 1)) * (
+                1 + 0.5 * position / len(query_tokens)
+            )
+        if not matched_parts:
+            return 0.0
+        return (
+            weighted
+            + cls._task_evidence_phrase_relevance(parts, query_tokens)
+            + 2 * matched_parts / len(parts)
+        )
 
     def _task_evidence_scored_symbols(
         self,
         path: str,
-        terms: Sequence[str],
-    ) -> list[tuple[int, Mapping[str, object]]]:
+        query_tokens: Sequence[tuple[str, ...]],
+        frequencies: Mapping[str, int],
+        total: int,
+    ) -> list[tuple[float, Mapping[str, object]]]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        scored: list[tuple[int, str, Mapping[str, object]]] = []
+        scored: list[tuple[float, str, Mapping[str, object]]] = []
         for symbol in self._session_symbols_for_path(path):
-            haystack = " ".join(
-                str(symbol.get(key) or "").lower()
-                for key in ("name", "qualname", "signature")
+            score = self._task_evidence_symbol_relevance(
+                str(symbol.get("name") or ""), query_tokens, frequencies, total
             )
-            score = sum(term in haystack for term in terms)
-            if score:
+            if score > 0:
                 scored.append(
                     (
                         score,
@@ -866,14 +978,14 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                     )
                 )
         scored.sort(key=lambda row: (-row[0], row[1]))
-        return [(row[0], row[2]) for row in scored[:2]]
+        return [(row[0], row[2]) for row in scored[:8]]
 
     @staticmethod
     def _task_evidence_supplement_row(
         path: str,
         symbol: Mapping[str, object],
         *,
-        score: int,
+        score: float,
         visibility: EvidenceVisibility,
     ) -> dict[str, object]:
         def optional_text(key: str) -> str | None:
@@ -896,7 +1008,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             evidence_visibility=visibility,
         ).as_dict()
         row["retrieval_supplement"] = "bounded-natural-language"
-        row["score_basis"] = "natural-term-match-count"
+        row["score_basis"] = "natural-identifier-phrase-relevance"
         return row
 
     def _task_evidence_natural_retrieval_supplements(
@@ -916,10 +1028,25 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             )
             for row in existing
         }
-        terms, _truncated = self._task_natural_term_candidates(task)
+        query = self._task_evidence_retrieval_query(task)
+        terms, _truncated = self._task_natural_term_candidates(query)
+        if not terms:
+            return []
+        term_set = set(terms)
+        query_tokens = tuple(
+            tuple(
+                variant
+                for variant in self._task_natural_term_variants(word)
+                if variant in term_set
+            )
+            for word in re.findall(r"[A-Za-z]+", query.lower())
+        )
+        total, frequencies = self._session_lexical_document_frequencies(terms)
         bound_reasons: set[str] = set()
-        paths = self._task_evidence_natural_candidate_paths(task, bound_reasons)
-        rows: list[dict[str, object]] = []
+        paths = self._task_evidence_natural_candidate_paths(
+            query, existing, terms, bound_reasons
+        )
+        eligible: list[tuple[str, EvidenceVisibility]] = []
         for path in paths:
             visibility = self._task_evidence_visibility(path)
             if (
@@ -930,7 +1057,13 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 or not self._indexed_path_current(path)
             ):
                 continue
-            for score, symbol in self._task_evidence_scored_symbols(path, terms):
+            eligible.append((path, visibility))
+        self._session_preload_symbols([path for path, _ in eligible])
+        scored_rows: list[tuple[float, int, str, dict[str, object]]] = []
+        for path_rank, (path, visibility) in enumerate(eligible):
+            for score, symbol in self._task_evidence_scored_symbols(
+                path, query_tokens, frequencies, total
+            ):
                 key = (
                     path,
                     str(symbol.get("qualname") or symbol.get("name") or ""),
@@ -938,14 +1071,18 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 if key in existing_keys:
                     continue
                 existing_keys.add(key)
-                rows.append(
-                    self._task_evidence_supplement_row(
-                        path, symbol, score=score, visibility=visibility
+                scored_rows.append(
+                    (
+                        score,
+                        path_rank,
+                        str(symbol.get("qualname") or symbol.get("name") or ""),
+                        self._task_evidence_supplement_row(
+                            path, symbol, score=score, visibility=visibility
+                        ),
                     )
                 )
-                if len(rows) == 2:
-                    return rows
-        return rows
+        scored_rows.sort(key=lambda row: (-row[0], row[1], row[2]))
+        return [row[3] for row in scored_rows[:2]]
 
     def _task_evidence_attach_retrieval_supplements(
         self,

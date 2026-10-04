@@ -16,13 +16,13 @@ _INSTALL_HINT = (
 )
 
 _SERVER_INSTRUCTIONS = (
-    "Hashmarks is read-only repository intelligence. When a coding or repository task "
-    "asks where behavior is implemented, which code owns it, or what to read or verify "
-    "and the exact owner/path/symbol is not already known, prefer task_evidence as the "
-    "first repository-discovery call before broad grep/glob or exploratory reads. Use "
-    "its bounded candidates, ambiguity, verification, freshness, and next-read evidence "
-    "to choose targeted native reads; retrieval ranking is evidence, not ownership "
-    "authority. If the exact path or symbol is already known, use find or a native read. "
+    "Hashmarks is read-only repository intelligence. For a task describing behavior "
+    "without a unique known implementation path, call task_evidence before the first "
+    "exploratory grep, glob, or read. This includes read-only questions asking which "
+    "function implements a behavior. Use its bounded candidates, ambiguity, freshness, "
+    "and next-read evidence to choose targeted native reads; retrieval ranking is "
+    "evidence, not ownership authority. Read a unique known path directly. For a known "
+    "exact symbol whose path is unknown, use find. "
     "After explicit changed paths exist, use change_impact or post_change when relevant. "
     "Hashmarks does not replace editing, shell, tests, or git."
 )
@@ -115,9 +115,8 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="find",
         description=(
-            "Use for a bounded path or symbol lookup when the target is already known. "
-            "For broader coding-task ownership, edit, verification, or next-read evidence, "
-            "use task_evidence instead."
+            "Look up a known exact path or symbol. If the task only describes behavior "
+            "and its implementation path is unknown, call task_evidence first."
         ),
         annotations=annotations,
     )
@@ -127,9 +126,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     @server.tool(
         name="task_evidence",
         description=(
-            "Prefer before broad grep/glob/read when a repository task's exact "
-            "owner/path/symbol is unknown, including read-only localization. Returns "
-            "bounded candidates, ambiguity, verification, freshness, and next-read evidence."
+            "First discovery tool for a behavior description with unknown implementation "
+            "path. Call before exploratory grep, glob, or read, including read-only "
+            "'which function?' tasks. Returns bounded candidates and next reads."
         ),
         annotations=annotations,
     )

@@ -385,18 +385,23 @@ def test_task_evidence_preserves_dense_natural_language_owner_candidates(
 
         with CodeMap(root) as codemap:
             codemap.sync()
-            packet = codemap.task_evidence(task, limit=20, token_budget=256)
-
-        retrieval = packet["retrieval"]["results"]
-        assert any(
-            row["path"] == expected_path
-            and (
-                row.get("name") == expected_symbol
-                or str(row.get("qualname") or "").rsplit(".", 1)[-1] == expected_symbol
-            )
-            for row in retrieval
-        ), case_id
-        assert packet["retrieval"]["ownership_authority"] is False
+            for query in (
+                task,
+                task + " Return exactly one JSON object with keys path and symbol, "
+                "and nothing else.",
+            ):
+                packet = codemap.task_evidence(query, limit=20, token_budget=256)
+                retrieval = packet["retrieval"]["results"]
+                assert any(
+                    row["path"] == expected_path
+                    and (
+                        row.get("name") == expected_symbol
+                        or str(row.get("qualname") or "").rsplit(".", 1)[-1]
+                        == expected_symbol
+                    )
+                    for row in retrieval
+                ), (case_id, query)
+                assert packet["retrieval"]["ownership_authority"] is False
 
 
 def test_task_evidence_natural_supplements_respect_deny_visibility(
@@ -491,7 +496,10 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
     assert retrieval["ordering"] == "canonical-then-bounded-natural-language"
     assert any(row["name"] == "paths_under" for row in supplements)
     assert all(set(action["canonical"][0]).issubset(row) for row in supplements)
-    assert all(row["score_basis"] == "natural-term-match-count" for row in supplements)
+    assert all(
+        row["score_basis"] == "natural-identifier-phrase-relevance"
+        for row in supplements
+    )
     assert all(
         isinstance(row["score"], float) and row["score"] > 0 for row in supplements
     )
