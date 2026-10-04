@@ -86,12 +86,55 @@ def _source_binding(
         )
     from hashmarks.test_shards import repository_content_identity
 
+    excluded = (source_root / "dist",)
+    before = repository_content_identity(
+        source_root,
+        excluded_paths=excluded,
+    )
+    after = repository_content_identity(
+        source_root,
+        excluded_paths=excluded,
+    )
+    if before != after:
+        raise HostGateError(
+            "Hashmarks source changed during handoff identity observation"
+        )
     return {
         "root": str(source_root),
-        "repository_content_identity": repository_content_identity(
+        "repository_content_identity": before,
+    }
+
+
+def _implementation_identity(
+    executable: Path,
+    source_root: Path | None,
+    *,
+    workspace: Path,
+) -> dict[str, object]:
+    try:
+        before_sha256 = sha256(executable)
+        version = run([str(executable), "--version"], cwd=workspace).stdout.strip()
+        source = _source_binding(
+            executable,
             source_root,
-            excluded_paths=(source_root / "dist",),
-        ),
+            workspace=workspace,
+        )
+        after_sha256 = sha256(executable)
+    except OSError as exc:
+        raise HostGateError(
+            f"Hashmarks implementation identity became unreadable: {exc}"
+        ) from exc
+    if before_sha256 != after_sha256:
+        raise HostGateError(
+            "Hashmarks executable changed during handoff identity observation"
+        )
+    if not version.startswith("hashmarks version "):
+        raise HostGateError(f"unexpected Hashmarks version output: {version!r}")
+    return {
+        "executable": str(executable),
+        "executable_sha256": before_sha256,
+        "version": version,
+        "source": source,
     }
 
 
@@ -192,14 +235,14 @@ def build_handoff(
     executable: Path,
     workspace: Path,
     state_dir: Path | None,
-    source: dict[str, str] | None,
+    implementation: dict[str, object],
     observation: dict[str, Any],
 ) -> dict[str, Any]:
     _validate_observation(observation)
     command = _command_argv(executable, workspace, state_dir)
-    version = run([str(executable), "--version"], cwd=workspace).stdout.strip()
-    if not version.startswith("hashmarks version "):
-        raise HostGateError(f"unexpected Hashmarks version output: {version!r}")
+    version = implementation.get("version")
+    if not isinstance(version, str) or not version.startswith("hashmarks version "):
+        raise HostGateError("qualified Hashmarks implementation version is unavailable")
     expected_server_version = version.removeprefix("hashmarks version ")
     server = observation.get("server")
     server_version = server.get("version") if isinstance(server, dict) else None
@@ -220,16 +263,47 @@ def build_handoff(
         },
         "workspace": str(workspace),
         "state_dir": None if state_dir is None else str(state_dir),
-        "source": source,
+        "source": implementation.get("source"),
         "hashmarks": {
-            "executable": str(executable),
-            "executable_sha256": sha256(executable),
+            "executable": implementation.get("executable"),
+            "executable_sha256": implementation.get("executable_sha256"),
             "version": version,
         },
         "mcp_command_argv": command,
         "mcp_command": _command_text(command),
         "mcp": observation,
     }
+
+
+async def qualify_handoff(
+    *,
+    executable: Path,
+    workspace: Path,
+    state_dir: Path | None,
+    source_root: Path | None,
+) -> dict[str, Any]:
+    before = _implementation_identity(
+        executable,
+        source_root,
+        workspace=workspace,
+    )
+    observation = await _observe_mcp(executable, workspace, state_dir)
+    after = _implementation_identity(
+        executable,
+        source_root,
+        workspace=workspace,
+    )
+    if before != after:
+        raise HostGateError(
+            "Hashmarks implementation changed while MCP handoff was being qualified"
+        )
+    return build_handoff(
+        executable=executable,
+        workspace=workspace,
+        state_dir=state_dir,
+        implementation=before,
+        observation=observation,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -277,18 +351,13 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"Hashmarks source root does not exist: {source_root}")
 
     try:
-        source = _source_binding(
-            executable,
-            source_root,
-            workspace=workspace,
-        )
-        observation = asyncio.run(_observe_mcp(executable, workspace, state_dir))
-        receipt = build_handoff(
-            executable=executable,
-            workspace=workspace,
-            state_dir=state_dir,
-            source=source,
-            observation=observation,
+        receipt = asyncio.run(
+            qualify_handoff(
+                executable=executable,
+                workspace=workspace,
+                state_dir=state_dir,
+                source_root=source_root,
+            )
         )
     except HostGateError as exc:
         raise SystemExit(f"ChatGPT MCP tunnel handoff unavailable: {exc}") from exc
