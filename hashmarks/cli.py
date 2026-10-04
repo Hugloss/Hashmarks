@@ -26,6 +26,7 @@ from .opencode_registration import (
     effective_command_uses_executable,
     inspect_effective_hashmarks_command,
 )
+from .mcp_transport import add_transport_arguments
 from .paths import canonical_host_path
 from .release_update import (
     ReleaseCheckError,
@@ -453,8 +454,6 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     _add_common_arguments(mcp, inherited=True)
-    from .mcp_server import add_transport_arguments
-
     add_transport_arguments(mcp)
     mcp.set_defaults(func=_mcp, automatic_update_check=False)
     install = sub.add_parser(
