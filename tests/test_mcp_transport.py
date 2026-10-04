@@ -46,10 +46,10 @@ def test_transport_validation_owner_accepts_only_local_authority() -> None:
         path="/mcp",
     ) == ("127.0.0.1", 8000, "/mcp")
     assert validate_streamable_http(
-        host="localhost",
+        host="::1",
         port=9123,
         path="/hashmarks/mcp",
-    ) == ("localhost", 9123, "/hashmarks/mcp")
+    ) == ("::1", 9123, "/hashmarks/mcp")
 
 
 def test_streamable_http_uses_loopback_stateless_json_transport(tmp_path) -> None:
@@ -88,6 +88,7 @@ def test_streamable_http_uses_loopback_stateless_json_transport(tmp_path) -> Non
     ("field", "value", "message"),
     [
         ("host", "0.0.0.0", "loopback-only"),
+        ("host", "localhost", "loopback-only"),
         ("host", "192.0.2.10", "loopback-only"),
         ("port", 0, "between 1 and 65535"),
         ("port", 65536, "between 1 and 65535"),
@@ -140,7 +141,7 @@ def test_top_level_cli_delegates_transport_once(tmp_path, monkeypatch) -> None:
                 "--transport",
                 "streamable-http",
                 "--host",
-                "localhost",
+                "::1",
                 "--port",
                 "9123",
                 "--path",
@@ -153,7 +154,7 @@ def test_top_level_cli_delegates_transport_once(tmp_path, monkeypatch) -> None:
         "workspace": tmp_path.resolve(),
         "state_dir": None,
         "transport": "streamable-http",
-        "host": "localhost",
+        "host": "::1",
         "port": 9123,
         "path": "/mcp",
     }
