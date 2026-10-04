@@ -6,6 +6,7 @@ import pytest
 
 from hashmarks.errors import UserFacingError
 from hashmarks.mcp_server import run_server
+from hashmarks.mcp_transport import validate_streamable_http
 
 
 class _Surface:
@@ -36,6 +37,19 @@ def test_stdio_remains_default_transport_and_closes_surface(tmp_path) -> None:
     build.assert_called_once_with(tmp_path, state_dir=None)
     assert server.calls == [((), {"transport": "stdio"})]
     assert server._hashmarks_surface.closed is True
+
+
+def test_transport_validation_owner_accepts_only_local_authority() -> None:
+    assert validate_streamable_http(
+        host="127.0.0.1",
+        port=8000,
+        path="/mcp",
+    ) == ("127.0.0.1", 8000, "/mcp")
+    assert validate_streamable_http(
+        host="localhost",
+        port=9123,
+        path="/hashmarks/mcp",
+    ) == ("localhost", 9123, "/hashmarks/mcp")
 
 
 def test_streamable_http_uses_loopback_stateless_json_transport(tmp_path) -> None:
