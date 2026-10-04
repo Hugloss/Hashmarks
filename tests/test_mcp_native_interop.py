@@ -64,13 +64,9 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
                 "implementation path is unknown, use task_evidence first."
             ),
             "task_evidence": (
-                "Primary semantic discovery tool when a task describes behavior but the exact "
-                "implementation path is not already known. Prefer this before exploratory "
-                "grep/glob/read: one bounded call separates supporting retrieval from ownership "
-                "authority, resolves a unique owner when admissible or preserves ambiguity, "
-                "returns source evidence or an exact next-read, selects verification evidence/"
-                "plan, and reports freshness. Native read is for the targeted path/range after "
-                "this reduction, not for reconstructing ownership by repeated exploration."
+                "Semantic first choice for behavior localization when the path is unknown. "
+                "Prefer before exploratory grep/read: separates retrieval from ownership, "
+                "resolves owner/ambiguity, and returns source/next-read, verification, freshness."
             ),
             "change_impact": (
                 "Use after explicit changed paths exist for bounded structural impact and "
@@ -86,13 +82,13 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         } == selection_contract
         task_description = descriptions["task_evidence"]
         for phrase in (
-            "Primary semantic discovery tool",
-            "supporting retrieval from ownership authority",
-            "preserves ambiguity",
-            "source evidence or an exact next-read",
-            "verification evidence/plan",
-            "reports freshness",
-            "not for reconstructing ownership",
+            "Semantic first choice",
+            "exploratory grep/read",
+            "retrieval from ownership",
+            "owner/ambiguity",
+            "source/next-read",
+            "verification",
+            "freshness",
         ):
             assert phrase in task_description
         schemas = {tool.name: tool.input_schema for tool in tools}
@@ -147,9 +143,16 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
                 assert initialized.server_info.name == "Hashmarks"
                 assert initialized.server_info.version == __version__
                 assert initialized.instructions is not None
-                assert "semantic repository-intelligence layer" in initialized.instructions
-                assert "call task_evidence before exploratory" in initialized.instructions
-                assert "supporting retrieval from ownership authority" in initialized.instructions
+                assert (
+                    "semantic repository-intelligence layer" in initialized.instructions
+                )
+                assert (
+                    "call task_evidence before exploratory" in initialized.instructions
+                )
+                assert (
+                    "supporting retrieval from ownership authority"
+                    in initialized.instructions
+                )
                 assert "preserve ambiguity" in initialized.instructions
                 assert "verification plan" in initialized.instructions
                 assert "report freshness" in initialized.instructions
