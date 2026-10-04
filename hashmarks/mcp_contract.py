@@ -161,10 +161,7 @@ def qualification_response_schemas(
     *,
     name_prefix: str = "",
 ) -> dict[str, str]:
-    return {
-        f"{name_prefix}{name}": default_response_schema(name)
-        for name in names
-    }
+    return {f"{name_prefix}{name}": default_response_schema(name) for name in names}
 
 
 def _json_model(value: object | None) -> object | None:
@@ -180,10 +177,7 @@ def _canonical_annotations(value: object) -> dict[str, bool]:
     raw = _json_model(value)
     if not isinstance(raw, dict):
         raise ValueError("Hashmarks MCP tool annotations are unavailable")
-    normalized = {
-        key: raw.get(key)
-        for key in MCP_READ_ONLY_ANNOTATIONS
-    }
+    normalized = {key: raw.get(key) for key in MCP_READ_ONLY_ANNOTATIONS}
     if normalized != MCP_READ_ONLY_ANNOTATIONS:
         raise ValueError("Hashmarks MCP tool annotations are not read-only")
     return dict(MCP_READ_ONLY_ANNOTATIONS)
@@ -209,7 +203,7 @@ def _contract_identity(value: dict[str, object]) -> str:
     return f"sha256:{digest}"
 
 
-def qualify_mcp_observation(observation: dict[str, Any]) -> dict[str, object]:
+def _qualified_server(observation: dict[str, Any]) -> str:
     server = observation.get("server")
     if not isinstance(server, dict) or server.get("name") != MCP_SERVER_NAME:
         raise ValueError("MCP observation did not initialize the Hashmarks server")
@@ -218,46 +212,53 @@ def qualify_mcp_observation(observation: dict[str, Any]) -> dict[str, object]:
         raise ValueError("Hashmarks MCP server version is unavailable")
     if server.get("instructions") != MCP_SERVER_INSTRUCTIONS:
         raise ValueError("Hashmarks MCP routing instructions differ from the contract")
+    return version
 
+
+def _qualified_tool(
+    expected: McpToolContract,
+    raw: object,
+) -> dict[str, object]:
+    if not isinstance(raw, dict):
+        raise ValueError("Hashmarks MCP catalog contains a malformed tool")
+    if raw.get("description") != expected.description:
+        raise ValueError(
+            f"Hashmarks MCP tool description differs from the contract: {expected.name}"
+        )
+    return {
+        "name": expected.name,
+        "description": expected.description,
+        "input_schema": _canonical_schema(
+            raw.get("input_schema"), label=f"{expected.name} input schema"
+        ),
+        "output_schema": _canonical_schema(
+            raw.get("output_schema"), label=f"{expected.name} output schema"
+        ),
+        "annotations": _canonical_annotations(raw.get("annotations")),
+        "response_schemas": list(expected.response_schemas),
+    }
+
+
+def _qualified_tools(observation: dict[str, Any]) -> list[dict[str, object]]:
     raw_tools = observation.get("tools")
     if not isinstance(raw_tools, list):
         raise ValueError("Hashmarks MCP tool catalog is unavailable")
-    names = tuple(
-        str(row.get("name"))
-        for row in raw_tools
-        if isinstance(row, dict)
-    )
+    names = tuple(str(row.get("name")) for row in raw_tools if isinstance(row, dict))
     if names != MCP_TOOL_NAMES:
         raise ValueError(
-            "Hashmarks MCP tool catalog differs from the contract: "
-            f"{names!r}"
+            f"Hashmarks MCP tool catalog differs from the contract: {names!r}"
         )
     if len(raw_tools) != len(MCP_TOOL_CONTRACTS):
         raise ValueError("Hashmarks MCP tool catalog contains malformed entries")
+    return [
+        _qualified_tool(expected, raw)
+        for expected, raw in zip(MCP_TOOL_CONTRACTS, raw_tools, strict=True)
+    ]
 
-    tools: list[dict[str, object]] = []
-    for expected, raw in zip(MCP_TOOL_CONTRACTS, raw_tools, strict=True):
-        if not isinstance(raw, dict):
-            raise ValueError("Hashmarks MCP catalog contains a malformed tool")
-        if raw.get("description") != expected.description:
-            raise ValueError(
-                f"Hashmarks MCP tool description differs from the contract: {expected.name}"
-            )
-        tools.append(
-            {
-                "name": expected.name,
-                "description": expected.description,
-                "input_schema": _canonical_schema(
-                    raw.get("input_schema"), label=f"{expected.name} input schema"
-                ),
-                "output_schema": _canonical_schema(
-                    raw.get("output_schema"), label=f"{expected.name} output schema"
-                ),
-                "annotations": _canonical_annotations(raw.get("annotations")),
-                "response_schemas": list(expected.response_schemas),
-            }
-        )
 
+def qualify_mcp_observation(observation: dict[str, Any]) -> dict[str, object]:
+    version = _qualified_server(observation)
+    tools = _qualified_tools(observation)
     manifest: dict[str, object] = {
         "schema": MCP_CONTRACT_SCHEMA,
         "server": {
@@ -270,7 +271,6 @@ def qualify_mcp_observation(observation: dict[str, Any]) -> dict[str, object]:
     }
     manifest["contract_identity"] = _contract_identity(manifest)
     return manifest
-
 
 def contract_from_tool_models(
     version: str,
@@ -313,11 +313,7 @@ def contract_summary(manifest: dict[str, object]) -> dict[str, object]:
         "schema": MCP_CONTRACT_SCHEMA,
         "contract_identity": manifest["contract_identity"],
         "server_version": server.get("version"),
-        "tools": [
-            str(row.get("name"))
-            for row in tools
-            if isinstance(row, dict)
-        ],
+        "tools": [str(row.get("name")) for row in tools if isinstance(row, dict)],
     }
 
 
