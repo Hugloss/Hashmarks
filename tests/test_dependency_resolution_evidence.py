@@ -1283,7 +1283,7 @@ def test_v3_dependency_query_refuses_unknown_request_field(
 
 
 @pytest.mark.parametrize(
-    ("request", "operation", "field"),
+    ("query_request", "operation", "field"),
     [
         (
             {"operation": "component", "component_id": "library", "node_id": "app@1"},
@@ -1324,7 +1324,7 @@ def test_v3_dependency_query_refuses_unknown_request_field(
 )
 def test_v3_dependency_query_rejects_operation_irrelevant_fields(
     tmp_path: Path,
-    request: dict[str, object],
+    query_request: dict[str, object],
     operation: str,
     field: str,
 ) -> None:
@@ -1335,11 +1335,11 @@ def test_v3_dependency_query_rejects_operation_irrelevant_fields(
             ValueError,
             match=f"dependency query field is not valid for {operation}: {field}",
         ):
-            codemap.dependency_resolution_queries(observation, [request])
+            codemap.dependency_resolution_queries(observation, [query_request])
 
 
 @pytest.mark.parametrize(
-    ("request", "field"),
+    ("query_request", "field"),
     [
         ({"operation": True}, "operation"),
         (
@@ -1384,13 +1384,13 @@ def test_v3_dependency_query_rejects_operation_irrelevant_fields(
     ],
 )
 def test_v3_dependency_query_rejects_non_string_identifiers(
-    tmp_path: Path, request: dict[str, object], field: str
+    tmp_path: Path, query_request: dict[str, object], field: str
 ) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         observation = codemap.dependency_resolution_evidence(_snapshot_v3())
         with pytest.raises(ValueError, match=f"{field} must be a string"):
-            codemap.dependency_resolution_queries(observation, [request])
+            codemap.dependency_resolution_queries(observation, [query_request])
 
 
 @pytest.mark.parametrize("field", ["max_depth", "max_results", "max_visits"])
