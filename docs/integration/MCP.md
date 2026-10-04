@@ -43,6 +43,61 @@ hashmarks --workspace . mcp
 
 One server process binds one canonical workspace. Start another process for another repository. The first repository-intelligence tool call may build or reconcile the CodeMap; MCP discovery itself does not pre-index the repository.
 
+### ChatGPT through Secure MCP Tunnel
+
+ChatGPT does not connect directly to a local stdio MCP process. OpenAI Secure MCP Tunnel can own the remote transport while launching Hashmarks through its existing local stdio command, so Hashmarks does **not** need a second HTTP server or public ingress.
+
+First qualify the exact local executable/workspace handoff without creating a tunnel or storing credentials:
+
+```bash
+make init
+make mcp-chatgpt-handoff \
+  CHATGPT_MCP_WORKSPACE=/absolute/path/to/repository
+```
+
+The default receipt is `dist/chatgpt-secure-mcp-tunnel-handoff.json`. It binds:
+
+- the canonical workspace;
+- the exact Hashmarks executable path, SHA-256, and version;
+- the exact stdio `mcp_command_argv` and shell-safe `mcp_command`;
+- the negotiated MCP protocol/server identity and server instructions;
+- the exact eight-tool read-only catalog and annotations;
+- explicit authority that Secure MCP Tunnel, ChatGPT configuration, and credentials remain external.
+
+To hand that already-qualified stdio command to OpenAI's tunnel client, create/select a tunnel in the OpenAI Platform first, then keep the runtime API key outside Hashmarks and run the OpenAI-owned client. For example:
+
+```bash
+mcp_command="$(
+  uv run --frozen --no-sync python -c \
+    'import json; print(json.load(open("dist/chatgpt-secure-mcp-tunnel-handoff.json"))["mcp_command"])'
+)"
+
+export CONTROL_PLANE_API_KEY='...'
+
+tunnel-client init \
+  --sample sample_mcp_stdio_local \
+  --profile hashmarks-chatgpt \
+  --tunnel-id '<tunnel_id>' \
+  --mcp-command "$mcp_command"
+
+tunnel-client doctor --profile hashmarks-chatgpt --explain
+tunnel-client run --profile hashmarks-chatgpt
+```
+
+Use the latest OpenAI `tunnel-client` release and the current Secure MCP Tunnel documentation rather than pinning tunnel-client behavior in Hashmarks. Hashmarks never receives or stores the control-plane API key or tunnel ID.
+
+When the target ChatGPT workspace has developer-mode custom-app access, create the app using **Tunnel** and select the OpenAI-managed tunnel. Review the discovered Hashmarks tools before model calls. The tunnel/app/workspace permissions remain OpenAI/organization authority; a successful local Hashmarks handoff does not imply that ChatGPT access has been granted.
+
+For routing benchmarking, do not count a missing Hashmarks app as a tool-selection loss. First capture the host-visible catalog and qualify it with the agentsCookbook host-neutral gate:
+
+```bash
+../agentsCookbook/benchmark tool-routing-catalog \
+  --catalog host-tools.json \
+  --subject hashmarks
+```
+
+Only a `READY` catalog can answer whether ChatGPT voluntarily chooses `task_evidence` before native repository search/read. `ENVIRONMENT_BLOCKED: required-subject-tool-missing` means the host integration is unavailable, not that Hashmarks lost the routing decision.
+
 ## Tool surface
 
 Hashmarks intentionally exposes a small read-only repository-intelligence tool catalog:
