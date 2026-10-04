@@ -446,10 +446,15 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
     try:
         names = [str(row["name"]) for row in registered]
         assert (
-            server.description == "Read-only repository intelligence for coding agents"
+            server.description
+            == (
+                "Semantic read-only repository intelligence for behavior localization, "
+                "ownership, impact, freshness, and verification evidence"
+            )
             and server.instructions == mcp_server._SERVER_INSTRUCTIONS
-            and "call task_evidence before the first" in server.instructions
-            and "exploratory grep, glob, or read" in server.instructions
+            and "call task_evidence before exploratory" in server.instructions
+            and "repeated native search/read calls" in server.instructions
+            and "unique known path" in server.instructions
         )
         assert names == [
             "repository_context",
