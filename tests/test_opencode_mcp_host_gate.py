@@ -578,6 +578,16 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
         "_package_versions",
         lambda _python: {"hashmarks": "1.0.0", "mcp": "1.0"},
     )
+    monkeypatch.setattr(
+        host_gate,
+        "_installed_mcp_contract",
+        lambda *_args, **_kwargs: {
+            "schema": "hashmarks.mcp-contract.v1",
+            "contract_identity": "sha256:" + "a" * 64,
+            "server_version": "1.0.0",
+            "tools": list(host_gate.MCP_WORKFLOW_HOST_QUALIFICATION_TOOLS),
+        },
+    )
     registration_env = {"QUALIFICATION": "opencode"}
     monkeypatch.setattr(
         host_gate,
@@ -653,6 +663,8 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
     assert receipt["status"] == "PASS"
     assert receipt["host"] == {"name": "opencode", "version": "opencode 2.0.4"}
     assert receipt["model_authority"] == "opencode-native-config"
+    assert receipt["mcp_contract"]["schema"] == "hashmarks.mcp-contract.v1"
+    assert receipt["mcp_contract"]["server_version"] == "1.0.0"
     assert "model" not in receipt
     assert receipt["phase1"]["generation"] == 1
     assert receipt["phase2"]["generation_after"] == 2
