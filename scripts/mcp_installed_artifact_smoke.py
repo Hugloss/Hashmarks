@@ -60,91 +60,87 @@ async def _exercise_session(
     assert [tool.name for tool in tools.tools] == _EXPECTED_TOOLS
 
     if not boundary_only:
-                found = await session.call_tool(
-                    "find", arguments={"query": "flare041", "limit": 5}
-                )
-                assert found.is_error is not True
-                assert found.structured_content is not None
-                assert found.structured_content["schema"] == "hashmarks.mcp-find.v1"
-                assert any(
-                    row["path"] == "src/feature.py"
-                    for row in found.structured_content["results"]
-                )
+        found = await session.call_tool(
+            "find", arguments={"query": "flare041", "limit": 5}
+        )
+        assert found.is_error is not True
+        assert found.structured_content is not None
+        assert found.structured_content["schema"] == "hashmarks.mcp-find.v1"
+        assert any(
+            row["path"] == "src/feature.py"
+            for row in found.structured_content["results"]
+        )
 
-                declarations = await session.call_tool(
-                    "repository_declarations",
-                    arguments={
-                        "groups": [
+        declarations = await session.call_tool(
+            "repository_declarations",
+            arguments={
+                "groups": [
+                    {
+                        "group_id": "runtime",
+                        "semantic_namespace": "installed-smoke",
+                        "concept": {"kind": "runtime", "identity": "python"},
+                        "scope": {},
+                        "correspondence": {
+                            "state": "declared",
+                            "basis": {"provider": "installed-smoke"},
+                        },
+                        "declarations": [
                             {
-                                "group_id": "runtime",
-                                "semantic_namespace": "installed-smoke",
-                                "concept": {"kind": "runtime", "identity": "python"},
-                                "scope": {},
-                                "correspondence": {
-                                    "state": "declared",
-                                    "basis": {"provider": "installed-smoke"},
-                                },
-                                "declarations": [
+                                "declaration_id": "a",
+                                "semantic_role": {"kind": "project-intent"},
+                                "value_state": "resolved",
+                                "value": "3.12",
+                                "producer": {"kind": "fixture"},
+                                "evidence": [
                                     {
-                                        "declaration_id": "a",
-                                        "semantic_role": {"kind": "project-intent"},
-                                        "value_state": "resolved",
-                                        "value": "3.12",
-                                        "producer": {"kind": "fixture"},
-                                        "evidence": [
-                                            {
-                                                "path": "runtime-a.txt",
-                                                "start_line": 1,
-                                                "end_line": 1,
-                                            }
-                                        ],
-                                    },
-                                    {
-                                        "declaration_id": "b",
-                                        "semantic_role": {"kind": "container-runtime"},
-                                        "value_state": "resolved",
-                                        "value": "3.12",
-                                        "producer": {"kind": "fixture"},
-                                        "evidence": [
-                                            {
-                                                "path": "runtime-b.txt",
-                                                "start_line": 1,
-                                                "end_line": 1,
-                                            }
-                                        ],
-                                    },
+                                        "path": "runtime-a.txt",
+                                        "start_line": 1,
+                                        "end_line": 1,
+                                    }
                                 ],
-                                "coverage": {
-                                    "state": "complete",
-                                    "truncation": "complete",
-                                    "expected_declaration_ids": ["a", "b"],
-                                    "scope": {},
-                                    "provenance": {"provider": "installed-smoke"},
-                                },
-                            }
-                        ]
-                    },
-                )
-                assert declarations.is_error is not True
-                assert declarations.structured_content is not None
-                assert (
-                    declarations.structured_content["schema"]
-                    == "hashmarks.repository-declarations.v1"
-                )
-                assert (
-                    declarations.structured_content["groups"][0]["comparison"]["state"]
-                    == "equivalent"
-                )
-                assert all(
-                    row["semantic_declaration_identity"].startswith("sha256:")
-                    for row in declarations.structured_content["groups"][0][
-                        "declarations"
-                    ]
-                )
+                            },
+                            {
+                                "declaration_id": "b",
+                                "semantic_role": {"kind": "container-runtime"},
+                                "value_state": "resolved",
+                                "value": "3.12",
+                                "producer": {"kind": "fixture"},
+                                "evidence": [
+                                    {
+                                        "path": "runtime-b.txt",
+                                        "start_line": 1,
+                                        "end_line": 1,
+                                    }
+                                ],
+                            },
+                        ],
+                        "coverage": {
+                            "state": "complete",
+                            "truncation": "complete",
+                            "expected_declaration_ids": ["a", "b"],
+                            "scope": {},
+                            "provenance": {"provider": "installed-smoke"},
+                        },
+                    }
+                ]
+            },
+        )
+        assert declarations.is_error is not True
+        assert declarations.structured_content is not None
+        assert (
+            declarations.structured_content["schema"]
+            == "hashmarks.repository-declarations.v1"
+        )
+        assert (
+            declarations.structured_content["groups"][0]["comparison"]["state"]
+            == "equivalent"
+        )
+        assert all(
+            row["semantic_declaration_identity"].startswith("sha256:")
+            for row in declarations.structured_content["groups"][0]["declarations"]
+        )
 
-    invalid = await session.call_tool(
-        "find", arguments={"query": "", "limit": 5}
-    )
+    invalid = await session.call_tool("find", arguments={"query": "", "limit": 5})
     assert invalid.is_error is True
     text = "\n".join(getattr(block, "text", "") for block in invalid.content)
     assert "query must not be empty" in text
