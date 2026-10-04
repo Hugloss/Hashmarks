@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import socket
+import subprocess
 import sys
 from typing import TYPE_CHECKING
 
@@ -161,3 +163,91 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
                 assert "Traceback" not in text
 
     asyncio.run(exercise())
+
+
+def _free_loopback_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        return int(listener.getsockname()[1])
+
+
+@pytest.mark.skipif(not _MCP_AVAILABLE, reason=_NATIVE_REASON)
+def test_mcp_native_streamable_http_initialize_catalog_and_call(tmp_path: Path) -> None:
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamable_http_client
+
+    repo = _repo(tmp_path)
+    state = tmp_path / "http-state"
+    port = _free_loopback_port()
+    endpoint = f"http://127.0.0.1:{port}/mcp"
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "hashmarks.mcp_server",
+            "--workspace",
+            str(repo),
+            "--state-dir",
+            str(state),
+            "--transport",
+            "streamable-http",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--path",
+            "/mcp",
+        ],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    async def exercise() -> None:
+        last_error: Exception | None = None
+        for _ in range(100):
+            if process.poll() is not None:
+                stdout, stderr = process.communicate()
+                raise AssertionError(
+                    "Hashmarks HTTP MCP exited before readiness: "
+                    f"stdout={stdout!r} stderr={stderr!r}"
+                )
+            try:
+                async with streamable_http_client(endpoint) as (read, write):
+                    async with ClientSession(read, write) as session:
+                        initialized = await session.initialize()
+                        assert initialized.server_info.name == "Hashmarks"
+                        assert initialized.instructions is not None
+                        assert "call task_evidence before the first" in initialized.instructions
+
+                        tools = await session.list_tools()
+                        assert [tool.name for tool in tools.tools] == _EXPECTED_TOOLS
+
+                        result = await session.call_tool(
+                            "find",
+                            arguments={"query": "flare041", "limit": 5},
+                        )
+                        assert result.is_error is not True
+                        assert result.structured_content is not None
+                        assert result.structured_content["schema"] == "hashmarks.mcp-find.v1"
+                        assert any(
+                            row["path"] == "src/feature.py"
+                            for row in result.structured_content["results"]
+                        )
+                        return
+            except Exception as exc:  # server startup is the only retried boundary
+                last_error = exc
+                await asyncio.sleep(0.05)
+        raise AssertionError(f"Hashmarks HTTP MCP did not become ready: {last_error}")
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        if process.poll() is None:
+            process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
