@@ -114,7 +114,7 @@ async def _observe_mcp(
         from mcp.client.stdio import stdio_client
     except ImportError as exc:
         raise HostGateError(
-            'ChatGPT tunnel handoff requires the MCP extra: uv sync --frozen --extra mcp'
+            "ChatGPT tunnel handoff requires the MCP extra: uv sync --frozen --extra mcp"
         ) from exc
 
     command = _command_argv(executable, workspace, state_dir)
@@ -160,15 +160,13 @@ def _validate_observation(observation: dict[str, Any]) -> None:
         "call task_evidence before the first" not in instructions
         or "exploratory grep, glob, or read" not in instructions
     ):
-        raise HostGateError("Hashmarks MCP routing instructions are unavailable or stale")
+        raise HostGateError(
+            "Hashmarks MCP routing instructions are unavailable or stale"
+        )
     tools = observation.get("tools")
     if not isinstance(tools, list):
         raise HostGateError("Hashmarks MCP tool catalog is unavailable")
-    names = tuple(
-        str(row.get("name"))
-        for row in tools
-        if isinstance(row, dict)
-    )
+    names = tuple(str(row.get("name")) for row in tools if isinstance(row, dict))
     if names != EXPECTED_TOOLS:
         raise HostGateError(
             "Hashmarks MCP tool catalog differs from the tunnel handoff contract: "
