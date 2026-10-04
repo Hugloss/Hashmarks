@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import argparse
+import asyncio
 import hashlib
 import json
 from dataclasses import dataclass
@@ -318,3 +320,34 @@ def contract_summary(manifest: dict[str, object]) -> dict[str, object]:
             if isinstance(row, dict)
         ],
     }
+
+
+async def _current_contract_summary(workspace: str) -> dict[str, object]:
+    from ._version import __version__
+    from .mcp_server import build_server
+
+    server = build_server(workspace)
+    try:
+        tools = await server.list_tools()
+        return contract_summary(contract_from_tool_models(__version__, tools))
+    finally:
+        server._hashmarks_surface.close()
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Emit the canonical contract identity for one installed Hashmarks MCP server."
+    )
+    parser.add_argument("--workspace", default=".")
+    args = parser.parse_args(argv)
+    print(
+        json.dumps(
+            asyncio.run(_current_contract_summary(args.workspace)),
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
