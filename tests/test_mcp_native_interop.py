@@ -54,9 +54,9 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         descriptions = {tool.name: tool.description or "" for tool in tools}
         selection_contract = {
             "repository_context": (
-                "Use only for broad repository orientation: freshness, languages, areas, and "
-                "topology. Do not use this to localize a behavior owner. For implementation "
-                "ownership, source/next-read, or verification evidence, use task_evidence."
+                "Broad orientation only: freshness, languages, areas, and topology. "
+                "Do not use for behavior ownership; use task_evidence for owner, "
+                "source/next-read, or verification evidence."
             ),
             "find": (
                 "Exact lookup for a path or symbol you already know by name. Do not use as a "
