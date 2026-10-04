@@ -159,6 +159,96 @@ def _changed_paths(values: list[str]) -> list[str]:
     ]
 
 
+def _find_freshness_state(stale: bool | None) -> str:
+    if stale is True:
+        return "stale"
+    if stale is False:
+        return "current"
+    return "unknown"
+
+
+def _find_claim_scope(intent: str) -> str:
+    return {
+        "identifier": "indexed-visible-symbol-surface",
+        "path": "admitted-visible-repository-path-index",
+    }.get(intent, "bounded-retrieval-only")
+
+
+def _find_exact_targets(
+    query: str, intent: str, hits: tuple[Any, ...]
+) -> set[tuple[object, ...]]:
+    if intent == "identifier":
+        return {
+            (hit.path, hit.qualname or hit.name, hit.start_line)
+            for hit in hits
+            if query in {hit.name, hit.qualname}
+        }
+    if intent == "path":
+        normalized = query[2:] if query.startswith("./") else query
+        return {
+            (hit.path,)
+            for hit in hits
+            if hit.path == normalized
+            or ("/" not in normalized and hit.path.rsplit("/", 1)[-1] == normalized)
+        }
+    return set()
+
+
+def _find_claim_fields(
+    query: str,
+    intent: str,
+    hits: tuple[Any, ...],
+    bound_reasons: tuple[str, ...],
+    *,
+    transport_truncated: bool,
+    freshness: str,
+) -> dict[str, object]:
+    omissions = set(bound_reasons)
+    if transport_truncated:
+        omissions.add("mcp-result-limit")
+    sorted_omissions = sorted(omissions)
+    exact_query = intent in {"identifier", "path"}
+    exact_targets = _find_exact_targets(query, intent, hits)
+    search_complete = exact_query and not sorted_omissions
+    claims_admissible = search_complete and freshness == "current"
+
+    reasons: list[str] = []
+    if not exact_query:
+        reasons.append("query-intent-not-exact")
+    if sorted_omissions:
+        reasons.append("bounded-search-omission")
+    if freshness != "current":
+        reasons.append(f"repository-freshness-{freshness}")
+
+    negative_evidence = "not-applicable"
+    if exact_query and not exact_targets:
+        negative_evidence = (
+            "admissible-within-declared-scope"
+            if claims_admissible
+            else "not-admissible"
+        )
+    elif not exact_query and not hits:
+        negative_evidence = "not-admissible"
+
+    uniqueness_evidence = "not-applicable"
+    if len(exact_targets) == 1:
+        uniqueness_evidence = (
+            "admissible-within-declared-scope"
+            if claims_admissible
+            else "not-admissible"
+        )
+
+    return {
+        "scope": _find_claim_scope(intent),
+        "completeness": "complete" if search_complete else "incomplete",
+        "observed_exact_match_count": len(exact_targets),
+        "negative_evidence": negative_evidence,
+        "uniqueness_evidence": uniqueness_evidence,
+        "omissions": sorted_omissions,
+        "admissibility_reasons": reasons,
+    }
+
+
 class HashmarksMcpSurface:
     """Small read-only MCP projection over one workspace-bound CodeMap.
 
@@ -185,13 +275,36 @@ class HashmarksMcpSurface:
     def find(self, query: str, *, limit: int = 20) -> dict[str, object]:
         query = _bounded_text(query, name="query", maximum=_MAX_QUERY_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
-        hits = self._read(lambda: self._map.find(query, limit=limit + 1))
+
+        def project() -> tuple[Any, Any, int, int, bool | None]:
+            evidence = self._map._find_evidence(query, limit=limit + 1)
+            route = self._map.query_route(query)
+            generation, identity_generation, stale = self._map._generation_status()
+            return evidence, route, generation, identity_generation, stale
+
+        evidence, route, generation, identity_generation, stale = self._read(project)
+        hits = evidence.hits
         visible = hits[:limit]
+        transport_truncated = len(hits) > limit
+        freshness = _find_freshness_state(stale)
+        claims = _find_claim_fields(
+            query,
+            route.intent.value,
+            hits,
+            evidence.bound_reasons,
+            transport_truncated=transport_truncated,
+            freshness=freshness,
+        )
         return {
             "schema": "hashmarks.mcp-find.v1",
             "query": query,
+            "query_intent": route.intent.value,
             "results": [hit.as_dict() for hit in visible],
-            "truncated": len(hits) > limit,
+            "truncated": transport_truncated,
+            "generation": generation,
+            "identity_generation": identity_generation,
+            "freshness": freshness,
+            **claims,
         }
 
     def task_evidence(

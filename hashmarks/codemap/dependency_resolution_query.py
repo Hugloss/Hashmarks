@@ -8,17 +8,33 @@ MAX_RESULTS = 256
 MAX_DEPTH = 16
 MAX_VISITS = 4096
 
-_QUERY_FIELDS = {
-    "operation",
-    "node_id",
-    "target_id",
-    "component_id",
-    "context",
-    "module",
-    "max_depth",
-    "max_results",
-    "max_visits",
+_OPERATION_QUERY_FIELDS = {
+    "component": frozenset({"operation", "component_id", "max_results"}),
+    "inventory": frozenset({"operation", "node_id", "context", "max_results"}),
+    "contexts": frozenset({"operation", "node_id", "max_results"}),
+    "module-owners": frozenset({"operation", "module", "context", "max_results"}),
+    "dependencies": frozenset(
+        {"operation", "node_id", "context", "max_depth", "max_results", "max_visits"}
+    ),
+    "dependents": frozenset(
+        {"operation", "node_id", "context", "max_depth", "max_results", "max_visits"}
+    ),
+    "paths": frozenset(
+        {
+            "operation",
+            "node_id",
+            "target_id",
+            "context",
+            "max_depth",
+            "max_results",
+            "max_visits",
+        }
+    ),
+    "reachability": frozenset(
+        {"operation", "node_id", "target_id", "context", "max_depth", "max_visits"}
+    ),
 }
+_QUERY_FIELDS = frozenset().union(*_OPERATION_QUERY_FIELDS.values())
 
 
 @dataclass(frozen=True)
@@ -281,21 +297,17 @@ def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915
     operation = _text(
         request.get("operation"), label="dependency query operation", required=True
     )
-    allowed = {
-        "component",
-        "dependencies",
-        "dependents",
-        "paths",
-        "reachability",
-        "contexts",
-        "inventory",
-        "module-owners",
-    }
-    if operation not in allowed:
+    if operation not in _OPERATION_QUERY_FIELDS:
         raise ValueError(f"unsupported dependency query operation: {operation}")
     unknown_fields = sorted(set(request) - _QUERY_FIELDS)
     if unknown_fields:
         raise ValueError(f"unknown dependency query field: {unknown_fields[0]}")
+    irrelevant_fields = sorted(set(request) - _OPERATION_QUERY_FIELDS[operation])
+    if irrelevant_fields:
+        raise ValueError(
+            "dependency query field is not valid for "
+            f"{operation}: {irrelevant_fields[0]}"
+        )
     max_depth, max_results, max_visits = _bounds(request)
     node_id = _text(request.get("node_id"), label="dependency query node_id")
     target_id = _text(request.get("target_id"), label="dependency query target_id")

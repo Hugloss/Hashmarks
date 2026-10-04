@@ -115,7 +115,7 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 | Tool | Purpose |
 | --- | --- |
 | `repository_context` | compact orientation, generation/freshness, languages, areas, projects |
-| `find` | bounded repository path/symbol discovery |
+| `find` | bounded exact path/symbol discovery with freshness, completeness, and negative/uniqueness admissibility |
 | `task_evidence` | role-separated retrieval, explicit-target, ownership, verification, freshness, ambiguity, and next-read repository evidence |
 | `change_impact` | bounded structural impact for caller-reported changed paths |
 | `correlate_evidence` | correlate bounded external/derived observations to canonical repository evidence without inferring causation |
@@ -126,6 +126,8 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 The tools are read-only from the repository consumer's perspective. Hashmarks may update its own disposable derived cache while answering them.
 
 Tool selection is intentionally phase-specific rather than interchangeable: use `repository_context` for broad orientation, `find` when an exact path/symbol/name is already known, `task_evidence` when a behavior/task needs semantic localization or ownership evidence, and `change_impact` after explicit changed paths exist. `task_evidence` is deliberately stronger than raw text search for that semantic case: one bounded packet separates supporting retrieval from ownership authority, preserves ambiguity, carries source evidence or an exact next-read, selects verification evidence/plan, and reports freshness. These descriptions are exposed through the native MCP catalog so hosts can choose the existing semantic owner without a Hashmarks-owned planner or workflow layer.
+
+`find` uses `hashmarks.mcp-find.v1` and does not let an empty or single bounded result silently become absence or uniqueness authority. It projects the core find engine's bound reasons together with CodeMap generation/freshness and reports observed exact-match cardinality. Exact path claims are scoped to the admitted visible repository path index; exact identifier claims are scoped to the indexed visible symbol surface. Only a current, unbounded exact-query cut can make `negative_evidence` or `uniqueness_evidence` admissible. Natural-language/conceptual retrieval remains bounded retrieval only and cannot prove absence.
 
 The MCP initialization also exposes concise server instructions for hosts that support them. For repository-localization work where the exact owner/path/symbol is not yet known, those instructions tell the coding agent to prefer one bounded `task_evidence` call before broad grep/glob or exploratory reads, then use native reads against the returned evidence. The opposite case is equally important: when a unique exact path is already known and the task is simply to inspect that file, native read is the better tool and Hashmarks should stay out of the way. This is routing guidance rather than workflow ownership: Hashmarks should win semantic reduction, not every repository access, and it does not replace editing, shell, test, or git tools.
 

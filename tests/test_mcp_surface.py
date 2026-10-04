@@ -213,9 +213,47 @@ def test_mcp_find_truncated_only_when_an_extra_hit_exists(tmp_path: Path) -> Non
         one = surface.find("flare041", limit=1)
         assert len(one["results"]) == 1
         assert one["truncated"] is True
+        assert "mcp-result-limit" in one["omissions"]
+        assert one["uniqueness_evidence"] == "not-admissible"
 
         exact = surface.find("feature_two.py", limit=10)
         assert exact["truncated"] is False
+        assert exact["query_intent"] == "path"
+        assert exact["observed_exact_match_count"] == 1
+    finally:
+        surface.close()
+
+
+def test_mcp_find_qualifies_absence_and_uniqueness_against_freshness(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _repo(tmp_path)
+    surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
+    try:
+        surface.repository_context()
+
+        def current_generation() -> tuple[int, int, bool]:
+            generation = surface._map.store.generation()
+            return generation, generation, False
+
+        monkeypatch.setattr(surface._map, "_generation_status", current_generation)
+
+        missing = surface.find("definitely_missing_symbol", limit=10)
+        assert missing["query_intent"] == "identifier"
+        assert missing["observed_exact_match_count"] == 0
+        assert missing["freshness"] == "current"
+        assert missing["completeness"] == "complete"
+        assert missing["negative_evidence"] == "admissible-within-declared-scope"
+        assert missing["admissibility_reasons"] == []
+
+        unique_path = surface.find("src/feature.py", limit=10)
+        assert unique_path["query_intent"] == "path"
+        assert unique_path["observed_exact_match_count"] == 1
+        assert unique_path["uniqueness_evidence"] == "admissible-within-declared-scope"
+
+        conceptual = surface.find("where is definitely_missing behavior", limit=10)
+        assert conceptual["negative_evidence"] == "not-admissible"
+        assert "query-intent-not-exact" in conceptual["admissibility_reasons"]
     finally:
         surface.close()
 
