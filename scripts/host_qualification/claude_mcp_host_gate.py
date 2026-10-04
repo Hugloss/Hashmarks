@@ -215,11 +215,6 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
         repo = tmp / "repo"
         repo.mkdir()
         write_fixture(repo)
-        mcp_contract = installed_mcp_contract(
-            python,
-            repo,
-            expected_version=versions["hashmarks"],
-        )
         config_path = _write_claude_config(repo, hashmarks)
 
         argv = [
@@ -260,7 +255,11 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
             "model": args.model or "configured-default",
             "python_selector": args.python,
             "installed_versions": versions,
-            "mcp_contract": mcp_contract,
+            "mcp_contract": installed_mcp_contract(
+                python,
+                repo,
+                expected_version=versions["hashmarks"],
+            ),
             "wheel": {"name": wheel.name, "sha256": sha256(wheel)},
             "qualified_registration": {
                 "path": str(config_path.relative_to(repo)),
