@@ -159,6 +159,96 @@ def _changed_paths(values: list[str]) -> list[str]:
     ]
 
 
+def _find_freshness_state(stale: bool | None) -> str:
+    if stale is True:
+        return "stale"
+    if stale is False:
+        return "current"
+    return "unknown"
+
+
+def _find_claim_scope(intent: str) -> str:
+    return {
+        "identifier": "indexed-visible-symbol-surface",
+        "path": "admitted-repository-path-index",
+    }.get(intent, "bounded-retrieval-only")
+
+
+def _find_exact_targets(
+    query: str, intent: str, hits: tuple[Any, ...]
+) -> set[tuple[object, ...]]:
+    if intent == "identifier":
+        return {
+            (hit.path, hit.qualname or hit.name, hit.start_line)
+            for hit in hits
+            if query in {hit.name, hit.qualname}
+        }
+    if intent == "path":
+        normalized = query[2:] if query.startswith("./") else query
+        return {
+            (hit.path,)
+            for hit in hits
+            if hit.path == normalized
+            or ("/" not in normalized and hit.path.rsplit("/", 1)[-1] == normalized)
+        }
+    return set()
+
+
+def _find_claim_fields(
+    query: str,
+    intent: str,
+    hits: tuple[Any, ...],
+    bound_reasons: tuple[str, ...],
+    *,
+    transport_truncated: bool,
+    freshness: str,
+) -> dict[str, object]:
+    omissions = set(bound_reasons)
+    if transport_truncated:
+        omissions.add("mcp-result-limit")
+    sorted_omissions = sorted(omissions)
+    exact_query = intent in {"identifier", "path"}
+    exact_targets = _find_exact_targets(query, intent, hits)
+    search_complete = exact_query and not sorted_omissions
+    claims_admissible = search_complete and freshness == "current"
+
+    reasons: list[str] = []
+    if not exact_query:
+        reasons.append("query-intent-not-exact")
+    if sorted_omissions:
+        reasons.append("bounded-search-omission")
+    if freshness != "current":
+        reasons.append(f"repository-freshness-{freshness}")
+
+    negative_evidence = "not-applicable"
+    if exact_query and not exact_targets:
+        negative_evidence = (
+            "admissible-within-declared-scope"
+            if claims_admissible
+            else "not-admissible"
+        )
+    elif not exact_query and not hits:
+        negative_evidence = "not-admissible"
+
+    uniqueness_evidence = "not-applicable"
+    if len(exact_targets) == 1:
+        uniqueness_evidence = (
+            "admissible-within-declared-scope"
+            if claims_admissible
+            else "not-admissible"
+        )
+
+    return {
+        "scope": _find_claim_scope(intent),
+        "completeness": "complete" if search_complete else "incomplete",
+        "observed_exact_match_count": len(exact_targets),
+        "negative_evidence": negative_evidence,
+        "uniqueness_evidence": uniqueness_evidence,
+        "omissions": sorted_omissions,
+        "admissibility_reasons": reasons,
+    }
+
+
 class HashmarksMcpSurface:
     """Small read-only MCP projection over one workspace-bound CodeMap.
 
@@ -196,63 +286,15 @@ class HashmarksMcpSurface:
         hits = evidence.hits
         visible = hits[:limit]
         transport_truncated = len(hits) > limit
-        omissions = list(evidence.bound_reasons)
-        if transport_truncated:
-            omissions.append("mcp-result-limit")
-        omissions = sorted(set(omissions))
-
-        freshness = (
-            "stale" if stale is True else "current" if stale is False else "unknown"
+        freshness = _find_freshness_state(stale)
+        claims = _find_claim_fields(
+            query,
+            route.intent.value,
+            hits,
+            evidence.bound_reasons,
+            transport_truncated=transport_truncated,
+            freshness=freshness,
         )
-        exact_query = route.intent.value in {"identifier", "path"}
-        claim_scope = {
-            "identifier": "indexed-visible-symbol-surface",
-            "path": "admitted-repository-path-index",
-        }.get(route.intent.value, "bounded-retrieval-only")
-        search_complete = exact_query and not omissions
-        claims_admissible = search_complete and freshness == "current"
-        admissibility_reasons: list[str] = []
-        if not exact_query:
-            admissibility_reasons.append("query-intent-not-exact")
-        if omissions:
-            admissibility_reasons.append("bounded-search-omission")
-        if freshness != "current":
-            admissibility_reasons.append(f"repository-freshness-{freshness}")
-
-        exact_targets: set[tuple[object, ...]] = set()
-        if route.intent.value == "identifier":
-            for hit in hits:
-                if query in {hit.name, hit.qualname}:
-                    exact_targets.add(
-                        (hit.path, hit.qualname or hit.name, hit.start_line)
-                    )
-        elif route.intent.value == "path":
-            normalized_query = query[2:] if query.startswith("./") else query
-            for hit in hits:
-                if hit.path == normalized_query or (
-                    "/" not in normalized_query
-                    and hit.path.rsplit("/", 1)[-1] == normalized_query
-                ):
-                    exact_targets.add((hit.path,))
-
-        negative_evidence = "not-applicable"
-        if exact_query and not exact_targets:
-            negative_evidence = (
-                "admissible-within-declared-scope"
-                if claims_admissible
-                else "not-admissible"
-            )
-        elif not exact_query and not visible:
-            negative_evidence = "not-admissible"
-
-        uniqueness_evidence = "not-applicable"
-        if len(exact_targets) == 1:
-            uniqueness_evidence = (
-                "admissible-within-declared-scope"
-                if claims_admissible and not transport_truncated
-                else "not-admissible"
-            )
-
         return {
             "schema": "hashmarks.mcp-find.v1",
             "query": query,
@@ -262,13 +304,7 @@ class HashmarksMcpSurface:
             "generation": generation,
             "identity_generation": identity_generation,
             "freshness": freshness,
-            "scope": claim_scope,
-            "completeness": "complete" if search_complete else "incomplete",
-            "exact_match_count": len(exact_targets),
-            "negative_evidence": negative_evidence,
-            "uniqueness_evidence": uniqueness_evidence,
-            "omissions": omissions,
-            "admissibility_reasons": admissibility_reasons,
+            **claims,
         }
 
     def task_evidence(
