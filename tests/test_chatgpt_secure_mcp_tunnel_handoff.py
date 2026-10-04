@@ -11,12 +11,12 @@ import pytest
 
 from scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff import (
     EXPECTED_TOOLS,
+    HostGateError,
     _command_argv,
     _observe_mcp,
     _validate_observation,
     build_handoff,
 )
-from scripts.mcp_host_gate_common import HostGateError
 
 _MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
@@ -126,12 +126,15 @@ def test_handoff_rejects_cli_mcp_version_split_brain(tmp_path: Path) -> None:
     workspace.mkdir()
     observation = _observation()
     observation["server"]["version"] = "0.25.0"
-    with mock.patch(
-        "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.run",
-        return_value=SimpleNamespace(stdout="hashmarks version 0.26.1\n"),
-    ), mock.patch(
-        "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.sha256",
-        return_value="a" * 64,
+    with (
+        mock.patch(
+            "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.run",
+            return_value=SimpleNamespace(stdout="hashmarks version 0.26.1\n"),
+        ),
+        mock.patch(
+            "scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff.sha256",
+            return_value="a" * 64,
+        ),
     ):
         with pytest.raises(HostGateError, match="CLI/MCP version authority differs"):
             build_handoff(
