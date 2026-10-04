@@ -46,12 +46,20 @@ def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
     second = qualify_mcp_observation(copy.deepcopy(_observation()))
 
     assert first == second
+    identity = first["contract_identity"]
+    server = first["server"]
+    tools = first["tools"]
+    assert isinstance(identity, str)
+    assert isinstance(server, dict)
+    assert isinstance(tools, list)
     assert first["schema"] == "hashmarks.mcp-contract.v1"
-    assert first["contract_identity"].startswith("sha256:")
-    assert first["server"]["name"] == MCP_SERVER_NAME
-    assert first["server"]["version"] == "0.26.1"
-    assert [row["name"] for row in first["tools"]] == list(MCP_TOOL_NAMES)
-    assert first["tools"][5]["response_schemas"] == [
+    assert identity.startswith("sha256:")
+    assert server["name"] == MCP_SERVER_NAME
+    assert server["version"] == "0.26.1"
+    assert all(isinstance(row, dict) for row in tools)
+    tool_rows = [row for row in tools if isinstance(row, dict)]
+    assert [row["name"] for row in tool_rows] == list(MCP_TOOL_NAMES)
+    assert tool_rows[5]["response_schemas"] == [
         "hashmarks.mcp-dependency-codemap.v1",
         "hashmarks.dependency-resolution-explain.v1",
         "hashmarks.dependency-resolution-delta.v3",
@@ -60,7 +68,7 @@ def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
     summary = contract_summary(first)
     assert summary == {
         "schema": "hashmarks.mcp-contract.v1",
-        "contract_identity": first["contract_identity"],
+        "contract_identity": identity,
         "server_version": "0.26.1",
         "tools": list(MCP_TOOL_NAMES),
     }
