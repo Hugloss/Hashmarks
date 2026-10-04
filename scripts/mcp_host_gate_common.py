@@ -98,7 +98,12 @@ def build_installed_wheel(
     return wheel, python, hashmarks, package_versions(python)
 
 
-def installed_mcp_contract(python: Path, workspace: Path) -> dict[str, Any]:
+def installed_mcp_contract(
+    python: Path,
+    workspace: Path,
+    *,
+    expected_version: str | None = None,
+) -> dict[str, Any]:
     code = """
 import asyncio
 import json
@@ -131,6 +136,11 @@ finally:
         ) from exc
     if not isinstance(value, dict):
         raise HostGateError("installed Hashmarks MCP contract is not an object")
+    if expected_version is not None and value.get("server_version") != expected_version:
+        raise HostGateError(
+            "installed Hashmarks package/MCP contract version differs: "
+            f"package={expected_version!r} mcp={value.get('server_version')!r}"
+        )
     return value
 
 
