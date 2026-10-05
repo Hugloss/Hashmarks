@@ -4,11 +4,13 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_schema
+
 if TYPE_CHECKING:
     from .engine import CodeMap
 
 _DERIVATION_SCHEMA = "hashmarks.repository-declaration-derivation.v1"
-_EXPLAIN_SCHEMA = "hashmarks.repository-declaration-explain.v1"
+_EXPLAIN_SCHEMA = operation_schema("repository_declarations", "explain")
 
 
 class RepositoryDeclarationDerivationMixin:
