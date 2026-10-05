@@ -9,7 +9,7 @@ import socketserver
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from hashmarks.client import default_runtime_dir
 from hashmarks.ipc_boundary import dispatch_json_request
@@ -29,28 +29,120 @@ MAX_REQUEST = 1024 * 1024
 MAX_RESPONSE = 8 * 1024 * 1024
 
 
+_ServiceRouteClassification = Literal["canonical-semantic", "internal-service"]
+
+
 @dataclass(frozen=True, slots=True)
-class _CanonicalServiceProjection:
-    operation: str
-    response_key: str
+class _ServiceRoute:
+    handler_name: str
+    classification: _ServiceRouteClassification
+    operation: str | None = None
+    response_key: str | None = None
 
     def __post_init__(self) -> None:
-        require_registered_operation(self.operation)
+        if not self.handler_name.strip():
+            raise ValueError("service route handler_name must not be empty")
+        if self.classification == "canonical-semantic":
+            if not self.operation or not self.response_key:
+                raise ValueError(
+                    "canonical-semantic service routes require operation and response_key"
+                )
+            self.admit()
+            return
+        if self.classification != "internal-service":
+            raise ValueError(
+                f"unsupported service route classification: {self.classification!r}"
+            )
+        if self.operation is not None or self.response_key is not None:
+            raise ValueError(
+                "internal-service routes must not carry semantic operation metadata"
+            )
+
+    def admit(self) -> None:
+        if self.classification == "canonical-semantic":
+            assert self.operation is not None
+            require_registered_operation(self.operation)
+
+    def validate_response(self, response: dict[str, Any]) -> None:
+        if self.classification != "canonical-semantic":
+            return
+        assert self.operation is not None
+        assert self.response_key is not None
+        validate_operation_response(
+            self.operation,
+            response.get(self.response_key),
+        )
 
 
-_CANONICAL_SERVICE_PROJECTIONS = {
-    "task_evidence": _CanonicalServiceProjection(
+def _internal_service_route(handler_name: str) -> _ServiceRoute:
+    return _ServiceRoute(
+        handler_name=handler_name,
+        classification="internal-service",
+    )
+
+
+def _canonical_service_route(
+    handler_name: str,
+    *,
+    operation: str,
+    response_key: str,
+) -> _ServiceRoute:
+    return _ServiceRoute(
+        handler_name=handler_name,
+        classification="canonical-semantic",
+        operation=operation,
+        response_key=response_key,
+    )
+
+
+_SERVICE_ROUTES = {
+    "status": _internal_service_route("_status_response"),
+    "sync": _internal_service_route("_sync_response"),
+    "repository_findings": _internal_service_route("_repository_findings_response"),
+    "import_ownership": _internal_service_route("_import_ownership_response"),
+    "cache_ownership": _internal_service_route("_cache_ownership_response"),
+    "cache_invalidation_ownership": _internal_service_route(
+        "_cache_invalidation_response"
+    ),
+    "authority_ownership": _internal_service_route("_authority_ownership_response"),
+    "concurrency_risk": _internal_service_route("_concurrency_risk_response"),
+    "verification_ownership": _internal_service_route(
+        "_verification_ownership_response"
+    ),
+    "find_task": _internal_service_route("_find_task_response"),
+    "task_action_map": _internal_service_route("_task_action_map_response"),
+    "verification_relevance": _internal_service_route(
+        "_verification_relevance_response"
+    ),
+    "ownership_relation_graph": _internal_service_route("_ownership_relation_response"),
+    "task_evidence": _canonical_service_route(
+        "_task_evidence_response",
         operation="task_evidence",
         response_key="task_evidence",
     ),
-    "task_change_impact": _CanonicalServiceProjection(
+    "task_change_impact": _canonical_service_route(
+        "_change_impact_response",
         operation="change_impact",
         response_key="task_change_impact",
     ),
-    "task_post_change_delta": _CanonicalServiceProjection(
+    "repository_intelligence_query": _internal_service_route(
+        "_repository_intelligence_query_response"
+    ),
+    "task_post_change_delta": _canonical_service_route(
+        "_post_change_delta_response",
         operation="post_change",
         response_key="post_change_delta",
     ),
+    "refresh_after_change_delta": _internal_service_route("_refresh_delta_response"),
+    "refresh_after_change_brief": _internal_service_route("_refresh_brief_response"),
+    "refresh_after_change": _internal_service_route("_refresh_response"),
+    "task_decision_brief": _internal_service_route("_decision_brief_response"),
+    "task_action_brief": _internal_service_route("_task_action_brief_response"),
+    "task_decision_brief_budget_sweep": _internal_service_route(
+        "_budget_sweep_response"
+    ),
+    "task_decision_packet": _internal_service_route("_decision_packet_response"),
+    "stop": _internal_service_route("_stop_response"),
 }
 
 
@@ -489,51 +581,21 @@ class CodeMapService:
     def dispatch(self, request: dict[str, Any]) -> dict[str, Any]:
         if request.get("protocol") != PROTOCOL:
             raise ValueError("unsupported protocol version")
-        handlers = {
-            "status": self._status_response,
-            "sync": self._sync_response,
-            "repository_findings": self._repository_findings_response,
-            "import_ownership": self._import_ownership_response,
-            "cache_ownership": self._cache_ownership_response,
-            "cache_invalidation_ownership": self._cache_invalidation_response,
-            "authority_ownership": self._authority_ownership_response,
-            "concurrency_risk": self._concurrency_risk_response,
-            "verification_ownership": self._verification_ownership_response,
-            "find_task": self._find_task_response,
-            "task_action_map": self._task_action_map_response,
-            "verification_relevance": self._verification_relevance_response,
-            "ownership_relation_graph": self._ownership_relation_response,
-            "task_evidence": self._task_evidence_response,
-            "task_change_impact": self._change_impact_response,
-            "repository_intelligence_query": self._repository_intelligence_query_response,
-            "task_post_change_delta": self._post_change_delta_response,
-            "refresh_after_change_delta": self._refresh_delta_response,
-            "refresh_after_change_brief": self._refresh_brief_response,
-            "refresh_after_change": self._refresh_response,
-            "task_decision_brief": self._decision_brief_response,
-            "task_action_brief": self._task_action_brief_response,
-            "task_decision_brief_budget_sweep": self._budget_sweep_response,
-            "task_decision_packet": self._decision_packet_response,
-            "stop": self._stop_response,
-        }
         op = request.get("op")
-        handler = handlers.get(op)
-        if handler is None:
+        route = _SERVICE_ROUTES.get(op) if isinstance(op, str) else None
+        if route is None:
             raise ValueError(f"unsupported operation: {op!r}")
 
-        projection = (
-            _CANONICAL_SERVICE_PROJECTIONS.get(op) if isinstance(op, str) else None
-        )
-        if projection is not None:
-            require_registered_operation(projection.operation)
+        route.admit()
+        handler = getattr(self, route.handler_name, None)
+        if not callable(handler):
+            raise RuntimeError(
+                f"CodeMap service route handler is unavailable: {route.handler_name}"
+            )
 
         self._requests += 1
         response = handler(request)
-        if projection is not None:
-            validate_operation_response(
-                projection.operation,
-                response.get(projection.response_key),
-            )
+        route.validate_response(response)
         return response
 
     def _prepare_socket(self) -> None:
