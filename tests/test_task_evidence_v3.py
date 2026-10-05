@@ -77,13 +77,9 @@ def test_task_evidence_v3_retrieval_is_compact_non_authoritative_projection(
     internal = action["canonical"][0]
     assert projected["path"] == internal["path"]
     assert projected["rank"] == internal["canonical_rank"]
-    assert projected.get("symbol") == (
-        internal.get("qualname") or internal.get("name")
-    )
+    assert projected.get("symbol") == (internal.get("qualname") or internal.get("name"))
     assert projected.get("roles") == internal.get("roles")
-    assert projected.get("evidence_visibility") == internal.get(
-        "evidence_visibility"
-    )
+    assert projected.get("evidence_visibility") == internal.get("evidence_visibility")
     for internal_only in (
         "canonical_rank",
         "canonical_score",
@@ -620,13 +616,9 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
         str(row.get("symbol") or "").rsplit(".", 1)[-1] == "paths_under"
         for row in supplements
     )
-    assert all(
-        row["supplement"] == "bounded-natural-language" for row in supplements
-    )
+    assert all(row["supplement"] == "bounded-natural-language" for row in supplements)
     assert all(row["evidence_visibility"] == "source" for row in supplements)
-    assert all(
-        not row.get("supplement") for row in tight["retrieval"]["results"]
-    )
+    assert all(not row.get("supplement") for row in tight["retrieval"]["results"])
     assert "canonical_omitted_results" not in tight["retrieval"]
     assert packet["ownership"]["candidate"]["path"] == action["edit"]["path"]
     assert delta["schema"] == "hashmarks.task-post-change-delta.v2"
