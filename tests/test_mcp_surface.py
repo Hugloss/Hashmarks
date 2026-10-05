@@ -607,6 +607,14 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             dependency_tool({}, result_mode="history")
         with pytest.raises(FakeToolError, match="result_mode must be one of"):
             declaration_tool([], result_mode="compare")
+
+        server._hashmarks_surface.dependency_codemap = (
+            lambda *_args, **_kwargs: {
+                "schema": "hashmarks.dependency-resolution-explain.v1"
+            }
+        )
+        with pytest.raises(RuntimeError, match="response schema drift"):
+            dependency_tool({}, result_mode="compare")
     finally:
         server._hashmarks_surface.close()
 
