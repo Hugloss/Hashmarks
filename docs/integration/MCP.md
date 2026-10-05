@@ -125,6 +125,28 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 
 The tools are read-only from the repository consumer's perspective. Hashmarks may update its own disposable derived cache while answering them.
 
+### Canonical operation schema authority
+
+Hashmarks resolves semantic response identity before any transport is involved:
+
+```text
+(operation, mode)
+        ↓
+one canonical operation contract
+        ↓
+exact schema + version
+        ↓
+core emits it
+        ↓
+MCP / CLI / API / adapters project it
+        ↓
+each exposed boundary validates the exact mapping
+```
+
+`hashmarks.operation-contract.v1` is the single owner of the exposed operation-to-schema mapping. Core producers consume that mapping; transports do not repeat schema/version strings. A transport may rename a tool for host integration, but it may not mint a different semantic response schema. The `find` CLI and MCP tool therefore both project the same core-owned `hashmarks.find.v2` packet, and dependency observation uses transport-neutral `hashmarks.dependency-codemap.v1`.
+
+Changing an exposed schema/version means changing the operation contract first. The operation-contract identity then changes, the MCP contract incorporates that identity, core output follows the mapping, and boundary validation rejects any producer or adapter that still emits the old schema.
+
 ### Canonical MCP contract identity
 
 Hashmarks owns one transport-neutral `hashmarks.mcp-contract.v1` manifest. The manifest binds the Hashmarks server name and installed version, the server description and routing instructions, canonical tool order and descriptions, the native MCP input/output schemas, read-only annotations, and each tool's Hashmarks response-schema set. A canonical JSON SHA-256 becomes the `contract_identity`.
