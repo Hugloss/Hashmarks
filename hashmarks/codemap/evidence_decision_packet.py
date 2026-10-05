@@ -5,6 +5,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_response, operation_schema
+
 from .decision_session import incomplete_decision_scoped
 from .evidence_verification import _VerificationSelectionState
 
@@ -209,6 +211,7 @@ class DecisionPacketMixin:
             decision_generation,
         )
 
+    @operation_response("task_decision_packet")
     @incomplete_decision_scoped
     def task_decision_packet(
         self,
@@ -262,7 +265,7 @@ class DecisionPacketMixin:
         timing.finish()
 
         return {
-            "schema": "hashmarks.task-decision-packet.v2",
+            "schema": operation_schema("task_decision_packet"),
             "task": task,
             "edit": edit,
             "candidate": action.get("edit"),
