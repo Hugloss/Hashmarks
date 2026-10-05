@@ -457,7 +457,7 @@ metrics-agent: bootstrap
 	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent
 
 metrics-agent-corpus: bootstrap
-	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_corpus --workspace . --corpus benchmarks/agent_tasks.json --budget 1200
+	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_corpus
 
 metrics-fresh-multi-repo: bootstrap
 	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_fresh_multi_repo \
