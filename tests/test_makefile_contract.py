@@ -71,3 +71,48 @@ def test_benchmark_make_aliases_delegate_all_launch_authority() -> None:
     )
     for token in stale_launch_owners:
         assert token not in text
+
+
+def test_mcp_host_make_aliases_do_not_own_gate_defaults() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert _make_recipe(text, "mcp-host-status") == (
+        "@$(UV_RUN) --offline --no-sync python scripts/mcp_host_status.py",
+    )
+
+    stale_defaults = (
+        "OPENCODE ?=",
+        "OPENCODE_HOST_PYTHON ?=",
+        "OPENCODE_HOST_RECEIPT ?=",
+        "CLAUDE ?=",
+        "CLAUDE_MODEL ?=",
+        "CLAUDE_HOST_PYTHON ?=",
+        "CLAUDE_HOST_RECEIPT ?=",
+        "CODEX ?=",
+        "CODEX_MODEL ?=",
+        "CODEX_HOST_PYTHON ?=",
+        "CODEX_HOST_RECEIPT ?=",
+        "CODEX_HOST_DANGEROUS ?=",
+        "PI ?=",
+        "PI_HOST_PYTHON ?=",
+        "PI_HOST_RECEIPT ?=",
+        "CHATGPT_MCP_HANDOFF_RECEIPT ?=",
+    )
+    for token in stale_defaults:
+        assert token not in text
+
+    explicit_override_transports = (
+        '$(if $(strip $(OPENCODE)),--opencode "$(OPENCODE)",)',
+        '$(if $(strip $(OPENCODE_MODEL)),--model "$(OPENCODE_MODEL)",)',
+        '$(if $(strip $(OPENCODE_HOST_PYTHON)),--python "$(OPENCODE_HOST_PYTHON)",)',
+        '$(if $(strip $(OPENCODE_HOST_RECEIPT)),--receipt "$(OPENCODE_HOST_RECEIPT)",)',
+        '$(if $(strip $(CLAUDE)),--claude "$(CLAUDE)",)',
+        '$(if $(strip $(CLAUDE_MODEL)),--model "$(CLAUDE_MODEL)",)',
+        '$(if $(strip $(CODEX)),--codex "$(CODEX)",)',
+        '$(if $(strip $(CODEX_MODEL)),--model "$(CODEX_MODEL)",)',
+        "$(if $(filter 1 true yes,$(CODEX_HOST_DANGEROUS)),--dangerous-bypass,)",
+        '$(if $(strip $(PI)),--pi "$(PI)",)',
+        '$(if $(strip $(CHATGPT_MCP_HANDOFF_RECEIPT)),--output "$(CHATGPT_MCP_HANDOFF_RECEIPT)",)',
+    )
+    for token in explicit_override_transports:
+        assert token in text
