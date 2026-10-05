@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import inspect
 import threading
 import time
 from typing import TYPE_CHECKING
 
-from hashmarks.codemap import CodeMapService, CodeMapServiceClient
+from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
+from hashmarks.codemap.evidence_packet import (
+    TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -104,6 +108,50 @@ def test_service_refresh_after_change_brief_avoids_full_packet_surface(
     finally:
         client.stop()
         thread.join(timeout=5)
+
+
+def test_budget_sweep_defaults_have_one_core_owner(tmp_path: Path) -> None:
+    assert (
+        inspect.signature(CodeMap.task_decision_brief_budget_sweep)
+        .parameters["budgets"]
+        .default
+        is TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
+    )
+    assert (
+        inspect.signature(CodeMapServiceClient.task_decision_brief_budget_sweep)
+        .parameters["budgets"]
+        .default
+        is TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
+    )
+    handler_source = inspect.getsource(CodeMapService._budget_sweep_response)
+    assert "TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS" in handler_source
+    assert "[64, 128, 192, 256, 384, 512]" not in handler_source
+
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src" / "engine.py").write_text("def widget(): return 1\n")
+    (tmp_path / "tests" / "test_engine.py").write_text(
+        "from src.engine import widget\ndef test_widget(): assert widget() == 2\n"
+    )
+    socket_path = tmp_path / "budget-defaults.sock"
+    service = CodeMapService(tmp_path, socket_path=socket_path)
+    thread = threading.Thread(target=service.serve_forever, daemon=True)
+    thread.start()
+    client = CodeMapServiceClient(tmp_path, socket_path=socket_path)
+    _wait(client)
+    try:
+        raw = client.request(
+            "task_decision_brief_budget_sweep",
+            task="widget implementation test",
+        )["budget_sweep"]
+        typed = client.task_decision_brief_budget_sweep("widget implementation test")
+    finally:
+        client.stop()
+        thread.join(timeout=5)
+
+    expected = list(TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS)
+    assert [row["budget"] for row in raw["rows"]] == expected
+    assert [row["budget"] for row in typed["rows"]] == expected
 
 
 def test_codemap_service_decision_brief_budget_sweep(tmp_path: Path) -> None:

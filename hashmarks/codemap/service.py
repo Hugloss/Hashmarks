@@ -21,6 +21,7 @@ from hashmarks.paths import canonical_host_path
 
 from .change_impact import ChangeImpactOptions
 from .engine import CodeMap
+from .evidence_packet import TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
 from .post_change import PostChangeOptions
 from .repository_intelligence_query import RepositoryIntelligenceQueryOptions
 
@@ -613,7 +614,9 @@ class CodeMapService:
 
     def _budget_sweep_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task, limit, per_role = self._task_context(request)
-        budgets = request.get("budgets", [64, 128, 192, 256, 384, 512])
+        budgets = request.get(
+            "budgets", list(TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS)
+        )
         if (
             not isinstance(budgets, list)
             or not budgets
@@ -940,7 +943,9 @@ class CodeMapServiceClient:
         self,
         task: str,
         *,
-        budgets: tuple[int, ...] | list[int] = (64, 128, 192, 256, 384, 512),
+        budgets: tuple[int, ...] | list[int] = (
+            TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
+        ),
         limit: int = 20,
         per_role: int = 3,
     ) -> dict[str, Any]:
