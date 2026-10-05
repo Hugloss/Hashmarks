@@ -275,9 +275,7 @@ def _decode_mcp_payload(value: object, *, host: str, tool: str) -> dict[str, obj
         return _decode_content_payload(value, host=host, tool=tool)
     if isinstance(value, str):
         return _decode_json_payload(value, host=host, tool=tool)
-    raise HostGateError(
-        f"{host} MCP response for {tool} has unsupported payload type"
-    )
+    raise HostGateError(f"{host} MCP response for {tool} has unsupported payload type")
 
 
 def validate_basic_qualification_response(
@@ -315,6 +313,7 @@ def validate_basic_qualification_response(
     else:
         raise HostGateError(f"{host} targeted unsupported qualification tool: {tool}")
     return payload
+
 
 def completed_at() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
