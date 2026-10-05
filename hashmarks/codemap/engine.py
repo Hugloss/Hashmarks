@@ -21,7 +21,7 @@ from hashmarks.paths import canonical_host_path, normalize_relative_path
 from .change_intelligence import ChangeIntelligenceMixin
 from .context_cache import ContextCache
 from .cross_repository_evidence import CrossRepositoryEvidenceMixin
-from .decision_session import DecisionSessionMixin
+from .decision_session import DecisionSessionMixin, decision_scoped
 from .dependency_resolution_delta import DependencyResolutionDeltaMixin
 from .dependency_resolution_derivation import DependencyResolutionDerivationMixin
 from .dependency_resolution_evidence import DependencyResolutionEvidenceMixin
@@ -358,6 +358,7 @@ class CodeMap(
         state = self._state_rel
         return bool(state and (clean == state or clean.startswith(state + "/")))
 
+    @decision_scoped
     def outline(self, relpath: str) -> dict[str, object]:
         self._ensure_map_ready()
         rel = normalize_relative_path(relpath, allow_root=False)
