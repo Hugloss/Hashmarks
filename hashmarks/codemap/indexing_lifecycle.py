@@ -828,13 +828,18 @@ class IndexingLifecycleMixin:
         self,
         *,
         rel: str,
+        path: Path,
         language: str,
         visibility: EvidenceVisibility,
         overlay_paths: set[str] | None,
         base_snapshot_payload: dict[str, object] | None,
         state: _SyncIndexState,
     ) -> bool:
-        """Reuse one qualified base-snapshot artifact when its evidence still matches."""
+        """Reuse a base artifact only after current repository identity matches.
+
+        Git overlay state only selects fast-path candidates. The current file
+        digest remains the admission authority for snapshot reuse.
+        """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if (
@@ -849,21 +854,30 @@ class IndexingLifecycleMixin:
             return False
         snap_digest = entry.get("file_digest")
         snap_artifact_key = entry.get("artifact_key")
-        artifact = (
-            self.artifacts.get(str(snap_artifact_key))
-            if isinstance(snap_artifact_key, str)
-            else None
-        )
+        if not isinstance(snap_digest, str) or not isinstance(
+            snap_artifact_key, str
+        ):
+            return False
+        try:
+            current_digest = self.file_store.digest(
+                path,
+                workspace=self.workspace,
+                relative_path=rel,
+            )
+        except (OSError, UnstableFileError):
+            return False
+        if current_digest.hash != snap_digest:
+            return False
+        artifact = self.artifacts.get(snap_artifact_key)
         if not (
-            isinstance(snap_digest, str)
-            and artifact is not None
+            artifact is not None
             and artifact.file_digest == snap_digest
             and entry.get("language") == language
             and entry.get("evidence_visibility") == visibility.value
         ):
             return False
         row = self.store.file_row(rel)
-        expected_artifact = str(snap_artifact_key)
+        expected_artifact = snap_artifact_key
         if (
             row is not None
             and str(row["file_digest"]) == snap_digest
@@ -1063,6 +1077,7 @@ class IndexingLifecycleMixin:
             state.present.add(rel)
             if self._sync_base_entry(
                 rel=rel,
+                path=path,
                 language=language,
                 visibility=visibility,
                 overlay_paths=overlay_paths,
