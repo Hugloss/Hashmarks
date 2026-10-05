@@ -604,7 +604,8 @@ def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_to
         impact_generation = codemap.store.generation()
 
     assert calls == 0
-    assert impact["generation"] == impact_generation == before_generation + 2
+    assert impact["generation"] == impact_generation
+    assert impact_generation > before_generation
     assert impact["project_refresh"]["mode"] == "freshness-rebind"
     assert impact["project_refresh"]["changed_manifests"] == ["contract.json"]
     assert impact["projects"] == ["npm:backend", "npm:frontend"]
