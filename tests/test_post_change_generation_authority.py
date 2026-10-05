@@ -96,3 +96,85 @@ def test_post_change_delta_rejects_competing_generation_after_sync(
                 ["src/owner.py"],
                 previous_evidence=previous,
             )
+
+
+def _declared_project_repo(root: Path) -> None:
+    for name in ("backend", "frontend"):
+        (root / name).mkdir()
+        (root / name / "package.json").write_text(
+            f'{{"name":"{name}"}}',
+            encoding="utf-8",
+        )
+    (root / "src").mkdir()
+    (root / "src" / "other.py").write_text(
+        "def other(): return 'old'\n",
+        encoding="utf-8",
+    )
+    (root / "contract.json").write_text('{"v":1}\n', encoding="utf-8")
+    (root / ".hashmarks-project-links.toml").write_text(
+        "[[shared_input]]\n"
+        "path='contract.json'\n"
+        "projects=['npm:backend','npm:frontend']\n"
+        "kind='contract'\n",
+        encoding="utf-8",
+    )
+
+
+def test_declared_freshness_rebind_rejects_competing_generation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _declared_project_repo(tmp_path)
+    state = tmp_path / ".state"
+    artifacts = tmp_path / "artifacts.sqlite3"
+    with (
+        CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as reader,
+        CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as writer,
+    ):
+        reader.sync()
+        reader.enrich_projects(("npm-package-graph", "declared-project-links"))
+        original_sync = reader.sync
+
+        def racing_sync(paths=None):
+            result = original_sync(paths)
+            (tmp_path / "src" / "other.py").write_text(
+                "def other(): return 'new'\n",
+                encoding="utf-8",
+            )
+            writer.sync(["src/other.py"])
+            return result
+
+        monkeypatch.setattr(reader, "sync", racing_sync)
+        (tmp_path / "contract.json").write_text('{"v":2}\n', encoding="utf-8")
+
+        with pytest.raises(
+            RuntimeError,
+            match="CodeMap generation changed before project freshness rebind",
+        ):
+            reader.task_change_impact("contract changed", ["contract.json"])
+
+
+def test_project_enrichment_rejects_stale_expected_generation(tmp_path: Path) -> None:
+    _declared_project_repo(tmp_path)
+    state = tmp_path / ".state"
+    artifacts = tmp_path / "artifacts.sqlite3"
+    with (
+        CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as reader,
+        CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as writer,
+    ):
+        reader.sync()
+        expected_generation = reader.store.generation()
+        (tmp_path / "src" / "other.py").write_text(
+            "def other(): return 'new'\n",
+            encoding="utf-8",
+        )
+        writer.sync(["src/other.py"])
+
+        with pytest.raises(
+            RuntimeError,
+            match="CodeMap generation changed before project enrichment",
+        ):
+            reader.enrich_projects(
+                ("npm-package-graph",),
+                expected_generation=expected_generation,
+            )
