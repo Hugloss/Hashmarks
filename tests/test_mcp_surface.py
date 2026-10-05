@@ -493,7 +493,7 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
         raise RuntimeError("implementation bug")
 
     with pytest.raises(FakeToolError, match="invalid query") as translated:
-        mcp_server._call_surface(FakeToolError, invalid)
+        mcp_server._call_surface("find", FakeToolError, invalid)
     assert json.loads(str(translated.value)) == {
         "schema": "hashmarks.mcp-error.v1",
         "reason": "invalid-request",
@@ -501,7 +501,14 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
         "recovery_authority": "consumer-owned",
     }
     with pytest.raises(RuntimeError, match="implementation bug"):
-        mcp_server._call_surface(FakeToolError, broken)
+        mcp_server._call_surface("find", FakeToolError, broken)
+
+    with pytest.raises(RuntimeError, match="response schema drift"):
+        mcp_server._call_surface(
+            "find",
+            FakeToolError,
+            lambda: {"schema": "hashmarks.repository-capsule.v1"},
+        )
 
 
 def test_mcp_server_registers_exact_small_read_only_tool_catalog(
