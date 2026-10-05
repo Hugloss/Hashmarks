@@ -4,8 +4,6 @@ UV_SYNC := $(UV) sync --frozen
 DEV_SYNC := $(UV_SYNC) --extra mcp --group test
 UV_RUN := $(UV) run --frozen
 RUFF_RUN := UV_PROJECT_ENVIRONMENT=.ruff-venv $(UV_RUN) --offline --only-group lint ruff
-FILES ?= 10000
-HOT_REQUESTS ?= 20
 TEST_SHARDS ?= 64
 DEV_BATCH_SIZE ?= 4
 DEV_BATCH_START ?= 0
@@ -435,16 +433,21 @@ release-check:
 	  '========================================'
 
 metrics: bootstrap
-	@$(UV_RUN) --offline python scripts/metrics.py --files $(FILES) --hot-requests $(HOT_REQUESTS)
+	@$(UV_RUN) --offline python scripts/metrics.py \
+	  $(if $(strip $(FILES)),--files $(FILES),) \
+	  $(if $(strip $(HOT_REQUESTS)),--hot-requests $(HOT_REQUESTS),)
 
 metrics-fast: bootstrap
-	@$(UV_RUN) --offline python scripts/metrics.py --files $(FILES) --hot-requests $(HOT_REQUESTS) --skip-daemon
+	@$(UV_RUN) --offline python scripts/metrics.py \
+	  $(if $(strip $(FILES)),--files $(FILES),) \
+	  $(if $(strip $(HOT_REQUESTS)),--hot-requests $(HOT_REQUESTS),) \
+	  --skip-daemon
 
 metrics-scale:
-	@$(MAKE) metrics FILES=100000 HOT_REQUESTS=20
+	@$(MAKE) metrics FILES=100000
 
 metrics-500k:
-	@$(MAKE) metrics FILES=500000 HOT_REQUESTS=20
+	@$(MAKE) metrics FILES=500000
 
 metrics-derived-authority: bootstrap
 	@$(UV_RUN) --offline python -m benchmarks.derived_authority_economics \

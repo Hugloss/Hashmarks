@@ -95,7 +95,7 @@ def _uv_version(root: Path) -> str | None:
     return completed.stdout.strip() or None
 
 
-def main() -> None:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Collect a reproducible Hashmarks development baseline"
     )
@@ -105,7 +105,11 @@ def main() -> None:
     parser.add_argument("--hot-requests", type=int, default=20)
     parser.add_argument("--skip-daemon", action="store_true")
     parser.add_argument("--output")
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> None:
+    args = _parser().parse_args()
 
     root = Path(args.workspace).resolve()
     python = sys.executable
