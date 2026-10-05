@@ -625,7 +625,7 @@ def measure_derived_authority_economics(
     )
 
 
-def main(argv: list[str] | None = None) -> int:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Measure explicit-packet derived-authority economics"
     )
@@ -638,7 +638,11 @@ def main(argv: list[str] | None = None) -> int:
         default=Path("tests/fixtures/dependency_dogfood"),
     )
     parser.add_argument("--output", type=Path)
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
 
     receipt = measure_derived_authority_economics(
         iterations=args.iterations,
