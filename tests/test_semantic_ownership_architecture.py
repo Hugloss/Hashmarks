@@ -95,17 +95,26 @@ def test_evidence_binding_projection_does_not_read_repository_bytes_directly() -
 
 
 def test_canonical_freshness_vocabulary_is_owned_once() -> None:
-    owner = (CODEMAP / "evidence_freshness.py").read_text(encoding="utf-8")
+    owner = (ROOT / "hashmarks" / "freshness.py").read_text(encoding="utf-8")
+    codemap_freshness = (CODEMAP / "evidence_freshness.py").read_text(encoding="utf-8")
     state_doc = (
         ROOT / "docs" / "reference" / "STATE_AND_SEMANTIC_OWNERS.md"
     ).read_text(encoding="utf-8")
     assert 'FRESHNESS_STATES = frozenset({"current", "stale", "unknown"})' in owner
+    assert "def freshness_state(" in owner
+    assert "from hashmarks.freshness import FRESHNESS_STATES, freshness_state" in (
+        codemap_freshness
+    )
     assert "current" in state_doc and "stale" in state_doc and "unknown" in state_doc
 
     freshness_map = (CODEMAP / "freshness_map.py").read_text(encoding="utf-8")
     context = (ROOT / "hashmarks" / "evidence_context.py").read_text(encoding="utf-8")
+    find_engine = (CODEMAP / "find_engine.py").read_text(encoding="utf-8")
     assert '"invalidated"' not in freshness_map
-    assert 'frozenset({"unknown", "current", "stale"})' in context
+    assert 'frozenset({"unknown", "current", "stale"})' not in context
+    assert "from .freshness import FRESHNESS_STATES" in context
+    assert "def _find_freshness_state(" not in find_engine
+    assert "from hashmarks.freshness import freshness_state" in find_engine
 
 
 def test_binding_modules_are_projection_owners_not_second_change_authorities() -> None:
