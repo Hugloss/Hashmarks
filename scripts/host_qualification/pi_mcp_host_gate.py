@@ -31,6 +31,8 @@ from mcp_host_gate_common import (  # noqa: E402 - import follows standalone scr
     run,
     sha256,
     source_binding,
+    validate_basic_qualification_request,
+    validate_basic_qualification_response,
     write_fixture,
 )
 
@@ -73,26 +75,6 @@ def _prompt() -> str:
     )
 
 
-def _schemas_in(value: Any) -> set[str]:
-    found: set[str] = set()
-    if isinstance(value, dict):
-        schema = value.get("schema")
-        if isinstance(schema, str):
-            found.add(schema)
-        nested = value.values()
-    elif isinstance(value, list):
-        nested = value
-    else:
-        return (
-            {schema for schema in EXPECTED.values() if schema in value}
-            if isinstance(value, str)
-            else found
-        )
-    for item in nested:
-        found.update(_schemas_in(item))
-    return found
-
-
 def _tool_events(
     events: list[dict[str, Any]], event_type: str
 ) -> dict[str, dict[str, Any]]:
@@ -118,17 +100,20 @@ def _validated_call(
         raise HostGateError(f"Pi MCP proxy targeted unexpected tool: {target!r}")
     if target in observed:
         raise HostGateError(f"Pi MCP proxy called tool more than once: {target}")
+    canonical_tool = str(target).removeprefix("hashmarks_")
+    validate_basic_qualification_request(
+        canonical_tool,
+        args.get("args"),
+        host="Pi",
+    )
     if end.get("isError") is True:
         raise HostGateError(f"Pi MCP proxy reported an error for {target}")
-    result = end.get("result")
-    expected_schema = EXPECTED[str(target)]
-    if expected_schema not in _schemas_in(result):
-        raise HostGateError(
-            f"Pi MCP proxy result for {target} did not expose schema {expected_schema}"
-        )
-    if "BUILDING" in json.dumps(result, sort_keys=True, default=str):
-        raise HostGateError("transient BUILDING state escaped through Pi")
-    return str(target), end
+    payload = validate_basic_qualification_response(
+        canonical_tool,
+        end.get("result"),
+        host="Pi",
+    )
+    return str(target), payload
 
 
 def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
