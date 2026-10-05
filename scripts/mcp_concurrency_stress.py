@@ -263,7 +263,7 @@ def _summary(receipt: dict[str, Any], path: Path) -> str:
     return "\n".join(lines)
 
 
-def main(argv: list[str] | None = None) -> int:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Stress independent Hashmarks MCP-style processes against one changing workspace/state."
     )
@@ -275,6 +275,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--writes", type=int, default=35)
     parser.add_argument("--extra-files", type=int, default=120)
     parser.add_argument("--receipt", default="dist/mcp-concurrency-stress.json")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = _parser()
     args = parser.parse_args(argv)
     if (
         min(args.rounds, args.workers, args.calls, args.writes) < 1

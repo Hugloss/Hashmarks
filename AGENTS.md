@@ -324,6 +324,10 @@ The full-suite runtime profile is owned by `make test-profile` and reports the s
 
 `scripts.hosted_diagnostic` owns the normal constrained-host shard count, start index, optional limit, extra-marker default, and capability-mode default. Make targets may choose the interpreter, define Make-specific batch/shard selectors, and transport an explicitly supplied `DIAGNOSTIC_SHARDS` or `DIAGNOSTIC_EXTRA_MARKER` override, but they must not mirror the script's semantic defaults. An unset override means “use the hosted-diagnostic parser owner.”
 
+### MCP concurrency-stress defaults have one owner
+
+`scripts.mcp_concurrency_stress` owns the normal stress profile and default receipt path, including rounds, workers, calls per reader, writes, extra fixture files, and `dist/mcp-concurrency-stress.json`. The Make target is a thin launcher: it may transport an explicitly supplied `MCP_STRESS_RECEIPT` such as CI's per-attempt receipt path, but it must not mirror the script's default receipt or workload values.
+
 ### Development-tool configuration has one owner
 
 `pyproject.toml` owns the Ruff dependency and rule configuration. Developer hooks, Make targets, and CI must invoke that configured Ruff rather than maintaining parallel min/latest compatibility paths. Do not add tests whose only assertion is that tool configuration, docs, and version strings agree. If a real tool upgrade breaks Hashmarks behavior, reproduce the failure and change the single project declaration or the affected behavior. Ruff remains diagnostic-only and never creates or transfers canonical promotion authority.
