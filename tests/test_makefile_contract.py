@@ -119,3 +119,36 @@ def test_mcp_host_make_aliases_do_not_own_gate_defaults() -> None:
     )
     for token in explicit_override_transports:
         assert token in text
+
+
+def test_hosted_diagnostic_make_aliases_transport_only_explicit_overrides() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    for token in ("DIAGNOSTIC_SHARDS ?=", "DIAGNOSTIC_EXTRA_MARKER ?="):
+        assert token not in text
+
+    full = _make_recipe(text, "test-diagnostic")
+    assert any(
+        "$(if $(strip $(DIAGNOSTIC_SHARDS)),--shards $(DIAGNOSTIC_SHARDS),)"
+        in line
+        for line in full
+    )
+    assert any(
+        "$(if $(strip $(DIAGNOSTIC_EXTRA_MARKER)),"
+        "--extra-marker '$(DIAGNOSTIC_EXTRA_MARKER)',)" in line
+        for line in full
+    )
+
+    batch = _make_recipe(text, "test-diagnostic-batch")
+    shard = _make_recipe(text, "test-diagnostic-shard")
+    for recipe in (batch, shard):
+        assert any(
+            "$(if $(strip $(DIAGNOSTIC_SHARDS)),--shards $(DIAGNOSTIC_SHARDS),)"
+            in line
+            for line in recipe
+        )
+        assert any(
+            "$(if $(strip $(DIAGNOSTIC_EXTRA_MARKER)),"
+            "--extra-marker '$(DIAGNOSTIC_EXTRA_MARKER)',)" in line
+            for line in recipe
+        )
