@@ -749,6 +749,23 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 str(row[0]) for row in self._db.execute("SELECT path FROM file_map")
             }
 
+    def _finish_file_write(self, *, bulk_write: bool, owns_transaction: bool) -> None:
+        if not bulk_write:
+            if owns_transaction:
+                self._db.execute("COMMIT")
+            return
+        self._bulk_file_write_count += 1
+        if self._bulk_file_write_count < self._bulk_file_write_batch_size:
+            return
+        committed = self._bulk_file_write_count
+        if not self._publication_transaction_active:
+            self._db.execute("COMMIT")
+        self._bulk_file_write_committed += committed
+        self._bulk_file_write_count = 0
+        callback = self._bulk_file_write_on_commit
+        if callback is not None:
+            callback(self._bulk_file_write_committed)
+
     def set_file(
         self,
         path: str,
@@ -866,19 +883,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                         for node in nodes
                     ],
                 )
-                if bulk_write:
-                    self._bulk_file_write_count += 1
-                    if self._bulk_file_write_count >= self._bulk_file_write_batch_size:
-                        committed = self._bulk_file_write_count
-                        if not self._publication_transaction_active:
-                            self._db.execute("COMMIT")
-                        self._bulk_file_write_committed += committed
-                        self._bulk_file_write_count = 0
-                        callback = self._bulk_file_write_on_commit
-                        if callback is not None:
-                            callback(self._bulk_file_write_committed)
-                elif owns_transaction:
-                    self._db.execute("COMMIT")
+                self._finish_file_write(
+                    bulk_write=bulk_write, owns_transaction=owns_transaction
+                )
             except Exception:
                 if owns_transaction and self._db.in_transaction:
                     self._db.execute("ROLLBACK")
@@ -913,6 +920,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         values = list(paths)
         if not values:
             return 0
+
         def delete_locked() -> None:
             for path in values:
                 self._db.execute("DELETE FROM symbol WHERE path=?", (path,))
