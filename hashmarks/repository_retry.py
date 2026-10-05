@@ -13,6 +13,7 @@ _TRANSIENT_RETRY_INITIAL_DELAY_SECONDS = 0.005
 _TRANSIENT_RETRY_MAX_DELAY_SECONDS = 0.25
 _TRANSIENT_RUNTIME_MESSAGES = (
     "CodeMap generation is incomplete (BUILDING)",
+    "CodeMap generation changed before expected decision session",
     "CodeMap generation changed before nested decision session",
     "CodeMap generation changed during decision session",
 )
