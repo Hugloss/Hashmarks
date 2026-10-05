@@ -107,6 +107,15 @@ def operation_modes(operation: str) -> dict[str, str]:
     return operation_contract(operation).mode_map()
 
 
+def require_operation_mode(operation: str, mode: str | None = None) -> str:
+    contract = operation_contract(operation)
+    selected = contract.default_mode if mode is None else mode
+    allowed = operation_modes(operation)
+    if selected not in allowed:
+        raise ValueError(f"result_mode must be one of: {', '.join(allowed)}")
+    return selected
+
+
 def validate_operation_response(
     operation: str,
     value: object,
