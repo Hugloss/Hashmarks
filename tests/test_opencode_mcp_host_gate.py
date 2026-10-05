@@ -72,7 +72,7 @@ def test_completed_tool_set_rejects_hashmarks_tool_from_wrong_phase() -> None:
     events = [
         _tool_event("hashmarks_find", {"schema": "hashmarks.mcp-find.v1"}),
         _tool_event(
-            "hashmarks_post_change", {"schema": "hashmarks.task-post-change-delta.v1"}
+            "hashmarks_post_change", {"schema": "hashmarks.task-post-change-delta.v2"}
         ),
     ]
     with pytest.raises(host_gate.HostGateError, match="outside this phase"):
@@ -633,7 +633,7 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
         _tool_event(
             "hashmarks_post_change",
             {
-                "schema": "hashmarks.task-post-change-delta.v1",
+                "schema": "hashmarks.task-post-change-delta.v2",
                 "status": "changed",
                 "generation_before": 1,
                 "generation_after": 2,
