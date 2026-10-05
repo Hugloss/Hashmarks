@@ -76,6 +76,7 @@ def test_codemap_completeness_does_not_redefine_freshness(
     assert packet["identity"]["codemap_complete"] is False
     assert packet["identity"]["codemap_build_state"] == "BUILDING"
 
+
 def test_action_brief_status_consumes_receipt_freshness_once(
     tmp_path: Path, monkeypatch
 ) -> None:
