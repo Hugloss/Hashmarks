@@ -402,7 +402,7 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
     }
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser()
     p.add_argument(
         "--root", type=Path, default=Path(".hashmarks/benchmarks/worker-multistep-ab")
@@ -415,6 +415,11 @@ def main() -> int:
     )
     p.add_argument("--workspace", type=Path)
     p.add_argument("--tasks", type=Path)
+    return p
+
+
+def main() -> int:
+    p = _parser()
     a = p.parse_args()
     if a.worker:
         if not a.policy or not a.workspace or not a.tasks or not a.output:
