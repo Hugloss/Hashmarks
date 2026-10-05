@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 import pytest
@@ -545,6 +546,30 @@ def _dense_prefix_repository(root: Path) -> tuple[Path, str]:
         "indexed repository paths underneath a requested prefix."
     )
     return owner, task
+
+
+def test_task_evidence_v3_compact_retrieval_is_materially_smaller_than_internal_rows(
+    tmp_path: Path,
+) -> None:
+    _owner, task = _dense_prefix_repository(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=9)
+        packet = codemap.task_evidence(task, limit=9, token_budget=256)
+
+    internal = json.dumps(
+        action["canonical"],
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    projected = json.dumps(
+        packet["retrieval"]["results"],
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+    assert len(packet["retrieval"]["results"]) == len(action["canonical"])
+    assert len(projected) < len(internal) * 0.8
 
 
 def test_task_evidence_supplements_account_for_displaced_canonical_hits(
