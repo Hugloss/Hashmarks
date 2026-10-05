@@ -7,11 +7,16 @@ import os
 import socket
 import socketserver
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from hashmarks.client import default_runtime_dir
 from hashmarks.ipc_boundary import dispatch_json_request
+from hashmarks.operation_contract import (
+    require_registered_operation,
+    validate_operation_response,
+)
 from hashmarks.paths import canonical_host_path
 
 from .change_impact import ChangeImpactOptions
@@ -22,6 +27,31 @@ from .repository_intelligence_query import RepositoryIntelligenceQueryOptions
 PROTOCOL = "hashmarks.codemap-service.v2"
 MAX_REQUEST = 1024 * 1024
 MAX_RESPONSE = 8 * 1024 * 1024
+
+
+@dataclass(frozen=True, slots=True)
+class _CanonicalServiceProjection:
+    operation: str
+    response_key: str
+
+    def __post_init__(self) -> None:
+        require_registered_operation(self.operation)
+
+
+_CANONICAL_SERVICE_PROJECTIONS = {
+    "task_evidence": _CanonicalServiceProjection(
+        operation="task_evidence",
+        response_key="task_evidence",
+    ),
+    "task_change_impact": _CanonicalServiceProjection(
+        operation="change_impact",
+        response_key="task_change_impact",
+    ),
+    "task_post_change_delta": _CanonicalServiceProjection(
+        operation="post_change",
+        response_key="post_change_delta",
+    ),
+}
 
 
 def default_codemap_socket(workspace: str | Path) -> Path:
@@ -459,7 +489,6 @@ class CodeMapService:
     def dispatch(self, request: dict[str, Any]) -> dict[str, Any]:
         if request.get("protocol") != PROTOCOL:
             raise ValueError("unsupported protocol version")
-        self._requests += 1
         handlers = {
             "status": self._status_response,
             "sync": self._sync_response,
@@ -491,7 +520,21 @@ class CodeMapService:
         handler = handlers.get(op)
         if handler is None:
             raise ValueError(f"unsupported operation: {op!r}")
-        return handler(request)
+
+        projection = (
+            _CANONICAL_SERVICE_PROJECTIONS.get(op) if isinstance(op, str) else None
+        )
+        if projection is not None:
+            require_registered_operation(projection.operation)
+
+        self._requests += 1
+        response = handler(request)
+        if projection is not None:
+            validate_operation_response(
+                projection.operation,
+                response.get(projection.response_key),
+            )
+        return response
 
     def _prepare_socket(self) -> None:
         self.socket_path.parent.mkdir(parents=True, exist_ok=True)
