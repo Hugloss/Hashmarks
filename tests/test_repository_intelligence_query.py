@@ -177,6 +177,42 @@ def test_repository_intelligence_defaults_have_one_core_owner(
     )
 
 
+def test_raw_query_omission_preserves_canonical_negative_members_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _Map:
+        def repository_intelligence_query(
+            self,
+            surface: str,
+            task: str,
+            changed_paths: list[str],
+            *,
+            options: RepositoryIntelligenceQueryOptions,
+        ) -> dict[str, object]:
+            captured["options"] = options
+            return {"schema": "hashmarks.repository-intelligence-query.v1"}
+
+    service = CodeMapService(tmp_path, socket_path=tmp_path / "service.sock")
+    monkeypatch.setattr(service, "_map", lambda: _Map())
+    service._repository_intelligence_query_response(
+        {
+            "surface": "profile",
+            "task": "inspect widget",
+            "changed_paths": ["src/widget.py"],
+        }
+    )
+
+    options = captured["options"]
+    assert isinstance(options, RepositoryIntelligenceQueryOptions)
+    assert options == REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS
+    assert (
+        options.negative_members
+        is REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS.negative_members
+    )
+
+
 def test_query_facade_service_roundtrip(tmp_path: Path) -> None:
     _source, task = _repo(tmp_path)
     socket = tmp_path / "query.sock"
