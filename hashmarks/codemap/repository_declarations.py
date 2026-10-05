@@ -656,7 +656,6 @@ class RepositoryDeclarationsMixin:
         groups: Sequence[Mapping[str, object]],
         *,
         previous_observation: Mapping[str, object] | None = None,
-        result_mode: str = "observation",
     ) -> dict[str, object]:
         """Qualify declaration correspondence against exact repository evidence.
 
@@ -668,12 +667,6 @@ class RepositoryDeclarationsMixin:
         """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        allowed = ("observation", "explain")
-        if result_mode not in allowed:
-            raise ValueError(f"result_mode must be one of: {', '.join(allowed)}")
-        if result_mode == "explain" and previous_observation is not None:
-            raise ValueError("previous_observation requires result_mode=observation")
-
         normalized_groups, bindings = normalize_request(groups)
         evidence_packet = self.repository_evidence_bindings(
             bindings, include_relationships=False
@@ -745,6 +738,25 @@ class RepositoryDeclarationsMixin:
                 raise ValueError(
                     f"declaration packet exceeds {MAX_PACKET_BYTES} encoded bytes"
                 )
+        return packet
+
+    def repository_declarations_operation(
+        self,
+        groups: Sequence[Mapping[str, object]],
+        *,
+        previous_observation: Mapping[str, object] | None = None,
+        result_mode: str = "observation",
+    ) -> dict[str, object]:
+        """Execute one canonical declaration operation independent of transport."""
+        allowed = ("observation", "explain")
+        if result_mode not in allowed:
+            raise ValueError(f"result_mode must be one of: {', '.join(allowed)}")
+        if result_mode == "explain" and previous_observation is not None:
+            raise ValueError("previous_observation requires result_mode=observation")
+        packet = self.repository_declarations(
+            groups,
+            previous_observation=previous_observation,
+        )
         if result_mode == "explain":
             return self.repository_declaration_explain(packet)
         return packet
