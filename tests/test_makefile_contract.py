@@ -202,3 +202,13 @@ def test_derived_authority_make_alias_owns_only_stable_output_path() -> None:
         "--fixture-root tests/fixtures/dependency_dogfood",
     ):
         assert stale not in joined
+
+
+def test_metrics_agent_make_alias_delegates_normal_defaults() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+    assert _make_recipe(text, "metrics-agent") == (
+        "@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent",
+    )
+
+    for stale in ("--files 1000", "--budget 1000"):
+        assert stale not in "\n".join(_make_recipe(text, "metrics-agent"))
