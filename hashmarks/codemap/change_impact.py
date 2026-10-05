@@ -626,9 +626,7 @@ class ChangeImpactMixin:
             expected_generation=sync_result.generation,
         )
         decision_generation = (
-            sync_result.generation
-            if refresh_generation is None
-            else refresh_generation
+            sync_result.generation if refresh_generation is None else refresh_generation
         )
 
         with self.decision_session(expected_generation=decision_generation):
