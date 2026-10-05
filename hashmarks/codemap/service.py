@@ -23,7 +23,10 @@ from .change_impact import ChangeImpactOptions
 from .engine import CodeMap
 from .evidence_packet import TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
 from .post_change import PostChangeOptions
-from .repository_intelligence_query import RepositoryIntelligenceQueryOptions
+from .repository_intelligence_query import (
+    REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
+    RepositoryIntelligenceQueryOptions,
+)
 
 PROTOCOL = "hashmarks.codemap-service.v2"
 MAX_REQUEST = 1024 * 1024
@@ -503,16 +506,21 @@ class CodeMapService:
         if not isinstance(surface, str) or not surface.strip():
             raise ValueError("surface must be a non-empty string")
         changed = self._string_list(request, "changed_paths", required=False)
-        negative_members = self._string_list(
-            request, "negative_members", required=False
+        defaults = REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS
+        negative_members = request.get(
+            "negative_members", list(defaults.negative_members)
         )
-        previous_map = request.get("previous_map")
+        if not isinstance(negative_members, list) or not all(
+            isinstance(item, str) for item in negative_members
+        ):
+            raise ValueError("negative_members must be a list of strings")
+        previous_map = request.get("previous_map", defaults.previous_map)
         if previous_map is not None and not isinstance(previous_map, dict):
             raise ValueError("previous_map must be an object or null")
-        previous_snapshot = request.get("previous_snapshot")
+        previous_snapshot = request.get("previous_snapshot", defaults.previous_snapshot)
         if previous_snapshot is not None and not isinstance(previous_snapshot, dict):
             raise ValueError("previous_snapshot must be an object or null")
-        member_path = request.get("member_path")
+        member_path = request.get("member_path", defaults.member_path)
         if member_path is not None and (
             not isinstance(member_path, str) or not member_path.strip()
         ):
@@ -523,18 +531,30 @@ class CodeMapService:
             changed,
             options=RepositoryIntelligenceQueryOptions(
                 member_path=member_path,
-                profile=str(request.get("profile", "compact")),
+                profile=str(request.get("profile", defaults.profile)),
                 negative_members=negative_members,
                 previous_map=previous_map,
                 previous_snapshot=previous_snapshot,
-                limit=self._bounded_int(request, "limit", 20, 1, 100),
-                per_role=self._bounded_int(request, "per_role", 3, 1, 20),
-                impact_limit_per_surface=self._bounded_int(
-                    request, "impact_limit_per_surface", 4, 1, 100
+                limit=self._bounded_int(request, "limit", defaults.limit, 1, 100),
+                per_role=self._bounded_int(
+                    request, "per_role", defaults.per_role, 1, 20
                 ),
-                max_depth=self._bounded_int(request, "max_depth", 3, 1, 32),
+                impact_limit_per_surface=self._bounded_int(
+                    request,
+                    "impact_limit_per_surface",
+                    defaults.impact_limit_per_surface,
+                    1,
+                    100,
+                ),
+                max_depth=self._bounded_int(
+                    request, "max_depth", defaults.max_depth, 1, 32
+                ),
                 project_impact_limit=self._bounded_int(
-                    request, "project_impact_limit", 12, 1, 100000
+                    request,
+                    "project_impact_limit",
+                    defaults.project_impact_limit,
+                    1,
+                    100_000,
                 ),
             ),
         )
@@ -965,7 +985,9 @@ class CodeMapServiceClient:
         task: str,
         changed_paths: tuple[str, ...] | list[str] = (),
         *,
-        options: RepositoryIntelligenceQueryOptions = RepositoryIntelligenceQueryOptions(),
+        options: RepositoryIntelligenceQueryOptions = (
+            REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS
+        ),
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "surface": surface,

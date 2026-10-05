@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import threading
 import time
 from typing import TYPE_CHECKING
@@ -8,6 +9,7 @@ import pytest
 
 from hashmarks import CodeMap
 from hashmarks.codemap.repository_intelligence_query import (
+    REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
     RepositoryIntelligenceQueryOptions,
 )
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
@@ -113,6 +115,66 @@ def test_query_facade_is_deterministic_and_fails_closed(tmp_path: Path) -> None:
             codemap.repository_intelligence_query("snapshot", task)
         with pytest.raises(ValueError, match="previous_snapshot is required"):
             codemap.repository_intelligence_query("delta", task, ["src/owner.py"])
+
+
+def test_repository_intelligence_defaults_have_one_core_owner(
+    tmp_path: Path,
+) -> None:
+    assert (
+        inspect.signature(CodeMap.repository_intelligence_query)
+        .parameters["options"]
+        .default
+        is REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS
+    )
+    assert (
+        inspect.signature(CodeMapServiceClient.repository_intelligence_query)
+        .parameters["options"]
+        .default
+        is REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS
+    )
+    handler_source = inspect.getsource(
+        CodeMapService._repository_intelligence_query_response
+    )
+    assert "REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS" in handler_source
+    for literal in ('"compact"', '"limit", 20', '"per_role", 3'):
+        assert literal not in handler_source
+
+    _source, task = _repo(tmp_path)
+    socket = tmp_path / "query-defaults.sock"
+    service = CodeMapService(tmp_path, socket_path=socket)
+    thread = threading.Thread(target=service.serve_forever, daemon=True)
+    thread.start()
+    client = CodeMapServiceClient(tmp_path, socket_path=socket)
+    deadline = time.time() + 5
+    while True:
+        try:
+            client.status()
+            break
+        except OSError:
+            if time.time() >= deadline:
+                raise
+            time.sleep(0.01)
+    try:
+        client.sync()
+        raw = client.request(
+            "repository_intelligence_query",
+            surface="profile",
+            task=task,
+            changed_paths=["src/owner.py"],
+        )["repository_intelligence_query"]
+        typed = client.repository_intelligence_query(
+            "profile",
+            task,
+            ["src/owner.py"],
+        )
+    finally:
+        client.stop()
+        thread.join(timeout=5)
+
+    assert raw == typed
+    assert typed["result"]["profile"] == (
+        REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS.profile
+    )
 
 
 def test_query_facade_service_roundtrip(tmp_path: Path) -> None:
