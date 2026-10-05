@@ -16,7 +16,7 @@ def _write(root: Path, rel: str, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def test_task_evidence_v2_separates_retrieval_ownership_and_freshness(
+def test_task_evidence_v3_separates_retrieval_ownership_and_freshness(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -36,7 +36,7 @@ def test_task_evidence_v2_separates_retrieval_ownership_and_freshness(
         codemap.sync()
         packet = codemap.task_evidence("change target_impl behavior", token_budget=256)
 
-    assert packet["schema"] == "hashmarks.task-evidence.v2"
+    assert packet["schema"] == "hashmarks.task-evidence.v3"
     assert "status" not in packet
     assert packet["retrieval"]["ownership_authority"] is False
     assert packet["ownership"]["status"] == "resolved"
@@ -48,7 +48,53 @@ def test_task_evidence_v2_separates_retrieval_ownership_and_freshness(
     assert packet["consumer_action"] == "external"
 
 
-def test_task_evidence_v2_consumes_canonical_admitted_edit(
+def test_task_evidence_v3_retrieval_is_compact_non_authoritative_projection(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/owner.py",
+        "def target_impl(value: int) -> int:\n    return value + 1\n",
+    )
+    _write(
+        tmp_path,
+        "src/helper.py",
+        "def helper(value: int) -> int:\n    return value\n",
+    )
+    task = "locate target_impl behavior"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20)
+        packet = codemap.task_evidence(task, limit=20, token_budget=256)
+
+    retrieval = packet["retrieval"]
+    assert retrieval["presentation"] == "compact-locators-v1"
+    assert retrieval["ownership_authority"] is False
+    assert retrieval["results"]
+    projected = retrieval["results"][0]
+    internal = action["canonical"][0]
+    assert projected["path"] == internal["path"]
+    assert projected["rank"] == internal["canonical_rank"]
+    assert projected.get("symbol") == (
+        internal.get("qualname") or internal.get("name")
+    )
+    assert projected.get("roles") == internal.get("roles")
+    assert projected.get("evidence_visibility") == internal.get(
+        "evidence_visibility"
+    )
+    for internal_only in (
+        "canonical_rank",
+        "canonical_score",
+        "domains",
+        "name",
+        "qualname",
+        "signature",
+    ):
+        assert internal_only not in projected
+
+
+def test_task_evidence_v3_consumes_canonical_admitted_edit(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -82,7 +128,7 @@ def test_task_evidence_v2_consumes_canonical_admitted_edit(
     assert packet["explicit_target"]["path"] == "src/owner.py"
 
 
-def test_task_evidence_v2_keeps_ambiguity_independent_from_freshness(
+def test_task_evidence_v3_keeps_ambiguity_independent_from_freshness(
     tmp_path: Path,
 ) -> None:
     _write(tmp_path, "src/a.py", "def calculate_value():\n    return 1\n")
@@ -99,7 +145,7 @@ def test_task_evidence_v2_keeps_ambiguity_independent_from_freshness(
     assert packet["freshness"]["state"] in {"unknown", "current", "stale"}
 
 
-def test_task_evidence_v2_owner_is_invariant_to_bounded_retrieval(
+def test_task_evidence_v3_owner_is_invariant_to_bounded_retrieval(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -132,7 +178,7 @@ def test_task_evidence_v2_owner_is_invariant_to_bounded_retrieval(
     assert wide["ownership"]["basis"] in {"exact-symbol", "unique-exact-symbol"}
 
 
-def test_task_evidence_v2_keeps_dependency_as_related_evidence_not_owner(
+def test_task_evidence_v3_keeps_dependency_as_related_evidence_not_owner(
     tmp_path: Path,
 ) -> None:
     _write(tmp_path, "src/publish.py", "def publish_result(value):\n    return value\n")
@@ -428,11 +474,8 @@ def test_task_evidence_preserves_dense_natural_language_owner_candidates(
                 retrieval = packet["retrieval"]["results"]
                 assert any(
                     row["path"] == expected_path
-                    and (
-                        row.get("name") == expected_symbol
-                        or str(row.get("qualname") or "").rsplit(".", 1)[-1]
-                        == expected_symbol
-                    )
+                    and str(row.get("symbol") or "").rsplit(".", 1)[-1]
+                    == expected_symbol
                     for row in retrieval
                 ), (case_id, query)
                 assert packet["retrieval"]["ownership_authority"] is False
@@ -474,7 +517,10 @@ def test_task_evidence_natural_supplements_respect_deny_visibility(
 
     retrieval = packet["retrieval"]["results"]
     assert all(row.get("path") != "hidden/engine.py" for row in retrieval)
-    assert all(row.get("qualname") != "cobalt_owner" for row in retrieval)
+    assert all(
+        str(row.get("symbol") or "").rsplit(".", 1)[-1] != "cobalt_owner"
+        for row in retrieval
+    )
 
 
 def _dense_prefix_repository(root: Path) -> tuple[Path, str]:
@@ -516,11 +562,28 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
 
     retrieval = packet["retrieval"]
     results = retrieval["results"]
-    supplements = [row for row in results if row.get("retrieval_supplement")]
+    supplements = [row for row in results if row.get("supplement")]
+    assert retrieval["presentation"] == "compact-locators-v1"
     assert 1 <= len(supplements) <= 2
     assert len(results) <= 20
     canonical_prefix = results[: -len(supplements)]
-    assert canonical_prefix == action["canonical"][: len(canonical_prefix)]
+    for projected, internal in zip(
+        canonical_prefix,
+        action["canonical"][: len(canonical_prefix)],
+        strict=True,
+    ):
+        assert projected["path"] == internal["path"]
+        assert projected["rank"] == internal["canonical_rank"]
+        assert projected.get("symbol") == (
+            internal.get("qualname") or internal.get("name")
+        )
+        assert projected.get("roles") == internal.get("roles")
+        assert projected.get("evidence_visibility") == internal.get(
+            "evidence_visibility"
+        )
+        assert "signature" not in projected
+        assert "canonical_score" not in projected
+        assert "domains" not in projected
     assert retrieval["canonical_omitted_results"] == len(action["canonical"]) - len(
         canonical_prefix
     )
@@ -528,19 +591,16 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
     assert retrieval["supplemental_results"] == len(supplements)
     assert retrieval["supplemental_authority"] is False
     assert retrieval["ordering"] == "canonical-then-bounded-natural-language"
-    assert any(row["name"] == "paths_under" for row in supplements)
-    assert all(set(action["canonical"][0]).issubset(row) for row in supplements)
-    assert all(
-        row["score_basis"] == "natural-identifier-phrase-relevance"
+    assert any(
+        str(row.get("symbol") or "").rsplit(".", 1)[-1] == "paths_under"
         for row in supplements
     )
     assert all(
-        isinstance(row["score"], float) and row["score"] > 0 for row in supplements
+        row["supplement"] == "bounded-natural-language" for row in supplements
     )
     assert all(row["evidence_visibility"] == "source" for row in supplements)
-    assert all("start_line" not in row and "end_line" not in row for row in supplements)
     assert all(
-        not row.get("retrieval_supplement") for row in tight["retrieval"]["results"]
+        not row.get("supplement") for row in tight["retrieval"]["results"]
     )
     assert "canonical_omitted_results" not in tight["retrieval"]
     assert packet["ownership"]["candidate"]["path"] == action["edit"]["path"]
@@ -557,7 +617,8 @@ def test_task_evidence_supplement_excludes_unsignaled_stale_symbol(
         codemap.sync()
         before = codemap.task_evidence(task, limit=20, token_budget=256)
         assert any(
-            row.get("retrieval_supplement") and row.get("name") == "paths_under"
+            row.get("supplement")
+            and str(row.get("symbol") or "").rsplit(".", 1)[-1] == "paths_under"
             for row in before["retrieval"]["results"]
         )
         if mutation == "rewrite":
@@ -572,7 +633,8 @@ def test_task_evidence_supplement_excludes_unsignaled_stale_symbol(
         after = codemap.task_evidence(task, limit=20, token_budget=256)
 
     assert all(
-        row.get("name") != "paths_under" for row in after["retrieval"]["results"]
+        str(row.get("symbol") or "").rsplit(".", 1)[-1] != "paths_under"
+        for row in after["retrieval"]["results"]
     )
 
 
@@ -593,7 +655,7 @@ def test_task_evidence_supplement_preserves_outline_visibility(
     supplements = [
         row
         for row in packet["retrieval"]["results"]
-        if row.get("retrieval_supplement")
+        if row.get("supplement")
         and row["path"] == owner.relative_to(tmp_path).as_posix()
     ]
     assert supplements
