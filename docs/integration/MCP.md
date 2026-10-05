@@ -266,6 +266,9 @@ The report separates `PASS`, `PROJECT TRUST REQUIRED`, `NOT INSTALLED`, `NOT REG
 
 The repository includes a real-host qualification command for maintainers:
 
+The host-gate scripts own their normal host executable, Python selector, receipt path, and safe-mode defaults. The Make targets are thin aliases: they use those script defaults unless you explicitly provide a Make override such as `OPENCODE_MODEL`, `CLAUDE_MODEL`, `CODEX_MODEL`, a host executable override, a Python selector override, or a receipt override. Pi deliberately keeps model selection in Pi's native configuration, so `mcp-pi-check` has no Hashmarks model override.
+
+
 ```bash
 opencode --version
 opencode models
@@ -310,7 +313,7 @@ The gate uses a disposable trusted repository and its project-local `.codex/conf
 
 ```bash
 pi install npm:pi-mcp-adapter
-PI_MODEL=<provider/model> make mcp-pi-check
+make mcp-pi-check
 ```
 
 The gate creates a disposable `.mcp.json`, launches Pi in JSON mode with built-in tools disabled and only the adapter's `mcp` proxy enabled, then requires real calls to `hashmarks_repository_context` and `hashmarks_find`. It validates the corresponding Hashmarks schemas and rejects any unexpected Pi tool execution. Adapter metadata/cache readiness alone cannot produce PASS.
