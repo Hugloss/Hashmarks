@@ -1081,13 +1081,7 @@ class IndexingLifecycleMixin:
 
         candidates: list[_DiscoveredFile] = []
         for item in discovered:
-            rel, path, language, visibility = (
-                item.rel,
-                item.path,
-                item.language,
-                item.visibility,
-            )
-            state.present.add(rel)
+            state.present.add(item.rel)
             if self._sync_base_entry(
                 item,
                 overlay_paths=overlay_paths,
