@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from hashmarks._command_output import log_command_output
+from hashmarks.mcp_contract import MCP_TOOL_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +22,6 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-EXPECTED_TOOLS = (
-    "repository_context",
-    "find",
-    "task_evidence",
-    "change_impact",
-    "post_change",
-)
 EXPECTED_UV_ARGS = [
     "run",
     "--frozen",
@@ -436,6 +430,17 @@ def _pi(workspace: Path, candidate_identity: str) -> dict[str, Check]:
     }
 
 
+def _mcp_tool_catalog_check(surface_type: type[Any]) -> Check:
+    missing = tuple(
+        name
+        for name in MCP_TOOL_NAMES
+        if not callable(getattr(surface_type, name, None))
+    )
+    if missing:
+        return Check("FAIL", "missing canonical tools: " + ", ".join(missing))
+    return Check("PASS", f"{len(MCP_TOOL_NAMES)} canonical tools")
+
+
 def collect(workspace: Path) -> dict[str, Any]:
     from hashmarks.mcp_surface import HashmarksMcpSurface
     from hashmarks.test_shards import repository_content_identity
@@ -445,9 +450,6 @@ def collect(workspace: Path) -> dict[str, Any]:
         excluded_paths=(workspace / "dist",),
     )
 
-    catalog_ok = all(
-        callable(getattr(HashmarksMcpSurface, name, None)) for name in EXPECTED_TOOLS
-    )
     core = {
         "mcp_server_executable": Check(
             "PASS"
@@ -458,9 +460,7 @@ def collect(workspace: Path) -> dict[str, Any]:
         "mcp_sdk": Check(
             "PASS" if importlib.util.find_spec("mcp") is not None else "NOT INSTALLED"
         ),
-        "mcp_tool_catalog": Check(
-            "PASS" if catalog_ok else "FAIL", f"{len(EXPECTED_TOOLS)} tools"
-        ),
+        "mcp_tool_catalog": _mcp_tool_catalog_check(HashmarksMcpSurface),
     }
 
     def host_dict(value: HostStatus) -> dict[str, dict[str, str]]:
