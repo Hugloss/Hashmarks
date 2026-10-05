@@ -162,3 +162,28 @@ def test_mcp_stress_make_alias_transports_only_explicit_receipt_override() -> No
         '--receipt "$(MCP_STRESS_RECEIPT)",)' in line
         for line in recipe
     )
+
+
+def test_metrics_make_aliases_transport_only_explicit_workload_overrides() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    for token in ("FILES ?= 10000", "HOT_REQUESTS ?= 20"):
+        assert token not in text
+
+    for target in ("metrics", "metrics-fast"):
+        recipe = _make_recipe(text, target)
+        assert any("scripts/metrics.py" in line for line in recipe)
+        assert any(
+            "$(if $(strip $(FILES)),--files $(FILES),)" in line for line in recipe
+        )
+        assert any(
+            "$(if $(strip $(HOT_REQUESTS)),--hot-requests $(HOT_REQUESTS),)" in line
+            for line in recipe
+        )
+
+    assert _make_recipe(text, "metrics-scale") == (
+        "@$(MAKE) metrics FILES=100000",
+    )
+    assert _make_recipe(text, "metrics-500k") == (
+        "@$(MAKE) metrics FILES=500000",
+    )
