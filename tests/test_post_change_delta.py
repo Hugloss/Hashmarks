@@ -126,7 +126,7 @@ def test_task_post_change_delta_rejects_non_start_packet(tmp_path: Path) -> None
                 task, ["src/owner.py"], previous_evidence={"schema": "wrong"}
             )
         except ValueError as exc:
-            assert "hashmarks.task-evidence.v2" in str(exc)
+            assert "hashmarks.task-evidence.v3" in str(exc)
         else:
             raise AssertionError("invalid previous_evidence must fail closed")
 
