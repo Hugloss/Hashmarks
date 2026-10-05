@@ -1254,7 +1254,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
             raise ValueError("dependency resolution definition identity is malformed")
         if before_definition != after_definition:
             return {
-                "schema": "hashmarks.dependency-resolution-delta.v3",
+                "schema": _contract.DELTA_SCHEMA_V3,
                 "comparability": "not-comparable",
                 "reason": "definition-changed",
                 "before_definition_identity": before_definition,
@@ -1343,7 +1343,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
             if isinstance(row, Mapping) and row.get("module")
         }
         return {
-            "schema": "hashmarks.dependency-resolution-delta.v3",
+            "schema": _contract.DELTA_SCHEMA_V3,
             "comparability": "comparable",
             "before_resolution_identity": before.get("resolution_identity"),
             "after_resolution_identity": after.get("resolution_identity"),
