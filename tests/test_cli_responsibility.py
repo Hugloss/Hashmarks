@@ -88,6 +88,13 @@ def test_repository_cli_operation_projection_validates_before_print(
         )
     assert printed == [packet]
 
+    with pytest.raises(ValueError, match="unknown Hashmarks operation"):
+        repository_cli._print_operation(
+            "unregistered_operation",
+            {"schema": "hashmarks.unregistered.v1"},
+        )
+    assert printed == [packet]
+
 
 def test_repository_cli_projects_all_canonical_cli_operations_through_one_guard() -> (
     None
