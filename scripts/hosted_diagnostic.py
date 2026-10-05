@@ -122,7 +122,7 @@ def _validate_range(shards: int, start: int, limit: int | None) -> tuple[int, in
     return start, stop
 
 
-def main(argv: list[str] | None = None) -> int:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Capability-aware constrained-host pytest runner"
     )
@@ -131,7 +131,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--extra-marker", default="")
     parser.add_argument("--capabilities", action="store_true")
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
 
     inventory = capabilities()
     if args.capabilities:
