@@ -632,7 +632,7 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
             "hashmarks_post_change",
             {
                 "schema": "hashmarks.task-post-change-delta.v2",
-                "status": "changed",
+                "change": "changed",
                 "generation_before": 1,
                 "generation_after": 2,
                 "invalidated": [host_gate.CHANGED_PATH],
@@ -666,6 +666,8 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
     assert "model" not in receipt
     assert receipt["phase1"]["generation"] == 1
     assert receipt["phase2"]["generation_after"] == 2
+    assert receipt["phase2"]["change"] == "changed"
+    assert "status" not in receipt["phase2"]
     assert calls == [(registration_env, None), (registration_env, "ses_123")]
     assert Path(receipt["logs"]["phase1"]["path"]).is_file()
     assert Path(receipt["logs"]["phase2"]["path"]).is_file()
