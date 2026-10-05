@@ -943,7 +943,9 @@ class CodeMapServiceClient:
         self,
         task: str,
         *,
-        budgets: tuple[int, ...] | list[int] = (64, 128, 192, 256, 384, 512),
+        budgets: tuple[int, ...] | list[int] = (
+            TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
+        ),
         limit: int = 20,
         per_role: int = 3,
     ) -> dict[str, Any]:
