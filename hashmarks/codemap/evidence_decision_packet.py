@@ -193,7 +193,7 @@ class DecisionPacketMixin:
             "repository_identity": repository_identity,
             "codemap_generation": generation,
             "identity_generation": identity_generation,
-            "stale": bool(stale) or not bool(build.get("complete")),
+            "stale": stale is not False,
             "codemap_complete": bool(build.get("complete")),
             "codemap_build_state": build.get("state"),
             "task_identity": task_identity,

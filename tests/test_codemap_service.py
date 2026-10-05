@@ -147,7 +147,7 @@ def test_codemap_service_task_action_brief(tmp_path: Path) -> None:
     try:
         brief = client.task_action_brief("widget implementation test", token_budget=64)
         assert brief["schema"] == "hashmarks.task-action-brief.v1"
-        assert brief["status"] == "safe-fresh"
+        assert brief["status"] == "safe-unknown"
         assert brief["edit"] == "src/engine.py"
         assert isinstance(brief["verify"], list)
     finally:

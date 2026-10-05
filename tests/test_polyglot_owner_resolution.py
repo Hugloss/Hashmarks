@@ -219,7 +219,7 @@ def test_go_same_package_unique_route_starts_structural_owner_when_phrase_is_con
         brief = c.task_action_brief(
             "Change the amber valley accepted response from old to new"
         )
-    assert brief["status"] == "safe-fresh"
+    assert brief["status"] == "safe-unknown"
     assert brief["edit"] == "service/service.go"
     assert brief["verify"] == ["go", "test", "./route"]
     assert brief["owner_path"] == "route/route.go --imports--> service/service.go"
@@ -252,7 +252,7 @@ def test_go_same_package_unique_route_can_continue_to_engine_when_service_delega
         brief = c.task_action_brief(
             "Change the velvet lantern accepted response from old to new"
         )
-    assert brief["status"] == "safe-fresh"
+    assert brief["status"] == "safe-unknown"
     assert brief["edit"] == "engine/engine.go"
     assert brief["verify"] == ["go", "test", "./route"]
     assert (

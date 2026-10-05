@@ -110,7 +110,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             if plan.get("available")
             else None,
             "safe": bool(context.get("safe")) and edit is not None,
-            "stale": bool(identity.get("stale")),
+            "stale": identity.get("stale"),
             "decision_generation": identity.get("decision_generation"),
             "evidence_receipt": dict(packet.get("evidence_receipt") or {}),
             "full_packet_available": True,
@@ -262,7 +262,15 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         )
         result: dict[str, object] = {
             "schema": "hashmarks.task-action-brief.v1",
-            "status": "unsafe" if not safe else "safe-stale" if stale else "safe-fresh",
+            "status": (
+                "unsafe"
+                if not safe
+                else "safe-stale"
+                if stale is True
+                else "safe-fresh"
+                if stale is False
+                else "safe-unknown"
+            ),
             "candidate": action.get("candidate_path"),
             "authority_proof_identity": str(
                 (
