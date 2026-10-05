@@ -48,8 +48,7 @@ _EXPECTED = {
 
 def test_operation_contract_is_one_exact_mapping() -> None:
     assert {
-        contract.operation: contract.mode_map()
-        for contract in OPERATION_CONTRACTS
+        contract.operation: contract.mode_map() for contract in OPERATION_CONTRACTS
     } == _EXPECTED
 
     manifest = operation_contract_manifest()
@@ -77,10 +76,7 @@ def test_operation_contract_validates_exact_operation_mode_schema(
     selected_mode = None if mode == "default" else mode
     assert operation_schema(operation, selected_mode) == schema
     packet = {"schema": schema}
-    assert (
-        validate_operation_response(operation, packet, mode=selected_mode)
-        is packet
-    )
+    assert validate_operation_response(operation, packet, mode=selected_mode) is packet
 
     with pytest.raises(RuntimeError, match="operation response schema drift"):
         validate_operation_response(
