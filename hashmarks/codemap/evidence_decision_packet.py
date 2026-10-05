@@ -132,21 +132,6 @@ class DecisionPacketMixin:
         }
 
     @staticmethod
-    def _decision_packet_edit_projection(
-        action: Mapping[str, object],
-    ) -> Mapping[str, object] | None:
-        ambiguity = (
-            action.get("ambiguity")
-            if isinstance(action.get("ambiguity"), Mapping)
-            else {}
-        )
-        if bool(ambiguity.get("ambiguous")):
-            value = action.get("admitted_edit")
-        else:
-            value = action.get("edit")
-        return value if isinstance(value, Mapping) else None
-
-    @staticmethod
     def _decision_packet_structural_start_summary(
         action: Mapping[str, object],
     ) -> dict[str, object]:
@@ -252,7 +237,8 @@ class DecisionPacketMixin:
             per_role=per_role,
         )
         timing.record("action_map")
-        edit = self._decision_packet_edit_projection(action)
+        edit_value = action.get("action_edit")
+        edit = edit_value if isinstance(edit_value, Mapping) else None
         verify = (
             action.get("verify") if isinstance(action.get("verify"), dict) else None
         )
