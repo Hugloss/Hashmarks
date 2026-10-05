@@ -75,3 +75,38 @@ def test_codemap_completeness_does_not_redefine_freshness(
     assert packet["identity"]["stale"] is False
     assert packet["identity"]["codemap_complete"] is False
     assert packet["identity"]["codemap_build_state"] == "BUILDING"
+
+def test_action_brief_status_consumes_receipt_freshness_once(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _repo(tmp_path)
+    task = "widget implementation test"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        generation = codemap.store.generation()
+        action = codemap.task_action_map(task)
+        reads = 0
+
+        def one_freshness_read(observation=None):
+            nonlocal reads
+            del observation
+            reads += 1
+            if reads > 1:
+                raise AssertionError(
+                    "task action brief re-read freshness after assembling its receipt"
+                )
+            return generation, generation, False
+
+        monkeypatch.setattr(codemap, "_generation_status", one_freshness_read)
+        brief = codemap._task_action_brief_from_action(
+            action,
+            task=task,
+            token_budget=256,
+            limit=20,
+        )
+
+    assert reads == 1
+    assert brief["status"] == "safe-fresh"
+    assert brief["evidence_receipt"]["stale"] is False
+
