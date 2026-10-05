@@ -89,7 +89,9 @@ def test_repository_cli_operation_projection_validates_before_print(
     assert printed == [packet]
 
 
-def test_repository_cli_projects_all_canonical_cli_operations_through_one_guard() -> None:
+def test_repository_cli_projects_all_canonical_cli_operations_through_one_guard() -> (
+    None
+):
     from pathlib import Path
 
     import hashmarks.repository_cli as repository_cli
