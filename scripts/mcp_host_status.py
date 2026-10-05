@@ -22,6 +22,13 @@ logger = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from mcp_host_gate_common import (  # noqa: E402 - import follows standalone script path setup
+    validate_basic_qualification_proof,
+)
 
 
 @dataclass(frozen=True)
@@ -115,6 +122,11 @@ def _receipt_host_check(
     return None
 
 
+def _receipt_qualification_check(data: dict[str, Any]) -> Check | None:
+    proof_error = validate_basic_qualification_proof(data.get("qualification"))
+    return Check("STALE", proof_error) if proof_error is not None else None
+
+
 def _latest_receipt_call(
     workspace: Path,
     host: str,
@@ -137,6 +149,7 @@ def _latest_receipt_call(
     for check in (
         _receipt_registration_check(data, workspace, registration_path),
         _receipt_host_check(data, host, installed),
+        _receipt_qualification_check(data),
     ):
         if check is not None:
             return check
