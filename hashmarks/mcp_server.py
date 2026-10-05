@@ -50,7 +50,7 @@ def _call_surface(
     try:
         return operation(*args, **kwargs)
     except McpSurfaceError as exc:
-        raise tool_error(str(exc)) from exc
+        raise tool_error(exc.transport_message()) from exc
 
 
 def _register_repository_declarations_tool(
