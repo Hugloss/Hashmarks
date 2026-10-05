@@ -162,7 +162,11 @@ class DecisionSessionMixin:
 
     @contextmanager
     def decision_session(
-        self, *, diagnostics: bool = False, _allow_incomplete: bool = False
+        self,
+        *,
+        diagnostics: bool = False,
+        _allow_incomplete: bool = False,
+        expected_generation: int | None = None,
     ):
         """Reuse immutable evidence primitives across many decisions on one generation.
 
@@ -171,10 +175,17 @@ class DecisionSessionMixin:
         """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        if self._decision_session_depth == 0:
+        outermost = self._decision_session_depth == 0
+        if outermost:
             generation = self._begin_decision_session(
                 diagnostics=diagnostics, allow_incomplete=_allow_incomplete
             )
+            if expected_generation is not None and generation != expected_generation:
+                self._finish_decision_session()
+                raise RuntimeError(
+                    "CodeMap generation changed before expected decision session "
+                    f"({expected_generation} -> {generation})"
+                )
         else:
             generation = self.store.generation()
         if (
@@ -183,6 +194,16 @@ class DecisionSessionMixin:
         ):
             raise RuntimeError(
                 "CodeMap generation changed before nested decision session"
+            )
+        if (
+            expected_generation is not None
+            and self._decision_session_generation != expected_generation
+        ):
+            if outermost:
+                self._finish_decision_session()
+            raise RuntimeError(
+                "CodeMap decision session generation does not match expected "
+                f"generation {expected_generation}"
             )
         self._decision_session_depth += 1
         try:
