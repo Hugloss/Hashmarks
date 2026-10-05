@@ -181,9 +181,5 @@ def test_metrics_make_aliases_transport_only_explicit_workload_overrides() -> No
             for line in recipe
         )
 
-    assert _make_recipe(text, "metrics-scale") == (
-        "@$(MAKE) metrics FILES=100000",
-    )
-    assert _make_recipe(text, "metrics-500k") == (
-        "@$(MAKE) metrics FILES=500000",
-    )
+    assert _make_recipe(text, "metrics-scale") == ("@$(MAKE) metrics FILES=100000",)
+    assert _make_recipe(text, "metrics-500k") == ("@$(MAKE) metrics FILES=500000",)
