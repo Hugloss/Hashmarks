@@ -174,6 +174,7 @@ def test_enrichment_only_generation_carries_unrelated_scip_binding(
         assert codemap.store.generation() == before_generation + 1
         snapshot = json.loads(_scip_snapshot(codemap) or "{}")
         assert snapshot["generation"] == codemap.store.generation()
-        assert codemap._evidence_fresh(
-            "scip", "scip-python:publication-test"
-        ) == (True, None)
+        assert codemap._evidence_fresh("scip", "scip-python:publication-test") == (
+            True,
+            None,
+        )
