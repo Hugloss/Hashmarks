@@ -42,6 +42,7 @@ def _end(
         "isError": is_error,
     }
 
+
 def test_pi_event_validation_accepts_exact_proxy_calls() -> None:
     events = [
         _start("a", "hashmarks_repository_context", {"max_areas": 8}),
@@ -81,6 +82,7 @@ def test_pi_event_validation_rejects_schema_only_or_wrong_fixture_result() -> No
     with pytest.raises(pi_gate.HostGateError, match="src/feature.py"):
         pi_gate._validate_events(wrong_path)
 
+
 def test_pi_event_validation_binds_fixture_arguments() -> None:
     events = [
         _start("a", "hashmarks_repository_context", {"max_areas": 8}),
@@ -97,6 +99,7 @@ def test_pi_event_validation_binds_fixture_arguments() -> None:
     with pytest.raises(pi_gate.HostGateError, match="fixture contract"):
         pi_gate._validate_events(events)
 
+
 def test_pi_event_validation_rejects_non_mcp_tool() -> None:
     events = [
         {
@@ -108,6 +111,7 @@ def test_pi_event_validation_rejects_non_mcp_tool() -> None:
     ]
     with pytest.raises(pi_gate.HostGateError, match="unexpected tool"):
         pi_gate._validate_events(events)
+
 
 def test_pi_event_validation_rejects_error_and_missing_schema() -> None:
     with pytest.raises(pi_gate.HostGateError, match="reported an error"):
@@ -145,6 +149,7 @@ def test_pi_event_validation_rejects_error_and_missing_schema() -> None:
             ]
         )
 
+
 def test_pi_run_uses_native_model_authority() -> None:
     argv = pi_gate._pi_run_argv("pi", "qualify")
     assert "--model" not in argv
@@ -159,6 +164,7 @@ def test_pi_run_uses_native_model_authority() -> None:
         "mcp",
         "qualify",
     ]
+
 
 def test_pi_config_binds_absolute_installed_hashmarks(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
