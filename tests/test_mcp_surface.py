@@ -57,8 +57,17 @@ def test_mcp_surface_rejects_unbounded_or_empty_inputs(tmp_path: Path) -> None:
         str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
     )
     try:
-        with pytest.raises(McpSurfaceError, match="query must not be empty"):
+        with pytest.raises(
+            McpSurfaceError, match="query must not be empty"
+        ) as invalid:
             surface.find(" ")
+        assert invalid.value.reason == "invalid-request"
+        assert invalid.value.as_dict() == {
+            "schema": "hashmarks.mcp-error.v1",
+            "reason": "invalid-request",
+            "message": "query must not be empty",
+            "recovery_authority": "consumer-owned",
+        }
         with pytest.raises(McpSurfaceError, match="between 1 and 50"):
             surface.find("flare041", limit=51)
         with pytest.raises(McpSurfaceError, match="changed_paths exceeds"):
@@ -398,6 +407,63 @@ def test_mcp_retry_remains_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls > 3
 
 
+def test_mcp_surface_classifies_exhausted_transient_race(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    surface = HashmarksMcpSurface(
+        str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
+    )
+
+    def exhausted(_operation):
+        raise RuntimeError("CodeMap generation changed during decision session")
+
+    monkeypatch.setattr(mcp_surface, "retry_transient_repository_race", exhausted)
+    try:
+        with pytest.raises(McpSurfaceError) as failure:
+            surface._read(lambda: "never")
+    finally:
+        surface.close()
+
+    assert failure.value.reason == "transient-race-exhausted"
+    assert "bounded MCP read window" in str(failure.value)
+
+
+def test_mcp_surface_classifies_foreign_previous_correlation(
+    tmp_path: Path,
+) -> None:
+    repo_a = tmp_path / "a"
+    repo_b = tmp_path / "b"
+    repo_a.mkdir()
+    repo_b.mkdir()
+    (repo_a / "owner.py").write_text("def owner():\n    return 1\n", encoding="utf-8")
+    (repo_b / "owner.py").write_text("def owner():\n    return 2\n", encoding="utf-8")
+    bundle = [
+        {
+            "bundle_id": "runtime:1",
+            "producer": {"kind": "traceback"},
+            "completeness": "complete",
+            "scope": {"kind": "traceback-request"},
+            "truncation": "complete",
+            "anchors": [{"anchor_id": "frame", "path": "owner.py"}],
+        }
+    ]
+    first = HashmarksMcpSurface(str(repo_a), state_dir=str(tmp_path / "state-a"))
+    second = HashmarksMcpSurface(str(repo_b), state_dir=str(tmp_path / "state-b"))
+    try:
+        previous = first.correlate_evidence(bundle, include_relationships=False)
+        with pytest.raises(McpSurfaceError, match="repository-mismatch") as failure:
+            second.correlate_evidence(
+                bundle,
+                previous_correlation=previous,
+                include_relationships=False,
+            )
+    finally:
+        first.close()
+        second.close()
+
+    assert failure.value.reason == "stale-or-foreign-evidence"
+
+
 def test_mcp_surface_read_centralizes_gate_and_retry(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -428,8 +494,14 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
     def broken() -> None:
         raise RuntimeError("implementation bug")
 
-    with pytest.raises(FakeToolError, match="invalid query"):
+    with pytest.raises(FakeToolError, match="invalid query") as translated:
         mcp_server._call_surface(FakeToolError, invalid)
+    assert json.loads(str(translated.value)) == {
+        "schema": "hashmarks.mcp-error.v1",
+        "reason": "invalid-request",
+        "message": "invalid query",
+        "recovery_authority": "consumer-owned",
+    }
     with pytest.raises(RuntimeError, match="implementation bug"):
         mcp_server._call_surface(FakeToolError, broken)
 
@@ -729,8 +801,9 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
         }
         with pytest.raises(
             McpSurfaceError, match="unsupported dependency relationship kind"
-        ):
+        ) as unsupported:
             surface.dependency_codemap(invalid_snapshot)
+        assert unsupported.value.reason == "unsupported-semantic"
         with pytest.raises(
             McpSurfaceError, match="max_depth must be a positive integer"
         ):
@@ -1085,7 +1158,9 @@ def test_mcp_correlation_rejects_recomputed_outer_identity_over_tampered_nested_
                 if key not in {"correlation_identity", "delta_from_previous"}
             },
         )
-        with pytest.raises(McpSurfaceError, match="bindings identity mismatch"):
+        with pytest.raises(
+            McpSurfaceError, match="bindings identity mismatch"
+        ) as continuity:
             surface.correlate_evidence(
                 [
                     {
@@ -1100,5 +1175,6 @@ def test_mcp_correlation_rejects_recomputed_outer_identity_over_tampered_nested_
                 previous_correlation=tampered,
                 include_relationships=False,
             )
+        assert continuity.value.reason == "continuity-mismatch"
     finally:
         surface.close()
