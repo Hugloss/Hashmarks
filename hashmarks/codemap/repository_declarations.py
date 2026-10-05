@@ -3,7 +3,11 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
-from hashmarks.operation_contract import operation_schema
+from hashmarks.operation_contract import (
+    operation_schema,
+    require_operation_mode,
+    validate_operation_response,
+)
 
 from .repository_declaration_contract import (
     MAX_DECLARATIONS,
@@ -748,15 +752,20 @@ class RepositoryDeclarationsMixin:
         result_mode: str = "observation",
     ) -> dict[str, object]:
         """Execute one canonical declaration operation independent of transport."""
-        allowed = ("observation", "explain")
-        if result_mode not in allowed:
-            raise ValueError(f"result_mode must be one of: {', '.join(allowed)}")
-        if result_mode == "explain" and previous_observation is not None:
+        mode = require_operation_mode("repository_declarations", result_mode)
+        if mode == "explain" and previous_observation is not None:
             raise ValueError("previous_observation requires result_mode=observation")
         packet = self.repository_declarations(
             groups,
             previous_observation=previous_observation,
         )
-        if result_mode == "explain":
-            return self.repository_declaration_explain(packet)
-        return packet
+        result = (
+            self.repository_declaration_explain(packet)
+            if mode == "explain"
+            else packet
+        )
+        return validate_operation_response(
+            "repository_declarations",
+            result,
+            mode=mode,
+        )
