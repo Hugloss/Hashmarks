@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.digest import hash_file
 from hashmarks.evidence_context import evidence_context_identity
-from hashmarks.operation_contract import operation_schema
+from hashmarks.operation_contract import operation_schema, validate_operation_response
 
 from .configuration_evidence import ConfigurationEvidenceMixin
 from .decision_session import decision_scoped
@@ -1287,7 +1287,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             operation_schema("task_evidence"),
             result,
         )
-        return result
+        return validate_operation_response("task_evidence", result)
 
     @decision_scoped
     def task_action_brief(
