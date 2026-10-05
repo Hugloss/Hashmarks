@@ -43,7 +43,7 @@ def _events() -> list[dict[str, object]]:
                     {
                         "type": "tool_result",
                         "tool_use_id": "a",
-                        "content": '{"schema":"hashmarks.repository-capsule.v1"}',
+                        "content": '{"schema":"hashmarks.repository-capsule.v1","generation":1}',
                     }
                 ]
             },
@@ -68,7 +68,7 @@ def _events() -> list[dict[str, object]]:
                     {
                         "type": "tool_result",
                         "tool_use_id": "b",
-                        "content": '{"schema":"hashmarks.find.v2"}',
+                        "content": '{"schema":"hashmarks.find.v2","results":[{"path":"src/feature.py"}]}',
                     }
                 ]
             },
@@ -82,6 +82,42 @@ def test_claude_event_validation_requires_connected_model_visible_tools_and_resu
     result = claude_gate._validate_events(_events())
     assert set(result) == set(claude_gate.EXPECTED)
 
+
+
+def test_claude_event_validation_rejects_schema_token_without_semantic_result() -> None:
+    events = _events()
+    result_event = events[-1]
+    assert isinstance(result_event, dict)
+    message = result_event["message"]
+    assert isinstance(message, dict)
+    content = message["content"]
+    assert isinstance(content, list)
+    block = content[0]
+    assert isinstance(block, dict)
+
+    block["content"] = "Hashmarks schema hashmarks.find.v2 was observed but no result exists."
+    with pytest.raises(claude_gate.HostGateError, match="exact JSON object"):
+        claude_gate._validate_events(events)
+
+    block["content"] = '{"schema":"hashmarks.find.v2","results":[]}'
+    with pytest.raises(claude_gate.HostGateError, match="src/feature.py"):
+        claude_gate._validate_events(events)
+
+
+def test_claude_event_validation_binds_fixture_arguments() -> None:
+    events = _events()
+    use_event = events[3]
+    assert isinstance(use_event, dict)
+    message = use_event["message"]
+    assert isinstance(message, dict)
+    content = message["content"]
+    assert isinstance(content, list)
+    block = content[0]
+    assert isinstance(block, dict)
+    block["input"] = {"query": "wrong", "limit": 5}
+
+    with pytest.raises(claude_gate.HostGateError, match="fixture contract"):
+        claude_gate._validate_events(events)
 
 def test_claude_connected_but_tools_not_model_visible_is_environment_blocked() -> None:
     events = _events()
