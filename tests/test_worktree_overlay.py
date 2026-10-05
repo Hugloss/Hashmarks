@@ -139,7 +139,6 @@ def test_overlay_rejects_generation_only_base_advance(tmp_path: Path) -> None:
                 overlay.find_task("helper", limit=10)
 
 
-
 def test_overlay_rejects_base_generation_change_during_fused_read(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
