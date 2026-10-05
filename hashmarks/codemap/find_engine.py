@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
-from hashmarks.operation_contract import operation_schema
+from hashmarks.operation_contract import operation_schema, validate_operation_response
 
 from .decision_session import decision_scoped
 from .model import EvidenceVisibility, SearchHit
@@ -162,7 +162,7 @@ class FindEngineMixin:
             evidence.bound_reasons,
             freshness=freshness,
         )
-        return {
+        result: dict[str, object] = {
             "schema": operation_schema("find"),
             "query": query,
             "query_intent": route.intent.value,
@@ -173,6 +173,7 @@ class FindEngineMixin:
             "freshness": freshness,
             **claims,
         }
+        return validate_operation_response("find", result)
 
     def _find_evidence(self, query: str, *, limit: int) -> _FindEvidence:
         if TYPE_CHECKING:

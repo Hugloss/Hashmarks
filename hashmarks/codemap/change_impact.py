@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from hashmarks.operation_contract import operation_schema
+from hashmarks.operation_contract import operation_schema, validate_operation_response
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import diagnostic_producer
@@ -619,6 +619,7 @@ class ChangeImpactMixin:
         self._apply_selected_verification_impact(
             state, edit_path, verify, verify_path, chain
         )
-        return self._project_change_impact(
+        result = self._project_change_impact(
             state, sync_result.generation, options, declared_refresh
         )
+        return validate_operation_response("change_impact", result)
