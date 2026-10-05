@@ -335,6 +335,26 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             ambiguity_reason=ambiguity_reason,
         )
 
+    @staticmethod
+    def _task_action_discrimination_payload(
+        final: _TaskActionFinalState,
+        authority: Mapping[str, object],
+    ) -> dict[str, object]:
+        """Classify unresolved action evidence once for downstream projections."""
+        reason = "resolved"
+        if final.edit is None:
+            reason = "no-supported-owner-candidate"
+        elif final.ambiguous:
+            reason = "competing-action-roles"
+        elif not bool(authority.get("owner_resolved")):
+            reason = "ownership-unresolved"
+        elif final.verify is None:
+            reason = "missing-verification-evidence"
+        return {
+            "needed": reason != "resolved",
+            "reason": reason,
+        }
+
     def _task_action_projection_result(
         self,
         task: str,
@@ -356,6 +376,9 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         )
         authority = cast("Mapping[str, object]", ownership["ownership_authority"])
         action_edit = ownership.get("action_edit")
+        action_discrimination = self._task_action_discrimination_payload(
+            final, authority
+        )
         proof_identity = str(authority.get("authority_proof_identity") or "")
         presentation = bounded_presentation_contract(
             proof_identity,
@@ -370,6 +393,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             "task": task,
             "edit": final.edit,
             "action_edit": action_edit,
+            "action_discrimination": action_discrimination,
             "verify": final.verify,
             "contract": final.contract,
             "inspect": selection.inspect_rows,
