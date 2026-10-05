@@ -5,8 +5,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from hashmarks.generation_domain import require_generation
+from hashmarks.operation_contract import operation_schema
 
-DECISION_PACKET_SCHEMA = "hashmarks.task-decision-packet.v2"
+DECISION_PACKET_SCHEMA = operation_schema("task_decision_packet")
 DECISION_CONTRACT_SCHEMA = "hashmarks.task-decision-contract.v1"
 
 
