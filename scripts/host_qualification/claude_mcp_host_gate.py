@@ -31,6 +31,8 @@ from mcp_host_gate_common import (  # noqa: E402 - import follows standalone scr
     run,
     sha256,
     source_binding,
+    validate_basic_qualification_request,
+    validate_basic_qualification_response,
     write_fixture,
 )
 
@@ -74,26 +76,6 @@ def _prompt() -> str:
     )
 
 
-def _schemas_in(value: Any) -> set[str]:
-    found: set[str] = set()
-    if isinstance(value, dict):
-        schema = value.get("schema")
-        if isinstance(schema, str):
-            found.add(schema)
-        nested = value.values()
-    elif isinstance(value, list):
-        nested = value
-    else:
-        return (
-            {schema for schema in EXPECTED.values() if schema in value}
-            if isinstance(value, str)
-            else found
-        )
-    for item in nested:
-        found.update(_schemas_in(item))
-    return found
-
-
 def _init_catalog(events: list[dict[str, Any]]) -> tuple[bool, set[str]]:
     for event in events:
         if event.get("type") != "system" or event.get("subtype") != "init":
@@ -128,6 +110,12 @@ def _tool_uses(events: list[dict[str, Any]]) -> dict[str, str]:
             name = str(block.get("name"))
             if name not in EXPECTED:
                 raise HostGateError(f"Claude Code used unexpected tool: {name}")
+            canonical_tool = name.removeprefix("mcp__hashmarks__")
+            validate_basic_qualification_request(
+                canonical_tool,
+                block.get("input"),
+                host="Claude Code",
+            )
             tool_id = str(block.get("id"))
             if name in uses:
                 raise HostGateError(
@@ -162,14 +150,12 @@ def _validated_tool_result(
         raise HostGateError(f"Claude Code emitted no tool_result for {name}")
     if result.get("is_error") is True:
         raise HostGateError(f"Claude Code reported an MCP error for {name}")
-    expected_schema = EXPECTED[name]
-    if expected_schema not in _schemas_in(result.get("content")):
-        raise HostGateError(
-            f"Claude Code result for {name} did not expose schema {expected_schema}"
-        )
-    if "BUILDING" in json.dumps(result, sort_keys=True, default=str):
-        raise HostGateError("transient BUILDING state escaped through Claude Code")
-    return result
+    canonical_tool = name.removeprefix("mcp__hashmarks__")
+    return validate_basic_qualification_response(
+        canonical_tool,
+        result.get("content"),
+        host="Claude Code",
+    )
 
 
 def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
