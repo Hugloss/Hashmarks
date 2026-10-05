@@ -11,10 +11,22 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.observation import ChangeTracker, ObservationState
 from hashmarks.watcher import create_default_watcher
 
-from .watch_continuity import WATCH_CONTINUITY_META, watch_record_from_snapshot
+from .watch_continuity import (
+    WATCH_CONTINUITY_META,
+    WatchContinuityRecord,
+    watch_record_from_snapshot,
+)
 
 if TYPE_CHECKING:
     from .engine import CodeMap
+
+
+class WatchLeaseHeldError(RuntimeError):
+    """Raised when another live watcher already owns continuity authority."""
+
+
+class WatchLeaseLostError(RuntimeError):
+    """Raised when a watcher tries to publish after losing its fence."""
 
 
 @dataclass(slots=True)
@@ -26,17 +38,71 @@ class _IndexWatchSession:
     tracker: ChangeTracker = field(default_factory=ChangeTracker)
     update_lock: threading.RLock = field(default_factory=threading.RLock)
     owner: str = field(default_factory=lambda: uuid.uuid4().hex)
+    fence: int | None = None
 
-    def publish(self, *, active: bool = True) -> None:
-        record = watch_record_from_snapshot(
+    def _record(self, *, fence: int, active: bool) -> object:
+        return watch_record_from_snapshot(
             self.tracker.snapshot(),
             owner=self.owner,
+            fence=fence,
             pid=os.getpid(),
             heartbeat_unix=time.time(),
             active=active,
             codemap_generation=self.codemap.store.generation(),
         )
-        self.codemap.store.set_meta(WATCH_CONTINUITY_META, record.to_json())
+
+    def acquire(self) -> None:
+        with self.update_lock:
+            for _ in range(8):
+                raw = self.codemap.store.meta(WATCH_CONTINUITY_META)
+                current = WatchContinuityRecord.from_json(raw)
+                if current is not None and current.lease_live():
+                    raise WatchLeaseHeldError(
+                        "CodeMap watch continuity is already owned by "
+                        f"{current.owner} (fence {current.fence})"
+                    )
+                fence = 1 if current is None else current.fence + 1
+                record = self._record(fence=fence, active=True)
+                if self.codemap.store.compare_and_set_meta(
+                    WATCH_CONTINUITY_META,
+                    expected=raw,
+                    value=record.to_json(),
+                ):
+                    self.fence = fence
+                    return
+            raise RuntimeError("CodeMap watch continuity authority changed repeatedly")
+
+    def publish(self, *, active: bool = True) -> None:
+        with self.update_lock:
+            if self.fence is None:
+                raise RuntimeError("CodeMap watch continuity lease is not acquired")
+            raw = self.codemap.store.meta(WATCH_CONTINUITY_META)
+            current = WatchContinuityRecord.from_json(raw)
+            if (
+                current is None
+                or current.owner != self.owner
+                or current.fence != self.fence
+            ):
+                raise WatchLeaseLostError(
+                    "CodeMap watch continuity lease was replaced by another owner"
+                )
+            record = self._record(fence=self.fence, active=active)
+            if not self.codemap.store.compare_and_set_meta(
+                WATCH_CONTINUITY_META,
+                expected=raw,
+                value=record.to_json(),
+            ):
+                raise WatchLeaseLostError(
+                    "CodeMap watch continuity changed while publishing"
+                )
+
+    def release(self) -> None:
+        if self.fence is None:
+            return
+        try:
+            self.publish(active=False)
+        except WatchLeaseLostError:
+            pass
 
     def reconcile(self, paths: list[str]) -> None:
         with self.update_lock:
@@ -75,6 +141,7 @@ class IndexWatchMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         session = _IndexWatchSession(self, on_update)
+        session.acquire()
 
         exclude = []
         try:
@@ -91,9 +158,8 @@ class IndexWatchMixin:
             change_tracker=session.tracker,
             exclude_relative_paths=exclude,
         )
-        watcher.start()
-        session.publish()
         try:
+            watcher.start()
             # Observer starts first so the cold scan has no uncovered gap.
             initial = self.sync()
             watcher.synchronize()
@@ -112,4 +178,4 @@ class IndexWatchMixin:
         finally:
             watcher.stop()
             session.tracker.mark_unknown("watcher stopped")
-            session.publish(active=False)
+            session.release()
