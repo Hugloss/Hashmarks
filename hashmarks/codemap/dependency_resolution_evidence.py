@@ -7,7 +7,6 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_schema
-
 from hashmarks.paths import normalize_relative_path
 
 from . import dependency_resolution_contract as _contract
@@ -1258,9 +1257,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         if result_mode != "observation" and queries:
             raise ValueError("queries require result_mode=observation")
         if result_mode == "compare" and previous_observation is None:
-            raise ValueError(
-                "previous_observation is required for result_mode=compare"
-            )
+            raise ValueError("previous_observation is required for result_mode=compare")
         if result_mode != "compare" and previous_observation is not None:
             raise ValueError(
                 "previous_observation is only valid for result_mode=compare"
