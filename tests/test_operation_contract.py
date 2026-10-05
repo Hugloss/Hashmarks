@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import re
 from pathlib import Path
+from typing import get_args
 
 import pytest
 
@@ -11,6 +12,10 @@ from hashmarks.codemap.dependency_resolution_evidence import (
 )
 from hashmarks.codemap.repository_declarations import RepositoryDeclarationsMixin
 from hashmarks.mcp_contract import McpToolContract
+from hashmarks.mcp_server import (
+    _DependencyCodemapResultMode,
+    _RepositoryDeclarationsResultMode,
+)
 from hashmarks.operation_contract import (
     OPERATION_CONTRACT_SCHEMA,
     OPERATION_CONTRACTS,
@@ -174,6 +179,15 @@ def test_cli_operation_projection_names_are_registered_literals() -> None:
 
     assert projected
     assert set(projected) <= set(registered_operations())
+
+
+def test_mcp_mode_types_derive_from_operation_contract() -> None:
+    assert get_args(_DependencyCodemapResultMode) == tuple(
+        operation_modes("dependency_codemap")
+    )
+    assert get_args(_RepositoryDeclarationsResultMode) == tuple(
+        operation_modes("repository_declarations")
+    )
 
 
 def test_operation_modes_fail_closed() -> None:

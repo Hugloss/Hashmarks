@@ -16,6 +16,7 @@ from hashmarks.mcp_contract import (
     contract_from_tool_models,
     tool_description,
 )
+from hashmarks.operation_contract import operation_modes
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -39,6 +40,18 @@ def _repo(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return repo
+
+
+def _assert_canonical_result_mode_schemas(
+    schemas: dict[str, dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    dependency = schemas["dependency_codemap"]["properties"]["result_mode"]
+    declarations = schemas["repository_declarations"]["properties"]["result_mode"]
+    assert dependency["enum"] == list(operation_modes("dependency_codemap"))
+    assert dependency["default"] == "observation"
+    assert declarations["enum"] == list(operation_modes("repository_declarations"))
+    assert declarations["default"] == "observation"
+    return schemas
 
 
 @pytest.mark.skipif(not _MCP_AVAILABLE, reason=_NATIVE_REASON)
@@ -74,7 +87,9 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
             "freshness",
         ):
             assert phrase in task_description
-        schemas = {tool.name: tool.input_schema for tool in tools}
+        schemas = _assert_canonical_result_mode_schemas(
+            {tool.name: tool.input_schema for tool in tools}
+        )
         assert schemas["task_evidence"]["required"] == ["task"]
         assert schemas["find"]["required"] == ["query"]
         assert schemas["change_impact"]["required"] == ["task", "changed_paths"]

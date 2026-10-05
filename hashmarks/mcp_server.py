@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from ._version import __version__
 from .errors import OptionalFeatureError, UserFacingError
@@ -14,6 +14,7 @@ from .mcp_contract import (
     validate_tool_response,
 )
 from .mcp_surface import HashmarksMcpSurface, McpSurfaceError
+from .operation_contract import operation_modes
 from .paths import canonical_host_path
 
 if TYPE_CHECKING:
@@ -25,6 +26,11 @@ _INSTALL_HINT = (
 )
 
 _SERVER_INSTRUCTIONS = MCP_SERVER_INSTRUCTIONS
+
+_DependencyCodemapResultMode = Literal[*tuple(operation_modes("dependency_codemap"))]
+_RepositoryDeclarationsResultMode = Literal[
+    *tuple(operation_modes("repository_declarations"))
+]
 
 
 def _sdk():
@@ -69,7 +75,7 @@ def _register_repository_declarations_tool(
     def repository_declarations(
         groups: list[dict[str, Any]],
         previous_observation: dict[str, Any] | None = None,
-        result_mode: str = "observation",
+        result_mode: _RepositoryDeclarationsResultMode = "observation",
     ) -> dict[str, object]:
         return _call_surface(
             "repository_declarations",
@@ -188,7 +194,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         snapshot: dict[str, object],
         queries: list[dict[str, object]] | None = None,
         previous_observation: dict[str, object] | None = None,
-        result_mode: str = "observation",
+        result_mode: _DependencyCodemapResultMode = "observation",
     ) -> dict[str, object]:
         return _call_surface(
             "dependency_codemap",
