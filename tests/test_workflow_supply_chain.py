@@ -328,8 +328,13 @@ def test_publish_preserves_mcp_concurrency_receipt_before_rebuilding_dist() -> N
     makefile = (_root() / "Makefile").read_text(encoding="utf-8")
 
     assert "Run MCP concurrency stress" in build_job
-    assert "MCP_STRESS_RECEIPT ?= dist/mcp-concurrency-stress.json" in makefile
-    assert '--receipt "$(MCP_STRESS_RECEIPT)"' in makefile
+    assert "run: make mcp-concurrency-stress" in build_job
+    assert "MCP_STRESS_RECEIPT=" not in build_job
+    assert "MCP_STRESS_RECEIPT ?=" not in makefile
+    assert (
+        '$(if $(strip $(MCP_STRESS_RECEIPT)),--receipt "$(MCP_STRESS_RECEIPT)",)'
+        in makefile
+    )
     assert "Preserve MCP concurrency stress receipt" in build_job
     assert "if: always()" in build_job
     assert "path: dist/mcp-concurrency-stress.json" in build_job
