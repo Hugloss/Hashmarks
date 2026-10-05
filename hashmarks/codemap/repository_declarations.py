@@ -760,9 +760,7 @@ class RepositoryDeclarationsMixin:
             previous_observation=previous_observation,
         )
         result = (
-            self.repository_declaration_explain(packet)
-            if mode == "explain"
-            else packet
+            self.repository_declaration_explain(packet) if mode == "explain" else packet
         )
         return validate_operation_response(
             "repository_declarations",
