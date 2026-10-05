@@ -355,7 +355,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             selection.owner_basis,
         )
         authority = cast("Mapping[str, object]", ownership["ownership_authority"])
-        action_edit = ownership.get("admitted_edit")
+        action_edit = ownership.get("action_edit")
         proof_identity = str(authority.get("authority_proof_identity") or "")
         presentation = bounded_presentation_contract(
             proof_identity,
