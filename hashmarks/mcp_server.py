@@ -5,6 +5,13 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from ._version import __version__
 from .errors import OptionalFeatureError, UserFacingError
+from .mcp_contract import (
+    MCP_READ_ONLY_ANNOTATIONS,
+    MCP_SERVER_DESCRIPTION,
+    MCP_SERVER_INSTRUCTIONS,
+    MCP_SERVER_NAME,
+    tool_description,
+)
 from .mcp_surface import HashmarksMcpSurface, McpSurfaceError
 from .paths import canonical_host_path
 
@@ -16,21 +23,7 @@ _INSTALL_HINT = (
     'Hashmarks MCP support requires the optional extra: pip install "hashmarks[mcp]"'
 )
 
-_SERVER_INSTRUCTIONS = (
-    "Hashmarks is the semantic repository-intelligence layer, not a text-search shortcut. "
-    "For a task asking where behavior is implemented, which file or function owns it, "
-    "what should be inspected next, or what verification is relevant when the exact "
-    "implementation path is not already known, call task_evidence before exploratory "
-    "grep, glob, or read. task_evidence can separate supporting retrieval from ownership "
-    "authority, resolve a unique owner when admissible, preserve ambiguity when it cannot, "
-    "return bounded source evidence or an exact next-read, select verification evidence "
-    "and a verification plan, and report freshness. Prefer that semantic reduction over "
-    "reconstructing ownership from repeated native search/read calls. Use native read for "
-    "a unique known path or for the targeted next-read returned by Hashmarks. For a known "
-    "exact symbol whose path is unknown, use find. After explicit changed paths exist, "
-    "use change_impact or post_change when relevant. Hashmarks does not replace editing, "
-    "shell, tests, or git."
-)
+_SERVER_INSTRUCTIONS = MCP_SERVER_INSTRUCTIONS
 
 _T = TypeVar("_T")
 
@@ -68,10 +61,7 @@ def _register_repository_declarations_tool(
 ) -> None:
     @server.tool(
         name="repository_declarations",
-        description=(
-            "Project correlated repository declarations as observation or explanation "
-            "while preserving provenance, ambiguity, coverage, and freshness."
-        ),
+        description=tool_description("repository_declarations"),
         annotations=annotations,
     )
     def repository_declarations(
@@ -94,28 +84,21 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         str(workspace), state_dir=None if state_dir is None else str(state_dir)
     )
     server = MCPServer(
-        "Hashmarks",
-        description=(
-            "Semantic read-only repository intelligence for behavior localization, "
-            "ownership, impact, freshness, and verification evidence"
-        ),
-        instructions=_SERVER_INSTRUCTIONS,
+        MCP_SERVER_NAME,
+        description=MCP_SERVER_DESCRIPTION,
+        instructions=MCP_SERVER_INSTRUCTIONS,
         version=__version__,
     )
     annotations = ToolAnnotations(
-        read_only_hint=True,
-        destructive_hint=False,
-        idempotent_hint=True,
-        open_world_hint=False,
+        read_only_hint=MCP_READ_ONLY_ANNOTATIONS["readOnlyHint"],
+        destructive_hint=MCP_READ_ONLY_ANNOTATIONS["destructiveHint"],
+        idempotent_hint=MCP_READ_ONLY_ANNOTATIONS["idempotentHint"],
+        open_world_hint=MCP_READ_ONLY_ANNOTATIONS["openWorldHint"],
     )
 
     @server.tool(
         name="repository_context",
-        description=(
-            "Broad orientation only: freshness, languages, areas, and topology. "
-            "Do not use for behavior ownership; use task_evidence for owner, "
-            "source/next-read, or verification evidence."
-        ),
+        description=tool_description("repository_context"),
         annotations=annotations,
     )
     def repository_context(max_areas: int = 12) -> dict[str, object]:
@@ -123,11 +106,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="find",
-        description=(
-            "Exact lookup for a path or symbol you already know by name. Do not use as a "
-            "behavior-localization substitute: when the task describes behavior and the "
-            "implementation path is unknown, use task_evidence first."
-        ),
+        description=tool_description("find"),
         annotations=annotations,
     )
     def find(query: str, limit: int = 20) -> dict[str, object]:
@@ -135,11 +114,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="task_evidence",
-        description=(
-            "Semantic first choice for unknown-path behavior. Prefer before exploratory "
-            "grep/read: separates retrieval from ownership, resolves owner/ambiguity, "
-            "and returns source/next-read, verification, freshness."
-        ),
+        description=tool_description("task_evidence"),
         annotations=annotations,
     )
     def task_evidence(
@@ -156,10 +131,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="change_impact",
-        description=(
-            "Use after explicit changed paths exist for bounded structural impact and "
-            "verification relevance. For pre-edit evidence, use task_evidence."
-        ),
+        description=tool_description("change_impact"),
         annotations=annotations,
     )
     def change_impact(
@@ -171,7 +143,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="correlate_evidence",
-        description="Correlate bounded external or derived observations to repository evidence while preserving ambiguity, provenance, completeness, and source equivalence.",
+        description=tool_description("correlate_evidence"),
         annotations=annotations,
     )
     def correlate_evidence(
@@ -193,10 +165,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="dependency_codemap",
-        description=(
-            "Project dependency evidence as observation, explanation, or explicit "
-            "endpoint comparison without executing a package manager."
-        ),
+        description=tool_description("dependency_codemap"),
         annotations=annotations,
     )
     def dependency_codemap(
@@ -218,7 +187,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     @server.tool(
         name="post_change",
-        description="Refresh caller-reported changed paths against a previous task_evidence packet and return only invalidated/reused/replacement evidence.",
+        description=tool_description("post_change"),
         annotations=annotations,
     )
     def post_change(

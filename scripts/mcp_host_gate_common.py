@@ -98,6 +98,39 @@ def build_installed_wheel(
     return wheel, python, hashmarks, package_versions(python)
 
 
+def installed_mcp_contract(
+    python: Path,
+    workspace: Path,
+    *,
+    expected_version: str | None = None,
+) -> dict[str, Any]:
+    output = run(
+        [
+            str(python),
+            "-I",
+            "-m",
+            "hashmarks.mcp_contract",
+            "--workspace",
+            str(workspace),
+        ],
+        cwd=workspace,
+    ).stdout
+    try:
+        value = json.loads(output)
+    except json.JSONDecodeError as exc:
+        raise HostGateError(
+            f"installed Hashmarks MCP contract was not JSON: {output!r}"
+        ) from exc
+    if not isinstance(value, dict):
+        raise HostGateError("installed Hashmarks MCP contract is not an object")
+    if expected_version is not None and value.get("server_version") != expected_version:
+        raise HostGateError(
+            "installed Hashmarks package/MCP contract version differs: "
+            f"package={expected_version!r} mcp={value.get('server_version')!r}"
+        )
+    return value
+
+
 def write_fixture(repo: Path) -> None:
     (repo / "src").mkdir(parents=True)
     (repo / "tests").mkdir()

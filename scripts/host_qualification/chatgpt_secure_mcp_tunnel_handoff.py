@@ -12,6 +12,11 @@ from pathlib import Path
 from typing import Any
 
 from hashmarks._command_output import log_command_output
+from hashmarks.mcp_contract import (
+    MCP_TOOL_NAMES,
+    contract_summary,
+    qualify_mcp_observation,
+)
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(SCRIPTS_DIR) not in sys.path:
@@ -27,16 +32,7 @@ from mcp_host_gate_common import (  # noqa: E402 - standalone script path setup
 
 logger = logging.getLogger(__name__)
 
-EXPECTED_TOOLS = (
-    "repository_context",
-    "find",
-    "task_evidence",
-    "change_impact",
-    "correlate_evidence",
-    "dependency_codemap",
-    "repository_declarations",
-    "post_change",
-)
+EXPECTED_TOOLS = MCP_TOOL_NAMES
 
 
 def _command_argv(
@@ -194,41 +190,11 @@ async def _observe_mcp(
     }
 
 
-def _validate_observation(observation: dict[str, Any]) -> None:
-    server = observation.get("server")
-    if not isinstance(server, dict) or server.get("name") != "Hashmarks":
-        raise HostGateError("MCP handoff did not initialize the Hashmarks server")
-    instructions = server.get("instructions")
-    if not isinstance(instructions, str) or (
-        "call task_evidence before exploratory" not in instructions
-        or "supporting retrieval from ownership authority" not in instructions
-        or "unique known path" not in instructions
-    ):
-        raise HostGateError(
-            "Hashmarks MCP routing instructions are unavailable or stale"
-        )
-    tools = observation.get("tools")
-    if not isinstance(tools, list):
-        raise HostGateError("Hashmarks MCP tool catalog is unavailable")
-    names = tuple(str(row.get("name")) for row in tools if isinstance(row, dict))
-    if names != EXPECTED_TOOLS:
-        raise HostGateError(
-            "Hashmarks MCP tool catalog differs from the tunnel handoff contract: "
-            f"{names!r}"
-        )
-    for row in tools:
-        if not isinstance(row, dict):
-            raise HostGateError("Hashmarks MCP catalog contains a malformed tool")
-        annotations = row.get("annotations")
-        if not isinstance(annotations, dict) or (
-            annotations.get("readOnlyHint") is not True
-            or annotations.get("destructiveHint") is not False
-            or annotations.get("idempotentHint") is not True
-            or annotations.get("openWorldHint") is not False
-        ):
-            raise HostGateError(
-                f"Hashmarks MCP tool annotations are not read-only: {row.get('name')}"
-            )
+def _validate_observation(observation: dict[str, Any]) -> dict[str, object]:
+    try:
+        return qualify_mcp_observation(observation)
+    except ValueError as exc:
+        raise HostGateError(str(exc)) from exc
 
 
 def build_handoff(
@@ -239,7 +205,7 @@ def build_handoff(
     implementation: dict[str, object],
     observation: dict[str, Any],
 ) -> dict[str, Any]:
-    _validate_observation(observation)
+    contract = _validate_observation(observation)
     command = _command_argv(executable, workspace, state_dir)
     version = implementation.get("version")
     if not isinstance(version, str) or not version.startswith("hashmarks version "):
@@ -272,6 +238,7 @@ def build_handoff(
         },
         "mcp_command_argv": command,
         "mcp_command": _command_text(command),
+        "mcp_contract": contract_summary(contract),
         "mcp": observation,
     }
 
