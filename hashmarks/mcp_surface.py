@@ -14,8 +14,8 @@ from .codemap.repository_declaration_contract import (
     MAX_REQUEST_BYTES,
 )
 from .mcp_contract import (
-    MCP_ERROR_RECOVERY_AUTHORITY,
     MCP_ERROR_REASONS,
+    MCP_ERROR_RECOVERY_AUTHORITY,
     MCP_ERROR_SCHEMA,
 )
 from .repository_retry import (
