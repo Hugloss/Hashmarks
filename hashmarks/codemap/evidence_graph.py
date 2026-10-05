@@ -577,7 +577,8 @@ class EvidenceGraphMixin:
             self._enrich_vitest_graph(
                 selected, results, warnings, ensure_publication_generation
             )
-            self.store.set_meta("project_graph_last_sync_unix", str(time.time()))
+            if publication_generation is not None:
+                self.store.set_meta("project_graph_last_sync_unix", str(time.time()))
         self._reverse_file_graph_cache = None
         return {
             "schema": "hashmarks.codemap-project-enrichment.v1",
