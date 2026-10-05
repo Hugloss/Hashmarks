@@ -486,12 +486,11 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     def bulk_file_writes(
         self, *, batch_size: int = 32, on_commit: Callable[[int], None] | None = None
     ):
-        """Bound cold-sync write amplification without changing file semantics.
+        """Batch file writes without weakening generation publication authority.
 
-        Each completed chunk is committed independently, so an interruption can
-        lose at most the current bounded chunk rather than the entire sync.  The
-        ordinary ``set_file`` contract remains one-file/one-transaction outside
-        this explicit context.
+        Standalone callers retain bounded commits. During CodeMap sync, the
+        enclosing publication transaction owns commit/rollback so no file batch
+        becomes visible before the complete generation is published.
         """
         self._begin_bulk_file_writes(batch_size, on_commit)
         try:
@@ -689,8 +688,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         one store lock/transaction so concurrent sync callers cannot both sample
         the same revision and publish the same successor.
         """
-        with self._lock:
-            def bump_locked() -> int:
+        def bump_locked() -> int:
                 row = self._db.execute(
                     "SELECT value FROM meta WHERE key='generation'"
                 ).fetchone()
@@ -700,8 +698,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                     "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                     (str(value),),
                 )
-                return value
+            return value
 
+        with self._lock:
             if self._publication_transaction_active:
                 return bump_locked()
             if self._db.in_transaction:
