@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_schema
+
 from .repository_declaration_contract import (
     MAX_DECLARATIONS,
     MAX_EXPECTED_PER_GROUP,
@@ -19,7 +21,7 @@ from .repository_declaration_delta import declaration_delta
 if TYPE_CHECKING:
     from .engine import CodeMap
 
-_SCHEMA = "hashmarks.repository-declarations.v1"
+_SCHEMA = operation_schema("repository_declarations", "observation")
 
 
 class RepositoryDeclarationsMixin:
@@ -736,4 +738,25 @@ class RepositoryDeclarationsMixin:
                 raise ValueError(
                     f"declaration packet exceeds {MAX_PACKET_BYTES} encoded bytes"
                 )
+        return packet
+
+    def repository_declarations_operation(
+        self,
+        groups: Sequence[Mapping[str, object]],
+        *,
+        previous_observation: Mapping[str, object] | None = None,
+        result_mode: str = "observation",
+    ) -> dict[str, object]:
+        """Execute one canonical declaration operation independent of transport."""
+        allowed = ("observation", "explain")
+        if result_mode not in allowed:
+            raise ValueError(f"result_mode must be one of: {', '.join(allowed)}")
+        if result_mode == "explain" and previous_observation is not None:
+            raise ValueError("previous_observation requires result_mode=observation")
+        packet = self.repository_declarations(
+            groups,
+            previous_observation=previous_observation,
+        )
+        if result_mode == "explain":
+            return self.repository_declaration_explain(packet)
         return packet

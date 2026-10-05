@@ -18,6 +18,7 @@ from pathlib import Path
 import hashmarks
 from hashmarks import CodeMap, File, RepositoryIdentity
 from hashmarks._command_output import log_command_output
+from hashmarks.operation_contract import operation_schema
 
 logger = logging.getLogger(__name__)
 
@@ -138,12 +139,13 @@ def _check_cli() -> None:
             raise RuntimeError("installed orient returned an unexpected schema")
 
         found = _run_cli("--workspace", str(root), "find", "answer")
-        hits = found.get("hits")
+        results = found.get("results")
         if (
-            found.get("schema") != "hashmarks.find.v1"
-            or not isinstance(hits, list)
+            found.get("schema") != operation_schema("find")
+            or not isinstance(results, list)
             or not any(
-                isinstance(row, dict) and row.get("path") == "sample.py" for row in hits
+                isinstance(row, dict) and row.get("path") == "sample.py"
+                for row in results
             )
         ):
             raise RuntimeError("installed find did not retrieve sample.py")

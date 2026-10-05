@@ -53,10 +53,14 @@ def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
     identity = first["contract_identity"]
     server = first["server"]
     tools = first["tools"]
+    operation_contract = first["operation_contract"]
     assert isinstance(identity, str)
     assert isinstance(server, dict)
     assert isinstance(tools, list)
+    assert isinstance(operation_contract, dict)
     assert first["schema"] == "hashmarks.mcp-contract.v1"
+    assert operation_contract["schema"] == "hashmarks.operation-contract.v1"
+    assert str(operation_contract["contract_identity"]).startswith("sha256:")
     assert first["errors"] == {
         "schema": MCP_ERROR_SCHEMA,
         "reasons": list(MCP_ERROR_REASONS),
@@ -69,12 +73,12 @@ def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
     tool_rows = [row for row in tools if isinstance(row, dict)]
     assert [row["name"] for row in tool_rows] == list(MCP_TOOL_NAMES)
     assert tool_rows[5]["response_schemas"] == [
-        "hashmarks.mcp-dependency-codemap.v1",
+        "hashmarks.dependency-codemap.v1",
         "hashmarks.dependency-resolution-explain.v1",
         "hashmarks.dependency-resolution-delta.v3",
     ]
     assert tool_rows[5]["response_modes"] == {
-        "observation": "hashmarks.mcp-dependency-codemap.v1",
+        "observation": "hashmarks.dependency-codemap.v1",
         "explain": "hashmarks.dependency-resolution-explain.v1",
         "compare": "hashmarks.dependency-resolution-delta.v3",
     }
@@ -88,6 +92,7 @@ def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
         "contract_identity": identity,
         "server_version": "0.26.1",
         "tools": list(MCP_TOOL_NAMES),
+        "operation_contract_identity": operation_contract["contract_identity"],
         "error_schema": MCP_ERROR_SCHEMA,
         "error_reasons": list(MCP_ERROR_REASONS),
         "error_recovery_authority": "consumer-owned",
@@ -155,10 +160,10 @@ def test_mcp_contract_rejects_independent_catalog_drift(
 
 
 def test_response_schema_authority_is_mode_specific() -> None:
-    assert response_schema_for_mode("find") == "hashmarks.mcp-find.v1"
+    assert response_schema_for_mode("find") == "hashmarks.find.v2"
     assert (
         response_schema_for_mode("dependency_codemap", "observation")
-        == "hashmarks.mcp-dependency-codemap.v1"
+        == "hashmarks.dependency-codemap.v1"
     )
     assert (
         response_schema_for_mode("dependency_codemap", "explain")
@@ -205,9 +210,9 @@ def test_host_schema_expectations_derive_from_canonical_contract() -> None:
 
     assert plain == {
         "repository_context": "hashmarks.repository-capsule.v1",
-        "find": "hashmarks.mcp-find.v1",
+        "find": "hashmarks.find.v2",
     }
     assert proxy == {
         "hashmarks_repository_context": "hashmarks.repository-capsule.v1",
-        "hashmarks_find": "hashmarks.mcp-find.v1",
+        "hashmarks_find": "hashmarks.find.v2",
     }

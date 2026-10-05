@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped
@@ -160,7 +161,7 @@ class ContextPlanningMixin:
         areas = list(self.store.top_level_counts().items())[:max_areas]
         generation, identity_generation, stale = self._generation_status()
         return {
-            "schema": "hashmarks.repository-capsule.v1",
+            "schema": operation_schema("repository_context"),
             "workspace": str(self.workspace),
             "generation": generation,
             "identity_generation": identity_generation,

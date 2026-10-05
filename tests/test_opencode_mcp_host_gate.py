@@ -38,7 +38,7 @@ def _tool_event(
 
 def test_parse_jsonl_and_session_id_accept_current_opencode_event_shape() -> None:
     text = (
-        json.dumps(_tool_event("hashmarks_find", {"schema": "hashmarks.mcp-find.v1"}))
+        json.dumps(_tool_event("hashmarks_find", {"schema": "hashmarks.find.v2"}))
         + "\n"
     )
     events = host_gate._parse_jsonl(text)
@@ -61,8 +61,8 @@ def test_completed_tool_set_rejects_missing_unexpected_and_duplicate_calls() -> 
         host_gate._assert_completed_tool_set(unexpected, expected)
 
     duplicate = [
-        _tool_event("hashmarks_find", {"schema": "hashmarks.mcp-find.v1"}),
-        _tool_event("hashmarks_find", {"schema": "hashmarks.mcp-find.v1"}),
+        _tool_event("hashmarks_find", {"schema": "hashmarks.find.v2"}),
+        _tool_event("hashmarks_find", {"schema": "hashmarks.find.v2"}),
     ]
     with pytest.raises(host_gate.HostGateError, match="more than once"):
         host_gate._assert_completed_tool_set(duplicate, expected)
@@ -70,7 +70,7 @@ def test_completed_tool_set_rejects_missing_unexpected_and_duplicate_calls() -> 
 
 def test_completed_tool_set_rejects_hashmarks_tool_from_wrong_phase() -> None:
     events = [
-        _tool_event("hashmarks_find", {"schema": "hashmarks.mcp-find.v1"}),
+        _tool_event("hashmarks_find", {"schema": "hashmarks.find.v2"}),
         _tool_event(
             "hashmarks_post_change", {"schema": "hashmarks.task-post-change-delta.v2"}
         ),
@@ -84,24 +84,22 @@ def test_tool_payload_requires_schema_and_rejects_building_state() -> None:
         [
             _tool_event(
                 "hashmarks_find",
-                {"schema": "hashmarks.mcp-find.v1", "status": "complete"},
+                {"schema": "hashmarks.find.v2", "status": "complete"},
             )
         ]
     )[0]
-    assert (
-        host_gate._tool_payload(part, "hashmarks.mcp-find.v1")["status"] == "complete"
-    )
+    assert host_gate._tool_payload(part, "hashmarks.find.v2")["status"] == "complete"
 
     building = host_gate._tool_events(
         [
             _tool_event(
                 "hashmarks_find",
-                {"schema": "hashmarks.mcp-find.v1", "status": "BUILDING"},
+                {"schema": "hashmarks.find.v2", "status": "BUILDING"},
             )
         ]
     )[0]
     with pytest.raises(host_gate.HostGateError, match="BUILDING"):
-        host_gate._tool_payload(building, "hashmarks.mcp-find.v1")
+        host_gate._tool_payload(building, "hashmarks.find.v2")
 
 
 def test_opencode_project_config_is_real_repo_local_minimal_registration(
@@ -606,7 +604,7 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
         _tool_event(
             "hashmarks_find",
             {
-                "schema": "hashmarks.mcp-find.v1",
+                "schema": "hashmarks.find.v2",
                 "results": [{"path": host_gate.CHANGED_PATH}],
             },
         ),

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.digest import hash_file
 from hashmarks.evidence_context import evidence_context_identity
+from hashmarks.operation_contract import operation_schema
 
 from .configuration_evidence import ConfigurationEvidenceMixin
 from .decision_session import decision_scoped
@@ -771,7 +772,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             else None
         )
         return {
-            "schema": "hashmarks.task-evidence.v2",
+            "schema": operation_schema("task_evidence"),
             "task": task,
             "evidence_receipt": dict(evidence_receipt),
             "retrieval": {
@@ -1297,7 +1298,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             verification_stale=verification_stale,
         )
         result["evidence_packet_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.task-evidence.v2",
+            operation_schema("task_evidence"),
             result,
         )
         return result

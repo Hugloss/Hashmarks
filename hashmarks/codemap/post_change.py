@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.evidence_context import validate_evidence_context
+from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactMixin
@@ -182,7 +183,7 @@ class PostChangeMixin(ChangeImpactMixin):
             reasons.extend(str(reason) for reason in context["reasons"])
         packet_identity = previous_evidence.get("evidence_packet_identity")
         expected_packet_identity = "sha256:" + self._packet_digest(
-            "hashmarks.task-evidence.v2",
+            operation_schema("task_evidence"),
             {
                 key: value
                 for key, value in previous_evidence.items()
@@ -339,12 +340,11 @@ class PostChangeMixin(ChangeImpactMixin):
             self = cast("CodeMap", self)
         if token_budget < 1:
             raise ValueError("token_budget must be >= 1")
-        if (
-            not isinstance(previous_evidence, dict)
-            or previous_evidence.get("schema") != "hashmarks.task-evidence.v2"
-        ):
+        if not isinstance(previous_evidence, dict) or previous_evidence.get(
+            "schema"
+        ) != operation_schema("task_evidence"):
             raise ValueError(
-                "previous_evidence must be a hashmarks.task-evidence.v2 packet"
+                f"previous_evidence must be a {operation_schema('task_evidence')} packet"
             )
         normalized = tuple(
             dict.fromkeys(
@@ -391,7 +391,7 @@ class PostChangeMixin(ChangeImpactMixin):
             previous_revision=previous_revision,
         )
         result: dict[str, object] = {
-            "schema": "hashmarks.task-post-change-delta.v2",
+            "schema": operation_schema("post_change"),
             "change": "changed" if invalidated else "unchanged",
             "ownership_status": ownership_status,
             "path_changes": self._post_change_path_changes(

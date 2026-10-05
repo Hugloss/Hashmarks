@@ -37,7 +37,7 @@ def test_codex_event_validation_accepts_exact_two_hashmarks_calls() -> None:
     result = codex_gate._validate_events(
         [
             _event("repository_context", "hashmarks.repository-capsule.v1"),
-            _event("find", "hashmarks.mcp-find.v1"),
+            _event("find", "hashmarks.find.v2"),
         ]
     )
     assert set(result) == {"repository_context", "find"}
@@ -50,7 +50,7 @@ def test_codex_event_validation_rejects_built_in_tool_use() -> None:
             "item": {"type": "command_execution", "status": "completed"},
         },
         _event("repository_context", "hashmarks.repository-capsule.v1"),
-        _event("find", "hashmarks.mcp-find.v1"),
+        _event("find", "hashmarks.find.v2"),
     ]
     with pytest.raises(codex_gate.HostGateError, match="forbidden built-in"):
         codex_gate._validate_events(events)
@@ -65,14 +65,14 @@ def test_codex_event_validation_rejects_failed_or_wrong_schema() -> None:
                     "hashmarks.repository-capsule.v1",
                     status="failed",
                 ),
-                _event("find", "hashmarks.mcp-find.v1"),
+                _event("find", "hashmarks.find.v2"),
             ]
         )
     with pytest.raises(codex_gate.HostGateError, match="unexpected schema"):
         codex_gate._validate_events(
             [
                 _event("repository_context", "wrong.schema"),
-                _event("find", "hashmarks.mcp-find.v1"),
+                _event("find", "hashmarks.find.v2"),
             ]
         )
 

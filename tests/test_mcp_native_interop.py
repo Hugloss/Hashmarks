@@ -140,7 +140,7 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
                 )
                 assert result.is_error is not True
                 assert result.structured_content is not None
-                assert result.structured_content["schema"] == "hashmarks.mcp-find.v1"
+                assert result.structured_content["schema"] == "hashmarks.find.v2"
                 assert any(
                     row["path"] == "src/feature.py"
                     for row in result.structured_content["results"]

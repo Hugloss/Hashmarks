@@ -7,19 +7,21 @@ from collections.abc import Mapping
 from typing import Any
 
 from .codemap.decision_contract import DecisionPacketContract
+from .operation_contract import operation_schema
 from .producer_identity import native_producer_implementation_identity
 
 REPOSITORY_INTELLIGENCE_CONFORMANCE_SCHEMA = (
     "hashmarks.repository-intelligence-consumer-conformance.v1"
 )
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
+_CHANGE_IMPACT_SCHEMA = operation_schema("change_impact")
 
 _CURRENT_EVIDENCE_KINDS: dict[str, str] = {
     "hashmarks.task-decision-packet.v2": "decision",
     "hashmarks.task-decision-brief.v1": "decision",
     "hashmarks.task-context-plan.v1": "context",
     "hashmarks.agent-work-context.v1": "context",
-    "hashmarks.task-change-impact.v1": "impact",
+    _CHANGE_IMPACT_SCHEMA: "impact",
     "hashmarks.verification-plan.v1": "verification",
     "hashmarks.ownership-relation-graph.v1": "ownership",
     "hashmarks.task-action-map.v1": "action-map",
@@ -359,7 +361,7 @@ _VALIDATORS = {
     "hashmarks.task-decision-brief.v1": _decision_brief,
     "hashmarks.task-context-plan.v1": _context_plan,
     "hashmarks.agent-work-context.v1": _work_context,
-    "hashmarks.task-change-impact.v1": _change_impact,
+    _CHANGE_IMPACT_SCHEMA: _change_impact,
     "hashmarks.verification-plan.v1": _verification_plan,
     "hashmarks.ownership-relation-graph.v1": _ownership_graph,
     "hashmarks.task-action-map.v1": _action_map,

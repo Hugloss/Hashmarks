@@ -139,14 +139,6 @@ def _bounded_json(value: Any, *, name: str, maximum: int, expected_type: type) -
     return value
 
 
-def _result_mode(value: str, *, allowed: tuple[str, ...]) -> str:
-    mode = _bounded_text(value, name="result_mode", maximum=32)
-    if mode not in allowed:
-        options = ", ".join(allowed)
-        raise McpSurfaceError(f"result_mode must be one of: {options}")
-    return mode
-
-
 def _dependency_codemap_request(
     snapshot: dict[str, Any],
     queries: list[dict[str, Any]] | None,
@@ -180,20 +172,7 @@ def _dependency_codemap_request(
             expected_type=dict,
         )
     )
-    mode = _result_mode(
-        result_mode,
-        allowed=("observation", "explain", "compare"),
-    )
-    if mode != "observation" and bounded_queries:
-        raise McpSurfaceError("queries require result_mode=observation")
-    if mode == "compare" and previous is None:
-        raise McpSurfaceError(
-            "previous_observation is required for result_mode=compare"
-        )
-    if mode != "compare" and previous is not None:
-        raise McpSurfaceError(
-            "previous_observation is only valid for result_mode=compare"
-        )
+    mode = _bounded_text(result_mode, name="result_mode", maximum=32)
     return raw_snapshot, bounded_queries, previous, mode
 
 
@@ -208,96 +187,6 @@ def _changed_paths(values: list[str]) -> list[str]:
         _bounded_text(str(value), name="changed path", maximum=4_096)
         for value in values
     ]
-
-
-def _find_freshness_state(stale: bool | None) -> str:
-    if stale is True:
-        return "stale"
-    if stale is False:
-        return "current"
-    return "unknown"
-
-
-def _find_claim_scope(intent: str) -> str:
-    return {
-        "identifier": "indexed-visible-symbol-surface",
-        "path": "admitted-visible-repository-path-index",
-    }.get(intent, "bounded-retrieval-only")
-
-
-def _find_exact_targets(
-    query: str, intent: str, hits: tuple[Any, ...]
-) -> set[tuple[object, ...]]:
-    if intent == "identifier":
-        return {
-            (hit.path, hit.qualname or hit.name, hit.start_line)
-            for hit in hits
-            if query in {hit.name, hit.qualname}
-        }
-    if intent == "path":
-        normalized = query[2:] if query.startswith("./") else query
-        return {
-            (hit.path,)
-            for hit in hits
-            if hit.path == normalized
-            or ("/" not in normalized and hit.path.rsplit("/", 1)[-1] == normalized)
-        }
-    return set()
-
-
-def _find_claim_fields(
-    query: str,
-    intent: str,
-    hits: tuple[Any, ...],
-    bound_reasons: tuple[str, ...],
-    *,
-    transport_truncated: bool,
-    freshness: str,
-) -> dict[str, object]:
-    omissions = set(bound_reasons)
-    if transport_truncated:
-        omissions.add("mcp-result-limit")
-    sorted_omissions = sorted(omissions)
-    exact_query = intent in {"identifier", "path"}
-    exact_targets = _find_exact_targets(query, intent, hits)
-    search_complete = exact_query and not sorted_omissions
-    claims_admissible = search_complete and freshness == "current"
-
-    reasons: list[str] = []
-    if not exact_query:
-        reasons.append("query-intent-not-exact")
-    if sorted_omissions:
-        reasons.append("bounded-search-omission")
-    if freshness != "current":
-        reasons.append(f"repository-freshness-{freshness}")
-
-    negative_evidence = "not-applicable"
-    if exact_query and not exact_targets:
-        negative_evidence = (
-            "admissible-within-declared-scope"
-            if claims_admissible
-            else "not-admissible"
-        )
-    elif not exact_query and not hits:
-        negative_evidence = "not-admissible"
-
-    uniqueness_evidence = "not-applicable"
-    if len(exact_targets) == 1:
-        uniqueness_evidence = (
-            "admissible-within-declared-scope"
-            if claims_admissible
-            else "not-admissible"
-        )
-
-    return {
-        "scope": _find_claim_scope(intent),
-        "completeness": "complete" if search_complete else "incomplete",
-        "observed_exact_match_count": len(exact_targets),
-        "negative_evidence": negative_evidence,
-        "uniqueness_evidence": uniqueness_evidence,
-        "omissions": sorted_omissions,
-        "admissibility_reasons": reasons,
-    }
 
 
 class HashmarksMcpSurface:
@@ -334,37 +223,7 @@ class HashmarksMcpSurface:
     def find(self, query: str, *, limit: int = 20) -> dict[str, object]:
         query = _bounded_text(query, name="query", maximum=_MAX_QUERY_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
-
-        def project() -> tuple[Any, Any, int, int, bool | None]:
-            evidence = self._map._find_evidence(query, limit=limit + 1)
-            route = self._map.query_route(query)
-            generation, identity_generation, stale = self._map._generation_status()
-            return evidence, route, generation, identity_generation, stale
-
-        evidence, route, generation, identity_generation, stale = self._read(project)
-        hits = evidence.hits
-        visible = hits[:limit]
-        transport_truncated = len(hits) > limit
-        freshness = _find_freshness_state(stale)
-        claims = _find_claim_fields(
-            query,
-            route.intent.value,
-            hits,
-            evidence.bound_reasons,
-            transport_truncated=transport_truncated,
-            freshness=freshness,
-        )
-        return {
-            "schema": "hashmarks.mcp-find.v1",
-            "query": query,
-            "query_intent": route.intent.value,
-            "results": [hit.as_dict() for hit in visible],
-            "truncated": transport_truncated,
-            "generation": generation,
-            "identity_generation": identity_generation,
-            "freshness": freshness,
-            **claims,
-        }
+        return self._read(lambda: self._map.find_packet(query, limit=limit))
 
     def task_evidence(
         self,
@@ -472,13 +331,8 @@ class HashmarksMcpSurface:
         previous_observation: dict[str, Any] | None = None,
         result_mode: str = "observation",
     ) -> dict[str, object]:
-        """Project one dependency observation as observation, explain, or compare."""
-        (
-            raw_snapshot,
-            bounded_queries,
-            previous,
-            mode,
-        ) = _dependency_codemap_request(
+        """Project one core-owned dependency operation without changing semantics."""
+        raw_snapshot, bounded_queries, previous, mode = _dependency_codemap_request(
             snapshot,
             queries,
             previous_observation,
@@ -487,29 +341,12 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                observation = self._map.dependency_resolution_evidence(raw_snapshot)
-                if mode == "explain":
-                    return self._map.dependency_resolution_explain(observation)
-                if mode == "compare":
-                    assert previous is not None
-                    return self._map.dependency_resolution_delta(
-                        previous,
-                        observation,
-                    )
-
-                result: dict[str, object] = {
-                    "schema": "hashmarks.mcp-dependency-codemap.v1",
-                    "observation": observation,
-                    "authority": "repository-intelligence-only",
-                    "producer_authority": "caller-claimed",
-                    "interpretation_authority": "consumer-owned",
-                    "causation": "not-inferred",
-                }
-                if bounded_queries:
-                    result["queries"] = self._map.dependency_resolution_queries(
-                        observation, bounded_queries
-                    )
-                return result
+                return self._map.dependency_codemap(
+                    raw_snapshot,
+                    bounded_queries,
+                    previous_observation=previous,
+                    result_mode=mode,
+                )
             except ValueError as exc:
                 raise _surface_value_error(exc) from exc
 
@@ -522,7 +359,7 @@ class HashmarksMcpSurface:
         previous_observation: dict[str, Any] | None = None,
         result_mode: str = "observation",
     ) -> dict[str, object]:
-        """Project repository declarations as an observation or explanation."""
+        """Project one core-owned declaration operation without changing semantics."""
         bounded_groups = _bounded_json(
             groups,
             name="groups",
@@ -539,24 +376,15 @@ class HashmarksMcpSurface:
                 expected_type=dict,
             )
         )
-        mode = _result_mode(
-            result_mode,
-            allowed=("observation", "explain"),
-        )
-        if mode == "explain" and previous is not None:
-            raise McpSurfaceError(
-                "previous_observation requires result_mode=observation"
-            )
+        mode = _bounded_text(result_mode, name="result_mode", maximum=32)
 
         def project() -> dict[str, object]:
             try:
-                packet = self._map.repository_declarations(
+                return self._map.repository_declarations_operation(
                     bounded_groups,
                     previous_observation=previous,
+                    result_mode=mode,
                 )
-                if mode == "explain":
-                    return self._map.repository_declaration_explain(packet)
-                return packet
             except ValueError as exc:
                 raise _surface_value_error(exc) from exc
 

@@ -5,13 +5,15 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_schema
+
 if TYPE_CHECKING:
     from .engine import CodeMap
 
 _MAX_TOTAL_ANCHORS = 256
 CORRELATION_REQUEST_MAX_BYTES = 1_048_576
 CORRELATION_PACKET_MAX_BYTES = 1_048_576
-_CORRELATION_SCHEMA = "hashmarks.evidence-correlation.v2"
+_CORRELATION_SCHEMA = operation_schema("correlate_evidence")
 _DEFINITION_DOMAIN = "hashmarks.evidence-correlation-definition.v2"
 _DELTA_SCHEMA = "hashmarks.evidence-correlation-delta.v2"
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")

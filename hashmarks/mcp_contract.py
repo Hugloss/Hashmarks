@@ -8,6 +8,13 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
+from .operation_contract import (
+    operation_contract_manifest,
+    operation_modes,
+    operation_schema,
+    validate_operation_response,
+)
+
 MCP_CONTRACT_SCHEMA = "hashmarks.mcp-contract.v1"
 MCP_ERROR_SCHEMA = "hashmarks.mcp-error.v1"
 MCP_ERROR_REASONS = (
@@ -51,30 +58,22 @@ MCP_READ_ONLY_ANNOTATIONS = {
 class McpToolContract:
     name: str
     description: str
-    response_schemas: tuple[str, ...]
-    response_modes: tuple[str, ...]
+    operation: str
 
-    def __post_init__(self) -> None:
-        if not self.response_schemas or len(self.response_schemas) != len(
-            self.response_modes
-        ):
-            raise ValueError(f"invalid Hashmarks MCP response contract: {self.name}")
-        if len(set(self.response_modes)) != len(self.response_modes):
-            raise ValueError(f"duplicate Hashmarks MCP response mode: {self.name}")
+    @property
+    def response_modes(self) -> tuple[str, ...]:
+        return tuple(operation_modes(self.operation))
+
+    @property
+    def response_schemas(self) -> tuple[str, ...]:
+        return tuple(operation_modes(self.operation).values())
 
     @property
     def default_response_schema(self) -> str:
-        return self.response_schemas[0]
+        return operation_schema(self.operation)
 
     def response_schema_for_mode(self, result_mode: str | None = None) -> str:
-        mode = self.response_modes[0] if result_mode is None else result_mode
-        try:
-            index = self.response_modes.index(mode)
-        except ValueError as exc:
-            raise ValueError(
-                f"unknown Hashmarks MCP response mode for {self.name}: {mode}"
-            ) from exc
-        return self.response_schemas[index]
+        return operation_schema(self.operation, result_mode)
 
 
 MCP_TOOL_CONTRACTS = (
@@ -85,8 +84,7 @@ MCP_TOOL_CONTRACTS = (
             "Do not use for behavior ownership; use task_evidence for owner, "
             "source/next-read, or verification evidence."
         ),
-        ("hashmarks.repository-capsule.v1",),
-        ("default",),
+        "repository_context",
     ),
     McpToolContract(
         "find",
@@ -95,8 +93,7 @@ MCP_TOOL_CONTRACTS = (
             "behavior-localization substitute: when the task describes behavior and the "
             "implementation path is unknown, use task_evidence first."
         ),
-        ("hashmarks.mcp-find.v1",),
-        ("default",),
+        "find",
     ),
     McpToolContract(
         "task_evidence",
@@ -105,8 +102,7 @@ MCP_TOOL_CONTRACTS = (
             "grep/read: separates retrieval from ownership, resolves owner/ambiguity, "
             "and returns source/next-read, verification, freshness."
         ),
-        ("hashmarks.task-evidence.v2",),
-        ("default",),
+        "task_evidence",
     ),
     McpToolContract(
         "change_impact",
@@ -114,8 +110,7 @@ MCP_TOOL_CONTRACTS = (
             "Use after explicit changed paths exist for bounded structural impact and "
             "verification relevance. For pre-edit evidence, use task_evidence."
         ),
-        ("hashmarks.task-change-impact.v1",),
-        ("default",),
+        "change_impact",
     ),
     McpToolContract(
         "correlate_evidence",
@@ -123,8 +118,7 @@ MCP_TOOL_CONTRACTS = (
             "Correlate bounded external or derived observations to repository evidence "
             "while preserving ambiguity, provenance, completeness, and source equivalence."
         ),
-        ("hashmarks.evidence-correlation.v2",),
-        ("default",),
+        "correlate_evidence",
     ),
     McpToolContract(
         "dependency_codemap",
@@ -132,12 +126,7 @@ MCP_TOOL_CONTRACTS = (
             "Project dependency evidence as observation, explanation, or explicit "
             "endpoint comparison without executing a package manager."
         ),
-        (
-            "hashmarks.mcp-dependency-codemap.v1",
-            "hashmarks.dependency-resolution-explain.v1",
-            "hashmarks.dependency-resolution-delta.v3",
-        ),
-        ("observation", "explain", "compare"),
+        "dependency_codemap",
     ),
     McpToolContract(
         "repository_declarations",
@@ -145,11 +134,7 @@ MCP_TOOL_CONTRACTS = (
             "Project correlated repository declarations as observation or explanation "
             "while preserving provenance, ambiguity, coverage, and freshness."
         ),
-        (
-            "hashmarks.repository-declarations.v1",
-            "hashmarks.repository-declaration-explain.v1",
-        ),
-        ("observation", "explain"),
+        "repository_declarations",
     ),
     McpToolContract(
         "post_change",
@@ -157,8 +142,7 @@ MCP_TOOL_CONTRACTS = (
             "Refresh caller-reported changed paths against a previous task_evidence packet "
             "and return only invalidated/reused/replacement evidence."
         ),
-        ("hashmarks.task-post-change-delta.v2",),
-        ("default",),
+        "post_change",
     ),
 )
 
@@ -199,15 +183,12 @@ def validate_tool_response(
     *,
     result_mode: str | None = None,
 ) -> dict[str, object]:
-    if not isinstance(value, dict):
-        raise RuntimeError(f"Hashmarks MCP {name} returned a non-object response")
-    expected = response_schema_for_mode(name, result_mode)
-    actual = value.get("schema")
-    if actual != expected:
-        raise RuntimeError(
-            f"Hashmarks MCP {name} response schema drift: expected {expected}, got {actual!r}"
-        )
-    return value
+    contract = tool_contract(name)
+    return validate_operation_response(
+        contract.operation,
+        value,
+        mode=result_mode,
+    )
 
 
 def tool_description(name: str) -> str:
@@ -293,10 +274,9 @@ def _qualified_tool(
             raw.get("output_schema"), label=f"{expected.name} output schema"
         ),
         "annotations": _canonical_annotations(raw.get("annotations")),
+        "operation": expected.operation,
         "response_schemas": list(expected.response_schemas),
-        "response_modes": dict(
-            zip(expected.response_modes, expected.response_schemas, strict=True)
-        ),
+        "response_modes": operation_modes(expected.operation),
     }
 
 
@@ -328,6 +308,7 @@ def qualify_mcp_observation(observation: dict[str, Any]) -> dict[str, object]:
             "description": MCP_SERVER_DESCRIPTION,
             "instructions": MCP_SERVER_INSTRUCTIONS,
         },
+        "operation_contract": operation_contract_manifest(),
         "tools": tools,
         "errors": {
             "schema": MCP_ERROR_SCHEMA,
@@ -369,14 +350,19 @@ def contract_from_tool_models(
 def contract_summary(manifest: dict[str, object]) -> dict[str, object]:
     server = manifest.get("server")
     tools = manifest.get("tools")
+    operation_contract = manifest.get("operation_contract")
     errors = manifest.get("errors")
     identity = manifest.get("contract_identity")
-    if (
-        manifest.get("schema") != MCP_CONTRACT_SCHEMA
-        or not isinstance(server, dict)
-        or not isinstance(tools, list)
-        or not isinstance(errors, dict)
-        or not isinstance(identity, str)
+    if manifest.get("schema") != MCP_CONTRACT_SCHEMA:
+        raise ValueError("invalid Hashmarks MCP contract manifest")
+    if not all(
+        (
+            isinstance(server, dict),
+            isinstance(tools, list),
+            isinstance(operation_contract, dict),
+            isinstance(errors, dict),
+            isinstance(identity, str),
+        )
     ):
         raise ValueError("invalid Hashmarks MCP contract manifest")
     identity_payload = {
@@ -389,6 +375,7 @@ def contract_summary(manifest: dict[str, object]) -> dict[str, object]:
         "contract_identity": identity,
         "server_version": server.get("version"),
         "tools": [str(row.get("name")) for row in tools if isinstance(row, dict)],
+        "operation_contract_identity": operation_contract.get("contract_identity"),
         "error_schema": errors.get("schema"),
         "error_reasons": errors.get("reasons"),
         "error_recovery_authority": errors.get("recovery_authority"),

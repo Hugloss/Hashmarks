@@ -125,6 +125,28 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 
 The tools are read-only from the repository consumer's perspective. Hashmarks may update its own disposable derived cache while answering them.
 
+### Canonical operation schema authority
+
+Hashmarks resolves semantic response identity before any transport is involved:
+
+```text
+(operation, mode)
+        ↓
+one canonical operation contract
+        ↓
+exact schema + version
+        ↓
+core emits it
+        ↓
+MCP / CLI / API / adapters project it
+        ↓
+each exposed boundary validates the exact mapping
+```
+
+`hashmarks.operation-contract.v1` is the single owner of the exposed operation-to-schema mapping. Core producers consume that mapping; transports do not repeat schema/version strings. A transport may rename a tool for host integration, but it may not mint a different semantic response schema. The `find` CLI and MCP tool therefore both project the same core-owned `hashmarks.find.v2` packet, and dependency observation uses transport-neutral `hashmarks.dependency-codemap.v1`.
+
+Changing an exposed schema/version means changing the operation contract first. The operation-contract identity then changes, the MCP contract incorporates that identity, core output follows the mapping, and boundary validation rejects any producer or adapter that still emits the old schema.
+
 ### Canonical MCP contract identity
 
 Hashmarks owns one transport-neutral `hashmarks.mcp-contract.v1` manifest. The manifest binds the Hashmarks server name and installed version, the server description and routing instructions, canonical tool order and descriptions, the native MCP input/output schemas, read-only annotations, and each tool's Hashmarks response-schema set. A canonical JSON SHA-256 becomes the `contract_identity`.
@@ -147,7 +169,7 @@ Repository or generation binding mismatches are classified as `stale-or-foreign-
 
 Tool selection is intentionally phase-specific rather than interchangeable: use `repository_context` for broad orientation, `find` when an exact path/symbol/name is already known, `task_evidence` when a behavior/task needs semantic localization or ownership evidence, and `change_impact` after explicit changed paths exist. `task_evidence` is deliberately stronger than raw text search for that semantic case: one bounded packet separates supporting retrieval from ownership authority, preserves ambiguity, carries source evidence or an exact next-read, selects verification evidence/plan, and reports freshness. These descriptions are exposed through the native MCP catalog so hosts can choose the existing semantic owner without a Hashmarks-owned planner or workflow layer.
 
-`find` uses `hashmarks.mcp-find.v1` and does not let an empty or single bounded result silently become absence or uniqueness authority. It projects the core find engine's bound reasons together with CodeMap generation/freshness and reports observed exact-match cardinality. Exact path claims are scoped to the admitted visible repository path index; exact identifier claims are scoped to the indexed visible symbol surface. Only a current, unbounded exact-query cut can make `negative_evidence` or `uniqueness_evidence` admissible. Natural-language/conceptual retrieval remains bounded retrieval only and cannot prove absence.
+`find` uses the core-owned `hashmarks.find.v2` packet for every transport. CLI and MCP consume the same packet rather than minting transport-specific schemas. It does not let an empty or single bounded result silently become absence or uniqueness authority; the core packet carries bound reasons together with CodeMap generation/freshness and observed exact-match cardinality. Exact path claims are scoped to the admitted visible repository path index; exact identifier claims are scoped to the indexed visible symbol surface. Only a current, unbounded exact-query cut can make `negative_evidence` or `uniqueness_evidence` admissible. Natural-language/conceptual retrieval remains bounded retrieval only and cannot prove absence.
 
 The MCP initialization also exposes concise server instructions for hosts that support them. For repository-localization work where the exact owner/path/symbol is not yet known, those instructions tell the coding agent to prefer one bounded `task_evidence` call before broad grep/glob or exploratory reads, then use native reads against the returned evidence. The opposite case is equally important: when a unique exact path is already known and the task is simply to inspect that file, native read is the better tool and Hashmarks should stay out of the way. This is routing guidance rather than workflow ownership: Hashmarks should win semantic reduction, not every repository access, and it does not replace editing, shell, test, or git tools.
 
@@ -163,7 +185,7 @@ The catalog stays small: explainability and endpoint comparison are modes on exi
 
 `dependency_codemap` accepts `result_mode="observation" | "explain" | "compare"`:
 
-- `observation` is the default and preserves the existing `hashmarks.mcp-dependency-codemap.v1` response; bounded dependency queries are available only in this mode;
+- `observation` is the default and preserves the existing `hashmarks.dependency-codemap.v1` response; bounded dependency queries are available only in this mode;
 - `explain` returns the existing typed `hashmarks.dependency-resolution-explain.v1` projection;
 - `compare` requires a bounded caller-supplied qualified `previous_observation` and returns `hashmarks.dependency-resolution-delta.v3`.
 

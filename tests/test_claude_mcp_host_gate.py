@@ -68,7 +68,7 @@ def _events() -> list[dict[str, object]]:
                     {
                         "type": "tool_result",
                         "tool_use_id": "b",
-                        "content": '{"schema":"hashmarks.mcp-find.v1"}',
+                        "content": '{"schema":"hashmarks.find.v2"}',
                     }
                 ]
             },

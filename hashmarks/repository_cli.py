@@ -10,6 +10,7 @@ from hashmarks._command_output import log_command_output
 
 from .codemap.change_impact import ChangeImpactOptions
 from .errors import RepositoryCliError
+from .operation_contract import validate_operation_response
 from .repository_retry import (
     is_transient_repository_race,
     retry_transient_repository_race,
@@ -199,19 +200,11 @@ def _outline(args) -> int:
 
 
 def _find_code(args) -> int:
-    hits, status = _call_codemap(
+    value = _call_codemap(
         args,
-        lambda codemap: (codemap.find(args.query, limit=args.limit), codemap.status()),
+        lambda codemap: codemap.find_packet(args.query, limit=args.limit),
     )
-    _print(
-        {
-            "schema": "hashmarks.find.v1",
-            "query": args.query,
-            "generation": status["generation"],
-            "stale": status["daemon_generation_changed"],
-            "hits": [hit.as_dict() for hit in hits],
-        }
-    )
+    _print(validate_operation_response("find", value))
     return 0
 
 
