@@ -408,9 +408,10 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         """Own one atomic, cross-process CodeMap generation publication.
 
         BEGIN IMMEDIATE serializes writers while WAL keeps the previously
-        committed generation readable. Repository rows, generation metadata,
-        and COMPLETE become visible together at commit; interruption rolls the
-        whole candidate generation back instead of exposing partial authority.
+        committed generation readable. Repository rows, retained enrichment,
+        generation metadata, and publication status become visible together at
+        commit; interruption rolls the whole candidate generation back instead
+        of exposing partial authority.
         """
 
         with self._lock:
