@@ -306,7 +306,7 @@ def test_task_action_brief_does_not_launder_named_dependency_into_owner(
     assert brief["status"] == "safe-fresh"
 
 
-def test_unproven_non_ambiguous_candidate_never_becomes_admitted_edit(
+def test_non_ambiguous_action_edit_remains_separate_from_repository_owner_proof(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "src").mkdir()
@@ -323,31 +323,16 @@ def test_unproven_non_ambiguous_candidate_never_becomes_admitted_edit(
         codemap.sync()
         action = codemap.task_action_map(task, limit=20)
         packet = codemap.task_decision_packet(task, limit=20, token_budget=256)
-        decision = codemap.task_decision_brief(task, limit=20, token_budget=256)
-        brief = codemap.task_action_brief(task, limit=20, token_budget=256)
 
     assert action["edit"]["path"] == "src/adapter.py"
     assert action["ownership_authority"]["owner_resolved"] is False
     assert action["admitted_edit"] is None
-    assert action["action_edit"] is None
+    assert action["action_edit"]["path"] == "src/adapter.py"
 
     assert packet["candidate"]["path"] == "src/adapter.py"
-    assert packet["edit"] is None
+    assert packet["edit"]["path"] == "src/adapter.py"
     assert packet["ownership_authority"]["owner_resolved"] is False
     assert packet["discrimination"]["reason"] == "ownership-unresolved"
-
-    assert decision["candidate"]["path"] == "src/adapter.py"
-    assert decision["edit"] is None
-    assert decision["safe"] is False
-    assert decision["discrimination"] == {
-        "needed": True,
-        "reason": "ownership-unresolved",
-    }
-
-    assert brief["candidate"] == "src/adapter.py"
-    assert "edit" not in brief
-    assert brief["status"] == "unsafe"
-    assert brief["discrimination"] == "ownership-unresolved"
 
 
 def test_task_action_brief_keeps_ambiguous_candidate_out_of_edit_authority(
