@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 from ._version import __version__
 from .errors import OptionalFeatureError, UserFacingError
@@ -11,6 +11,7 @@ from .mcp_contract import (
     MCP_SERVER_INSTRUCTIONS,
     MCP_SERVER_NAME,
     tool_description,
+    validate_tool_response,
 )
 from .mcp_surface import HashmarksMcpSurface, McpSurfaceError
 from .paths import canonical_host_path
@@ -25,8 +26,6 @@ _INSTALL_HINT = (
 
 _SERVER_INSTRUCTIONS = MCP_SERVER_INSTRUCTIONS
 
-_T = TypeVar("_T")
-
 
 def _sdk():
     try:
@@ -39,18 +38,21 @@ def _sdk():
 
 
 def _call_surface(
+    tool_name: str,
     tool_error: type[Exception],
-    operation: Callable[..., _T],
+    operation: Callable[..., dict[str, object]],
     /,
     *args: Any,
+    response_mode: str | None = None,
     **kwargs: Any,
-) -> _T:
-    """Translate Hashmarks consumer errors at the MCP transport boundary."""
+) -> dict[str, object]:
+    """Translate consumer errors and enforce the canonical response contract."""
 
     try:
-        return operation(*args, **kwargs)
+        result = operation(*args, **kwargs)
     except McpSurfaceError as exc:
         raise tool_error(exc.transport_message()) from exc
+    return validate_tool_response(tool_name, result, result_mode=response_mode)
 
 
 def _register_repository_declarations_tool(
@@ -70,11 +72,13 @@ def _register_repository_declarations_tool(
         result_mode: str = "observation",
     ) -> dict[str, object]:
         return _call_surface(
+            "repository_declarations",
             tool_error,
             surface.repository_declarations,
             groups,
             previous_observation=previous_observation,
             result_mode=result_mode,
+            response_mode=result_mode,
         )
 
 
@@ -102,7 +106,12 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         annotations=annotations,
     )
     def repository_context(max_areas: int = 12) -> dict[str, object]:
-        return _call_surface(ToolError, surface.repository_context, max_areas=max_areas)
+        return _call_surface(
+            "repository_context",
+            ToolError,
+            surface.repository_context,
+            max_areas=max_areas,
+        )
 
     @server.tool(
         name="find",
@@ -110,7 +119,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         annotations=annotations,
     )
     def find(query: str, limit: int = 20) -> dict[str, object]:
-        return _call_surface(ToolError, surface.find, query, limit=limit)
+        return _call_surface("find", ToolError, surface.find, query, limit=limit)
 
     @server.tool(
         name="task_evidence",
@@ -121,6 +130,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         task: str, limit: int = 20, per_role: int = 3, token_budget: int = 1536
     ) -> dict[str, object]:
         return _call_surface(
+            "task_evidence",
             ToolError,
             surface.task_evidence,
             task,
@@ -138,7 +148,12 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         task: str, changed_paths: list[str], max_depth: int = 4
     ) -> dict[str, object]:
         return _call_surface(
-            ToolError, surface.change_impact, task, changed_paths, max_depth=max_depth
+            "change_impact",
+            ToolError,
+            surface.change_impact,
+            task,
+            changed_paths,
+            max_depth=max_depth,
         )
 
     @server.tool(
@@ -154,6 +169,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         relationship_limit_per_path: int = 100,
     ) -> dict[str, object]:
         return _call_surface(
+            "correlate_evidence",
             ToolError,
             surface.correlate_evidence,
             bundles,
@@ -175,12 +191,14 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         result_mode: str = "observation",
     ) -> dict[str, object]:
         return _call_surface(
+            "dependency_codemap",
             ToolError,
             surface.dependency_codemap,
             snapshot,
             queries,
             previous_observation=previous_observation,
             result_mode=result_mode,
+            response_mode=result_mode,
         )
 
     _register_repository_declarations_tool(server, surface, annotations, ToolError)
@@ -197,6 +215,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         token_budget: int = 1536,
     ) -> dict[str, object]:
         return _call_surface(
+            "post_change",
             ToolError,
             surface.post_change,
             task,
