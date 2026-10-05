@@ -35,7 +35,7 @@ from .repository_declaration_provider import (
 from .repository_intelligence_query import RepositoryIntelligenceQueryOptions
 from .service import CodeMapService, CodeMapServiceClient, default_codemap_socket
 from .structural_locality import structural_locality_delta
-from .worktree_overlay import WorktreeOverlay
+from .worktree_overlay import WorktreeOverlay, WorktreeOverlayBaseChangedError
 
 __all__ = [
     "CodeMap",
@@ -59,6 +59,7 @@ __all__ = [
     "SearchHit",
     "SyncResult",
     "WorktreeOverlay",
+    "WorktreeOverlayBaseChangedError",
     "structural_locality_delta",
     "COMPACT_PROJECT_IMPACT_SCHEMA",
     "compact_project_impact",
