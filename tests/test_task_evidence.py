@@ -51,7 +51,7 @@ def test_task_evidence_supplies_exact_owner_source_and_verification(
 
     ownership = _ownership(start)
     verification = _verification(start)
-    assert start["schema"] == "hashmarks.task-evidence.v2"
+    assert start["schema"] == "hashmarks.task-evidence.v3"
     assert "status" not in start
     assert ownership["status"] == "resolved"
     assert ownership["owner"]["path"] == "src/engine.py"
@@ -160,7 +160,7 @@ def test_task_evidence_cli_exposes_native_start_packet(tmp_path: Path, capsys) -
         == 0
     )
     output = json.loads(capsys.readouterr().out)
-    assert output["schema"] == "hashmarks.task-evidence.v2"
+    assert output["schema"] == "hashmarks.task-evidence.v3"
     assert output["ownership"]["owner"]["path"] == "src/engine.py"
     assert output["ownership"]["source_budget"]["complete"] is True
 
