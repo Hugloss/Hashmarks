@@ -86,7 +86,7 @@ def _map_findings(args) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.repository_findings(args.path or None)
     )
-    _print(value)
+    _print_operation("repository_findings", value)
     return 0
 
 
@@ -94,7 +94,7 @@ def _map_import_ownership(args) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.import_ownership_findings(args.path or None)
     )
-    _print(value)
+    _print_operation("import_ownership", value)
     return 0
 
 
@@ -102,7 +102,7 @@ def _map_concurrency_risk(args) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.concurrency_risk_findings(args.path or None)
     )
-    _print(value)
+    _print_operation("concurrency_risk", value)
     return 0
 
 
@@ -113,7 +113,7 @@ def _map_verification_ownership(args) -> int:
             args.task, limit=args.limit, candidate_limit=args.candidate_limit
         ),
     )
-    _print(value)
+    _print_operation("verification_ownership", value)
     return 0
 
 
@@ -121,7 +121,7 @@ def _map_repository_ownership(args) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.repository_ownership_graph(args.path or None)
     )
-    _print(value)
+    _print_operation("repository_ownership", value)
     return 0
 
 
@@ -129,7 +129,7 @@ def _map_cache_ownership(args) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.cache_ownership_findings(args.path or None)
     )
-    _print(value)
+    _print_operation("cache_ownership", value)
     return 0
 
 
@@ -138,7 +138,7 @@ def _map_cache_invalidation_ownership(args) -> int:
         args,
         lambda codemap: codemap.cache_invalidation_ownership_graph(args.path or None),
     )
-    _print(value)
+    _print_operation("cache_invalidation_ownership", value)
     return 0
 
 
@@ -182,7 +182,7 @@ def _map_enrich(args) -> int:
 
 def _map_projects(args) -> int:
     value = _call_codemap(args, lambda codemap: codemap.projects())
-    _print(value)
+    _print_operation("projects", value)
     return 0
 
 
@@ -204,7 +204,7 @@ def _map_orient(args) -> int:
 
 def _outline(args) -> int:
     value = _call_codemap(args, lambda codemap: codemap.outline(args.path))
-    _print(value)
+    _print_operation("outline", value)
     return 0
 
 
@@ -224,7 +224,7 @@ def _grep_code(args) -> int:
             args.query, limit=args.limit, context_lines=args.context
         ),
     )
-    _print(value)
+    _print_operation("grep", value)
     return 0
 
 
@@ -235,13 +235,13 @@ def _structural_code(args) -> int:
             args.pattern, language=args.lang, limit=args.limit
         ),
     )
-    _print(value)
+    _print_operation("structural", value)
     return 0
 
 
 def _symbol_code(args) -> int:
     value = _call_codemap(args, lambda codemap: codemap.symbol(args.query))
-    _print(value)
+    _print_operation("symbol", value)
     return 0
 
 
@@ -249,7 +249,7 @@ def _source_code(args) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.source(args.query, token_budget=args.budget)
     )
-    _print(value)
+    _print_operation("source", value)
     return 0
 
 
@@ -269,7 +269,7 @@ def _affected_code(args) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.affected(args.query, max_depth=args.max_depth)
     )
-    _print(value)
+    _print_operation("affected", value)
     return 0
 
 
@@ -277,7 +277,7 @@ def _tests_code(args) -> int:
     value = _call_codemap(
         args, lambda codemap: codemap.tests(args.query, max_depth=args.max_depth)
     )
-    _print(value)
+    _print_operation("tests", value)
     return 0
 
 
@@ -291,7 +291,7 @@ def _structural_locality_code(args) -> int:
             ref_limit_per_symbol=args.ref_limit,
         ),
     )
-    _print(value)
+    _print_operation("structural_locality", value)
     return 0
 
 
@@ -300,7 +300,10 @@ def _structural_locality_delta_code(args) -> int:
 
     before = _read_json_object(args.before, option="--before")
     after = _read_json_object(args.after, option="--after")
-    _print(structural_locality_delta(before, after))
+    _print_operation(
+        "structural_locality_delta",
+        structural_locality_delta(before, after),
+    )
     return 0
 
 
@@ -314,7 +317,7 @@ def _context_code(args) -> int:
             disclosure=args.level,
         ),
     )
-    _print(value.as_dict())
+    _print_operation("context", value.as_dict())
     return 0
 
 
@@ -339,7 +342,7 @@ def _verification_relevance_code(args) -> int:
             args.task, limit=args.limit, candidate_limit=args.candidate_limit
         ),
     )
-    _print(value)
+    _print_operation("verification_relevance", value)
     return 0
 
 

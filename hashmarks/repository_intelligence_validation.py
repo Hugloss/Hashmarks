@@ -15,16 +15,20 @@ REPOSITORY_INTELLIGENCE_CONFORMANCE_SCHEMA = (
 )
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _CHANGE_IMPACT_SCHEMA = operation_schema("change_impact")
+_DECISION_PACKET_SCHEMA = operation_schema("task_decision_packet")
+_DECISION_BRIEF_SCHEMA = operation_schema("task_decision_brief")
+_OWNERSHIP_RELATION_SCHEMA = operation_schema("ownership_relation_graph")
+_TASK_ACTION_MAP_SCHEMA = operation_schema("task_action_map")
 
 _CURRENT_EVIDENCE_KINDS: dict[str, str] = {
-    "hashmarks.task-decision-packet.v2": "decision",
-    "hashmarks.task-decision-brief.v1": "decision",
+    _DECISION_PACKET_SCHEMA: "decision",
+    _DECISION_BRIEF_SCHEMA: "decision",
     "hashmarks.task-context-plan.v1": "context",
     "hashmarks.agent-work-context.v1": "context",
     _CHANGE_IMPACT_SCHEMA: "impact",
     "hashmarks.verification-plan.v1": "verification",
-    "hashmarks.ownership-relation-graph.v1": "ownership",
-    "hashmarks.task-action-map.v1": "action-map",
+    _OWNERSHIP_RELATION_SCHEMA: "ownership",
+    _TASK_ACTION_MAP_SCHEMA: "action-map",
     "hashmarks.repository-intelligence-snapshot.v1": "repository-snapshot",
     "hashmarks.repository-intelligence-delta.v1": "repository-delta",
     "hashmarks.external-diagnostic-observation.v1": "diagnostic-observation",
@@ -357,14 +361,14 @@ def _observation_freshness(
 
 
 _VALIDATORS = {
-    "hashmarks.task-decision-packet.v2": _decision_packet,
-    "hashmarks.task-decision-brief.v1": _decision_brief,
+    _DECISION_PACKET_SCHEMA: _decision_packet,
+    _DECISION_BRIEF_SCHEMA: _decision_brief,
     "hashmarks.task-context-plan.v1": _context_plan,
     "hashmarks.agent-work-context.v1": _work_context,
     _CHANGE_IMPACT_SCHEMA: _change_impact,
     "hashmarks.verification-plan.v1": _verification_plan,
-    "hashmarks.ownership-relation-graph.v1": _ownership_graph,
-    "hashmarks.task-action-map.v1": _action_map,
+    _OWNERSHIP_RELATION_SCHEMA: _ownership_graph,
+    _TASK_ACTION_MAP_SCHEMA: _action_map,
     "hashmarks.repository-intelligence-snapshot.v1": _repository_snapshot,
     "hashmarks.repository-intelligence-delta.v1": _repository_delta,
     "hashmarks.external-diagnostic-observation.v1": _diagnostic_observation,

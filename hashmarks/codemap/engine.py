@@ -16,6 +16,7 @@ from hashmarks.native_vitest import (  # noqa: F401 - evidence_graph uses these 
     collect_vitest_vite_graph,
     local_vitest,
 )
+from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import canonical_host_path, normalize_relative_path
 
 from .change_intelligence import ChangeIntelligenceMixin
@@ -358,6 +359,7 @@ class CodeMap(
         state = self._state_rel
         return bool(state and (clean == state or clean.startswith(state + "/")))
 
+    @operation_response("outline")
     @decision_scoped
     def outline(self, relpath: str) -> dict[str, object]:
         self._ensure_map_ready()
@@ -373,7 +375,7 @@ class CodeMap(
             )
         generation, identity_generation, stale = self._generation_status()
         return {
-            "schema": "hashmarks.outline.v1",
+            "schema": operation_schema("outline"),
             "path": rel,
             "language": row["language"],
             "file_digest": row["file_digest"],

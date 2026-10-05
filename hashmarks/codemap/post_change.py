@@ -6,7 +6,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.evidence_context import validate_evidence_context
-from hashmarks.operation_contract import operation_schema, validate_operation_response
+from hashmarks.operation_contract import (
+    operation_response,
+    operation_schema,
+    validate_operation_response,
+)
 from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactMixin
@@ -427,6 +431,7 @@ class PostChangeMixin(ChangeImpactMixin):
             result["replacement"] = replacement
         return validate_operation_response("post_change", result)
 
+    @operation_response("refresh_after_change_delta")
     def refresh_after_change_delta(
         self,
         task: str,
@@ -471,7 +476,7 @@ class PostChangeMixin(ChangeImpactMixin):
             else None
         )
         result: dict[str, object] = {
-            "schema": "hashmarks.refresh-delta.v1",
+            "schema": operation_schema("refresh_after_change_delta"),
             "changed_paths": list(normalized),
             "generation": sync_result.generation,
         }
@@ -491,6 +496,7 @@ class PostChangeMixin(ChangeImpactMixin):
             result["safe"] = False
         return result
 
+    @operation_response("refresh_after_change_brief")
     def refresh_after_change_brief(
         self,
         task: str,
@@ -524,7 +530,7 @@ class PostChangeMixin(ChangeImpactMixin):
             token_budget=token_budget,
         )
         return {
-            "schema": "hashmarks.post-change-refresh-brief.v1",
+            "schema": operation_schema("refresh_after_change_brief"),
             "changed_paths": list(normalized),
             "generation_before": before,
             "generation_after": sync_result.generation,
@@ -534,6 +540,7 @@ class PostChangeMixin(ChangeImpactMixin):
             "consumer_owner": "external",
         }
 
+    @operation_response("refresh_after_change")
     def refresh_after_change(
         self,
         task: str,
@@ -571,7 +578,7 @@ class PostChangeMixin(ChangeImpactMixin):
             token_budget=token_budget,
         )
         return {
-            "schema": "hashmarks.post-change-refresh.v1",
+            "schema": operation_schema("refresh_after_change"),
             "changed_paths": list(normalized),
             "generation_before": before,
             "generation_after": sync_result.generation,

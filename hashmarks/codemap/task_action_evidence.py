@@ -6,6 +6,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_schema
+
 from .model import EvidenceVisibility, SearchHit
 from .query_primitives import _TASK_STOPWORDS
 from .repository_domains import RepositoryDomain, classify_repository_path
@@ -521,7 +523,7 @@ class TaskActionEvidenceMixin:
             ],
             "cycle_count": 0,
             "revisit_count": 0,
-            "relation_graph_schema": "hashmarks.ownership-relation-graph.v1",
+            "relation_graph_schema": operation_schema("ownership_relation_graph"),
             "selected": owner_path,
             "secret_knowledge_used": False,
             "effect": "repository-owner-projection-only",

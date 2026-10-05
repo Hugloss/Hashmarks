@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from hashmarks.operation_contract import operation_response, operation_schema
+
 CODEMAP_SCHEMA = "hashmarks.codemap.v1"
 PYTHON_PARSER = "hashmarks.python-ast.v5"
 
@@ -224,9 +226,10 @@ class ContextPack:
     items: tuple[ContextItem, ...] = field(default_factory=tuple)
     warnings: tuple[str, ...] = field(default_factory=tuple)
 
+    @operation_response("context")
     def as_dict(self) -> dict[str, Any]:
         return {
-            "schema": "hashmarks.context-pack.v2",
+            "schema": operation_schema("context"),
             "query": self.query,
             "budget": self.budget,
             "disclosure": self.disclosure.value,

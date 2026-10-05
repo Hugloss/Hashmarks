@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped
@@ -1134,6 +1135,7 @@ class OwnershipGraphMixin:
     def _selected_ownership_path(selected: dict[str, object] | None) -> str | None:
         return None if selected is None else str(selected["path"])
 
+    @operation_response("ownership_relation_graph")
     def ownership_relation_graph(
         self, task: str, start_path: str, *, max_depth: int = 2
     ) -> dict[str, object]:
@@ -1163,7 +1165,7 @@ class OwnershipGraphMixin:
         owner_path = self._ownership_path(state, selected)
         search_complete = not state.search_bound_reasons
         return {
-            "schema": "hashmarks.ownership-relation-graph.v1",
+            "schema": operation_schema("ownership_relation_graph"),
             "task": task,
             "start_path": start,
             "max_depth": max_depth,

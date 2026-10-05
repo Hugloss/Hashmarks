@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from hashmarks._version import __version__
+from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 from hashmarks.producer_identity import native_producer_implementation_identity
 from hashmarks.python_ast_cache import read_python_ast
@@ -18,8 +19,8 @@ from .model import EvidenceVisibility
 if TYPE_CHECKING:
     from .engine import CodeMap
 
-STRUCTURAL_LOCALITY_SCHEMA = "hashmarks.structural-locality.v1"
-STRUCTURAL_LOCALITY_DELTA_SCHEMA = "hashmarks.structural-locality-delta.v1"
+STRUCTURAL_LOCALITY_SCHEMA = operation_schema("structural_locality")
+STRUCTURAL_LOCALITY_DELTA_SCHEMA = operation_schema("structural_locality_delta")
 _LOCALITY_SYMBOL_CANDIDATE_LIMIT = 64
 
 
@@ -793,6 +794,7 @@ class StructuralLocalityMixin:
         ordered_nodes = sorted(nodes.values(), key=_locality_node_sort_key)
         return ordered_nodes, edges, unresolved_calls, external_calls
 
+    @operation_response("structural_locality")
     def structural_locality(
         self,
         target: str,
@@ -1081,6 +1083,7 @@ def _string_set(packet: Mapping[str, object], key: str) -> set[str]:
     return {str(value) for value in values if value}
 
 
+@operation_response("structural_locality_delta")
 def structural_locality_delta(
     before: Mapping[str, object], after: Mapping[str, object]
 ) -> dict[str, object]:

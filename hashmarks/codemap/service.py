@@ -98,23 +98,57 @@ def _canonical_service_route(
 _SERVICE_ROUTES = {
     "status": _internal_service_route("_status_response"),
     "sync": _internal_service_route("_sync_response"),
-    "repository_findings": _internal_service_route("_repository_findings_response"),
-    "import_ownership": _internal_service_route("_import_ownership_response"),
-    "cache_ownership": _internal_service_route("_cache_ownership_response"),
-    "cache_invalidation_ownership": _internal_service_route(
-        "_cache_invalidation_response"
+    "repository_findings": _canonical_service_route(
+        "_repository_findings_response",
+        operation="repository_findings",
+        response_key="repository_findings",
     ),
-    "authority_ownership": _internal_service_route("_authority_ownership_response"),
-    "concurrency_risk": _internal_service_route("_concurrency_risk_response"),
-    "verification_ownership": _internal_service_route(
-        "_verification_ownership_response"
+    "import_ownership": _canonical_service_route(
+        "_import_ownership_response",
+        operation="import_ownership",
+        response_key="import_ownership",
+    ),
+    "cache_ownership": _canonical_service_route(
+        "_cache_ownership_response",
+        operation="cache_ownership",
+        response_key="cache_ownership",
+    ),
+    "cache_invalidation_ownership": _canonical_service_route(
+        "_cache_invalidation_response",
+        operation="cache_invalidation_ownership",
+        response_key="cache_invalidation_ownership",
+    ),
+    "authority_ownership": _canonical_service_route(
+        "_authority_ownership_response",
+        operation="repository_ownership",
+        response_key="authority_ownership",
+    ),
+    "concurrency_risk": _canonical_service_route(
+        "_concurrency_risk_response",
+        operation="concurrency_risk",
+        response_key="concurrency_risk",
+    ),
+    "verification_ownership": _canonical_service_route(
+        "_verification_ownership_response",
+        operation="verification_ownership",
+        response_key="verification_ownership",
     ),
     "find_task": _internal_service_route("_find_task_response"),
-    "task_action_map": _internal_service_route("_task_action_map_response"),
-    "verification_relevance": _internal_service_route(
-        "_verification_relevance_response"
+    "task_action_map": _canonical_service_route(
+        "_task_action_map_response",
+        operation="task_action_map",
+        response_key="action_map",
     ),
-    "ownership_relation_graph": _internal_service_route("_ownership_relation_response"),
+    "verification_relevance": _canonical_service_route(
+        "_verification_relevance_response",
+        operation="verification_relevance",
+        response_key="verification_relevance",
+    ),
+    "ownership_relation_graph": _canonical_service_route(
+        "_ownership_relation_response",
+        operation="ownership_relation_graph",
+        response_key="ownership_relation_graph",
+    ),
     "task_evidence": _canonical_service_route(
         "_task_evidence_response",
         operation="task_evidence",
@@ -125,23 +159,51 @@ _SERVICE_ROUTES = {
         operation="change_impact",
         response_key="task_change_impact",
     ),
-    "repository_intelligence_query": _internal_service_route(
-        "_repository_intelligence_query_response"
+    "repository_intelligence_query": _canonical_service_route(
+        "_repository_intelligence_query_response",
+        operation="repository_intelligence_query",
+        response_key="repository_intelligence_query",
     ),
     "task_post_change_delta": _canonical_service_route(
         "_post_change_delta_response",
         operation="post_change",
         response_key="post_change_delta",
     ),
-    "refresh_after_change_delta": _internal_service_route("_refresh_delta_response"),
-    "refresh_after_change_brief": _internal_service_route("_refresh_brief_response"),
-    "refresh_after_change": _internal_service_route("_refresh_response"),
-    "task_decision_brief": _internal_service_route("_decision_brief_response"),
-    "task_action_brief": _internal_service_route("_task_action_brief_response"),
-    "task_decision_brief_budget_sweep": _internal_service_route(
-        "_budget_sweep_response"
+    "refresh_after_change_delta": _canonical_service_route(
+        "_refresh_delta_response",
+        operation="refresh_after_change_delta",
+        response_key="refresh_delta",
     ),
-    "task_decision_packet": _internal_service_route("_decision_packet_response"),
+    "refresh_after_change_brief": _canonical_service_route(
+        "_refresh_brief_response",
+        operation="refresh_after_change_brief",
+        response_key="refresh_brief",
+    ),
+    "refresh_after_change": _canonical_service_route(
+        "_refresh_response",
+        operation="refresh_after_change",
+        response_key="refresh",
+    ),
+    "task_decision_brief": _canonical_service_route(
+        "_decision_brief_response",
+        operation="task_decision_brief",
+        response_key="decision_brief",
+    ),
+    "task_action_brief": _canonical_service_route(
+        "_task_action_brief_response",
+        operation="task_action_brief",
+        response_key="task_action_brief",
+    ),
+    "task_decision_brief_budget_sweep": _canonical_service_route(
+        "_budget_sweep_response",
+        operation="task_decision_brief_budget_sweep",
+        response_key="budget_sweep",
+    ),
+    "task_decision_packet": _canonical_service_route(
+        "_decision_packet_response",
+        operation="task_decision_packet",
+        response_key="decision_packet",
+    ),
     "stop": _internal_service_route("_stop_response"),
 }
 
