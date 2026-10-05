@@ -68,7 +68,7 @@ def test_codex_event_validation_rejects_failed_or_wrong_schema() -> None:
                 _event("find", "hashmarks.find.v2"),
             ]
         )
-    with pytest.raises(codex_gate.HostGateError, match="unexpected schema"):
+    with pytest.raises(codex_gate.HostGateError, match="canonical contract validation"):
         codex_gate._validate_events(
             [
                 _event("repository_context", "wrong.schema"),
