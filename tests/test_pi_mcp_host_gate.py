@@ -39,7 +39,7 @@ def test_pi_event_validation_accepts_exact_proxy_calls() -> None:
         _start("a", "hashmarks_repository_context", {"max_areas": 8}),
         _end("a", "hashmarks.repository-capsule.v1"),
         _start("b", "hashmarks_find", {"query": "flare041", "limit": 5}),
-        _end("b", "hashmarks.mcp-find.v1"),
+        _end("b", "hashmarks.find.v2"),
     ]
     result = pi_gate._validate_events(events)
     assert set(result) == {"hashmarks_repository_context", "hashmarks_find"}
@@ -65,7 +65,7 @@ def test_pi_event_validation_rejects_error_and_missing_schema() -> None:
                 _start("a", "hashmarks_repository_context", {}),
                 _end("a", "hashmarks.repository-capsule.v1", is_error=True),
                 _start("b", "hashmarks_find", {}),
-                _end("b", "hashmarks.mcp-find.v1"),
+                _end("b", "hashmarks.find.v2"),
             ]
         )
     with pytest.raises(pi_gate.HostGateError, match="did not expose schema"):
@@ -74,7 +74,7 @@ def test_pi_event_validation_rejects_error_and_missing_schema() -> None:
                 _start("a", "hashmarks_repository_context", {}),
                 _end("a", "wrong.schema"),
                 _start("b", "hashmarks_find", {}),
-                _end("b", "hashmarks.mcp-find.v1"),
+                _end("b", "hashmarks.find.v2"),
             ]
         )
 
