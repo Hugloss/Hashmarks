@@ -182,10 +182,12 @@ class EvidenceFreshnessMixin:
                 return True
         return False
 
-    def _rebind_project_freshness(self, producer: str) -> bool:
+    def _rebind_project_freshness(
+        self, producer: str, *, expected_generation: int | None = None
+    ) -> int | None:
         value = self._evidence_snapshot("project", producer)
         if value is None or bool(value.get("bind_generation", False)):
-            return False
+            return None
         manifests = value.get("manifests") or {}
         inadmissible = _inadmissible_manifest_count(value)
         if (
@@ -194,14 +196,30 @@ class EvidenceFreshnessMixin:
             or inadmissible is None
             or inadmissible > 0
         ):
-            return False
-        self._record_evidence_snapshot(
-            "project",
-            producer,
-            bind_generation=False,
-            manifests=tuple(str(rel) for rel in manifests),
-        )
-        return True
+            return None
+        with self.store.publication_transaction():
+            previous_generation = self.store.generation()
+            if (
+                expected_generation is not None
+                and previous_generation != expected_generation
+            ):
+                raise RuntimeError(
+                    "CodeMap generation changed before project freshness rebind "
+                    f"({expected_generation} -> {previous_generation})"
+                )
+            generation = self.store.bump_generation()
+            self._carry_forward_evidence_generation(
+                previous_generation=previous_generation,
+                generation=generation,
+            )
+            self._record_evidence_snapshot(
+                "project",
+                producer,
+                bind_generation=False,
+                manifests=tuple(str(rel) for rel in manifests),
+                generation=generation,
+            )
+        return generation
 
     def _generation_snapshot_fresh(
         self, value: dict[str, object]

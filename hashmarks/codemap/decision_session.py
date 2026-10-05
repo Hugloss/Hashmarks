@@ -160,9 +160,48 @@ class DecisionSessionMixin:
         self._decision_session_observation = None
         self._clear_decision_session_caches()
 
+    def _decision_session_entry_generation(
+        self,
+        *,
+        diagnostics: bool,
+        allow_incomplete: bool,
+        expected_generation: int | None,
+    ) -> int:
+        if self._decision_session_depth == 0:
+            generation = self._begin_decision_session(
+                diagnostics=diagnostics,
+                allow_incomplete=allow_incomplete,
+            )
+            if expected_generation is not None and generation != expected_generation:
+                self._finish_decision_session()
+                raise RuntimeError(
+                    "CodeMap generation changed before expected decision session "
+                    f"({expected_generation} -> {generation})"
+                )
+            return generation
+
+        generation = self.store.generation()
+        if self._decision_session_generation != generation:
+            raise RuntimeError(
+                "CodeMap generation changed before nested decision session"
+            )
+        if (
+            expected_generation is not None
+            and self._decision_session_generation != expected_generation
+        ):
+            raise RuntimeError(
+                "CodeMap generation changed before expected decision session "
+                f"({expected_generation} -> {self._decision_session_generation})"
+            )
+        return generation
+
     @contextmanager
     def decision_session(
-        self, *, diagnostics: bool = False, _allow_incomplete: bool = False
+        self,
+        *,
+        diagnostics: bool = False,
+        _allow_incomplete: bool = False,
+        expected_generation: int | None = None,
     ):
         """Reuse immutable evidence primitives across many decisions on one generation.
 
@@ -171,19 +210,11 @@ class DecisionSessionMixin:
         """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        if self._decision_session_depth == 0:
-            generation = self._begin_decision_session(
-                diagnostics=diagnostics, allow_incomplete=_allow_incomplete
-            )
-        else:
-            generation = self.store.generation()
-        if (
-            self._decision_session_depth > 0
-            and self._decision_session_generation != generation
-        ):
-            raise RuntimeError(
-                "CodeMap generation changed before nested decision session"
-            )
+        generation = self._decision_session_entry_generation(
+            diagnostics=diagnostics,
+            allow_incomplete=_allow_incomplete,
+            expected_generation=expected_generation,
+        )
         self._decision_session_depth += 1
         try:
             yield self

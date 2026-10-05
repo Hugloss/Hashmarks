@@ -543,7 +543,10 @@ class EvidenceGraphMixin:
                 warnings.extend(vite.warnings)
 
     def enrich_projects(
-        self, providers: Iterable[str] | None = None
+        self,
+        providers: Iterable[str] | None = None,
+        *,
+        expected_generation: int | None = None,
     ) -> dict[str, object]:
         """Collect slower/native package graph evidence explicitly in the enrichment lane."""
         if TYPE_CHECKING:
@@ -565,6 +568,15 @@ class EvidenceGraphMixin:
             return publication_generation
 
         with self.store.publication_transaction():
+            current_generation = self.store.generation()
+            if (
+                expected_generation is not None
+                and current_generation != expected_generation
+            ):
+                raise RuntimeError(
+                    "CodeMap generation changed before project enrichment "
+                    f"({expected_generation} -> {current_generation})"
+                )
             self._enrich_project_graphs(
                 selected, results, warnings, ensure_publication_generation
             )
@@ -582,6 +594,11 @@ class EvidenceGraphMixin:
         self._reverse_file_graph_cache = None
         return {
             "schema": "hashmarks.codemap-project-enrichment.v1",
+            "generation": (
+                self.store.generation()
+                if publication_generation is None
+                else publication_generation
+            ),
             "providers": results,
             "projects": self._fresh_project_nodes(),
             "edges": self._fresh_project_edges(),
