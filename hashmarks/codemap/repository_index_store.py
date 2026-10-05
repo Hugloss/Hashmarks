@@ -408,9 +408,10 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         """Own one atomic, cross-process CodeMap generation publication.
 
         BEGIN IMMEDIATE serializes writers while WAL keeps the previously
-        committed generation readable. Repository rows, generation metadata,
-        and COMPLETE become visible together at commit; interruption rolls the
-        whole candidate generation back instead of exposing partial authority.
+        committed generation readable. Repository rows, retained enrichment,
+        generation metadata, and publication status become visible together at
+        commit; interruption rolls the whole candidate generation back instead
+        of exposing partial authority.
         """
 
         with self._lock:
@@ -937,26 +938,32 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         return len(values)
 
     def replace_native_file_edges(self, producer_prefix: str, edges) -> None:
+        def replace_locked() -> None:
+            self._db.execute(
+                "DELETE FROM native_file_edge WHERE producer LIKE ?",
+                (producer_prefix + "%",),
+            )
+            self._db.executemany(
+                "INSERT OR REPLACE INTO native_file_edge(source,target,kind,confidence,producer,specifier) VALUES (?,?,?,?,?,?)",
+                [
+                    (
+                        edge.source,
+                        edge.target,
+                        edge.kind,
+                        edge.confidence,
+                        edge.producer,
+                        edge.specifier,
+                    )
+                    for edge in edges
+                ],
+            )
+
         with self._lock:
-            with sqlite_transaction(self._db):
-                self._db.execute(
-                    "DELETE FROM native_file_edge WHERE producer LIKE ?",
-                    (producer_prefix + "%",),
-                )
-                self._db.executemany(
-                    "INSERT OR REPLACE INTO native_file_edge(source,target,kind,confidence,producer,specifier) VALUES (?,?,?,?,?,?)",
-                    [
-                        (
-                            edge.source,
-                            edge.target,
-                            edge.kind,
-                            edge.confidence,
-                            edge.producer,
-                            edge.specifier,
-                        )
-                        for edge in edges
-                    ],
-                )
+            if self._publication_transaction_active:
+                replace_locked()
+            else:
+                with sqlite_transaction(self._db):
+                    replace_locked()
 
     def native_file_edges(self) -> list[dict]:
         with self._lock:
@@ -974,42 +981,46 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         return [dict(row) for row in rows]
 
     def replace_native_occurrences(self, producer: str, definitions, edges) -> None:
+        def replace_locked() -> None:
+            self._db.execute(
+                "DELETE FROM native_definition WHERE producer=?", (producer,)
+            )
+            self._db.execute("DELETE FROM native_edge WHERE producer=?", (producer,))
+            self._db.executemany(
+                "INSERT OR REPLACE INTO native_definition(path,symbol,display_name,line,end_line,producer) VALUES (?,?,?,?,?,?)",
+                [
+                    (
+                        row["path"],
+                        row["symbol"],
+                        row["display_name"],
+                        int(row["line"]),
+                        int(row["end_line"]),
+                        producer,
+                    )
+                    for row in definitions
+                ],
+            )
+            self._db.executemany(
+                "INSERT OR REPLACE INTO native_edge(path,source,target_symbol,target_name,line,producer) VALUES (?,?,?,?,?,?)",
+                [
+                    (
+                        row["path"],
+                        row.get("source"),
+                        row["target_symbol"],
+                        row["target_name"],
+                        int(row["line"]),
+                        producer,
+                    )
+                    for row in edges
+                ],
+            )
+
         with self._lock:
-            with sqlite_transaction(self._db):
-                self._db.execute(
-                    "DELETE FROM native_definition WHERE producer=?", (producer,)
-                )
-                self._db.execute(
-                    "DELETE FROM native_edge WHERE producer=?", (producer,)
-                )
-                self._db.executemany(
-                    "INSERT OR REPLACE INTO native_definition(path,symbol,display_name,line,end_line,producer) VALUES (?,?,?,?,?,?)",
-                    [
-                        (
-                            row["path"],
-                            row["symbol"],
-                            row["display_name"],
-                            int(row["line"]),
-                            int(row["end_line"]),
-                            producer,
-                        )
-                        for row in definitions
-                    ],
-                )
-                self._db.executemany(
-                    "INSERT OR REPLACE INTO native_edge(path,source,target_symbol,target_name,line,producer) VALUES (?,?,?,?,?,?)",
-                    [
-                        (
-                            row["path"],
-                            row.get("source"),
-                            row["target_symbol"],
-                            row["target_name"],
-                            int(row["line"]),
-                            producer,
-                        )
-                        for row in edges
-                    ],
-                )
+            if self._publication_transaction_active:
+                replace_locked()
+            else:
+                with sqlite_transaction(self._db):
+                    replace_locked()
 
     def native_definitions(self, query: str, limit: int = 100) -> list[dict]:
         q = f"%{query.lower()}%"
@@ -1046,43 +1057,45 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         return [dict(row) for row in rows]
 
     def replace_project_graph(self, producer: str, nodes, edges) -> None:
+        def replace_locked() -> None:
+            self._db.execute("DELETE FROM project_edge WHERE producer=?", (producer,))
+            self._db.execute("DELETE FROM project_node WHERE producer=?", (producer,))
+            self._db.executemany(
+                "INSERT INTO project_node(project_id,kind,root,manifest,producer,metadata) VALUES (?,?,?,?,?,?)",
+                [
+                    (
+                        node.project_id,
+                        node.kind,
+                        node.root,
+                        node.manifest,
+                        node.producer,
+                        json.dumps(
+                            node.metadata, sort_keys=True, separators=(",", ":")
+                        ),
+                    )
+                    for node in nodes
+                ],
+            )
+            self._db.executemany(
+                "INSERT OR REPLACE INTO project_edge(source,target,kind,confidence,producer) VALUES (?,?,?,?,?)",
+                [
+                    (
+                        edge.source,
+                        edge.target,
+                        edge.kind,
+                        edge.confidence,
+                        edge.producer,
+                    )
+                    for edge in edges
+                ],
+            )
+
         with self._lock:
-            with sqlite_transaction(self._db):
-                self._db.execute(
-                    "DELETE FROM project_edge WHERE producer=?", (producer,)
-                )
-                self._db.execute(
-                    "DELETE FROM project_node WHERE producer=?", (producer,)
-                )
-                self._db.executemany(
-                    "INSERT INTO project_node(project_id,kind,root,manifest,producer,metadata) VALUES (?,?,?,?,?,?)",
-                    [
-                        (
-                            node.project_id,
-                            node.kind,
-                            node.root,
-                            node.manifest,
-                            node.producer,
-                            json.dumps(
-                                node.metadata, sort_keys=True, separators=(",", ":")
-                            ),
-                        )
-                        for node in nodes
-                    ],
-                )
-                self._db.executemany(
-                    "INSERT OR REPLACE INTO project_edge(source,target,kind,confidence,producer) VALUES (?,?,?,?,?)",
-                    [
-                        (
-                            edge.source,
-                            edge.target,
-                            edge.kind,
-                            edge.confidence,
-                            edge.producer,
-                        )
-                        for edge in edges
-                    ],
-                )
+            if self._publication_transaction_active:
+                replace_locked()
+            else:
+                with sqlite_transaction(self._db):
+                    replace_locked()
 
     def project_nodes(self) -> list[dict]:
         with self._lock:

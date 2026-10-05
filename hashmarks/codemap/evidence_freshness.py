@@ -76,6 +76,7 @@ class EvidenceFreshnessMixin:
         *,
         bind_generation: bool,
         manifests: Iterable[str] = (),
+        generation: int | None = None,
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -92,7 +93,9 @@ class EvidenceFreshnessMixin:
                 continue
             manifest_rows[rel] = self._manifest_digest(rel)
         value = {
-            "generation": self.store.generation(),
+            "generation": (
+                self.store.generation() if generation is None else int(generation)
+            ),
             "bind_generation": bool(bind_generation),
             "manifests": manifest_rows,
             "inadmissible_manifest_count": inadmissible_manifest_count,
@@ -102,6 +105,42 @@ class EvidenceFreshnessMixin:
             self._evidence_key(kind, producer),
             json.dumps(value, sort_keys=True, separators=(",", ":")),
         )
+
+    def _carry_forward_evidence_generation(
+        self, *, previous_generation: int, generation: int
+    ) -> None:
+        """Carry retained evidence across an enrichment-only generation publication.
+
+        Repository sync deliberately does not call this: changed repository rows
+        invalidate generation-bound native evidence. Enrichment publication changes
+        the admitted derived state without changing repository rows, so snapshots
+        already bound to the immediately previous generation remain valid unless
+        their own manifest checks say otherwise.
+        """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if generation != previous_generation + 1:
+            raise RuntimeError("enrichment generation must advance exactly once")
+        prefix = "native_evidence:"
+        for key, raw in self.store.meta_items(prefix=prefix):
+            try:
+                value = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(value, dict) or not bool(
+                value.get("bind_generation", False)
+            ):
+                continue
+            try:
+                recorded_generation = int(cast(Any, value.get("generation")))
+            except (TypeError, ValueError):
+                continue
+            if recorded_generation != previous_generation:
+                continue
+            value["generation"] = generation
+            self.store.set_meta(
+                key, json.dumps(value, sort_keys=True, separators=(",", ":"))
+            )
 
     def _evidence_snapshot(self, kind: str, producer: str) -> dict[str, object] | None:
         if TYPE_CHECKING:
