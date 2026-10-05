@@ -291,6 +291,10 @@ agentsCookbook owns benchmark configuration, suite/task selection, native-agent 
 
 `hashmarks.mcp_launch` owns the semantic Hashmarks stdio launch tuple: workspace binding, optional state-directory binding, the `mcp` subcommand, and the locked source-development `uv run --frozen --no-sync hashmarks` prefix. Installed-host registration, effective-registration inspection, host-status diagnostics, real-host qualification, and ChatGPT tunnel handoff must consume that owner instead of rebuilding the argv locally. Checked-in OpenCode, Claude/Pi, and Codex project files are host-syntax projections of the canonical source launch and must remain byte-level validation targets, not competing configuration owners.
 
+### MCP host-gate defaults belong to the gate scripts
+
+Each real-host qualification script owns its normal host executable, Python selector, receipt path, model/default-mode behavior, and safe-mode default. Make targets are convenience aliases only. They may pass the repository-wide `UV` executable and transport an explicitly supplied operator override, but they must not mirror the scripts' defaults. An unset Make override means “use the script owner,” not “restate the same value here.” Pi model choice remains Pi-native configuration rather than a Hashmarks Make default.
+
 ### Architecture guards resolve relative imports
 
 Product-boundary checks must inspect both absolute and package-relative imports. A relative import is not a valid way to reintroduce removed execution/agent-loop responsibilities into modern CodeMap/repository-intelligence code. Architecture tests must resolve imports to fully-qualified module ownership before classifying the dependency; textual spelling alone is not authority.
