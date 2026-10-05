@@ -149,6 +149,8 @@ Changing an exposed schema/version means changing the operation contract first. 
 
 Public semantic exposure is admitted through the same owner. MCP tool contracts fail construction when their operation is not registered, CLI semantic projection fails before printing an unknown operation, and public transport modules must not mint versioned `hashmarks.*.vN` semantic schemas locally. A future API or adapter must therefore register the operation contract first and project that registered response rather than introducing a transport-local schema identity.
 
+Registered fixed-mode core operations also self-prove their final packet before any transport receives it. Repository context, find, task evidence, change impact, evidence correlation, and post-change each validate the completed response against the canonical operation contract at the public core boundary. This validation is proof, not a second schema selector: producers still obtain schema identity from `operation_schema(...)`, while service, CLI, and MCP retain independent convergence checks over the same canonical mapping.
+
 ### Canonical MCP contract identity
 
 Hashmarks owns one transport-neutral `hashmarks.mcp-contract.v1` manifest. The manifest binds the Hashmarks server name and installed version, the server description and routing instructions, canonical tool order and descriptions, the native MCP input/output schemas, read-only annotations, and each tool's Hashmarks response-schema set. A canonical JSON SHA-256 becomes the `contract_identity`.
