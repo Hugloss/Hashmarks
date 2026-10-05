@@ -78,6 +78,30 @@ def test_structural_candidate_without_authority_requires_discrimination(
     assert packet["discrimination"]["reason"] == "ownership-unresolved"
 
 
+def test_decision_packet_build_guard_overrides_action_discrimination(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/adapter.py").write_text("class Adapter:\n    pass\n")
+    (tmp_path / "tests/test_adapter.py").write_text(
+        "from src.adapter import Adapter\ndef test_adapter(): assert Adapter\n"
+    )
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map("Adapter implementation test", limit=20)
+        assert action["action_discrimination"]["reason"] == "ownership-unresolved"
+        result = codemap._decision_packet_discrimination(
+            action=action,
+            verify=action["verify"],
+            build={"complete": False},
+        )
+
+    assert result["needed"] is True
+    assert result["reason"] == "codemap-generation-incomplete"
+
+
 def test_decision_packet_exposes_provenance_bound_verification_selection(
     tmp_path: Path,
 ) -> None:

@@ -94,30 +94,21 @@ class DecisionPacketMixin:
         action: Mapping[str, object],
         verify: Mapping[str, object] | None,
         build: Mapping[str, object],
-        limit: int,
     ) -> dict[str, object]:
-        """Describe whether repository evidence needs more discrimination without choosing consumer workflow."""
+        """Project canonical action discrimination with the packet-local build guard."""
         ambiguity = (
             action.get("ambiguity") if isinstance(action.get("ambiguity"), dict) else {}
         )
-        needed = False
-        reason = "resolved"
+        action_discrimination = action.get("action_discrimination")
+        if not isinstance(action_discrimination, Mapping):
+            raise AssertionError(
+                "task action map must provide canonical action_discrimination"
+            )
         if not bool(build.get("complete")):
             needed, reason = True, "codemap-generation-incomplete"
-        elif action.get("edit") is None:
-            needed, reason = True, "no-supported-owner-candidate"
-        elif bool(ambiguity.get("ambiguous")):
-            needed, reason = True, "competing-action-roles"
-        elif not bool(
-            (
-                action.get("ownership_authority")
-                if isinstance(action.get("ownership_authority"), Mapping)
-                else {}
-            ).get("owner_resolved")
-        ):
-            needed, reason = True, "ownership-unresolved"
-        elif verify is None:
-            needed, reason = True, "missing-verification-evidence"
+        else:
+            needed = bool(action_discrimination.get("needed"))
+            reason = str(action_discrimination.get("reason") or "resolved")
         candidate = (
             action.get("edit") if isinstance(action.get("edit"), Mapping) else None
         )
@@ -247,7 +238,6 @@ class DecisionPacketMixin:
             action=action,
             verify=verify,
             build=build,
-            limit=limit,
         )
 
         timing.begin_phase()

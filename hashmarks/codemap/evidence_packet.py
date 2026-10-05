@@ -178,33 +178,6 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         return chain or None
 
     @staticmethod
-    def _discrimination_reason(
-        action: Mapping[str, object],
-        edit: Mapping[str, object] | None,
-        verify: Mapping[str, object] | None,
-        *,
-        limit: int,
-    ) -> str | None:
-        """Describe unresolved repository evidence without selecting a consumer workflow."""
-        del limit
-        ambiguity = action.get("ambiguity")
-        ambiguity = ambiguity if isinstance(ambiguity, dict) else {}
-        if action.get("edit") is None:
-            return "no-supported-owner-candidate"
-        if bool(ambiguity.get("ambiguous")):
-            return "competing-action-roles"
-        authority = (
-            action.get("ownership_authority")
-            if isinstance(action.get("ownership_authority"), Mapping)
-            else {}
-        )
-        if not bool(authority.get("owner_resolved")):
-            return "ownership-unresolved"
-        if verify is None:
-            return "missing-verification-evidence"
-        return None
-
-    @staticmethod
     def _task_action_selected_rows(
         action: Mapping[str, object],
     ) -> tuple[
@@ -276,6 +249,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
+        del limit
         context = self.work_context(action, token_budget=token_budget)
         _generation, _identity_generation, stale = self._generation_status()
         edit, verify, contract = self._task_action_selected_rows(action)
@@ -326,11 +300,15 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         if missing:
             result["missing"] = missing
 
-        discrimination_reason = self._discrimination_reason(
-            action, edit, verify, limit=limit
-        )
-        if discrimination_reason is not None:
-            result["discrimination"] = discrimination_reason
+        action_discrimination = action.get("action_discrimination")
+        if not isinstance(action_discrimination, Mapping):
+            raise AssertionError(
+                "task action map must provide canonical action_discrimination"
+            )
+        if bool(action_discrimination.get("needed")):
+            result["discrimination"] = str(
+                action_discrimination.get("reason") or "unresolved"
+            )
         return result
 
     def _task_evidence_current_symbol(
