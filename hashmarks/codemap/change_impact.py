@@ -47,6 +47,9 @@ class ChangeImpactOptions:
         )
 
 
+CHANGE_IMPACT_DEFAULT_OPTIONS = ChangeImpactOptions()
+
+
 @dataclass(frozen=True)
 class _ImpactCandidate:
     path: str
@@ -584,7 +587,7 @@ class ChangeImpactMixin:
         *,
         limit: int = 20,
         per_role: int = 3,
-        options: ChangeImpactOptions = ChangeImpactOptions(),
+        options: ChangeImpactOptions = CHANGE_IMPACT_DEFAULT_OPTIONS,
     ) -> dict[str, object]:
         """Expose bounded changed-code impact and verification relevance.
 
