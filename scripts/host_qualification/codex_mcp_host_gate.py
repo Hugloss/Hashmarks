@@ -15,6 +15,7 @@ from hashmarks.mcp_contract import (
     MCP_BASIC_HOST_QUALIFICATION_TOOLS,
     qualification_response_schemas,
 )
+from hashmarks.mcp_launch import installed_mcp_command
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(SCRIPTS_DIR) not in sys.path:
@@ -46,11 +47,11 @@ def _trust_override(repo: Path) -> str:
 def _write_codex_config(repo: Path, hashmarks: Path) -> Path:
     path = repo / ".codex" / "config.toml"
     path.parent.mkdir(parents=True)
-    args = ["--workspace", str(repo), "mcp"]
-    rendered_args = ", ".join(json.dumps(value) for value in args)
+    launch = installed_mcp_command(hashmarks, repo)
+    rendered_args = ", ".join(json.dumps(value) for value in launch[1:])
     path.write_text(
         "[mcp_servers.hashmarks]\n"
-        f"command = {json.dumps(str(hashmarks))}\n"
+        f"command = {json.dumps(launch[0])}\n"
         f"args = [{rendered_args}]\n"
         "enabled = true\n",
         encoding="utf-8",
