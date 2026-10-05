@@ -182,7 +182,9 @@ class EvidenceFreshnessMixin:
                 return True
         return False
 
-    def _rebind_project_freshness(self, producer: str) -> int | None:
+    def _rebind_project_freshness(
+        self, producer: str, *, expected_generation: int | None = None
+    ) -> int | None:
         value = self._evidence_snapshot("project", producer)
         if value is None or bool(value.get("bind_generation", False)):
             return None
@@ -197,6 +199,14 @@ class EvidenceFreshnessMixin:
             return None
         with self.store.publication_transaction():
             previous_generation = self.store.generation()
+            if (
+                expected_generation is not None
+                and previous_generation != expected_generation
+            ):
+                raise RuntimeError(
+                    "CodeMap generation changed before project freshness rebind "
+                    f"({expected_generation} -> {previous_generation})"
+                )
             generation = self.store.bump_generation()
             self._carry_forward_evidence_generation(
                 previous_generation=previous_generation,
