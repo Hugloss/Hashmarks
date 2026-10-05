@@ -141,7 +141,9 @@ def test_core_operation_dispatchers_consume_canonical_mode_admission() -> None:
         ROOT / "hashmarks" / "codemap" / "repository_declarations.py"
     ).read_text(encoding="utf-8")
 
-    assert 'require_operation_mode("dependency_codemap", result_mode)' in dependency_source
+    assert (
+        'require_operation_mode("dependency_codemap", result_mode)' in dependency_source
+    )
     assert (
         'require_operation_mode("repository_declarations", result_mode)'
         in declarations_source
