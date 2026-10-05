@@ -483,9 +483,7 @@ class CodeMapService:
             1,
             100,
         )
-        max_depth = self._bounded_int(
-            request, "max_depth", defaults.max_depth, 1, 32
-        )
+        max_depth = self._bounded_int(request, "max_depth", defaults.max_depth, 1, 32)
         raw_limit = request.get("project_impact_limit", defaults.project_impact_limit)
         project_limit = None if raw_limit is None else int(raw_limit)
         if project_limit is not None and not 1 <= project_limit <= 100_000:
