@@ -582,6 +582,11 @@ class EvidenceGraphMixin:
         self._reverse_file_graph_cache = None
         return {
             "schema": "hashmarks.codemap-project-enrichment.v1",
+            "generation": (
+                self.store.generation()
+                if publication_generation is None
+                else publication_generation
+            ),
             "providers": results,
             "projects": self._fresh_project_nodes(),
             "edges": self._fresh_project_edges(),
