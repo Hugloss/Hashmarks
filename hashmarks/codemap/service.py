@@ -21,6 +21,7 @@ from hashmarks.paths import canonical_host_path
 
 from .change_impact import ChangeImpactOptions
 from .engine import CodeMap
+from .evidence_packet import TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
 from .post_change import PostChangeOptions
 from .repository_intelligence_query import RepositoryIntelligenceQueryOptions
 
