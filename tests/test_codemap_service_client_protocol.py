@@ -175,9 +175,51 @@ def test_service_routes_are_exhaustively_classified() -> None:
         if entry.classification == "canonical-semantic"
     }
     assert semantic == {
+        "repository_findings": ("repository_findings", "repository_findings"),
+        "import_ownership": ("import_ownership", "import_ownership"),
+        "cache_ownership": ("cache_ownership", "cache_ownership"),
+        "cache_invalidation_ownership": (
+            "cache_invalidation_ownership",
+            "cache_invalidation_ownership",
+        ),
+        "authority_ownership": ("repository_ownership", "authority_ownership"),
+        "concurrency_risk": ("concurrency_risk", "concurrency_risk"),
+        "verification_ownership": (
+            "verification_ownership",
+            "verification_ownership",
+        ),
+        "task_action_map": ("task_action_map", "action_map"),
+        "verification_relevance": (
+            "verification_relevance",
+            "verification_relevance",
+        ),
+        "ownership_relation_graph": (
+            "ownership_relation_graph",
+            "ownership_relation_graph",
+        ),
         "task_evidence": ("task_evidence", "task_evidence"),
         "task_change_impact": ("change_impact", "task_change_impact"),
+        "repository_intelligence_query": (
+            "repository_intelligence_query",
+            "repository_intelligence_query",
+        ),
         "task_post_change_delta": ("post_change", "post_change_delta"),
+        "refresh_after_change_delta": (
+            "refresh_after_change_delta",
+            "refresh_delta",
+        ),
+        "refresh_after_change_brief": (
+            "refresh_after_change_brief",
+            "refresh_brief",
+        ),
+        "refresh_after_change": ("refresh_after_change", "refresh"),
+        "task_decision_brief": ("task_decision_brief", "decision_brief"),
+        "task_action_brief": ("task_action_brief", "task_action_brief"),
+        "task_decision_brief_budget_sweep": (
+            "task_decision_brief_budget_sweep",
+            "budget_sweep",
+        ),
+        "task_decision_packet": ("task_decision_packet", "decision_packet"),
     }
     assert all(
         entry.classification in {"canonical-semantic", "internal-service"}
@@ -318,9 +360,51 @@ def test_canonical_service_admission_fails_before_work(
 @pytest.mark.parametrize(
     ("route", "handler_name", "response_key"),
     [
+        ("repository_findings", "_repository_findings_response", "repository_findings"),
+        ("import_ownership", "_import_ownership_response", "import_ownership"),
+        ("cache_ownership", "_cache_ownership_response", "cache_ownership"),
+        (
+            "cache_invalidation_ownership",
+            "_cache_invalidation_response",
+            "cache_invalidation_ownership",
+        ),
+        ("authority_ownership", "_authority_ownership_response", "authority_ownership"),
+        ("concurrency_risk", "_concurrency_risk_response", "concurrency_risk"),
+        (
+            "verification_ownership",
+            "_verification_ownership_response",
+            "verification_ownership",
+        ),
+        ("task_action_map", "_task_action_map_response", "action_map"),
+        (
+            "verification_relevance",
+            "_verification_relevance_response",
+            "verification_relevance",
+        ),
+        (
+            "ownership_relation_graph",
+            "_ownership_relation_response",
+            "ownership_relation_graph",
+        ),
         ("task_evidence", "_task_evidence_response", "task_evidence"),
         ("task_change_impact", "_change_impact_response", "task_change_impact"),
+        (
+            "repository_intelligence_query",
+            "_repository_intelligence_query_response",
+            "repository_intelligence_query",
+        ),
         ("task_post_change_delta", "_post_change_delta_response", "post_change_delta"),
+        ("refresh_after_change_delta", "_refresh_delta_response", "refresh_delta"),
+        ("refresh_after_change_brief", "_refresh_brief_response", "refresh_brief"),
+        ("refresh_after_change", "_refresh_response", "refresh"),
+        ("task_decision_brief", "_decision_brief_response", "decision_brief"),
+        ("task_action_brief", "_task_action_brief_response", "task_action_brief"),
+        (
+            "task_decision_brief_budget_sweep",
+            "_budget_sweep_response",
+            "budget_sweep",
+        ),
+        ("task_decision_packet", "_decision_packet_response", "decision_packet"),
     ],
 )
 def test_canonical_service_projection_rejects_schema_drift(
