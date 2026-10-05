@@ -1517,18 +1517,18 @@ class IndexingLifecycleMixin:
             return False
         return actual == str(row["file_digest"] or "")
 
-    def _path_refresh_required(self, relpath: str) -> bool:
-        """Return whether one indexed path must republish current authority."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        rel = normalize_relative_path(relpath, allow_root=False)
-        row = self.store.file_row(rel)
-        path = self.workspace / rel
-        if (
+    def _path_unavailable(self, rel: str, path: Path) -> bool:
+        return (
             not self._path_admitted_for_analysis(rel)
             or path.is_symlink()
             or not path.is_file()
-        ):
+        )
+
+    def _path_refresh_required(self, relpath: str) -> bool:
+        rel = normalize_relative_path(relpath, allow_root=False)
+        row = self.store.file_row(rel)
+        path = self.workspace / rel
+        if self._path_unavailable(rel, path):
             return row is not None
         language = _language_for_path(path)
         if language is None:
@@ -1557,20 +1557,13 @@ class IndexingLifecycleMixin:
         )
 
     def _refresh_path_current(self, relpath: str) -> None:
-        """Atomically publish one path refresh before a read-only decision binds."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         rel = normalize_relative_path(relpath, allow_root=False)
         with self.store.publication_transaction():
             if not self._path_refresh_required(rel):
                 return
             row = self.store.file_row(rel)
             path = self.workspace / rel
-            if (
-                not self._path_admitted_for_analysis(rel)
-                or path.is_symlink()
-                or not path.is_file()
-            ):
+            if self._path_unavailable(rel, path):
                 if row is None:
                     return
                 self.store.delete_paths((rel,))
@@ -1584,9 +1577,7 @@ class IndexingLifecycleMixin:
                     workspace=self.workspace,
                     relative_path=rel,
                 )
-                artifact, _ = self._parse_or_reuse(
-                    rel, path, language, digest.hash
-                )
+                artifact, _ = self._parse_or_reuse(rel, path, language, digest.hash)
                 self.store.set_file(
                     rel,
                     artifact,
@@ -1602,11 +1593,8 @@ class IndexingLifecycleMixin:
             )
 
     def _ensure_path_current(self, relpath: str) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         rel = normalize_relative_path(relpath, allow_root=False)
-        if not self._path_refresh_required(rel):
-            return
-        if self._decision_session_depth > 0:
-            raise DecisionRefreshRequired(rel)
-        self._refresh_path_current(rel)
+        if self._path_refresh_required(rel):
+            if self._decision_session_depth > 0:
+                raise DecisionRefreshRequired(rel)
+            self._refresh_path_current(rel)
