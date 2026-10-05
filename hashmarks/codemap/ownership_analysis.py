@@ -4,6 +4,7 @@ import ast
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 from hashmarks.python_ast_cache import read_python_ast
 
@@ -105,7 +106,7 @@ class OwnershipAnalysisMixin:
         warnings = sum(1 for finding in findings if finding["severity"] == "warning")
         advisories = len(findings) - warnings
         return {
-            "schema": "hashmarks.import-ownership.v2",
+            "schema": operation_schema("import_ownership"),
             "generation": generation,
             "identity_generation": identity_generation,
             "stale": stale,
@@ -118,6 +119,7 @@ class OwnershipAnalysisMixin:
             "findings": findings,
         }
 
+    @operation_response("import_ownership")
     @decision_scoped
     def import_ownership_findings(
         self, paths: Sequence[str] | None = None
@@ -141,7 +143,7 @@ class OwnershipAnalysisMixin:
             "line": finding["line"],
             "reason": finding["reason"],
             "recommendation": finding["recommendation"],
-            "source_schema": "hashmarks.import-ownership.v2",
+            "source_schema": operation_schema("import_ownership"),
             "evidence": dict(finding),
         }
 
@@ -158,7 +160,7 @@ class OwnershipAnalysisMixin:
             "line": finding["line"],
             "reason": finding["reason"],
             "recommendation": finding["recommendation"],
-            "source_schema": "hashmarks.concurrency-risk.v1",
+            "source_schema": operation_schema("concurrency_risk"),
             "evidence": dict(finding),
         }
 
@@ -175,7 +177,7 @@ class OwnershipAnalysisMixin:
             "line": owner["line"],
             "reason": owner["reason"],
             "recommendation": owner["recommendation"],
-            "source_schema": "hashmarks.cache-ownership.v1",
+            "source_schema": operation_schema("cache_ownership"),
             "evidence": dict(owner),
         }
 
@@ -202,6 +204,7 @@ class OwnershipAnalysisMixin:
         }
         return result
 
+    @operation_response("repository_findings")
     @decision_scoped
     def repository_findings(
         self, paths: Sequence[str] | None = None
@@ -259,7 +262,7 @@ class OwnershipAnalysisMixin:
             categories[category] = categories.get(category, 0) + 1
         generation, identity_generation, stale = self._generation_status()
         return {
-            "schema": "hashmarks.repository-findings.v1",
+            "schema": operation_schema("repository_findings"),
             "generation": generation,
             "identity_generation": identity_generation,
             "stale": stale,
@@ -338,7 +341,7 @@ class OwnershipAnalysisMixin:
             )
         generation, identity_generation, stale = self._generation_status()
         return {
-            "schema": "hashmarks.concurrency-risk.v1",
+            "schema": operation_schema("concurrency_risk"),
             "generation": generation,
             "identity_generation": identity_generation,
             "stale": stale,
@@ -351,6 +354,7 @@ class OwnershipAnalysisMixin:
             "boundary": "static risk nomination only; concurrency admission/execution remains external",
         }
 
+    @operation_response("concurrency_risk")
     @decision_scoped
     def concurrency_risk_findings(
         self, paths: Sequence[str] | None = None
@@ -621,6 +625,7 @@ class OwnershipAnalysisMixin:
         concurrency_result = self._concurrency_risk_findings(normalized, all_rows)
         return import_result, cache_result, invalidation_result, concurrency_result
 
+    @operation_response("repository_ownership")
     @decision_scoped
     def repository_ownership_graph(
         self, paths: Sequence[str] | None = None
@@ -648,7 +653,7 @@ class OwnershipAnalysisMixin:
         ambiguous = sorted(cache_ids - resolved)
         generation, identity_generation, stale = self._generation_status()
         return {
-            "schema": "hashmarks.authority-ownership-graph.v3",
+            "schema": operation_schema("repository_ownership"),
             "generation": generation,
             "identity_generation": identity_generation,
             "stale": stale,
@@ -810,7 +815,7 @@ class OwnershipAnalysisMixin:
         unresolved = sorted(cid for cid in owner_ids.values() if cid not in invalidated)
         generation, identity_generation, stale = self._generation_status()
         return {
-            "schema": "hashmarks.cache-invalidation-ownership.v1",
+            "schema": operation_schema("cache_invalidation_ownership"),
             "generation": generation,
             "identity_generation": identity_generation,
             "stale": stale,
@@ -836,6 +841,7 @@ class OwnershipAnalysisMixin:
             "boundary": "repository-evidence-only; cache mutation/execution authority remains external",
         }
 
+    @operation_response("cache_invalidation_ownership")
     @decision_scoped
     def cache_invalidation_ownership_graph(
         self, paths: Sequence[str] | None = None
@@ -930,7 +936,7 @@ class OwnershipAnalysisMixin:
         risky = sum(1 for f in findings if f["import_identity_risk"])
         unresolved = sum(1 for f in findings if f["invalidation"] == "not-proven")
         return {
-            "schema": "hashmarks.cache-ownership.v1",
+            "schema": operation_schema("cache_ownership"),
             "generation": generation,
             "identity_generation": identity_generation,
             "stale": stale,
@@ -943,6 +949,7 @@ class OwnershipAnalysisMixin:
             "owners": findings,
         }
 
+    @operation_response("cache_ownership")
     @decision_scoped
     def cache_ownership_findings(
         self, paths: Sequence[str] | None = None
