@@ -380,56 +380,57 @@ class PostChangeMixin(ChangeImpactMixin):
             )
         )
         sync_result = self.sync(normalized)
-        current, provenance, ownership_status = self._post_change_current_evidence(
-            task,
-            limit=limit,
-            per_role=per_role,
-            token_budget=token_budget,
-        )
-        invalidated, reused, replacement = self._post_change_evidence_diff(
-            previous_evidence,
-            current,
-            previous_provenance,
-            provenance,
-            generation_changed=sync_result.generation != generation_before,
-            previous_revision=previous_revision,
-        )
-        result: dict[str, object] = {
-            "schema": operation_schema("post_change"),
-            "change": "changed" if invalidated else "unchanged",
-            "ownership_status": ownership_status,
-            "path_changes": self._post_change_path_changes(
-                normalized, before_revisions
-            ),
-            "generation_before": generation_before,
-            "generation_after": sync_result.generation,
-            "invalidated": invalidated,
-            "reused": reused,
-            "freshness": str(
-                current["freshness"].get("state") or "unknown"
-                if isinstance(current.get("freshness"), Mapping)
-                else "unknown"
-            ),
-            "scope": "changed-paths-only",
-            "consumer_owner": "external",
-        }
-        if previous_index_binding != "current":
-            result["previous_index_binding"] = previous_index_binding
-        if any(
-            (
-                sync_result.derived_surfaces_changed,
-                sync_result.derived_surfaces_preserved,
-                sync_result.semantic_invalidation_shields,
+        with self.decision_session(expected_generation=sync_result.generation):
+            current, provenance, ownership_status = self._post_change_current_evidence(
+                task,
+                limit=limit,
+                per_role=per_role,
+                token_budget=token_budget,
             )
-        ):
-            result["semantic_invalidation"] = {
-                "changed": sync_result.derived_surfaces_changed,
-                "preserved": sync_result.derived_surfaces_preserved,
-                "shields": sync_result.semantic_invalidation_shields,
+            invalidated, reused, replacement = self._post_change_evidence_diff(
+                previous_evidence,
+                current,
+                previous_provenance,
+                provenance,
+                generation_changed=sync_result.generation != generation_before,
+                previous_revision=previous_revision,
+            )
+            result: dict[str, object] = {
+                "schema": operation_schema("post_change"),
+                "change": "changed" if invalidated else "unchanged",
+                "ownership_status": ownership_status,
+                "path_changes": self._post_change_path_changes(
+                    normalized, before_revisions
+                ),
+                "generation_before": generation_before,
+                "generation_after": sync_result.generation,
+                "invalidated": invalidated,
+                "reused": reused,
+                "freshness": str(
+                    current["freshness"].get("state") or "unknown"
+                    if isinstance(current.get("freshness"), Mapping)
+                    else "unknown"
+                ),
+                "scope": "changed-paths-only",
+                "consumer_owner": "external",
             }
-        if replacement:
-            result["replacement"] = replacement
-        return validate_operation_response("post_change", result)
+            if previous_index_binding != "current":
+                result["previous_index_binding"] = previous_index_binding
+            if any(
+                (
+                    sync_result.derived_surfaces_changed,
+                    sync_result.derived_surfaces_preserved,
+                    sync_result.semantic_invalidation_shields,
+                )
+            ):
+                result["semantic_invalidation"] = {
+                    "changed": sync_result.derived_surfaces_changed,
+                    "preserved": sync_result.derived_surfaces_preserved,
+                    "shields": sync_result.semantic_invalidation_shields,
+                }
+            if replacement:
+                result["replacement"] = replacement
+            return validate_operation_response("post_change", result)
 
     @operation_response("refresh_after_change_delta")
     def refresh_after_change_delta(
@@ -453,48 +454,53 @@ class PostChangeMixin(ChangeImpactMixin):
             )
         before = self.store.generation()
         sync_result = self.sync(normalized)
-        brief = self.task_decision_brief(
-            task,
-            limit=options.limit,
-            per_role=options.per_role,
-            token_budget=options.token_budget,
-        )
-        edit = brief.get("edit") if isinstance(brief.get("edit"), dict) else None
-        verify = brief.get("verify") if isinstance(brief.get("verify"), dict) else None
-        current_edit = str(edit.get("path")) if edit and edit.get("path") else None
-        current_verify = (
-            str(verify.get("path")) if verify and verify.get("path") else None
-        )
-        prior_edit = (
-            normalize_relative_path(options.previous_edit_path, allow_root=False)
-            if options.previous_edit_path
-            else None
-        )
-        prior_verify = (
-            normalize_relative_path(options.previous_verify_path, allow_root=False)
-            if options.previous_verify_path
-            else None
-        )
-        result: dict[str, object] = {
-            "schema": operation_schema("refresh_after_change_delta"),
-            "changed_paths": list(normalized),
-            "generation": sync_result.generation,
-        }
-        if edit is not None and current_edit != prior_edit:
-            result["edit"] = dict(edit)
-            owner_path = brief.get("owner_path")
-            if isinstance(owner_path, list) and owner_path:
-                result["owner_path"] = list(owner_path)
-        if verify is not None and current_verify != prior_verify:
-            result["verify"] = dict(verify)
-            argv = brief.get("verification_argv")
-            if isinstance(argv, list):
-                result["verification_argv"] = list(argv)
-        if bool(brief.get("stale")):
-            result["stale"] = True
-        if not bool(brief.get("safe", True)):
-            result["safe"] = False
-        return result
+        with self.decision_session(expected_generation=sync_result.generation):
+            brief = self.task_decision_brief(
+                task,
+                limit=options.limit,
+                per_role=options.per_role,
+                token_budget=options.token_budget,
+            )
+            edit = brief.get("edit") if isinstance(brief.get("edit"), dict) else None
+            verify = (
+                brief.get("verify") if isinstance(brief.get("verify"), dict) else None
+            )
+            current_edit = str(edit.get("path")) if edit and edit.get("path") else None
+            current_verify = (
+                str(verify.get("path")) if verify and verify.get("path") else None
+            )
+            prior_edit = (
+                normalize_relative_path(options.previous_edit_path, allow_root=False)
+                if options.previous_edit_path
+                else None
+            )
+            prior_verify = (
+                normalize_relative_path(
+                    options.previous_verify_path, allow_root=False
+                )
+                if options.previous_verify_path
+                else None
+            )
+            result: dict[str, object] = {
+                "schema": operation_schema("refresh_after_change_delta"),
+                "changed_paths": list(normalized),
+                "generation": sync_result.generation,
+            }
+            if edit is not None and current_edit != prior_edit:
+                result["edit"] = dict(edit)
+                owner_path = brief.get("owner_path")
+                if isinstance(owner_path, list) and owner_path:
+                    result["owner_path"] = list(owner_path)
+            if verify is not None and current_verify != prior_verify:
+                result["verify"] = dict(verify)
+                argv = brief.get("verification_argv")
+                if isinstance(argv, list):
+                    result["verification_argv"] = list(argv)
+            if bool(brief.get("stale")):
+                result["stale"] = True
+            if not bool(brief.get("safe", True)):
+                result["safe"] = False
+            return result
 
     @operation_response("refresh_after_change_brief")
     def refresh_after_change_brief(
@@ -523,22 +529,23 @@ class PostChangeMixin(ChangeImpactMixin):
         started = time.perf_counter()
         sync_result = self.sync(normalized)
         refresh_ms = (time.perf_counter() - started) * 1000.0
-        brief = self.task_decision_brief(
-            task,
-            limit=limit,
-            per_role=per_role,
-            token_budget=token_budget,
-        )
-        return {
-            "schema": operation_schema("refresh_after_change_brief"),
-            "changed_paths": list(normalized),
-            "generation_before": before,
-            "generation_after": sync_result.generation,
-            "refresh_ms": refresh_ms,
-            "decision_brief": brief,
-            "scope": "changed-paths-only",
-            "consumer_owner": "external",
-        }
+        with self.decision_session(expected_generation=sync_result.generation):
+            brief = self.task_decision_brief(
+                task,
+                limit=limit,
+                per_role=per_role,
+                token_budget=token_budget,
+            )
+            return {
+                "schema": operation_schema("refresh_after_change_brief"),
+                "changed_paths": list(normalized),
+                "generation_before": before,
+                "generation_after": sync_result.generation,
+                "refresh_ms": refresh_ms,
+                "decision_brief": brief,
+                "scope": "changed-paths-only",
+                "consumer_owner": "external",
+            }
 
     @operation_response("refresh_after_change")
     def refresh_after_change(
@@ -571,20 +578,21 @@ class PostChangeMixin(ChangeImpactMixin):
         started = time.perf_counter()
         sync_result = self.sync(normalized)
         refresh_ms = (time.perf_counter() - started) * 1000.0
-        packet = self.task_decision_packet(
-            task,
-            limit=limit,
-            per_role=per_role,
-            token_budget=token_budget,
-        )
-        return {
-            "schema": operation_schema("refresh_after_change"),
-            "changed_paths": list(normalized),
-            "generation_before": before,
-            "generation_after": sync_result.generation,
-            "refresh_ms": refresh_ms,
-            "sync": sync_result.as_dict(),
-            "packet": packet,
-            "scope": "changed-paths-only",
-            "consumer_owner": "external",
-        }
+        with self.decision_session(expected_generation=sync_result.generation):
+            packet = self.task_decision_packet(
+                task,
+                limit=limit,
+                per_role=per_role,
+                token_budget=token_budget,
+            )
+            return {
+                "schema": operation_schema("refresh_after_change"),
+                "changed_paths": list(normalized),
+                "generation_before": before,
+                "generation_after": sync_result.generation,
+                "refresh_ms": refresh_ms,
+                "sync": sync_result.as_dict(),
+                "packet": packet,
+                "scope": "changed-paths-only",
+                "consumer_owner": "external",
+            }
