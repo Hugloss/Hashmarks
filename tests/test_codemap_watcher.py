@@ -9,6 +9,11 @@ from pathlib import Path
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.index_watch import _IndexWatchSession
+from hashmarks.codemap.watch_continuity import (
+    WATCH_CONTINUITY_META,
+    WatchContinuityRecord,
+)
 
 
 def _write_repo(root: Path) -> None:
@@ -116,6 +121,93 @@ def test_watcher_shutdown_does_nothing_after_process_exit() -> None:
     _stop_watcher(proc)  # type: ignore[arg-type]
 
     assert proc.calls == [("poll",)]
+
+
+def test_watcher_continuity_is_one_atomic_freshness_authority(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_repo(tmp_path)
+    state = tmp_path / ".state"
+    with CodeMap(
+        tmp_path,
+        state_dir=state,
+        artifact_db=tmp_path / "artifacts.sqlite3",
+    ) as codemap:
+        codemap.sync()
+        monkeypatch.setattr(codemap, "_daemon_observation", lambda: None)
+        session = _IndexWatchSession(codemap, None)
+        assert session.tracker.mark_reconciled(expected_generation=0)
+        session.publish()
+
+        items = dict(codemap.store.meta_items(prefix="watcher"))
+        assert set(items) == {WATCH_CONTINUITY_META}
+        record = WatchContinuityRecord.from_json(items[WATCH_CONTINUITY_META])
+        assert record is not None
+        assert record.observation.state.value == "clean"
+        assert record.codemap_generation == codemap.store.generation()
+
+        codemap.store.set_meta("watcher_pid", "999999")
+        codemap.store.set_meta("watcher_state", "dirty")
+        codemap.store.set_meta("watcher_heartbeat_unix", "0")
+        status = codemap.status()
+        assert status["daemon_generation_changed"] is False
+        assert status["watcher"]["state"] == "clean"
+
+        session.tracker.mark_dirty(["src/auth.py"])
+        session.publish()
+        assert codemap.status()["daemon_generation_changed"] is True
+
+        session.tracker.mark_unknown("synthetic overflow")
+        session.publish()
+        status = codemap.status()
+        assert status["daemon_generation_changed"] is None
+        assert status["watcher"]["state"] == "unknown"
+        assert status["watcher"]["reason"] == "synthetic overflow"
+
+
+def test_clean_watcher_observation_only_covers_its_published_codemap_generation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_repo(tmp_path)
+    with CodeMap(
+        tmp_path,
+        state_dir=tmp_path / ".state",
+        artifact_db=tmp_path / "artifacts.sqlite3",
+    ) as codemap:
+        codemap.sync()
+        monkeypatch.setattr(codemap, "_daemon_observation", lambda: None)
+        session = _IndexWatchSession(codemap, None)
+        assert session.tracker.mark_reconciled(expected_generation=0)
+        session.publish()
+        assert codemap.status()["daemon_generation_changed"] is False
+
+        with codemap.store.publication_transaction():
+            codemap.store.bump_generation()
+
+        status = codemap.status()
+        assert status["daemon_generation_changed"] is None
+        assert status["watcher"]["codemap_generation"] != status["generation"]
+
+
+def test_inactive_watcher_observation_cannot_authorize_current_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_repo(tmp_path)
+    with CodeMap(
+        tmp_path,
+        state_dir=tmp_path / ".state",
+        artifact_db=tmp_path / "artifacts.sqlite3",
+    ) as codemap:
+        codemap.sync()
+        monkeypatch.setattr(codemap, "_daemon_observation", lambda: None)
+        session = _IndexWatchSession(codemap, None)
+        assert session.tracker.mark_reconciled(expected_generation=0)
+        session.publish(active=False)
+
+        status = codemap.status()
+        assert status["daemon_generation_changed"] is None
+        assert status["watcher"]["active"] is False
+        assert status["watcher"]["pid"] is None
 
 
 def test_codemap_watcher_keeps_map_hot_without_identity_daemon(tmp_path: Path):
