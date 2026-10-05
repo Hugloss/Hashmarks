@@ -84,3 +84,35 @@ def test_basic_qualification_request_binds_fixture_arguments() -> None:
             {"query": "other", "limit": 5},
             host="fixture",
         )
+
+
+def test_basic_qualification_proof_roundtrips_semantic_authority() -> None:
+    proof = common.basic_qualification_proof(
+        generation=7,
+        find_paths={"src/feature.py", "tests/test_feature.py"},
+    )
+
+    assert common.validate_basic_qualification_proof(proof) is None
+    assert proof["repository_context"] == {
+        "schema": "hashmarks.repository-capsule.v1",
+        "generation": 7,
+    }
+    assert proof["find"] == {
+        "schema": "hashmarks.find.v2",
+        "paths": ["src/feature.py", "tests/test_feature.py"],
+    }
+
+
+def test_basic_qualification_proof_rejects_missing_or_wrong_semantics() -> None:
+    assert (
+        common.validate_basic_qualification_proof(None)
+        == "receipt predates semantic qualification proof"
+    )
+
+    proof = common.basic_qualification_proof(
+        generation=1,
+        find_paths={"src/wrong.py"},
+    )
+    error = common.validate_basic_qualification_proof(proof)
+    assert error is not None
+    assert "src/feature.py" in error
