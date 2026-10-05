@@ -181,7 +181,6 @@ def source_binding(project_root: Path, registration_path: Path) -> dict[str, Any
     }
 
 
-
 _BASIC_QUALIFICATION_REQUESTS: dict[str, dict[str, object]] = {
     "repository_context": {"max_areas": 8},
     "find": {"query": "flare041", "limit": 5},
