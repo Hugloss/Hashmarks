@@ -29,12 +29,8 @@ class _PublicationHarness:
             "def after_owner():\n    return 'after'\n",
             encoding="utf-8",
         )
-        self.writer_a = CodeMap(
-            root, state_dir=self.state, artifact_db=self.artifacts
-        )
-        self.writer_b = CodeMap(
-            root, state_dir=self.state, artifact_db=self.artifacts
-        )
+        self.writer_a = CodeMap(root, state_dir=self.state, artifact_db=self.artifacts)
+        self.writer_b = CodeMap(root, state_dir=self.state, artifact_db=self.artifacts)
         self.reader = CodeMap(root, state_dir=self.state, artifact_db=self.artifacts)
         self.a_entered = threading.Event()
         self.a_release = threading.Event()
