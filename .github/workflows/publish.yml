@@ -246,17 +246,8 @@ jobs:
       - run: uv python install 3.14
       - name: Materialize locked Hashmarks + MCP runtime
         run: uv sync --frozen --extra mcp --python 3.14
-      - name: Add pinned standalone packager
-        run: uv pip install --python .venv/bin/python "pyinstaller==6.22.3"
       - name: Build self-contained executable
-        run: |
-          .venv/bin/pyinstaller \
-            --clean \
-            --noconfirm \
-            --onefile \
-            --name hashmarks \
-            --collect-all hashmarks \
-            scripts/hashmarks_entrypoint.py
+        run: uv run --frozen --no-sync python scripts/standalone_build.py
       - name: Smoke standalone CLI and MCP
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
@@ -326,19 +317,9 @@ jobs:
       - run: uv python install 3.14
       - name: Materialize locked Hashmarks + MCP runtime
         run: uv sync --frozen --extra mcp --python 3.14
-      - name: Add pinned standalone packager
-        shell: pwsh
-        run: uv pip install --python .venv\Scripts\python.exe "pyinstaller==6.22.3"
       - name: Build self-contained executable
         shell: pwsh
-        run: |
-          & .venv\Scripts\pyinstaller.exe `
-            --clean `
-            --noconfirm `
-            --onefile `
-            --name hashmarks `
-            --collect-all hashmarks `
-            scripts/hashmarks_entrypoint.py
+        run: uv run --frozen --no-sync python scripts\standalone_build.py
       - name: Smoke standalone CLI, MCP, install, and upgrade
         shell: pwsh
         env:
