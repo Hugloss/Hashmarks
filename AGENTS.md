@@ -320,6 +320,10 @@ Tests that only validate projections, tamper rejection, authority fields, or con
 
 The full-suite runtime profile is owned by `make test-profile` and reports the slowest 25 pytest phases taking at least one second. Duration alone never changes PASS/FAIL semantics, and slow-test optimization must preserve the proof scope required by the tested contract. Do not duplicate duration flags across qualification entrypoints or introduce production caches solely to improve test timing.
 
+### Hosted diagnostic launch defaults have one owner
+
+`scripts.hosted_diagnostic` owns the normal constrained-host shard count, start index, optional limit, extra-marker default, and capability-mode default. Make targets may choose the interpreter, define Make-specific batch/shard selectors, and transport an explicitly supplied `DIAGNOSTIC_SHARDS` or `DIAGNOSTIC_EXTRA_MARKER` override, but they must not mirror the script's semantic defaults. An unset override means “use the hosted-diagnostic parser owner.”
+
 ### Development-tool configuration has one owner
 
 `pyproject.toml` owns the Ruff dependency and rule configuration. Developer hooks, Make targets, and CI must invoke that configured Ruff rather than maintaining parallel min/latest compatibility paths. Do not add tests whose only assertion is that tool configuration, docs, and version strings agree. If a real tool upgrade breaks Hashmarks behavior, reproduce the failure and change the single project declaration or the affected behavior. Ruff remains diagnostic-only and never creates or transfers canonical promotion authority.
