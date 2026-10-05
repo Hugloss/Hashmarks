@@ -217,6 +217,104 @@ def test_inactive_watcher_observation_cannot_authorize_current_state(
         assert status["watcher"]["pid"] is None
 
 
+def test_second_live_watcher_cannot_claim_continuity_authority(
+    tmp_path: Path,
+) -> None:
+    _write_repo(tmp_path)
+    with CodeMap(
+        tmp_path,
+        state_dir=tmp_path / ".state",
+        artifact_db=tmp_path / "artifacts.sqlite3",
+    ) as codemap:
+        codemap.sync()
+        first = _IndexWatchSession(codemap, None)
+        first.acquire()
+        second = _IndexWatchSession(codemap, None)
+
+        with pytest.raises(WatchLeaseHeldError, match="already owned"):
+            second.acquire()
+
+        record = WatchContinuityRecord.from_json(
+            codemap.store.meta(WATCH_CONTINUITY_META)
+        )
+        assert record is not None
+        assert record.owner == first.owner
+        assert record.fence == first.fence
+        first.release()
+
+
+def test_replacement_fence_blocks_stale_clean_overwrite(
+    tmp_path: Path,
+) -> None:
+    _write_repo(tmp_path)
+    with CodeMap(
+        tmp_path,
+        state_dir=tmp_path / ".state",
+        artifact_db=tmp_path / "artifacts.sqlite3",
+    ) as codemap:
+        codemap.sync()
+        first = _IndexWatchSession(codemap, None)
+        assert first.tracker.mark_reconciled(expected_generation=0)
+        first.acquire()
+
+        first_record = WatchContinuityRecord.from_json(
+            codemap.store.meta(WATCH_CONTINUITY_META)
+        )
+        assert first_record is not None
+        expired = WatchContinuityRecord(
+            owner=first_record.owner,
+            fence=first_record.fence,
+            pid=first_record.pid,
+            heartbeat_unix=0.0,
+            active=True,
+            codemap_generation=first_record.codemap_generation,
+            observation=first_record.observation,
+        )
+        codemap.store.set_meta(WATCH_CONTINUITY_META, expired.to_json())
+
+        replacement = _IndexWatchSession(codemap, None)
+        replacement.tracker.mark_dirty(["src/auth.py"])
+        replacement.acquire()
+
+        replacement_record = WatchContinuityRecord.from_json(
+            codemap.store.meta(WATCH_CONTINUITY_META)
+        )
+        assert replacement_record is not None
+        assert replacement_record.owner == replacement.owner
+        assert replacement_record.fence == first_record.fence + 1
+        assert replacement_record.observation.state.value == "dirty"
+
+        with pytest.raises(WatchLeaseLostError, match="replaced"):
+            first.publish()
+
+        first.release()
+        final_record = WatchContinuityRecord.from_json(
+            codemap.store.meta(WATCH_CONTINUITY_META)
+        )
+        assert final_record == replacement_record
+        replacement.release()
+
+
+def test_released_watcher_advances_fence_on_next_claim(tmp_path: Path) -> None:
+    _write_repo(tmp_path)
+    with CodeMap(
+        tmp_path,
+        state_dir=tmp_path / ".state",
+        artifact_db=tmp_path / "artifacts.sqlite3",
+    ) as codemap:
+        codemap.sync()
+        first = _IndexWatchSession(codemap, None)
+        first.acquire()
+        first_fence = first.fence
+        first.release()
+
+        second = _IndexWatchSession(codemap, None)
+        second.acquire()
+        assert first_fence is not None
+        assert second.fence == first_fence + 1
+        second.release()
+
+
 def test_codemap_watcher_keeps_map_hot_without_identity_daemon(tmp_path: Path):
     if not sys.platform.startswith("linux"):
         pytest.skip("native watcher regression is Linux-specific")
