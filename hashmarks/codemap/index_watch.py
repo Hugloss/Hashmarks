@@ -3,12 +3,15 @@ from __future__ import annotations
 import os
 import threading
 import time
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.observation import ChangeTracker, ObservationState
 from hashmarks.watcher import create_default_watcher
+
+from .watch_continuity import WATCH_CONTINUITY_META, watch_record_from_snapshot
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -22,11 +25,18 @@ class _IndexWatchSession:
     on_update: Callable[[object, list[str]], None] | None
     tracker: ChangeTracker = field(default_factory=ChangeTracker)
     update_lock: threading.RLock = field(default_factory=threading.RLock)
+    owner: str = field(default_factory=lambda: uuid.uuid4().hex)
 
-    def publish(self, state: str) -> None:
-        self.codemap.store.set_meta("watcher_pid", str(os.getpid()))
-        self.codemap.store.set_meta("watcher_state", state)
-        self.codemap.store.set_meta("watcher_heartbeat_unix", str(time.time()))
+    def publish(self, *, active: bool = True) -> None:
+        record = watch_record_from_snapshot(
+            self.tracker.snapshot(),
+            owner=self.owner,
+            pid=os.getpid(),
+            heartbeat_unix=time.time(),
+            active=active,
+            codemap_generation=self.codemap.store.generation(),
+        )
+        self.codemap.store.set_meta(WATCH_CONTINUITY_META, record.to_json())
 
     def reconcile(self, paths: list[str]) -> None:
         with self.update_lock:
@@ -34,8 +44,8 @@ class _IndexWatchSession:
             result = self.codemap.sync(
                 None if before.state is ObservationState.UNKNOWN else paths
             )
-            clean = self.tracker.mark_reconciled(expected_generation=before.generation)
-            self.publish("clean" if clean else "dirty")
+            self.tracker.mark_reconciled(expected_generation=before.generation)
+            self.publish()
             if self.on_update is not None:
                 self.on_update(result, paths)
 
@@ -45,10 +55,10 @@ class _IndexWatchSession:
             with self.update_lock:
                 snapshot = self.tracker.snapshot()
                 if snapshot.state is ObservationState.UNKNOWN:
-                    self.publish("reconciling")
+                    self.publish()
                     self.reconcile([])
                     return
-        self.publish(snapshot.state.value)
+        self.publish()
 
 
 class IndexWatchMixin:
@@ -82,7 +92,7 @@ class IndexWatchMixin:
             exclude_relative_paths=exclude,
         )
         watcher.start()
-        session.publish("reconciling")
+        session.publish()
         try:
             # Observer starts first so the cold scan has no uncovered gap.
             initial = self.sync()
@@ -90,7 +100,7 @@ class IndexWatchMixin:
             session.tracker.mark_reconciled(
                 expected_generation=session.tracker.snapshot().generation
             )
-            session.publish("clean")
+            session.publish()
             if on_update is not None:
                 on_update(initial, [])
 
@@ -101,6 +111,5 @@ class IndexWatchMixin:
             return
         finally:
             watcher.stop()
-            self.store.set_meta("watcher_state", "stopped")
-            self.store.set_meta("watcher_heartbeat_unix", str(time.time()))
-            self.store.set_meta("watcher_pid", "")
+            session.tracker.mark_unknown("watcher stopped")
+            session.publish(active=False)
