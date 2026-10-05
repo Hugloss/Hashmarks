@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.digest import hash_file
 from hashmarks.evidence_context import evidence_context_identity
-from hashmarks.operation_contract import operation_schema, validate_operation_response
+from hashmarks.operation_contract import (
+    operation_response,
+    operation_schema,
+    validate_operation_response,
+)
 
 from .configuration_evidence import ConfigurationEvidenceMixin
 from .decision_session import decision_scoped
@@ -44,6 +48,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             row["symbol"] = str(symbol)
         return row
 
+    @operation_response("task_decision_brief")
     @decision_scoped
     def task_decision_brief(
         self,
@@ -102,7 +107,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             else []
         )
         result: dict[str, object] = {
-            "schema": "hashmarks.task-decision-brief.v1",
+            "schema": operation_schema("task_decision_brief"),
             "edit": edit,
             "candidate": candidate,
             "verify": verify,
@@ -261,7 +266,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             and bool(verification.get("available"))
         )
         result: dict[str, object] = {
-            "schema": "hashmarks.task-action-brief.v1",
+            "schema": operation_schema("task_action_brief"),
             "status": (
                 "unsafe"
                 if not safe
@@ -1289,6 +1294,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         )
         return validate_operation_response("task_evidence", result)
 
+    @operation_response("task_action_brief")
     @decision_scoped
     def task_action_brief(
         self,
@@ -1341,6 +1347,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             limit=limit,
         )
 
+    @operation_response("task_decision_brief_budget_sweep")
     def task_decision_brief_budget_sweep(
         self,
         task: str,
@@ -1389,7 +1396,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         smallest = int(safe[0]["budget"]) if safe else None
         smallest_row = safe[0] if safe else None
         return {
-            "schema": "hashmarks.task-decision-brief-budget-sweep.v1",
+            "schema": operation_schema("task_decision_brief_budget_sweep"),
             "rows": rows,
             "smallest_safe_budget": smallest,
             "smallest_safe_visible_brief_bytes": (
