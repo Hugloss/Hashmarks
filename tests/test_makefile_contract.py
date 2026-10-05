@@ -212,3 +212,18 @@ def test_metrics_agent_make_alias_delegates_normal_defaults() -> None:
 
     for stale in ("--files 1000", "--budget 1000"):
         assert stale not in "\n".join(_make_recipe(text, "metrics-agent"))
+
+
+def test_metrics_agent_corpus_make_alias_delegates_normal_defaults() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+    assert _make_recipe(text, "metrics-agent-corpus") == (
+        "@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_corpus",
+    )
+
+    joined = "\n".join(_make_recipe(text, "metrics-agent-corpus"))
+    for stale in (
+        "--workspace .",
+        "--corpus benchmarks/agent_tasks.json",
+        "--budget 1200",
+    ):
+        assert stale not in joined

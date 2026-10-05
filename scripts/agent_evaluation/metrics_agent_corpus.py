@@ -206,7 +206,7 @@ def collect(
     }
 
 
-def main() -> None:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Replay agent localization tasks against Hashmarks CodeMap"
     )
@@ -217,7 +217,11 @@ def main() -> None:
     parser.add_argument("--budget", type=int, default=1200)
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--output", type=Path)
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> None:
+    args = _parser().parse_args()
     payload = collect(args.workspace, args.corpus, budget=args.budget, limit=args.limit)
     rendered = json.dumps(payload, indent=2, sort_keys=True)
     if args.output is not None:
