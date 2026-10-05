@@ -7,6 +7,13 @@ from typing import get_args
 
 import pytest
 
+import hashmarks.codemap.change_impact as change_impact_module
+import hashmarks.codemap.evidence_correlation as evidence_correlation_module
+import hashmarks.codemap.evidence_packet as evidence_packet_module
+import hashmarks.codemap.find_engine as find_engine_module
+import hashmarks.codemap.post_change as post_change_module
+import hashmarks.codemap.repository_context as repository_context_module
+from hashmarks.codemap import CodeMap
 from hashmarks.codemap.dependency_resolution_evidence import (
     DependencyResolutionEvidenceMixin,
 )
@@ -201,6 +208,196 @@ def test_operation_modes_fail_closed() -> None:
         require_operation_mode("dependency_codemap", "history")
     with pytest.raises(ValueError, match="unknown Hashmarks operation mode"):
         operation_schema("dependency_codemap", "history")
+
+
+_FIXED_MODE_CORE_BOUNDARIES = {
+    "repository_context": ("hashmarks/codemap/repository_context.py", "orient"),
+    "find": ("hashmarks/codemap/find_engine.py", "find_packet"),
+    "task_evidence": ("hashmarks/codemap/evidence_packet.py", "task_evidence"),
+    "change_impact": ("hashmarks/codemap/change_impact.py", "task_change_impact"),
+    "correlate_evidence": (
+        "hashmarks/codemap/evidence_correlation.py",
+        "correlate_evidence",
+    ),
+    "post_change": ("hashmarks/codemap/post_change.py", "task_post_change_delta"),
+}
+
+
+def _function_node(source: str, name: str) -> ast.FunctionDef:
+    tree = ast.parse(source)
+    matches = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == name
+    ]
+    assert len(matches) == 1
+    return matches[0]
+
+
+def test_fixed_mode_operations_self_prove_at_canonical_core_boundary() -> None:
+    fixed_modes = {
+        contract.operation
+        for contract in OPERATION_CONTRACTS
+        if len(contract.modes) == 1
+    }
+    assert set(_FIXED_MODE_CORE_BOUNDARIES) == fixed_modes
+
+    for operation, (relative, function_name) in _FIXED_MODE_CORE_BOUNDARIES.items():
+        source = (ROOT / relative).read_text(encoding="utf-8")
+        function = _function_node(source, function_name)
+        validated = [
+            node
+            for node in ast.walk(function)
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "validate_operation_response"
+                and node.args
+                and isinstance(node.args[0], ast.Constant)
+                and node.args[0].value == operation
+            )
+        ]
+        assert validated, f"{operation} must self-prove at {function_name}"
+
+
+def _fixed_mode_repo(root: Path) -> tuple[Path, str]:
+    (root / "src").mkdir()
+    (root / "tests").mkdir()
+    source = root / "src" / "owner.py"
+    source.write_text("def widget(): return 'old'\n", encoding="utf-8")
+    (root / "tests" / "test_owner.py").write_text(
+        "from src.owner import widget\n"
+        "def test_widget(): assert widget() == 'new'\n",
+        encoding="utf-8",
+    )
+    return source, "change widget implementation and verify widget test"
+
+
+def test_core_repository_context_rejects_its_own_schema_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _fixed_mode_repo(tmp_path)
+    monkeypatch.setattr(
+        repository_context_module,
+        "operation_schema",
+        lambda _operation: "hashmarks.wrong.v1",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(RuntimeError, match="operation response schema drift"):
+            codemap.orient()
+
+
+def test_core_find_rejects_its_own_schema_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _fixed_mode_repo(tmp_path)
+    monkeypatch.setattr(
+        find_engine_module,
+        "operation_schema",
+        lambda _operation: "hashmarks.wrong.v1",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(RuntimeError, match="operation response schema drift"):
+            codemap.find_packet("widget")
+
+
+def test_core_task_evidence_rejects_its_own_schema_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _source, task = _fixed_mode_repo(tmp_path)
+    monkeypatch.setattr(
+        evidence_packet_module,
+        "operation_schema",
+        lambda _operation: "hashmarks.wrong.v1",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(RuntimeError, match="operation response schema drift"):
+            codemap.task_evidence(task)
+
+
+def test_core_change_impact_rejects_its_own_schema_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _source, task = _fixed_mode_repo(tmp_path)
+    monkeypatch.setattr(
+        change_impact_module,
+        "operation_schema",
+        lambda _operation: "hashmarks.wrong.v1",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(RuntimeError, match="operation response schema drift"):
+            codemap.task_change_impact(task, ["src/owner.py"])
+
+
+def test_core_correlation_rejects_its_own_schema_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _fixed_mode_repo(tmp_path)
+    monkeypatch.setattr(
+        evidence_correlation_module,
+        "_CORRELATION_SCHEMA",
+        "hashmarks.wrong.v1",
+    )
+    bundles = [
+        {
+            "bundle_id": "fixture:1",
+            "producer": {"kind": "test-fixture"},
+            "completeness": "complete",
+            "scope": {"kind": "test-fixture"},
+            "truncation": "complete",
+            "anchors": [
+                {
+                    "anchor_id": "frame:0",
+                    "path": "/app/src/owner.py",
+                    "line": 1,
+                    "symbol": "widget",
+                    "metadata": {},
+                }
+            ],
+        }
+    ]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        with pytest.raises(RuntimeError, match="operation response schema drift"):
+            codemap.correlate_evidence(
+                bundles,
+                path_mappings=[
+                    {"external_prefix": "/app", "repository_prefix": ""}
+                ],
+            )
+
+
+def test_core_post_change_rejects_its_own_schema_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, task = _fixed_mode_repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        previous = codemap.task_evidence(task)
+        source.write_text("def widget(): return 'new'\n", encoding="utf-8")
+
+        def drifted_schema(operation: str, mode: str | None = None) -> str:
+            if operation == "post_change":
+                return "hashmarks.wrong.v1"
+            return operation_schema(operation, mode)
+
+        monkeypatch.setattr(post_change_module, "operation_schema", drifted_schema)
+        with pytest.raises(RuntimeError, match="operation response schema drift"):
+            codemap.task_post_change_delta(
+                task,
+                ["src/owner.py"],
+                previous_evidence=previous,
+            )
 
 
 def test_core_operation_dispatchers_consume_canonical_mode_admission() -> None:
