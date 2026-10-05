@@ -68,7 +68,9 @@ def test_concurrent_sync_writers_serialize_one_publication_authority(
             errors.append(exc)
 
     thread_a = threading.Thread(target=run, args=(writer_a,))
-    thread_b = threading.Thread(target=run, args=(writer_b,), kwargs={"started": b_started})
+    thread_b = threading.Thread(
+        target=run, args=(writer_b,), kwargs={"started": b_started}
+    )
     try:
         thread_a.start()
         assert a_entered.wait(timeout=5)
@@ -150,7 +152,9 @@ def test_inflight_decision_never_observes_uncommitted_next_generation(
         thread.start()
         assert staged.wait(timeout=5)
 
-        with pytest.raises(RuntimeError, match="generation changed during decision session"):
+        with pytest.raises(
+            RuntimeError, match="generation changed during decision session"
+        ):
             with reader.decision_session():
                 assert reader.store.generation() == initial.generation
                 assert reader.store.symbol("before_owner")
