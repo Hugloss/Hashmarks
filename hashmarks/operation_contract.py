@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from functools import wraps
+from typing import Callable, TypeVar, cast
 
 OPERATION_CONTRACT_SCHEMA = "hashmarks.operation-contract.v1"
 
@@ -87,6 +89,101 @@ OPERATION_CONTRACTS = (
         "post_change",
         (("default", "hashmarks.task-post-change-delta.v2"),),
     ),
+    OperationContract("projects", (("default", "hashmarks.codemap-projects.v1"),)),
+    OperationContract("outline", (("default", "hashmarks.outline.v1"),)),
+    OperationContract("grep", (("default", "hashmarks.grep.v1"),)),
+    OperationContract(
+        "structural",
+        (("default", "hashmarks.structural-search.v1"),),
+    ),
+    OperationContract("symbol", (("default", "hashmarks.symbol.v1"),)),
+    OperationContract("source", (("default", "hashmarks.source.v1"),)),
+    OperationContract(
+        "affected",
+        (("default", "hashmarks.codemap-affected.v1"),),
+    ),
+    OperationContract("tests", (("default", "hashmarks.codemap-tests.v1"),)),
+    OperationContract(
+        "structural_locality",
+        (("default", "hashmarks.structural-locality.v1"),),
+    ),
+    OperationContract(
+        "structural_locality_delta",
+        (("default", "hashmarks.structural-locality-delta.v1"),),
+    ),
+    OperationContract("context", (("default", "hashmarks.context-pack.v2"),)),
+    OperationContract(
+        "repository_findings",
+        (("default", "hashmarks.repository-findings.v1"),),
+    ),
+    OperationContract(
+        "import_ownership",
+        (("default", "hashmarks.import-ownership.v2"),),
+    ),
+    OperationContract(
+        "concurrency_risk",
+        (("default", "hashmarks.concurrency-risk.v1"),),
+    ),
+    OperationContract(
+        "verification_ownership",
+        (("default", "hashmarks.verification-ownership.v2"),),
+    ),
+    OperationContract(
+        "repository_ownership",
+        (("default", "hashmarks.authority-ownership-graph.v3"),),
+    ),
+    OperationContract(
+        "cache_ownership",
+        (("default", "hashmarks.cache-ownership.v1"),),
+    ),
+    OperationContract(
+        "cache_invalidation_ownership",
+        (("default", "hashmarks.cache-invalidation-ownership.v1"),),
+    ),
+    OperationContract(
+        "task_action_map",
+        (("default", "hashmarks.task-action-map.v1"),),
+    ),
+    OperationContract(
+        "verification_relevance",
+        (("default", "hashmarks.verification-relevance.v1"),),
+    ),
+    OperationContract(
+        "ownership_relation_graph",
+        (("default", "hashmarks.ownership-relation-graph.v1"),),
+    ),
+    OperationContract(
+        "task_decision_packet",
+        (("default", "hashmarks.task-decision-packet.v2"),),
+    ),
+    OperationContract(
+        "task_decision_brief",
+        (("default", "hashmarks.task-decision-brief.v1"),),
+    ),
+    OperationContract(
+        "task_action_brief",
+        (("default", "hashmarks.task-action-brief.v1"),),
+    ),
+    OperationContract(
+        "task_decision_brief_budget_sweep",
+        (("default", "hashmarks.task-decision-brief-budget-sweep.v1"),),
+    ),
+    OperationContract(
+        "repository_intelligence_query",
+        (("default", "hashmarks.repository-intelligence-query.v1"),),
+    ),
+    OperationContract(
+        "refresh_after_change_delta",
+        (("default", "hashmarks.refresh-delta.v1"),),
+    ),
+    OperationContract(
+        "refresh_after_change_brief",
+        (("default", "hashmarks.post-change-refresh-brief.v1"),),
+    ),
+    OperationContract(
+        "refresh_after_change",
+        (("default", "hashmarks.post-change-refresh.v1"),),
+    ),
 )
 
 _OPERATION_BY_NAME = {contract.operation: contract for contract in OPERATION_CONTRACTS}
@@ -144,6 +241,35 @@ def validate_operation_response(
             f"expected={expected} got={actual!r}"
         )
     return value
+
+
+_OperationResponse = TypeVar(
+    "_OperationResponse",
+    bound=Callable[..., dict[str, object]],
+)
+
+
+def operation_response(
+    operation: str,
+    *,
+    mode: str | None = None,
+) -> Callable[[_OperationResponse], _OperationResponse]:
+    """Bind one public core producer to its canonical operation response proof."""
+
+    require_registered_operation(operation)
+
+    def decorate(function: _OperationResponse) -> _OperationResponse:
+        @wraps(function)
+        def wrapped(*args: object, **kwargs: object) -> dict[str, object]:
+            return validate_operation_response(
+                operation,
+                function(*args, **kwargs),
+                mode=mode,
+            )
+
+        return cast(_OperationResponse, wrapped)
+
+    return decorate
 
 
 def operation_contract_manifest() -> dict[str, object]:
