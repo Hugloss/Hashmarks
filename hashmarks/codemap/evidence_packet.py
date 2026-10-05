@@ -26,6 +26,9 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS = (64, 128, 192, 256, 384, 512)
+
+
 @dataclass(frozen=True, slots=True)
 class _TaskEvidenceRange:
     path: str
@@ -1352,7 +1355,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         self,
         task: str,
         *,
-        budgets: Sequence[int] = (64, 128, 192, 256, 384, 512),
+        budgets: Sequence[int] = TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS,
         limit: int = 20,
         per_role: int = 3,
     ) -> dict[str, object]:
