@@ -37,9 +37,7 @@ def _watch_owner(codemap: CodeMap):
 
 
 def _watch_record(codemap: CodeMap) -> WatchContinuityRecord:
-    record = WatchContinuityRecord.from_json(
-        codemap.store.meta(WATCH_CONTINUITY_META)
-    )
+    record = WatchContinuityRecord.from_json(codemap.store.meta(WATCH_CONTINUITY_META))
     assert record is not None
     return record
 
