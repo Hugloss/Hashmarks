@@ -12,6 +12,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from .mcp_launch import mcp_server_args
 from .paths import canonical_host_path
 
 
@@ -60,7 +61,7 @@ def effective_command_uses_executable(
     command: list[str],
     executable: Path,
 ) -> bool:
-    if command[1:] != ["--workspace", ".", "mcp"]:
+    if command[1:] != list(mcp_server_args(".")):
         return False
     configured = command[0]
     resolved = (
