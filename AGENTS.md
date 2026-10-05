@@ -283,6 +283,10 @@ The committed lock is repository development/qualification authority, not instal
 
 agentsCookbook owns benchmark configuration, suite/task selection, native-agent selection, campaign/run state, resume/new behavior, interpreter launch, scoring, and reporting. Hashmarks may expose thin Make aliases into agentsCookbook, but those aliases must not mirror or reinterpret those choices, create their own run directories or latest pointers, invoke `python -m benchmarks` directly, or maintain compatibility launch paths beside the agentsCookbook front door. Configure the agentsCookbook benchmark environment once, including the exact `HASHMARKS_BENCH_SOURCE`, and transport that authority unchanged.
 
+### Standalone packaging has one semantic build owner
+
+`scripts/standalone_build.py` owns the standalone packager version, packager installation into the already-materialized candidate environment, exact PyInstaller flags, output name, collected package, and Python entrypoint. CI and publish workflows may choose platform runners and own smoke, qualification, signing/publication, and artifact transport, but they must call this build owner rather than copy packaging commands. PyInstaller is an ephemeral standalone-packaging implementation detail, not a second project runtime or development dependency authority.
+
 ### Architecture guards resolve relative imports
 
 Product-boundary checks must inspect both absolute and package-relative imports. A relative import is not a valid way to reintroduce removed execution/agent-loop responsibilities into modern CodeMap/repository-intelligence code. Architecture tests must resolve imports to fully-qualified module ownership before classifying the dependency; textual spelling alone is not authority.

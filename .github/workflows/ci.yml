@@ -268,17 +268,9 @@ jobs:
       - run: uv python install 3.14
       - name: Materialize locked Hashmarks + MCP runtime
         run: uv sync --frozen --extra mcp --python 3.14
-      - name: Add pinned standalone packager
-        run: uv pip install --python .venv/bin/python "pyinstaller==6.22.3"
       - name: Build and smoke self-contained executable
         run: |
-          .venv/bin/pyinstaller \
-            --clean \
-            --noconfirm \
-            --onefile \
-            --name hashmarks \
-            --collect-all hashmarks \
-            scripts/hashmarks_entrypoint.py
+          uv run --frozen --no-sync python scripts/standalone_build.py
           version="$(uv run --frozen --no-sync python -c 'import hashmarks; print(hashmarks.__version__)')"
           test "$(./dist/hashmarks --version)" = "hashmarks version $version"
           ./dist/hashmarks version
@@ -337,19 +329,10 @@ jobs:
       - run: uv python install 3.14
       - name: Materialize locked Hashmarks + MCP runtime
         run: uv sync --frozen --extra mcp --python 3.14
-      - name: Add pinned standalone packager
-        shell: pwsh
-        run: uv pip install --python .venv\Scripts\python.exe "pyinstaller==6.22.3"
       - name: Build and smoke native Windows executable
         shell: pwsh
         run: |
-          & .venv\Scripts\pyinstaller.exe `
-            --clean `
-            --noconfirm `
-            --onefile `
-            --name hashmarks `
-            --collect-all hashmarks `
-            scripts/hashmarks_entrypoint.py
+          uv run --frozen --no-sync python scripts\standalone_build.py
           $version = (& .venv\Scripts\python.exe -c "import hashmarks; print(hashmarks.__version__)").Trim()
           $reported = (& .\dist\hashmarks.exe --version).Trim()
           if ($reported -ne "hashmarks version $version") {
