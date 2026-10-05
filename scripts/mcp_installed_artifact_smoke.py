@@ -76,7 +76,7 @@ async def _exercise(
                 )
                 assert found.is_error is not True
                 assert found.structured_content is not None
-                assert found.structured_content["schema"] == "hashmarks.mcp-find.v1"
+                assert found.structured_content["schema"] == "hashmarks.find.v2"
                 assert any(
                     row["path"] == "src/feature.py"
                     for row in found.structured_content["results"]
