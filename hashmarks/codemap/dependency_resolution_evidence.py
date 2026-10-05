@@ -6,6 +6,8 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_schema
+
 from hashmarks.paths import normalize_relative_path
 
 from . import dependency_resolution_contract as _contract
@@ -1240,6 +1242,51 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
     ) -> dict[str, object]:
         self._require_current_dependency_observation_v3(observation)
         return dependency_queries(observation, requests)
+
+    def dependency_codemap(
+        self,
+        snapshot: Mapping[str, object],
+        queries: Sequence[Mapping[str, object]] = (),
+        *,
+        previous_observation: Mapping[str, object] | None = None,
+        result_mode: str = "observation",
+    ) -> dict[str, object]:
+        """Execute one canonical dependency operation independent of transport."""
+        allowed = ("observation", "explain", "compare")
+        if result_mode not in allowed:
+            raise ValueError(f"result_mode must be one of: {', '.join(allowed)}")
+        if result_mode != "observation" and queries:
+            raise ValueError("queries require result_mode=observation")
+        if result_mode == "compare" and previous_observation is None:
+            raise ValueError(
+                "previous_observation is required for result_mode=compare"
+            )
+        if result_mode != "compare" and previous_observation is not None:
+            raise ValueError(
+                "previous_observation is only valid for result_mode=compare"
+            )
+
+        observation = self.dependency_resolution_evidence(snapshot)
+        if result_mode == "explain":
+            return self.dependency_resolution_explain(observation)
+        if result_mode == "compare":
+            assert previous_observation is not None
+            return self.dependency_resolution_delta(previous_observation, observation)
+
+        result: dict[str, object] = {
+            "schema": operation_schema("dependency_codemap", "observation"),
+            "observation": observation,
+            "authority": "repository-intelligence-only",
+            "producer_authority": "caller-claimed",
+            "interpretation_authority": "consumer-owned",
+            "causation": "not-inferred",
+        }
+        if queries:
+            result["queries"] = self.dependency_resolution_queries(
+                observation,
+                queries,
+            )
+        return result
 
     @staticmethod
     def _dependency_resolution_delta_v3(  # noqa: C901
