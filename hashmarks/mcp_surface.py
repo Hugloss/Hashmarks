@@ -175,6 +175,7 @@ def _dependency_codemap_request(
     mode = _bounded_text(result_mode, name="result_mode", maximum=32)
     return raw_snapshot, bounded_queries, previous, mode
 
+
 def _changed_paths(values: list[str]) -> list[str]:
     if not isinstance(values, list) or not values:
         raise McpSurfaceError(
