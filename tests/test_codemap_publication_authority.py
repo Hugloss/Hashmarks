@@ -176,7 +176,6 @@ def test_inflight_decision_never_observes_uncommitted_next_generation(
         harness.close()
 
 
-
 def test_public_symbol_fails_instead_of_mixing_committed_generations(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
