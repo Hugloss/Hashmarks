@@ -256,9 +256,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             self = cast("CodeMap", self)
         del limit
         context = self.work_context(action, token_budget=token_budget)
-        _generation, _identity_generation, stale = self._generation_status()
         edit, verify, contract = self._task_action_selected_rows(action)
         verification = self._task_action_verification_plan(verify)
+        evidence_receipt = self._decision_evidence_receipt(task, action, verification)
+        stale = evidence_receipt.get("stale")
 
         safe = (
             bool(context.get("safe"))
@@ -285,9 +286,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 ).get("authority_proof_identity")
                 or ""
             ),
-            "evidence_receipt": self._decision_evidence_receipt(
-                task, action, verification
-            ),
+            "evidence_receipt": evidence_receipt,
         }
         if edit and edit.get("path"):
             result["edit"] = str(edit["path"])
