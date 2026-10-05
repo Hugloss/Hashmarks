@@ -42,6 +42,9 @@ class RepositoryIntelligenceQueryOptions:
     project_impact_limit: int = 12
 
 
+REPOSITORY_INTELLIGENCE_QUERY_DEFAULTS = RepositoryIntelligenceQueryOptions()
+
+
 class RepositoryIntelligenceQueryMixin:
     """Thin deterministic facade over existing repository-intelligence producers.
 
@@ -57,7 +60,7 @@ class RepositoryIntelligenceQueryMixin:
         task: str,
         changed_paths: Sequence[str | Path] = (),
         *,
-        options: RepositoryIntelligenceQueryOptions = RepositoryIntelligenceQueryOptions(),
+        options: RepositoryIntelligenceQueryOptions = REPOSITORY_INTELLIGENCE_QUERY_DEFAULTS,
     ) -> dict[str, object]:
         self = cast("CodeMap", self)
         if surface not in _QUERY_SURFACES:
