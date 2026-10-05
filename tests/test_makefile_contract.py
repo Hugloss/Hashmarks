@@ -129,8 +129,7 @@ def test_hosted_diagnostic_make_aliases_transport_only_explicit_overrides() -> N
 
     full = _make_recipe(text, "test-diagnostic")
     assert any(
-        "$(if $(strip $(DIAGNOSTIC_SHARDS)),--shards $(DIAGNOSTIC_SHARDS),)"
-        in line
+        "$(if $(strip $(DIAGNOSTIC_SHARDS)),--shards $(DIAGNOSTIC_SHARDS),)" in line
         for line in full
     )
     assert any(
@@ -143,8 +142,7 @@ def test_hosted_diagnostic_make_aliases_transport_only_explicit_overrides() -> N
     shard = _make_recipe(text, "test-diagnostic-shard")
     for recipe in (batch, shard):
         assert any(
-            "$(if $(strip $(DIAGNOSTIC_SHARDS)),--shards $(DIAGNOSTIC_SHARDS),)"
-            in line
+            "$(if $(strip $(DIAGNOSTIC_SHARDS)),--shards $(DIAGNOSTIC_SHARDS),)" in line
             for line in recipe
         )
         assert any(
