@@ -4,6 +4,10 @@ import importlib
 from typing import TYPE_CHECKING
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.watch_continuity import (
+    WATCH_CONTINUITY_META,
+    WatchContinuityRecord,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -30,6 +34,12 @@ class _FakeWatcher:
 
 def _watch_owner(codemap: CodeMap):
     return importlib.import_module(codemap.watch_forever.__module__)
+
+
+def _watch_record(codemap: CodeMap) -> WatchContinuityRecord:
+    record = WatchContinuityRecord.from_json(codemap.store.meta(WATCH_CONTINUITY_META))
+    assert record is not None
+    return record
 
 
 def test_watch_forever_starts_observer_before_initial_sync_and_stops_cleanly(
@@ -82,8 +92,12 @@ def test_watch_forever_starts_observer_before_initial_sync_and_stops_cleanly(
             "watcher-stop",
         ]
         assert updates == [({"paths": None}, [])]
-        assert codemap.store.meta("watcher_state") == "stopped"
-        assert codemap.store.meta("watcher_pid") == ""
+        record = _watch_record(codemap)
+        assert record.active is False
+        assert record.observation.state.value == "unknown"
+        assert record.observation.reason == "watcher stopped"
+        assert codemap.store.meta("watcher_state") is None
+        assert codemap.store.meta("watcher_pid") is None
 
 
 def test_watch_forever_unknown_observation_forces_full_reconciliation(
@@ -141,7 +155,10 @@ def test_watch_forever_unknown_observation_forces_full_reconciliation(
             ({"call": 1, "paths": None}, []),
             ({"call": 2, "paths": None}, []),
         ]
-        assert codemap.store.meta("watcher_state") == "stopped"
+        record = _watch_record(codemap)
+        assert record.active is False
+        assert record.observation.state.value == "unknown"
+        assert record.observation.reason == "watcher stopped"
 
 
 def test_watch_forever_incremental_callback_reconciles_observed_paths(
