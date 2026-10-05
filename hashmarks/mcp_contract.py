@@ -9,6 +9,15 @@ from dataclasses import dataclass
 from typing import Any
 
 MCP_CONTRACT_SCHEMA = "hashmarks.mcp-contract.v1"
+MCP_ERROR_SCHEMA = "hashmarks.mcp-error.v1"
+MCP_ERROR_REASONS = (
+    "invalid-request",
+    "stale-or-foreign-evidence",
+    "continuity-mismatch",
+    "unsupported-semantic",
+    "transient-race-exhausted",
+)
+MCP_ERROR_RECOVERY_AUTHORITY = "consumer-owned"
 MCP_SERVER_NAME = "Hashmarks"
 MCP_SERVER_DESCRIPTION = (
     "Semantic read-only repository intelligence for behavior localization, "
@@ -268,6 +277,11 @@ def qualify_mcp_observation(observation: dict[str, Any]) -> dict[str, object]:
             "instructions": MCP_SERVER_INSTRUCTIONS,
         },
         "tools": tools,
+        "errors": {
+            "schema": MCP_ERROR_SCHEMA,
+            "reasons": list(MCP_ERROR_REASONS),
+            "recovery_authority": MCP_ERROR_RECOVERY_AUTHORITY,
+        },
     }
     manifest["contract_identity"] = _contract_identity(manifest)
     return manifest
@@ -303,11 +317,13 @@ def contract_from_tool_models(
 def contract_summary(manifest: dict[str, object]) -> dict[str, object]:
     server = manifest.get("server")
     tools = manifest.get("tools")
+    errors = manifest.get("errors")
     identity = manifest.get("contract_identity")
     if (
         manifest.get("schema") != MCP_CONTRACT_SCHEMA
         or not isinstance(server, dict)
         or not isinstance(tools, list)
+        or not isinstance(errors, dict)
         or not isinstance(identity, str)
     ):
         raise ValueError("invalid Hashmarks MCP contract manifest")
@@ -321,6 +337,9 @@ def contract_summary(manifest: dict[str, object]) -> dict[str, object]:
         "contract_identity": identity,
         "server_version": server.get("version"),
         "tools": [str(row.get("name")) for row in tools if isinstance(row, dict)],
+        "error_schema": errors.get("schema"),
+        "error_reasons": errors.get("reasons"),
+        "error_recovery_authority": errors.get("recovery_authority"),
     }
 
 
