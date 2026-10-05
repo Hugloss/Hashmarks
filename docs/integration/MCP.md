@@ -223,6 +223,8 @@ The heavier stress runs independent reader processes while source bytes change a
 
 Hashmarks keeps host integration inside the repository. The checked-in development registrations do not require editing a user's global host config. Run `uv sync --frozen --extra mcp --group test` first so the local `uv run --frozen --no-sync hashmarks ...` command is available without rewriting dependency authority.
 
+`hashmarks.mcp_launch` is the single semantic owner of the stdio launch tuple used by these registrations and by installed-host qualification. The checked-in `opencode.json`, `.mcp.json`, and `.codex/config.toml` files only project that command into each host's native configuration syntax; host-status tests validate those projections against the canonical source command. Real-host gates and the ChatGPT Secure MCP Tunnel handoff use the same installed-command builder with their resolved executable and workspace paths.
+
 ### OpenCode MCP server configuration
 
 `opencode.json` contains the project-local `mcp.hashmarks` registration for **Hashmarks source development**. It intentionally launches the locked checkout through `uv run --frozen --no-sync`; it is not the end-user standalone-binary registration.
