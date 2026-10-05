@@ -380,7 +380,7 @@ class HashmarksMcpSurface:
 
         def project() -> dict[str, object]:
             try:
-                return self._map.repository_declarations(
+                return self._map.repository_declarations_operation(
                     bounded_groups,
                     previous_observation=previous,
                     result_mode=mode,
