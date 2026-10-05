@@ -59,12 +59,14 @@ def _impact_dictionary(
     )
 
 
-def _edge_by_source(edges: list[dict[str, object]]) -> dict[str, dict[str, object]]:
-    result: dict[str, dict[str, object]] = {}
+def _edges_by_source(
+    edges: list[dict[str, object]],
+) -> dict[str, list[dict[str, object]]]:
+    result: dict[str, list[dict[str, object]]] = {}
     for edge in edges:
         source = str(edge.get("from") or "")
         if source:
-            result.setdefault(source, edge)
+            result.setdefault(source, []).append(edge)
     return result
 
 
@@ -99,16 +101,15 @@ def compact_project_impact(fragment: Mapping[str, object]) -> dict[str, object]:
     affected = _mapping_rows(fragment, "affected")
     edges = _mapping_rows(fragment, "edges")
     dictionary = _impact_dictionary(roots, affected, edges)
-    edge_map = _edge_by_source(edges)
-    rows = [
-        row
-        for item in affected
-        if (
-            row := _compact_row(
-                item, edge_map.get(str(item.get("project") or "")), dictionary
-            )
+    edge_map = _edges_by_source(edges)
+    rows: list[list[int]] = []
+    for item in affected:
+        project_edges = edge_map.get(str(item.get("project") or "")) or (None,)
+        rows.extend(
+            row
+            for edge in project_edges
+            if (row := _compact_row(item, edge, dictionary)) is not None
         )
-    ]
     project_index = dictionary.project_index
     result: dict[str, object] = {
         "schema": COMPACT_PROJECT_IMPACT_SCHEMA,
@@ -167,14 +168,29 @@ def expand_project_impact(fragment: Mapping[str, object]) -> dict[str, object]:
         [str(value) for value in fragment.get("producers", [])],
         [str(value) for value in fragment.get("confidences", [])],
     )
-    affected: list[dict[str, object]] = []
+    affected_by_project: dict[str, dict[str, object]] = {}
     edges: list[dict[str, object]] = []
     for raw in fragment.get("rows", []):
         affected_row, edge = _expanded_row(raw, dictionary)
         if affected_row is not None:
-            affected.append(affected_row)
+            project = str(affected_row["project"])
+            current = affected_by_project.get(project)
+            if current is None or int(affected_row["depth"]) < int(current["depth"]):
+                affected_by_project[project] = affected_row
         if edge is not None:
             edges.append(edge)
+    affected = sorted(
+        affected_by_project.values(),
+        key=lambda row: (int(row["depth"]), str(row["project"])),
+    )
+    edges.sort(
+        key=lambda row: (
+            str(row.get("from") or ""),
+            str(row.get("to") or ""),
+            str(row.get("kind") or ""),
+            str(row.get("producer") or ""),
+        )
+    )
     roots = [
         _lookup(dictionary.projects, int(index)) for index in fragment.get("roots", [])
     ]
