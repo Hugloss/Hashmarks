@@ -8,9 +8,9 @@ from hashmarks.paths import normalize_relative_path
 from hashmarks.python_ast_cache import read_python_ast
 
 from .cache_invalidation import analyze_python_cache_invalidators
-from .decision_session import decision_scoped
 from .cache_ownership import analyze_python_cache_ownership
 from .concurrency_risk import analyze_python_concurrency_risk
+from .decision_session import decision_scoped
 from .import_ownership import analyze_python_import_ownership
 from .repository_domains import RepositoryDomain, classify_repository_path
 
