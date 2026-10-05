@@ -684,20 +684,21 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     def bump_generation(self) -> int:
         """Atomically advance the durable CodeMap generation.
 
-        Generation is shared durable state.  Keep the read-modify-write inside
-        one store lock/transaction so concurrent sync callers cannot both sample
-        the same revision and publish the same successor.
+        Generation is shared durable state. Keep the read-modify-write under
+        the active publication authority, or acquire one standalone SQLite
+        writer transaction when called outside CodeMap sync.
         """
+
         def bump_locked() -> int:
-                row = self._db.execute(
-                    "SELECT value FROM meta WHERE key='generation'"
-                ).fetchone()
-                value = int(row[0]) + 1 if row is not None else 1
-                self._db.execute(
-                    "INSERT INTO meta(key,value) VALUES ('generation',?) "
-                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                    (str(value),),
-                )
+            row = self._db.execute(
+                "SELECT value FROM meta WHERE key='generation'"
+            ).fetchone()
+            value = int(row[0]) + 1 if row is not None else 1
+            self._db.execute(
+                "INSERT INTO meta(key,value) VALUES ('generation',?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (str(value),),
+            )
             return value
 
         with self._lock:
