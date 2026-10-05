@@ -306,6 +306,35 @@ def test_task_action_brief_does_not_launder_named_dependency_into_owner(
     assert brief["status"] == "safe-fresh"
 
 
+def test_non_ambiguous_action_edit_remains_separate_from_repository_owner_proof(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src" / "adapter.py").write_text(
+        "class Adapter:\n    pass\n", encoding="utf-8"
+    )
+    (tmp_path / "tests" / "test_adapter.py").write_text(
+        "from src.adapter import Adapter\n", encoding="utf-8"
+    )
+    task = "Adapter implementation test"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task, limit=20)
+        packet = codemap.task_decision_packet(task, limit=20, token_budget=256)
+
+    assert action["edit"]["path"] == "src/adapter.py"
+    assert action["ownership_authority"]["owner_resolved"] is False
+    assert action["admitted_edit"] is None
+    assert action["action_edit"]["path"] == "src/adapter.py"
+
+    assert packet["candidate"]["path"] == "src/adapter.py"
+    assert packet["edit"]["path"] == "src/adapter.py"
+    assert packet["ownership_authority"]["owner_resolved"] is False
+    assert packet["discrimination"]["reason"] == "ownership-unresolved"
+
+
 def test_task_action_brief_keeps_ambiguous_candidate_out_of_edit_authority(
     tmp_path: Path,
 ) -> None:
