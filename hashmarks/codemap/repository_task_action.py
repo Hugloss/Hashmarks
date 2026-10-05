@@ -1480,9 +1480,11 @@ class TaskActionMixin(TaskActionProjectionMixin, TaskActionEvidenceMixin):
         admitted_edit, _candidate, _resolved = project_owner_candidate(
             {"edit": edit, "ownership_authority": authority}
         )
+        action_edit = admitted_edit if ambiguous else edit
         return {
             "ownership_decision_trace": trace,
             "ownership_authority": authority,
             "admitted_edit": admitted_edit,
+            "action_edit": action_edit,
             "candidate_path": ownership_candidate_path({"edit": edit}),
         }
