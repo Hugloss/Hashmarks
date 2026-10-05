@@ -38,3 +38,13 @@ def test_shard_range_is_bounded() -> None:
 
 def test_mandatory_policy_excludes_scale_measurements() -> None:
     assert "not scale" in hosted.marker_expression()
+
+
+def test_hosted_diagnostic_parser_owns_normal_launch_defaults() -> None:
+    args = hosted._parser().parse_args([])
+
+    assert args.shards == 64
+    assert args.start == 0
+    assert args.limit is None
+    assert args.extra_marker == ""
+    assert args.capabilities is False
