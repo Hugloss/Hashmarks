@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_schema
+
 from .model import EvidenceVisibility, SearchHit
 from .query_primitives import _WORD_RE, _query_terms
 from .query_router import QueryRoute, route_query
@@ -46,6 +48,94 @@ def _optional_int(value: object) -> int | None:
     return None if value is None else int(value)
 
 
+def _find_freshness_state(stale: bool | None) -> str:
+    if stale is True:
+        return "stale"
+    if stale is False:
+        return "current"
+    return "unknown"
+
+
+def _find_claim_scope(intent: str) -> str:
+    return {
+        "identifier": "indexed-visible-symbol-surface",
+        "path": "admitted-visible-repository-path-index",
+    }.get(intent, "bounded-retrieval-only")
+
+
+def _find_exact_targets(
+    query: str,
+    intent: str,
+    hits: tuple[SearchHit, ...],
+) -> set[tuple[object, ...]]:
+    if intent == "identifier":
+        return {
+            (hit.path, hit.qualname or hit.name, hit.start_line)
+            for hit in hits
+            if query in {hit.name, hit.qualname}
+        }
+    if intent == "path":
+        normalized = query[2:] if query.startswith("./") else query
+        return {
+            (hit.path,)
+            for hit in hits
+            if hit.path == normalized
+            or ("/" not in normalized and hit.path.rsplit("/", 1)[-1] == normalized)
+        }
+    return set()
+
+
+def _find_claim_fields(
+    query: str,
+    intent: str,
+    hits: tuple[SearchHit, ...],
+    bound_reasons: tuple[str, ...],
+    *,
+    freshness: str,
+) -> dict[str, object]:
+    omissions = sorted(set(bound_reasons))
+    exact_query = intent in {"identifier", "path"}
+    exact_targets = _find_exact_targets(query, intent, hits)
+    search_complete = exact_query and not omissions
+    claims_admissible = search_complete and freshness == "current"
+
+    reasons: list[str] = []
+    if not exact_query:
+        reasons.append("query-intent-not-exact")
+    if omissions:
+        reasons.append("bounded-search-omission")
+    if freshness != "current":
+        reasons.append(f"repository-freshness-{freshness}")
+
+    negative_evidence = "not-applicable"
+    if exact_query and not exact_targets:
+        negative_evidence = (
+            "admissible-within-declared-scope"
+            if claims_admissible
+            else "not-admissible"
+        )
+    elif not exact_query and not hits:
+        negative_evidence = "not-admissible"
+
+    uniqueness_evidence = "not-applicable"
+    if len(exact_targets) == 1:
+        uniqueness_evidence = (
+            "admissible-within-declared-scope"
+            if claims_admissible
+            else "not-admissible"
+        )
+
+    return {
+        "scope": _find_claim_scope(intent),
+        "completeness": "complete" if search_complete else "incomplete",
+        "observed_exact_match_count": len(exact_targets),
+        "negative_evidence": negative_evidence,
+        "uniqueness_evidence": uniqueness_evidence,
+        "omissions": omissions,
+        "admissibility_reasons": reasons,
+    }
+
+
 class FindEngineMixin:
     def query_route(self, query: str) -> QueryRoute:
         """Return the deterministic retrieval route without executing search."""
@@ -53,6 +143,33 @@ class FindEngineMixin:
 
     def find(self, query: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
         return self._find_evidence(query, limit=limit).hits
+
+    def find_packet(self, query: str, *, limit: int = 20) -> dict[str, object]:
+        """Return the canonical repository find observation for every transport."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        evidence = self._find_evidence(query, limit=limit)
+        route = self.query_route(query)
+        generation, identity_generation, stale = self._generation_status()
+        freshness = _find_freshness_state(stale)
+        claims = _find_claim_fields(
+            query,
+            route.intent.value,
+            evidence.hits,
+            evidence.bound_reasons,
+            freshness=freshness,
+        )
+        return {
+            "schema": operation_schema("find"),
+            "query": query,
+            "query_intent": route.intent.value,
+            "results": [hit.as_dict() for hit in evidence.hits],
+            "truncated": "find-result-limit" in evidence.bound_reasons,
+            "generation": generation,
+            "identity_generation": identity_generation,
+            "freshness": freshness,
+            **claims,
+        }
 
     def _find_evidence(self, query: str, *, limit: int) -> _FindEvidence:
         if TYPE_CHECKING:
