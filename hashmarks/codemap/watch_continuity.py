@@ -55,42 +55,67 @@ def _parse_lease(
     return owner, int(pid), float(heartbeat), active, int(generation)
 
 
-def _parse_observation(payload: object) -> RepositoryObservation | None:
-    if not isinstance(payload, dict):
+def _string_paths(value: object) -> tuple[str, ...] | None:
+    if not isinstance(value, list):
         return None
-    state_raw = payload.get("state")
+    if not all(isinstance(path, str) for path in value):
+        return None
+    return tuple(value)
+
+
+def _observation_fields(
+    payload: dict[str, object],
+) -> tuple[str, int, tuple[str, ...], bool, int, str | None] | None:
+    state = payload.get("state")
     generation = payload.get("generation")
-    dirty_paths = payload.get("dirty_paths")
-    paths_complete = payload.get("paths_complete")
-    dirty_count = payload.get("dirty_path_count")
+    paths = _string_paths(payload.get("dirty_paths"))
+    complete = payload.get("paths_complete")
+    count = payload.get("dirty_path_count")
     reason = payload.get("reason")
-    if not isinstance(state_raw, str) or not _plain_int(generation):
+    if not isinstance(state, str) or not _plain_int(generation):
         return None
-    if not isinstance(dirty_paths, list) or not all(
-        isinstance(path, str) for path in dirty_paths
-    ):
-        return None
-    if not isinstance(paths_complete, bool) or not _plain_int(dirty_count):
+    if paths is None or not isinstance(complete, bool) or not _plain_int(count):
         return None
     if reason is not None and not isinstance(reason, str):
         return None
+    return state, int(generation), paths, complete, int(count), reason
+
+
+def _observation_semantics_valid(
+    state: ObservationState,
+    generation: int,
+    paths: tuple[str, ...],
+    complete: bool,
+    count: int,
+) -> bool:
+    if generation < 0 or count < len(paths):
+        return False
+    if complete and count != len(paths):
+        return False
+    if state is ObservationState.CLEAN and (paths or count):
+        return False
+    return True
+
+
+def _parse_observation(payload: object) -> RepositoryObservation | None:
+    if not isinstance(payload, dict):
+        return None
+    fields = _observation_fields(payload)
+    if fields is None:
+        return None
+    state_raw, generation, paths, complete, count, reason = fields
     try:
         state = ObservationState(state_raw)
     except ValueError:
         return None
-    paths = tuple(dirty_paths)
-    if int(generation) < 0 or int(dirty_count) < len(paths):
-        return None
-    if paths_complete and int(dirty_count) != len(paths):
-        return None
-    if state is ObservationState.CLEAN and (paths or int(dirty_count)):
+    if not _observation_semantics_valid(state, generation, paths, complete, count):
         return None
     return RepositoryObservation(
         state=state,
-        generation=int(generation),
+        generation=generation,
         dirty_paths=paths,
-        paths_complete=paths_complete,
-        dirty_path_count=int(dirty_count),
+        paths_complete=complete,
+        dirty_path_count=count,
         reason=reason,
     )
 
