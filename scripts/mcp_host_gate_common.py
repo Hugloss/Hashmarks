@@ -207,58 +207,74 @@ def validate_basic_qualification_request(
     return value
 
 
+def _decode_json_payload(text: str, *, host: str, tool: str) -> dict[str, object]:
+    stripped = text.strip()
+    if not stripped:
+        raise HostGateError(f"{host} MCP response for {tool} is empty")
+    try:
+        decoded = json.loads(stripped)
+    except json.JSONDecodeError as exc:
+        raise HostGateError(
+            f"{host} MCP response for {tool} is not an exact JSON object"
+        ) from exc
+    if not isinstance(decoded, dict):
+        raise HostGateError(f"{host} MCP response for {tool} JSON is not an object")
+    return decoded
+
+
+def _decode_content_payload(
+    value: list[object],
+    *,
+    host: str,
+    tool: str,
+) -> dict[str, object]:
+    if len(value) != 1:
+        raise HostGateError(
+            f"{host} MCP response for {tool} must contain exactly one structured payload"
+        )
+    part = value[0]
+    if not isinstance(part, dict):
+        raise HostGateError(
+            f"{host} MCP response content for {tool} contains a non-object part"
+        )
+    if part.get("type") != "text" or not isinstance(part.get("text"), str):
+        raise HostGateError(
+            f"{host} MCP response content for {tool} is not a text JSON payload"
+        )
+    return _decode_json_payload(part["text"], host=host, tool=tool)
+
+
+def _decode_mapping_payload(
+    value: dict[object, object],
+    *,
+    host: str,
+    tool: str,
+) -> dict[str, object]:
+    structured = value.get("structured_content")
+    if structured is None:
+        structured = value.get("structuredContent")
+    if structured is not None:
+        if not isinstance(structured, dict):
+            raise HostGateError(
+                f"{host} structured MCP response for {tool} is not an object"
+            )
+        return structured
+    if isinstance(value.get("schema"), str):
+        return dict(value)
+    if "content" in value:
+        return _decode_mcp_payload(value["content"], host=host, tool=tool)
+    raise HostGateError(
+        f"{host} MCP response for {tool} has no structured Hashmarks payload"
+    )
+
+
 def _decode_mcp_payload(value: object, *, host: str, tool: str) -> dict[str, object]:
     if isinstance(value, dict):
-        structured = value.get("structured_content")
-        if structured is None:
-            structured = value.get("structuredContent")
-        if structured is not None:
-            if not isinstance(structured, dict):
-                raise HostGateError(
-                    f"{host} structured MCP response for {tool} is not an object"
-                )
-            return structured
-        if isinstance(value.get("schema"), str):
-            return value
-        if "content" in value:
-            return _decode_mcp_payload(value["content"], host=host, tool=tool)
-        raise HostGateError(
-            f"{host} MCP response for {tool} has no structured Hashmarks payload"
-        )
+        return _decode_mapping_payload(value, host=host, tool=tool)
     if isinstance(value, list):
-        decoded: list[dict[str, object]] = []
-        for part in value:
-            if not isinstance(part, dict):
-                raise HostGateError(
-                    f"{host} MCP response content for {tool} contains a non-object part"
-                )
-            if part.get("type") != "text" or not isinstance(part.get("text"), str):
-                raise HostGateError(
-                    f"{host} MCP response content for {tool} is not a text JSON payload"
-                )
-            decoded.append(
-                _decode_mcp_payload(part["text"], host=host, tool=tool)
-            )
-        if len(decoded) != 1:
-            raise HostGateError(
-                f"{host} MCP response for {tool} must contain exactly one structured payload"
-            )
-        return decoded[0]
+        return _decode_content_payload(value, host=host, tool=tool)
     if isinstance(value, str):
-        text = value.strip()
-        if not text:
-            raise HostGateError(f"{host} MCP response for {tool} is empty")
-        try:
-            decoded = json.loads(text)
-        except json.JSONDecodeError as exc:
-            raise HostGateError(
-                f"{host} MCP response for {tool} is not an exact JSON object"
-            ) from exc
-        if not isinstance(decoded, dict):
-            raise HostGateError(
-                f"{host} MCP response for {tool} JSON is not an object"
-            )
-        return decoded
+        return _decode_json_payload(value, host=host, tool=tool)
     raise HostGateError(
         f"{host} MCP response for {tool} has unsupported payload type"
     )
