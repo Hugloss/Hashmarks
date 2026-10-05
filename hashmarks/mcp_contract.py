@@ -12,6 +12,7 @@ from .operation_contract import (
     operation_contract_manifest,
     operation_modes,
     operation_schema,
+    require_registered_operation,
     validate_operation_response,
 )
 
@@ -59,6 +60,9 @@ class McpToolContract:
     name: str
     description: str
     operation: str
+
+    def __post_init__(self) -> None:
+        require_registered_operation(self.operation)
 
     @property
     def response_modes(self) -> tuple[str, ...]:
