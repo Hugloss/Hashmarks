@@ -662,6 +662,30 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             if owns_transaction:
                 self._db.commit()
 
+    def compare_and_set_meta(
+        self, key: str, *, expected: str | None, value: str
+    ) -> bool:
+        """Atomically replace one metadata value only from the expected authority."""
+
+        with self._lock:
+            if self._db.in_transaction:
+                raise RuntimeError(
+                    "cannot compare-and-set metadata inside an active transaction"
+                )
+            with sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
+                row = self._db.execute(
+                    "SELECT value FROM meta WHERE key=?", (key,)
+                ).fetchone()
+                current = None if row is None else str(row[0])
+                if current != expected:
+                    return False
+                self._db.execute(
+                    "INSERT INTO meta(key,value) VALUES (?,?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    (key, value),
+                )
+                return True
+
     def set_meta_many(self, values: dict[str, str]) -> None:
         if not values:
             return

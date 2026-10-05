@@ -9,7 +9,11 @@ from pathlib import Path
 import pytest
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.index_watch import _IndexWatchSession
+from hashmarks.codemap.index_watch import (
+    WatchLeaseHeldError,
+    WatchLeaseLostError,
+    _IndexWatchSession,
+)
 from hashmarks.codemap.watch_continuity import (
     WATCH_CONTINUITY_META,
     WatchContinuityRecord,
@@ -136,6 +140,7 @@ def test_watcher_continuity_is_one_atomic_freshness_authority(
         codemap.sync()
         monkeypatch.setattr(codemap, "_daemon_observation", lambda: None)
         session = _IndexWatchSession(codemap, None)
+        session.acquire()
         assert session.tracker.mark_reconciled(expected_generation=0)
         session.publish()
 
@@ -143,6 +148,7 @@ def test_watcher_continuity_is_one_atomic_freshness_authority(
         assert set(items) == {WATCH_CONTINUITY_META}
         record = WatchContinuityRecord.from_json(items[WATCH_CONTINUITY_META])
         assert record is not None
+        assert record.fence == session.fence
         assert record.observation.state.value == "clean"
         assert record.codemap_generation == codemap.store.generation()
 
@@ -152,6 +158,7 @@ def test_watcher_continuity_is_one_atomic_freshness_authority(
         status = codemap.status()
         assert status["daemon_generation_changed"] is False
         assert status["watcher"]["state"] == "clean"
+        assert status["watcher"]["fence"] == session.fence
 
         session.tracker.mark_dirty(["src/auth.py"])
         session.publish()
@@ -177,6 +184,7 @@ def test_clean_watcher_observation_only_covers_its_published_codemap_generation(
         codemap.sync()
         monkeypatch.setattr(codemap, "_daemon_observation", lambda: None)
         session = _IndexWatchSession(codemap, None)
+        session.acquire()
         assert session.tracker.mark_reconciled(expected_generation=0)
         session.publish()
         assert codemap.status()["daemon_generation_changed"] is False
@@ -201,6 +209,7 @@ def test_inactive_watcher_observation_cannot_authorize_current_state(
         codemap.sync()
         monkeypatch.setattr(codemap, "_daemon_observation", lambda: None)
         session = _IndexWatchSession(codemap, None)
+        session.acquire()
         assert session.tracker.mark_reconciled(expected_generation=0)
         session.publish(active=False)
 
@@ -208,6 +217,105 @@ def test_inactive_watcher_observation_cannot_authorize_current_state(
         assert status["daemon_generation_changed"] is None
         assert status["watcher"]["active"] is False
         assert status["watcher"]["pid"] is None
+
+
+def test_second_live_watcher_cannot_claim_continuity_authority(
+    tmp_path: Path,
+) -> None:
+    _write_repo(tmp_path)
+    with CodeMap(
+        tmp_path,
+        state_dir=tmp_path / ".state",
+        artifact_db=tmp_path / "artifacts.sqlite3",
+    ) as codemap:
+        codemap.sync()
+        first = _IndexWatchSession(codemap, None)
+        first.acquire()
+        second = _IndexWatchSession(codemap, None)
+
+        with pytest.raises(WatchLeaseHeldError, match="already owned"):
+            second.acquire()
+
+        record = WatchContinuityRecord.from_json(
+            codemap.store.meta(WATCH_CONTINUITY_META)
+        )
+        assert record is not None
+        assert record.owner == first.owner
+        assert record.fence == first.fence
+        first.release()
+
+
+def test_replacement_fence_blocks_stale_clean_overwrite(
+    tmp_path: Path,
+) -> None:
+    _write_repo(tmp_path)
+    with CodeMap(
+        tmp_path,
+        state_dir=tmp_path / ".state",
+        artifact_db=tmp_path / "artifacts.sqlite3",
+    ) as codemap:
+        codemap.sync()
+        first = _IndexWatchSession(codemap, None)
+        assert first.tracker.mark_reconciled(expected_generation=0)
+        first.acquire()
+
+        first_record = WatchContinuityRecord.from_json(
+            codemap.store.meta(WATCH_CONTINUITY_META)
+        )
+        assert first_record is not None
+        expired = WatchContinuityRecord(
+            owner=first_record.owner,
+            fence=first_record.fence,
+            pid=first_record.pid,
+            heartbeat_unix=0.0,
+            active=True,
+            codemap_generation=first_record.codemap_generation,
+            observation=first_record.observation,
+        )
+        codemap.store.set_meta(WATCH_CONTINUITY_META, expired.to_json())
+
+        replacement = _IndexWatchSession(codemap, None)
+        assert replacement.tracker.mark_reconciled(expected_generation=0)
+        replacement.tracker.mark_dirty(["src/auth.py"])
+        replacement.acquire()
+
+        replacement_record = WatchContinuityRecord.from_json(
+            codemap.store.meta(WATCH_CONTINUITY_META)
+        )
+        assert replacement_record is not None
+        assert replacement_record.owner == replacement.owner
+        assert replacement_record.fence == first_record.fence + 1
+        assert replacement_record.observation.state.value == "dirty"
+
+        with pytest.raises(WatchLeaseLostError, match="replaced"):
+            first.publish()
+
+        first.release()
+        final_record = WatchContinuityRecord.from_json(
+            codemap.store.meta(WATCH_CONTINUITY_META)
+        )
+        assert final_record == replacement_record
+        replacement.release()
+
+
+def test_released_watcher_advances_fence_on_next_claim(tmp_path: Path) -> None:
+    _write_repo(tmp_path)
+    with CodeMap(
+        tmp_path,
+        state_dir=tmp_path / ".state",
+        artifact_db=tmp_path / "artifacts.sqlite3",
+    ) as codemap:
+        codemap.sync()
+        first = _IndexWatchSession(codemap, None)
+        first.acquire()
+        first_fence = first.fence
+        first.release()
+
+        second = _IndexWatchSession(codemap, None)
+        second.acquire()
+        assert first_fence is not None
+        assert second.fence == first_fence + 1
+        second.release()
 
 
 def test_codemap_watcher_keeps_map_hot_without_identity_daemon(tmp_path: Path):
