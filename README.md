@@ -412,6 +412,8 @@ uv sync --frozen --extra mcp --group test
 
 Use that direct command when repairing or materializing the project environment without Make. The same MCP-capable `.venv` is required when this checkout is used as the Hashmarks subject by an external benchmark harness.
 
+External benchmark execution is owned by the sibling agentsCookbook checkout. Configure its explicit `.env` so `HASHMARKS_BENCH_SOURCE` names this clean committed Hashmarks checkout, then use `make benchmark-check`, `make benchmark`, or `make benchmark-report` here as thin aliases. Hashmarks does not mirror agentsCookbook suite, agent, campaign, run/resume, interpreter, or reporting defaults.
+
 The normal OSS test surface does not require an external coding-agent host. `make mcp-host-status` inspects project-local MCP registration/readiness; `make mcp-opencode-check` is the real OpenCode release host gate. Native release qualification and the other real-host MCP gates are documented separately.
 
 See [Contributing](.github/CONTRIBUTING.md) and the [MCP integration guide](docs/integration/MCP.md).
