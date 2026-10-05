@@ -7,6 +7,8 @@ import pytest
 
 from hashmarks.mcp_contract import (
     MCP_BASIC_HOST_QUALIFICATION_TOOLS,
+    MCP_ERROR_REASONS,
+    MCP_ERROR_SCHEMA,
     MCP_READ_ONLY_ANNOTATIONS,
     MCP_SERVER_INSTRUCTIONS,
     MCP_SERVER_NAME,
@@ -53,6 +55,11 @@ def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
     assert isinstance(server, dict)
     assert isinstance(tools, list)
     assert first["schema"] == "hashmarks.mcp-contract.v1"
+    assert first["errors"] == {
+        "schema": MCP_ERROR_SCHEMA,
+        "reasons": list(MCP_ERROR_REASONS),
+        "recovery_authority": "consumer-owned",
+    }
     assert identity.startswith("sha256:")
     assert server["name"] == MCP_SERVER_NAME
     assert server["version"] == "0.26.1"
@@ -71,6 +78,9 @@ def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
         "contract_identity": identity,
         "server_version": "0.26.1",
         "tools": list(MCP_TOOL_NAMES),
+        "error_schema": MCP_ERROR_SCHEMA,
+        "error_reasons": list(MCP_ERROR_REASONS),
+        "error_recovery_authority": "consumer-owned",
     }
 
 
