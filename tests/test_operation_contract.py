@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -8,13 +10,16 @@ from hashmarks.codemap.dependency_resolution_evidence import (
     DependencyResolutionEvidenceMixin,
 )
 from hashmarks.codemap.repository_declarations import RepositoryDeclarationsMixin
+from hashmarks.mcp_contract import McpToolContract
 from hashmarks.operation_contract import (
     OPERATION_CONTRACT_SCHEMA,
     OPERATION_CONTRACTS,
     operation_contract_manifest,
     operation_modes,
     operation_schema,
+    registered_operations,
     require_operation_mode,
+    require_registered_operation,
     validate_operation_response,
 )
 
@@ -118,6 +123,57 @@ def test_transports_do_not_own_semantic_find_or_dependency_schema() -> None:
     assert "hashmarks.mcp-find.v1" not in mcp_source
     assert "hashmarks.find.v1" not in cli_source
     assert "hashmarks.mcp-dependency-codemap.v1" not in mcp_source
+
+
+def test_public_operation_admission_fails_before_projection() -> None:
+    assert registered_operations() == tuple(_EXPECTED)
+    assert require_registered_operation("find").operation == "find"
+
+    with pytest.raises(ValueError, match="unknown Hashmarks operation"):
+        require_registered_operation("unregistered_operation")
+    with pytest.raises(ValueError, match="unknown Hashmarks operation"):
+        validate_operation_response(
+            "unregistered_operation",
+            {"schema": "hashmarks.unregistered.v1"},
+        )
+    with pytest.raises(ValueError, match="unknown Hashmarks operation"):
+        McpToolContract(
+            "future_tool",
+            "fixture",
+            "unregistered_operation",
+        )
+
+
+def test_public_surfaces_do_not_mint_versioned_semantic_schemas() -> None:
+    schema_literal = re.compile(r"hashmarks\.[a-z0-9_.-]+\.v\d+")
+    for relative in (
+        "hashmarks/mcp_surface.py",
+        "hashmarks/mcp_server.py",
+        "hashmarks/repository_cli.py",
+    ):
+        source = (ROOT / relative).read_text(encoding="utf-8")
+        assert schema_literal.findall(source) == [], relative
+
+
+def test_cli_operation_projection_names_are_registered_literals() -> None:
+    source = (ROOT / "hashmarks" / "repository_cli.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    projected: list[str] = []
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "_print_operation"
+        ):
+            continue
+        assert node.args
+        operation = node.args[0]
+        assert isinstance(operation, ast.Constant)
+        assert isinstance(operation.value, str)
+        projected.append(operation.value)
+
+    assert projected
+    assert set(projected) <= set(registered_operations())
 
 
 def test_operation_modes_fail_closed() -> None:
