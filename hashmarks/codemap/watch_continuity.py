@@ -223,7 +223,6 @@ def watch_record_from_snapshot(
     *,
     owner: str,
     fence: int,
-    pid: int,
     heartbeat_unix: float,
     active: bool,
     codemap_generation: int,
@@ -232,7 +231,7 @@ def watch_record_from_snapshot(
     return WatchContinuityRecord(
         owner=owner,
         fence=fence,
-        pid=pid,
+        pid=os.getpid(),
         heartbeat_unix=heartbeat_unix,
         active=active,
         codemap_generation=codemap_generation,
