@@ -139,21 +139,147 @@ def test_client_serializes_typed_query_and_refresh_options(
     )
 
 
-def test_canonical_service_projections_bind_registered_operations() -> None:
-    assert {
-        route: (projection.operation, projection.response_key)
-        for route, projection in service_module._CANONICAL_SERVICE_PROJECTIONS.items()
-    } == {
+def test_service_routes_are_exhaustively_classified() -> None:
+    routes = service_module._SERVICE_ROUTES
+    assert set(routes) == {
+        "status",
+        "sync",
+        "repository_findings",
+        "import_ownership",
+        "cache_ownership",
+        "cache_invalidation_ownership",
+        "authority_ownership",
+        "concurrency_risk",
+        "verification_ownership",
+        "find_task",
+        "task_action_map",
+        "verification_relevance",
+        "ownership_relation_graph",
+        "task_evidence",
+        "task_change_impact",
+        "repository_intelligence_query",
+        "task_post_change_delta",
+        "refresh_after_change_delta",
+        "refresh_after_change_brief",
+        "refresh_after_change",
+        "task_decision_brief",
+        "task_action_brief",
+        "task_decision_brief_budget_sweep",
+        "task_decision_packet",
+        "stop",
+    }
+
+    semantic = {
+        route: (entry.operation, entry.response_key)
+        for route, entry in routes.items()
+        if entry.classification == "canonical-semantic"
+    }
+    assert semantic == {
         "task_evidence": ("task_evidence", "task_evidence"),
         "task_change_impact": ("change_impact", "task_change_impact"),
         "task_post_change_delta": ("post_change", "post_change_delta"),
     }
+    assert all(
+        entry.classification in {"canonical-semantic", "internal-service"}
+        for entry in routes.values()
+    )
+    assert all(
+        (entry.operation is None and entry.response_key is None)
+        for entry in routes.values()
+        if entry.classification == "internal-service"
+    )
 
+
+def test_service_route_classification_fails_closed() -> None:
     with pytest.raises(ValueError, match="unknown Hashmarks operation"):
-        service_module._CanonicalServiceProjection(
+        service_module._ServiceRoute(
+            handler_name="_fixture",
+            classification="canonical-semantic",
             operation="unregistered_operation",
             response_key="payload",
         )
+    with pytest.raises(
+        ValueError,
+        match="canonical-semantic service routes require operation and response_key",
+    ):
+        service_module._ServiceRoute(
+            handler_name="_fixture",
+            classification="canonical-semantic",
+            operation="find",
+        )
+    with pytest.raises(
+        ValueError,
+        match="internal-service routes must not carry semantic operation metadata",
+    ):
+        service_module._ServiceRoute(
+            handler_name="_fixture",
+            classification="internal-service",
+            operation="find",
+            response_key="payload",
+        )
+    with pytest.raises(ValueError, match="unsupported service route classification"):
+        service_module._ServiceRoute(
+            handler_name="_fixture",
+            classification="implicit",  # type: ignore[arg-type]
+        )
+
+
+def test_service_registry_owns_handler_selection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = service_module.CodeMapService(tmp_path)
+    seen: list[dict[str, object]] = []
+
+    def project(request: dict[str, object]) -> dict[str, object]:
+        seen.append(request)
+        return {
+            "ok": True,
+            "task_evidence": {"schema": "hashmarks.task-evidence.v2"},
+        }
+
+    monkeypatch.setattr(service, "_task_evidence_response", project)
+    service.dispatch(
+        {
+            "protocol": service_module.PROTOCOL,
+            "op": "task_evidence",
+            "task": "inspect",
+        }
+    )
+
+    assert seen == [
+        {
+            "protocol": service_module.PROTOCOL,
+            "op": "task_evidence",
+            "task": "inspect",
+        }
+    ]
+    assert service._requests == 1
+
+
+def test_service_route_missing_handler_fails_before_request_count(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = service_module.CodeMapService(tmp_path)
+    monkeypatch.setitem(
+        service_module._SERVICE_ROUTES,
+        "fixture",
+        service_module._ServiceRoute(
+            handler_name="_missing_handler",
+            classification="internal-service",
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="route handler is unavailable"):
+        service.dispatch(
+            {
+                "protocol": service_module.PROTOCOL,
+                "op": "fixture",
+            }
+        )
+
+    assert service._requests == 0
 
 
 def test_canonical_service_admission_fails_before_work(
