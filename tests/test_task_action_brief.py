@@ -332,6 +332,27 @@ def test_task_action_brief_keeps_ambiguous_candidate_out_of_edit_authority(
     assert brief["discrimination"] == "competing-action-roles"
 
 
+def test_task_action_brief_consumes_canonical_action_edit(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    task = "widget implementation test"
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task)
+        assert action["ambiguity"]["ambiguous"] is False
+        assert action["edit"]["path"] == "src/engine.py"
+        assert action["action_edit"]["path"] == "src/engine.py"
+
+        action["action_edit"] = None
+        codemap.task_action_map = lambda *args, **kwargs: action  # type: ignore[method-assign]
+        brief = codemap.task_action_brief(task, token_budget=256)
+
+    assert brief["status"] == "unsafe"
+    assert "edit" not in brief
+    assert brief["candidate"] == "src/engine.py"
+
+
 def test_task_action_brief_receipt_is_assembled_inside_decision_session(
     tmp_path: Path,
     monkeypatch,
