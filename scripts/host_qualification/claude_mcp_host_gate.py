@@ -15,6 +15,7 @@ from hashmarks.mcp_contract import (
     MCP_BASIC_HOST_QUALIFICATION_TOOLS,
     qualification_response_schemas,
 )
+from hashmarks.mcp_launch import installed_mcp_command
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(SCRIPTS_DIR) not in sys.path:
@@ -43,13 +44,14 @@ EXPECTED = qualification_response_schemas(
 
 def _write_claude_config(repo: Path, hashmarks: Path) -> Path:
     path = repo / ".mcp.json"
+    launch = installed_mcp_command(hashmarks, repo)
     path.write_text(
         json.dumps(
             {
                 "mcpServers": {
                     "hashmarks": {
-                        "command": str(hashmarks),
-                        "args": ["--workspace", str(repo), "mcp"],
+                        "command": launch[0],
+                        "args": list(launch[1:]),
                     }
                 }
             },

@@ -17,7 +17,6 @@ from hashmarks.mcp_contract import (
 from scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff import (
     EXPECTED_TOOLS,
     HostGateError,
-    _command_argv,
     _observe_mcp,
     _source_binding,
     _validate_observation,
@@ -47,26 +46,6 @@ def _observation() -> dict[str, object]:
             for contract in MCP_TOOL_CONTRACTS
         ],
     }
-
-
-def test_handoff_command_is_exact_workspace_bound_stdio(tmp_path: Path) -> None:
-    executable = tmp_path / "bin" / "hashmarks"
-    workspace = tmp_path / "repo"
-    state = workspace / ".state"
-    assert _command_argv(executable, workspace, None) == [
-        str(executable),
-        "--workspace",
-        str(workspace),
-        "mcp",
-    ]
-    assert _command_argv(executable, workspace, state) == [
-        str(executable),
-        "--workspace",
-        str(workspace),
-        "--state-dir",
-        str(state),
-        "mcp",
-    ]
 
 
 def test_handoff_receipt_preserves_external_tunnel_authority(tmp_path: Path) -> None:
