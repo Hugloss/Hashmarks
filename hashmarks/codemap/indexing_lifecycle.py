@@ -1256,97 +1256,101 @@ class IndexingLifecycleMixin:
             return self.sync()
         started = time.perf_counter()
         warnings: list[str] = []
-        removed = self._reconcile_persisted_analysis_scope()
-        identity_generation_before = getattr(
-            self._daemon_observation(), "generation", None
-        )
-        discovery = self._sync_discovery(paths, warnings)
-        previous_python_import_roots = self._python_import_roots
-        self._sync_refresh_python_import_roots(
-            discovery.files,
-            full=discovery.full,
-            requested_paths=discovery.requested_paths,
-        )
-        reprojection_removed = self._sync_expand_python_reprojection(
-            discovery.files,
-            full=discovery.full,
-            previous_roots=previous_python_import_roots,
-        )
-        preflight = self._preflight_from_discovered(discovery.files)
-        cache_state = self._sync_begin_build(
-            discovered=discovery.files,
-            full=discovery.full,
-            requested_paths=discovery.requested_paths,
-            preflight=preflight,
-        )
-        base = self._sync_base_snapshot(full=discovery.full)
-        state = self._sync_index_discovered(
-            discovered=discovery.files,
-            overlay_paths=base.overlay_paths,
-            base_snapshot_payload=base.payload,
-            warnings=warnings,
-        )
-        removed += reprojection_removed + self._sync_remove_stale_paths(
-            full=discovery.full,
-            present=state.present,
-            discovered=discovery.files,
-            requested_paths=discovery.requested_paths,
-        )
-        identity = self._sync_finalize_identity(
-            changed=state.changed or bool(removed),
-            identity_generation_before=identity_generation_before,
-            warnings=warnings,
-        )
-        self._sync_write_base_snapshot(
-            full=discovery.full,
-            base_identity=base.identity,
-            overlay_paths=base.overlay_paths,
-            skipped=state.skipped,
-        )
-        elapsed = time.perf_counter() - started
-        economics = self._sync_economics(
-            cache_state=cache_state,
-            elapsed=elapsed,
-            discovered_count=len(discovery.files),
-            source_bytes=int(preflight.get("source_bytes") or 0),
-            persisted_file_writes=state.persisted_file_writes,
-        )
-        self.store.set_meta_many(
-            {
-                "sync.build_state": "COMPLETE",
-                "sync.completed_unix": str(time.time()),
-                "sync.persisted_file_writes": str(state.persisted_file_writes),
-                "sync.economics": json.dumps(
-                    economics, sort_keys=True, separators=(",", ":")
+        # One BEGIN IMMEDIATE owns both cross-process writer admission and the
+        # publication boundary. WAL readers continue to see the previously
+        # complete generation until rows + generation + COMPLETE commit together.
+        with self.store.publication_transaction():
+            removed = self._reconcile_persisted_analysis_scope()
+            identity_generation_before = getattr(
+                self._daemon_observation(), "generation", None
+            )
+            discovery = self._sync_discovery(paths, warnings)
+            previous_python_import_roots = self._python_import_roots
+            self._sync_refresh_python_import_roots(
+                discovery.files,
+                full=discovery.full,
+                requested_paths=discovery.requested_paths,
+            )
+            reprojection_removed = self._sync_expand_python_reprojection(
+                discovery.files,
+                full=discovery.full,
+                previous_roots=previous_python_import_roots,
+            )
+            preflight = self._preflight_from_discovered(discovery.files)
+            cache_state = self._sync_begin_build(
+                discovered=discovery.files,
+                full=discovery.full,
+                requested_paths=discovery.requested_paths,
+                preflight=preflight,
+            )
+            base = self._sync_base_snapshot(full=discovery.full)
+            state = self._sync_index_discovered(
+                discovered=discovery.files,
+                overlay_paths=base.overlay_paths,
+                base_snapshot_payload=base.payload,
+                warnings=warnings,
+            )
+            removed += reprojection_removed + self._sync_remove_stale_paths(
+                full=discovery.full,
+                present=state.present,
+                discovered=discovery.files,
+                requested_paths=discovery.requested_paths,
+            )
+            identity = self._sync_finalize_identity(
+                changed=state.changed or bool(removed),
+                identity_generation_before=identity_generation_before,
+                warnings=warnings,
+            )
+            self._sync_write_base_snapshot(
+                full=discovery.full,
+                base_identity=base.identity,
+                overlay_paths=base.overlay_paths,
+                skipped=state.skipped,
+            )
+            elapsed = time.perf_counter() - started
+            economics = self._sync_economics(
+                cache_state=cache_state,
+                elapsed=elapsed,
+                discovered_count=len(discovery.files),
+                source_bytes=int(preflight.get("source_bytes") or 0),
+                persisted_file_writes=state.persisted_file_writes,
+            )
+            self.store.set_meta_many(
+                {
+                    "sync.build_state": "COMPLETE",
+                    "sync.completed_unix": str(time.time()),
+                    "sync.persisted_file_writes": str(state.persisted_file_writes),
+                    "sync.economics": json.dumps(
+                        economics, sort_keys=True, separators=(",", ":")
+                    ),
+                }
+            )
+            self._reverse_file_graph_cache = None
+            return SyncResult(
+                generation=identity.generation,
+                discovered=len(discovery.files),
+                indexed=state.indexed,
+                reused_artifacts=state.reused,
+                parsed_artifacts=state.parsed,
+                removed=removed,
+                skipped=state.skipped,
+                parse_errors=state.parse_errors,
+                seconds=elapsed,
+                workspace_fingerprint=identity.fingerprint,
+                identity_generation=identity.identity_generation,
+                derived_surfaces_changed=state.derived_changed,
+                derived_surfaces_preserved=state.derived_preserved,
+                semantic_invalidation_shields=state.semantic_shields,
+                base_snapshot_reused=state.base_snapshot_reused,
+                base_identity=base.identity,
+                overlay_paths=(
+                    0 if base.overlay_paths is None else len(base.overlay_paths)
                 ),
-            }
-        )
-        self._reverse_file_graph_cache = None
-        return SyncResult(
-            generation=identity.generation,
-            discovered=len(discovery.files),
-            indexed=state.indexed,
-            reused_artifacts=state.reused,
-            parsed_artifacts=state.parsed,
-            removed=removed,
-            skipped=state.skipped,
-            parse_errors=state.parse_errors,
-            seconds=elapsed,
-            workspace_fingerprint=identity.fingerprint,
-            identity_generation=identity.identity_generation,
-            derived_surfaces_changed=state.derived_changed,
-            derived_surfaces_preserved=state.derived_preserved,
-            semantic_invalidation_shields=state.semantic_shields,
-            base_snapshot_reused=state.base_snapshot_reused,
-            base_identity=base.identity,
-            overlay_paths=(
-                0 if base.overlay_paths is None else len(base.overlay_paths)
-            ),
-            warnings=tuple(warnings),
-            preflight=preflight,
-            economics=economics,
-            build_state="COMPLETE",
-        )
+                warnings=tuple(warnings),
+                preflight=preflight,
+                economics=economics,
+                build_state="COMPLETE",
+            )
 
     def derived_graph(self, path: str | None = None) -> dict[str, object]:
         """Expose dependency-tracked derived CodeMap surfaces for diagnostics.

@@ -126,7 +126,7 @@ def test_index_denial_policy_purges_previous_shared_artifact(tmp_path: Path) -> 
         assert codemap.artifacts.get(key) is None
 
 
-def test_interrupted_sync_leaves_durable_incomplete_generation_and_decision_fails_closed(
+def test_interrupted_sync_rolls_back_candidate_generation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "src").mkdir()
@@ -143,13 +143,11 @@ def test_interrupted_sync_leaves_durable_incomplete_generation_and_decision_fail
         monkeypatch.setattr(codemap, "_parse_or_reuse", explode)
         with pytest.raises(RuntimeError, match="synthetic interruption"):
             codemap.sync()
-        assert codemap.status()["build"]["state"] == "BUILDING"
+        assert codemap.status()["build"]["state"] == "NEVER_SYNCED"
+        assert codemap.store.generation() == 0
+        assert codemap.store.paths() == set()
+
     with CodeMap(tmp_path, artifact_db=artifact_db) as reopened:
-        status = reopened.status()
-        packet = reopened.task_decision_packet("Fix run behavior")
-    assert status["build"]["complete"] is False
-    assert packet["identity"]["codemap_complete"] is False
-    assert packet["identity"]["stale"] is True
-    assert packet["discrimination"]["needed"] is True
-    assert packet["discrimination"]["reason"] == "codemap-generation-incomplete"
-    assert packet["context_budget"]["safe"] is False
+        assert reopened.status()["build"]["state"] == "NEVER_SYNCED"
+        assert reopened.find("run")[0].path == "src/app.py"
+        assert reopened.status()["build"]["complete"] is True

@@ -401,6 +401,34 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         self._bulk_file_write_count = 0
         self._bulk_file_write_committed = 0
         self._bulk_file_write_on_commit: Callable[[int], None] | None = None
+        self._publication_transaction_active = False
+
+    @contextmanager
+    def publication_transaction(self):
+        """Own one atomic, cross-process CodeMap generation publication.
+
+        BEGIN IMMEDIATE serializes writers while WAL keeps the previously
+        committed generation readable. Repository rows, generation metadata,
+        and COMPLETE become visible together at commit; interruption rolls the
+        whole candidate generation back instead of exposing partial authority.
+        """
+
+        with self._lock:
+            if self._publication_transaction_active or self._db.in_transaction:
+                raise RuntimeError(
+                    "nested CodeMap publication transactions are not supported"
+                )
+            self._db.execute("BEGIN IMMEDIATE")
+            self._publication_transaction_active = True
+            committed = False
+            try:
+                yield
+                self._db.execute("COMMIT")
+                committed = True
+            finally:
+                if not committed and self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                self._publication_transaction_active = False
 
     def _count_read(self, name: str) -> None:
         self._read_counters[name] = self._read_counters.get(name, 0) + 1
@@ -419,7 +447,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         with self._lock:
             if self._bulk_file_write_batch_size:
                 raise RuntimeError("nested bulk file writes are not supported")
-            if self._db.in_transaction:
+            if self._db.in_transaction and not self._publication_transaction_active:
                 raise RuntimeError("cannot start bulk file writes inside a transaction")
             self._bulk_file_write_batch_size = batch_size
             self._bulk_file_write_count = 0
@@ -434,7 +462,7 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     def _rollback_bulk_file_writes(self) -> None:
         with self._lock:
             try:
-                if self._db.in_transaction:
+                if self._db.in_transaction and not self._publication_transaction_active:
                     self._db.execute("ROLLBACK")
             finally:
                 self._clear_bulk_file_write_state()
@@ -444,7 +472,8 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
             try:
                 if self._db.in_transaction:
                     pending = self._bulk_file_write_count
-                    self._db.execute("COMMIT")
+                    if not self._publication_transaction_active:
+                        self._db.execute("COMMIT")
                     self._bulk_file_write_committed += pending
                     callback = self._bulk_file_write_on_commit
                     if callback is not None and pending:
@@ -456,12 +485,11 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     def bulk_file_writes(
         self, *, batch_size: int = 32, on_commit: Callable[[int], None] | None = None
     ):
-        """Bound cold-sync write amplification without changing file semantics.
+        """Batch file writes without weakening generation publication authority.
 
-        Each completed chunk is committed independently, so an interruption can
-        lose at most the current bounded chunk rather than the entire sync.  The
-        ordinary ``set_file`` contract remains one-file/one-transaction outside
-        this explicit context.
+        Standalone callers retain bounded commits. During CodeMap sync, the
+        enclosing publication transaction owns commit/rollback so no file batch
+        becomes visible before the complete generation is published.
         """
         self._begin_bulk_file_writes(batch_size, on_commit)
         try:
@@ -625,25 +653,29 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
 
     def set_meta(self, key: str, value: str) -> None:
         with self._lock:
+            owns_transaction = not self._db.in_transaction
             self._db.execute(
                 "INSERT INTO meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (key, value),
             )
-            self._db.commit()
+            if owns_transaction:
+                self._db.commit()
 
     def set_meta_many(self, values: dict[str, str]) -> None:
         if not values:
             return
         with self._lock:
-            if self._db.in_transaction:
+            if self._db.in_transaction and not self._publication_transaction_active:
                 raise RuntimeError(
                     "cannot publish sync metadata inside an active transaction"
                 )
+            owns_transaction = not self._db.in_transaction
             self._db.executemany(
                 "INSERT INTO meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 list(values.items()),
             )
-            self._db.commit()
+            if owns_transaction:
+                self._db.commit()
 
     def generation(self) -> int:
         return int(self.meta("generation", "0") or 0)
@@ -651,29 +683,32 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
     def bump_generation(self) -> int:
         """Atomically advance the durable CodeMap generation.
 
-        Generation is shared durable state.  Keep the read-modify-write inside
-        one store lock/transaction so concurrent sync callers cannot both sample
-        the same revision and publish the same successor.
+        Generation is shared durable state. Keep the read-modify-write under
+        the active publication authority, or acquire one standalone SQLite
+        writer transaction when called outside CodeMap sync.
         """
+
+        def bump_locked() -> int:
+            row = self._db.execute(
+                "SELECT value FROM meta WHERE key='generation'"
+            ).fetchone()
+            value = int(row[0]) + 1 if row is not None else 1
+            self._db.execute(
+                "INSERT INTO meta(key,value) VALUES ('generation',?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (str(value),),
+            )
+            return value
+
         with self._lock:
+            if self._publication_transaction_active:
+                return bump_locked()
             if self._db.in_transaction:
                 raise RuntimeError(
                     "cannot bump generation inside an active transaction"
                 )
-            # The Python lock owns one connection; BEGIN IMMEDIATE additionally
-            # serializes other WorkspaceMapStore instances/processes using the
-            # same durable database so the read-modify-write cannot lose a bump.
             with sqlite_transaction(self._db, begin="BEGIN IMMEDIATE"):
-                row = self._db.execute(
-                    "SELECT value FROM meta WHERE key='generation'"
-                ).fetchone()
-                value = int(row[0]) + 1 if row is not None else 1
-                self._db.execute(
-                    "INSERT INTO meta(key,value) VALUES ('generation',?) "
-                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                    (str(value),),
-                )
-            return value
+                return bump_locked()
 
     def file_row(self, path: str):
         self._count_read("file_row")
@@ -713,6 +748,23 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 str(row[0]) for row in self._db.execute("SELECT path FROM file_map")
             }
 
+    def _finish_file_write(self, *, bulk_write: bool, owns_transaction: bool) -> None:
+        if not bulk_write:
+            if owns_transaction:
+                self._db.execute("COMMIT")
+            return
+        self._bulk_file_write_count += 1
+        if self._bulk_file_write_count < self._bulk_file_write_batch_size:
+            return
+        committed = self._bulk_file_write_count
+        if not self._publication_transaction_active:
+            self._db.execute("COMMIT")
+        self._bulk_file_write_committed += committed
+        self._bulk_file_write_count = 0
+        callback = self._bulk_file_write_on_commit
+        if callback is not None:
+            callback(self._bulk_file_write_committed)
+
     def set_file(
         self,
         path: str,
@@ -743,7 +795,8 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         )
         with self._lock:
             bulk_write = self._bulk_file_write_batch_size > 0
-            if not self._db.in_transaction:
+            owns_transaction = not self._db.in_transaction
+            if owns_transaction:
                 self._db.execute("BEGIN")
             try:
                 self._db.execute("DELETE FROM symbol WHERE path=?", (path,))
@@ -829,20 +882,11 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                         for node in nodes
                     ],
                 )
-                if bulk_write:
-                    self._bulk_file_write_count += 1
-                    if self._bulk_file_write_count >= self._bulk_file_write_batch_size:
-                        committed = self._bulk_file_write_count
-                        self._db.execute("COMMIT")
-                        self._bulk_file_write_committed += committed
-                        self._bulk_file_write_count = 0
-                        callback = self._bulk_file_write_on_commit
-                        if callback is not None:
-                            callback(self._bulk_file_write_committed)
-                else:
-                    self._db.execute("COMMIT")
+                self._finish_file_write(
+                    bulk_write=bulk_write, owns_transaction=owns_transaction
+                )
             except Exception:
-                if self._db.in_transaction:
+                if owns_transaction and self._db.in_transaction:
                     self._db.execute("ROLLBACK")
                 self._bulk_file_write_count = 0
                 raise
@@ -875,13 +919,21 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         values = list(paths)
         if not values:
             return 0
-        with self._lock, sqlite_transaction(self._db):
+
+        def delete_locked() -> None:
             for path in values:
                 self._db.execute("DELETE FROM symbol WHERE path=?", (path,))
                 self._db.execute("DELETE FROM edge WHERE path=?", (path,))
                 self._db.execute("DELETE FROM lexical WHERE path=?", (path,))
                 self._db.execute("DELETE FROM derived_node WHERE path=?", (path,))
                 self._db.execute("DELETE FROM file_map WHERE path=?", (path,))
+
+        with self._lock:
+            if self._publication_transaction_active:
+                delete_locked()
+            else:
+                with sqlite_transaction(self._db):
+                    delete_locked()
         return len(values)
 
     def replace_native_file_edges(self, producer_prefix: str, edges) -> None:
