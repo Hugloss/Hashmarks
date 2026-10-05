@@ -48,50 +48,69 @@ class WatchContinuityRecord:
             return None
         try:
             payload = json.loads(raw)
-        except (TypeError, ValueError, json.JSONDecodeError):
+        except (TypeError, ValueError):
             return None
         if not isinstance(payload, dict) or payload.get("schema") != WATCH_CONTINUITY_SCHEMA:
             return None
         observation = payload.get("observation")
         if not isinstance(observation, dict):
             return None
-        try:
-            state = ObservationState(str(observation["state"]))
-            generation = int(observation["generation"])
-            dirty_paths = tuple(str(path) for path in observation["dirty_paths"])
-            paths_complete = bool(observation["paths_complete"])
-            dirty_path_count = int(observation["dirty_path_count"])
-            owner = str(payload["owner"])
-            pid = int(payload["pid"])
-            heartbeat_unix = float(payload["heartbeat_unix"])
-            active = bool(payload["active"])
-            codemap_generation = int(payload["codemap_generation"])
-        except (KeyError, TypeError, ValueError):
-            return None
-        if (
-            not owner
-            or generation < 0
-            or dirty_path_count < len(dirty_paths)
-            or codemap_generation < 0
+
+        owner = payload.get("owner")
+        pid = payload.get("pid")
+        heartbeat_unix = payload.get("heartbeat_unix")
+        active = payload.get("active")
+        codemap_generation = payload.get("codemap_generation")
+        state_raw = observation.get("state")
+        generation = observation.get("generation")
+        dirty_paths = observation.get("dirty_paths")
+        paths_complete = observation.get("paths_complete")
+        dirty_path_count = observation.get("dirty_path_count")
+        reason = observation.get("reason")
+        if not (
+            isinstance(owner, str)
+            and owner
+            and isinstance(pid, int)
+            and not isinstance(pid, bool)
+            and isinstance(heartbeat_unix, (int, float))
+            and not isinstance(heartbeat_unix, bool)
+            and isinstance(active, bool)
+            and isinstance(codemap_generation, int)
+            and not isinstance(codemap_generation, bool)
+            and isinstance(state_raw, str)
+            and isinstance(generation, int)
+            and not isinstance(generation, bool)
+            and isinstance(dirty_paths, list)
+            and all(isinstance(path, str) for path in dirty_paths)
+            and isinstance(paths_complete, bool)
+            and isinstance(dirty_path_count, int)
+            and not isinstance(dirty_path_count, bool)
+            and (reason is None or isinstance(reason, str))
         ):
             return None
-        if paths_complete and dirty_path_count != len(dirty_paths):
+        try:
+            state = ObservationState(state_raw)
+        except ValueError:
             return None
-        if state is ObservationState.CLEAN and (dirty_paths or dirty_path_count):
-            return None
-        reason = observation.get("reason")
-        if reason is not None and not isinstance(reason, str):
+        paths = tuple(dirty_paths)
+        if (
+            generation < 0
+            or dirty_path_count < len(paths)
+            or codemap_generation < 0
+            or (paths_complete and dirty_path_count != len(paths))
+            or (state is ObservationState.CLEAN and (paths or dirty_path_count))
+        ):
             return None
         return cls(
             owner=owner,
             pid=pid,
-            heartbeat_unix=heartbeat_unix,
+            heartbeat_unix=float(heartbeat_unix),
             active=active,
             codemap_generation=codemap_generation,
             observation=RepositoryObservation(
                 state=state,
                 generation=generation,
-                dirty_paths=dirty_paths,
+                dirty_paths=paths,
                 paths_complete=paths_complete,
                 dirty_path_count=dirty_path_count,
                 reason=reason,
@@ -102,7 +121,8 @@ class WatchContinuityRecord:
         if not self.active or self.pid <= 0:
             return False
         current = time.time() if now is None else now
-        if current - self.heartbeat_unix >= _MAX_HEARTBEAT_AGE_SECONDS:
+        age = current - self.heartbeat_unix
+        if age < 0 or age >= _MAX_HEARTBEAT_AGE_SECONDS:
             return False
         try:
             os.kill(self.pid, 0)
@@ -166,3 +186,22 @@ def watch_record_from_snapshot(
             reason=snapshot.reason,
         ),
     )
+
+
+def watch_status_projection(
+    record: WatchContinuityRecord | None,
+) -> dict[str, object]:
+    if record is not None:
+        return record.status_projection()
+    return {
+        "owner": None,
+        "pid": None,
+        "active": False,
+        "state": None,
+        "heartbeat_unix": None,
+        "observation_generation": None,
+        "codemap_generation": None,
+        "paths_complete": None,
+        "dirty_path_count": None,
+        "reason": None,
+    }
