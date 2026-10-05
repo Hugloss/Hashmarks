@@ -15,11 +15,9 @@ CHATGPT_MCP_HASHMARKS ?= $(abspath .venv/bin/hashmarks)
 CHATGPT_MCP_WORKSPACE ?= $(CURDIR)
 CHATGPT_MCP_SOURCE_ROOT ?= $(CURDIR)
 DIAGNOSTIC_PYTHON ?= python3
-DIAGNOSTIC_SHARDS ?= 64
 DIAGNOSTIC_BATCH ?= 0
 DIAGNOSTIC_BATCH_LIMIT ?= 8
 DIAGNOSTIC_SHARD ?= 0
-DIAGNOSTIC_EXTRA_MARKER ?=
 AGENTS_COOKBOOK ?= ../agentsCookbook
 RUFF_DEBT_PREVIOUS_BASELINE ?=
 RUFF_AUTOFIX_SELECT ?= E4,E7,E9,I,T201
@@ -261,23 +259,23 @@ test-diagnostic-capabilities:
 
 test-diagnostic:
 	@$(DIAGNOSTIC_PYTHON) -m scripts.hosted_diagnostic \
-	  --shards $(DIAGNOSTIC_SHARDS) \
-	  --extra-marker '$(DIAGNOSTIC_EXTRA_MARKER)'
+	  $(if $(strip $(DIAGNOSTIC_SHARDS)),--shards $(DIAGNOSTIC_SHARDS),) \
+	  $(if $(strip $(DIAGNOSTIC_EXTRA_MARKER)),--extra-marker '$(DIAGNOSTIC_EXTRA_MARKER)',)
 
 test-diagnostic-batch:
 	@start=$$(( $(DIAGNOSTIC_BATCH) * $(DIAGNOSTIC_BATCH_LIMIT) )); \
 	$(DIAGNOSTIC_PYTHON) -m scripts.hosted_diagnostic \
-	  --shards $(DIAGNOSTIC_SHARDS) \
-	  --start $$start \
+	  $(if $(strip $(DIAGNOSTIC_SHARDS)),--shards $(DIAGNOSTIC_SHARDS),) \
+	  --start $start \
 	  --limit $(DIAGNOSTIC_BATCH_LIMIT) \
-	  --extra-marker '$(DIAGNOSTIC_EXTRA_MARKER)'
+	  $(if $(strip $(DIAGNOSTIC_EXTRA_MARKER)),--extra-marker '$(DIAGNOSTIC_EXTRA_MARKER)',)
 
 test-diagnostic-shard:
 	@$(DIAGNOSTIC_PYTHON) -m scripts.hosted_diagnostic \
-	  --shards $(DIAGNOSTIC_SHARDS) \
+	  $(if $(strip $(DIAGNOSTIC_SHARDS)),--shards $(DIAGNOSTIC_SHARDS),) \
 	  --start $(DIAGNOSTIC_SHARD) \
 	  --limit 1 \
-	  --extra-marker '$(DIAGNOSTIC_EXTRA_MARKER)'
+	  $(if $(strip $(DIAGNOSTIC_EXTRA_MARKER)),--extra-marker '$(DIAGNOSTIC_EXTRA_MARKER)',)
 
 test-profile:
 	@$(UV_RUN) --offline --no-sync --group test python scripts/qualification_filesystem.py
