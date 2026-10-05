@@ -60,7 +60,7 @@ OPERATION_CONTRACTS = (
     ),
     OperationContract(
         "task_evidence",
-        ((("default", "hashmarks.task-evidence.v3"),)),
+        (("default", "hashmarks.task-evidence.v3"),),
     ),
     OperationContract(
         "change_impact",
