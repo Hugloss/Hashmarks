@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
@@ -8,9 +8,6 @@ from benchmarks import derived_authority_economics as derived
 from benchmarks.derived_authority_economics import (
     measure_derived_authority_economics,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def test_derived_authority_economics_proves_explicit_packet_reuse() -> None:
