@@ -1071,12 +1071,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         existing_keys = {
             (
                 str(row.get("path") or ""),
-                str(
-                    row.get("symbol")
-                    or row.get("qualname")
-                    or row.get("name")
-                    or ""
-                ),
+                str(row.get("symbol") or row.get("qualname") or row.get("name") or ""),
             )
             for row in existing
         }
@@ -1160,10 +1155,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         keep = max(0, limit - len(supplements))
         retrieval["results"] = [
             *current[:keep],
-            *[
-                self._task_evidence_retrieval_locator(row)
-                for row in supplements
-            ],
+            *[self._task_evidence_retrieval_locator(row) for row in supplements],
         ]
         retrieval["canonical_omitted_results"] = max(0, len(current) - keep)
         retrieval["supplemental_results"] = len(supplements)
