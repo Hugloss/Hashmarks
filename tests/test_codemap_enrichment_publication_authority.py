@@ -87,6 +87,44 @@ def test_scip_rows_and_freshness_snapshot_roll_back_together(
         assert codemap.store.native_definitions("AfterOwner") == []
 
 
+def test_project_rows_and_freshness_snapshot_roll_back_together(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _repository(tmp_path)
+    state = tmp_path / ".state"
+    artifacts = tmp_path / "artifacts.sqlite3"
+
+    with CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as codemap:
+        codemap.sync()
+        codemap.enrich_projects(("npm-package-graph",))
+        before_generation = codemap.store.generation()
+        before_nodes = codemap.store.project_nodes()
+        before_snapshot = codemap.store.meta(
+            "native_evidence:project:npm-package-graph"
+        )
+
+        (tmp_path / "package.json").write_text(
+            json.dumps({"name": "replacement-project", "private": True}),
+            encoding="utf-8",
+        )
+
+        def fail_snapshot(*args, **kwargs) -> None:
+            raise RuntimeError("injected project snapshot publication failure")
+
+        monkeypatch.setattr(codemap, "_record_evidence_snapshot", fail_snapshot)
+        with pytest.raises(
+            RuntimeError, match="injected project snapshot publication failure"
+        ):
+            codemap.enrich_projects(("npm-package-graph",))
+
+        assert codemap.store.generation() == before_generation
+        assert codemap.store.project_nodes() == before_nodes
+        assert (
+            codemap.store.meta("native_evidence:project:npm-package-graph")
+            == before_snapshot
+        )
+
+
 def test_enrichment_commit_invalidates_inflight_generation_session(
     tmp_path: Path,
 ) -> None:
