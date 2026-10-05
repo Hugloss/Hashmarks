@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
 
+from .decision_session import decision_scoped
 from .model import EvidenceVisibility
 from .python_ast import estimate_tokens
 from .query_primitives import _WORD_RE
@@ -137,6 +138,7 @@ class QuerySurfaceMixin:
             "evidence_visibility": visibility.value,
         }
 
+    @decision_scoped
     def grep(
         self, query: str, *, limit: int = 50, context_lines: int = 0
     ) -> dict[str, object]:
@@ -172,6 +174,7 @@ class QuerySurfaceMixin:
             "matches": matches,
         }
 
+    @decision_scoped
     def symbol(self, query: str) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -239,6 +242,7 @@ class QuerySurfaceMixin:
         )
         return path, qualname, current, content
 
+    @decision_scoped
     def source(self, query: str, *, token_budget: int = 4000) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -292,6 +296,7 @@ class QuerySurfaceMixin:
             "content": body,
         }
 
+    @decision_scoped
     def projects(self) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -307,6 +312,7 @@ class QuerySurfaceMixin:
             else float(self.store.meta("project_graph_last_sync_unix") or 0),
         }
 
+    @decision_scoped
     def structural(
         self, pattern: str, *, language: str | None = None, limit: int = 100
     ) -> dict[str, object]:
@@ -412,6 +418,7 @@ class QuerySurfaceMixin:
             frontier = next_frontier
         return resolved, seen
 
+    @decision_scoped
     def affected(self, query: str, *, max_depth: int = 12) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -443,6 +450,7 @@ class QuerySurfaceMixin:
             "evidence": "static import graph plus retained native/manifest project graph when available; advisory and conservative",
         }
 
+    @decision_scoped
     def tests(self, query: str, *, max_depth: int = 12) -> dict[str, object]:
         value = self.affected(query, max_depth=max_depth)
         return {
@@ -531,6 +539,7 @@ class QuerySurfaceMixin:
         )
         return chains, ordered
 
+    @decision_scoped
     def repository_instruction_scope(
         self, query: str, *, seed_limit: int = 8
     ) -> dict[str, object]:
@@ -626,6 +635,7 @@ class QuerySurfaceMixin:
             return str(provenance_rows[0].get("relation") or "") or None
         return None
 
+    @decision_scoped
     def change_impact(
         self, query: str, *, max_depth: int = 4, limit_per_surface: int = 20
     ) -> dict[str, object]:
