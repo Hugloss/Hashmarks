@@ -212,9 +212,12 @@ def operation_modes(operation: str) -> dict[str, str]:
     return operation_contract(operation).mode_map()
 
 
+def operation_default_mode(operation: str) -> str:
+    return operation_contract(operation).default_mode
+
+
 def require_operation_mode(operation: str, mode: str | None = None) -> str:
-    contract = operation_contract(operation)
-    selected = contract.default_mode if mode is None else mode
+    selected = operation_default_mode(operation) if mode is None else mode
     allowed = operation_modes(operation)
     if selected not in allowed:
         raise ValueError(f"result_mode must be one of: {', '.join(allowed)}")

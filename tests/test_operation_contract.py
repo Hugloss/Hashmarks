@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import inspect
 import re
 from pathlib import Path
 from typing import get_args
@@ -18,15 +19,17 @@ from hashmarks.codemap.dependency_resolution_evidence import (
     DependencyResolutionEvidenceMixin,
 )
 from hashmarks.codemap.repository_declarations import RepositoryDeclarationsMixin
-from hashmarks.mcp_contract import McpToolContract
+from hashmarks.mcp_contract import McpToolContract, tool_contract
 from hashmarks.mcp_server import (
     _DependencyCodemapResultMode,
     _RepositoryDeclarationsResultMode,
 )
+from hashmarks.mcp_surface import HashmarksMcpSurface
 from hashmarks.operation_contract import (
     OPERATION_CONTRACT_SCHEMA,
     OPERATION_CONTRACTS,
     operation_contract_manifest,
+    operation_default_mode,
     operation_modes,
     operation_schema,
     registered_operations,
@@ -270,6 +273,46 @@ def test_mcp_mode_types_derive_from_operation_contract() -> None:
     )
 
 
+def test_multimode_public_defaults_consume_canonical_operation_authority() -> None:
+    expected = {
+        "dependency_codemap": "observation",
+        "repository_declarations": "observation",
+    }
+    assert {
+        operation: operation_default_mode(operation) for operation in expected
+    } == expected
+
+    assert inspect.signature(
+        DependencyResolutionEvidenceMixin.dependency_codemap
+    ).parameters["result_mode"].default == operation_default_mode("dependency_codemap")
+    assert inspect.signature(
+        RepositoryDeclarationsMixin.repository_declarations_operation
+    ).parameters["result_mode"].default == operation_default_mode(
+        "repository_declarations"
+    )
+    assert inspect.signature(HashmarksMcpSurface.dependency_codemap).parameters[
+        "result_mode"
+    ].default == operation_default_mode("dependency_codemap")
+    assert inspect.signature(HashmarksMcpSurface.repository_declarations).parameters[
+        "result_mode"
+    ].default == operation_default_mode("repository_declarations")
+    assert tool_contract("dependency_codemap").default_response_mode == (
+        operation_default_mode("dependency_codemap")
+    )
+    assert tool_contract("repository_declarations").default_response_mode == (
+        operation_default_mode("repository_declarations")
+    )
+
+    server_source = (ROOT / "hashmarks" / "mcp_server.py").read_text(encoding="utf-8")
+    assert (
+        "result_mode: _RepositoryDeclarationsResultMode = "
+        "contract.default_response_mode"
+    ) in server_source
+    assert "dependency_codemap_contract.default_response_mode" in server_source
+    assert '_RepositoryDeclarationsResultMode = "observation"' not in server_source
+    assert '_DependencyCodemapResultMode = "observation"' not in server_source
+
+
 def test_operation_modes_fail_closed() -> None:
     assert require_operation_mode("dependency_codemap", "compare") == "compare"
     assert require_operation_mode("repository_declarations", "observation") == (
@@ -277,6 +320,8 @@ def test_operation_modes_fail_closed() -> None:
     )
     with pytest.raises(ValueError, match="unknown Hashmarks operation"):
         operation_modes("unknown")
+    with pytest.raises(ValueError, match="unknown Hashmarks operation"):
+        operation_default_mode("unknown")
     with pytest.raises(ValueError, match="result_mode must be one of"):
         require_operation_mode("dependency_codemap", "history")
     with pytest.raises(ValueError, match="unknown Hashmarks operation mode"):

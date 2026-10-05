@@ -77,7 +77,7 @@ def _register_repository_declarations_tool(
     def repository_declarations(
         groups: list[dict[str, Any]],
         previous_observation: dict[str, Any] | None = None,
-        result_mode: _RepositoryDeclarationsResultMode = "observation",
+        result_mode: _RepositoryDeclarationsResultMode = contract.default_response_mode,
     ) -> dict[str, object]:
         return _call_surface(
             contract,
@@ -208,7 +208,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         snapshot: dict[str, object],
         queries: list[dict[str, object]] | None = None,
         previous_observation: dict[str, object] | None = None,
-        result_mode: _DependencyCodemapResultMode = "observation",
+        result_mode: _DependencyCodemapResultMode = (
+            dependency_codemap_contract.default_response_mode
+        ),
     ) -> dict[str, object]:
         return _call_surface(
             dependency_codemap_contract,

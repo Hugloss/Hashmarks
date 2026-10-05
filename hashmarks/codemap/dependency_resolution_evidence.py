@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import (
+    operation_default_mode,
     operation_schema,
     require_operation_mode,
     validate_operation_response,
@@ -1252,7 +1253,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         queries: Sequence[Mapping[str, object]] = (),
         *,
         previous_observation: Mapping[str, object] | None = None,
-        result_mode: str = "observation",
+        result_mode: str = operation_default_mode("dependency_codemap"),
     ) -> dict[str, object]:
         """Execute one canonical dependency operation independent of transport."""
         mode = require_operation_mode("dependency_codemap", result_mode)

@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import (
+    operation_default_mode,
     operation_schema,
     require_operation_mode,
     validate_operation_response,
@@ -25,7 +26,7 @@ from .repository_declaration_delta import declaration_delta
 if TYPE_CHECKING:
     from .engine import CodeMap
 
-_SCHEMA = operation_schema("repository_declarations", "observation")
+_SCHEMA = operation_schema("repository_declarations")
 
 
 class RepositoryDeclarationsMixin:
@@ -749,7 +750,7 @@ class RepositoryDeclarationsMixin:
         groups: Sequence[Mapping[str, object]],
         *,
         previous_observation: Mapping[str, object] | None = None,
-        result_mode: str = "observation",
+        result_mode: str = operation_default_mode("repository_declarations"),
     ) -> dict[str, object]:
         """Execute one canonical declaration operation independent of transport."""
         mode = require_operation_mode("repository_declarations", result_mode)
