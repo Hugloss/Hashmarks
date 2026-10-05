@@ -133,7 +133,7 @@ def test_pi_event_validation_rejects_error_and_missing_schema() -> None:
                 ),
             ]
         )
-    with pytest.raises(pi_gate.HostGateError, match="did not expose schema"):
+    with pytest.raises(pi_gate.HostGateError, match="canonical contract validation"):
         pi_gate._validate_events(
             [
                 _start("a", "hashmarks_repository_context", {"max_areas": 8}),
