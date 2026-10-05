@@ -10,6 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.python_ast_cache import read_python_ast
 from hashmarks.verification_selection import (
     VerificationSelectionEnvelopeState,
@@ -183,7 +184,7 @@ class VerificationMixin:
                 "test_symbol": None,
             }
         return {
-            "schema": "hashmarks.verification-relevance.v1",
+            "schema": operation_schema("verification_relevance"),
             "selected": selected,
             "candidates": [selected] if selected else [],
             "selection_reason": "no-edit-owner",
@@ -1044,7 +1045,7 @@ class VerificationMixin:
         else:
             projected_reason = "no-verification-candidate"
         return {
-            "schema": "hashmarks.verification-relevance.v1",
+            "schema": operation_schema("verification_relevance"),
             "selected": selected,
             "candidates": VerificationMixin._verification_bounded_candidates(
                 candidates, selected_row, limit
@@ -1123,6 +1124,7 @@ class VerificationMixin:
             state, candidates, selected, reason, limit
         )
 
+    @operation_response("verification_relevance")
     def verification_relevance(
         self,
         task: str,
@@ -1305,6 +1307,7 @@ class VerificationMixin:
             if isinstance(covered, str)
         }
 
+    @operation_response("verification_ownership")
     def verification_ownership_graph(
         self, task: str, *, limit: int = 20, candidate_limit: int = 8
     ) -> dict[str, object]:
@@ -1327,7 +1330,7 @@ class VerificationMixin:
         selected = relevance.get("selected")
         generation, identity_generation, stale = self._generation_status()
         return {
-            "schema": "hashmarks.verification-ownership.v2",
+            "schema": operation_schema("verification_ownership"),
             "generation": generation,
             "identity_generation": identity_generation,
             "stale": stale,
@@ -1491,7 +1494,7 @@ class VerificationMixin:
             "verification_plan": f"sha256:{verification_digest}",
             "verification_relevance": "sha256:"
             + self._packet_digest(
-                "hashmarks.verification-relevance.v1",
+                operation_schema("verification_relevance"),
                 action.get("verification_relevance"),
             ),
             "ownership": "sha256:"
