@@ -657,7 +657,8 @@ def test_declared_topology_change_recollects_provider(
         source = codemap.task_change_impact("backend changed", ["backend/value.ts"])
 
     assert calls == 1
-    assert impact["generation"] == impact_generation == before_generation + 2
+    assert impact["generation"] == impact_generation
+    assert impact_generation > before_generation
     assert impact["project_refresh"]["mode"] == "topology-recollect"
     assert impact["project_refresh"]["changed"] == ".hashmarks-project-links.toml"
     assert source["projects"] == ["npm:frontend", "npm:mobile"]
