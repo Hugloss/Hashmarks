@@ -8,6 +8,7 @@ from hashmarks.paths import normalize_relative_path
 from hashmarks.python_ast_cache import read_python_ast
 
 from .cache_invalidation import analyze_python_cache_invalidators
+from .decision_session import decision_scoped
 from .cache_ownership import analyze_python_cache_ownership
 from .concurrency_risk import analyze_python_concurrency_risk
 from .import_ownership import analyze_python_import_ownership
@@ -117,6 +118,7 @@ class OwnershipAnalysisMixin:
             "findings": findings,
         }
 
+    @decision_scoped
     def import_ownership_findings(
         self, paths: Sequence[str] | None = None
     ) -> dict[str, object]:
@@ -200,6 +202,7 @@ class OwnershipAnalysisMixin:
         }
         return result
 
+    @decision_scoped
     def repository_findings(
         self, paths: Sequence[str] | None = None
     ) -> dict[str, object]:
@@ -348,6 +351,7 @@ class OwnershipAnalysisMixin:
             "boundary": "static risk nomination only; concurrency admission/execution remains external",
         }
 
+    @decision_scoped
     def concurrency_risk_findings(
         self, paths: Sequence[str] | None = None
     ) -> dict[str, object]:
@@ -617,6 +621,7 @@ class OwnershipAnalysisMixin:
         concurrency_result = self._concurrency_risk_findings(normalized, all_rows)
         return import_result, cache_result, invalidation_result, concurrency_result
 
+    @decision_scoped
     def repository_ownership_graph(
         self, paths: Sequence[str] | None = None
     ) -> dict[str, object]:
@@ -831,6 +836,7 @@ class OwnershipAnalysisMixin:
             "boundary": "repository-evidence-only; cache mutation/execution authority remains external",
         }
 
+    @decision_scoped
     def cache_invalidation_ownership_graph(
         self, paths: Sequence[str] | None = None
     ) -> dict[str, object]:
@@ -937,6 +943,7 @@ class OwnershipAnalysisMixin:
             "owners": findings,
         }
 
+    @decision_scoped
     def cache_ownership_findings(
         self, paths: Sequence[str] | None = None
     ) -> dict[str, object]:
