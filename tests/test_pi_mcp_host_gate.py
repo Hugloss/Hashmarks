@@ -24,12 +24,21 @@ def _start(call_id: str, target: str, args: dict[str, object]) -> dict[str, obje
     }
 
 
-def _end(call_id: str, schema: str, *, is_error: bool = False) -> dict[str, object]:
+def _end(
+    call_id: str,
+    payload: dict[str, object],
+    *,
+    is_error: bool = False,
+) -> dict[str, object]:
+    import json
+
     return {
         "type": "tool_execution_end",
         "toolCallId": call_id,
         "toolName": "mcp",
-        "result": {"content": [{"type": "text", "text": f'{{"schema":"{schema}"}}'}]},
+        "result": {
+            "content": [{"type": "text", "text": json.dumps(payload, sort_keys=True)}]
+        },
         "isError": is_error,
     }
 
@@ -37,13 +46,59 @@ def _end(call_id: str, schema: str, *, is_error: bool = False) -> dict[str, obje
 def test_pi_event_validation_accepts_exact_proxy_calls() -> None:
     events = [
         _start("a", "hashmarks_repository_context", {"max_areas": 8}),
-        _end("a", "hashmarks.repository-capsule.v1"),
+        _end("a", {"schema": "hashmarks.repository-capsule.v1", "generation": 1}),
         _start("b", "hashmarks_find", {"query": "flare041", "limit": 5}),
-        _end("b", "hashmarks.find.v2"),
+        _end(
+            "b",
+            {
+                "schema": "hashmarks.find.v2",
+                "results": [{"path": "src/feature.py"}],
+            },
+        ),
     ]
     result = pi_gate._validate_events(events)
     assert set(result) == {"hashmarks_repository_context", "hashmarks_find"}
 
+
+
+def test_pi_event_validation_rejects_schema_only_or_wrong_fixture_result() -> None:
+    schema_only = [
+        _start("a", "hashmarks_repository_context", {"max_areas": 8}),
+        _end("a", {"schema": "hashmarks.repository-capsule.v1", "generation": 1}),
+        _start("b", "hashmarks_find", {"query": "flare041", "limit": 5}),
+        _end("b", {"schema": "hashmarks.find.v2"}),
+    ]
+    with pytest.raises(pi_gate.HostGateError, match="src/feature.py"):
+        pi_gate._validate_events(schema_only)
+
+    wrong_path = [
+        _start("a", "hashmarks_repository_context", {"max_areas": 8}),
+        _end("a", {"schema": "hashmarks.repository-capsule.v1", "generation": 1}),
+        _start("b", "hashmarks_find", {"query": "flare041", "limit": 5}),
+        _end(
+            "b",
+            {"schema": "hashmarks.find.v2", "results": [{"path": "src/wrong.py"}]},
+        ),
+    ]
+    with pytest.raises(pi_gate.HostGateError, match="src/feature.py"):
+        pi_gate._validate_events(wrong_path)
+
+
+def test_pi_event_validation_binds_fixture_arguments() -> None:
+    events = [
+        _start("a", "hashmarks_repository_context", {"max_areas": 8}),
+        _end("a", {"schema": "hashmarks.repository-capsule.v1", "generation": 1}),
+        _start("b", "hashmarks_find", {"query": "wrong", "limit": 5}),
+        _end(
+            "b",
+            {
+                "schema": "hashmarks.find.v2",
+                "results": [{"path": "src/feature.py"}],
+            },
+        ),
+    ]
+    with pytest.raises(pi_gate.HostGateError, match="fixture contract"):
+        pi_gate._validate_events(events)
 
 def test_pi_event_validation_rejects_non_mcp_tool() -> None:
     events = [
@@ -62,19 +117,35 @@ def test_pi_event_validation_rejects_error_and_missing_schema() -> None:
     with pytest.raises(pi_gate.HostGateError, match="reported an error"):
         pi_gate._validate_events(
             [
-                _start("a", "hashmarks_repository_context", {}),
-                _end("a", "hashmarks.repository-capsule.v1", is_error=True),
-                _start("b", "hashmarks_find", {}),
-                _end("b", "hashmarks.find.v2"),
+                _start("a", "hashmarks_repository_context", {"max_areas": 8}),
+                _end(
+                    "a",
+                    {"schema": "hashmarks.repository-capsule.v1", "generation": 1},
+                    is_error=True,
+                ),
+                _start("b", "hashmarks_find", {"query": "flare041", "limit": 5}),
+                _end(
+                    "b",
+                    {
+                        "schema": "hashmarks.find.v2",
+                        "results": [{"path": "src/feature.py"}],
+                    },
+                ),
             ]
         )
     with pytest.raises(pi_gate.HostGateError, match="did not expose schema"):
         pi_gate._validate_events(
             [
-                _start("a", "hashmarks_repository_context", {}),
-                _end("a", "wrong.schema"),
-                _start("b", "hashmarks_find", {}),
-                _end("b", "hashmarks.find.v2"),
+                _start("a", "hashmarks_repository_context", {"max_areas": 8}),
+                _end("a", {"schema": "wrong.schema", "generation": 1}),
+                _start("b", "hashmarks_find", {"query": "flare041", "limit": 5}),
+                _end(
+                    "b",
+                    {
+                        "schema": "hashmarks.find.v2",
+                        "results": [{"path": "src/feature.py"}],
+                    },
+                ),
             ]
         )
 
