@@ -17,6 +17,7 @@ from hashmarks.mcp_contract import (
     contract_summary,
     qualify_mcp_observation,
 )
+from hashmarks.mcp_launch import installed_mcp_command
 
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(SCRIPTS_DIR) not in sys.path:
@@ -33,18 +34,6 @@ from mcp_host_gate_common import (  # noqa: E402 - standalone script path setup
 logger = logging.getLogger(__name__)
 
 EXPECTED_TOOLS = MCP_TOOL_NAMES
-
-
-def _command_argv(
-    executable: Path,
-    workspace: Path,
-    state_dir: Path | None,
-) -> list[str]:
-    argv = [str(executable), "--workspace", str(workspace)]
-    if state_dir is not None:
-        argv.extend(("--state-dir", str(state_dir)))
-    argv.append("mcp")
-    return argv
 
 
 def _command_text(argv: list[str]) -> str:
@@ -156,7 +145,7 @@ async def _observe_mcp(
             "ChatGPT tunnel handoff requires the MCP extra: uv sync --frozen --extra mcp"
         ) from exc
 
-    command = _command_argv(executable, workspace, state_dir)
+    command = list(installed_mcp_command(executable, workspace, state_dir=state_dir))
     params = StdioServerParameters(command=command[0], args=command[1:])
     try:
         async with stdio_client(params) as (read, write):
@@ -206,7 +195,7 @@ def build_handoff(
     observation: dict[str, Any],
 ) -> dict[str, Any]:
     contract = _validate_observation(observation)
-    command = _command_argv(executable, workspace, state_dir)
+    command = list(installed_mcp_command(executable, workspace, state_dir=state_dir))
     version = implementation.get("version")
     if not isinstance(version, str) or not version.startswith("hashmarks version "):
         raise HostGateError("qualified Hashmarks implementation version is unavailable")
