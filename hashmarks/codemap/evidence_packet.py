@@ -210,15 +210,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
     ) -> tuple[
         dict[str, object] | None, dict[str, object] | None, dict[str, object] | None
     ]:
-        """Return edit projection, verification, and contract evidence rows."""
-        ambiguity = (
-            action.get("ambiguity")
-            if isinstance(action.get("ambiguity"), Mapping)
-            else {}
-        )
-        edit_key = "admitted_edit" if bool(ambiguity.get("ambiguous")) else "edit"
+        """Consume the action map's canonical Stage-1 edit projection."""
         selected = []
-        for role in (edit_key, "verify", "contract"):
+        for role in ("action_edit", "verify", "contract"):
             value = action.get(role)
             selected.append(value if isinstance(value, dict) else None)
         return selected[0], selected[1], selected[2]

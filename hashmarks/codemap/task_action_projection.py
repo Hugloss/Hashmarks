@@ -355,6 +355,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             selection.owner_basis,
         )
         authority = cast("Mapping[str, object]", ownership["ownership_authority"])
+        action_edit = ownership.get("admitted_edit") if final.ambiguous else final.edit
         proof_identity = str(authority.get("authority_proof_identity") or "")
         presentation = bounded_presentation_contract(
             proof_identity,
@@ -368,6 +369,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             "schema": "hashmarks.task-action-map.v1",
             "task": task,
             "edit": final.edit,
+            "action_edit": action_edit,
             "verify": final.verify,
             "contract": final.contract,
             "inspect": selection.inspect_rows,
