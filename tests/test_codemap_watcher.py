@@ -275,6 +275,7 @@ def test_replacement_fence_blocks_stale_clean_overwrite(
         codemap.store.set_meta(WATCH_CONTINUITY_META, expired.to_json())
 
         replacement = _IndexWatchSession(codemap, None)
+        assert replacement.tracker.mark_reconciled(expected_generation=0)
         replacement.tracker.mark_dirty(["src/auth.py"])
         replacement.acquire()
 
