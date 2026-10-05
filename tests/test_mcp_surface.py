@@ -10,6 +10,7 @@ import pytest
 from hashmarks import mcp_server, mcp_surface, repository_retry
 from hashmarks.codemap import CodeMap
 from hashmarks.file_store import UnstableFileError
+from hashmarks.mcp_contract import tool_contract
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
 
 
@@ -493,7 +494,7 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
         raise RuntimeError("implementation bug")
 
     with pytest.raises(FakeToolError, match="invalid query") as translated:
-        mcp_server._call_surface("find", FakeToolError, invalid)
+        mcp_server._call_surface(tool_contract("find"), FakeToolError, invalid)
     assert json.loads(str(translated.value)) == {
         "schema": "hashmarks.mcp-error.v1",
         "reason": "invalid-request",
@@ -501,11 +502,11 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
         "recovery_authority": "consumer-owned",
     }
     with pytest.raises(RuntimeError, match="implementation bug"):
-        mcp_server._call_surface("find", FakeToolError, broken)
+        mcp_server._call_surface(tool_contract("find"), FakeToolError, broken)
 
     with pytest.raises(RuntimeError, match="response schema drift"):
         mcp_server._call_surface(
-            "find",
+            tool_contract("find"),
             FakeToolError,
             lambda: {"schema": "hashmarks.repository-capsule.v1"},
         )
