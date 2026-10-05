@@ -38,7 +38,7 @@ def test_mcp_surface_exposes_only_bounded_repository_intelligence(
         assert context["schema"] == "hashmarks.repository-capsule.v1"
 
         found = surface.find("flare041", limit=5)
-        assert found["schema"] == "hashmarks.mcp-find.v1"
+        assert found["schema"] == "hashmarks.find.v2"
         assert any(row["path"] == "src/feature.py" for row in found["results"])
 
         evidence = surface.task_evidence("change flare041 behavior", token_budget=256)
@@ -220,7 +220,7 @@ def test_mcp_find_truncated_only_when_an_extra_hit_exists(tmp_path: Path) -> Non
         one = surface.find("flare041", limit=1)
         assert len(one["results"]) == 1
         assert one["truncated"] is True
-        assert "mcp-result-limit" in one["omissions"]
+        assert "find-result-limit" in one["omissions"]
         assert one["uniqueness_evidence"] == "not-admissible"
 
         exact = surface.find("feature_two.py", limit=10)
@@ -880,7 +880,7 @@ def test_mcp_surface_qualifies_and_queries_dependency_codemap(tmp_path: Path) ->
     finally:
         surface.close()
 
-    assert packet["schema"] == "hashmarks.mcp-dependency-codemap.v1"
+    assert packet["schema"] == "hashmarks.dependency-codemap.v1"
     assert packet["observation"]["schema"] == "hashmarks.dependency-resolution.v3"
     assert packet["producer_authority"] == "caller-claimed"
     assert packet["observation"]["producer_authority"] == "caller-claimed"
@@ -988,7 +988,7 @@ def test_mcp_dependency_codemap_explain_and_compare_reuse_core_authority(
     finally:
         surface.close()
 
-    assert observed["schema"] == "hashmarks.mcp-dependency-codemap.v1"
+    assert observed["schema"] == "hashmarks.dependency-codemap.v1"
     assert explained["schema"] == "hashmarks.dependency-resolution-explain.v1"
     assert (
         explained["semantic_result"]["observation_identity"]
