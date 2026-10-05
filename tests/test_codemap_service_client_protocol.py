@@ -137,3 +137,87 @@ def test_client_serializes_typed_query_and_refresh_options(
             "token_budget": 256,
         },
     )
+
+
+def test_canonical_service_projections_bind_registered_operations() -> None:
+    assert {
+        route: (projection.operation, projection.response_key)
+        for route, projection in service_module._CANONICAL_SERVICE_PROJECTIONS.items()
+    } == {
+        "task_evidence": ("task_evidence", "task_evidence"),
+        "task_change_impact": ("change_impact", "task_change_impact"),
+        "task_post_change_delta": ("post_change", "post_change_delta"),
+    }
+
+    with pytest.raises(ValueError, match="unknown Hashmarks operation"):
+        service_module._CanonicalServiceProjection(
+            operation="unregistered_operation",
+            response_key="payload",
+        )
+
+
+def test_canonical_service_admission_fails_before_work(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = service_module.CodeMapService(tmp_path)
+    projected: list[dict[str, object]] = []
+
+    def reject(operation: str) -> None:
+        assert operation == "task_evidence"
+        raise ValueError("unknown Hashmarks operation: task_evidence")
+
+    def project(request: dict[str, object]) -> dict[str, object]:
+        projected.append(request)
+        return {
+            "ok": True,
+            "task_evidence": {"schema": "hashmarks.task-evidence.v2"},
+        }
+
+    monkeypatch.setattr(service_module, "require_registered_operation", reject)
+    monkeypatch.setattr(service, "_task_evidence_response", project)
+
+    with pytest.raises(ValueError, match="unknown Hashmarks operation"):
+        service.dispatch(
+            {
+                "protocol": service_module.PROTOCOL,
+                "op": "task_evidence",
+                "task": "inspect",
+            }
+        )
+
+    assert projected == []
+    assert service._requests == 0
+
+
+@pytest.mark.parametrize(
+    ("route", "handler_name", "response_key"),
+    [
+        ("task_evidence", "_task_evidence_response", "task_evidence"),
+        ("task_change_impact", "_change_impact_response", "task_change_impact"),
+        ("task_post_change_delta", "_post_change_delta_response", "post_change_delta"),
+    ],
+)
+def test_canonical_service_projection_rejects_schema_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    route: str,
+    handler_name: str,
+    response_key: str,
+) -> None:
+    service = service_module.CodeMapService(tmp_path)
+
+    def project(_request: dict[str, object]) -> dict[str, object]:
+        return {
+            "ok": True,
+            response_key: {"schema": "hashmarks.wrong.v1"},
+        }
+
+    monkeypatch.setattr(service, handler_name, project)
+
+    with pytest.raises(RuntimeError, match="operation response schema drift"):
+        service.dispatch(
+            {
+                "protocol": service_module.PROTOCOL,
+                "op": route,
+            }
+        )
