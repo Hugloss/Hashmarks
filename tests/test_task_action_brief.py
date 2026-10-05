@@ -26,7 +26,7 @@ def test_task_action_brief_is_smaller_than_authority_brief_and_action_complete(
         full = c.task_decision_brief("widget implementation test", token_budget=64)
         agent = c.task_action_brief("widget implementation test", token_budget=64)
     assert agent["schema"] == "hashmarks.task-action-brief.v1"
-    assert agent["status"] == "safe-fresh"
+    assert agent["status"] == "safe-unknown"
     assert agent["edit"] == "src/engine.py"
     assert agent["verify"] == full["verification_argv"]
     assert "decision_generation" not in agent
@@ -56,7 +56,7 @@ def test_task_action_brief_auto_budget_qualifies_instead_of_assuming_fixed_minim
         c.sync()
         auto = c.task_action_brief("widget implementation test")
         forced_tiny = c.task_action_brief("widget implementation test", token_budget=1)
-    assert auto["status"] == "safe-fresh"
+    assert auto["status"] == "safe-unknown"
     assert forced_tiny["status"] == "unsafe"
 
 
@@ -91,7 +91,7 @@ def test_task_action_brief_auto_budget_does_not_call_diagnostic_sweep(
 
         c.task_decision_brief_budget_sweep = forbidden  # type: ignore[method-assign]
         brief = c.task_action_brief("widget implementation test")
-    assert brief["status"] == "safe-fresh"
+    assert brief["status"] == "safe-unknown"
 
 
 def test_task_action_brief_computes_canonical_action_map_once(tmp_path: Path) -> None:
@@ -108,7 +108,7 @@ def test_task_action_brief_computes_canonical_action_map_once(tmp_path: Path) ->
 
         c.task_action_map = counted  # type: ignore[method-assign]
         brief = c.task_action_brief("widget implementation test")
-    assert brief["status"] == "safe-fresh"
+    assert brief["status"] == "safe-unknown"
     assert calls == 1
 
 
@@ -145,7 +145,7 @@ def test_rare_ticket_action_brief_uses_exact_index_anchor_without_general_find(
 
         c.find = counted  # type: ignore[method-assign]
         brief = c.task_action_brief("For ABC123 change the accepted response")
-    assert brief["status"] == "safe-fresh"
+    assert brief["status"] == "safe-unknown"
     assert brief["edit"] == "src/abc123/engine_b.py"
     assert brief["verify"] == [
         "python",
@@ -180,7 +180,7 @@ def test_rare_ticket_fast_path_is_not_used_for_configuration_authority(
 
         c._rare_task_anchor_hits = forbidden  # type: ignore[method-assign]
         brief = c.task_action_brief("For ABC123 change the configuration policy")
-    assert brief["status"] in {"safe-fresh", "unsafe"}
+    assert brief["status"] in {"safe-unknown", "unsafe"}
 
 
 def test_multi_term_task_local_island_beats_large_generic_vocabulary(
@@ -208,7 +208,7 @@ def test_multi_term_task_local_island_beats_large_generic_vocabulary(
         brief = codemap.task_action_brief(
             "Change the cobalt grove accepted response from old to new. Update the implementation that drives the request and verify the behavior."
         )
-        assert brief["status"] == "safe-fresh"
+        assert brief["status"] == "safe-unknown"
         assert brief["edit"] == "src/case/engine.py"
         assert brief["verify"][-1].startswith("tests/test_case.py")
     finally:
@@ -303,7 +303,7 @@ def test_task_action_brief_does_not_launder_named_dependency_into_owner(
         )
 
     assert brief["edit"] == "src/publish.py"
-    assert brief["status"] == "safe-fresh"
+    assert brief["status"] == "safe-unknown"
 
 
 def test_non_ambiguous_action_edit_remains_separate_from_repository_owner_proof(
@@ -398,7 +398,7 @@ def test_task_action_brief_receipt_is_assembled_inside_decision_session(
         monkeypatch.setattr(codemap, "_decision_evidence_receipt", observed)
         brief = codemap.task_action_brief("widget implementation test", token_budget=64)
 
-    assert brief["status"] == "safe-fresh"
+    assert brief["status"] == "safe-unknown"
 
 
 @pytest.mark.parametrize("limit,per_role", [(3, 1), (8, 2), (20, 3)])
