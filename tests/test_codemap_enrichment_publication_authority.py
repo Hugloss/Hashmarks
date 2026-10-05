@@ -49,9 +49,7 @@ def _write_scip(path: Path, *, symbol: str) -> None:
 
 
 def _scip_snapshot(codemap: CodeMap) -> str | None:
-    return codemap.store.meta(
-        "native_evidence:scip:scip-python:publication-test"
-    )
+    return codemap.store.meta("native_evidence:scip:scip-python:publication-test")
 
 
 def test_scip_rows_and_freshness_snapshot_roll_back_together(
@@ -76,9 +74,7 @@ def test_scip_rows_and_freshness_snapshot_roll_back_together(
             raise RuntimeError("injected snapshot publication failure")
 
         monkeypatch.setattr(codemap, "_record_evidence_snapshot", fail_snapshot)
-        with pytest.raises(
-            RuntimeError, match="injected snapshot publication failure"
-        ):
+        with pytest.raises(RuntimeError, match="injected snapshot publication failure"):
             codemap.import_scip(scip)
 
         assert codemap.store.generation() == before_generation
@@ -167,9 +163,10 @@ def test_enrichment_only_generation_carries_unrelated_scip_binding(
         codemap.sync()
         codemap.import_scip(scip)
         before_generation = codemap.store.generation()
-        assert codemap._evidence_fresh(
-            "scip", "scip-python:publication-test"
-        ) == (True, None)
+        assert codemap._evidence_fresh("scip", "scip-python:publication-test") == (
+            True,
+            None,
+        )
 
         result = codemap.enrich_projects(("npm-package-graph",))
 
