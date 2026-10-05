@@ -48,6 +48,40 @@ def test_task_evidence_v2_separates_retrieval_ownership_and_freshness(
     assert packet["consumer_action"] == "external"
 
 
+def test_task_evidence_v2_consumes_canonical_admitted_edit(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/owner.py",
+        "def target_impl(value: int) -> int:\n    return value + 1\n",
+    )
+    _write(
+        tmp_path,
+        "tests/test_owner.py",
+        "from src.owner import target_impl\n\n"
+        "def test_target_impl():\n"
+        "    assert target_impl(1) == 2\n",
+    )
+    task = "change target_impl behavior"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task)
+        assert action["ownership_authority"]["owner_resolved"] is True
+        assert action["edit"]["path"] == "src/owner.py"
+        assert action["admitted_edit"]["path"] == "src/owner.py"
+
+        action["admitted_edit"] = None
+        codemap.task_action_map = lambda *args, **kwargs: action  # type: ignore[method-assign]
+        packet = codemap.task_evidence(task, token_budget=256)
+
+    assert packet["ownership"]["candidate"]["path"] == "src/owner.py"
+    assert packet["ownership"]["owner"] is None
+    assert packet["ownership"]["basis"] is None
+    assert packet["explicit_target"]["path"] == "src/owner.py"
+
+
 def test_task_evidence_v2_keeps_ambiguity_independent_from_freshness(
     tmp_path: Path,
 ) -> None:
