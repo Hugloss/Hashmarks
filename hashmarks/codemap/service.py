@@ -517,9 +517,7 @@ class CodeMapService:
         previous_map = request.get("previous_map", defaults.previous_map)
         if previous_map is not None and not isinstance(previous_map, dict):
             raise ValueError("previous_map must be an object or null")
-        previous_snapshot = request.get(
-            "previous_snapshot", defaults.previous_snapshot
-        )
+        previous_snapshot = request.get("previous_snapshot", defaults.previous_snapshot)
         if previous_snapshot is not None and not isinstance(previous_snapshot, dict):
             raise ValueError("previous_snapshot must be an object or null")
         member_path = request.get("member_path", defaults.member_path)
