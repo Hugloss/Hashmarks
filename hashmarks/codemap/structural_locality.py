@@ -802,6 +802,30 @@ class StructuralLocalityMixin:
         ref_limit_per_symbol: int = 256,
         refresh: bool = True,
     ) -> dict[str, object]:
+        """Return one generation-scoped structural-locality observation."""
+        self._validate_locality_bounds(
+            max_depth, call_limit_per_symbol, ref_limit_per_symbol
+        )
+        if refresh:
+            self.sync()
+        with self.decision_session():
+            return self._structural_locality_impl(
+                target,
+                max_depth=max_depth,
+                call_limit_per_symbol=call_limit_per_symbol,
+                ref_limit_per_symbol=ref_limit_per_symbol,
+                refresh=refresh,
+            )
+
+    def _structural_locality_impl(
+        self,
+        target: str,
+        *,
+        max_depth: int = 2,
+        call_limit_per_symbol: int = 64,
+        ref_limit_per_symbol: int = 256,
+        refresh: bool = True,
+    ) -> dict[str, object]:
         """Return bounded structural facts reachable from one exact symbol.
 
         The projection deliberately does not label a refactor good/bad, propose an
@@ -813,10 +837,7 @@ class StructuralLocalityMixin:
         self._validate_locality_bounds(
             max_depth, call_limit_per_symbol, ref_limit_per_symbol
         )
-        if refresh:
-            self.sync()
-        else:
-            self._ensure_map_ready()
+        self._ensure_map_ready()
         target_row = self._exact_locality_target(target)
 
         (
