@@ -146,7 +146,10 @@ def operation_contract_manifest() -> dict[str, object]:
         separators=(",", ":"),
         ensure_ascii=False,
     ).encode("utf-8")
-    payload["contract_identity"] = "sha256:" + hashlib.sha256(
-        OPERATION_CONTRACT_SCHEMA.encode("utf-8") + b"\0" + encoded
-    ).hexdigest()
+    payload["contract_identity"] = (
+        "sha256:"
+        + hashlib.sha256(
+            OPERATION_CONTRACT_SCHEMA.encode("utf-8") + b"\0" + encoded
+        ).hexdigest()
+    )
     return payload
