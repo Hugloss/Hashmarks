@@ -10,26 +10,10 @@ TEST_SHARDS ?= 64
 DEV_BATCH_SIZE ?= 4
 DEV_BATCH_START ?= 0
 ARTIFACT_PYTHON ?= 3.14
-OPENCODE ?= opencode
-OPENCODE_HOST_PYTHON ?= $(ARTIFACT_PYTHON)
-OPENCODE_HOST_RECEIPT ?= dist/opencode-mcp-host-gate.json
-CLAUDE ?= claude
-CLAUDE_MODEL ?=
-CLAUDE_HOST_PYTHON ?= $(ARTIFACT_PYTHON)
-CLAUDE_HOST_RECEIPT ?= dist/claude-mcp-host-gate.json
-CODEX ?= codex
-CODEX_MODEL ?=
-CODEX_HOST_PYTHON ?= $(ARTIFACT_PYTHON)
-CODEX_HOST_RECEIPT ?= dist/codex-mcp-host-gate.json
-CODEX_HOST_DANGEROUS ?= 0
-PI ?= pi
-PI_HOST_PYTHON ?= $(ARTIFACT_PYTHON)
-PI_HOST_RECEIPT ?= dist/pi-mcp-host-gate.json
 MCP_STRESS_RECEIPT ?= dist/mcp-concurrency-stress.json
 CHATGPT_MCP_HASHMARKS ?= $(abspath .venv/bin/hashmarks)
 CHATGPT_MCP_WORKSPACE ?= $(CURDIR)
 CHATGPT_MCP_SOURCE_ROOT ?= $(CURDIR)
-CHATGPT_MCP_HANDOFF_RECEIPT ?= dist/chatgpt-secure-mcp-tunnel-handoff.json
 DIAGNOSTIC_PYTHON ?= python3
 DIAGNOSTIC_SHARDS ?= 64
 DIAGNOSTIC_BATCH ?= 0
@@ -383,7 +367,7 @@ artifact-check:
 	printf '%s\n' 'Hashmarks installed-artifact qualification: PASS (wheel + sdist).'
 
 mcp-host-status:
-	@$(UV_RUN) --offline --no-sync python scripts/mcp_host_status.py --workspace .
+	@$(UV_RUN) --offline --no-sync python scripts/mcp_host_status.py
 
 mcp-concurrency-stress:
 	@$(UV_RUN) --offline --no-sync python scripts/mcp_concurrency_stress.py --receipt "$(MCP_STRESS_RECEIPT)"
@@ -391,33 +375,34 @@ mcp-concurrency-stress:
 mcp-opencode-check:
 	@$(UV_RUN) --offline --no-sync python scripts/host_qualification/opencode_mcp_host_gate.py \
 	  --uv "$(UV)" \
-	  --opencode "$(OPENCODE)" \
-	  --python "$(OPENCODE_HOST_PYTHON)" \
-	  --receipt "$(OPENCODE_HOST_RECEIPT)"
+	  $(if $(strip $(OPENCODE)),--opencode "$(OPENCODE)",) \
+	  $(if $(strip $(OPENCODE_MODEL)),--model "$(OPENCODE_MODEL)",) \
+	  $(if $(strip $(OPENCODE_HOST_PYTHON)),--python "$(OPENCODE_HOST_PYTHON)",) \
+	  $(if $(strip $(OPENCODE_HOST_RECEIPT)),--receipt "$(OPENCODE_HOST_RECEIPT)",)
 
 mcp-claude-check:
 	@$(UV_RUN) --offline --no-sync python scripts/host_qualification/claude_mcp_host_gate.py \
 	  --uv "$(UV)" \
-	  --claude "$(CLAUDE)" \
-	  --model "$(CLAUDE_MODEL)" \
-	  --python "$(CLAUDE_HOST_PYTHON)" \
-	  --receipt "$(CLAUDE_HOST_RECEIPT)"
+	  $(if $(strip $(CLAUDE)),--claude "$(CLAUDE)",) \
+	  $(if $(strip $(CLAUDE_MODEL)),--model "$(CLAUDE_MODEL)",) \
+	  $(if $(strip $(CLAUDE_HOST_PYTHON)),--python "$(CLAUDE_HOST_PYTHON)",) \
+	  $(if $(strip $(CLAUDE_HOST_RECEIPT)),--receipt "$(CLAUDE_HOST_RECEIPT)",)
 
 mcp-codex-check:
 	@$(UV_RUN) --offline --no-sync python scripts/host_qualification/codex_mcp_host_gate.py \
 	  --uv "$(UV)" \
-	  --codex "$(CODEX)" \
-	  --model "$(CODEX_MODEL)" \
-	  --python "$(CODEX_HOST_PYTHON)" \
+	  $(if $(strip $(CODEX)),--codex "$(CODEX)",) \
+	  $(if $(strip $(CODEX_MODEL)),--model "$(CODEX_MODEL)",) \
+	  $(if $(strip $(CODEX_HOST_PYTHON)),--python "$(CODEX_HOST_PYTHON)",) \
 	  $(if $(filter 1 true yes,$(CODEX_HOST_DANGEROUS)),--dangerous-bypass,) \
-	  --receipt "$(CODEX_HOST_RECEIPT)"
+	  $(if $(strip $(CODEX_HOST_RECEIPT)),--receipt "$(CODEX_HOST_RECEIPT)",)
 
 mcp-pi-check:
 	@$(UV_RUN) --offline --no-sync python scripts/host_qualification/pi_mcp_host_gate.py \
 	  --uv "$(UV)" \
-	  --pi "$(PI)" \
-	  --python "$(PI_HOST_PYTHON)" \
-	  --receipt "$(PI_HOST_RECEIPT)"
+	  $(if $(strip $(PI)),--pi "$(PI)",) \
+	  $(if $(strip $(PI_HOST_PYTHON)),--python "$(PI_HOST_PYTHON)",) \
+	  $(if $(strip $(PI_HOST_RECEIPT)),--receipt "$(PI_HOST_RECEIPT)",)
 
 mcp-chatgpt-handoff:
 	@test -x "$(CHATGPT_MCP_HASHMARKS)" || { \
@@ -428,7 +413,7 @@ mcp-chatgpt-handoff:
 	  --hashmarks "$(CHATGPT_MCP_HASHMARKS)" \
 	  --workspace "$(CHATGPT_MCP_WORKSPACE)" \
 	  $(if $(strip $(CHATGPT_MCP_SOURCE_ROOT)),--source-root "$(CHATGPT_MCP_SOURCE_ROOT)",) \
-	  --output "$(CHATGPT_MCP_HANDOFF_RECEIPT)"
+	  $(if $(strip $(CHATGPT_MCP_HANDOFF_RECEIPT)),--output "$(CHATGPT_MCP_HANDOFF_RECEIPT)",)
 
 release-prepare:
 	@test -n "$(VERSION)" || (echo "VERSION is required, e.g. make release-prepare VERSION=X.Y.Z" >&2; exit 2)
