@@ -507,11 +507,10 @@ class CodeMapService:
             raise ValueError("surface must be a non-empty string")
         changed = self._string_list(request, "changed_paths", required=False)
         defaults = REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS
-        negative_members = request.get(
-            "negative_members", list(defaults.negative_members)
-        )
-        if not isinstance(negative_members, list) or not all(
-            isinstance(item, str) for item in negative_members
+        negative_members = request.get("negative_members", defaults.negative_members)
+        if "negative_members" in request and (
+            not isinstance(negative_members, list)
+            or not all(isinstance(item, str) for item in negative_members)
         ):
             raise ValueError("negative_members must be a list of strings")
         previous_map = request.get("previous_map", defaults.previous_map)
