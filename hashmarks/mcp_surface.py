@@ -4,6 +4,7 @@ import json
 from threading import RLock
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from . import repository_retry
 from .codemap import ChangeImpactOptions, CodeMap
 from .codemap.evidence_correlation import (
     CORRELATION_PACKET_MAX_BYTES,
@@ -13,15 +14,13 @@ from .codemap.repository_declaration_contract import (
     MAX_PACKET_BYTES,
     MAX_REQUEST_BYTES,
 )
+from .file_store import UnstableFileError
 from .mcp_contract import (
     MCP_ERROR_REASONS,
     MCP_ERROR_RECOVERY_AUTHORITY,
     MCP_ERROR_SCHEMA,
 )
-from .repository_retry import (
-    is_transient_repository_race,
-    retry_transient_repository_race,
-)
+from .repository_retry import retry_transient_repository_race
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -320,8 +319,8 @@ class HashmarksMcpSurface:
         with self._gate:
             try:
                 return retry_transient_repository_race(operation)
-            except Exception as exc:
-                if is_transient_repository_race(exc):
+            except (RuntimeError, UnstableFileError) as exc:
+                if repository_retry.is_transient_repository_race(exc):
                     raise McpSurfaceError(
                         "repository state did not stabilize within the bounded MCP read window",
                         reason="transient-race-exhausted",
