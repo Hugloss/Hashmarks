@@ -144,9 +144,7 @@ def test_budget_sweep_defaults_have_one_core_owner(tmp_path: Path) -> None:
             "task_decision_brief_budget_sweep",
             task="widget implementation test",
         )["budget_sweep"]
-        typed = client.task_decision_brief_budget_sweep(
-            "widget implementation test"
-        )
+        typed = client.task_decision_brief_budget_sweep("widget implementation test")
     finally:
         client.stop()
         thread.join(timeout=5)
