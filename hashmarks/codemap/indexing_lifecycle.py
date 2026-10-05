@@ -28,6 +28,7 @@ from .repository_index_store import (
     git_overlay_paths,
 )
 from .source_languages import SOURCE_LANGUAGES
+from .watch_continuity import WATCH_CONTINUITY_META, WatchContinuityRecord
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -93,20 +94,6 @@ def _language_for_path(path: Path) -> str | None:
     if path.name in _TEXT_NAMES or path.suffix.lower() in _TEXT_EXTENSIONS:
         return "text"
     return None
-
-
-def _pid_alive(pid: int) -> bool:
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return True
 
 
 def _uv_workspace_pyprojects(
@@ -1407,11 +1394,16 @@ class IndexingLifecycleMixin:
             "shared_artifact_db": str(self.artifacts.db_path),
         }
 
-    def _generation_status(
-        self, observation: RepositoryObservation | None = None
+    def _watch_continuity(self) -> WatchContinuityRecord | None:
+        return WatchContinuityRecord.from_json(
+            self.store.meta(WATCH_CONTINUITY_META, "") or ""
+        )
+
+    def _generation_status_with_watch(
+        self,
+        observation: RepositoryObservation | None,
+        watch_record: WatchContinuityRecord | None,
     ) -> tuple[int, int | None, bool | None]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
         generation = self.store.generation()
         synced_raw = self.store.meta("identity_generation", "") or ""
         synced = None if not synced_raw else int(synced_raw)
@@ -1422,20 +1414,13 @@ class IndexingLifecycleMixin:
                 observation = self._daemon_observation()
         if synced is not None and observation is not None:
             return generation, synced, observation.generation != synced
+        stale = None if watch_record is None else watch_record.stale_for(generation)
+        return generation, synced, stale
 
-        pid_raw = self.store.meta("watcher_pid", "") or ""
-        state = self.store.meta("watcher_state", "") or ""
-        heartbeat_raw = self.store.meta("watcher_heartbeat_unix", "") or ""
-        try:
-            pid = int(pid_raw)
-            heartbeat = float(heartbeat_raw)
-        except ValueError:
-            return generation, synced, None
-        alive = _pid_alive(pid)
-        fresh_heartbeat = (time.time() - heartbeat) < 2.5
-        if alive and fresh_heartbeat:
-            return generation, synced, state != "clean"
-        return generation, synced, None
+    def _generation_status(
+        self, observation: RepositoryObservation | None = None
+    ) -> tuple[int, int | None, bool | None]:
+        return self._generation_status_with_watch(observation, self._watch_continuity())
 
     def _query_freshness_fields(self) -> dict[str, object]:
         """Project existing CodeMap freshness authority into query responses."""
@@ -1449,7 +1434,10 @@ class IndexingLifecycleMixin:
     def status(self) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        generation, identity_generation, stale = self._generation_status()
+        watch_record = self._watch_continuity()
+        generation, identity_generation, stale = self._generation_status_with_watch(
+            None, watch_record
+        )
         return {
             "schema": "hashmarks.codemap-status.v1",
             "workspace": str(self.workspace),
@@ -1489,13 +1477,11 @@ class IndexingLifecycleMixin:
                 ],
             ],
             "native_evidence": self._native_evidence_status(),
-            "watcher": {
-                "pid": self.store.meta("watcher_pid", "") or None,
-                "state": self.store.meta("watcher_state", "") or None,
-                "heartbeat_unix": None
-                if not (self.store.meta("watcher_heartbeat_unix", "") or "")
-                else float(self.store.meta("watcher_heartbeat_unix", "0") or 0),
-            },
+            "watcher": (
+                {}
+                if watch_record is None
+                else watch_record.status_projection()
+            ),
             **self.store.stats(),
         }
 
