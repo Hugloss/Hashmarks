@@ -52,10 +52,29 @@ class McpToolContract:
     name: str
     description: str
     response_schemas: tuple[str, ...]
+    response_modes: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not self.response_schemas or len(self.response_schemas) != len(
+            self.response_modes
+        ):
+            raise ValueError(f"invalid Hashmarks MCP response contract: {self.name}")
+        if len(set(self.response_modes)) != len(self.response_modes):
+            raise ValueError(f"duplicate Hashmarks MCP response mode: {self.name}")
 
     @property
     def default_response_schema(self) -> str:
         return self.response_schemas[0]
+
+    def response_schema_for_mode(self, result_mode: str | None = None) -> str:
+        mode = self.response_modes[0] if result_mode is None else result_mode
+        try:
+            index = self.response_modes.index(mode)
+        except ValueError as exc:
+            raise ValueError(
+                f"unknown Hashmarks MCP response mode for {self.name}: {mode}"
+            ) from exc
+        return self.response_schemas[index]
 
 
 MCP_TOOL_CONTRACTS = (
@@ -67,6 +86,7 @@ MCP_TOOL_CONTRACTS = (
             "source/next-read, or verification evidence."
         ),
         ("hashmarks.repository-capsule.v1",),
+        ("default",),
     ),
     McpToolContract(
         "find",
@@ -76,6 +96,7 @@ MCP_TOOL_CONTRACTS = (
             "implementation path is unknown, use task_evidence first."
         ),
         ("hashmarks.mcp-find.v1",),
+        ("default",),
     ),
     McpToolContract(
         "task_evidence",
@@ -85,6 +106,7 @@ MCP_TOOL_CONTRACTS = (
             "and returns source/next-read, verification, freshness."
         ),
         ("hashmarks.task-evidence.v2",),
+        ("default",),
     ),
     McpToolContract(
         "change_impact",
@@ -93,6 +115,7 @@ MCP_TOOL_CONTRACTS = (
             "verification relevance. For pre-edit evidence, use task_evidence."
         ),
         ("hashmarks.task-change-impact.v1",),
+        ("default",),
     ),
     McpToolContract(
         "correlate_evidence",
@@ -101,6 +124,7 @@ MCP_TOOL_CONTRACTS = (
             "while preserving ambiguity, provenance, completeness, and source equivalence."
         ),
         ("hashmarks.evidence-correlation.v2",),
+        ("default",),
     ),
     McpToolContract(
         "dependency_codemap",
@@ -113,6 +137,7 @@ MCP_TOOL_CONTRACTS = (
             "hashmarks.dependency-resolution-explain.v1",
             "hashmarks.dependency-resolution-delta.v3",
         ),
+        ("observation", "explain", "compare"),
     ),
     McpToolContract(
         "repository_declarations",
@@ -124,6 +149,7 @@ MCP_TOOL_CONTRACTS = (
             "hashmarks.repository-declarations.v1",
             "hashmarks.repository-declaration-explain.v1",
         ),
+        ("observation", "explain"),
     ),
     McpToolContract(
         "post_change",
@@ -131,7 +157,8 @@ MCP_TOOL_CONTRACTS = (
             "Refresh caller-reported changed paths against a previous task_evidence packet "
             "and return only invalidated/reused/replacement evidence."
         ),
-        ("hashmarks.task-post-change-delta.v1",),
+        ("hashmarks.task-post-change-delta.v2",),
+        ("default",),
     ),
 )
 
@@ -160,6 +187,27 @@ def default_response_schema(name: str) -> str:
 
 def response_schemas(name: str) -> tuple[str, ...]:
     return tool_contract(name).response_schemas
+
+
+def response_schema_for_mode(name: str, result_mode: str | None = None) -> str:
+    return tool_contract(name).response_schema_for_mode(result_mode)
+
+
+def validate_tool_response(
+    name: str,
+    value: object,
+    *,
+    result_mode: str | None = None,
+) -> dict[str, object]:
+    if not isinstance(value, dict):
+        raise RuntimeError(f"Hashmarks MCP {name} returned a non-object response")
+    expected = response_schema_for_mode(name, result_mode)
+    actual = value.get("schema")
+    if actual != expected:
+        raise RuntimeError(
+            f"Hashmarks MCP {name} response schema drift: expected {expected}, got {actual!r}"
+        )
+    return value
 
 
 def tool_description(name: str) -> str:
@@ -246,6 +294,9 @@ def _qualified_tool(
         ),
         "annotations": _canonical_annotations(raw.get("annotations")),
         "response_schemas": list(expected.response_schemas),
+        "response_modes": dict(
+            zip(expected.response_modes, expected.response_schemas, strict=True)
+        ),
     }
 
 

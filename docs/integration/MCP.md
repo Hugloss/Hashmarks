@@ -131,7 +131,11 @@ Hashmarks owns one transport-neutral `hashmarks.mcp-contract.v1` manifest. The m
 
 The server registration consumes the same contract constants that qualification uses; host gates do not maintain independent copies of tool descriptions or response-schema strings. OpenCode, Codex, Claude Code, Pi, and the ChatGPT Secure MCP Tunnel handoff qualify the exact installed wheel and record a compact summary containing the same contract schema, identity, server version, and canonical tool names. Host-specific spellings such as `hashmarks_find` or `mcp__hashmarks__find` are transport aliases only and never become separate semantic authorities.
 
-Input or output schema drift, tool-order drift, description drift, annotation drift, routing-instruction drift, or installed-version drift therefore changes or rejects the canonical contract before host behavior is accepted. This remains an observation/qualification contract: it does not add another MCP tool, workflow state, host router, or execution authority.
+Input or output schema drift, tool-order drift, description drift, annotation drift, routing-instruction drift, or installed-version drift therefore changes or rejects the canonical contract before host behavior is accepted. Successful tool calls are also checked at runtime against the canonical semantic response schema before the MCP boundary publishes them. Fixed-response tools have one default schema; alternate-mode tools bind each `result_mode` to its exact schema, so an `explain` packet cannot satisfy a `compare` call merely because both schemas are known to the same tool. Response-schema drift is an implementation contract violation, not a caller error.
+
+The canonical `post_change` response is `hashmarks.task-post-change-delta.v2`, matching the core post-change projection. This closes the earlier declaration/runtime split where the MCP contract still named the retired v1 response.
+
+This remains an observation/qualification contract: it does not add another MCP tool, workflow state, host router, or execution authority.
 
 ### Machine-classifiable MCP failures
 

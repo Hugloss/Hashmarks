@@ -17,6 +17,8 @@ from hashmarks.mcp_contract import (
     contract_summary,
     qualification_response_schemas,
     qualify_mcp_observation,
+    response_schema_for_mode,
+    validate_tool_response,
 )
 
 
@@ -71,6 +73,14 @@ def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
         "hashmarks.dependency-resolution-explain.v1",
         "hashmarks.dependency-resolution-delta.v3",
     ]
+    assert tool_rows[5]["response_modes"] == {
+        "observation": "hashmarks.mcp-dependency-codemap.v1",
+        "explain": "hashmarks.dependency-resolution-explain.v1",
+        "compare": "hashmarks.dependency-resolution-delta.v3",
+    }
+    assert tool_rows[7]["response_modes"] == {
+        "default": "hashmarks.task-post-change-delta.v2"
+    }
 
     summary = contract_summary(first)
     assert summary == {
@@ -142,6 +152,48 @@ def test_mcp_contract_rejects_independent_catalog_drift(
     mutation(observation)
     with pytest.raises(ValueError, match=message):
         qualify_mcp_observation(observation)
+
+
+def test_response_schema_authority_is_mode_specific() -> None:
+    assert response_schema_for_mode("find") == "hashmarks.mcp-find.v1"
+    assert (
+        response_schema_for_mode("dependency_codemap", "observation")
+        == "hashmarks.mcp-dependency-codemap.v1"
+    )
+    assert (
+        response_schema_for_mode("dependency_codemap", "explain")
+        == "hashmarks.dependency-resolution-explain.v1"
+    )
+    assert (
+        response_schema_for_mode("dependency_codemap", "compare")
+        == "hashmarks.dependency-resolution-delta.v3"
+    )
+    assert (
+        response_schema_for_mode("repository_declarations", "explain")
+        == "hashmarks.repository-declaration-explain.v1"
+    )
+    assert (
+        response_schema_for_mode("post_change") == "hashmarks.task-post-change-delta.v2"
+    )
+
+
+def test_response_schema_authority_rejects_runtime_drift() -> None:
+    packet = {"schema": "hashmarks.task-post-change-delta.v2", "change": "unchanged"}
+    assert validate_tool_response("post_change", packet) is packet
+
+    with pytest.raises(RuntimeError, match="response schema drift"):
+        validate_tool_response(
+            "post_change",
+            {"schema": "hashmarks.task-post-change-delta.v1"},
+        )
+    with pytest.raises(RuntimeError, match="response schema drift"):
+        validate_tool_response(
+            "dependency_codemap",
+            {"schema": "hashmarks.dependency-resolution-explain.v1"},
+            result_mode="compare",
+        )
+    with pytest.raises(RuntimeError, match="non-object response"):
+        validate_tool_response("find", ["not", "an", "object"])
 
 
 def test_host_schema_expectations_derive_from_canonical_contract() -> None:

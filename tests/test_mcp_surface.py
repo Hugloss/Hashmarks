@@ -493,7 +493,7 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
         raise RuntimeError("implementation bug")
 
     with pytest.raises(FakeToolError, match="invalid query") as translated:
-        mcp_server._call_surface(FakeToolError, invalid)
+        mcp_server._call_surface("find", FakeToolError, invalid)
     assert json.loads(str(translated.value)) == {
         "schema": "hashmarks.mcp-error.v1",
         "reason": "invalid-request",
@@ -501,7 +501,14 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
         "recovery_authority": "consumer-owned",
     }
     with pytest.raises(RuntimeError, match="implementation bug"):
-        mcp_server._call_surface(FakeToolError, broken)
+        mcp_server._call_surface("find", FakeToolError, broken)
+
+    with pytest.raises(RuntimeError, match="response schema drift"):
+        mcp_server._call_surface(
+            "find",
+            FakeToolError,
+            lambda: {"schema": "hashmarks.repository-capsule.v1"},
+        )
 
 
 def test_mcp_server_registers_exact_small_read_only_tool_catalog(
@@ -600,6 +607,60 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             dependency_tool({}, result_mode="history")
         with pytest.raises(FakeToolError, match="result_mode must be one of"):
             declaration_tool([], result_mode="compare")
+
+    finally:
+        server._hashmarks_surface.close()
+
+
+def test_mcp_server_rejects_mode_specific_response_schema_drift(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    registered: list[dict[str, object]] = []
+
+    class FakeToolAnnotations:
+        def __init__(self, **kwargs):
+            self.values = kwargs
+
+    class FakeMCPServer:
+        def __init__(self, _name: str, **_kwargs):
+            pass
+
+        def tool(self, **metadata):
+            def decorate(fn):
+                registered.append({"fn": fn, **metadata})
+                return fn
+
+            return decorate
+
+    class FakeToolError(Exception):
+        pass
+
+    mcp_module = types.ModuleType("mcp")
+    server_module = types.ModuleType("mcp.server")
+    mcpserver_module = types.ModuleType("mcp.server.mcpserver")
+    exceptions_module = types.ModuleType("mcp.server.mcpserver.exceptions")
+    types_module = types.ModuleType("mcp.types")
+    server_module.MCPServer = FakeMCPServer
+    exceptions_module.ToolError = FakeToolError
+    types_module.ToolAnnotations = FakeToolAnnotations
+    monkeypatch.setitem(sys.modules, "mcp", mcp_module)
+    monkeypatch.setitem(sys.modules, "mcp.server", server_module)
+    monkeypatch.setitem(sys.modules, "mcp.server.mcpserver", mcpserver_module)
+    monkeypatch.setitem(
+        sys.modules, "mcp.server.mcpserver.exceptions", exceptions_module
+    )
+    monkeypatch.setitem(sys.modules, "mcp.types", types_module)
+
+    server = mcp_server.build_server(_repo(tmp_path), state_dir=tmp_path / "state")
+    try:
+        server._hashmarks_surface.dependency_codemap = lambda *_args, **_kwargs: {
+            "schema": "hashmarks.dependency-resolution-explain.v1"
+        }
+        tool = next(
+            row["fn"] for row in registered if row["name"] == "dependency_codemap"
+        )
+        with pytest.raises(RuntimeError, match="response schema drift"):
+            tool({}, result_mode="compare")
     finally:
         server._hashmarks_surface.close()
 
