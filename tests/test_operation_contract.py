@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 
 from hashmarks.operation_contract import (
-    OPERATION_CONTRACTS,
     OPERATION_CONTRACT_SCHEMA,
+    OPERATION_CONTRACTS,
     operation_contract_manifest,
     operation_modes,
     operation_schema,
