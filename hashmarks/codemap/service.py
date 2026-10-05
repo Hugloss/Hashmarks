@@ -614,7 +614,9 @@ class CodeMapService:
 
     def _budget_sweep_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task, limit, per_role = self._task_context(request)
-        budgets = request.get("budgets", [64, 128, 192, 256, 384, 512])
+        budgets = request.get(
+            "budgets", list(TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS)
+        )
         if (
             not isinstance(budgets, list)
             or not budgets
