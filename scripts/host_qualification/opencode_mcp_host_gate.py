@@ -1058,9 +1058,9 @@ def _run_phase_two(
         SELECTION_RESPONSE_SCHEMAS["hashmarks_repository_context"],
     )
     generation = context.get("generation")
-    if post.get("status") != "changed":
+    if post.get("change") != "changed":
         raise HostGateError(
-            f"post_change status was not changed: {post.get('status')!r}"
+            f"post_change did not report change=changed: {post.get('change')!r}"
         )
     if post.get("generation_before") != phase_one.generation:
         raise HostGateError(
@@ -1125,7 +1125,7 @@ def _gate_receipt(
         "phase2": {
             "generation_before": phase_two.post_change.get("generation_before"),
             "generation_after": phase_two.post_change.get("generation_after"),
-            "status": phase_two.post_change.get("status"),
+            "change": phase_two.post_change.get("change"),
             "invalidated": phase_two.post_change.get("invalidated"),
             "path_changes": phase_two.path_changes,
         },
