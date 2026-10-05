@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -18,8 +19,11 @@ from hashmarks.mcp_contract import (
     qualification_response_schemas,
     qualify_mcp_observation,
     response_schema_for_mode,
+    tool_contract,
     validate_tool_response,
 )
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _observation() -> dict[str, Any]:
@@ -199,6 +203,26 @@ def test_response_schema_authority_rejects_runtime_drift() -> None:
         )
     with pytest.raises(RuntimeError, match="non-object response"):
         validate_tool_response("find", ["not", "an", "object"])
+
+
+def test_tool_contract_owns_response_validation() -> None:
+    contract = tool_contract("post_change")
+    packet = {"schema": "hashmarks.task-post-change-delta.v2"}
+    assert contract.validate_response(packet) is packet
+
+    with pytest.raises(RuntimeError, match="response schema drift"):
+        contract.validate_response({"schema": "hashmarks.task-post-change-delta.v1"})
+
+
+def test_mcp_server_consumes_one_contract_object_per_tool() -> None:
+    source = (ROOT / "hashmarks" / "mcp_server.py").read_text(encoding="utf-8")
+
+    assert "tool_description(" not in source
+    assert "validate_tool_response(" not in source
+    for name in MCP_TOOL_NAMES:
+        assert source.count(f'tool_contract("{name}")') == 1
+        assert f'name="{name}"' not in source
+        assert f'_call_surface("{name}"' not in source
 
 
 def test_host_schema_expectations_derive_from_canonical_contract() -> None:

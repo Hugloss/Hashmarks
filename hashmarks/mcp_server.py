@@ -10,8 +10,8 @@ from .mcp_contract import (
     MCP_SERVER_DESCRIPTION,
     MCP_SERVER_INSTRUCTIONS,
     MCP_SERVER_NAME,
-    tool_description,
-    validate_tool_response,
+    McpToolContract,
+    tool_contract,
 )
 from .mcp_surface import HashmarksMcpSurface, McpSurfaceError
 from .operation_contract import operation_modes
@@ -44,7 +44,7 @@ def _sdk():
 
 
 def _call_surface(
-    tool_name: str,
+    contract: McpToolContract,
     tool_error: type[Exception],
     operation: Callable[..., dict[str, object]],
     /,
@@ -58,7 +58,7 @@ def _call_surface(
         result = operation(*args, **kwargs)
     except McpSurfaceError as exc:
         raise tool_error(exc.transport_message()) from exc
-    return validate_tool_response(tool_name, result, result_mode=response_mode)
+    return contract.validate_response(result, result_mode=response_mode)
 
 
 def _register_repository_declarations_tool(
@@ -67,9 +67,11 @@ def _register_repository_declarations_tool(
     annotations: Any,
     tool_error: type[Exception],
 ) -> None:
+    contract = tool_contract("repository_declarations")
+
     @server.tool(
-        name="repository_declarations",
-        description=tool_description("repository_declarations"),
+        name=contract.name,
+        description=contract.description,
         annotations=annotations,
     )
     def repository_declarations(
@@ -78,7 +80,7 @@ def _register_repository_declarations_tool(
         result_mode: _RepositoryDeclarationsResultMode = "observation",
     ) -> dict[str, object]:
         return _call_surface(
-            "repository_declarations",
+            contract,
             tool_error,
             surface.repository_declarations,
             groups,
@@ -106,37 +108,43 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         open_world_hint=MCP_READ_ONLY_ANNOTATIONS["openWorldHint"],
     )
 
+    repository_context_contract = tool_contract("repository_context")
+
     @server.tool(
-        name="repository_context",
-        description=tool_description("repository_context"),
+        name=repository_context_contract.name,
+        description=repository_context_contract.description,
         annotations=annotations,
     )
     def repository_context(max_areas: int = 12) -> dict[str, object]:
         return _call_surface(
-            "repository_context",
+            repository_context_contract,
             ToolError,
             surface.repository_context,
             max_areas=max_areas,
         )
 
+    find_contract = tool_contract("find")
+
     @server.tool(
-        name="find",
-        description=tool_description("find"),
+        name=find_contract.name,
+        description=find_contract.description,
         annotations=annotations,
     )
     def find(query: str, limit: int = 20) -> dict[str, object]:
-        return _call_surface("find", ToolError, surface.find, query, limit=limit)
+        return _call_surface(find_contract, ToolError, surface.find, query, limit=limit)
+
+    task_evidence_contract = tool_contract("task_evidence")
 
     @server.tool(
-        name="task_evidence",
-        description=tool_description("task_evidence"),
+        name=task_evidence_contract.name,
+        description=task_evidence_contract.description,
         annotations=annotations,
     )
     def task_evidence(
         task: str, limit: int = 20, per_role: int = 3, token_budget: int = 1536
     ) -> dict[str, object]:
         return _call_surface(
-            "task_evidence",
+            task_evidence_contract,
             ToolError,
             surface.task_evidence,
             task,
@@ -145,16 +153,18 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
             token_budget=token_budget,
         )
 
+    change_impact_contract = tool_contract("change_impact")
+
     @server.tool(
-        name="change_impact",
-        description=tool_description("change_impact"),
+        name=change_impact_contract.name,
+        description=change_impact_contract.description,
         annotations=annotations,
     )
     def change_impact(
         task: str, changed_paths: list[str], max_depth: int = 4
     ) -> dict[str, object]:
         return _call_surface(
-            "change_impact",
+            change_impact_contract,
             ToolError,
             surface.change_impact,
             task,
@@ -162,9 +172,11 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
             max_depth=max_depth,
         )
 
+    correlate_evidence_contract = tool_contract("correlate_evidence")
+
     @server.tool(
-        name="correlate_evidence",
-        description=tool_description("correlate_evidence"),
+        name=correlate_evidence_contract.name,
+        description=correlate_evidence_contract.description,
         annotations=annotations,
     )
     def correlate_evidence(
@@ -175,7 +187,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         relationship_limit_per_path: int = 100,
     ) -> dict[str, object]:
         return _call_surface(
-            "correlate_evidence",
+            correlate_evidence_contract,
             ToolError,
             surface.correlate_evidence,
             bundles,
@@ -185,9 +197,11 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
             relationship_limit_per_path=relationship_limit_per_path,
         )
 
+    dependency_codemap_contract = tool_contract("dependency_codemap")
+
     @server.tool(
-        name="dependency_codemap",
-        description=tool_description("dependency_codemap"),
+        name=dependency_codemap_contract.name,
+        description=dependency_codemap_contract.description,
         annotations=annotations,
     )
     def dependency_codemap(
@@ -197,7 +211,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         result_mode: _DependencyCodemapResultMode = "observation",
     ) -> dict[str, object]:
         return _call_surface(
-            "dependency_codemap",
+            dependency_codemap_contract,
             ToolError,
             surface.dependency_codemap,
             snapshot,
@@ -209,9 +223,11 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
 
     _register_repository_declarations_tool(server, surface, annotations, ToolError)
 
+    post_change_contract = tool_contract("post_change")
+
     @server.tool(
-        name="post_change",
-        description=tool_description("post_change"),
+        name=post_change_contract.name,
+        description=post_change_contract.description,
         annotations=annotations,
     )
     def post_change(
@@ -221,7 +237,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         token_budget: int = 1536,
     ) -> dict[str, object]:
         return _call_surface(
-            "post_change",
+            post_change_contract,
             ToolError,
             surface.post_change,
             task,
