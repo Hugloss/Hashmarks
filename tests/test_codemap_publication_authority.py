@@ -100,7 +100,8 @@ def test_concurrent_sync_writers_serialize_one_publication_authority(
     finally:
         a_release.set()
         thread_a.join(timeout=1)
-        thread_b.join(timeout=1)
+        if thread_b.ident is not None:
+            thread_b.join(timeout=1)
         writer_a.close()
         writer_b.close()
         reader.close()
