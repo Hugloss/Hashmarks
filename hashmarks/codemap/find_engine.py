@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.freshness import freshness_state
 from hashmarks.operation_contract import operation_schema, validate_operation_response
 
 from .decision_session import decision_scoped
@@ -47,14 +48,6 @@ def _optional_str(value: object) -> str | None:
 
 def _optional_int(value: object) -> int | None:
     return None if value is None else int(value)
-
-
-def _find_freshness_state(stale: bool | None) -> str:
-    if stale is True:
-        return "stale"
-    if stale is False:
-        return "current"
-    return "unknown"
 
 
 def _find_claim_scope(intent: str) -> str:
@@ -154,7 +147,7 @@ class FindEngineMixin:
         evidence = self._find_evidence(query, limit=limit)
         route = self.query_route(query)
         generation, identity_generation, stale = self._generation_status()
-        freshness = _find_freshness_state(stale)
+        freshness = freshness_state(stale)
         claims = _find_claim_fields(
             query,
             route.intent.value,

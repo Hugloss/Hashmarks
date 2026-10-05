@@ -5,24 +5,13 @@ import json
 import time
 from typing import TYPE_CHECKING, Any, cast
 
+from hashmarks.freshness import FRESHNESS_STATES, freshness_state
 from hashmarks.paths import normalize_relative_path
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from .engine import CodeMap
-
-
-FRESHNESS_STATES = frozenset({"current", "stale", "unknown"})
-
-
-def freshness_state(stale: bool | None) -> str:
-    """Return the canonical serialized freshness state."""
-    if stale is True:
-        return "stale"
-    if stale is False:
-        return "current"
-    return "unknown"
 
 
 def _inadmissible_manifest_count(value: dict[str, object]) -> int | None:
