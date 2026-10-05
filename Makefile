@@ -486,7 +486,6 @@ metrics-worker-multistep-ab: bootstrap
 
 metrics-worker-failed-verification-ab: bootstrap
 	$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_worker_failed_verification_ab \
-	  --root .hashmarks/benchmarks/worker-failed-verification-ab \
 	  --output .hashmarks/metrics/worker-failed-verification-ab-latest.json
 
 metrics-agent-economics: bootstrap
