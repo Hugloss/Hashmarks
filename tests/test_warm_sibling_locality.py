@@ -90,7 +90,7 @@ def test_repetitive_warm_repository_keeps_edit_and_verify_in_task_namespace(
             assert action["edit"]["path"] == task["edit"], task["token"]
             assert action["verify"]["path"] == task["verify"], task["token"]
             brief = codemap.task_action_brief(task["query"])
-            assert brief["status"] == "safe-fresh", task["token"]
+            assert brief["status"] == "safe-unknown", task["token"]
             assert brief["edit"] == task["edit"], task["token"]
             assert task["verify"] in brief["verify"][-1], task["token"]
             if "contract" in brief:
@@ -128,5 +128,5 @@ def test_unique_identifier_anchor_excludes_generic_contract_sibling_owners(
     assert action["ambiguity"]["ambiguous"] is False
     assert action["ambiguity"]["task_local_structural_owners"] == [target["edit"]]
     assert action["ownership_authority"]["owner_resolved"] is False
-    assert brief["status"] == "safe-fresh"
+    assert brief["status"] == "safe-unknown"
     assert brief["edit"] == target["edit"]
