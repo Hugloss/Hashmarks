@@ -4,6 +4,8 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_response, operation_schema
+
 from ..ownership_decision import bounded_presentation_contract
 from .decision_session import decision_scoped, diagnostic_producer
 from .model import EvidenceVisibility
@@ -24,6 +26,7 @@ if TYPE_CHECKING:
 
 
 class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
+    @operation_response("task_action_map")
     @decision_scoped
     @diagnostic_producer
     def task_action_map(
@@ -389,7 +392,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             compact=False,
         )
         return {
-            "schema": "hashmarks.task-action-map.v1",
+            "schema": operation_schema("task_action_map"),
             "task": task,
             "edit": final.edit,
             "action_edit": action_edit,
