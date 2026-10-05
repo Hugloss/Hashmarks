@@ -266,8 +266,7 @@ def _fixed_mode_repo(root: Path) -> tuple[Path, str]:
     source = root / "src" / "owner.py"
     source.write_text("def widget(): return 'old'\n", encoding="utf-8")
     (root / "tests" / "test_owner.py").write_text(
-        "from src.owner import widget\n"
-        "def test_widget(): assert widget() == 'new'\n",
+        "from src.owner import widget\ndef test_widget(): assert widget() == 'new'\n",
         encoding="utf-8",
     )
     return source, "change widget implementation and verify widget test"
@@ -370,9 +369,7 @@ def test_core_correlation_rejects_its_own_schema_drift(
         with pytest.raises(RuntimeError, match="operation response schema drift"):
             codemap.correlate_evidence(
                 bundles,
-                path_mappings=[
-                    {"external_prefix": "/app", "repository_prefix": ""}
-                ],
+                path_mappings=[{"external_prefix": "/app", "repository_prefix": ""}],
             )
 
 
