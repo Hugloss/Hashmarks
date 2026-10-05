@@ -76,6 +76,7 @@ class EvidenceFreshnessMixin:
         *,
         bind_generation: bool,
         manifests: Iterable[str] = (),
+        generation: int | None = None,
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -92,7 +93,7 @@ class EvidenceFreshnessMixin:
                 continue
             manifest_rows[rel] = self._manifest_digest(rel)
         value = {
-            "generation": self.store.generation(),
+            "generation": self.store.generation() if generation is None else int(generation),
             "bind_generation": bool(bind_generation),
             "manifests": manifest_rows,
             "inadmissible_manifest_count": inadmissible_manifest_count,
