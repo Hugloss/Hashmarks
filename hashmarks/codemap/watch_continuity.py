@@ -14,6 +14,87 @@ _MAX_DIRTY_PATHS = 1000
 _MAX_HEARTBEAT_AGE_SECONDS = 2.5
 
 
+def _plain_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _number(value: object) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _decode_payload(raw: str | None) -> dict[str, object] | None:
+    if not raw:
+        return None
+    try:
+        payload = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("schema") != WATCH_CONTINUITY_SCHEMA:
+        return None
+    return payload
+
+
+def _parse_lease(
+    payload: dict[str, object],
+) -> tuple[str, int, float, bool, int] | None:
+    owner = payload.get("owner")
+    pid = payload.get("pid")
+    heartbeat = payload.get("heartbeat_unix")
+    active = payload.get("active")
+    generation = payload.get("codemap_generation")
+    if not isinstance(owner, str) or not owner:
+        return None
+    if not _plain_int(pid) or not _number(heartbeat):
+        return None
+    if not isinstance(active, bool) or not _plain_int(generation):
+        return None
+    if int(generation) < 0:
+        return None
+    return owner, int(pid), float(heartbeat), active, int(generation)
+
+
+def _parse_observation(payload: object) -> RepositoryObservation | None:
+    if not isinstance(payload, dict):
+        return None
+    state_raw = payload.get("state")
+    generation = payload.get("generation")
+    dirty_paths = payload.get("dirty_paths")
+    paths_complete = payload.get("paths_complete")
+    dirty_count = payload.get("dirty_path_count")
+    reason = payload.get("reason")
+    if not isinstance(state_raw, str) or not _plain_int(generation):
+        return None
+    if not isinstance(dirty_paths, list) or not all(
+        isinstance(path, str) for path in dirty_paths
+    ):
+        return None
+    if not isinstance(paths_complete, bool) or not _plain_int(dirty_count):
+        return None
+    if reason is not None and not isinstance(reason, str):
+        return None
+    try:
+        state = ObservationState(state_raw)
+    except ValueError:
+        return None
+    paths = tuple(dirty_paths)
+    if int(generation) < 0 or int(dirty_count) < len(paths):
+        return None
+    if paths_complete and int(dirty_count) != len(paths):
+        return None
+    if state is ObservationState.CLEAN and (paths or int(dirty_count)):
+        return None
+    return RepositoryObservation(
+        state=state,
+        generation=int(generation),
+        dirty_paths=paths,
+        paths_complete=paths_complete,
+        dirty_path_count=int(dirty_count),
+        reason=reason,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class WatchContinuityRecord:
     owner: str
@@ -44,77 +125,21 @@ class WatchContinuityRecord:
 
     @classmethod
     def from_json(cls, raw: str | None) -> WatchContinuityRecord | None:
-        if not raw:
+        payload = _decode_payload(raw)
+        if payload is None:
             return None
-        try:
-            payload = json.loads(raw)
-        except (TypeError, ValueError):
+        lease = _parse_lease(payload)
+        observation = _parse_observation(payload.get("observation"))
+        if lease is None or observation is None:
             return None
-        if not isinstance(payload, dict) or payload.get("schema") != WATCH_CONTINUITY_SCHEMA:
-            return None
-        observation = payload.get("observation")
-        if not isinstance(observation, dict):
-            return None
-
-        owner = payload.get("owner")
-        pid = payload.get("pid")
-        heartbeat_unix = payload.get("heartbeat_unix")
-        active = payload.get("active")
-        codemap_generation = payload.get("codemap_generation")
-        state_raw = observation.get("state")
-        generation = observation.get("generation")
-        dirty_paths = observation.get("dirty_paths")
-        paths_complete = observation.get("paths_complete")
-        dirty_path_count = observation.get("dirty_path_count")
-        reason = observation.get("reason")
-        if not (
-            isinstance(owner, str)
-            and owner
-            and isinstance(pid, int)
-            and not isinstance(pid, bool)
-            and isinstance(heartbeat_unix, (int, float))
-            and not isinstance(heartbeat_unix, bool)
-            and isinstance(active, bool)
-            and isinstance(codemap_generation, int)
-            and not isinstance(codemap_generation, bool)
-            and isinstance(state_raw, str)
-            and isinstance(generation, int)
-            and not isinstance(generation, bool)
-            and isinstance(dirty_paths, list)
-            and all(isinstance(path, str) for path in dirty_paths)
-            and isinstance(paths_complete, bool)
-            and isinstance(dirty_path_count, int)
-            and not isinstance(dirty_path_count, bool)
-            and (reason is None or isinstance(reason, str))
-        ):
-            return None
-        try:
-            state = ObservationState(state_raw)
-        except ValueError:
-            return None
-        paths = tuple(dirty_paths)
-        if (
-            generation < 0
-            or dirty_path_count < len(paths)
-            or codemap_generation < 0
-            or (paths_complete and dirty_path_count != len(paths))
-            or (state is ObservationState.CLEAN and (paths or dirty_path_count))
-        ):
-            return None
+        owner, pid, heartbeat, active, generation = lease
         return cls(
             owner=owner,
             pid=pid,
-            heartbeat_unix=float(heartbeat_unix),
+            heartbeat_unix=heartbeat,
             active=active,
-            codemap_generation=codemap_generation,
-            observation=RepositoryObservation(
-                state=state,
-                generation=generation,
-                dirty_paths=paths,
-                paths_complete=paths_complete,
-                dirty_path_count=dirty_path_count,
-                reason=reason,
-            ),
+            codemap_generation=generation,
+            observation=observation,
         )
 
     def lease_live(self, *, now: float | None = None) -> bool:
