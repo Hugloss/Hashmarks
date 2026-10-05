@@ -20,6 +20,7 @@ from .mcp_contract import (
     MCP_ERROR_RECOVERY_AUTHORITY,
     MCP_ERROR_SCHEMA,
 )
+from .operation_contract import operation_default_mode
 from .repository_retry import retry_transient_repository_race
 
 if TYPE_CHECKING:
@@ -329,7 +330,7 @@ class HashmarksMcpSurface:
         queries: list[dict[str, Any]] | None = None,
         *,
         previous_observation: dict[str, Any] | None = None,
-        result_mode: str = "observation",
+        result_mode: str = operation_default_mode("dependency_codemap"),
     ) -> dict[str, object]:
         """Project one core-owned dependency operation without changing semantics."""
         raw_snapshot, bounded_queries, previous, mode = _dependency_codemap_request(
@@ -357,7 +358,7 @@ class HashmarksMcpSurface:
         groups: list[dict[str, Any]],
         *,
         previous_observation: dict[str, Any] | None = None,
-        result_mode: str = "observation",
+        result_mode: str = operation_default_mode("repository_declarations"),
     ) -> dict[str, object]:
         """Project one core-owned declaration operation without changing semantics."""
         bounded_groups = _bounded_json(
