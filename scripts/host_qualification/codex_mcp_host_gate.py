@@ -24,6 +24,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 from mcp_host_gate_common import (  # noqa: E402 - import follows standalone script path setup
     HostGateEnvironmentBlocked,
     HostGateError,
+    basic_qualification_proof_from_payloads,
     build_installed_wheel,
     completed_at,
     installed_mcp_contract,
@@ -226,6 +227,11 @@ def _gate(args: argparse.Namespace, project_root: Path) -> dict[str, Any]:
                 "sha256": sha256(config_path),
             },
             "observed_tools": sorted(payloads),
+            "qualification": basic_qualification_proof_from_payloads(
+                payloads["repository_context"],
+                payloads["find"],
+                host="Codex",
+            ),
             "event_log": {"path": str(event_log), "sha256": sha256(event_log)},
         }
 
