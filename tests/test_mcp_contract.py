@@ -173,8 +173,7 @@ def test_response_schema_authority_is_mode_specific() -> None:
         == "hashmarks.repository-declaration-explain.v1"
     )
     assert (
-        response_schema_for_mode("post_change")
-        == "hashmarks.task-post-change-delta.v2"
+        response_schema_for_mode("post_change") == "hashmarks.task-post-change-delta.v2"
     )
 
 
