@@ -9,7 +9,7 @@ from hashmarks.client import RepositoryObservation
 from hashmarks.observation import ChangeSnapshot, ObservationState
 
 WATCH_CONTINUITY_META = "watcher.observation"
-WATCH_CONTINUITY_SCHEMA = "hashmarks.codemap-watch-observation.v1"
+WATCH_CONTINUITY_SCHEMA = "hashmarks.codemap-watch-observation.v2"
 _MAX_DIRTY_PATHS = 1000
 _MAX_HEARTBEAT_AGE_SECONDS = 2.5
 
@@ -38,13 +38,16 @@ def _decode_payload(raw: str | None) -> dict[str, object] | None:
 
 def _parse_lease(
     payload: dict[str, object],
-) -> tuple[str, int, float, bool, int] | None:
+) -> tuple[str, int, int, float, bool, int] | None:
     owner = payload.get("owner")
+    fence = payload.get("fence")
     pid = payload.get("pid")
     heartbeat = payload.get("heartbeat_unix")
     active = payload.get("active")
     generation = payload.get("codemap_generation")
     if not isinstance(owner, str) or not owner:
+        return None
+    if not _plain_int(fence) or int(fence) < 1:
         return None
     if not _plain_int(pid) or not _number(heartbeat):
         return None
@@ -52,7 +55,7 @@ def _parse_lease(
         return None
     if int(generation) < 0:
         return None
-    return owner, int(pid), float(heartbeat), active, int(generation)
+    return owner, int(fence), int(pid), float(heartbeat), active, int(generation)
 
 
 def _string_paths(value: object) -> tuple[str, ...] | None:
@@ -123,6 +126,7 @@ def _parse_observation(payload: object) -> RepositoryObservation | None:
 @dataclass(frozen=True, slots=True)
 class WatchContinuityRecord:
     owner: str
+    fence: int
     pid: int
     heartbeat_unix: float
     active: bool
@@ -133,6 +137,7 @@ class WatchContinuityRecord:
         payload = {
             "schema": WATCH_CONTINUITY_SCHEMA,
             "owner": self.owner,
+            "fence": self.fence,
             "pid": self.pid,
             "heartbeat_unix": self.heartbeat_unix,
             "active": self.active,
@@ -157,9 +162,10 @@ class WatchContinuityRecord:
         observation = _parse_observation(payload.get("observation"))
         if lease is None or observation is None:
             return None
-        owner, pid, heartbeat, active, generation = lease
+        owner, fence, pid, heartbeat, active, generation = lease
         return cls(
             owner=owner,
+            fence=fence,
             pid=pid,
             heartbeat_unix=heartbeat,
             active=active,
@@ -199,6 +205,7 @@ class WatchContinuityRecord:
         observation = self.observation
         return {
             "owner": self.owner,
+            "fence": self.fence,
             "pid": self.pid if self.active else None,
             "active": self.active,
             "state": observation.state.value,
@@ -215,6 +222,7 @@ def watch_record_from_snapshot(
     snapshot: ChangeSnapshot,
     *,
     owner: str,
+    fence: int,
     pid: int,
     heartbeat_unix: float,
     active: bool,
@@ -223,6 +231,7 @@ def watch_record_from_snapshot(
     dirty_paths = snapshot.paths[:_MAX_DIRTY_PATHS]
     return WatchContinuityRecord(
         owner=owner,
+        fence=fence,
         pid=pid,
         heartbeat_unix=heartbeat_unix,
         active=active,
@@ -245,6 +254,7 @@ def watch_status_projection(
         return record.status_projection()
     return {
         "owner": None,
+        "fence": None,
         "pid": None,
         "active": False,
         "state": None,
