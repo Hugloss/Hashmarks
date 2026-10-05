@@ -32,7 +32,7 @@ def test_documented_make_commands_are_real_phony_targets() -> None:
 
 def _make_recipe(text: str, target: str) -> tuple[str, ...]:
     match = re.search(
-        rf"^{re.escape(target)}:\n(?P<recipe>(?:\t.*\n)+)",
+        rf"^{re.escape(target)}:[^\n]*\n(?P<recipe>(?:\t.*\n)+)",
         text,
         flags=re.MULTILINE,
     )
