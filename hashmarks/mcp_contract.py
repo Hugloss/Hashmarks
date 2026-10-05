@@ -79,6 +79,18 @@ class McpToolContract:
     def response_schema_for_mode(self, result_mode: str | None = None) -> str:
         return operation_schema(self.operation, result_mode)
 
+    def validate_response(
+        self,
+        value: object,
+        *,
+        result_mode: str | None = None,
+    ) -> dict[str, object]:
+        return validate_operation_response(
+            self.operation,
+            value,
+            mode=result_mode,
+        )
+
 
 MCP_TOOL_CONTRACTS = (
     McpToolContract(
@@ -187,11 +199,9 @@ def validate_tool_response(
     *,
     result_mode: str | None = None,
 ) -> dict[str, object]:
-    contract = tool_contract(name)
-    return validate_operation_response(
-        contract.operation,
+    return tool_contract(name).validate_response(
         value,
-        mode=result_mode,
+        result_mode=result_mode,
     )
 
 
