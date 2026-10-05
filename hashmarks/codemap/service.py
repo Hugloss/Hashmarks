@@ -23,7 +23,10 @@ from .change_impact import ChangeImpactOptions
 from .engine import CodeMap
 from .evidence_packet import TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
 from .post_change import PostChangeOptions
-from .repository_intelligence_query import RepositoryIntelligenceQueryOptions
+from .repository_intelligence_query import (
+    REPOSITORY_INTELLIGENCE_QUERY_DEFAULTS,
+    RepositoryIntelligenceQueryOptions,
+)
 
 PROTOCOL = "hashmarks.codemap-service.v2"
 MAX_REQUEST = 1024 * 1024
@@ -517,24 +520,37 @@ class CodeMapService:
             not isinstance(member_path, str) or not member_path.strip()
         ):
             raise ValueError("member_path must be a non-empty string or null")
+        defaults = REPOSITORY_INTELLIGENCE_QUERY_DEFAULTS
         result = self._map().repository_intelligence_query(
             surface,
             task,
             changed,
             options=RepositoryIntelligenceQueryOptions(
                 member_path=member_path,
-                profile=str(request.get("profile", "compact")),
+                profile=str(request.get("profile", defaults.profile)),
                 negative_members=negative_members,
                 previous_map=previous_map,
                 previous_snapshot=previous_snapshot,
-                limit=self._bounded_int(request, "limit", 20, 1, 100),
-                per_role=self._bounded_int(request, "per_role", 3, 1, 20),
-                impact_limit_per_surface=self._bounded_int(
-                    request, "impact_limit_per_surface", 4, 1, 100
+                limit=self._bounded_int(request, "limit", defaults.limit, 1, 100),
+                per_role=self._bounded_int(
+                    request, "per_role", defaults.per_role, 1, 20
                 ),
-                max_depth=self._bounded_int(request, "max_depth", 3, 1, 32),
+                impact_limit_per_surface=self._bounded_int(
+                    request,
+                    "impact_limit_per_surface",
+                    defaults.impact_limit_per_surface,
+                    1,
+                    100,
+                ),
+                max_depth=self._bounded_int(
+                    request, "max_depth", defaults.max_depth, 1, 32
+                ),
                 project_impact_limit=self._bounded_int(
-                    request, "project_impact_limit", 12, 1, 100000
+                    request,
+                    "project_impact_limit",
+                    defaults.project_impact_limit,
+                    1,
+                    100000,
                 ),
             ),
         )
@@ -965,7 +981,7 @@ class CodeMapServiceClient:
         task: str,
         changed_paths: tuple[str, ...] | list[str] = (),
         *,
-        options: RepositoryIntelligenceQueryOptions = RepositoryIntelligenceQueryOptions(),
+        options: RepositoryIntelligenceQueryOptions = REPOSITORY_INTELLIGENCE_QUERY_DEFAULTS,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "surface": surface,
