@@ -88,9 +88,7 @@ def test_tool_payload_requires_schema_and_rejects_building_state() -> None:
             )
         ]
     )[0]
-    assert (
-        host_gate._tool_payload(part, "hashmarks.find.v2")["status"] == "complete"
-    )
+    assert host_gate._tool_payload(part, "hashmarks.find.v2")["status"] == "complete"
 
     building = host_gate._tool_events(
         [
