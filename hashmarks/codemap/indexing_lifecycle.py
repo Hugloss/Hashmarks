@@ -28,7 +28,11 @@ from .repository_index_store import (
     git_overlay_paths,
 )
 from .source_languages import SOURCE_LANGUAGES
-from .watch_continuity import WATCH_CONTINUITY_META, WatchContinuityRecord
+from .watch_continuity import (
+    WATCH_CONTINUITY_META,
+    WatchContinuityRecord,
+    watch_status_projection,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -1477,11 +1481,7 @@ class IndexingLifecycleMixin:
                 ],
             ],
             "native_evidence": self._native_evidence_status(),
-            "watcher": (
-                {}
-                if watch_record is None
-                else watch_record.status_projection()
-            ),
+            "watcher": watch_status_projection(watch_record),
             **self.store.stats(),
         }
 
