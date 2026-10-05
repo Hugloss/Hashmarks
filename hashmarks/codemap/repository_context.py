@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, cast
 
-from hashmarks.operation_contract import operation_schema
+from hashmarks.operation_contract import operation_schema, validate_operation_response
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped
@@ -163,7 +163,7 @@ class ContextPlanningMixin:
         stats = self.store.stats()
         areas = list(self.store.top_level_counts().items())[:max_areas]
         generation, identity_generation, stale = self._generation_status()
-        return {
+        result: dict[str, object] = {
             "schema": operation_schema("repository_context"),
             "workspace": str(self.workspace),
             "generation": generation,
@@ -180,6 +180,7 @@ class ContextPlanningMixin:
             ],
             "guidance": "Use find/outline/symbol/deps before reading full files.",
         }
+        return validate_operation_response("repository_context", result)
 
     def _source_slice(
         self, path: str, start: int, end: int, *, qualname: str | None = None
