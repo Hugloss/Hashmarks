@@ -727,12 +727,18 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             if isinstance(action.get("ambiguity"), Mapping)
             else {}
         )
-        owner = action.get("edit") if isinstance(action.get("edit"), Mapping) else None
-        owner_resolved = bool(authority.get("owner_resolved")) and owner is not None
+        candidate = (
+            action.get("edit") if isinstance(action.get("edit"), Mapping) else None
+        )
+        owner = (
+            action.get("admitted_edit")
+            if isinstance(action.get("admitted_edit"), Mapping)
+            else None
+        )
         basis = str(action.get("owner_basis") or "") or None
         explicit_target_basis = (
-            str(owner.get("explicit_target_basis") or "")
-            if isinstance(owner, Mapping)
+            str(candidate.get("explicit_target_basis") or "")
+            if isinstance(candidate, Mapping)
             else ""
         ) or basis
         explicit_bases = {
@@ -746,10 +752,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             {
                 "status": "resolved",
                 "basis": explicit_target_basis,
-                "path": str(owner.get("path") or ""),
-                "symbol": owner.get("qualname") or owner.get("name"),
+                "path": str(candidate.get("path") or ""),
+                "symbol": candidate.get("qualname") or candidate.get("name"),
             }
-            if owner is not None and explicit_target_basis in explicit_bases
+            if candidate is not None and explicit_target_basis in explicit_bases
             else {
                 "status": "not-explicit",
                 "basis": None,
@@ -783,9 +789,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 ),
                 "proof_scope": authority.get("proof_scope"),
                 "proof_scope_complete": bool(authority.get("proof_scope_complete")),
-                "owner": dict(owner) if owner_resolved else None,
-                "candidate": None if owner is None else dict(owner),
-                "basis": basis if owner_resolved else None,
+                "owner": None if owner is None else dict(owner),
+                "candidate": None if candidate is None else dict(candidate),
+                "basis": basis if owner is not None else None,
                 "candidate_basis": explicit_target_basis or basis,
                 "ambiguity": dict(ambiguity),
                 "authority": "repository-ownership-only",
