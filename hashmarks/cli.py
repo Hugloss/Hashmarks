@@ -22,6 +22,7 @@ from .client import (
 from .daemon import IdentityDaemon
 from .errors import UserFacingError
 from .identity import RepositoryIdentity, RepositoryIdentityMode
+from .mcp_launch import installed_mcp_command
 from .opencode_registration import (
     effective_command_uses_executable,
     inspect_effective_hashmarks_command,
@@ -327,10 +328,7 @@ def _install(args) -> int:
         "add",
         "hashmarks",
         "--",
-        str(executable),
-        "--workspace",
-        ".",
-        "mcp",
+        *installed_mcp_command(executable, "."),
     ]
     result = subprocess.run(command, check=False)
     if result.returncode != 0:
