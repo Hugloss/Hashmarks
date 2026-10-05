@@ -99,6 +99,14 @@ def operation_contract(operation: str) -> OperationContract:
         raise ValueError(f"unknown Hashmarks operation: {operation}") from exc
 
 
+def registered_operations() -> tuple[str, ...]:
+    return tuple(_OPERATION_BY_NAME)
+
+
+def require_registered_operation(operation: str) -> OperationContract:
+    return operation_contract(operation)
+
+
 def operation_schema(operation: str, mode: str | None = None) -> str:
     return operation_contract(operation).schema_for_mode(mode)
 
@@ -122,16 +130,17 @@ def validate_operation_response(
     *,
     mode: str | None = None,
 ) -> dict[str, object]:
+    contract = require_registered_operation(operation)
     if not isinstance(value, dict):
         raise RuntimeError(
             f"Hashmarks operation {operation} returned a non-object response"
         )
-    expected = operation_schema(operation, mode)
+    expected = contract.schema_for_mode(mode)
     actual = value.get("schema")
     if actual != expected:
         raise RuntimeError(
             "Hashmarks operation response schema drift: "
-            f"operation={operation} mode={mode or operation_contract(operation).default_mode} "
+            f"operation={operation} mode={mode or contract.default_mode} "
             f"expected={expected} got={actual!r}"
         )
     return value
