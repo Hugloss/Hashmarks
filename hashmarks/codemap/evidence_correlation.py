@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import validate_operation_response
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped
@@ -1429,7 +1430,7 @@ class EvidenceCorrelationMixin(EvidenceCorrelationReplayMixin):
                 previous_correlation, packet
             )
         self._validate_packet_size(packet)
-        return packet
+        return validate_operation_response("correlate_evidence", packet)
 
     @staticmethod
     def _validate_request_size(
