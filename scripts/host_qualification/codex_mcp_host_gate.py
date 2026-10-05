@@ -31,6 +31,7 @@ from mcp_host_gate_common import (  # noqa: E402 - import follows standalone scr
     run,
     sha256,
     source_binding,
+    validate_basic_qualification_response,
     write_fixture,
 )
 
@@ -88,24 +89,16 @@ def _mcp_completed(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return completed
 
 
-def _structured_payload(item: dict[str, Any], expected_schema: str) -> dict[str, Any]:
+def _structured_payload(item: dict[str, Any], tool: str) -> dict[str, object]:
     if item.get("status") != "completed":
         raise HostGateError(
             f"Codex MCP call did not complete: {item.get('server')}/{item.get('tool')} status={item.get('status')!r}"
         )
-    result = item.get("result")
-    if not isinstance(result, dict):
-        raise HostGateError("Codex MCP call has no structured result")
-    payload = result.get("structured_content")
-    if payload is None:
-        payload = result.get("structuredContent")
-    if not isinstance(payload, dict) or payload.get("schema") != expected_schema:
-        raise HostGateError(
-            f"Codex MCP call returned unexpected schema: {None if not isinstance(payload, dict) else payload.get('schema')!r}"
-        )
-    if "BUILDING" in json.dumps(payload, sort_keys=True):
-        raise HostGateError("transient BUILDING state escaped through Codex")
-    return payload
+    return validate_basic_qualification_response(
+        tool,
+        item.get("result"),
+        host="Codex",
+    )
 
 
 def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -130,16 +123,11 @@ def _validate_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
             raise HostGateError(
                 f"Codex called Hashmarks MCP tool more than once: {tool}"
             )
-        by_tool[tool] = _structured_payload(item, EXPECTED[tool])
+        by_tool[tool] = _structured_payload(item, tool)
     if set(by_tool) != set(EXPECTED):
         raise HostGateError(
             f"Codex missing required Hashmarks MCP tools: {sorted(set(EXPECTED) - set(by_tool))}"
         )
-    found = by_tool["find"].get("results")
-    if not isinstance(found, list) or not any(
-        isinstance(row, dict) and row.get("path") == "src/feature.py" for row in found
-    ):
-        raise HostGateError("Codex-hosted Hashmarks find did not return src/feature.py")
     return by_tool
 
 

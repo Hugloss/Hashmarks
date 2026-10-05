@@ -181,5 +181,139 @@ def source_binding(project_root: Path, registration_path: Path) -> dict[str, Any
     }
 
 
+_BASIC_QUALIFICATION_REQUESTS: dict[str, dict[str, object]] = {
+    "repository_context": {"max_areas": 8},
+    "find": {"query": "flare041", "limit": 5},
+}
+_BASIC_QUALIFICATION_FIND_PATH = "src/feature.py"
+
+
+def validate_basic_qualification_request(
+    tool: str,
+    value: object,
+    *,
+    host: str,
+) -> dict[str, object]:
+    expected = _BASIC_QUALIFICATION_REQUESTS.get(tool)
+    if expected is None:
+        raise HostGateError(f"{host} targeted unsupported qualification tool: {tool}")
+    if not isinstance(value, dict):
+        raise HostGateError(f"{host} qualification request for {tool} is not an object")
+    if value != expected:
+        raise HostGateError(
+            f"{host} qualification request for {tool} differs from fixture contract: "
+            f"expected={expected!r} got={value!r}"
+        )
+    return value
+
+
+def _decode_json_payload(text: str, *, host: str, tool: str) -> dict[str, object]:
+    stripped = text.strip()
+    if not stripped:
+        raise HostGateError(f"{host} MCP response for {tool} is empty")
+    try:
+        decoded = json.loads(stripped)
+    except json.JSONDecodeError as exc:
+        raise HostGateError(
+            f"{host} MCP response for {tool} is not an exact JSON object"
+        ) from exc
+    if not isinstance(decoded, dict):
+        raise HostGateError(f"{host} MCP response for {tool} JSON is not an object")
+    return decoded
+
+
+def _decode_content_payload(
+    value: list[object],
+    *,
+    host: str,
+    tool: str,
+) -> dict[str, object]:
+    if len(value) != 1:
+        raise HostGateError(
+            f"{host} MCP response for {tool} must contain exactly one structured payload"
+        )
+    part = value[0]
+    if not isinstance(part, dict):
+        raise HostGateError(
+            f"{host} MCP response content for {tool} contains a non-object part"
+        )
+    if part.get("type") != "text" or not isinstance(part.get("text"), str):
+        raise HostGateError(
+            f"{host} MCP response content for {tool} is not a text JSON payload"
+        )
+    return _decode_json_payload(part["text"], host=host, tool=tool)
+
+
+def _decode_mapping_payload(
+    value: dict[object, object],
+    *,
+    host: str,
+    tool: str,
+) -> dict[str, object]:
+    structured = value.get("structured_content")
+    if structured is None:
+        structured = value.get("structuredContent")
+    if structured is not None:
+        if not isinstance(structured, dict):
+            raise HostGateError(
+                f"{host} structured MCP response for {tool} is not an object"
+            )
+        return structured
+    if isinstance(value.get("schema"), str):
+        return dict(value)
+    if "content" in value:
+        return _decode_mcp_payload(value["content"], host=host, tool=tool)
+    raise HostGateError(
+        f"{host} MCP response for {tool} has no structured Hashmarks payload"
+    )
+
+
+def _decode_mcp_payload(value: object, *, host: str, tool: str) -> dict[str, object]:
+    if isinstance(value, dict):
+        return _decode_mapping_payload(value, host=host, tool=tool)
+    if isinstance(value, list):
+        return _decode_content_payload(value, host=host, tool=tool)
+    if isinstance(value, str):
+        return _decode_json_payload(value, host=host, tool=tool)
+    raise HostGateError(f"{host} MCP response for {tool} has unsupported payload type")
+
+
+def validate_basic_qualification_response(
+    tool: str,
+    value: object,
+    *,
+    host: str,
+) -> dict[str, object]:
+    from hashmarks.mcp_contract import validate_tool_response
+
+    payload = _decode_mcp_payload(value, host=host, tool=tool)
+    try:
+        payload = validate_tool_response(tool, payload)
+    except (RuntimeError, ValueError) as exc:
+        raise HostGateError(
+            f"{host} MCP response for {tool} failed canonical contract validation: {exc}"
+        ) from exc
+    if "BUILDING" in json.dumps(payload, sort_keys=True, default=str):
+        raise HostGateError(f"transient BUILDING state escaped through {host}")
+    if tool == "repository_context":
+        generation = payload.get("generation")
+        if not isinstance(generation, int) or isinstance(generation, bool):
+            raise HostGateError(
+                f"{host} repository_context did not expose an integer generation"
+            )
+    elif tool == "find":
+        results = payload.get("results")
+        if not isinstance(results, list) or not any(
+            isinstance(row, dict) and row.get("path") == _BASIC_QUALIFICATION_FIND_PATH
+            for row in results
+        ):
+            raise HostGateError(
+                f"{host} find did not return {_BASIC_QUALIFICATION_FIND_PATH}"
+            )
+    else:
+        raise HostGateError(f"{host} targeted unsupported qualification tool: {tool}")
+    return payload
+
+
 def completed_at() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
