@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 from hashmarks._command_output import log_command_output
 
+from .operation_contract import validate_operation_response
 from .codemap.change_impact import ChangeImpactOptions
 from .errors import RepositoryCliError
 from .repository_retry import (
@@ -203,7 +204,7 @@ def _find_code(args) -> int:
         args,
         lambda codemap: codemap.find_packet(args.query, limit=args.limit),
     )
-    _print(value)
+    _print(validate_operation_response("find", value))
     return 0
 
 
