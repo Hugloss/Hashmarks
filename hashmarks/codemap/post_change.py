@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.evidence_context import validate_evidence_context
-from hashmarks.operation_contract import operation_schema
+from hashmarks.operation_contract import operation_schema, validate_operation_response
 from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactMixin
@@ -425,7 +425,7 @@ class PostChangeMixin(ChangeImpactMixin):
             }
         if replacement:
             result["replacement"] = replacement
-        return result
+        return validate_operation_response("post_change", result)
 
     def refresh_after_change_delta(
         self,
