@@ -54,6 +54,14 @@ class McpToolContract:
     response_schemas: tuple[str, ...]
     response_modes: tuple[str, ...]
 
+    def __post_init__(self) -> None:
+        if not self.response_schemas or len(self.response_schemas) != len(
+            self.response_modes
+        ):
+            raise ValueError(f"invalid Hashmarks MCP response contract: {self.name}")
+        if len(set(self.response_modes)) != len(self.response_modes):
+            raise ValueError(f"duplicate Hashmarks MCP response mode: {self.name}")
+
     @property
     def default_response_schema(self) -> str:
         return self.response_schemas[0]
