@@ -85,6 +85,32 @@ def test_sibling_worktree_reuses_clean_base_snapshot_and_keeps_dirty_overlay_loc
     assert codemap is not None
 
 
+def test_assume_unchanged_path_must_match_snapshot_bytes_before_reuse(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    repo = _repo(tmp_path)
+    with CodeMap(repo) as codemap:
+        codemap.sync()
+
+    subprocess.run(
+        ["git", "-C", str(repo), "update-index", "--assume-unchanged", "a.py"],
+        check=True,
+    )
+    (repo / "a.py").write_text("def omega():\n    return 1\n", encoding="utf-8")
+
+    assert _git(repo, "status", "--porcelain") == ""
+    assert git_overlay_paths(repo) == set()
+
+    with CodeMap(repo) as codemap:
+        result = codemap.sync()
+        assert result.overlay_paths == 0
+        assert result.base_snapshot_reused == 1
+        assert result.parsed_artifacts == 1
+        assert codemap.store.symbol("alpha") == []
+        assert codemap.store.symbol("omega")
+
+
 def test_git_overlay_paths_includes_rename_origin_and_untracked_file(
     tmp_path: Path,
 ) -> None:

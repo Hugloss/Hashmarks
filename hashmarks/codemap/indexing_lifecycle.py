@@ -17,7 +17,7 @@ from hashmarks.paths import normalize_relative_path
 
 from . import repository_file_discovery
 from .index_surfaces import index_surface_for_path
-from .model import EvidenceVisibility, SyncResult
+from .model import EvidenceVisibility, ParsedArtifact, SyncResult
 from .parsers import artifact_key_for, parse_source
 from .policy import ContextPolicy
 from .repository_file_discovery import _AdmittedRepositoryFile
@@ -824,51 +824,78 @@ class IndexingLifecycleMixin:
             return _SyncBaseSnapshot(base_identity, overlay_paths, None)
         return _SyncBaseSnapshot(base_identity, overlay_paths, candidate)
 
+    def _sync_base_artifact(
+        self,
+        item: _DiscoveredFile,
+        *,
+        overlay_paths: set[str] | None,
+        base_snapshot_payload: dict[str, object] | None,
+    ) -> ParsedArtifact | None:
+        """Qualify one Git-nominated snapshot artifact against current bytes."""
+        if (
+            base_snapshot_payload is None
+            or overlay_paths is None
+            or item.rel in overlay_paths
+        ):
+            return None
+        entries = base_snapshot_payload.get("files")
+        entry = entries.get(item.rel) if isinstance(entries, dict) else None
+        if not isinstance(entry, dict):
+            return None
+        snap_digest = entry.get("file_digest")
+        snap_artifact_key = entry.get("artifact_key")
+        if not isinstance(snap_digest, str) or not isinstance(snap_artifact_key, str):
+            return None
+        try:
+            current_digest = self.file_store.digest(
+                item.path,
+                workspace=self.workspace,
+                relative_path=item.rel,
+            )
+        except (OSError, UnstableFileError):
+            return None
+        if current_digest.hash != snap_digest:
+            return None
+        artifact = self.artifacts.get(snap_artifact_key)
+        return (
+            artifact
+            if artifact is not None
+            and artifact.file_digest == snap_digest
+            and entry.get("language") == item.language
+            and entry.get("evidence_visibility") == item.visibility.value
+            else None
+        )
+
     def _sync_base_entry(
         self,
+        item: _DiscoveredFile,
         *,
-        rel: str,
-        language: str,
-        visibility: EvidenceVisibility,
         overlay_paths: set[str] | None,
         base_snapshot_payload: dict[str, object] | None,
         state: _SyncIndexState,
     ) -> bool:
-        """Reuse one qualified base-snapshot artifact when its evidence still matches."""
+        """Reuse a base artifact only after current repository identity matches.
+
+        Git overlay state only selects fast-path candidates. The current file
+        digest remains the admission authority for snapshot reuse.
+        """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        if (
-            base_snapshot_payload is None
-            or overlay_paths is None
-            or rel in overlay_paths
-        ):
-            return False
-        entries = base_snapshot_payload.get("files")
-        entry = entries.get(rel) if isinstance(entries, dict) else None
-        if not isinstance(entry, dict):
-            return False
-        snap_digest = entry.get("file_digest")
-        snap_artifact_key = entry.get("artifact_key")
-        artifact = (
-            self.artifacts.get(str(snap_artifact_key))
-            if isinstance(snap_artifact_key, str)
-            else None
+        artifact = self._sync_base_artifact(
+            item,
+            overlay_paths=overlay_paths,
+            base_snapshot_payload=base_snapshot_payload,
         )
-        if not (
-            isinstance(snap_digest, str)
-            and artifact is not None
-            and artifact.file_digest == snap_digest
-            and entry.get("language") == language
-            and entry.get("evidence_visibility") == visibility.value
-        ):
+        if artifact is None:
             return False
+        rel = item.rel
         row = self.store.file_row(rel)
-        expected_artifact = str(snap_artifact_key)
+        expected_artifact = artifact.artifact_key
         if (
             row is not None
-            and str(row["file_digest"]) == snap_digest
+            and str(row["file_digest"]) == artifact.file_digest
             and str(row["artifact_key"]) == expected_artifact
-            and str(row["evidence_visibility"]) == visibility.value
+            and str(row["evidence_visibility"]) == item.visibility.value
             and self.store.has_derived_nodes(rel)
         ):
             state.indexed += 1
@@ -879,7 +906,7 @@ class IndexingLifecycleMixin:
             rel,
             artifact,
             module_name=_module_name(rel, getattr(self, "_python_import_roots", ())),
-            visibility=visibility,
+            visibility=item.visibility,
             index_surface=self._index_surface_for_path(rel),
         )
         state.persisted_file_writes += 1
@@ -1054,17 +1081,9 @@ class IndexingLifecycleMixin:
 
         candidates: list[_DiscoveredFile] = []
         for item in discovered:
-            rel, path, language, visibility = (
-                item.rel,
-                item.path,
-                item.language,
-                item.visibility,
-            )
-            state.present.add(rel)
+            state.present.add(item.rel)
             if self._sync_base_entry(
-                rel=rel,
-                language=language,
-                visibility=visibility,
+                item,
                 overlay_paths=overlay_paths,
                 base_snapshot_payload=base_snapshot_payload,
                 state=state,
