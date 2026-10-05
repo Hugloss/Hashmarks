@@ -328,6 +328,10 @@ The full-suite runtime profile is owned by `make test-profile` and reports the s
 
 `scripts.mcp_concurrency_stress` owns the normal stress profile and default receipt path, including rounds, workers, calls per reader, writes, extra fixture files, and `dist/mcp-concurrency-stress.json`. The Make target is a thin launcher: it may transport an explicitly supplied `MCP_STRESS_RECEIPT` such as CI's per-attempt receipt path, but it must not mirror the script's default receipt or workload values.
 
+### Repository metrics baseline defaults have one owner
+
+`scripts.metrics` owns the normal repository-baseline workload defaults, including workspace, 10k files, files-per-directory, 20 hot requests, daemon inclusion, and automatic output naming. `make metrics` and `make metrics-fast` are convenience launchers: they may transport explicitly supplied `FILES` or `HOT_REQUESTS` overrides, while the named scale targets own only their intentional file-count profiles. Do not mirror the script's normal workload defaults in Make.
+
 ### Development-tool configuration has one owner
 
 `pyproject.toml` owns the Ruff dependency and rule configuration. Developer hooks, Make targets, and CI must invoke that configured Ruff rather than maintaining parallel min/latest compatibility paths. Do not add tests whose only assertion is that tool configuration, docs, and version strings agree. If a real tool upgrade breaks Hashmarks behavior, reproduce the failure and change the single project declaration or the affected behavior. Ruff remains diagnostic-only and never creates or transfers canonical promotion authority.
