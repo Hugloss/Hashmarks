@@ -148,6 +148,7 @@ def test_watcher_continuity_is_one_atomic_freshness_authority(
         assert set(items) == {WATCH_CONTINUITY_META}
         record = WatchContinuityRecord.from_json(items[WATCH_CONTINUITY_META])
         assert record is not None
+        assert record.fence == session.fence
         assert record.observation.state.value == "clean"
         assert record.codemap_generation == codemap.store.generation()
 
@@ -157,6 +158,7 @@ def test_watcher_continuity_is_one_atomic_freshness_authority(
         status = codemap.status()
         assert status["daemon_generation_changed"] is False
         assert status["watcher"]["state"] == "clean"
+        assert status["watcher"]["fence"] == session.fence
 
         session.tracker.mark_dirty(["src/auth.py"])
         session.publish()
