@@ -16,10 +16,16 @@ if TYPE_CHECKING:
     from .model import SearchHit
 
 
+class WorktreeOverlayBaseChangedError(RuntimeError):
+    """Raised when an overlay's canonical base authority has advanced."""
+
+
 @dataclass(frozen=True)
 class OverlayStats:
     worker_id: str
     base_workspace: str
+    base_generation: int
+    base_workspace_fingerprint: str
     worktree_workspace: str
     changed_paths: tuple[str, ...]
     overlay_generation: int
@@ -28,9 +34,11 @@ class OverlayStats:
 
     def as_dict(self) -> dict[str, object]:
         return {
-            "schema": "hashmarks.worktree-overlay-stats.v1",
+            "schema": "hashmarks.worktree-overlay-stats.v2",
             "worker_id": self.worker_id,
             "base_workspace": self.base_workspace,
+            "base_generation": self.base_generation,
+            "base_workspace_fingerprint": self.base_workspace_fingerprint,
             "worktree_workspace": self.worktree_workspace,
             "changed_paths": list(self.changed_paths),
             "overlay_generation": self.overlay_generation,
@@ -89,15 +97,26 @@ class WorktreeOverlay:
                 values.append(rel)
         return tuple(values)
 
+    def _base_authority(self) -> tuple[int, str]:
+        generation = self.base.store.generation()
+        fingerprint = self.base.store.meta("workspace_fingerprint")
+        if not fingerprint:
+            raise RuntimeError("canonical base has no published workspace fingerprint")
+        return generation, fingerprint
+
     def sync(self, changed_paths: Iterable[str | Path]) -> OverlayStats:
         changed = self._normalize_paths(changed_paths)
         if not changed:
             raise ValueError("changed_paths must not be empty")
-        result = self.overlay.sync(changed)
+        with self.base.decision_session():
+            base_generation, base_fingerprint = self._base_authority()
+            result = self.overlay.sync(changed)
         self._changed = changed
         self._stats = OverlayStats(
             worker_id=self.worker_id,
             base_workspace=str(self.base.workspace),
+            base_generation=base_generation,
+            base_workspace_fingerprint=base_fingerprint,
             worktree_workspace=str(self.worktree),
             changed_paths=changed,
             overlay_generation=result.generation,
@@ -111,24 +130,39 @@ class WorktreeOverlay:
             raise RuntimeError("overlay has not been synced")
         return self._stats.as_dict()
 
-    def find_task(self, task: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
+    def _require_bound_base(self) -> OverlayStats:
         if self._stats is None:
             raise RuntimeError("overlay has not been synced")
+        self.base._ensure_map_ready()
+        generation, fingerprint = self._base_authority()
+        if (
+            generation != self._stats.base_generation
+            or fingerprint != self._stats.base_workspace_fingerprint
+        ):
+            raise WorktreeOverlayBaseChangedError(
+                "canonical base advanced after overlay sync; "
+                "resync the overlay with changed paths relative to the new base"
+            )
+        return self._stats
+
+    def find_task(self, task: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
+        stats = self._require_bound_base()
         changed = set(self._changed)
-        overlay_hits = list(self.overlay.find_task(task, limit=limit))
-        base_hits = [
-            hit
-            for hit in self.base.find_task(task, limit=limit)
-            if hit.path not in changed
-        ]
-        result: list[SearchHit] = []
-        seen: set[str] = set()
-        # Worker-local changed evidence shadows canonical evidence for the same path.
-        for hit in overlay_hits + base_hits:
-            if hit.path in seen:
-                continue
-            seen.add(hit.path)
-            result.append(hit)
-            if len(result) >= limit:
-                break
-        return tuple(result)
+        with self.base.decision_session(expected_generation=stats.base_generation):
+            overlay_hits = list(self.overlay.find_task(task, limit=limit))
+            base_hits = [
+                hit
+                for hit in self.base.find_task(task, limit=limit)
+                if hit.path not in changed
+            ]
+            result: list[SearchHit] = []
+            seen: set[str] = set()
+            # Worker-local changed evidence shadows canonical evidence for the same path.
+            for hit in overlay_hits + base_hits:
+                if hit.path in seen:
+                    continue
+                seen.add(hit.path)
+                result.append(hit)
+                if len(result) >= limit:
+                    break
+            return tuple(result)
