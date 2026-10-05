@@ -147,6 +147,8 @@ each exposed boundary validates the exact mapping
 
 Changing an exposed schema/version means changing the operation contract first. The operation-contract identity then changes, the MCP contract incorporates that identity, core output follows the mapping, and boundary validation rejects any producer or adapter that still emits the old schema. CLI handlers for repository context, find, task evidence, change impact, and post-change all validate through the same operation contract before printing; MCP validates independently at its own transport boundary.
 
+Public semantic exposure is admitted through the same owner. MCP tool contracts fail construction when their operation is not registered, CLI semantic projection fails before printing an unknown operation, and public transport modules must not mint versioned `hashmarks.*.vN` semantic schemas locally. A future API or adapter must therefore register the operation contract first and project that registered response rather than introducing a transport-local schema identity.
+
 ### Canonical MCP contract identity
 
 Hashmarks owns one transport-neutral `hashmarks.mcp-contract.v1` manifest. The manifest binds the Hashmarks server name and installed version, the server description and routing instructions, canonical tool order and descriptions, the native MCP input/output schemas, read-only annotations, and each tool's Hashmarks response-schema set. A canonical JSON SHA-256 becomes the `contract_identity`.
