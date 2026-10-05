@@ -32,9 +32,8 @@ def test_overlay_indexes_only_changed_paths_and_reuses_base_artifacts(
             stats = overlay.sync(["src/engine.py"])
             hits = overlay.find_task("target engine", limit=10)
             assert stats.base_generation == base.store.generation()
-            assert (
-                stats.base_workspace_fingerprint
-                == base.store.meta("workspace_fingerprint")
+            assert stats.base_workspace_fingerprint == base.store.meta(
+                "workspace_fingerprint"
             )
     assert stats.changed_paths == ("src/engine.py",)
     assert stats.as_dict()["schema"] == "hashmarks.worktree-overlay-stats.v2"
