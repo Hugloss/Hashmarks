@@ -20,7 +20,8 @@ def test_decision_packet_discriminates_unproven_ranked_candidate(
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.task_decision_packet("Adapter implementation test", limit=20)
-    assert packet["edit"]["path"] == "src/adapter.py"
+    assert packet["edit"] is None
+    assert packet["candidate"]["path"] == "src/adapter.py"
     assert packet["verify"]["path"] == "tests/test_adapter.py"
     assert packet["discrimination"]["needed"] is True
     assert packet["discrimination"]["reason"] == "ownership-unresolved"
@@ -72,7 +73,8 @@ def test_structural_candidate_without_authority_requires_discrimination(
         packet = codemap.task_decision_packet(
             "Fix widget accepted response to '-new'", limit=20
         )
-    assert packet["edit"]["path"] == "src/engine.py"
+    assert packet["edit"] is None
+    assert packet["candidate"]["path"] == "src/engine.py"
     assert packet["ownership_authority"]["owner_resolved"] is False
     assert packet["discrimination"]["needed"] is True
     assert packet["discrimination"]["reason"] == "ownership-unresolved"
