@@ -433,7 +433,6 @@ class PostChangeMixin(ChangeImpactMixin):
 
     @operation_response("refresh_after_change_delta")
     def refresh_after_change_delta(
-
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -499,7 +498,6 @@ class PostChangeMixin(ChangeImpactMixin):
 
     @operation_response("refresh_after_change_brief")
     def refresh_after_change_brief(
-
         self,
         task: str,
         changed_paths: Sequence[str | Path],
@@ -544,7 +542,6 @@ class PostChangeMixin(ChangeImpactMixin):
 
     @operation_response("refresh_after_change")
     def refresh_after_change(
-
         self,
         task: str,
         changed_paths: Sequence[str | Path],
