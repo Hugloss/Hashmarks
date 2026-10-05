@@ -279,6 +279,10 @@ A new local developer must not need to know Hashmarks' internal qualification to
 
 The committed lock is repository development/qualification authority, not installed-package runtime metadata and not a second package manifest. Wheel/sdist consumer dependency semantics remain owned by package metadata. Hashmarks must not maintain a second normalized representation, checksum companion, reconstructed lock, or compatibility layer for the resolved dependency graph. Release/qualification provenance may bind the exact `uv.lock` bytes directly when dependency-environment identity matters.
 
+### External benchmark entrypoints transport authority; they do not recreate it
+
+agentsCookbook owns benchmark configuration, suite/task selection, native-agent selection, campaign/run state, resume/new behavior, interpreter launch, scoring, and reporting. Hashmarks may expose thin Make aliases into agentsCookbook, but those aliases must not mirror or reinterpret those choices, create their own run directories or latest pointers, invoke `python -m benchmarks` directly, or maintain compatibility launch paths beside the agentsCookbook front door. Configure the agentsCookbook benchmark environment once, including the exact `HASHMARKS_BENCH_SOURCE`, and transport that authority unchanged.
+
 ### Architecture guards resolve relative imports
 
 Product-boundary checks must inspect both absolute and package-relative imports. A relative import is not a valid way to reintroduce removed execution/agent-loop responsibilities into modern CodeMap/repository-intelligence code. Architecture tests must resolve imports to fully-qualified module ownership before classifying the dependency; textual spelling alone is not authority.
