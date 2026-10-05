@@ -292,7 +292,12 @@ class EvidenceGraphMixin:
                 }
             )
         with self.store.publication_transaction():
+            previous_generation = self.store.generation()
             generation = self.store.bump_generation()
+            self._carry_forward_evidence_generation(
+                previous_generation=previous_generation,
+                generation=generation,
+            )
             self.store.replace_native_occurrences(producer, definitions, edges)
             self._record_evidence_snapshot(
                 "scip",
@@ -551,7 +556,12 @@ class EvidenceGraphMixin:
         def ensure_publication_generation() -> int:
             nonlocal publication_generation
             if publication_generation is None:
+                previous_generation = self.store.generation()
                 publication_generation = self.store.bump_generation()
+                self._carry_forward_evidence_generation(
+                    previous_generation=previous_generation,
+                    generation=publication_generation,
+                )
             return publication_generation
 
         with self.store.publication_transaction():
