@@ -16,7 +16,7 @@ from hashmarks.mcp_contract import (
     contract_from_tool_models,
     tool_description,
 )
-from hashmarks.operation_contract import operation_modes
+from hashmarks.operation_contract import operation_default_mode, operation_modes
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -48,9 +48,11 @@ def _assert_canonical_result_mode_schemas(
     dependency = schemas["dependency_codemap"]["properties"]["result_mode"]
     declarations = schemas["repository_declarations"]["properties"]["result_mode"]
     assert dependency["enum"] == list(operation_modes("dependency_codemap"))
-    assert dependency["default"] == "observation"
+    assert dependency["default"] == operation_default_mode("dependency_codemap")
     assert declarations["enum"] == list(operation_modes("repository_declarations"))
-    assert declarations["default"] == "observation"
+    assert declarations["default"] == operation_default_mode(
+        "repository_declarations"
+    )
     return schemas
 
 
