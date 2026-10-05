@@ -18,158 +18,163 @@ def _write_repository(root: Path, *, symbol: str) -> Path:
     return source
 
 
-def test_concurrent_sync_writers_serialize_one_publication_authority(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    source = _write_repository(tmp_path, symbol="before_owner")
-    state = tmp_path / ".state"
-    artifacts = tmp_path / "artifacts.sqlite3"
+class _PublicationHarness:
+    def __init__(self, root: Path) -> None:
+        self.source = _write_repository(root, symbol="before_owner")
+        self.state = root / ".state"
+        self.artifacts = root / "artifacts.sqlite3"
+        with CodeMap(root, state_dir=self.state, artifact_db=self.artifacts) as seed:
+            self.initial = seed.sync()
+        self.source.write_text(
+            "def after_owner():\n    return 'after'\n",
+            encoding="utf-8",
+        )
+        self.writer_a = CodeMap(
+            root, state_dir=self.state, artifact_db=self.artifacts
+        )
+        self.writer_b = CodeMap(
+            root, state_dir=self.state, artifact_db=self.artifacts
+        )
+        self.reader = CodeMap(root, state_dir=self.state, artifact_db=self.artifacts)
+        self.a_entered = threading.Event()
+        self.a_release = threading.Event()
+        self.b_entered = threading.Event()
+        self.b_started = threading.Event()
+        self.staged = threading.Event()
+        self.finished = threading.Event()
+        self.results: list[object] = []
+        self.errors: list[BaseException] = []
 
-    with CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as seed:
-        initial = seed.sync()
+    def install_writer_serialization_hooks(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        original_a_begin = self.writer_a._sync_begin_build
+        original_b_begin = self.writer_b._sync_begin_build
 
-    source.write_text(
-        "def after_owner():\n    return 'after'\n",
-        encoding="utf-8",
-    )
-    writer_a = CodeMap(tmp_path, state_dir=state, artifact_db=artifacts)
-    writer_b = CodeMap(tmp_path, state_dir=state, artifact_db=artifacts)
-    reader = CodeMap(tmp_path, state_dir=state, artifact_db=artifacts)
-    a_entered = threading.Event()
-    a_release = threading.Event()
-    b_entered = threading.Event()
-    b_started = threading.Event()
-    results: list[object] = []
-    errors: list[BaseException] = []
+        def block_a(*args, **kwargs):
+            value = original_a_begin(*args, **kwargs)
+            self.a_entered.set()
+            if not self.a_release.wait(timeout=5):
+                raise TimeoutError("test did not release first CodeMap writer")
+            return value
 
-    original_a_begin = writer_a._sync_begin_build
-    original_b_begin = writer_b._sync_begin_build
+        def observe_b(*args, **kwargs):
+            self.b_entered.set()
+            return original_b_begin(*args, **kwargs)
 
-    def block_a(*args, **kwargs):
-        value = original_a_begin(*args, **kwargs)
-        a_entered.set()
-        if not a_release.wait(timeout=5):
-            raise TimeoutError("test did not release first CodeMap writer")
-        return value
+        monkeypatch.setattr(self.writer_a, "_sync_begin_build", block_a)
+        monkeypatch.setattr(self.writer_b, "_sync_begin_build", observe_b)
 
-    def observe_b(*args, **kwargs):
-        b_entered.set()
-        return original_b_begin(*args, **kwargs)
+    def install_staged_finalize_hook(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        original_finalize = self.writer_a._sync_finalize_identity
 
-    monkeypatch.setattr(writer_a, "_sync_begin_build", block_a)
-    monkeypatch.setattr(writer_b, "_sync_begin_build", observe_b)
+        def block_before_publication(*args, **kwargs):
+            self.staged.set()
+            if not self.a_release.wait(timeout=5):
+                raise TimeoutError("test did not release staged CodeMap publication")
+            return original_finalize(*args, **kwargs)
 
-    def run(writer: CodeMap, *, started: threading.Event | None = None) -> None:
+        monkeypatch.setattr(
+            self.writer_a, "_sync_finalize_identity", block_before_publication
+        )
+
+    def run(self, writer: CodeMap, *, started: threading.Event | None = None) -> None:
         if started is not None:
             started.set()
         try:
-            results.append(writer.sync())
+            self.results.append(writer.sync())
         except BaseException as exc:  # pragma: no cover - surfaced below
-            errors.append(exc)
+            self.errors.append(exc)
 
-    thread_a = threading.Thread(target=run, args=(writer_a,))
+    def run_and_finish(self) -> None:
+        try:
+            self.run(self.writer_a)
+        finally:
+            self.finished.set()
+
+    def close(self) -> None:
+        self.a_release.set()
+        self.writer_a.close()
+        self.writer_b.close()
+        self.reader.close()
+
+
+def test_concurrent_sync_writers_serialize_one_publication_authority(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = _PublicationHarness(tmp_path)
+    harness.install_writer_serialization_hooks(monkeypatch)
+    thread_a = threading.Thread(target=harness.run, args=(harness.writer_a,))
     thread_b = threading.Thread(
-        target=run, args=(writer_b,), kwargs={"started": b_started}
+        target=harness.run,
+        args=(harness.writer_b,),
+        kwargs={"started": harness.b_started},
     )
     try:
         thread_a.start()
-        assert a_entered.wait(timeout=5)
+        assert harness.a_entered.wait(timeout=5)
 
-        status = reader.status()
-        assert status["generation"] == initial.generation
+        status = harness.reader.status()
+        assert status["generation"] == harness.initial.generation
         assert status["build"]["complete"] is True
-        assert reader.store.symbol("before_owner")
-        assert reader.store.symbol("after_owner") == []
+        assert harness.reader.store.symbol("before_owner")
+        assert harness.reader.store.symbol("after_owner") == []
 
         thread_b.start()
-        assert b_started.wait(timeout=2)
-        assert not b_entered.wait(timeout=0.1)
+        assert harness.b_started.wait(timeout=2)
+        assert not harness.b_entered.wait(timeout=0.1)
 
-        a_release.set()
+        harness.a_release.set()
         thread_a.join(timeout=10)
         thread_b.join(timeout=10)
         assert not thread_a.is_alive()
         assert not thread_b.is_alive()
-        assert errors == []
-        assert b_entered.is_set()
-        assert len(results) == 2
-        assert {result.generation for result in results} == {initial.generation + 1}
+        assert harness.errors == []
+        assert harness.b_entered.is_set()
+        assert len(harness.results) == 2
+        assert {result.generation for result in harness.results} == {
+            harness.initial.generation + 1
+        }
 
-        assert reader.store.symbol("before_owner") == []
-        assert reader.store.symbol("after_owner")
-        assert reader.status()["build"]["complete"] is True
-        assert reader.store.generation() == initial.generation + 1
+        assert harness.reader.store.symbol("before_owner") == []
+        assert harness.reader.store.symbol("after_owner")
+        assert harness.reader.status()["build"]["complete"] is True
+        assert harness.reader.store.generation() == harness.initial.generation + 1
     finally:
-        a_release.set()
+        harness.a_release.set()
         thread_a.join(timeout=1)
         if thread_b.ident is not None:
             thread_b.join(timeout=1)
-        writer_a.close()
-        writer_b.close()
-        reader.close()
+        harness.close()
 
 
 def test_inflight_decision_never_observes_uncommitted_next_generation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    source = _write_repository(tmp_path, symbol="before_owner")
-    state = tmp_path / ".state"
-    artifacts = tmp_path / "artifacts.sqlite3"
-
-    with CodeMap(tmp_path, state_dir=state, artifact_db=artifacts) as seed:
-        initial = seed.sync()
-
-    writer = CodeMap(tmp_path, state_dir=state, artifact_db=artifacts)
-    reader = CodeMap(tmp_path, state_dir=state, artifact_db=artifacts)
-    source.write_text(
-        "def after_owner():\n    return 'after'\n",
-        encoding="utf-8",
-    )
-    staged = threading.Event()
-    release = threading.Event()
-    finished = threading.Event()
-    errors: list[BaseException] = []
-    original_finalize = writer._sync_finalize_identity
-
-    def block_before_publication(*args, **kwargs):
-        staged.set()
-        if not release.wait(timeout=5):
-            raise TimeoutError("test did not release staged CodeMap publication")
-        return original_finalize(*args, **kwargs)
-
-    monkeypatch.setattr(writer, "_sync_finalize_identity", block_before_publication)
-
-    def run_writer() -> None:
-        try:
-            writer.sync()
-        except BaseException as exc:  # pragma: no cover - surfaced below
-            errors.append(exc)
-        finally:
-            finished.set()
-
-    thread = threading.Thread(target=run_writer)
+    harness = _PublicationHarness(tmp_path)
+    harness.install_staged_finalize_hook(monkeypatch)
+    thread = threading.Thread(target=harness.run_and_finish)
     try:
         thread.start()
-        assert staged.wait(timeout=5)
+        assert harness.staged.wait(timeout=5)
 
         with pytest.raises(
             RuntimeError, match="generation changed during decision session"
         ):
-            with reader.decision_session():
-                assert reader.store.generation() == initial.generation
-                assert reader.store.symbol("before_owner")
-                assert reader.store.symbol("after_owner") == []
-                release.set()
-                assert finished.wait(timeout=5)
+            with harness.reader.decision_session():
+                assert harness.reader.store.generation() == harness.initial.generation
+                assert harness.reader.store.symbol("before_owner")
+                assert harness.reader.store.symbol("after_owner") == []
+                harness.a_release.set()
+                assert harness.finished.wait(timeout=5)
 
         thread.join(timeout=5)
         assert not thread.is_alive()
-        assert errors == []
-        assert reader.store.generation() == initial.generation + 1
-        assert reader.store.symbol("before_owner") == []
-        assert reader.store.symbol("after_owner")
+        assert harness.errors == []
+        assert harness.reader.store.generation() == harness.initial.generation + 1
+        assert harness.reader.store.symbol("before_owner") == []
+        assert harness.reader.store.symbol("after_owner")
     finally:
-        release.set()
+        harness.a_release.set()
         thread.join(timeout=1)
-        writer.close()
-        reader.close()
+        harness.close()
