@@ -315,5 +315,97 @@ def validate_basic_qualification_response(
     return payload
 
 
+BASIC_QUALIFICATION_PROOF_SCHEMA = "hashmarks.mcp-basic-host-qualification.v1"
+
+
+def basic_qualification_proof(
+    *,
+    generation: int,
+    find_paths: set[str] | list[str] | tuple[str, ...],
+) -> dict[str, object]:
+    from hashmarks.mcp_contract import default_response_schema
+
+    return {
+        "schema": BASIC_QUALIFICATION_PROOF_SCHEMA,
+        "repository_context": {
+            "schema": default_response_schema("repository_context"),
+            "generation": generation,
+        },
+        "find": {
+            "schema": default_response_schema("find"),
+            "paths": sorted(set(find_paths)),
+        },
+    }
+
+
+def basic_qualification_proof_from_payloads(
+    repository_context: dict[str, object],
+    find: dict[str, object],
+    *,
+    host: str,
+) -> dict[str, object]:
+    context = validate_basic_qualification_response(
+        "repository_context",
+        repository_context,
+        host=host,
+    )
+    found = validate_basic_qualification_response("find", find, host=host)
+    generation = context["generation"]
+    results = found["results"]
+    assert isinstance(generation, int) and not isinstance(generation, bool)
+    assert isinstance(results, list)
+    return basic_qualification_proof(
+        generation=generation,
+        find_paths={
+            str(row["path"])
+            for row in results
+            if isinstance(row, dict) and isinstance(row.get("path"), str)
+        },
+    )
+
+
+def _validate_qualification_context(value: object) -> str | None:
+    from hashmarks.mcp_contract import default_response_schema
+
+    if not isinstance(value, dict):
+        return "semantic qualification proof has no repository_context"
+    if value.get("schema") != default_response_schema("repository_context"):
+        return "semantic qualification repository_context schema drifted"
+    generation = value.get("generation")
+    if not isinstance(generation, int) or isinstance(generation, bool):
+        return "semantic qualification proof has no repository generation"
+    return None
+
+
+def _validate_qualification_find(value: object) -> str | None:
+    from hashmarks.mcp_contract import default_response_schema
+
+    if not isinstance(value, dict):
+        return "semantic qualification proof has no find result"
+    if value.get("schema") != default_response_schema("find"):
+        return "semantic qualification find schema drifted"
+    paths = value.get("paths")
+    if not isinstance(paths, list) or not all(isinstance(path, str) for path in paths):
+        return "semantic qualification find paths are invalid"
+    if _BASIC_QUALIFICATION_FIND_PATH not in paths:
+        return f"semantic qualification find did not prove {_BASIC_QUALIFICATION_FIND_PATH}"
+    return None
+
+
+def validate_basic_qualification_proof(value: object) -> str | None:
+    if not isinstance(value, dict):
+        return "receipt predates semantic qualification proof"
+    if value.get("schema") != BASIC_QUALIFICATION_PROOF_SCHEMA:
+        return "semantic qualification proof schema is not current"
+
+    for error in (
+        _validate_qualification_context(value.get("repository_context")),
+        _validate_qualification_find(value.get("find")),
+    ):
+        if error is not None:
+            return error
+    return None
+
+
 def completed_at() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
