@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped
@@ -138,6 +139,7 @@ class QuerySurfaceMixin:
             "evidence_visibility": visibility.value,
         }
 
+    @operation_response("grep")
     @decision_scoped
     def grep(
         self, query: str, *, limit: int = 50, context_lines: int = 0
@@ -166,7 +168,7 @@ class QuerySurfaceMixin:
                 break
         generation, identity_generation, stale = self._generation_status()
         return {
-            "schema": "hashmarks.grep.v1",
+            "schema": operation_schema("grep"),
             "query": query,
             "generation": generation,
             "identity_generation": identity_generation,
@@ -174,6 +176,7 @@ class QuerySurfaceMixin:
             "matches": matches,
         }
 
+    @operation_response("symbol")
     @decision_scoped
     def symbol(self, query: str) -> dict[str, object]:
         if TYPE_CHECKING:
@@ -191,7 +194,7 @@ class QuerySurfaceMixin:
         if not visible:
             raise PermissionError(f"symbol exists but agent context is denied: {query}")
         return {
-            "schema": "hashmarks.symbol.v1",
+            "schema": operation_schema("symbol"),
             "query": query,
             **self._query_freshness_fields(),
             "matches": visible,
@@ -242,6 +245,7 @@ class QuerySurfaceMixin:
         )
         return path, qualname, current, content
 
+    @operation_response("source")
     @decision_scoped
     def source(self, query: str, *, token_budget: int = 4000) -> dict[str, object]:
         if TYPE_CHECKING:
@@ -252,7 +256,7 @@ class QuerySurfaceMixin:
         visible = self._source_visible_matches(query)
         if len(visible) > 1 and "::" not in query:
             return {
-                "schema": "hashmarks.source.v1",
+                "schema": operation_schema("source"),
                 "query": query,
                 "ambiguous": True,
                 "matches": [
@@ -270,7 +274,7 @@ class QuerySurfaceMixin:
         tokens = estimate_tokens(body)
         if tokens > token_budget:
             return {
-                "schema": "hashmarks.source.v1",
+                "schema": operation_schema("source"),
                 "query": query,
                 "symbol_id": f"{path}::{qualname}",
                 "path": path,
@@ -283,7 +287,7 @@ class QuerySurfaceMixin:
                 "guidance": "Use outline/deps or raise the explicit source budget.",
             }
         return {
-            "schema": "hashmarks.source.v1",
+            "schema": operation_schema("source"),
             "query": query,
             "symbol_id": f"{path}::{qualname}",
             "path": path,
@@ -296,13 +300,14 @@ class QuerySurfaceMixin:
             "content": body,
         }
 
+    @operation_response("projects")
     @decision_scoped
     def projects(self) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         self._ensure_map_ready()
         return {
-            "schema": "hashmarks.codemap-projects.v1",
+            "schema": operation_schema("projects"),
             **self._query_freshness_fields(),
             "projects": self._fresh_project_nodes(),
             "edges": self._fresh_project_edges(),
@@ -312,6 +317,7 @@ class QuerySurfaceMixin:
             else float(self.store.meta("project_graph_last_sync_unix") or 0),
         }
 
+    @operation_response("structural")
     @decision_scoped
     def structural(
         self, pattern: str, *, language: str | None = None, limit: int = 100
@@ -362,7 +368,7 @@ class QuerySurfaceMixin:
             if len(matches) >= limit:
                 break
         return {
-            "schema": "hashmarks.structural-search.v1",
+            "schema": operation_schema("structural"),
             **self._query_freshness_fields(),
             "pattern": pattern,
             "available": self.structural_search_provider.available,
@@ -418,6 +424,7 @@ class QuerySurfaceMixin:
             frontier = next_frontier
         return resolved, seen
 
+    @operation_response("affected")
     @decision_scoped
     def affected(self, query: str, *, max_depth: int = 12) -> dict[str, object]:
         if TYPE_CHECKING:
@@ -438,7 +445,7 @@ class QuerySurfaceMixin:
             else set()
         )
         return {
-            "schema": "hashmarks.codemap-affected.v1",
+            "schema": operation_schema("affected"),
             "query": query,
             **self._query_freshness_fields(),
             "roots": sorted(roots),
@@ -450,11 +457,12 @@ class QuerySurfaceMixin:
             "evidence": "static import graph plus retained native/manifest project graph when available; advisory and conservative",
         }
 
+    @operation_response("tests")
     @decision_scoped
     def tests(self, query: str, *, max_depth: int = 12) -> dict[str, object]:
         value = self.affected(query, max_depth=max_depth)
         return {
-            "schema": "hashmarks.codemap-tests.v1",
+            "schema": operation_schema("tests"),
             "query": query,
             "generation": value["generation"],
             "identity_generation": value["identity_generation"],
