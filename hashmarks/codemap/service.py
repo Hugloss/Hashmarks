@@ -19,7 +19,7 @@ from hashmarks.operation_contract import (
 )
 from hashmarks.paths import canonical_host_path
 
-from .change_impact import ChangeImpactOptions
+from .change_impact import CHANGE_IMPACT_DEFAULT_OPTIONS, ChangeImpactOptions
 from .engine import CodeMap
 from .evidence_packet import TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
 from .post_change import PostChangeOptions
@@ -475,13 +475,22 @@ class CodeMapService:
 
     def _change_impact_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task, changed, limit, per_role, _budget = self._changed_context(request)
-        impact_limit = self._bounded_int(request, "impact_limit_per_surface", 6, 1, 100)
-        max_depth = self._bounded_int(request, "max_depth", 4, 1, 32)
-        raw_limit = request.get("project_impact_limit")
+        defaults = CHANGE_IMPACT_DEFAULT_OPTIONS
+        impact_limit = self._bounded_int(
+            request,
+            "impact_limit_per_surface",
+            defaults.impact_limit_per_surface,
+            1,
+            100,
+        )
+        max_depth = self._bounded_int(request, "max_depth", defaults.max_depth, 1, 32)
+        raw_limit = request.get("project_impact_limit", defaults.project_impact_limit)
         project_limit = None if raw_limit is None else int(raw_limit)
         if project_limit is not None and not 1 <= project_limit <= 100_000:
             raise ValueError("project_impact_limit must be between 1 and 100000")
-        encoding = str(request.get("project_impact_encoding", "verbose"))
+        encoding = str(
+            request.get("project_impact_encoding", defaults.project_impact_encoding)
+        )
         if encoding not in {"verbose", "compact"}:
             raise ValueError("project_impact_encoding must be verbose or compact")
         result = self._map().task_change_impact(
@@ -1021,7 +1030,7 @@ class CodeMapServiceClient:
         *,
         limit: int = 20,
         per_role: int = 3,
-        options: ChangeImpactOptions = ChangeImpactOptions(),
+        options: ChangeImpactOptions = CHANGE_IMPACT_DEFAULT_OPTIONS,
     ) -> dict[str, Any]:
         return dict(
             self.request(
