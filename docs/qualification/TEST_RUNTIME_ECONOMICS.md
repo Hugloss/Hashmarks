@@ -28,7 +28,7 @@ Runtime measurements should identify enough environment and execution mode to ma
 
 ## Derived-authority explicit-packet economics
 
-Use `make metrics-derived-authority` when evaluating whether explain/endpoint-comparison work needs any bounded retention. The command writes one diagnostic receipt under `.hashmarks/metrics/` containing both a controlled fixture and the existing genuine uv/Maven dependency dogfood corpus.
+Use `make metrics-derived-authority` when evaluating whether explain/endpoint-comparison work needs any bounded retention. The command writes one diagnostic receipt under `.hashmarks/metrics/` containing both a controlled fixture and the existing genuine uv/Maven dependency dogfood corpus. The benchmark module owns the normal measurement profile (controlled iterations, scale, real-producer iterations, and fixture root); the Make target only selects the stable `derived-authority-economics-latest.json` receipt path.
 
 The receipt is **runtime diagnostics only**. It is not repository evidence, release authority, or a performance threshold. The controlled section records packet sizes, explain/delta timings, transient allocation peaks, repository re-observation calls, and persistent-state byte growth. The real-producer section separately records adapter artifact bytes and parse cost, qualification cost, explicit endpoint/explain/delta sizes and timings, adapter semantic identity, and dependency change axes.
 

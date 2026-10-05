@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
+from benchmarks import derived_authority_economics as derived
 from benchmarks.derived_authority_economics import (
     measure_derived_authority_economics,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def test_derived_authority_economics_proves_explicit_packet_reuse() -> None:
@@ -62,3 +60,13 @@ def test_derived_authority_economics_rejects_invalid_bounds(
             iterations=iterations,
             scale=scale,
         )
+
+
+def test_derived_authority_parser_owns_normal_profile_defaults() -> None:
+    args = derived._parser().parse_args([])
+
+    assert args.iterations == 100
+    assert args.scale == 64
+    assert args.real_iterations == 25
+    assert args.fixture_root == Path("tests/fixtures/dependency_dogfood")
+    assert args.output is None

@@ -183,3 +183,22 @@ def test_metrics_make_aliases_transport_only_explicit_workload_overrides() -> No
 
     assert _make_recipe(text, "metrics-scale") == ("@$(MAKE) metrics FILES=100000",)
     assert _make_recipe(text, "metrics-500k") == ("@$(MAKE) metrics FILES=500000",)
+
+
+def test_derived_authority_make_alias_owns_only_stable_output_path() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+    recipe = _make_recipe(text, "metrics-derived-authority")
+
+    joined = "\n".join(recipe)
+    assert "benchmarks.derived_authority_economics" in joined
+    assert (
+        "--output .hashmarks/metrics/derived-authority-economics-latest.json" in joined
+    )
+
+    for stale in (
+        "--iterations 100",
+        "--scale 64",
+        "--real-iterations 25",
+        "--fixture-root tests/fixtures/dependency_dogfood",
+    ):
+        assert stale not in joined

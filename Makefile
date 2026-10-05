@@ -451,9 +451,6 @@ metrics-500k:
 
 metrics-derived-authority: bootstrap
 	@$(UV_RUN) --offline python -m benchmarks.derived_authority_economics \
-	  --iterations 100 --scale 64 \
-	  --real-iterations 25 \
-	  --fixture-root tests/fixtures/dependency_dogfood \
 	  --output .hashmarks/metrics/derived-authority-economics-latest.json
 
 metrics-agent: bootstrap
