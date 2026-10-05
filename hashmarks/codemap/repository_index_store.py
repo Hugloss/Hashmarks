@@ -1068,7 +1068,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                         node.root,
                         node.manifest,
                         node.producer,
-                        json.dumps(node.metadata, sort_keys=True, separators=(",", ":")),
+                        json.dumps(
+                            node.metadata, sort_keys=True, separators=(",", ":")
+                        ),
                     )
                     for node in nodes
                 ],
