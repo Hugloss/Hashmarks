@@ -12,7 +12,7 @@ from .repository_domains import is_test_path
 from .scip_adapter import load_scip_json
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
     from .engine import CodeMap
 
@@ -291,9 +291,16 @@ class EvidenceGraphMixin:
                     "line": occurrence.line,
                 }
             )
-        self.store.replace_native_occurrences(producer, definitions, edges)
-        self._record_evidence_snapshot("scip", producer, bind_generation=True)
-        self.store.set_meta("scip_last_import_unix", str(time.time()))
+        with self.store.publication_transaction():
+            generation = self.store.bump_generation()
+            self.store.replace_native_occurrences(producer, definitions, edges)
+            self._record_evidence_snapshot(
+                "scip",
+                producer,
+                bind_generation=True,
+                generation=generation,
+            )
+            self.store.set_meta("scip_last_import_unix", str(time.time()))
         return {
             "schema": "hashmarks.scip-import.v1",
             "producer": producer,
@@ -366,6 +373,7 @@ class EvidenceGraphMixin:
         selected: set[str] | None,
         results: list[dict[str, object]],
         warnings: list[str],
+        ensure_publication_generation: Callable[[], int],
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -388,6 +396,7 @@ class EvidenceGraphMixin:
                 edges = ()
                 filtered_nodes = len(evidence.nodes)
                 filtered_edges = len(evidence.edges)
+            generation = ensure_publication_generation()
             self.store.replace_project_graph(provider.name, nodes, edges)
             project_manifests = [
                 manifest
@@ -406,6 +415,7 @@ class EvidenceGraphMixin:
                 provider.name,
                 bind_generation=provider.bind_generation,
                 manifests=project_manifests,
+                generation=generation,
             )
             results.append(
                 {
@@ -426,12 +436,14 @@ class EvidenceGraphMixin:
         selected: set[str] | None,
         results: list[dict[str, object]],
         warnings: list[str],
+        ensure_publication_generation: Callable[[], int],
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if selected is None or self.typescript_resolver.name in selected:
             if self.typescript_resolver.detect(self.workspace):
                 ts = self.typescript_resolver.collect(self.workspace)
+                generation = ensure_publication_generation()
                 self.store.replace_native_file_edges(
                     self.typescript_resolver.name, ts.edges
                 )
@@ -440,6 +452,7 @@ class EvidenceGraphMixin:
                     ts.producer,
                     bind_generation=True,
                     manifests=("tsconfig.json",),
+                    generation=generation,
                 )
                 results.append({"producer": ts.producer, "file_edges": len(ts.edges)})
                 warnings.extend(ts.warnings)
@@ -449,6 +462,7 @@ class EvidenceGraphMixin:
         selected: set[str] | None,
         results: list[dict[str, object]],
         warnings: list[str],
+        ensure_publication_generation: Callable[[], int],
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -462,6 +476,7 @@ class EvidenceGraphMixin:
                 pyright = self.pyright_type_server.collect(
                     self.workspace, python_sources
                 )
+                generation = ensure_publication_generation()
                 self.store.replace_native_file_edges(
                     self.pyright_type_server.name, pyright.edges
                 )
@@ -470,6 +485,7 @@ class EvidenceGraphMixin:
                     pyright.producer,
                     bind_generation=True,
                     manifests=("pyrightconfig.json", "pyproject.toml"),
+                    generation=generation,
                 )
                 results.append(
                     {
@@ -485,6 +501,7 @@ class EvidenceGraphMixin:
         selected: set[str] | None,
         results: list[dict[str, object]],
         warnings: list[str],
+        ensure_publication_generation: Callable[[], int],
     ) -> None:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -496,6 +513,7 @@ class EvidenceGraphMixin:
             if engine_module.local_vitest(self.workspace) is not None:
                 vite = engine_module.collect_vitest_vite_graph(self.workspace)
                 if vite.command or vite.edges:
+                    generation = ensure_publication_generation()
                     self.store.replace_native_file_edges(vite.producer, vite.edges)
                     self._record_evidence_snapshot(
                         "native-file",
@@ -512,6 +530,7 @@ class EvidenceGraphMixin:
                             "vite.config.mts",
                             "vite.config.mjs",
                         ),
+                        generation=generation,
                     )
                     results.append(
                         {"producer": vite.producer, "file_edges": len(vite.edges)}
@@ -527,11 +546,28 @@ class EvidenceGraphMixin:
         selected = None if providers is None else {str(value) for value in providers}
         results: list[dict[str, object]] = []
         warnings: list[str] = []
-        self._enrich_project_graphs(selected, results, warnings)
-        self._enrich_typescript_graph(selected, results, warnings)
-        self._enrich_pyright_graph(selected, results, warnings)
-        self._enrich_vitest_graph(selected, results, warnings)
-        self.store.set_meta("project_graph_last_sync_unix", str(time.time()))
+        publication_generation: int | None = None
+
+        def ensure_publication_generation() -> int:
+            nonlocal publication_generation
+            if publication_generation is None:
+                publication_generation = self.store.bump_generation()
+            return publication_generation
+
+        with self.store.publication_transaction():
+            self._enrich_project_graphs(
+                selected, results, warnings, ensure_publication_generation
+            )
+            self._enrich_typescript_graph(
+                selected, results, warnings, ensure_publication_generation
+            )
+            self._enrich_pyright_graph(
+                selected, results, warnings, ensure_publication_generation
+            )
+            self._enrich_vitest_graph(
+                selected, results, warnings, ensure_publication_generation
+            )
+            self.store.set_meta("project_graph_last_sync_unix", str(time.time()))
         self._reverse_file_graph_cache = None
         return {
             "schema": "hashmarks.codemap-project-enrichment.v1",
