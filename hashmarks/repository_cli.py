@@ -26,6 +26,15 @@ def _print(value) -> None:
     log_command_output(logger, json.dumps(value, indent=2, sort_keys=True))
 
 
+def _print_operation(
+    operation: str,
+    value: object,
+    *,
+    mode: str | None = None,
+) -> None:
+    _print(validate_operation_response(operation, value, mode=mode))
+
+
 _T = TypeVar("_T")
 _REPOSITORY_USER_ERRORS = (KeyError, PermissionError, ValueError, FileNotFoundError)
 
@@ -189,7 +198,7 @@ def _map_import_scip(args) -> int:
 
 def _map_orient(args) -> int:
     value = _call_codemap(args, lambda codemap: codemap.orient())
-    _print(value)
+    _print_operation("repository_context", value)
     return 0
 
 
@@ -204,7 +213,7 @@ def _find_code(args) -> int:
         args,
         lambda codemap: codemap.find_packet(args.query, limit=args.limit),
     )
-    _print(validate_operation_response("find", value))
+    _print_operation("find", value)
     return 0
 
 
@@ -319,7 +328,7 @@ def _task_evidence_code(args) -> int:
             per_role=args.per_role,
         ),
     )
-    _print(value)
+    _print_operation("task_evidence", value)
     return 0
 
 
@@ -350,7 +359,7 @@ def _change_impact_code(args) -> int:
             ),
         ),
     )
-    _print(value)
+    _print_operation("change_impact", value)
     return 0
 
 
@@ -367,7 +376,7 @@ def _post_change_code(args) -> int:
             per_role=args.per_role,
         ),
     )
-    _print(value)
+    _print_operation("post_change", value)
     return 0
 
 

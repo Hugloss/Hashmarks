@@ -67,3 +67,54 @@ def test_removed_cli_shortcuts_are_not_callable(command: str) -> None:
     with pytest.raises(SystemExit) as exc:
         main([command])
     assert exc.value.code == 2
+
+
+def test_repository_cli_operation_projection_validates_before_print(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import hashmarks.repository_cli as repository_cli
+
+    printed: list[object] = []
+    monkeypatch.setattr(repository_cli, "_print", printed.append)
+
+    packet = {"schema": "hashmarks.find.v2", "results": []}
+    repository_cli._print_operation("find", packet)
+    assert printed == [packet]
+
+    with pytest.raises(RuntimeError, match="operation response schema drift"):
+        repository_cli._print_operation(
+            "find",
+            {"schema": "hashmarks.repository-capsule.v1"},
+        )
+    assert printed == [packet]
+
+
+def test_repository_cli_projects_all_canonical_cli_operations_through_one_guard() -> (
+    None
+):
+    from pathlib import Path
+
+    import hashmarks.repository_cli as repository_cli
+
+    source = Path(repository_cli.__file__).read_text(encoding="utf-8")
+    expected = {
+        '_print_operation("repository_context", value)',
+        '_print_operation("find", value)',
+        '_print_operation("task_evidence", value)',
+        '_print_operation("change_impact", value)',
+        '_print_operation("post_change", value)',
+    }
+    assert all(call in source for call in expected)
+
+    for function_name in (
+        "_map_orient",
+        "_find_code",
+        "_task_evidence_code",
+        "_change_impact_code",
+        "_post_change_code",
+    ):
+        start = source.index(f"def {function_name}(")
+        next_def = source.find("\ndef ", start + 1)
+        body = source[start:] if next_def < 0 else source[start:next_def]
+        assert "_print_operation(" in body
+        assert "_print(value)" not in body

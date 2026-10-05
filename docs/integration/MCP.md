@@ -145,7 +145,7 @@ each exposed boundary validates the exact mapping
 
 `hashmarks.operation-contract.v1` is the single owner of the exposed operation-to-schema mapping. Core producers consume that mapping; transports do not repeat schema/version strings. A transport may rename a tool for host integration, but it may not mint a different semantic response schema. The `find` CLI and MCP tool therefore both project the same core-owned `hashmarks.find.v2` packet, and dependency observation uses transport-neutral `hashmarks.dependency-codemap.v1`.
 
-Changing an exposed schema/version means changing the operation contract first. The operation-contract identity then changes, the MCP contract incorporates that identity, core output follows the mapping, and boundary validation rejects any producer or adapter that still emits the old schema.
+Changing an exposed schema/version means changing the operation contract first. The operation-contract identity then changes, the MCP contract incorporates that identity, core output follows the mapping, and boundary validation rejects any producer or adapter that still emits the old schema. CLI handlers for repository context, find, task evidence, change impact, and post-change all validate through the same operation contract before printing; MCP validates independently at its own transport boundary.
 
 ### Canonical MCP contract identity
 
