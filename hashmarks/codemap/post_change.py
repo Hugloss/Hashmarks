@@ -343,8 +343,9 @@ class PostChangeMixin(ChangeImpactMixin):
         if not isinstance(previous_evidence, dict) or previous_evidence.get(
             "schema"
         ) != operation_schema("task_evidence"):
+            expected_schema = operation_schema("task_evidence")
             raise ValueError(
-                "previous_evidence must be a hashmarks.task-evidence.v2 packet"
+                f"previous_evidence must be a {expected_schema} packet"
             )
         normalized = tuple(
             dict.fromkeys(
