@@ -420,15 +420,14 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 )
             self._db.execute("BEGIN IMMEDIATE")
             self._publication_transaction_active = True
+            committed = False
             try:
                 yield
-            except Exception:
-                if self._db.in_transaction:
-                    self._db.execute("ROLLBACK")
-                raise
-            else:
                 self._db.execute("COMMIT")
+                committed = True
             finally:
+                if not committed and self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
                 self._publication_transaction_active = False
 
     def _count_read(self, name: str) -> None:
