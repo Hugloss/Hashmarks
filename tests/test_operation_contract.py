@@ -38,21 +38,11 @@ from hashmarks.operation_contract import (
 ROOT = Path(__file__).resolve().parents[1]
 
 _EXPECTED = {
-    "repository_context": {
-        "default": "hashmarks.repository-capsule.v1",
-    },
-    "find": {
-        "default": "hashmarks.find.v2",
-    },
-    "task_evidence": {
-        "default": "hashmarks.task-evidence.v2",
-    },
-    "change_impact": {
-        "default": "hashmarks.task-change-impact.v1",
-    },
-    "correlate_evidence": {
-        "default": "hashmarks.evidence-correlation.v2",
-    },
+    "repository_context": {"default": "hashmarks.repository-capsule.v1"},
+    "find": {"default": "hashmarks.find.v2"},
+    "task_evidence": {"default": "hashmarks.task-evidence.v2"},
+    "change_impact": {"default": "hashmarks.task-change-impact.v1"},
+    "correlate_evidence": {"default": "hashmarks.evidence-correlation.v2"},
     "dependency_codemap": {
         "observation": "hashmarks.dependency-codemap.v1",
         "explain": "hashmarks.dependency-resolution-explain.v1",
@@ -62,9 +52,48 @@ _EXPECTED = {
         "observation": "hashmarks.repository-declarations.v1",
         "explain": "hashmarks.repository-declaration-explain.v1",
     },
-    "post_change": {
-        "default": "hashmarks.task-post-change-delta.v2",
+    "post_change": {"default": "hashmarks.task-post-change-delta.v2"},
+    "projects": {"default": "hashmarks.codemap-projects.v1"},
+    "outline": {"default": "hashmarks.outline.v1"},
+    "grep": {"default": "hashmarks.grep.v1"},
+    "structural": {"default": "hashmarks.structural-search.v1"},
+    "symbol": {"default": "hashmarks.symbol.v1"},
+    "source": {"default": "hashmarks.source.v1"},
+    "affected": {"default": "hashmarks.codemap-affected.v1"},
+    "tests": {"default": "hashmarks.codemap-tests.v1"},
+    "structural_locality": {"default": "hashmarks.structural-locality.v1"},
+    "structural_locality_delta": {
+        "default": "hashmarks.structural-locality-delta.v1"
     },
+    "context": {"default": "hashmarks.context-pack.v2"},
+    "repository_findings": {"default": "hashmarks.repository-findings.v1"},
+    "import_ownership": {"default": "hashmarks.import-ownership.v2"},
+    "concurrency_risk": {"default": "hashmarks.concurrency-risk.v1"},
+    "verification_ownership": {"default": "hashmarks.verification-ownership.v2"},
+    "repository_ownership": {"default": "hashmarks.authority-ownership-graph.v3"},
+    "cache_ownership": {"default": "hashmarks.cache-ownership.v1"},
+    "cache_invalidation_ownership": {
+        "default": "hashmarks.cache-invalidation-ownership.v1"
+    },
+    "task_action_map": {"default": "hashmarks.task-action-map.v1"},
+    "verification_relevance": {"default": "hashmarks.verification-relevance.v1"},
+    "ownership_relation_graph": {
+        "default": "hashmarks.ownership-relation-graph.v1"
+    },
+    "task_decision_packet": {"default": "hashmarks.task-decision-packet.v2"},
+    "task_decision_brief": {"default": "hashmarks.task-decision-brief.v1"},
+    "task_action_brief": {"default": "hashmarks.task-action-brief.v1"},
+    "task_decision_brief_budget_sweep": {
+        "default": "hashmarks.task-decision-brief-budget-sweep.v1"
+    },
+    "repository_intelligence_query": {
+        "default": "hashmarks.repository-intelligence-query.v1"
+    },
+    "refresh_after_change_delta": {"default": "hashmarks.refresh-delta.v1"},
+    "refresh_after_change_brief": {
+        "default": "hashmarks.post-change-refresh-brief.v1"
+    },
+    "refresh_after_change": {"default": "hashmarks.post-change-refresh.v1"},
 }
 
 
@@ -188,6 +217,58 @@ def test_cli_operation_projection_names_are_registered_literals() -> None:
     assert set(projected) <= set(registered_operations())
 
 
+_CLI_NON_SEMANTIC_CODEMAP_HANDLERS = {
+    "_map_sync",
+    "_map_clean",
+    "_map_watch",
+    "_map_status",
+    "_map_enrich",
+    "_map_import_scip",
+    "_deps_code",
+    "_refs_code",
+}
+
+
+def test_cli_codemap_exposure_is_exhaustively_classified() -> None:
+    source = (ROOT / "hashmarks" / "repository_cli.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    non_semantic: set[str] = set()
+
+    for function in (
+        node for node in tree.body if isinstance(node, ast.FunctionDef)
+    ):
+        codemap_calls = [
+            node
+            for node in ast.walk(function)
+            if (
+                isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "codemap"
+            )
+        ]
+        if not codemap_calls:
+            continue
+        printers = [
+            node
+            for node in ast.walk(function)
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id in {"_print", "_print_operation"}
+            )
+        ]
+        if not printers:
+            continue
+        semantic = any(
+            isinstance(node.func, ast.Name) and node.func.id == "_print_operation"
+            for node in printers
+        )
+        if not semantic:
+            non_semantic.add(function.name)
+
+    assert non_semantic == _CLI_NON_SEMANTIC_CODEMAP_HANDLERS
+
+
 def test_mcp_mode_types_derive_from_operation_contract() -> None:
     assert get_args(_DependencyCodemapResultMode) == tuple(
         operation_modes("dependency_codemap")
@@ -220,15 +301,120 @@ _FIXED_MODE_CORE_BOUNDARIES = {
         "correlate_evidence",
     ),
     "post_change": ("hashmarks/codemap/post_change.py", "task_post_change_delta"),
+    "projects": ("hashmarks/codemap/query_surface.py", "projects"),
+    "outline": ("hashmarks/codemap/engine.py", "outline"),
+    "grep": ("hashmarks/codemap/query_surface.py", "grep"),
+    "structural": ("hashmarks/codemap/query_surface.py", "structural"),
+    "symbol": ("hashmarks/codemap/query_surface.py", "symbol"),
+    "source": ("hashmarks/codemap/query_surface.py", "source"),
+    "affected": ("hashmarks/codemap/query_surface.py", "affected"),
+    "tests": ("hashmarks/codemap/query_surface.py", "tests"),
+    "structural_locality": (
+        "hashmarks/codemap/structural_locality.py",
+        "structural_locality",
+    ),
+    "structural_locality_delta": (
+        "hashmarks/codemap/structural_locality.py",
+        "structural_locality_delta",
+    ),
+    "context": ("hashmarks/codemap/model.py", "ContextPack.as_dict"),
+    "repository_findings": (
+        "hashmarks/codemap/ownership_analysis.py",
+        "repository_findings",
+    ),
+    "import_ownership": (
+        "hashmarks/codemap/ownership_analysis.py",
+        "import_ownership_findings",
+    ),
+    "concurrency_risk": (
+        "hashmarks/codemap/ownership_analysis.py",
+        "concurrency_risk_findings",
+    ),
+    "verification_ownership": (
+        "hashmarks/codemap/evidence_verification.py",
+        "verification_ownership_graph",
+    ),
+    "repository_ownership": (
+        "hashmarks/codemap/ownership_analysis.py",
+        "repository_ownership_graph",
+    ),
+    "cache_ownership": (
+        "hashmarks/codemap/ownership_analysis.py",
+        "cache_ownership_findings",
+    ),
+    "cache_invalidation_ownership": (
+        "hashmarks/codemap/ownership_analysis.py",
+        "cache_invalidation_ownership_graph",
+    ),
+    "task_action_map": (
+        "hashmarks/codemap/task_action_projection.py",
+        "task_action_map",
+    ),
+    "verification_relevance": (
+        "hashmarks/codemap/evidence_verification.py",
+        "verification_relevance",
+    ),
+    "ownership_relation_graph": (
+        "hashmarks/codemap/ownership_graph.py",
+        "ownership_relation_graph",
+    ),
+    "task_decision_packet": (
+        "hashmarks/codemap/evidence_decision_packet.py",
+        "task_decision_packet",
+    ),
+    "task_decision_brief": (
+        "hashmarks/codemap/evidence_packet.py",
+        "task_decision_brief",
+    ),
+    "task_action_brief": (
+        "hashmarks/codemap/evidence_packet.py",
+        "task_action_brief",
+    ),
+    "task_decision_brief_budget_sweep": (
+        "hashmarks/codemap/evidence_packet.py",
+        "task_decision_brief_budget_sweep",
+    ),
+    "repository_intelligence_query": (
+        "hashmarks/codemap/repository_intelligence_query.py",
+        "repository_intelligence_query",
+    ),
+    "refresh_after_change_delta": (
+        "hashmarks/codemap/post_change.py",
+        "refresh_after_change_delta",
+    ),
+    "refresh_after_change_brief": (
+        "hashmarks/codemap/post_change.py",
+        "refresh_after_change_brief",
+    ),
+    "refresh_after_change": (
+        "hashmarks/codemap/post_change.py",
+        "refresh_after_change",
+    ),
 }
 
 
 def _function_node(source: str, name: str) -> ast.FunctionDef:
     tree = ast.parse(source)
+    if "." not in name:
+        matches = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == name
+        ]
+        assert len(matches) == 1
+        return matches[0]
+
+    class_name, method_name = name.split(".", 1)
+    classes = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == class_name
+    ]
+    assert len(classes) == 1
     matches = [
         node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef) and node.name == name
+        for node in classes[0].body
+        if isinstance(node, ast.FunctionDef) and node.name == method_name
     ]
     assert len(matches) == 1
     return matches[0]
@@ -257,7 +443,21 @@ def test_fixed_mode_operations_self_prove_at_canonical_core_boundary() -> None:
                 and node.args[0].value == operation
             )
         ]
-        assert validated, f"{operation} must self-prove at {function_name}"
+        decorated = [
+            node
+            for node in function.decorator_list
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "operation_response"
+                and node.args
+                and isinstance(node.args[0], ast.Constant)
+                and node.args[0].value == operation
+            )
+        ]
+        assert validated or decorated, (
+            f"{operation} must self-prove at {function_name}"
+        )
 
 
 def _fixed_mode_repo(root: Path) -> tuple[Path, str]:
