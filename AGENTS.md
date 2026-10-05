@@ -336,6 +336,10 @@ The full-suite runtime profile is owned by `make test-profile` and reports the s
 
 `benchmarks.derived_authority_economics` owns the normal explicit-packet economics profile: controlled iterations, fixture scale, real-producer iterations, and the dependency-dogfood fixture root. `make metrics-derived-authority` owns only the stable repository-local latest-receipt destination. It must not restate the benchmark module's measurement defaults.
 
+### Agent-context metrics defaults have one owner
+
+`scripts.agent_evaluation.metrics_agent` owns the normal synthetic agent-context benchmark profile, including the 1,000-file fixture size and 1,000-token context budget. `make metrics-agent` is only the repository convenience entrypoint and must invoke that owner without restating the normal workload defaults.
+
 ### Development-tool configuration has one owner
 
 `pyproject.toml` owns the Ruff dependency and rule configuration. Developer hooks, Make targets, and CI must invoke that configured Ruff rather than maintaining parallel min/latest compatibility paths. Do not add tests whose only assertion is that tool configuration, docs, and version strings agree. If a real tool upgrade breaks Hashmarks behavior, reproduce the failure and change the single project declaration or the affected behavior. Ruff remains diagnostic-only and never creates or transfers canonical promotion authority.

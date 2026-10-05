@@ -454,7 +454,7 @@ metrics-derived-authority: bootstrap
 	  --output .hashmarks/metrics/derived-authority-economics-latest.json
 
 metrics-agent: bootstrap
-	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent --files 1000 --budget 1000
+	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent
 
 metrics-agent-corpus: bootstrap
 	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_corpus --workspace . --corpus benchmarks/agent_tasks.json --budget 1200
