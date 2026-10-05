@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import threading
 import time
 import uuid
@@ -45,7 +44,6 @@ class _IndexWatchSession:
             self.tracker.snapshot(),
             owner=self.owner,
             fence=fence,
-            pid=os.getpid(),
             heartbeat_unix=time.time(),
             active=active,
             codemap_generation=self.codemap.store.generation(),
