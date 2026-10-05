@@ -475,9 +475,7 @@ class PostChangeMixin(ChangeImpactMixin):
                 else None
             )
             prior_verify = (
-                normalize_relative_path(
-                    options.previous_verify_path, allow_root=False
-                )
+                normalize_relative_path(options.previous_verify_path, allow_root=False)
                 if options.previous_verify_path
                 else None
             )
