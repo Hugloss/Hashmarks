@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from dataclasses import dataclass
@@ -23,6 +24,14 @@ from hashmarks.mcp_contract import (
     qualification_response_schemas,
 )
 from hashmarks.mcp_launch import installed_mcp_command
+
+SCRIPTS_DIR = Path(__file__).resolve().parent.parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from mcp_host_gate_common import (  # noqa: E402 - import follows standalone script path setup
+    basic_qualification_proof,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1115,6 +1124,10 @@ def _gate_receipt(
         "opencode_mcp_config_path": runtime.mcp_config_path,
         "session_id": phase_one.session_id,
         "observed_tools": sorted(EXPECTED_HASHMARKS_TOOLS),
+        "qualification": basic_qualification_proof(
+            generation=phase_one.generation,
+            find_paths=phase_one.found_paths,
+        ),
         "phase1": {
             "generation": phase_one.generation,
             "find_paths": sorted(phase_one.found_paths),
