@@ -191,7 +191,9 @@ def test_derived_authority_make_alias_owns_only_stable_output_path() -> None:
 
     joined = "\n".join(recipe)
     assert "benchmarks.derived_authority_economics" in joined
-    assert "--output .hashmarks/metrics/derived-authority-economics-latest.json" in joined
+    assert (
+        "--output .hashmarks/metrics/derived-authority-economics-latest.json" in joined
+    )
 
     for stale in (
         "--iterations 100",
