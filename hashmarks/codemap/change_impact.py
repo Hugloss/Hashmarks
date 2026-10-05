@@ -225,8 +225,11 @@ class _ImpactState:
 
 class ChangeImpactMixin:
     def _refresh_declared_project_impact(
-        self, normalized: tuple[str, ...]
-    ) -> dict[str, object] | None:
+        self,
+        normalized: tuple[str, ...],
+        *,
+        expected_generation: int,
+    ) -> tuple[dict[str, object] | None, int | None]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         provider = next(
@@ -239,7 +242,7 @@ class ChangeImpactMixin:
             None,
         )
         if provider is None:
-            return None
+            return None, None
         producer = provider.name
         declared_file = provider.topology_manifest
         fresh, freshness_reason = self._evidence_fresh("project", producer)
@@ -248,7 +251,7 @@ class ChangeImpactMixin:
             or not freshness_reason
             or not freshness_reason.startswith("manifest changed: ")
         ):
-            return None
+            return None, None
         changed_manifests = self._evidence_manifest_changes("project", producer)
         reported = set(normalized)
         shared_only = bool(changed_manifests) and all(
@@ -257,30 +260,45 @@ class ChangeImpactMixin:
             and self._project_shared_input(rel, producer)
             for rel in changed_manifests
         )
-        if shared_only and self._rebind_project_freshness(producer):
-            return {
-                "producer": producer,
-                "reason": "caller-reported-shared-input-changed",
-                "changed": changed_manifests[0],
-                "changed_manifests": list(changed_manifests),
-                "mode": "freshness-rebind",
-                "warnings": [],
-            }
+        rebind_generation = (
+            self._rebind_project_freshness(
+                producer, expected_generation=expected_generation
+            )
+            if shared_only
+            else None
+        )
+        if rebind_generation is not None:
+            return (
+                {
+                    "producer": producer,
+                    "reason": "caller-reported-shared-input-changed",
+                    "changed": changed_manifests[0],
+                    "changed_manifests": list(changed_manifests),
+                    "mode": "freshness-rebind",
+                    "warnings": [],
+                },
+                rebind_generation,
+            )
         if declared_file not in changed_manifests or declared_file not in reported:
-            return None
+            return None, None
         if provider.detect(self.workspace):
-            refreshed = self.enrich_projects((producer,))
-            return {
-                "producer": producer,
-                "reason": "caller-reported-declaration-changed",
-                "changed": declared_file,
-                "changed_manifests": list(changed_manifests),
-                "mode": "topology-recollect",
-                "warnings": list(
-                    cast("Sequence[object]", refreshed.get("warnings") or ())
-                ),
-            }
-        return None
+            refreshed = self.enrich_projects(
+                (producer,), expected_generation=expected_generation
+            )
+            return (
+                {
+                    "producer": producer,
+                    "reason": "caller-reported-declaration-changed",
+                    "changed": declared_file,
+                    "changed_manifests": list(changed_manifests),
+                    "mode": "topology-recollect",
+                    "warnings": list(
+                        cast("Sequence[object]", refreshed.get("warnings") or ())
+                    ),
+                },
+                int(refreshed["generation"]),
+            )
+        return None, None
 
     def _change_impact_surface_state(
         self,
@@ -603,23 +621,32 @@ class ChangeImpactMixin:
         # cheap declarative provider so post-change impact can bind the same
         # declared topology to the current input bytes.  Other native/project
         # providers remain untouched.
-        declared_refresh = self._refresh_declared_project_impact(normalized)
-
-        action = self.task_action_map(task, limit=limit, per_role=per_role)
-        state = self._change_impact_surface_state(
+        declared_refresh, refresh_generation = self._refresh_declared_project_impact(
             normalized,
-            max_depth=options.max_depth,
-            impact_limit_per_surface=options.impact_limit_per_surface,
-            effective_project_impact_limit=options.effective_project_impact_limit,
+            expected_generation=sync_result.generation,
         )
-        edit_path, verify, verify_path, chain, edge_relations = (
-            self._change_impact_owner_chain(task, action, state.visible)
+        decision_generation = (
+            sync_result.generation
+            if refresh_generation is None
+            else refresh_generation
         )
-        self._apply_owner_path_impact(state, chain, edge_relations)
-        self._apply_selected_verification_impact(
-            state, edit_path, verify, verify_path, chain
-        )
-        result = self._project_change_impact(
-            state, sync_result.generation, options, declared_refresh
-        )
-        return validate_operation_response("change_impact", result)
+
+        with self.decision_session(expected_generation=decision_generation):
+            action = self.task_action_map(task, limit=limit, per_role=per_role)
+            state = self._change_impact_surface_state(
+                normalized,
+                max_depth=options.max_depth,
+                impact_limit_per_surface=options.impact_limit_per_surface,
+                effective_project_impact_limit=options.effective_project_impact_limit,
+            )
+            edit_path, verify, verify_path, chain, edge_relations = (
+                self._change_impact_owner_chain(task, action, state.visible)
+            )
+            self._apply_owner_path_impact(state, chain, edge_relations)
+            self._apply_selected_verification_impact(
+                state, edit_path, verify, verify_path, chain
+            )
+            result = self._project_change_impact(
+                state, decision_generation, options, declared_refresh
+            )
+            return validate_operation_response("change_impact", result)
