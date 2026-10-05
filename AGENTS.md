@@ -344,6 +344,10 @@ The full-suite runtime profile is owned by `make test-profile` and reports the s
 
 `scripts.agent_evaluation.metrics_agent_corpus` owns the normal repository-local corpus replay profile: workspace `.`, corpus `benchmarks/agent_tasks.json`, 1,200-token context budget, 20-result limit, and stdout-only output unless explicitly redirected. `make metrics-agent-corpus` is only the convenience entrypoint and must not restate those defaults.
 
+### Fresh multi-repository metrics defaults have one owner
+
+`scripts.agent_evaluation.metrics_fresh_multi_repo` owns the normal fresh-repository workload and acceptance defaults: 1,200-token context budget, 20-result limit, perfect file/symbol recall floors, and zero fallback-search rate. `make metrics-fresh-multi-repo` owns only the repository-local materialization root and stable latest-receipt path; it must not restate the script's workload or acceptance defaults.
+
 ### Development-tool configuration has one owner
 
 `pyproject.toml` owns the Ruff dependency and rule configuration. Developer hooks, Make targets, and CI must invoke that configured Ruff rather than maintaining parallel min/latest compatibility paths. Do not add tests whose only assertion is that tool configuration, docs, and version strings agree. If a real tool upgrade breaks Hashmarks behavior, reproduce the failure and change the single project declaration or the affected behavior. Ruff remains diagnostic-only and never creates or transfers canonical promotion authority.

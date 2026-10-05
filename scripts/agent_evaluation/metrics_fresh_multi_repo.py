@@ -253,7 +253,7 @@ def collect_fresh(
     }
 
 
-def main() -> None:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Materialize and run the canonical fresh multi-repository Hashmarks corpus"
     )
@@ -264,7 +264,11 @@ def main() -> None:
     parser.add_argument("--min-file-recall", type=float, default=1.0)
     parser.add_argument("--min-symbol-recall", type=float, default=1.0)
     parser.add_argument("--max-fallback-rate", type=float, default=0.0)
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> None:
+    args = _parser().parse_args()
     payload = collect_fresh(args.root, budget=args.budget, limit=args.limit)
     rendered = json.dumps(payload, indent=2, sort_keys=True)
     if args.output:

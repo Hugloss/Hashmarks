@@ -227,3 +227,22 @@ def test_metrics_agent_corpus_make_alias_delegates_normal_defaults() -> None:
         "--budget 1200",
     ):
         assert stale not in joined
+
+
+def test_fresh_multi_repo_make_alias_owns_only_repo_local_paths() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+    recipe = _make_recipe(text, "metrics-fresh-multi-repo")
+    joined = "\n".join(recipe)
+
+    assert "scripts.agent_evaluation.metrics_fresh_multi_repo" in joined
+    assert "--root .hashmarks/benchmarks/fresh-multi-repo" in joined
+    assert "--output .hashmarks/metrics/fresh-multi-repo-latest.json" in joined
+
+    for stale in (
+        "--budget 1200",
+        "--limit 20",
+        "--min-file-recall 1",
+        "--min-symbol-recall 1",
+        "--max-fallback-rate 0",
+    ):
+        assert stale not in joined

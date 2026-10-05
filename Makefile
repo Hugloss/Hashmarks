@@ -462,8 +462,6 @@ metrics-agent-corpus: bootstrap
 metrics-fresh-multi-repo: bootstrap
 	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_fresh_multi_repo \
 	  --root .hashmarks/benchmarks/fresh-multi-repo \
-	  --budget 1200 --limit 20 \
-	  --min-file-recall 1 --min-symbol-recall 1 --max-fallback-rate 0 \
 	  --output .hashmarks/metrics/fresh-multi-repo-latest.json
 
 metrics-blind-worker-ab: bootstrap
