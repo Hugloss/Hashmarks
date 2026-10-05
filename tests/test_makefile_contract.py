@@ -113,7 +113,7 @@ def test_mcp_host_make_aliases_do_not_own_gate_defaults() -> None:
         "$(if $(filter 1 true yes,$(CODEX_HOST_DANGEROUS)),--dangerous-bypass,)",
         '$(if $(strip $(PI)),--pi "$(PI)",)',
         (
-            '$(if $(strip $(CHATGPT_MCP_HANDOFF_RECEIPT)),'
+            "$(if $(strip $(CHATGPT_MCP_HANDOFF_RECEIPT)),"
             '--output "$(CHATGPT_MCP_HANDOFF_RECEIPT)",)'
         ),
     )
