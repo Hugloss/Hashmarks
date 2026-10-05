@@ -234,6 +234,7 @@ def test_leading_dependency_context_does_not_steal_explicit_edit_owner(
     assert packet["candidate"]["path"] == "src/publish.py"
     assert packet["discrimination"]["needed"] is False
 
+
 def test_decision_packet_consumes_canonical_action_edit(tmp_path: Path) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
@@ -260,4 +261,3 @@ def test_decision_packet_consumes_canonical_action_edit(tmp_path: Path) -> None:
 
     assert packet["candidate"]["path"] == "src/engine.py"
     assert packet["edit"] is None
-
