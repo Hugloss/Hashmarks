@@ -478,8 +478,6 @@ metrics-worker-behavior-ab: bootstrap
 
 metrics-worker-inspection-ab: bootstrap
 	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_worker_inspection_ab \
-	  --root .hashmarks/benchmarks/worker-inspection-ab \
-	  --limit 20 \
 	  --output .hashmarks/metrics/worker-inspection-ab-latest.json
 
 metrics-worker-multistep-ab: bootstrap
