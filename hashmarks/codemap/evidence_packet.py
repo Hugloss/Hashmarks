@@ -807,6 +807,59 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         }
 
     @staticmethod
+    def _task_evidence_retrieval_locator(
+        row: Mapping[str, object],
+    ) -> dict[str, object]:
+        """Project one retrieval candidate into a compact non-authoritative locator."""
+        result: dict[str, object] = {"path": str(row.get("path") or "")}
+
+        rank = row.get("canonical_rank")
+        if isinstance(rank, int) and rank > 0:
+            result["rank"] = rank
+
+        symbol = row.get("qualname") or row.get("name")
+        if symbol:
+            result["symbol"] = str(symbol)
+
+        roles = row.get("roles")
+        if isinstance(roles, list) and roles:
+            result["roles"] = [str(role) for role in roles if str(role)]
+
+        start = row.get("start_line")
+        end = row.get("end_line")
+        if isinstance(start, int) and start > 0:
+            result["start_line"] = start
+        if isinstance(end, int) and end > 0:
+            result["end_line"] = end
+
+        visibility = row.get("evidence_visibility")
+        if visibility:
+            result["evidence_visibility"] = str(visibility)
+
+        supplement = row.get("retrieval_supplement")
+        if supplement:
+            result["supplement"] = str(supplement)
+        return result
+
+    def _task_evidence_compact_retrieval(
+        self,
+        result: dict[str, object],
+    ) -> None:
+        """Compact retrieval presentation without changing ranking or ownership."""
+        retrieval = result.get("retrieval")
+        if not isinstance(retrieval, dict):
+            raise AssertionError("task evidence retrieval projection must be a mapping")
+        current = retrieval.get("results")
+        if not isinstance(current, list):
+            raise AssertionError("task evidence retrieval results must be a list")
+        retrieval["results"] = [
+            self._task_evidence_retrieval_locator(row)
+            for row in current
+            if isinstance(row, Mapping)
+        ]
+        retrieval["presentation"] = "compact-locators-v1"
+
+    @staticmethod
     def _task_evidence_retrieval_query(task: str) -> str:
         """Exclude a separate output-format sentence from retrieval vocabulary."""
         directive = re.search(
@@ -1018,7 +1071,12 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         existing_keys = {
             (
                 str(row.get("path") or ""),
-                str(row.get("qualname") or row.get("name") or ""),
+                str(
+                    row.get("symbol")
+                    or row.get("qualname")
+                    or row.get("name")
+                    or ""
+                ),
             )
             for row in existing
         }
@@ -1100,7 +1158,13 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         if not supplements:
             return
         keep = max(0, limit - len(supplements))
-        retrieval["results"] = [*current[:keep], *supplements]
+        retrieval["results"] = [
+            *current[:keep],
+            *[
+                self._task_evidence_retrieval_locator(row)
+                for row in supplements
+            ],
+        ]
         retrieval["canonical_omitted_results"] = max(0, len(current) - keep)
         retrieval["supplemental_results"] = len(supplements)
         retrieval["supplemental_authority"] = False
@@ -1261,6 +1325,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 evidence_receipt,
                 verification_plan,
             )
+            self._task_evidence_compact_retrieval(result)
             self._task_evidence_attach_retrieval_supplements(
                 result,
                 task,
