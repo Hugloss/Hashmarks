@@ -1,3 +1,4 @@
+from scripts.agent_evaluation import metrics_agent
 from scripts.agent_evaluation.metrics_agent import SCHEMA, collect
 
 
@@ -19,3 +20,10 @@ def test_agent_metrics_measure_sync_retrieval_and_bounded_context() -> None:
         "context",
         "one_file_reindex",
     }
+
+
+def test_metrics_agent_parser_owns_normal_defaults() -> None:
+    args = metrics_agent._parser().parse_args([])
+
+    assert args.files == 1000
+    assert args.budget == 1000
