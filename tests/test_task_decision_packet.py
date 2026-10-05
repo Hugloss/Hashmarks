@@ -233,3 +233,31 @@ def test_leading_dependency_context_does_not_steal_explicit_edit_owner(
     assert packet["edit"]["path"] == "src/publish.py"
     assert packet["candidate"]["path"] == "src/publish.py"
     assert packet["discrimination"]["needed"] is False
+
+
+def test_decision_packet_consumes_canonical_action_edit(tmp_path: Path) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "src/engine.py").write_text(
+        "def widget_value():\n    return 'old'\n", encoding="utf-8"
+    )
+    (tmp_path / "tests/test_engine.py").write_text(
+        "from src.engine import widget_value\n"
+        "def test_widget_value(): assert widget_value() == 'old'\n",
+        encoding="utf-8",
+    )
+    task = "Change widget_value behavior"
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        action = codemap.task_action_map(task)
+        assert action["edit"]["path"] == "src/engine.py"
+        assert action["action_edit"]["path"] == "src/engine.py"
+        assert action["admitted_edit"]["path"] == "src/engine.py"
+
+        action["action_edit"] = None
+        codemap.task_action_map = lambda *args, **kwargs: action  # type: ignore[method-assign]
+        packet = codemap.task_decision_packet(task, token_budget=256)
+
+    assert packet["candidate"]["path"] == "src/engine.py"
+    assert packet["edit"] is None
