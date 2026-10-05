@@ -22,6 +22,7 @@ from hashmarks.mcp_contract import (
     MCP_WORKFLOW_HOST_QUALIFICATION_TOOLS,
     qualification_response_schemas,
 )
+from hashmarks.mcp_launch import installed_mcp_command
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +214,7 @@ def _opencode_server_config(hashmarks: Path, repo: Path) -> dict[str, Any]:
     # correctness does not depend on the host subprocess working directory.
     return {
         "type": "local",
-        "command": [str(hashmarks), "--workspace", str(repo), "mcp"],
+        "command": list(installed_mcp_command(hashmarks, repo)),
         "enabled": True,
     }
 
