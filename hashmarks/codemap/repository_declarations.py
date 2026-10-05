@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_schema
+
 from .repository_declaration_contract import (
     MAX_DECLARATIONS,
     MAX_EXPECTED_PER_GROUP,
@@ -19,7 +21,7 @@ from .repository_declaration_delta import declaration_delta
 if TYPE_CHECKING:
     from .engine import CodeMap
 
-_SCHEMA = "hashmarks.repository-declarations.v1"
+_SCHEMA = operation_schema("repository_declarations", "observation")
 
 
 class RepositoryDeclarationsMixin:
