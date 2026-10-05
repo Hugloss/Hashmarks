@@ -10,7 +10,6 @@ TEST_SHARDS ?= 64
 DEV_BATCH_SIZE ?= 4
 DEV_BATCH_START ?= 0
 ARTIFACT_PYTHON ?= 3.14
-MCP_STRESS_RECEIPT ?= dist/mcp-concurrency-stress.json
 CHATGPT_MCP_HASHMARKS ?= $(abspath .venv/bin/hashmarks)
 CHATGPT_MCP_WORKSPACE ?= $(CURDIR)
 CHATGPT_MCP_SOURCE_ROOT ?= $(CURDIR)
@@ -368,7 +367,8 @@ mcp-host-status:
 	@$(UV_RUN) --offline --no-sync python scripts/mcp_host_status.py
 
 mcp-concurrency-stress:
-	@$(UV_RUN) --offline --no-sync python scripts/mcp_concurrency_stress.py --receipt "$(MCP_STRESS_RECEIPT)"
+	@$(UV_RUN) --offline --no-sync python scripts/mcp_concurrency_stress.py \
+	  $(if $(strip $(MCP_STRESS_RECEIPT)),--receipt "$(MCP_STRESS_RECEIPT)",)
 
 mcp-opencode-check:
 	@$(UV_RUN) --offline --no-sync python scripts/host_qualification/opencode_mcp_host_gate.py \
