@@ -855,9 +855,12 @@ class IndexingLifecycleMixin:
             )
         except (OSError, UnstableFileError):
             return None
-        if current_digest.hash != snap_digest:
+        expected_artifact = artifact_key_for(
+            current_digest.hash, item.language, range_provider=self.range_provider
+        )
+        if current_digest.hash != snap_digest or snap_artifact_key != expected_artifact:
             return None
-        artifact = self.artifacts.get(snap_artifact_key)
+        artifact = self.artifacts.get(expected_artifact)
         return (
             artifact
             if artifact is not None
@@ -875,11 +878,7 @@ class IndexingLifecycleMixin:
         base_snapshot_payload: dict[str, object] | None,
         state: _SyncIndexState,
     ) -> bool:
-        """Reuse a base artifact only after current repository identity matches.
-
-        Git overlay state only selects fast-path candidates. The current file
-        digest remains the admission authority for snapshot reuse.
-        """
+        """Reuse a base artifact only when every current semantic authority matches."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         artifact = self._sync_base_artifact(
@@ -891,13 +890,13 @@ class IndexingLifecycleMixin:
             return False
         rel = item.rel
         row = self.store.file_row(rel)
-        expected_artifact = artifact.artifact_key
-        if (
-            row is not None
-            and str(row["file_digest"]) == artifact.file_digest
-            and str(row["artifact_key"]) == expected_artifact
-            and str(row["evidence_visibility"]) == item.visibility.value
-            and self.store.has_derived_nodes(rel)
+        module_name = _module_name(rel, self._python_import_roots) or ""
+        if row is not None and self._sync_file_reusable(
+            self._sync_reuse_state(rel, row),
+            digest_hash=artifact.file_digest,
+            expected_artifact=artifact.artifact_key,
+            visibility=item.visibility,
+            module_name=module_name,
         ):
             state.indexed += 1
             state.reused += 1
@@ -906,7 +905,7 @@ class IndexingLifecycleMixin:
         derived_update = self.store.set_file(
             rel,
             artifact,
-            module_name=_module_name(rel, getattr(self, "_python_import_roots", ())),
+            module_name=module_name,
             visibility=item.visibility,
             index_surface=self._index_surface_for_path(rel),
         )
