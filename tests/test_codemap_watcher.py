@@ -9,7 +9,11 @@ from pathlib import Path
 import pytest
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.index_watch import _IndexWatchSession
+from hashmarks.codemap.index_watch import (
+    WatchLeaseHeldError,
+    WatchLeaseLostError,
+    _IndexWatchSession,
+)
 from hashmarks.codemap.watch_continuity import (
     WATCH_CONTINUITY_META,
     WatchContinuityRecord,
@@ -136,6 +140,7 @@ def test_watcher_continuity_is_one_atomic_freshness_authority(
         codemap.sync()
         monkeypatch.setattr(codemap, "_daemon_observation", lambda: None)
         session = _IndexWatchSession(codemap, None)
+        session.acquire()
         assert session.tracker.mark_reconciled(expected_generation=0)
         session.publish()
 
@@ -177,6 +182,7 @@ def test_clean_watcher_observation_only_covers_its_published_codemap_generation(
         codemap.sync()
         monkeypatch.setattr(codemap, "_daemon_observation", lambda: None)
         session = _IndexWatchSession(codemap, None)
+        session.acquire()
         assert session.tracker.mark_reconciled(expected_generation=0)
         session.publish()
         assert codemap.status()["daemon_generation_changed"] is False
@@ -201,6 +207,7 @@ def test_inactive_watcher_observation_cannot_authorize_current_state(
         codemap.sync()
         monkeypatch.setattr(codemap, "_daemon_observation", lambda: None)
         session = _IndexWatchSession(codemap, None)
+        session.acquire()
         assert session.tracker.mark_reconciled(expected_generation=0)
         session.publish(active=False)
 
