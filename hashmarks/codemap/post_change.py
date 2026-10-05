@@ -340,10 +340,9 @@ class PostChangeMixin(ChangeImpactMixin):
             self = cast("CodeMap", self)
         if token_budget < 1:
             raise ValueError("token_budget must be >= 1")
-        if (
-            not isinstance(previous_evidence, dict)
-            or previous_evidence.get("schema") != operation_schema("task_evidence")
-        ):
+        if not isinstance(previous_evidence, dict) or previous_evidence.get(
+            "schema"
+        ) != operation_schema("task_evidence"):
             raise ValueError(
                 "previous_evidence must be a hashmarks.task-evidence.v2 packet"
             )
