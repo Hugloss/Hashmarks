@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import diagnostic_producer
@@ -522,7 +523,7 @@ class ChangeImpactMixin:
     ) -> dict[str, object]:
         changed_roles = ChangeImpactMixin._changed_path_evidence(state)
         result: dict[str, object] = {
-            "schema": "hashmarks.task-change-impact.v1",
+            "schema": operation_schema("change_impact"),
             "generation": generation,
             "changed": changed_roles,
             "changed_evidence": {
