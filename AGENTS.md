@@ -287,6 +287,10 @@ agentsCookbook owns benchmark configuration, suite/task selection, native-agent 
 
 `scripts/standalone_build.py` owns the standalone packager version, packager installation into the already-materialized candidate environment, exact PyInstaller flags, output name, collected package, and Python entrypoint. CI and publish workflows may choose platform runners and own smoke, qualification, signing/publication, and artifact transport, but they must call this build owner rather than copy packaging commands. PyInstaller is an ephemeral standalone-packaging implementation detail, not a second project runtime or development dependency authority.
 
+### MCP stdio launch semantics have one owner
+
+`hashmarks.mcp_launch` owns the semantic Hashmarks stdio launch tuple: workspace binding, optional state-directory binding, the `mcp` subcommand, and the locked source-development `uv run --frozen --no-sync hashmarks` prefix. Installed-host registration, effective-registration inspection, host-status diagnostics, real-host qualification, and ChatGPT tunnel handoff must consume that owner instead of rebuilding the argv locally. Checked-in OpenCode, Claude/Pi, and Codex project files are host-syntax projections of the canonical source launch and must remain byte-level validation targets, not competing configuration owners.
+
 ### Architecture guards resolve relative imports
 
 Product-boundary checks must inspect both absolute and package-relative imports. A relative import is not a valid way to reintroduce removed execution/agent-loop responsibilities into modern CodeMap/repository-intelligence code. Architecture tests must resolve imports to fully-qualified module ownership before classifying the dependency; textual spelling alone is not authority.
