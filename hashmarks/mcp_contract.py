@@ -10,6 +10,7 @@ from typing import Any
 
 from .operation_contract import (
     operation_contract_manifest,
+    operation_default_mode,
     operation_modes,
     operation_schema,
     require_registered_operation,
@@ -71,6 +72,10 @@ class McpToolContract:
     @property
     def response_schemas(self) -> tuple[str, ...]:
         return tuple(operation_modes(self.operation).values())
+
+    @property
+    def default_response_mode(self) -> str:
+        return operation_default_mode(self.operation)
 
     @property
     def default_response_schema(self) -> str:
