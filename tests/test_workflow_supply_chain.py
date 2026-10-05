@@ -183,7 +183,6 @@ def test_changed_release_request_is_checked_before_merge() -> None:
     assert 'validate-release-candidate --base-ref "$BASE_SHA"' in fast_gate
 
 
-
 def test_standalone_workflows_consume_one_build_owner() -> None:
     workflows = (
         _root() / ".github" / "workflows" / "ci.yml",
@@ -196,6 +195,7 @@ def test_standalone_workflows_consume_one_build_owner() -> None:
         assert normalized.count("scripts/standalone_build.py") == 2
         assert "pyinstaller" not in text.casefold()
         assert "scripts/hashmarks_entrypoint.py" not in normalized
+
 
 def test_ci_qualifies_native_linux_wsl_and_windows_install_paths() -> None:
     text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
