@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_schema
 
+from .decision_session import decision_scoped
 from .model import EvidenceVisibility, SearchHit
 from .query_primitives import _WORD_RE, _query_terms
 from .query_router import QueryRoute, route_query
@@ -141,9 +142,11 @@ class FindEngineMixin:
         """Return the deterministic retrieval route without executing search."""
         return route_query(query)
 
+    @decision_scoped
     def find(self, query: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
         return self._find_evidence(query, limit=limit).hits
 
+    @decision_scoped
     def find_packet(self, query: str, *, limit: int = 20) -> dict[str, object]:
         """Return the canonical repository find observation for every transport."""
         if TYPE_CHECKING:
