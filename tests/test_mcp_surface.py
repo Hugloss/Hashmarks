@@ -57,9 +57,7 @@ def test_mcp_surface_rejects_unbounded_or_empty_inputs(tmp_path: Path) -> None:
         str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
     )
     try:
-        with pytest.raises(
-            McpSurfaceError, match="query must not be empty"
-        ) as invalid:
+        with pytest.raises(McpSurfaceError, match="query must not be empty") as invalid:
             surface.find(" ")
         assert invalid.value.reason == "invalid-request"
         assert invalid.value.as_dict() == {
