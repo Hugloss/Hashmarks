@@ -27,12 +27,34 @@ def test_checked_in_project_configs_are_hashmarks_owned() -> None:
     assert status._is_uv_registration(entry["command"], entry["args"])
 
 
+def test_mcp_tool_catalog_consumes_canonical_contract() -> None:
+    class CompleteSurface:
+        pass
+
+    for name in status.MCP_TOOL_NAMES:
+        setattr(CompleteSurface, name, lambda: None)
+
+    assert status._mcp_tool_catalog_check(CompleteSurface) == status.Check(
+        "PASS", f"{len(status.MCP_TOOL_NAMES)} canonical tools"
+    )
+
+    missing = status.MCP_TOOL_NAMES[-1]
+    delattr(CompleteSurface, missing)
+    result = status._mcp_tool_catalog_check(CompleteSurface)
+
+    assert result.status == "FAIL"
+    assert result.detail == f"missing canonical tools: {missing}"
+
+
 def test_render_distinguishes_pi_native_mcp_from_adapter() -> None:
     report = {
         "core": {
             "mcp_server_executable": {"status": "PASS", "detail": ""},
             "mcp_sdk": {"status": "PASS", "detail": ""},
-            "mcp_tool_catalog": {"status": "PASS", "detail": "5 tools"},
+            "mcp_tool_catalog": {
+                "status": "PASS",
+                "detail": f"{len(status.MCP_TOOL_NAMES)} canonical tools",
+            },
         },
         "opencode": _host(),
         "claude": _host(),
