@@ -353,13 +353,16 @@ def contract_summary(manifest: dict[str, object]) -> dict[str, object]:
     operation_contract = manifest.get("operation_contract")
     errors = manifest.get("errors")
     identity = manifest.get("contract_identity")
-    if (
-        manifest.get("schema") != MCP_CONTRACT_SCHEMA
-        or not isinstance(server, dict)
-        or not isinstance(tools, list)
-        or not isinstance(operation_contract, dict)
-        or not isinstance(errors, dict)
-        or not isinstance(identity, str)
+    if manifest.get("schema") != MCP_CONTRACT_SCHEMA:
+        raise ValueError("invalid Hashmarks MCP contract manifest")
+    if not all(
+        (
+            isinstance(server, dict),
+            isinstance(tools, list),
+            isinstance(operation_contract, dict),
+            isinstance(errors, dict),
+            isinstance(identity, str),
+        )
     ):
         raise ValueError("invalid Hashmarks MCP contract manifest")
     identity_payload = {
