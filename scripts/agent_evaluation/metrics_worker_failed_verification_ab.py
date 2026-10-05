@@ -402,7 +402,7 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
     }
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Measure worker recovery after controlled failed verification."
     )
@@ -417,6 +417,11 @@ def main() -> int:
     parser.add_argument("--policy", choices=POLICIES)
     parser.add_argument("--workspace", type=Path)
     parser.add_argument("--tasks", type=Path)
+    return parser
+
+
+def main() -> int:
+    parser = _parser()
     args = parser.parse_args()
     if args.worker:
         if not args.policy or not args.workspace or not args.tasks or not args.output:
