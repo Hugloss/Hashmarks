@@ -75,3 +75,14 @@ def test_stress_writes_full_receipt_before_reporting_failed_calls(
     assert receipt["totals"]["successful_calls"] == 1439
     assert receipt["totals"]["expected_calls"] == 1440
     assert receipt["round_results"] == [round_result]
+
+
+def test_stress_parser_owns_normal_launch_defaults() -> None:
+    args = mcp_concurrency_stress._parser().parse_args([])
+
+    assert args.rounds == 3
+    assert args.workers == 6
+    assert args.calls == 80
+    assert args.writes == 35
+    assert args.extra_files == 120
+    assert args.receipt == "dist/mcp-concurrency-stress.json"
