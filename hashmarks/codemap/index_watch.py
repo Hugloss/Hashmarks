@@ -40,7 +40,7 @@ class _IndexWatchSession:
     owner: str = field(default_factory=lambda: uuid.uuid4().hex)
     fence: int | None = None
 
-    def _record(self, *, fence: int, active: bool) -> object:
+    def _record(self, *, fence: int, active: bool) -> WatchContinuityRecord:
         return watch_record_from_snapshot(
             self.tracker.snapshot(),
             owner=self.owner,
@@ -82,6 +82,7 @@ class _IndexWatchSession:
                 current is None
                 or current.owner != self.owner
                 or current.fence != self.fence
+                or (active and not current.active)
             ):
                 raise WatchLeaseLostError(
                     "CodeMap watch continuity lease was replaced by another owner"
@@ -142,23 +143,23 @@ class IndexWatchMixin:
             self = cast("CodeMap", self)
         session = _IndexWatchSession(self, on_update)
         session.acquire()
-
-        exclude = []
+        watcher = None
         try:
-            state_rel = self.state_dir.relative_to(self.workspace).as_posix()
-        except ValueError:
-            pass
-        else:
-            exclude.append(state_rel)
-        exclude.append(".git")
-        watcher = create_default_watcher(
-            self.workspace,
-            session.reconcile,
-            debounce_seconds=debounce_seconds,
-            change_tracker=session.tracker,
-            exclude_relative_paths=exclude,
-        )
-        try:
+            exclude = []
+            try:
+                state_rel = self.state_dir.relative_to(self.workspace).as_posix()
+            except ValueError:
+                pass
+            else:
+                exclude.append(state_rel)
+            exclude.append(".git")
+            watcher = create_default_watcher(
+                self.workspace,
+                session.reconcile,
+                debounce_seconds=debounce_seconds,
+                change_tracker=session.tracker,
+                exclude_relative_paths=exclude,
+            )
             watcher.start()
             # Observer starts first so the cold scan has no uncovered gap.
             initial = self.sync()
@@ -176,6 +177,7 @@ class IndexWatchMixin:
         except KeyboardInterrupt:
             return
         finally:
-            watcher.stop()
+            if watcher is not None:
+                watcher.stop()
             session.tracker.mark_unknown("watcher stopped")
             session.release()
