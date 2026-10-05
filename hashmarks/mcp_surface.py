@@ -577,6 +577,7 @@ class HashmarksMcpSurface:
         token_budget = _bounded_int(
             token_budget, name="token_budget", minimum=1, maximum=_MAX_TOKEN_BUDGET
         )
+
         def project() -> dict[str, object]:
             try:
                 return self._map.task_post_change_delta(
