@@ -110,4 +110,3 @@ def test_action_brief_status_consumes_receipt_freshness_once(
     assert reads == 1
     assert brief["status"] == "safe-fresh"
     assert brief["evidence_receipt"]["stale"] is False
-
