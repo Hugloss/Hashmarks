@@ -75,6 +75,7 @@ class McpToolContract:
     def response_schema_for_mode(self, result_mode: str | None = None) -> str:
         return operation_schema(self.operation, result_mode)
 
+
 MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "repository_context",
