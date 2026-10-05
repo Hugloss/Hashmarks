@@ -36,18 +36,11 @@ DIAGNOSTIC_BATCH ?= 0
 DIAGNOSTIC_BATCH_LIMIT ?= 8
 DIAGNOSTIC_SHARD ?= 0
 DIAGNOSTIC_EXTRA_MARKER ?=
-BENCHMARK ?= smoke
-BENCH_AGENT ?=
 AGENTS_COOKBOOK ?= ../agentsCookbook
-BENCH_ROOT ?= .hashmarks/benchmarks/native
-BENCH_PYTHON ?= $(shell command -v python3)
-BENCH_RUN ?=
-BENCH_PARTIAL ?= 0
-export BENCH_RUN BENCH_AGENT BENCH_PARTIAL
 RUFF_DEBT_PREVIOUS_BASELINE ?=
 RUFF_AUTOFIX_SELECT ?= E4,E7,E9,I,T201
 
-.PHONY: help benchmark benchmark-check benchmark-show benchmark-report evaluation-help lock lock-check init setup bootstrap check start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-chatgpt-handoff mcp-host-status mcp-concurrency-stress release-prepare release-check metrics metrics-fast metrics-scale metrics-500k metrics-derived-authority metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
+.PHONY: help benchmark benchmark-check benchmark-report evaluation-help lock lock-check init setup bootstrap check start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-chatgpt-handoff mcp-host-status mcp-concurrency-stress release-prepare release-check metrics metrics-fast metrics-scale metrics-500k metrics-derived-authority metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
 
 help:
 	@printf '%s\n' \
@@ -104,77 +97,21 @@ help:
 	  '  make metrics-derived-authority  Measure controlled + uv/Maven explicit-packet economics before retention' \
 	  '  make metrics        Quick 10k repository-intelligence baseline including daemon + impact metrics' \
 	  '  make metrics-scale  100k repository-intelligence baseline' \
-	  '  make benchmark      Run the agentsCookbook-owned native benchmark against this Hashmarks checkout' \
-	  '  make benchmark-check  Preflight agentsCookbook benchmark arms before model calls' \
-	  '  make benchmark-show Show agentsCookbook-owned trial definitions without running agents' \
-	  '  make benchmark-report  Report the latest agentsCookbook benchmark run (BENCH_RUN=id selects one)' \
+	  '  make benchmark      Delegate benchmark execution to the sibling agentsCookbook checkout' \
+	  '  make benchmark-check  Delegate benchmark readiness to agentsCookbook' \
+	  '  make benchmark-report  Delegate benchmark reporting to agentsCookbook' \
 	  '  make evaluation-help  Show external-agent/research evaluation targets' \
 	  '' \
 	  'Override FILES/HOT_REQUESTS, e.g. make metrics FILES=50000 HOT_REQUESTS=50'
 
-benchmark benchmark-check benchmark-show benchmark-report:
-	@set -eu; \
-	 case "$(BENCHMARK)" in \
-	   smoke) suite=native-matrix-v3; task='--task locate-receipt-completion-owner' ;; \
-	   matrix) suite=native-matrix-v3; task='' ;; \
-	   cycle) suite=enola-cycle-reproduction-v1; task='' ;; \
-	   *) echo 'BENCHMARK must be smoke, matrix, or cycle' >&2; exit 2 ;; \
-	 esac; \
-	 cookbook='$(abspath $(AGENTS_COOKBOOK))'; \
-	 test -f "$$cookbook/benchmarks/__main__.py" || { echo "agentsCookbook checkout missing: $$cookbook" >&2; exit 2; }; \
-	 base='$(abspath $(BENCH_ROOT))'/"$$suite"/'$(BENCHMARK)'; \
-	 suite="$$cookbook/benchmarks/suites/repository-intelligence/$$suite"; \
-	 case "$$BENCH_AGENT" in ''|codex-native|opencode-native) ;; *) echo 'BENCH_AGENT must be codex-native or opencode-native' >&2; exit 2 ;; esac; \
-	 case "$$BENCH_PARTIAL" in 0|1) ;; *) echo 'BENCH_PARTIAL must be 0 or 1' >&2; exit 2 ;; esac; \
-	 agent=''; if test -n "$$BENCH_AGENT"; then agent="--agent $$BENCH_AGENT"; fi; \
-	 cd "$$cookbook"; \
-	 if test '$@' = benchmark-show; then \
-	   $(BENCH_PYTHON) -m benchmarks plan --suite "$$suite" $$task $$agent; \
-	 elif test '$@' = benchmark || test '$@' = benchmark-check; then \
-	   test -x '$(abspath .venv/bin/hashmarks)' || { echo 'Hashmarks .venv is missing; run make init first' >&2; exit 2; }; \
-	   PATH='$(abspath .venv/bin)':"$$PATH" HASHMARKS_BENCH_SOURCE='$(CURDIR)' \
-	   $(BENCH_PYTHON) -m benchmarks preflight --suite "$$suite" \
-	   --source . --cache "$$base/cache" --work "$$base/preflight-work" $$task $$agent; \
-	   if test '$@' = benchmark-check; then exit 0; fi; \
-	   mkdir -p "$$base/runs"; \
-	   if test -z "$$BENCH_RUN"; then \
-	     run_dir=$$(mktemp -d "$$base/runs/$$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX"); \
-	     run_id=$$(basename "$$run_dir"); \
-	   else \
-	     case "$$BENCH_RUN" in .|..|*[!A-Za-z0-9._-]*|'') echo 'BENCH_RUN must be one safe directory name' >&2; exit 2 ;; esac; \
-	     run_id="$$BENCH_RUN"; run_dir="$$base/runs/$$run_id"; mkdir -p "$$run_dir"; \
-	   fi; \
-	   if test -f "$$run_dir/agent-selection"; then \
-	     saved_agent=$$(cat "$$run_dir/agent-selection"); \
-	     test "$$saved_agent" = "$$BENCH_AGENT" || { echo 'BENCH_RUN has a different agent selection; choose a new run ID' >&2; exit 2; }; \
-	   else \
-	     printf '%s\n' "$$BENCH_AGENT" > "$$run_dir/agent-selection"; \
-	   fi; \
-	   marker=$$(mktemp "$$base/.latest.XXXXXX"); printf '%s\n' "$$run_id" > "$$marker"; mv -f "$$marker" "$$base/latest"; \
-	   printf 'Benchmark run: %s\n' "$$run_dir" >&2; \
-	   PATH='$(abspath .venv/bin)':"$$PATH" HASHMARKS_BENCH_SOURCE='$(CURDIR)' \
-	   $(BENCH_PYTHON) -m benchmarks run --suite "$$suite" \
-	   --source . --cache "$$base/cache" --work "$$run_dir/work" \
-	   --results "$$run_dir/results" $$task $$agent; \
-	 else \
-	   if test -n "$$BENCH_RUN"; then \
-	     case "$$BENCH_RUN" in .|..|*[!A-Za-z0-9._-]*|'') echo 'BENCH_RUN must be one safe directory name' >&2; exit 2 ;; esac; \
-	     run_id="$$BENCH_RUN"; \
-	   else \
-	     test -f "$$base/latest" || { echo 'No benchmark run yet; run make benchmark first' >&2; exit 2; }; \
-	     run_id=$$(cat "$$base/latest"); \
-	   fi; \
-	   run_dir="$$base/runs/$$run_id"; \
-	   test -f "$$run_dir/agent-selection" || { echo "Unknown benchmark run: $$run_id" >&2; exit 2; }; \
-	   saved_agent=$$(cat "$$run_dir/agent-selection"); \
-	   if test -n "$$BENCH_AGENT" && test "$$BENCH_AGENT" != "$$saved_agent"; then echo 'BENCH_AGENT differs from the saved run selection' >&2; exit 2; fi; \
-	   agent=''; if test -n "$$saved_agent"; then agent="--agent $$saved_agent"; fi; \
-	   partial=''; if test "$$BENCH_PARTIAL" = 1; then partial='--allow-incomplete'; fi; \
-	   $(BENCH_PYTHON) -m benchmarks report --suite "$$suite" --results "$$run_dir/results" $$task $$agent $$partial; \
-	   if test '$(BENCHMARK)' = cycle; then \
-	     PYTHONPATH=. $(BENCH_PYTHON) "$$suite/score.py" "$$run_dir/results" $$agent $$partial; \
-	   fi; \
-	 fi
+benchmark:
+	@$(MAKE) --no-print-directory -C "$(AGENTS_COOKBOOK)" benchmark
+
+benchmark-check:
+	@$(MAKE) --no-print-directory -C "$(AGENTS_COOKBOOK)" benchmark-check
+
+benchmark-report:
+	@$(MAKE) --no-print-directory -C "$(AGENTS_COOKBOOK)" benchmark-report
 
 evaluation-help:
 	@printf '%s\n' \
