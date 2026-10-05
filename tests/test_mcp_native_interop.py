@@ -50,9 +50,7 @@ def _assert_canonical_result_mode_schemas(
     assert dependency["enum"] == list(operation_modes("dependency_codemap"))
     assert dependency["default"] == operation_default_mode("dependency_codemap")
     assert declarations["enum"] == list(operation_modes("repository_declarations"))
-    assert declarations["default"] == operation_default_mode(
-        "repository_declarations"
-    )
+    assert declarations["default"] == operation_default_mode("repository_declarations")
     return schemas
 
 
