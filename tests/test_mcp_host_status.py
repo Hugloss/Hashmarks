@@ -217,6 +217,17 @@ def test_host_receipt_is_bound_to_registration_host_and_completion(
             "sha256": status._sha256(registration),
         },
         "host": {"name": "opencode", "version": "opencode v2.0.4"},
+        "qualification": {
+            "schema": "hashmarks.mcp-basic-host-qualification.v1",
+            "repository_context": {
+                "schema": "hashmarks.repository-capsule.v1",
+                "generation": 1,
+            },
+            "find": {
+                "schema": "hashmarks.find.v2",
+                "paths": ["src/feature.py"],
+            },
+        },
         "completed_at": "2026-09-23T12:00:00Z",
     }
 
@@ -230,6 +241,10 @@ def test_host_receipt_is_bound_to_registration_host_and_completion(
             candidate_identity="sha256:current:1",
         )
 
+    proofless = {key: value for key, value in base.items() if key != "qualification"}
+    assert check(proofless) == status.Check(
+        "STALE", "receipt predates semantic qualification proof"
+    )
     assert check(base) == status.Check("PASS", "2026-09-23T12:00:00Z")
     mutations = [
         ({**base, "schema": "old"}, "schema"),
@@ -258,6 +273,19 @@ def test_host_receipt_is_bound_to_registration_host_and_completion(
         (
             {**base, "host": {"name": "opencode", "version": "old"}},
             "version changed",
+        ),
+        (
+            {
+                **base,
+                "qualification": {
+                    **base["qualification"],
+                    "find": {
+                        "schema": "hashmarks.find.v2",
+                        "paths": ["src/wrong.py"],
+                    },
+                },
+            },
+            "src/feature.py",
         ),
         ({**base, "completed_at": ""}, "completion timestamp"),
     ]
