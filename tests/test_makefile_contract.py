@@ -150,3 +150,15 @@ def test_hosted_diagnostic_make_aliases_transport_only_explicit_overrides() -> N
             "--extra-marker '$(DIAGNOSTIC_EXTRA_MARKER)',)" in line
             for line in recipe
         )
+
+
+def test_mcp_stress_make_alias_transports_only_explicit_receipt_override() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert "MCP_STRESS_RECEIPT ?=" not in text
+    recipe = _make_recipe(text, "mcp-concurrency-stress")
+    assert any(
+        "$(if $(strip $(MCP_STRESS_RECEIPT)),"
+        '--receipt "$(MCP_STRESS_RECEIPT)",)' in line
+        for line in recipe
+    )
