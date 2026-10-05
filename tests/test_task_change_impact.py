@@ -733,6 +733,53 @@ def test_task_change_impact_compact_project_provenance_round_trips(
     )
 
 
+def test_task_change_impact_compact_preserves_multiple_edges_from_one_project(
+    tmp_path: Path,
+) -> None:
+    from hashmarks.codemap import expand_project_impact
+
+    for name in ("root-a", "root-b", "client"):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "package.json").write_text(
+            json.dumps({"name": name}), encoding="utf-8"
+        )
+    for name in ("root-a", "root-b"):
+        (tmp_path / name / "value.ts").write_text(
+            "export const value = 1\n", encoding="utf-8"
+        )
+    (tmp_path / ".hashmarks-project-links.toml").write_text(
+        "[[link]]\nsource='npm:client'\ntarget='npm:root-a'\nkind='consumer-a'\n"
+        "[[link]]\nsource='npm:client'\ntarget='npm:root-b'\nkind='consumer-b'\n",
+        encoding="utf-8",
+    )
+
+    changed = ["root-a/value.ts", "root-b/value.ts"]
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        codemap.enrich_projects(("npm-package-graph", "declared-project-links"))
+        verbose = codemap.task_change_impact(
+            "both roots changed",
+            changed,
+            options=ChangeImpactOptions(project_impact_limit=20),
+        )
+        compact = codemap.task_change_impact(
+            "both roots changed",
+            changed,
+            options=ChangeImpactOptions(
+                project_impact_limit=20, project_impact_encoding="compact"
+            ),
+        )
+
+    client_edges = [
+        edge
+        for edge in verbose["project_impact"]["edges"]
+        if edge["from"] == "npm:client"
+    ]
+    assert len(client_edges) == 2
+    assert {edge["to"] for edge in client_edges} == {"npm:root-a", "npm:root-b"}
+    assert expand_project_impact(compact["project_impact"]) == verbose["project_impact"]
+
+
 def test_task_change_impact_rejects_unknown_project_impact_encoding(
     tmp_path: Path,
 ) -> None:
