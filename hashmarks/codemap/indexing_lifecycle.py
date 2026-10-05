@@ -1325,7 +1325,8 @@ class IndexingLifecycleMixin:
                     ),
                 }
             )
-            result = SyncResult(
+            self._reverse_file_graph_cache = None
+            return SyncResult(
                 generation=identity.generation,
                 discovered=len(discovery.files),
                 indexed=state.indexed,
@@ -1350,8 +1351,6 @@ class IndexingLifecycleMixin:
                 economics=economics,
                 build_state="COMPLETE",
             )
-        self._reverse_file_graph_cache = None
-        return result
 
     def derived_graph(self, path: str | None = None) -> dict[str, object]:
         """Expose dependency-tracked derived CodeMap surfaces for diagnostics.
