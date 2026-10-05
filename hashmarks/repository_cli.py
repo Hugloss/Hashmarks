@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING, TypeVar
 
 from hashmarks._command_output import log_command_output
 
-from .operation_contract import validate_operation_response
 from .codemap.change_impact import ChangeImpactOptions
 from .errors import RepositoryCliError
+from .operation_contract import validate_operation_response
 from .repository_retry import (
     is_transient_repository_race,
     retry_transient_repository_race,
