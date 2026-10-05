@@ -53,10 +53,14 @@ def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
     identity = first["contract_identity"]
     server = first["server"]
     tools = first["tools"]
+    operation_contract = first["operation_contract"]
     assert isinstance(identity, str)
     assert isinstance(server, dict)
     assert isinstance(tools, list)
+    assert isinstance(operation_contract, dict)
     assert first["schema"] == "hashmarks.mcp-contract.v1"
+    assert operation_contract["schema"] == "hashmarks.operation-contract.v1"
+    assert str(operation_contract["contract_identity"]).startswith("sha256:")
     assert first["errors"] == {
         "schema": MCP_ERROR_SCHEMA,
         "reasons": list(MCP_ERROR_REASONS),
@@ -88,6 +92,7 @@ def test_mcp_contract_manifest_is_deterministic_and_complete() -> None:
         "contract_identity": identity,
         "server_version": "0.26.1",
         "tools": list(MCP_TOOL_NAMES),
+        "operation_contract_identity": operation_contract["contract_identity"],
         "error_schema": MCP_ERROR_SCHEMA,
         "error_reasons": list(MCP_ERROR_REASONS),
         "error_recovery_authority": "consumer-owned",
