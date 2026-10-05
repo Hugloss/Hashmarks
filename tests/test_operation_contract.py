@@ -282,30 +282,20 @@ def test_multimode_public_defaults_consume_canonical_operation_authority() -> No
         operation: operation_default_mode(operation) for operation in expected
     } == expected
 
-    assert (
-        inspect.signature(DependencyResolutionEvidenceMixin.dependency_codemap)
-        .parameters["result_mode"]
-        .default
-        == operation_default_mode("dependency_codemap")
+    assert inspect.signature(
+        DependencyResolutionEvidenceMixin.dependency_codemap
+    ).parameters["result_mode"].default == operation_default_mode("dependency_codemap")
+    assert inspect.signature(
+        RepositoryDeclarationsMixin.repository_declarations_operation
+    ).parameters["result_mode"].default == operation_default_mode(
+        "repository_declarations"
     )
-    assert (
-        inspect.signature(RepositoryDeclarationsMixin.repository_declarations_operation)
-        .parameters["result_mode"]
-        .default
-        == operation_default_mode("repository_declarations")
-    )
-    assert (
-        inspect.signature(HashmarksMcpSurface.dependency_codemap)
-        .parameters["result_mode"]
-        .default
-        == operation_default_mode("dependency_codemap")
-    )
-    assert (
-        inspect.signature(HashmarksMcpSurface.repository_declarations)
-        .parameters["result_mode"]
-        .default
-        == operation_default_mode("repository_declarations")
-    )
+    assert inspect.signature(HashmarksMcpSurface.dependency_codemap).parameters[
+        "result_mode"
+    ].default == operation_default_mode("dependency_codemap")
+    assert inspect.signature(HashmarksMcpSurface.repository_declarations).parameters[
+        "result_mode"
+    ].default == operation_default_mode("repository_declarations")
     assert tool_contract("dependency_codemap").default_response_mode == (
         operation_default_mode("dependency_codemap")
     )
