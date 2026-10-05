@@ -15,6 +15,7 @@ _TRANSIENT_RUNTIME_MESSAGES = (
     "CodeMap generation is incomplete (BUILDING)",
     "CodeMap generation changed before expected decision session",
     "CodeMap generation changed before nested decision session",
+    "CodeMap generation changed before expected decision session",
     "CodeMap generation changed during decision session",
 )
 

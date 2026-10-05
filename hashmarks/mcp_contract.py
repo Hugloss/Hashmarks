@@ -248,6 +248,42 @@ def _canonical_schema(value: object, *, label: str) -> dict[str, Any]:
     return raw
 
 
+def _canonical_tool_input_schema(
+    expected: McpToolContract,
+    value: object,
+) -> dict[str, Any]:
+    schema = _canonical_schema(value, label=f"{expected.name} input schema")
+    if len(expected.response_modes) <= 1:
+        return schema
+
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        raise ValueError(
+            f"Hashmarks MCP {expected.name} result_mode schema is unavailable"
+        )
+    result_mode = properties.get("result_mode")
+    if not isinstance(result_mode, dict):
+        raise ValueError(
+            f"Hashmarks MCP {expected.name} result_mode schema is unavailable"
+        )
+    if result_mode.get("enum") != list(expected.response_modes):
+        raise ValueError(
+            f"Hashmarks MCP {expected.name} result_mode enum differs from "
+            "the operation contract"
+        )
+    if result_mode.get("default") != expected.default_response_mode:
+        raise ValueError(
+            f"Hashmarks MCP {expected.name} result_mode default differs from "
+            "the operation contract"
+        )
+    required = schema.get("required", [])
+    if isinstance(required, list) and "result_mode" in required:
+        raise ValueError(
+            f"Hashmarks MCP {expected.name} result_mode default is not omittable"
+        )
+    return schema
+
+
 def _contract_identity(value: dict[str, object]) -> str:
     encoded = json.dumps(
         value,
@@ -286,8 +322,9 @@ def _qualified_tool(
     return {
         "name": expected.name,
         "description": expected.description,
-        "input_schema": _canonical_schema(
-            raw.get("input_schema"), label=f"{expected.name} input schema"
+        "input_schema": _canonical_tool_input_schema(
+            expected,
+            raw.get("input_schema"),
         ),
         "output_schema": _canonical_schema(
             raw.get("output_schema"), label=f"{expected.name} output schema"

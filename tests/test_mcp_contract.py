@@ -15,6 +15,7 @@ from hashmarks.mcp_contract import (
     MCP_SERVER_NAME,
     MCP_TOOL_CONTRACTS,
     MCP_TOOL_NAMES,
+    McpToolContract,
     contract_summary,
     qualification_response_schemas,
     qualify_mcp_observation,
@@ -24,6 +25,20 @@ from hashmarks.mcp_contract import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _input_schema(contract: McpToolContract) -> dict[str, object]:
+    properties: dict[str, object] = {"fixture": {"type": "string"}}
+    if len(contract.response_modes) > 1:
+        properties["result_mode"] = {
+            "type": "string",
+            "enum": list(contract.response_modes),
+            "default": contract.default_response_mode,
+        }
+    return {
+        "type": "object",
+        "properties": properties,
+    }
 
 
 def _observation() -> dict[str, Any]:
@@ -37,10 +52,7 @@ def _observation() -> dict[str, Any]:
             {
                 "name": contract.name,
                 "description": contract.description,
-                "input_schema": {
-                    "type": "object",
-                    "properties": {"fixture": {"type": "string"}},
-                },
+                "input_schema": _input_schema(contract),
                 "output_schema": {"type": "object"},
                 "annotations": dict(MCP_READ_ONLY_ANNOTATIONS),
             }
@@ -159,6 +171,49 @@ def test_mcp_contract_rejects_independent_catalog_drift(
 ) -> None:
     observation = _observation()
     mutation(observation)
+    with pytest.raises(ValueError, match=message):
+        qualify_mcp_observation(observation)
+
+
+@pytest.mark.parametrize(
+    ("name", "mutation", "message"),
+    [
+        (
+            "dependency_codemap",
+            lambda schema: schema["properties"].pop("result_mode"),
+            "result_mode schema is unavailable",
+        ),
+        (
+            "dependency_codemap",
+            lambda schema: schema["properties"]["result_mode"].update(
+                {"enum": ["observation", "compare"]}
+            ),
+            "result_mode enum differs",
+        ),
+        (
+            "repository_declarations",
+            lambda schema: schema["properties"]["result_mode"].update(
+                {"default": "explain"}
+            ),
+            "result_mode default differs",
+        ),
+        (
+            "repository_declarations",
+            lambda schema: schema.update({"required": ["result_mode"]}),
+            "result_mode default is not omittable",
+        ),
+    ],
+)
+def test_mcp_contract_rejects_native_result_mode_schema_drift(
+    name: str,
+    mutation,
+    message: str,
+) -> None:
+    observation = _observation()
+    tool = next(row for row in observation["tools"] if row["name"] == name)
+    schema = tool["input_schema"]
+    mutation(schema)
+
     with pytest.raises(ValueError, match=message):
         qualify_mcp_observation(observation)
 

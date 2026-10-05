@@ -13,6 +13,7 @@ from hashmarks.mcp_contract import (
     MCP_SERVER_INSTRUCTIONS,
     MCP_SERVER_NAME,
     MCP_TOOL_CONTRACTS,
+    McpToolContract,
 )
 from scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff import (
     EXPECTED_TOOLS,
@@ -27,6 +28,17 @@ from scripts.host_qualification.chatgpt_secure_mcp_tunnel_handoff import (
 _MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
 
+def _input_schema(contract: McpToolContract) -> dict[str, object]:
+    properties: dict[str, object] = {}
+    if len(contract.response_modes) > 1:
+        properties["result_mode"] = {
+            "type": "string",
+            "enum": list(contract.response_modes),
+            "default": contract.default_response_mode,
+        }
+    return {"type": "object", "properties": properties}
+
+
 def _observation() -> dict[str, object]:
     return {
         "protocol_version": "2026-07-28",
@@ -39,7 +51,7 @@ def _observation() -> dict[str, object]:
             {
                 "name": contract.name,
                 "description": contract.description,
-                "input_schema": {"type": "object", "properties": {}},
+                "input_schema": _input_schema(contract),
                 "output_schema": {"type": "object"},
                 "annotations": dict(MCP_READ_ONLY_ANNOTATIONS),
             }

@@ -276,6 +276,9 @@ def test_mcp_find_qualifies_absence_and_uniqueness_against_freshness(
             "CodeMap generation changed before expected decision session (30 -> 31)"
         ),
         RuntimeError("CodeMap generation changed before nested decision session"),
+        RuntimeError(
+            "CodeMap generation changed before expected decision session (30 -> 31)"
+        ),
         RuntimeError("CodeMap generation changed during decision session"),
         UnstableFileError("file changed while hashing: src/feature.py"),
     ],
