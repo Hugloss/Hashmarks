@@ -37,9 +37,7 @@ def _make_recipe(text: str, target: str) -> tuple[str, ...]:
         flags=re.MULTILINE,
     )
     assert match is not None
-    return tuple(
-        line.removeprefix("\t") for line in match.group("recipe").splitlines()
-    )
+    return tuple(line.removeprefix("\t") for line in match.group("recipe").splitlines())
 
 
 def test_benchmark_make_aliases_delegate_all_launch_authority() -> None:
