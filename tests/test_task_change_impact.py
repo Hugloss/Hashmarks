@@ -598,10 +598,13 @@ def test_declared_shared_input_refresh_rebinds_freshness_without_recollecting_to
             return original_collect(workspace)
 
         monkeypatch.setattr(provider, "collect", counted_collect)
+        before_generation = codemap.store.generation()
         (tmp_path / "contract.json").write_text('{"v":2}\n', encoding="utf-8")
         impact = codemap.task_change_impact("contract changed", ["contract.json"])
+        impact_generation = codemap.store.generation()
 
     assert calls == 0
+    assert impact["generation"] == impact_generation == before_generation + 2
     assert impact["project_refresh"]["mode"] == "freshness-rebind"
     assert impact["project_refresh"]["changed_manifests"] == ["contract.json"]
     assert impact["projects"] == ["npm:backend", "npm:frontend"]
@@ -640,6 +643,7 @@ def test_declared_topology_change_recollects_provider(
             return original_collect(workspace)
 
         monkeypatch.setattr(provider, "collect", counted_collect)
+        before_generation = codemap.store.generation()
         links.write_text(
             "[[link]]\nsource='npm:frontend'\ntarget='npm:backend'\nkind='consumer'\n"
             "[[link]]\nsource='npm:mobile'\ntarget='npm:frontend'\nkind='consumer'\n",
@@ -648,9 +652,11 @@ def test_declared_topology_change_recollects_provider(
         impact = codemap.task_change_impact(
             "declared topology changed", [".hashmarks-project-links.toml"]
         )
+        impact_generation = codemap.store.generation()
         source = codemap.task_change_impact("backend changed", ["backend/value.ts"])
 
     assert calls == 1
+    assert impact["generation"] == impact_generation == before_generation + 2
     assert impact["project_refresh"]["mode"] == "topology-recollect"
     assert impact["project_refresh"]["changed"] == ".hashmarks-project-links.toml"
     assert source["projects"] == ["npm:frontend", "npm:mobile"]
