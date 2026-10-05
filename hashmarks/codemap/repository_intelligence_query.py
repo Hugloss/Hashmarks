@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_response, operation_schema
+
 from .change_impact import ChangeImpactOptions
 from .freshness_map import FreshnessMapOptions
 
@@ -48,6 +50,7 @@ class RepositoryIntelligenceQueryMixin:
     existing producer that already owns the requested semantics.
     """
 
+    @operation_response("repository_intelligence_query")
     def repository_intelligence_query(
         self,
         surface: str,
@@ -148,7 +151,7 @@ class RepositoryIntelligenceQueryMixin:
 
         producer_schema = str(result.get("schema") or "")
         envelope: dict[str, object] = {
-            "schema": "hashmarks.repository-intelligence-query.v1",
+            "schema": operation_schema("repository_intelligence_query"),
             "surface": surface,
             "producer_schema": producer_schema,
             "result": result,
@@ -157,7 +160,7 @@ class RepositoryIntelligenceQueryMixin:
             "execution_effect": "none",
         }
         envelope["query_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.repository-intelligence-query.v1",
+            operation_schema("repository_intelligence_query"),
             envelope,
         )
         return envelope
