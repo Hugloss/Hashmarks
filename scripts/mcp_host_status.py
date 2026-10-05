@@ -15,23 +15,13 @@ from typing import Any
 
 from hashmarks._command_output import log_command_output
 from hashmarks.mcp_contract import MCP_TOOL_NAMES
+from hashmarks.mcp_launch import source_mcp_command
 
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-
-EXPECTED_UV_ARGS = [
-    "run",
-    "--frozen",
-    "--no-sync",
-    "hashmarks",
-    "--workspace",
-    ".",
-    "mcp",
-]
-
 
 @dataclass(frozen=True)
 class Check:
@@ -90,9 +80,10 @@ def _sha256(path: Path) -> str:
 
 
 def _is_uv_registration(command: Any, args: Any = None) -> bool:
+    expected = list(source_mcp_command("."))
     if isinstance(command, list):
-        return command == ["uv", *EXPECTED_UV_ARGS]
-    return command == "uv" and args == EXPECTED_UV_ARGS
+        return command == expected
+    return command == expected[0] and args == expected[1:]
 
 
 def _receipt_registration_check(
