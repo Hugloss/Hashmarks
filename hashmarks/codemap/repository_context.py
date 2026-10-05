@@ -68,6 +68,7 @@ class ContextPlanningMixin:
         value["resolved_symbols"] = resolved_symbols
         return value
 
+    @decision_scoped
     def deps(self, query: str) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -124,6 +125,7 @@ class ContextPlanningMixin:
             "native_file_edges": self._fresh_native_file_edges_from(rel),
         }
 
+    @decision_scoped
     def refs(self, query: str) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -153,6 +155,7 @@ class ContextPlanningMixin:
             "native_references": native,
         }
 
+    @decision_scoped
     def orient(self, *, max_areas: int = 12) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -271,6 +274,7 @@ class ContextPlanningMixin:
             "items": [item.as_dict() for item in items],
         }
 
+    @decision_scoped
     def task_context_plan(
         self,
         task: str,
@@ -337,6 +341,7 @@ class ContextPlanningMixin:
             "ranking_effect": "none",
         }
 
+    @decision_scoped
     def task_context(
         self,
         task: str,

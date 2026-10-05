@@ -16,6 +16,14 @@ _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
 
+class DecisionRefreshRequired(RuntimeError):
+    """Signal that one path must refresh before a read-only decision restarts."""
+
+    def __init__(self, path: str) -> None:
+        super().__init__(f"CodeMap path refresh required before decision: {path}")
+        self.path = path
+
+
 def _decision_scoped(
     method: Callable[_P, _R], *, allow_incomplete: bool
 ) -> Callable[_P, _R]:
@@ -23,13 +31,26 @@ def _decision_scoped(
 
     @wraps(method)
     def wrapped(self, *args, **kwargs):
-        if self._decision_session_depth == 0:
+        if self._decision_session_depth > 0:
+            with self.decision_session(_allow_incomplete=allow_incomplete):
+                return method(self, *args, **kwargs)
+
+        refreshed: set[str] = set()
+        while True:
             incomplete_build = self.store.meta("sync.build_state") == "BUILDING"
             preflight = getattr(self, "_decision_preflight", None)
             if preflight is not None and not (allow_incomplete and incomplete_build):
                 preflight(method.__name__, args, kwargs)
-        with self.decision_session(_allow_incomplete=allow_incomplete):
-            return method(self, *args, **kwargs)
+            try:
+                with self.decision_session(_allow_incomplete=allow_incomplete):
+                    return method(self, *args, **kwargs)
+            except DecisionRefreshRequired as exc:
+                if exc.path in refreshed:
+                    raise RuntimeError(
+                        f"CodeMap path remained stale after refresh: {exc.path}"
+                    ) from exc
+                refreshed.add(exc.path)
+                self._refresh_path_current(exc.path)
 
     return wrapped
 

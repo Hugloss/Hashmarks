@@ -174,3 +174,130 @@ def test_inflight_decision_never_observes_uncommitted_next_generation(
         harness.a_release.set()
         thread.join(timeout=1)
         harness.close()
+
+
+def test_public_symbol_fails_instead_of_mixing_committed_generations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = _PublicationHarness(tmp_path)
+    evidence_read = threading.Event()
+    writer_finished = threading.Event()
+    original_symbol = harness.reader.store.symbol
+
+    def block_after_symbol_read(query: str):
+        rows = original_symbol(query)
+        if query == "before_owner":
+            evidence_read.set()
+            if not writer_finished.wait(timeout=5):
+                raise TimeoutError("writer did not publish the competing generation")
+        return rows
+
+    monkeypatch.setattr(harness.reader.store, "symbol", block_after_symbol_read)
+
+    def publish_next_generation() -> None:
+        if not evidence_read.wait(timeout=5):
+            harness.errors.append(TimeoutError("reader did not reach symbol evidence"))
+            return
+        try:
+            harness.writer_a.sync()
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            harness.errors.append(exc)
+        finally:
+            writer_finished.set()
+
+    thread = threading.Thread(target=publish_next_generation)
+    try:
+        thread.start()
+        with pytest.raises(
+            RuntimeError, match="generation changed during decision session"
+        ):
+            harness.reader.symbol("before_owner")
+        thread.join(timeout=5)
+        assert not thread.is_alive()
+        assert harness.errors == []
+        assert harness.reader.store.generation() == harness.initial.generation + 1
+    finally:
+        writer_finished.set()
+        thread.join(timeout=1)
+        harness.close()
+
+
+class _LazyRefreshHarness:
+    def __init__(self, root: Path) -> None:
+        source = _write_repository(root, symbol="before_owner")
+        self.state = root / ".state"
+        self.artifacts = root / "artifacts.sqlite3"
+        with CodeMap(root, state_dir=self.state, artifact_db=self.artifacts) as seed:
+            self.initial = seed.sync()
+            self.initial_fingerprint = seed.store.meta("workspace_fingerprint")
+        self.reader = CodeMap(root, state_dir=self.state, artifact_db=self.artifacts)
+        self.observer = CodeMap(root, state_dir=self.state, artifact_db=self.artifacts)
+        source.write_text(
+            "def after_owner():\n    return 'after'\n",
+            encoding="utf-8",
+        )
+        self.staged = threading.Event()
+        self.release = threading.Event()
+        self.results: list[dict[str, object]] = []
+        self.errors: list[BaseException] = []
+
+    def install_staged_row_hook(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        original_set_file = self.reader.store.set_file
+
+        def block_after_staged_row(*args, **kwargs):
+            value = original_set_file(*args, **kwargs)
+            self.staged.set()
+            if not self.release.wait(timeout=5):
+                raise TimeoutError("test did not release staged path refresh")
+            return value
+
+        monkeypatch.setattr(self.reader.store, "set_file", block_after_staged_row)
+
+    def run_outline(self) -> None:
+        try:
+            self.results.append(self.reader.outline("src/owner.py"))
+        except BaseException as exc:  # pragma: no cover - surfaced below
+            self.errors.append(exc)
+
+    def close(self) -> None:
+        self.release.set()
+        self.reader.close()
+        self.observer.close()
+
+
+def test_lazy_path_refresh_publishes_row_generation_and_fingerprint_atomically(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    harness = _LazyRefreshHarness(tmp_path)
+    harness.install_staged_row_hook(monkeypatch)
+    thread = threading.Thread(target=harness.run_outline)
+    try:
+        thread.start()
+        assert harness.staged.wait(timeout=5)
+
+        assert harness.observer.store.generation() == harness.initial.generation
+        assert harness.observer.store.symbol("before_owner")
+        assert harness.observer.store.symbol("after_owner") == []
+        assert (
+            harness.observer.store.meta("workspace_fingerprint")
+            == harness.initial_fingerprint
+        )
+
+        harness.release.set()
+        thread.join(timeout=5)
+        assert not thread.is_alive()
+        assert harness.errors == []
+        assert len(harness.results) == 1
+        assert harness.results[0]["generation"] == harness.initial.generation + 1
+        assert "after_owner" in str(harness.results[0]["outline"])
+        assert harness.observer.store.generation() == harness.initial.generation + 1
+        assert harness.observer.store.symbol("before_owner") == []
+        assert harness.observer.store.symbol("after_owner")
+        assert (
+            harness.observer.store.meta("workspace_fingerprint")
+            != harness.initial_fingerprint
+        )
+    finally:
+        harness.release.set()
+        thread.join(timeout=1)
+        harness.close()

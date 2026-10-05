@@ -16,6 +16,7 @@ from hashmarks.file_store import UnstableFileError
 from hashmarks.paths import normalize_relative_path
 
 from . import repository_file_discovery
+from .decision_session import DecisionRefreshRequired, decision_scoped
 from .index_surfaces import index_surface_for_path
 from .model import EvidenceVisibility, ParsedArtifact, SyncResult
 from .parsers import artifact_key_for, parse_source
@@ -1371,6 +1372,7 @@ class IndexingLifecycleMixin:
                 build_state="COMPLETE",
             )
 
+    @decision_scoped
     def derived_graph(self, path: str | None = None) -> dict[str, object]:
         """Expose dependency-tracked derived CodeMap surfaces for diagnostics.
 
@@ -1515,46 +1517,84 @@ class IndexingLifecycleMixin:
             return False
         return actual == str(row["file_digest"] or "")
 
-    def _retire_indexed_path(self, rel: str, row) -> None:
-        if row is None:
-            return
-        self.store.delete_paths((rel,))
-        self.store.bump_generation()
-
-    def _ensure_path_current(self, relpath: str) -> None:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        rel = normalize_relative_path(relpath, allow_root=False)
-        row = self.store.file_row(rel)
-        path = self.workspace / rel
-        if (
+    def _path_unavailable(self, rel: str, path: Path) -> bool:
+        return (
             not self._path_admitted_for_analysis(rel)
             or path.is_symlink()
             or not path.is_file()
-        ):
-            self._retire_indexed_path(rel, row)
-            return
+        )
+
+    def _path_refresh_required(self, relpath: str) -> bool:
+        rel = normalize_relative_path(relpath, allow_root=False)
+        row = self.store.file_row(rel)
+        path = self.workspace / rel
+        if self._path_unavailable(rel, path):
+            return row is not None
         language = _language_for_path(path)
         if language is None:
-            return
+            return False
         decision = self.policy.decide(rel)
         digest = self.file_store.digest(
             path,
             workspace=self.workspace,
             relative_path=rel,
         )
-        if (
-            row is not None
-            and str(row["file_digest"]) == digest.hash
-            and str(row["evidence_visibility"]) == decision.evidence_visibility.value
-        ):
-            return
-        artifact, _ = self._parse_or_reuse(rel, path, language, digest.hash)
-        self.store.set_file(
-            rel,
-            artifact,
-            module_name=_module_name(rel, getattr(self, "_python_import_roots", ())),
-            visibility=decision.evidence_visibility,
-            index_surface=self._index_surface_for_path(rel),
+        expected_artifact = artifact_key_for(
+            digest.hash,
+            language,
+            range_provider=self.range_provider,
         )
-        self.store.bump_generation()
+        module_name = _module_name(rel, getattr(self, "_python_import_roots", ())) or ""
+        return not (
+            row is not None
+            and self._sync_file_reusable(
+                self._sync_reuse_state(rel, row),
+                digest_hash=digest.hash,
+                expected_artifact=expected_artifact,
+                visibility=decision.evidence_visibility,
+                module_name=module_name,
+            )
+        )
+
+    def _refresh_path_current(self, relpath: str) -> None:
+        rel = normalize_relative_path(relpath, allow_root=False)
+        with self.store.publication_transaction():
+            if not self._path_refresh_required(rel):
+                return
+            row = self.store.file_row(rel)
+            path = self.workspace / rel
+            if self._path_unavailable(rel, path):
+                if row is None:
+                    return
+                self.store.delete_paths((rel,))
+            else:
+                language = _language_for_path(path)
+                if language is None:
+                    return
+                decision = self.policy.decide(rel)
+                digest = self.file_store.digest(
+                    path,
+                    workspace=self.workspace,
+                    relative_path=rel,
+                )
+                artifact, _ = self._parse_or_reuse(rel, path, language, digest.hash)
+                self.store.set_file(
+                    rel,
+                    artifact,
+                    module_name=_module_name(
+                        rel, getattr(self, "_python_import_roots", ())
+                    ),
+                    visibility=decision.evidence_visibility,
+                    index_surface=self._index_surface_for_path(rel),
+                )
+            self.store.bump_generation()
+            self.store.set_meta(
+                "workspace_fingerprint", self._workspace_fingerprint_from_store()
+            )
+
+    def _ensure_path_current(self, relpath: str) -> None:
+        rel = normalize_relative_path(relpath, allow_root=False)
+        if self._path_refresh_required(rel):
+            if self._decision_session_depth > 0:
+                raise DecisionRefreshRequired(rel)
+            self._refresh_path_current(rel)
