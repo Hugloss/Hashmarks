@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import json
 import sys
 from typing import TYPE_CHECKING
 
@@ -154,5 +155,13 @@ def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> N
                 )
                 assert "query must not be empty" in text
                 assert "Traceback" not in text
+                payload_start = text.index("{")
+                payload, _ = json.JSONDecoder().raw_decode(text[payload_start:])
+                assert payload == {
+                    "schema": "hashmarks.mcp-error.v1",
+                    "reason": "invalid-request",
+                    "message": "query must not be empty",
+                    "recovery_authority": "consumer-owned",
+                }
 
     asyncio.run(exercise())

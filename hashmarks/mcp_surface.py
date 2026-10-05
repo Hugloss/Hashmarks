@@ -4,6 +4,7 @@ import json
 from threading import RLock
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from . import repository_retry
 from .codemap import ChangeImpactOptions, CodeMap
 from .codemap.evidence_correlation import (
     CORRELATION_PACKET_MAX_BYTES,
@@ -12,6 +13,12 @@ from .codemap.evidence_correlation import (
 from .codemap.repository_declaration_contract import (
     MAX_PACKET_BYTES,
     MAX_REQUEST_BYTES,
+)
+from .file_store import UnstableFileError
+from .mcp_contract import (
+    MCP_ERROR_REASONS,
+    MCP_ERROR_RECOVERY_AUTHORITY,
+    MCP_ERROR_SCHEMA,
 )
 from .repository_retry import retry_transient_repository_race
 
@@ -31,7 +38,51 @@ _T = TypeVar("_T")
 
 
 class McpSurfaceError(ValueError):
-    """Invalid consumer input at the Hashmarks MCP boundary."""
+    """Caller-visible Hashmarks MCP failure with one stable reason code."""
+
+    def __init__(self, message: str, *, reason: str = "invalid-request") -> None:
+        if reason not in MCP_ERROR_REASONS:
+            raise RuntimeError(f"unknown Hashmarks MCP error reason: {reason}")
+        super().__init__(message)
+        self.reason = reason
+
+    def as_dict(self) -> dict[str, str]:
+        return {
+            "schema": MCP_ERROR_SCHEMA,
+            "reason": self.reason,
+            "message": str(self),
+            "recovery_authority": MCP_ERROR_RECOVERY_AUTHORITY,
+        }
+
+    def transport_message(self) -> str:
+        return json.dumps(
+            self.as_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+
+
+def _value_error_reason(message: str) -> str:
+    lowered = message.lower()
+    if "repository-mismatch" in lowered or "repository binding mismatch" in lowered:
+        return "stale-or-foreign-evidence"
+    if "codemap-generation-mismatch" in lowered:
+        return "stale-or-foreign-evidence"
+    if "unsupported " in lowered:
+        return "unsupported-semantic"
+    if "continuity mismatch" in lowered:
+        return "continuity-mismatch"
+    if "mismatch" in lowered and (
+        lowered.startswith("previous ") or lowered.startswith("before ")
+    ):
+        return "continuity-mismatch"
+    return "invalid-request"
+
+
+def _surface_value_error(exc: ValueError) -> McpSurfaceError:
+    message = str(exc)
+    return McpSurfaceError(message, reason=_value_error_reason(message))
 
 
 def _bounded_text(
@@ -266,7 +317,15 @@ class HashmarksMcpSurface:
 
     def _read(self, operation: Callable[[], _T]) -> _T:
         with self._gate:
-            return retry_transient_repository_race(operation)
+            try:
+                return retry_transient_repository_race(operation)
+            except (RuntimeError, UnstableFileError) as exc:
+                if repository_retry.is_transient_repository_race(exc):
+                    raise McpSurfaceError(
+                        "repository state did not stabilize within the bounded MCP read window",
+                        reason="transient-race-exhausted",
+                    ) from exc
+                raise
 
     def repository_context(self, *, max_areas: int = 12) -> dict[str, object]:
         max_areas = _bounded_int(max_areas, name="max_areas", minimum=1, maximum=32)
@@ -401,7 +460,7 @@ class HashmarksMcpSurface:
                     relationship_limit_per_path=relationship_limit_per_path,
                 )
             except ValueError as exc:
-                raise McpSurfaceError(str(exc)) from exc
+                raise _surface_value_error(exc) from exc
 
         return self._read(correlate)
 
@@ -452,7 +511,7 @@ class HashmarksMcpSurface:
                     )
                 return result
             except ValueError as exc:
-                raise McpSurfaceError(str(exc)) from exc
+                raise _surface_value_error(exc) from exc
 
         return self._read(project)
 
@@ -499,7 +558,7 @@ class HashmarksMcpSurface:
                     return self._map.repository_declaration_explain(packet)
                 return packet
             except ValueError as exc:
-                raise McpSurfaceError(str(exc)) from exc
+                raise _surface_value_error(exc) from exc
 
         return self._read(project)
 
@@ -517,13 +576,18 @@ class HashmarksMcpSurface:
         token_budget = _bounded_int(
             token_budget, name="token_budget", minimum=1, maximum=_MAX_TOKEN_BUDGET
         )
-        return self._read(
-            lambda: self._map.task_post_change_delta(
-                task,
-                paths,
-                previous_evidence=previous_evidence,
-                limit=20,
-                per_role=3,
-                token_budget=token_budget,
-            )
-        )
+
+        def project() -> dict[str, object]:
+            try:
+                return self._map.task_post_change_delta(
+                    task,
+                    paths,
+                    previous_evidence=previous_evidence,
+                    limit=20,
+                    per_role=3,
+                    token_budget=token_budget,
+                )
+            except ValueError as exc:
+                raise _surface_value_error(exc) from exc
+
+        return self._read(project)
