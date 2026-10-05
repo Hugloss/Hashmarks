@@ -75,6 +75,7 @@ def _events() -> list[dict[str, object]]:
         },
     ]
 
+
 def test_claude_event_validation_requires_connected_model_visible_tools_and_results() -> (
     None
 ):
@@ -93,13 +94,16 @@ def test_claude_event_validation_rejects_schema_token_without_semantic_result() 
     block = content[0]
     assert isinstance(block, dict)
 
-    block["content"] = "Hashmarks schema hashmarks.find.v2 was observed but no result exists."
+    block["content"] = (
+        "Hashmarks schema hashmarks.find.v2 was observed but no result exists."
+    )
     with pytest.raises(claude_gate.HostGateError, match="exact JSON object"):
         claude_gate._validate_events(events)
 
     block["content"] = '{"schema":"hashmarks.find.v2","results":[]}'
     with pytest.raises(claude_gate.HostGateError, match="src/feature.py"):
         claude_gate._validate_events(events)
+
 
 def test_claude_event_validation_binds_fixture_arguments() -> None:
     events = _events()
@@ -116,6 +120,7 @@ def test_claude_event_validation_binds_fixture_arguments() -> None:
     with pytest.raises(claude_gate.HostGateError, match="fixture contract"):
         claude_gate._validate_events(events)
 
+
 def test_claude_connected_but_tools_not_model_visible_is_environment_blocked() -> None:
     events = _events()
     init = events[0]
@@ -125,6 +130,7 @@ def test_claude_connected_but_tools_not_model_visible_is_environment_blocked() -
         claude_gate.HostGateEnvironmentBlocked, match="model-visible catalog"
     ):
         claude_gate._validate_events(events)
+
 
 def test_claude_event_validation_rejects_builtin_tool() -> None:
     events = _events()
@@ -140,6 +146,7 @@ def test_claude_event_validation_rejects_builtin_tool() -> None:
     )
     with pytest.raises(claude_gate.HostGateError, match="unexpected tool"):
         claude_gate._validate_events(events)
+
 
 def test_claude_config_binds_absolute_installed_hashmarks(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
