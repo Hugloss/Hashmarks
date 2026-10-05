@@ -112,13 +112,17 @@ def collect(*, files: int = 1000, budget: int = 1000) -> dict[str, object]:
         }
 
 
-def main() -> None:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Measure Hashmarks CodeMap/agent-context efficiency"
     )
     parser.add_argument("--files", type=int, default=1000)
     parser.add_argument("--budget", type=int, default=1000)
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> None:
+    args = _parser().parse_args()
     log_command_output(
         logger,
         json.dumps(
