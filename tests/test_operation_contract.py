@@ -62,9 +62,7 @@ _EXPECTED = {
     "affected": {"default": "hashmarks.codemap-affected.v1"},
     "tests": {"default": "hashmarks.codemap-tests.v1"},
     "structural_locality": {"default": "hashmarks.structural-locality.v1"},
-    "structural_locality_delta": {
-        "default": "hashmarks.structural-locality-delta.v1"
-    },
+    "structural_locality_delta": {"default": "hashmarks.structural-locality-delta.v1"},
     "context": {"default": "hashmarks.context-pack.v2"},
     "repository_findings": {"default": "hashmarks.repository-findings.v1"},
     "import_ownership": {"default": "hashmarks.import-ownership.v2"},
@@ -77,9 +75,7 @@ _EXPECTED = {
     },
     "task_action_map": {"default": "hashmarks.task-action-map.v1"},
     "verification_relevance": {"default": "hashmarks.verification-relevance.v1"},
-    "ownership_relation_graph": {
-        "default": "hashmarks.ownership-relation-graph.v1"
-    },
+    "ownership_relation_graph": {"default": "hashmarks.ownership-relation-graph.v1"},
     "task_decision_packet": {"default": "hashmarks.task-decision-packet.v2"},
     "task_decision_brief": {"default": "hashmarks.task-decision-brief.v1"},
     "task_action_brief": {"default": "hashmarks.task-action-brief.v1"},
@@ -90,9 +86,7 @@ _EXPECTED = {
         "default": "hashmarks.repository-intelligence-query.v1"
     },
     "refresh_after_change_delta": {"default": "hashmarks.refresh-delta.v1"},
-    "refresh_after_change_brief": {
-        "default": "hashmarks.post-change-refresh-brief.v1"
-    },
+    "refresh_after_change_brief": {"default": "hashmarks.post-change-refresh-brief.v1"},
     "refresh_after_change": {"default": "hashmarks.post-change-refresh.v1"},
 }
 
@@ -234,9 +228,7 @@ def test_cli_codemap_exposure_is_exhaustively_classified() -> None:
     tree = ast.parse(source)
     non_semantic: set[str] = set()
 
-    for function in (
-        node for node in tree.body if isinstance(node, ast.FunctionDef)
-    ):
+    for function in (node for node in tree.body if isinstance(node, ast.FunctionDef)):
         codemap_calls = [
             node
             for node in ast.walk(function)
@@ -455,9 +447,7 @@ def test_fixed_mode_operations_self_prove_at_canonical_core_boundary() -> None:
                 and node.args[0].value == operation
             )
         ]
-        assert validated or decorated, (
-            f"{operation} must self-prove at {function_name}"
-        )
+        assert validated or decorated, f"{operation} must self-prove at {function_name}"
 
 
 def _fixed_mode_repo(root: Path) -> tuple[Path, str]:
