@@ -35,8 +35,9 @@ MCP_SERVER_INSTRUCTIONS = (
     "reconstructing ownership from repeated native search/read calls. Use native read for "
     "a unique known path or for the targeted next-read returned by Hashmarks. For a known "
     "exact symbol whose path is unknown, use find. After explicit changed paths exist, "
-    "use change_impact or post_change when relevant. Hashmarks does not replace editing, "
-    "shell, tests, or git."
+    "use change_impact or post_change when relevant. Caller-visible tool failures carry "
+    "hashmarks.mcp-error.v1 JSON with consumer-owned recovery. Hashmarks does not replace "
+    "editing, shell, tests, or git."
 )
 MCP_READ_ONLY_ANNOTATIONS = {
     "readOnlyHint": True,
