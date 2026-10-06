@@ -36,7 +36,7 @@ from .repository_intelligence_query import (
     RepositoryIntelligenceQueryOptions,
 )
 from .task_action_projection import TASK_ACTION_DEFAULT_OPTIONS
-from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 PROTOCOL = "hashmarks.codemap-service.v2"
 MAX_REQUEST = 1024 * 1024
@@ -414,7 +414,7 @@ class CodeMapService:
     def _verification_ownership_response(
         self, request: dict[str, Any]
     ) -> dict[str, Any]:
-        defaults = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
+        defaults = VERIFICATION_RELEVANCE_DEFAULTS
         task = self._task(request)
         limit = self._bounded_int(request, "limit", defaults.limit, 1, 100)
         candidate_limit = self._bounded_int(
@@ -456,7 +456,7 @@ class CodeMapService:
     def _verification_relevance_response(
         self, request: dict[str, Any]
     ) -> dict[str, Any]:
-        defaults = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
+        defaults = VERIFICATION_RELEVANCE_DEFAULTS
         task = self._task(request)
         limit = self._bounded_int(request, "limit", defaults.limit, 1, 100)
         candidate_limit = self._bounded_int(
@@ -895,8 +895,8 @@ class CodeMapServiceClient:
         self,
         task: str,
         *,
-        limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
-        candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
+        limit: int = VERIFICATION_RELEVANCE_DEFAULTS.limit,
+        candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit,
     ) -> dict[str, Any]:
         return dict(
             self.request(
@@ -961,8 +961,8 @@ class CodeMapServiceClient:
         self,
         task: str,
         *,
-        limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
-        candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
+        limit: int = VERIFICATION_RELEVANCE_DEFAULTS.limit,
+        candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit,
     ) -> dict[str, Any]:
         return dict(
             self.request(
