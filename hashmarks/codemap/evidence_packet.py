@@ -1285,11 +1285,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "reason": provenance.get("freshness_reason"),
         }
 
-    def _task_evidence_discrimination_next_read(
-        self,
+    @staticmethod
+    def _task_evidence_discrimination_candidate(
         action: Mapping[str, object],
-    ) -> dict[str, object] | None:
-        """Project one existing ambiguity candidate into a non-authoritative read."""
+    ) -> tuple[Mapping[str, object], Mapping[str, object]] | None:
         ambiguity = action.get("ambiguity")
         if not isinstance(ambiguity, Mapping) or not bool(
             ambiguity.get("ambiguous")
@@ -1298,16 +1297,20 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         candidates = ambiguity.get("candidates")
         if not isinstance(candidates, list):
             return None
-        candidate = next(
-            (
-                row
-                for row in candidates
-                if isinstance(row, Mapping) and row.get("path")
-            ),
-            None,
-        )
-        if candidate is None:
+        for row in candidates:
+            if isinstance(row, Mapping) and row.get("path"):
+                return ambiguity, row
+        return None
+
+    def _task_evidence_discrimination_next_read(
+        self,
+        action: Mapping[str, object],
+    ) -> dict[str, object] | None:
+        """Project one existing ambiguity candidate into a non-authoritative read."""
+        selected = self._task_evidence_discrimination_candidate(action)
+        if selected is None:
             return None
+        ambiguity, candidate = selected
 
         path = str(candidate.get("path") or "")
         visibility, denied = self._task_evidence_path_admission(
