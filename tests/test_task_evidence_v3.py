@@ -144,8 +144,9 @@ def test_task_evidence_v3_keeps_ambiguity_independent_from_freshness(
     assert ownership["owner"] is None
     assert ownership["ambiguity"]["ambiguous"] is True
     assert ownership["source_evidence"] is None
-    assert ownership["authority_proof_identity"] == (
-        action["ownership_authority"]["authority_proof_identity"]
+    assert (
+        ownership["authority_proof_identity"]
+        == action["ownership_authority"]["authority_proof_identity"]
     )
     next_read = ownership["next_read"]
     assert next_read["path"] in {"src/a.py", "src/b.py"}
