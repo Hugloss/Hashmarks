@@ -8,11 +8,11 @@ import pytest
 
 from hashmarks.cli import _add_common_arguments
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 from hashmarks.codemap.verification_defaults import (
-    VERIFICATION_RELEVANCE_DEFAULT_OPTIONS,
+    VERIFICATION_RELEVANCE_DEFAULTS,
     VerificationRelevanceOptions,
 )
-from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 from hashmarks.repository_cli import add_repository_cli
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 def test_verification_defaults_have_one_core_owner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    defaults = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
+    defaults = VERIFICATION_RELEVANCE_DEFAULTS
     for owner in (
         CodeMap.verification_relevance,
         CodeMap.verification_ownership_graph,
@@ -87,15 +87,15 @@ def test_verification_cli_defaults_consume_core_authority() -> None:
     add_repository_cli(sub, add_common_arguments=_add_common_arguments)
 
     relevance = parser.parse_args(["verification-relevance", "inspect widget"])
-    assert relevance.limit == VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit
+    assert relevance.limit == VERIFICATION_RELEVANCE_DEFAULTS.limit
     assert (
         relevance.candidate_limit
-        == VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit
+        == VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
     )
 
     ownership = parser.parse_args(["map", "verification-ownership", "inspect widget"])
-    assert ownership.limit == VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit
+    assert ownership.limit == VERIFICATION_RELEVANCE_DEFAULTS.limit
     assert (
         ownership.candidate_limit
-        == VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit
+        == VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
     )
