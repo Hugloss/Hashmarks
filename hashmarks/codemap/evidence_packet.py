@@ -809,12 +809,13 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
     @staticmethod
     def _task_evidence_retrieval_locator(
         row: Mapping[str, object],
+        *,
+        rank: int | None = None,
     ) -> dict[str, object]:
         """Project one retrieval candidate into a compact non-authoritative locator."""
         result: dict[str, object] = {"path": str(row.get("path") or "")}
 
-        rank = row.get("canonical_rank")
-        if isinstance(rank, int) and rank > 0:
+        if rank is not None:
             result["rank"] = rank
 
         symbol = row.get("qualname") or row.get("name")
@@ -853,8 +854,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         if not isinstance(current, list):
             raise AssertionError("task evidence retrieval results must be a list")
         retrieval["results"] = [
-            self._task_evidence_retrieval_locator(row)
-            for row in current
+            self._task_evidence_retrieval_locator(row, rank=rank)
+            for rank, row in enumerate(current, 1)
             if isinstance(row, Mapping)
         ]
         retrieval["presentation"] = "compact-locators-v1"
