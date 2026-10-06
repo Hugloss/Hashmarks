@@ -25,8 +25,8 @@ from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_index_store import git_base_identity
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 
-_DEFAULT_LIMIT = _DEFAULT_LIMIT
-_DEFAULT_CANDIDATE_LIMIT = _DEFAULT_CANDIDATE_LIMIT
+_DEFAULT_LIMIT = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit
+_DEFAULT_CANDIDATE_LIMIT = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit
 
 if TYPE_CHECKING:
     from .engine import CodeMap
