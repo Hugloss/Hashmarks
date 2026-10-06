@@ -367,7 +367,7 @@ def collect(
     }
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser()
     p.add_argument(
         "--root", type=Path, default=Path(".hashmarks/benchmarks/codex-selective-scout")
@@ -379,6 +379,11 @@ def main() -> int:
     p.add_argument("--timeout", type=int, default=900)
     p.add_argument("--max-tasks", type=int)
     p.add_argument("--output", type=Path)
+    return p
+
+
+def main() -> int:
+    p = _parser()
     a = p.parse_args()
     v = collect(
         a.root,

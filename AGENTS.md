@@ -380,6 +380,10 @@ The full-suite runtime profile is owned by `make test-profile` and reports the s
 
 `scripts.agent_evaluation.codex_agent_economics` owns the normal benchmark materialization root and the remaining CLI defaults used by both normal and preflight modes. `make codex-agent-economics` owns only the stable latest-receipt destination and must not restate the script's default root. `make codex-agent-economics-preflight` is a distinct mode selector and may own its preflight receipt path.
 
+### Codex selective-scout defaults have one owner
+
+`scripts.agent_evaluation.codex_selective_scout_economics` owns the normal benchmark materialization root and the remaining CLI defaults for the selective-scout economics run. `make codex-selective-scout-economics` owns only the stable latest-receipt destination and must not restate the script's default root.
+
 ### Repository context defaults have one owner
 
 `hashmarks.codemap.context_defaults.REPOSITORY_CONTEXT_DEFAULTS` owns the public context token budget, result limit, and disclosure default. Core `CodeMap.context()` and the `hashmarks context` CLI must consume that authority rather than restating `4000`, `30`, or `source`.

@@ -14,6 +14,7 @@ from .codemap.change_impact import (
 )
 from .codemap.context_defaults import REPOSITORY_CONTEXT_DEFAULTS
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
+from .codemap.find_engine import FIND_DEFAULT_OPTIONS
 from .codemap.verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .errors import RepositoryCliError
 from .operation_contract import validate_operation_response
@@ -569,7 +570,7 @@ def _add_navigation_cli(sub, *, add_common_arguments: Callable[..., None]) -> No
     find_code = sub.add_parser("find", help="search the maintained path/symbol index")
     add_common_arguments(find_code, inherited=True)
     find_code.add_argument("query")
-    find_code.add_argument("--limit", type=int, default=20)
+    find_code.add_argument("--limit", type=int, default=FIND_DEFAULT_OPTIONS.limit)
     find_code.set_defaults(func=_find_code, automatic_update_check=True)
 
     grep_code = sub.add_parser(

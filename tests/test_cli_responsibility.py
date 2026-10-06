@@ -126,7 +126,6 @@ def test_repository_cli_projects_all_canonical_cli_operations_through_one_guard(
         assert "_print_operation(" in body
         assert "_print(value)" not in body
 
-
 def test_repository_context_defaults_have_one_owner() -> None:
     import argparse
     import inspect

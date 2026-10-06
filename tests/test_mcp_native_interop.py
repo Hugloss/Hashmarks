@@ -10,6 +10,7 @@ import pytest
 
 from hashmarks._version import __version__
 from hashmarks.codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
+from hashmarks.codemap.find_engine import FIND_DEFAULT_OPTIONS
 from hashmarks.mcp_contract import (
     MCP_SERVER_INSTRUCTIONS,
     MCP_SERVER_NAME,
@@ -53,6 +54,14 @@ def _assert_canonical_result_mode_schemas(
     assert declarations["enum"] == list(operation_modes("repository_declarations"))
     assert declarations["default"] == operation_default_mode("repository_declarations")
     return schemas
+
+
+def _assert_find_defaults(
+    schemas: dict[str, dict[str, object]],
+) -> None:
+    assert (
+        schemas["find"]["properties"]["limit"]["default"] == FIND_DEFAULT_OPTIONS.limit
+    )
 
 
 def _assert_task_evidence_defaults(
@@ -108,6 +117,7 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         assert schemas["task_evidence"]["required"] == ["task"]
         assert schemas["find"]["required"] == ["query"]
         assert schemas["change_impact"]["required"] == ["task", "changed_paths"]
+        _assert_find_defaults(schemas)
         _assert_task_evidence_defaults(schemas)
         for tool in tools:
             assert tool.annotations is not None

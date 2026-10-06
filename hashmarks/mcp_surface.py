@@ -12,6 +12,7 @@ from .codemap.evidence_correlation import (
     CORRELATION_REQUEST_MAX_BYTES,
 )
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
+from .codemap.find_engine import FIND_DEFAULT_OPTIONS
 from .codemap.repository_declaration_contract import (
     MAX_PACKET_BYTES,
     MAX_REQUEST_BYTES,
@@ -223,7 +224,12 @@ class HashmarksMcpSurface:
         max_areas = _bounded_int(max_areas, name="max_areas", minimum=1, maximum=32)
         return self._read(lambda: self._map.orient(max_areas=max_areas))
 
-    def find(self, query: str, *, limit: int = 20) -> dict[str, object]:
+    def find(
+        self,
+        query: str,
+        *,
+        limit: int = FIND_DEFAULT_OPTIONS.limit,
+    ) -> dict[str, object]:
         query = _bounded_text(query, name="query", maximum=_MAX_QUERY_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
         return self._read(lambda: self._map.find_packet(query, limit=limit))

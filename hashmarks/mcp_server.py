@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from ._version import __version__
 from .codemap.change_impact import CHANGE_IMPACT_DEFAULT_REQUEST
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
+from .codemap.find_engine import FIND_DEFAULT_OPTIONS
 from .errors import OptionalFeatureError, UserFacingError
 from .mcp_contract import (
     MCP_READ_ONLY_ANNOTATIONS,
@@ -132,7 +133,10 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         description=find_contract.description,
         annotations=annotations,
     )
-    def find(query: str, limit: int = 20) -> dict[str, object]:
+    def find(
+        query: str,
+        limit: int = FIND_DEFAULT_OPTIONS.limit,
+    ) -> dict[str, object]:
         return _call_surface(find_contract, ToolError, surface.find, query, limit=limit)
 
     task_evidence_contract = tool_contract("task_evidence")

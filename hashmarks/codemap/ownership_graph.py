@@ -9,6 +9,7 @@ from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped
 from .model import EvidenceVisibility
+from .ownership_relation_defaults import OWNERSHIP_RELATION_DEFAULT_OPTIONS
 from .python_ast import estimate_tokens
 from .query_primitives import _WORD_RE, _query_terms
 from .query_router import QueryRoute, route_query
@@ -1137,7 +1138,11 @@ class OwnershipGraphMixin:
 
     @operation_response("ownership_relation_graph")
     def ownership_relation_graph(
-        self, task: str, start_path: str, *, max_depth: int = 2
+        self,
+        task: str,
+        start_path: str,
+        *,
+        max_depth: int = OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth,
     ) -> dict[str, object]:
         """Project a bounded, cycle-safe ownership relation graph."""
         if TYPE_CHECKING:

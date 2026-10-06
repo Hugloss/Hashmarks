@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.operation_contract import operation_schema, validate_operation_response
 from hashmarks.paths import normalize_relative_path
 
-from .context_defaults import REPOSITORY_CONTEXT_DEFAULTS
 from .decision_session import decision_scoped
+from .context_defaults import REPOSITORY_CONTEXT_DEFAULTS
 from .model import (
     ContextDisclosure,
     ContextItem,

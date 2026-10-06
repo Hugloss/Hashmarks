@@ -17,7 +17,7 @@ def _write(root: Path, rel: str, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def test_task_evidence_v3_separates_retrieval_ownership_and_freshness(
+def test_task_evidence_v4_separates_retrieval_ownership_and_freshness(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -37,7 +37,7 @@ def test_task_evidence_v3_separates_retrieval_ownership_and_freshness(
         codemap.sync()
         packet = codemap.task_evidence("change target_impl behavior", token_budget=256)
 
-    assert packet["schema"] == "hashmarks.task-evidence.v3"
+    assert packet["schema"] == "hashmarks.task-evidence.v4"
     assert "status" not in packet
     assert packet["retrieval"]["ownership_authority"] is False
     assert packet["ownership"]["status"] == "resolved"
@@ -49,7 +49,7 @@ def test_task_evidence_v3_separates_retrieval_ownership_and_freshness(
     assert packet["consumer_action"] == "external"
 
 
-def test_task_evidence_v3_retrieval_is_compact_non_authoritative_projection(
+def test_task_evidence_v4_retrieval_is_compact_non_authoritative_projection(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -93,7 +93,7 @@ def test_task_evidence_v3_retrieval_is_compact_non_authoritative_projection(
         assert internal_only not in projected
 
 
-def test_task_evidence_v3_consumes_canonical_admitted_edit(
+def test_task_evidence_v4_consumes_canonical_admitted_edit(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -127,7 +127,7 @@ def test_task_evidence_v3_consumes_canonical_admitted_edit(
     assert packet["explicit_target"]["path"] == "src/owner.py"
 
 
-def test_task_evidence_v3_keeps_ambiguity_independent_from_freshness(
+def test_task_evidence_v4_keeps_ambiguity_independent_from_freshness(
     tmp_path: Path,
 ) -> None:
     _write(tmp_path, "src/a.py", "def calculate_value():\n    return 1\n")
@@ -155,12 +155,146 @@ def test_task_evidence_v3_keeps_ambiguity_independent_from_freshness(
     assert next_read["end_line"] == 2
     assert next_read["reason"] == "ownership-ambiguity-discrimination"
     assert next_read["ambiguity_reason"]
+    assert next_read["selection_basis"] == "ambiguity-candidate-order"
     assert next_read["authority"] == "non-authoritative-discrimination"
     assert next_read["discriminator"]
     assert packet["freshness"]["state"] in {"unknown", "current", "stale"}
 
 
-def test_task_evidence_v3_owner_is_invariant_to_bounded_retrieval(
+def test_task_evidence_v4_prefers_complete_unique_structural_owner_for_discrimination(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/ranked.py",
+        "def ranked_candidate():\n    return 'ranked'\n",
+    )
+    _write(
+        tmp_path,
+        "src/structural.py",
+        "def structural_owner():\n    return 'owner'\n",
+    )
+    action = {
+        "ambiguity": {
+            "ambiguous": True,
+            "reason": "competing-action-roles",
+            "candidates": [
+                {
+                    "path": "src/ranked.py",
+                    "name": "ranked_candidate",
+                    "start_line": 1,
+                    "end_line": 2,
+                    "discriminator": "inspect ranked candidate",
+                },
+                {
+                    "path": "src/structural.py",
+                    "name": "structural_owner",
+                    "start_line": 1,
+                    "end_line": 2,
+                },
+            ],
+        },
+        "structural_starts": {
+            "status": "observed",
+            "observation_complete": True,
+            "observed_owners": ["src/structural.py"],
+        },
+        "canonical": [],
+    }
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        next_read = codemap._task_evidence_discrimination_next_read(action)
+
+    assert next_read is not None
+    assert next_read["path"] == "src/structural.py"
+    assert next_read["selection_basis"] == "unique-complete-structural-owner"
+    assert next_read["authority"] == "non-authoritative-discrimination"
+    assert "ownership remains unadmitted" in next_read["discriminator"]
+
+
+def test_task_evidence_v4_structural_discrimination_fails_closed_on_incomplete_observation(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/ranked.py",
+        "def ranked_candidate():\n    return 'ranked'\n",
+    )
+    _write(
+        tmp_path,
+        "src/structural.py",
+        "def structural_owner():\n    return 'owner'\n",
+    )
+    action = {
+        "ambiguity": {
+            "ambiguous": True,
+            "reason": "structural-start-observation-incomplete",
+            "candidates": [
+                {
+                    "path": "src/ranked.py",
+                    "name": "ranked_candidate",
+                    "start_line": 1,
+                    "end_line": 2,
+                    "discriminator": "inspect ranked candidate",
+                },
+                {
+                    "path": "src/structural.py",
+                    "name": "structural_owner",
+                    "start_line": 1,
+                    "end_line": 2,
+                },
+            ],
+        },
+        "structural_starts": {
+            "status": "observed",
+            "observation_complete": False,
+            "observed_owners": ["src/structural.py"],
+        },
+        "canonical": [],
+    }
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        next_read = codemap._task_evidence_discrimination_next_read(action)
+
+    assert next_read is not None
+    assert next_read["path"] == "src/ranked.py"
+    assert next_read["selection_basis"] == "ambiguity-candidate-order"
+
+
+def test_task_evidence_v4_structural_discrimination_fails_closed_on_multiple_owners(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "src/a.py", "def owner_a():\n    return 'a'\n")
+    _write(tmp_path, "src/b.py", "def owner_b():\n    return 'b'\n")
+    action = {
+        "ambiguity": {
+            "ambiguous": True,
+            "reason": "multiple-task-local-structural-owners",
+            "candidates": [
+                {"path": "src/a.py", "name": "owner_a", "start_line": 1, "end_line": 2},
+                {"path": "src/b.py", "name": "owner_b", "start_line": 1, "end_line": 2},
+            ],
+        },
+        "structural_starts": {
+            "status": "observed",
+            "observation_complete": True,
+            "observed_owners": ["src/a.py", "src/b.py"],
+        },
+        "canonical": [],
+    }
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        next_read = codemap._task_evidence_discrimination_next_read(action)
+
+    assert next_read is not None
+    assert next_read["path"] == "src/a.py"
+    assert next_read["selection_basis"] == "ambiguity-candidate-order"
+
+
+def test_task_evidence_v4_owner_is_invariant_to_bounded_retrieval(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -193,7 +327,7 @@ def test_task_evidence_v3_owner_is_invariant_to_bounded_retrieval(
     assert wide["ownership"]["basis"] in {"exact-symbol", "unique-exact-symbol"}
 
 
-def test_task_evidence_v3_keeps_dependency_as_related_evidence_not_owner(
+def test_task_evidence_v4_keeps_dependency_as_related_evidence_not_owner(
     tmp_path: Path,
 ) -> None:
     _write(tmp_path, "src/publish.py", "def publish_result(value):\n    return value\n")
@@ -562,7 +696,7 @@ def _dense_prefix_repository(root: Path) -> tuple[Path, str]:
     return owner, task
 
 
-def test_task_evidence_v3_compact_retrieval_is_materially_smaller_than_internal_rows(
+def test_task_evidence_v4_compact_retrieval_is_materially_smaller_than_internal_rows(
     tmp_path: Path,
 ) -> None:
     _owner, task = _dense_prefix_repository(tmp_path)
