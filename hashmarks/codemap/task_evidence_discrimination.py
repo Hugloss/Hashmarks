@@ -39,8 +39,7 @@ def _row_for_path(value: object, path: str) -> Mapping[str, object] | None:
         (
             row
             for row in value
-            if isinstance(row, Mapping)
-            and str(row.get("path") or "") == path
+            if isinstance(row, Mapping) and str(row.get("path") or "") == path
         ),
         None,
     )
@@ -67,11 +66,7 @@ def _fallback_candidate(
     if not isinstance(candidates, list):
         return None
     return next(
-        (
-            row
-            for row in candidates
-            if isinstance(row, Mapping) and row.get("path")
-        ),
+        (row for row in candidates if isinstance(row, Mapping) and row.get("path")),
         None,
     )
 
