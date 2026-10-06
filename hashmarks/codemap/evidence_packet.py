@@ -1400,7 +1400,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         *,
         limit: int = TASK_ACTION_DEFAULT_OPTIONS.limit,
         per_role: int = TASK_ACTION_DEFAULT_OPTIONS.per_role,
-        token_budget: int | None = TASK_ACTION_BRIEF_BUDGET_DEFAULT_OPTIONS.token_budget,
+        token_budget: int
+        | None = TASK_ACTION_BRIEF_BUDGET_DEFAULT_OPTIONS.token_budget,
         candidate_budgets: Sequence[int] = (
             TASK_ACTION_BRIEF_BUDGET_DEFAULT_OPTIONS.candidate_budgets
         ),
