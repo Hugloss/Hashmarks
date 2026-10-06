@@ -11,4 +11,4 @@ class VerificationRelevanceOptions:
     candidate_limit: int = 8
 
 
-VERIFICATION_RELEVANCE_DEFAULT_OPTIONS = VerificationRelevanceOptions()
+VERIFICATION_RELEVANCE_DEFAULTS = VerificationRelevanceOptions()
