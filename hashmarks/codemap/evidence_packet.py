@@ -1290,9 +1290,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         action: Mapping[str, object],
     ) -> tuple[Mapping[str, object], Mapping[str, object]] | None:
         ambiguity = action.get("ambiguity")
-        if not isinstance(ambiguity, Mapping) or not bool(
-            ambiguity.get("ambiguous")
-        ):
+        if not isinstance(ambiguity, Mapping) or not bool(ambiguity.get("ambiguous")):
             return None
         candidates = ambiguity.get("candidates")
         if not isinstance(candidates, list):
@@ -1320,9 +1318,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         result: dict[str, object] = {
             "path": path,
             "reason": "ownership-ambiguity-discrimination",
-            "ambiguity_reason": str(
-                ambiguity.get("reason") or "ownership-ambiguous"
-            ),
+            "ambiguity_reason": str(ambiguity.get("reason") or "ownership-ambiguous"),
             "authority": "non-authoritative-discrimination",
         }
         discriminator = candidate.get("discriminator")
@@ -1335,8 +1331,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             return result
         assert visibility is not None
 
-        qualname, name, _signature, start, end = (
-            self._task_evidence_current_range(path, candidate)
+        qualname, name, _signature, start, end = self._task_evidence_current_range(
+            path, candidate
         )
         symbol = qualname or name
         if symbol:
@@ -1380,9 +1376,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             )
         )
         if ownership.get("status") == "ambiguous":
-            compact_pending = self._task_evidence_discrimination_next_read(
-                action
-            )
+            compact_pending = self._task_evidence_discrimination_next_read(action)
         ownership["source_evidence"] = compact_item
         ownership["next_read"] = compact_pending
         ownership["source_budget"] = source_budget
