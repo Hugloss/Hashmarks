@@ -473,9 +473,7 @@ class CodeMapService:
         start_path = request.get("start_path")
         if not isinstance(start_path, str) or not start_path.strip():
             raise ValueError("start_path must be a non-empty string")
-        max_depth = int(
-            request.get("max_depth", OWNERSHIP_RELATION_DEFAULT_MAX_DEPTH)
-        )
+        max_depth = int(request.get("max_depth", OWNERSHIP_RELATION_DEFAULT_MAX_DEPTH))
         result = self._map().ownership_relation_graph(
             task, start_path, max_depth=max_depth
         )
