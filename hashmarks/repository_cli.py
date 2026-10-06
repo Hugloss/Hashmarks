@@ -13,6 +13,7 @@ from .codemap.change_impact import (
     ChangeImpactOptions,
 )
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
+from .codemap.evidence_verification import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 from .errors import RepositoryCliError
 from .operation_contract import validate_operation_response
 from .repository_retry import (
@@ -687,8 +688,14 @@ def _add_task_evidence_cli(sub, *, add_common_arguments: Callable[..., None]) ->
     )
     add_common_arguments(verification_relevance, inherited=True)
     verification_relevance.add_argument("task")
-    verification_relevance.add_argument("--limit", type=int, default=20)
-    verification_relevance.add_argument("--candidate-limit", type=int, default=8)
+    verification_relevance.add_argument(
+        "--limit", type=int, default=VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit
+    )
+    verification_relevance.add_argument(
+        "--candidate-limit",
+        type=int,
+        default=VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
+    )
     verification_relevance.set_defaults(
         func=_verification_relevance_code, automatic_update_check=True
     )
