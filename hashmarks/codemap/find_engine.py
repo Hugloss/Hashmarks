@@ -18,6 +18,16 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+@dataclass(frozen=True, slots=True)
+class FindOptions:
+    """Default bound for public repository find requests."""
+
+    limit: int = 20
+
+
+FIND_DEFAULT_OPTIONS = FindOptions()
+
+
 @dataclass(frozen=True)
 class _FindContext:
     query: str
@@ -136,11 +146,21 @@ class FindEngineMixin:
         return route_query(query)
 
     @decision_scoped
-    def find(self, query: str, *, limit: int = 20) -> tuple[SearchHit, ...]:
+    def find(
+        self,
+        query: str,
+        *,
+        limit: int = FIND_DEFAULT_OPTIONS.limit,
+    ) -> tuple[SearchHit, ...]:
         return self._find_evidence(query, limit=limit).hits
 
     @decision_scoped
-    def find_packet(self, query: str, *, limit: int = 20) -> dict[str, object]:
+    def find_packet(
+        self,
+        query: str,
+        *,
+        limit: int = FIND_DEFAULT_OPTIONS.limit,
+    ) -> dict[str, object]:
         """Return the canonical repository find observation for every transport."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -762,7 +782,12 @@ class FindEngineMixin:
         state.selected.sort(key=lambda hit: (-hit.score, hit.path, hit.start_line or 0))
         return tuple(state.selected[: ctx.limit])
 
-    def _find_compose(self, query: str, *, limit: int = 20) -> _FindEvidence:
+    def _find_compose(
+        self,
+        query: str,
+        *,
+        limit: int = FIND_DEFAULT_OPTIONS.limit,
+    ) -> _FindEvidence:
         if not query.strip():
             raise ValueError("query must not be empty")
         ctx = self._find_context(query, limit)
