@@ -593,7 +593,7 @@ def collect(root: Path, *, limit: int = 20) -> dict[str, object]:
     }
 
 
-def main() -> None:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run answer-blind subprocess worker A/B localization benchmark"
     )
@@ -607,6 +607,11 @@ def main() -> None:
     parser.add_argument("--root", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--limit", type=int, default=20)
+    return parser
+
+
+def main() -> None:
+    parser = _parser()
     args = parser.parse_args()
     if args.worker:
         if (

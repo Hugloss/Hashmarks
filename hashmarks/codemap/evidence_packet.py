@@ -807,37 +807,14 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         }
 
     @staticmethod
-    def _task_evidence_positive_int(value: object) -> int | None:
-        return value if isinstance(value, int) and value > 0 else None
-
-    @classmethod
-    def _task_evidence_retrieval_range(
-        cls,
-        row: Mapping[str, object],
-    ) -> tuple[int | None, int | None]:
-        start = cls._task_evidence_positive_int(row.get("start_line"))
-        end = cls._task_evidence_positive_int(row.get("end_line"))
-        lines = row.get("lines")
-        if not isinstance(lines, list):
-            return start, end
-        if start is None and lines:
-            start = cls._task_evidence_positive_int(lines[0])
-        if end is None and len(lines) > 1:
-            end = cls._task_evidence_positive_int(lines[1])
-        return start, end
-
-    @classmethod
     def _task_evidence_retrieval_locator(
-        cls,
         row: Mapping[str, object],
         *,
-        fallback_rank: int | None = None,
+        rank: int | None = None,
     ) -> dict[str, object]:
         """Project one retrieval candidate into a compact non-authoritative locator."""
         result: dict[str, object] = {"path": str(row.get("path") or "")}
 
-        rank = cls._task_evidence_positive_int(row.get("canonical_rank"))
-        rank = rank or cls._task_evidence_positive_int(fallback_rank)
         if rank is not None:
             result["rank"] = rank
 
@@ -849,10 +826,11 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         if isinstance(roles, list) and roles:
             result["roles"] = [str(role) for role in roles if str(role)]
 
-        start, end = cls._task_evidence_retrieval_range(row)
-        if start is not None:
+        start = row.get("start_line")
+        end = row.get("end_line")
+        if isinstance(start, int) and start > 0:
             result["start_line"] = start
-        if end is not None:
+        if isinstance(end, int) and end > 0:
             result["end_line"] = end
 
         visibility = row.get("evidence_visibility")
@@ -876,7 +854,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         if not isinstance(current, list):
             raise AssertionError("task evidence retrieval results must be a list")
         retrieval["results"] = [
-            self._task_evidence_retrieval_locator(row, fallback_rank=rank)
+            self._task_evidence_retrieval_locator(row, rank=rank)
             for rank, row in enumerate(current, 1)
             if isinstance(row, Mapping)
         ]

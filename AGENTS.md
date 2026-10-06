@@ -348,6 +348,10 @@ The full-suite runtime profile is owned by `make test-profile` and reports the s
 
 `scripts.agent_evaluation.metrics_fresh_multi_repo` owns the normal fresh-repository workload and acceptance defaults: 1,200-token context budget, 20-result limit, perfect file/symbol recall floors, and zero fallback-search rate. `make metrics-fresh-multi-repo` owns only the repository-local materialization root and stable latest-receipt path; it must not restate the script's workload or acceptance defaults.
 
+### Blind-worker A/B metrics defaults have one owner
+
+`scripts.agent_evaluation.metrics_blind_worker_ab` owns the normal 20-result query limit for both benchmark and worker modes. `make metrics-blind-worker-ab` owns only the repository-local benchmark root and stable latest-receipt path; it must not restate the script's query-limit default.
+
 ### Worker-inspection A/B metrics defaults have one owner
 
 `scripts.agent_evaluation.metrics_worker_inspection_ab` owns the normal benchmark materialization root and 20-result query limit. `make metrics-worker-inspection-ab` owns only the stable repository-local latest-receipt destination and must not restate those workload defaults.

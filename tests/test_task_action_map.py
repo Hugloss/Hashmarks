@@ -36,6 +36,11 @@ def test_task_action_map_routes_source_test_contract_without_changing_ranking(
     assert [row["path"] for row in action["canonical"]] == [
         hit.path for hit in canonical
     ]
+    assert [row["canonical_rank"] for row in action["canonical"]] == list(
+        range(1, len(action["canonical"]) + 1)
+    )
+    assert all("canonical_score" in row for row in action["canonical"])
+    assert all("roles" in row for row in action["canonical"])
     assert action["ranking_effect"] == "none"
     assert action["discovery_effect"] == "none"
     assert action["edit"]["path"] == "src/widget.py"
