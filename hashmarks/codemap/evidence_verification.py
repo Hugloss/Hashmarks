@@ -28,6 +28,17 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+@dataclass(frozen=True, slots=True)
+class VerificationRelevanceOptions:
+    """Default bounds for public verification relevance projections."""
+
+    limit: int = 20
+    candidate_limit: int = 8
+
+
+VERIFICATION_RELEVANCE_DEFAULT_OPTIONS = VerificationRelevanceOptions()
+
+
 @dataclass(frozen=True)
 class _VerificationSelectionState:
     generation: int
@@ -1129,8 +1140,10 @@ class VerificationMixin:
         self,
         task: str,
         *,
-        limit: int = 20,
-        candidate_limit: int = 8,
+        limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
+        candidate_limit: int = (
+            VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit
+        ),
     ) -> dict[str, object]:
         """Return the task's bounded verification relevance evidence."""
         if TYPE_CHECKING:
@@ -1309,7 +1322,13 @@ class VerificationMixin:
 
     @operation_response("verification_ownership")
     def verification_ownership_graph(
-        self, task: str, *, limit: int = 20, candidate_limit: int = 8
+        self,
+        task: str,
+        *,
+        limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
+        candidate_limit: int = (
+            VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit
+        ),
     ) -> dict[str, object]:
         """Expose verification owners and their evidence-backed edit-authority links."""
         if TYPE_CHECKING:
