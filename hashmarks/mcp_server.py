@@ -240,7 +240,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         task: str,
         changed_paths: list[str],
         previous_evidence: dict[str, Any],
-        token_budget: int = 1536,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, object]:
         return _call_surface(
             post_change_contract,

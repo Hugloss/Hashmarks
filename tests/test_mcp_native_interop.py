@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks._version import __version__
+from hashmarks.codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from hashmarks.mcp_contract import (
     MCP_SERVER_INSTRUCTIONS,
     MCP_SERVER_NAME,
@@ -54,6 +55,20 @@ def _assert_canonical_result_mode_schemas(
     return schemas
 
 
+def _assert_task_evidence_defaults(
+    schemas: dict[str, dict[str, object]],
+) -> None:
+    defaults = TASK_EVIDENCE_DEFAULT_OPTIONS
+    task_properties = schemas["task_evidence"]["properties"]
+    assert task_properties["limit"]["default"] == defaults.limit
+    assert task_properties["per_role"]["default"] == defaults.per_role
+    assert task_properties["token_budget"]["default"] == defaults.token_budget
+    assert (
+        schemas["post_change"]["properties"]["token_budget"]["default"]
+        == defaults.token_budget
+    )
+
+
 @pytest.mark.skipif(not _MCP_AVAILABLE, reason=_NATIVE_REASON)
 def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
     from hashmarks.mcp_server import build_server
@@ -93,9 +108,7 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         assert schemas["task_evidence"]["required"] == ["task"]
         assert schemas["find"]["required"] == ["query"]
         assert schemas["change_impact"]["required"] == ["task", "changed_paths"]
-        assert schemas["task_evidence"]["properties"]["limit"]["default"] == 20
-        assert schemas["task_evidence"]["properties"]["per_role"]["default"] == 3
-        assert schemas["task_evidence"]["properties"]["token_budget"]["default"] == 1536
+        _assert_task_evidence_defaults(schemas)
         for tool in tools:
             assert tool.annotations is not None
             assert tool.annotations.read_only_hint is True
