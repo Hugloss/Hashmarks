@@ -12,6 +12,7 @@ from .codemap.change_impact import (
     CHANGE_IMPACT_DEFAULT_REQUEST,
     ChangeImpactOptions,
 )
+from .codemap.context_defaults import REPOSITORY_CONTEXT_DEFAULTS
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from .codemap.find_engine import FIND_DEFAULT_OPTIONS
 from .codemap.verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
@@ -657,12 +658,20 @@ def _add_context_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     )
     add_common_arguments(context_code, inherited=True)
     context_code.add_argument("query")
-    context_code.add_argument("--budget", type=int, default=4000)
-    context_code.add_argument("--limit", type=int, default=30)
+    context_code.add_argument(
+        "--budget",
+        type=int,
+        default=REPOSITORY_CONTEXT_DEFAULTS.token_budget,
+    )
+    context_code.add_argument(
+        "--limit",
+        type=int,
+        default=REPOSITORY_CONTEXT_DEFAULTS.limit,
+    )
     context_code.add_argument(
         "--level",
         choices=("orient", "outline", "evidence", "source"),
-        default="source",
+        default=REPOSITORY_CONTEXT_DEFAULTS.disclosure.value,
         help="progressive disclosure level; source preserves the pre-0.10.12 behavior",
     )
     context_code.set_defaults(func=_context_code, automatic_update_check=True)
