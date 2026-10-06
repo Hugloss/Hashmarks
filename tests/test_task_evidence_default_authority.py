@@ -39,7 +39,9 @@ def test_task_evidence_defaults_have_one_owner(
     assert surface_parameters["limit"].default == defaults.limit
     assert surface_parameters["per_role"].default == defaults.per_role
     assert surface_parameters["token_budget"].default == defaults.token_budget
-    post_change_parameters = inspect.signature(HashmarksMcpSurface.post_change).parameters
+    post_change_parameters = inspect.signature(
+        HashmarksMcpSurface.post_change
+    ).parameters
     assert post_change_parameters["token_budget"].default == defaults.token_budget
 
     parser = argparse.ArgumentParser()
