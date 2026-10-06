@@ -467,7 +467,6 @@ metrics-fresh-multi-repo: bootstrap
 metrics-blind-worker-ab: bootstrap
 	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_blind_worker_ab \
 	  --root .hashmarks/benchmarks/blind-worker-ab \
-	  --limit 20 \
 	  --output .hashmarks/metrics/blind-worker-ab-latest.json
 
 metrics-worker-behavior-ab: bootstrap
