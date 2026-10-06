@@ -9,6 +9,7 @@ from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
 from hashmarks.codemap.evidence_packet import (
     TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS,
 )
+from hashmarks.codemap.ownership_graph import OWNERSHIP_RELATION_DEFAULT_MAX_DEPTH
 from hashmarks.operation_contract import operation_schema
 
 if TYPE_CHECKING:
@@ -56,6 +57,20 @@ def test_codemap_service_shares_one_warm_authority(tmp_path: Path) -> None:
         thread.join(timeout=5)
     assert not thread.is_alive()
     assert not socket_path.exists()
+
+
+def test_ownership_relation_depth_default_has_one_core_owner() -> None:
+    expected = OWNERSHIP_RELATION_DEFAULT_MAX_DEPTH
+    for owner in (
+        CodeMap.ownership_relation_graph,
+        CodeMap._structural_owner_candidate,
+        CodeMapServiceClient.ownership_relation_graph,
+    ):
+        assert inspect.signature(owner).parameters["max_depth"].default == expected
+
+    handler_source = inspect.getsource(CodeMapService._ownership_relation_response)
+    assert "OWNERSHIP_RELATION_DEFAULT_MAX_DEPTH" in handler_source
+    assert 'request.get("max_depth", 2)' not in handler_source
 
 
 def test_codemap_service_decision_brief(tmp_path: Path) -> None:
