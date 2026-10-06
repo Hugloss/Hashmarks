@@ -8,7 +8,10 @@ from typing import TYPE_CHECKING, TypeVar
 
 from hashmarks._command_output import log_command_output
 
-from .codemap.change_impact import ChangeImpactOptions
+from .codemap.change_impact import (
+    CHANGE_IMPACT_DEFAULT_REQUEST,
+    ChangeImpactOptions,
+)
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from .errors import RepositoryCliError
 from .operation_contract import validate_operation_response
@@ -704,12 +707,17 @@ def _add_change_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
         required=True,
         help="repository-relative changed path; repeatable",
     )
-    change_impact.add_argument("--limit", type=int, default=20)
-    change_impact.add_argument("--per-role", type=int, default=3)
+    defaults = CHANGE_IMPACT_DEFAULT_REQUEST
+    options = defaults.options
+    change_impact.add_argument("--limit", type=int, default=defaults.limit)
+    change_impact.add_argument("--per-role", type=int, default=defaults.per_role)
     change_impact.add_argument(
-        "--impact-limit", type=int, default=6, help="maximum affected paths per surface"
+        "--impact-limit",
+        type=int,
+        default=options.impact_limit_per_surface,
+        help="maximum affected paths per surface",
     )
-    change_impact.add_argument("--max-depth", type=int, default=4)
+    change_impact.add_argument("--max-depth", type=int, default=options.max_depth)
     change_impact.add_argument(
         "--project-impact-limit",
         type=int,
@@ -718,7 +726,7 @@ def _add_change_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     change_impact.add_argument(
         "--project-impact-encoding",
         choices=("verbose", "compact"),
-        default="verbose",
+        default=options.project_impact_encoding,
         help="project provenance transport encoding",
     )
     change_impact.set_defaults(func=_change_impact_code, automatic_update_check=True)

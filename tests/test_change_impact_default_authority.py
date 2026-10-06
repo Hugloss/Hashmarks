@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import inspect
 from typing import TYPE_CHECKING
 
@@ -7,10 +8,11 @@ import pytest
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.change_impact import (
-    CHANGE_IMPACT_DEFAULT_OPTIONS,
+    CHANGE_IMPACT_DEFAULT_REQUEST,
     ChangeImpactOptions,
 )
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
+from hashmarks.repository_cli import add_repository_cli
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -19,16 +21,28 @@ if TYPE_CHECKING:
 def test_change_impact_defaults_have_one_owner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    core_default = (
-        inspect.signature(CodeMap.task_change_impact).parameters["options"].default
+    defaults = CHANGE_IMPACT_DEFAULT_REQUEST
+    for owner in (CodeMap.task_change_impact, CodeMapServiceClient.task_change_impact):
+        parameters = inspect.signature(owner).parameters
+        assert parameters["limit"].default == defaults.limit
+        assert parameters["per_role"].default == defaults.per_role
+        assert parameters["options"].default is defaults.options
+
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="command", required=True)
+    add_repository_cli(
+        sub,
+        add_common_arguments=lambda _parser, *, inherited=False: None,
     )
-    client_default = (
-        inspect.signature(CodeMapServiceClient.task_change_impact)
-        .parameters["options"]
-        .default
+    args = parser.parse_args(
+        ["change-impact", "inspect widget", "--changed", "src/widget.py"]
     )
-    assert core_default is CHANGE_IMPACT_DEFAULT_OPTIONS
-    assert client_default is CHANGE_IMPACT_DEFAULT_OPTIONS
+    assert args.limit == defaults.limit
+    assert args.per_role == defaults.per_role
+    assert args.impact_limit == defaults.options.impact_limit_per_surface
+    assert args.max_depth == defaults.options.max_depth
+    assert args.project_impact_limit == defaults.options.project_impact_limit
+    assert args.project_impact_encoding == defaults.options.project_impact_encoding
 
     captured: dict[str, object] = {}
 
@@ -60,6 +74,8 @@ def test_change_impact_defaults_have_one_owner(
         }
     )
 
+    assert captured["limit"] == defaults.limit
+    assert captured["per_role"] == defaults.per_role
     options = captured["options"]
     assert isinstance(options, ChangeImpactOptions)
-    assert options == CHANGE_IMPACT_DEFAULT_OPTIONS
+    assert options == defaults.options

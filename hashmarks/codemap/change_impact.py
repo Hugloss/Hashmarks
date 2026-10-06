@@ -51,6 +51,18 @@ CHANGE_IMPACT_DEFAULT_OPTIONS = ChangeImpactOptions()
 
 
 @dataclass(frozen=True)
+class ChangeImpactRequestDefaults:
+    """Default retrieval bounds plus semantic options for change-impact requests."""
+
+    limit: int = 20
+    per_role: int = 3
+    options: ChangeImpactOptions = CHANGE_IMPACT_DEFAULT_OPTIONS
+
+
+CHANGE_IMPACT_DEFAULT_REQUEST = ChangeImpactRequestDefaults()
+
+
+@dataclass(frozen=True)
 class _ImpactCandidate:
     path: str
     depth: int
@@ -346,8 +358,17 @@ class ChangeImpactMixin:
         if self._decision_session_depth <= 0:
             return None
         bounds = action.get("bounds")
-        limit = int(bounds.get("limit", 20)) if isinstance(bounds, dict) else 20
-        per_role = int(bounds.get("per_role", 3)) if isinstance(bounds, dict) else 3
+        defaults = CHANGE_IMPACT_DEFAULT_REQUEST
+        limit = (
+            int(bounds.get("limit", defaults.limit))
+            if isinstance(bounds, dict)
+            else defaults.limit
+        )
+        per_role = (
+            int(bounds.get("per_role", defaults.per_role))
+            if isinstance(bounds, dict)
+            else defaults.per_role
+        )
         generation = int(self._decision_session_generation or self.store.generation())
         return generation, task, limit, per_role
 
@@ -585,9 +606,9 @@ class ChangeImpactMixin:
         task: str,
         changed_paths: Sequence[str | Path],
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        options: ChangeImpactOptions = CHANGE_IMPACT_DEFAULT_OPTIONS,
+        limit: int = CHANGE_IMPACT_DEFAULT_REQUEST.limit,
+        per_role: int = CHANGE_IMPACT_DEFAULT_REQUEST.per_role,
+        options: ChangeImpactOptions = CHANGE_IMPACT_DEFAULT_REQUEST.options,
     ) -> dict[str, object]:
         """Expose bounded changed-code impact and verification relevance.
 

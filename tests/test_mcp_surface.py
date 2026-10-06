@@ -10,6 +10,10 @@ import pytest
 
 from hashmarks import mcp_server, mcp_surface, repository_retry
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.change_impact import (
+    CHANGE_IMPACT_DEFAULT_REQUEST,
+    ChangeImpactOptions,
+)
 from hashmarks.codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from hashmarks.file_store import UnstableFileError
 from hashmarks.mcp_contract import tool_contract
@@ -53,6 +57,46 @@ def test_mcp_surface_exposes_only_bounded_repository_intelligence(
         assert "provenance" in evidence
     finally:
         surface.close()
+
+
+def test_mcp_change_impact_consumes_canonical_semantic_defaults(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    defaults = CHANGE_IMPACT_DEFAULT_REQUEST
+    captured: dict[str, object] = {}
+    surface = HashmarksMcpSurface(str(tmp_path), state_dir=str(tmp_path / "state"))
+
+    def project(
+        task: str,
+        changed_paths: list[str],
+        *,
+        limit: int,
+        per_role: int,
+        options: ChangeImpactOptions,
+    ) -> dict[str, object]:
+        captured.update(
+            task=task,
+            changed_paths=changed_paths,
+            limit=limit,
+            per_role=per_role,
+            options=options,
+        )
+        return {"schema": "hashmarks.task-change-impact.v1"}
+
+    monkeypatch.setattr(surface._map, "task_change_impact", project)
+    try:
+        surface.change_impact("inspect widget", ["src/widget.py"])
+    finally:
+        surface.close()
+
+    assert captured["limit"] == defaults.limit
+    assert captured["per_role"] == defaults.per_role
+    options = captured["options"]
+    assert isinstance(options, ChangeImpactOptions)
+    assert options.impact_limit_per_surface == defaults.options.impact_limit_per_surface
+    assert options.max_depth == defaults.options.max_depth
+    assert options.project_impact_limit == defaults.options.project_impact_limit
+    assert options.project_impact_encoding == "compact"
 
 
 def test_mcp_surface_rejects_unbounded_or_empty_inputs(tmp_path: Path) -> None:
@@ -533,6 +577,27 @@ def _assert_registered_task_evidence_defaults(
     assert parameters["token_budget"].default == defaults.token_budget
 
 
+def _assert_registered_change_impact_defaults(
+    registered: list[dict[str, object]],
+) -> None:
+    defaults = CHANGE_IMPACT_DEFAULT_REQUEST
+    surface_parameters = inspect.signature(HashmarksMcpSurface.change_impact).parameters
+    assert surface_parameters["max_depth"].default == defaults.options.max_depth
+
+    change_impact_tool = next(
+        row["fn"] for row in registered if row["name"] == "change_impact"
+    )
+    parameters = inspect.signature(change_impact_tool).parameters
+    assert parameters["max_depth"].default == defaults.options.max_depth
+
+
+def _assert_registered_public_defaults(
+    registered: list[dict[str, object]],
+) -> None:
+    _assert_registered_task_evidence_defaults(registered)
+    _assert_registered_change_impact_defaults(registered)
+
+
 def test_mcp_server_registers_exact_small_read_only_tool_catalog(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -613,7 +678,7 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             }
             assert len(str(row["description"])) < 220
 
-        _assert_registered_task_evidence_defaults(registered)
+        _assert_registered_public_defaults(registered)
 
         with pytest.raises(FakeToolError, match="query must not be empty"):
             next(row["fn"] for row in registered if row["name"] == "find")(" ", limit=5)
