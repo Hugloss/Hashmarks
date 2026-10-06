@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.evidence_verification import (
+from hashmarks.codemap.verification_relevance_defaults import (
     VERIFICATION_RELEVANCE_DEFAULT_OPTIONS,
     VerificationRelevanceOptions,
 )
