@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.operation_contract import operation_schema, validate_operation_response
 from hashmarks.paths import normalize_relative_path
 
+from .context_defaults import REPOSITORY_CONTEXT_DEFAULTS
 from .decision_session import decision_scoped
 from .model import (
     ContextDisclosure,
@@ -370,9 +371,9 @@ class ContextPlanningMixin:
         self,
         query: str,
         *,
-        token_budget: int = 4000,
-        limit: int = 30,
-        disclosure: ContextDisclosure | str = ContextDisclosure.SOURCE,
+        token_budget: int = REPOSITORY_CONTEXT_DEFAULTS.token_budget,
+        limit: int = REPOSITORY_CONTEXT_DEFAULTS.limit,
+        disclosure: ContextDisclosure | str = REPOSITORY_CONTEXT_DEFAULTS.disclosure,
     ) -> ContextPack:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)

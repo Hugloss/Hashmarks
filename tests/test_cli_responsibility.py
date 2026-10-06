@@ -125,3 +125,39 @@ def test_repository_cli_projects_all_canonical_cli_operations_through_one_guard(
         body = source[start:] if next_def < 0 else source[start:next_def]
         assert "_print_operation(" in body
         assert "_print(value)" not in body
+
+
+def test_repository_context_defaults_have_one_owner() -> None:
+    import argparse
+    import inspect
+
+    from hashmarks.codemap.context_defaults import REPOSITORY_CONTEXT_DEFAULTS
+    from hashmarks.codemap.repository_context import ContextPlanningMixin
+    from hashmarks.repository_cli import add_repository_cli
+
+    signature = inspect.signature(ContextPlanningMixin.context)
+    assert (
+        signature.parameters["token_budget"].default
+        == REPOSITORY_CONTEXT_DEFAULTS.token_budget
+    )
+    assert signature.parameters["limit"].default == REPOSITORY_CONTEXT_DEFAULTS.limit
+    assert (
+        signature.parameters["disclosure"].default
+        == REPOSITORY_CONTEXT_DEFAULTS.disclosure
+    )
+
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="command", required=True)
+    add_repository_cli(sub, add_common_arguments=lambda *_args, **_kwargs: None)
+    parsed = parser.parse_args(["context", "Widget.run"])
+    assert parsed.budget == REPOSITORY_CONTEXT_DEFAULTS.token_budget
+    assert parsed.limit == REPOSITORY_CONTEXT_DEFAULTS.limit
+    assert parsed.level == REPOSITORY_CONTEXT_DEFAULTS.disclosure.value
+
+    source = inspect.getsource(__import__("hashmarks.repository_cli", fromlist=["_"]))
+    context_registration = source.split("def _add_context_cli", 1)[1].split(
+        "def _add_task_evidence_cli", 1
+    )[0]
+    assert "default=4000" not in context_registration
+    assert "default=30" not in context_registration
+    assert 'default="source"' not in context_registration

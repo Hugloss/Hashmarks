@@ -380,6 +380,10 @@ The full-suite runtime profile is owned by `make test-profile` and reports the s
 
 `scripts.agent_evaluation.codex_agent_economics` owns the normal benchmark materialization root and the remaining CLI defaults used by both normal and preflight modes. `make codex-agent-economics` owns only the stable latest-receipt destination and must not restate the script's default root. `make codex-agent-economics-preflight` is a distinct mode selector and may own its preflight receipt path.
 
+### Repository context defaults have one owner
+
+`hashmarks.codemap.context_defaults.REPOSITORY_CONTEXT_DEFAULTS` owns the public context token budget, result limit, and disclosure default. Core `CodeMap.context()` and the `hashmarks context` CLI must consume that authority rather than restating `4000`, `30`, or `source`.
+
 ### Development-tool configuration has one owner
 
 `pyproject.toml` owns the Ruff dependency and rule configuration. Developer hooks, Make targets, and CI must invoke that configured Ruff rather than maintaining parallel min/latest compatibility paths. Do not add tests whose only assertion is that tool configuration, docs, and version strings agree. If a real tool upgrade breaks Hashmarks behavior, reproduce the failure and change the single project declaration or the affected behavior. Ruff remains diagnostic-only and never creates or transfers canonical promotion authority.
