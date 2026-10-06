@@ -77,3 +77,40 @@ def test_task_decision_packet_and_brief_defaults_have_one_owner(
     service._decision_brief_response({"task": "inspect widget"})
 
     assert captured == [defaults, defaults]
+
+
+def test_task_decision_budget_sweep_defaults_have_one_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    defaults = TASK_DECISION_DEFAULT_OPTIONS
+    for owner in (
+        CodeMap.task_decision_brief_budget_sweep,
+        CodeMapServiceClient.task_decision_brief_budget_sweep,
+    ):
+        parameters = inspect.signature(owner).parameters
+        assert parameters["limit"].default == defaults.limit
+        assert parameters["per_role"].default == defaults.per_role
+
+    captured: list[tuple[int, int]] = []
+
+    class _Map:
+        def task_decision_brief_budget_sweep(
+            self,
+            task: str,
+            *,
+            budgets: list[int],
+            limit: int,
+            per_role: int,
+        ) -> dict[str, object]:
+            del task, budgets
+            captured.append((limit, per_role))
+            return {
+                "schema": "hashmarks.task-decision-brief-budget-sweep.v1",
+                "rows": [],
+            }
+
+    service = CodeMapService(tmp_path, socket_path=tmp_path / "service.sock")
+    monkeypatch.setattr(service, "_map", lambda: _Map())
+    service._budget_sweep_response({"task": "inspect widget"})
+
+    assert captured == [(defaults.limit, defaults.per_role)]
