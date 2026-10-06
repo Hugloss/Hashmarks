@@ -13,7 +13,9 @@ from .codemap.change_impact import (
     ChangeImpactOptions,
 )
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
-from .codemap.evidence_verification import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
+from .codemap.verification_relevance_defaults import (
+    VERIFICATION_RELEVANCE_DEFAULT_OPTIONS,
+)
 from .errors import RepositoryCliError
 from .operation_contract import validate_operation_response
 from .repository_retry import (
