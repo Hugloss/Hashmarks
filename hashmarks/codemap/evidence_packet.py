@@ -1428,8 +1428,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         task: str,
         *,
         budgets: Sequence[int] = TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS,
-        limit: int = 20,
-        per_role: int = 3,
+        limit: int = TASK_DECISION_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_DECISION_DEFAULT_OPTIONS.per_role,
     ) -> dict[str, object]:
         """Measure the smallest worker-visible decision budget that stays safe.
 
