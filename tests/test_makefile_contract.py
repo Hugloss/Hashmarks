@@ -300,9 +300,15 @@ def test_agent_suite_make_alias_keeps_only_repo_and_qualification_policy() -> No
     recipe = _make_recipe(text, "metrics-agent-suite")
     joined = "\n".join(recipe)
 
-    assert '$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_suite' in joined
+    assert (
+        "$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_suite"
+        in joined
+    )
     assert '--repo "hashmarks=.::benchmarks/agent_tasks.json"' in joined
-    assert '--repo "oh-goon=$(OH_GOON)::benchmarks/external/oh_goon_1267_0_49_agent_tasks.json"' in joined
+    assert (
+        '--repo "oh-goon=$(OH_GOON)::'
+        'benchmarks/external/oh_goon_1267_0_49_agent_tasks.json"' in joined
+    )
     assert "--min-file-recall 1" in joined
     assert "--min-symbol-recall 1" in joined
     assert "--max-fallback-rate 0" in joined
