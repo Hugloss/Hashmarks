@@ -23,8 +23,10 @@ from .model import EvidenceVisibility
 from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_index_store import git_base_identity
-from .verification_relevance_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
+_LIMIT = VERIFICATION_RELEVANCE_DEFAULTS.limit
+_CANDIDATES = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
 if TYPE_CHECKING:
     from .engine import CodeMap
 
@@ -1130,8 +1132,8 @@ class VerificationMixin:
         self,
         task: str,
         *,
-        limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
-        candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
+        limit: int = _LIMIT,
+        candidate_limit: int = (_CANDIDATES),
     ) -> dict[str, object]:
         """Return the task's bounded verification relevance evidence."""
         if TYPE_CHECKING:
@@ -1310,8 +1312,7 @@ class VerificationMixin:
 
     @operation_response("verification_ownership")
     def verification_ownership_graph(
-        self, task: str, *, limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
-        candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
+        self, task: str, *, limit: int = _LIMIT, candidate_limit: int = _CANDIDATES
     ) -> dict[str, object]:
         """Expose verification owners and their evidence-backed edit-authority links."""
         if TYPE_CHECKING:

@@ -5,10 +5,10 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class VerificationRelevanceOptions:
-    """Default bounds for verification relevance and its ownership projection."""
+    """Default bounds for public verification relevance projections."""
 
     limit: int = 20
     candidate_limit: int = 8
 
 
-VERIFICATION_RELEVANCE_DEFAULT_OPTIONS = VerificationRelevanceOptions()
+VERIFICATION_RELEVANCE_DEFAULTS = VerificationRelevanceOptions()

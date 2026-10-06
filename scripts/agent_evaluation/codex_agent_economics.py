@@ -387,7 +387,7 @@ def preflight(codex_bin: str) -> dict[str, object]:
     }
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser()
     p.add_argument(
         "--root", type=Path, default=Path(".hashmarks/benchmarks/codex-agent-economics")
@@ -401,6 +401,11 @@ def main() -> int:
     p.add_argument("--lanes", default=",".join(LANES))
     p.add_argument("--preflight", action="store_true")
     p.add_argument("--output", type=Path)
+    return p
+
+
+def main() -> int:
+    p = _parser()
     a = p.parse_args()
     if a.preflight:
         value = {
