@@ -456,7 +456,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                     ),
                 )
             ),
-            "canonical": [hit.as_dict() for hit in context.hits],
+            "canonical": [dict(row) for row in context.canonical_rows],
             "bounds": self._task_action_bounds_payload(limit, per_role),
             "authority_non_interference": {
                 "presentation_bounded": True,
