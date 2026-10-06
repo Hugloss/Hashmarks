@@ -591,6 +591,13 @@ def _assert_registered_change_impact_defaults(
     assert parameters["max_depth"].default == defaults.options.max_depth
 
 
+def _assert_registered_public_defaults(
+    registered: list[dict[str, object]],
+) -> None:
+    _assert_registered_task_evidence_defaults(registered)
+    _assert_registered_change_impact_defaults(registered)
+
+
 def test_mcp_server_registers_exact_small_read_only_tool_catalog(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -671,8 +678,7 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             }
             assert len(str(row["description"])) < 220
 
-        _assert_registered_task_evidence_defaults(registered)
-        _assert_registered_change_impact_defaults(registered)
+        _assert_registered_public_defaults(registered)
 
         with pytest.raises(FakeToolError, match="query must not be empty"):
             next(row["fn"] for row in registered if row["name"] == "find")(" ", limit=5)
