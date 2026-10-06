@@ -398,7 +398,7 @@ class HashmarksMcpSurface:
         changed_paths: list[str],
         previous_evidence: dict[str, Any],
         *,
-        token_budget: int = 1536,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, object]:
         task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
         paths = _changed_paths(changed_paths)
@@ -413,8 +413,8 @@ class HashmarksMcpSurface:
                     task,
                     paths,
                     previous_evidence=previous_evidence,
-                    limit=20,
-                    per_role=3,
+                    limit=TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+                    per_role=TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
                     token_budget=token_budget,
                 )
             except ValueError as exc:
