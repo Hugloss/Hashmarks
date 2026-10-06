@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks._version import __version__
+from hashmarks.codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from hashmarks.mcp_contract import (
     MCP_SERVER_INSTRUCTIONS,
     MCP_SERVER_NAME,
@@ -93,9 +94,20 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
         assert schemas["task_evidence"]["required"] == ["task"]
         assert schemas["find"]["required"] == ["query"]
         assert schemas["change_impact"]["required"] == ["task", "changed_paths"]
-        assert schemas["task_evidence"]["properties"]["limit"]["default"] == 20
-        assert schemas["task_evidence"]["properties"]["per_role"]["default"] == 3
-        assert schemas["task_evidence"]["properties"]["token_budget"]["default"] == 1536
+        defaults = TASK_EVIDENCE_DEFAULT_OPTIONS
+        assert schemas["task_evidence"]["properties"]["limit"]["default"] == defaults.limit
+        assert (
+            schemas["task_evidence"]["properties"]["per_role"]["default"]
+            == defaults.per_role
+        )
+        assert (
+            schemas["task_evidence"]["properties"]["token_budget"]["default"]
+            == defaults.token_budget
+        )
+        assert (
+            schemas["post_change"]["properties"]["token_budget"]["default"]
+            == defaults.token_budget
+        )
         for tool in tools:
             assert tool.annotations is not None
             assert tool.annotations.read_only_hint is True
