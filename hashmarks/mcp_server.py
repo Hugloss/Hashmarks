@@ -4,6 +4,7 @@ import argparse
 from typing import TYPE_CHECKING, Any, Literal
 
 from ._version import __version__
+from .codemap.change_impact import CHANGE_IMPACT_DEFAULT_REQUEST
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from .errors import OptionalFeatureError, UserFacingError
 from .mcp_contract import (
@@ -165,7 +166,9 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         annotations=annotations,
     )
     def change_impact(
-        task: str, changed_paths: list[str], max_depth: int = 4
+        task: str,
+        changed_paths: list[str],
+        max_depth: int = CHANGE_IMPACT_DEFAULT_REQUEST.options.max_depth,
     ) -> dict[str, object]:
         return _call_surface(
             change_impact_contract,
