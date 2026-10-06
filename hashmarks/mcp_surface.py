@@ -10,6 +10,7 @@ from .codemap.evidence_correlation import (
     CORRELATION_PACKET_MAX_BYTES,
     CORRELATION_REQUEST_MAX_BYTES,
 )
+from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from .codemap.repository_declaration_contract import (
     MAX_PACKET_BYTES,
     MAX_REQUEST_BYTES,
@@ -230,9 +231,9 @@ class HashmarksMcpSurface:
         self,
         task: str,
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 1536,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, object]:
         task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
