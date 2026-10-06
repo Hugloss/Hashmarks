@@ -18,6 +18,9 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+OWNERSHIP_RELATION_DEFAULT_MAX_DEPTH = 2
+
+
 @dataclass
 class _OwnershipGraphState:
     start: str
@@ -1137,7 +1140,11 @@ class OwnershipGraphMixin:
 
     @operation_response("ownership_relation_graph")
     def ownership_relation_graph(
-        self, task: str, start_path: str, *, max_depth: int = 2
+        self,
+        task: str,
+        start_path: str,
+        *,
+        max_depth: int = OWNERSHIP_RELATION_DEFAULT_MAX_DEPTH,
     ) -> dict[str, object]:
         """Project a bounded, cycle-safe ownership relation graph."""
         if TYPE_CHECKING:
@@ -1222,7 +1229,11 @@ class OwnershipGraphMixin:
         return default if value is None else value
 
     def _structural_owner_candidate(
-        self, start_path: str, *, max_depth: int = 2, task: str = ""
+        self,
+        start_path: str,
+        *,
+        max_depth: int = OWNERSHIP_RELATION_DEFAULT_MAX_DEPTH,
+        task: str = "",
     ) -> dict[str, object] | None:
         """Project the selected typed ownership relation into the action anchor shape."""
         graph = self.ownership_relation_graph(task, start_path, max_depth=max_depth)
