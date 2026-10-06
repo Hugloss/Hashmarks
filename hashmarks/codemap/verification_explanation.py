@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import diagnostic_producer
-from .evidence_verification import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 
 if TYPE_CHECKING:
     from pathlib import Path
