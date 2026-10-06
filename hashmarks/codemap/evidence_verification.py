@@ -23,7 +23,8 @@ from .model import EvidenceVisibility
 from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_index_store import git_base_identity
-from .verification_defaults import DEFAULT_CANDIDATE_LIMIT as C, DEFAULT_LIMIT as L
+from .verification_defaults import DEFAULT_CANDIDATE_LIMIT as C
+from .verification_defaults import DEFAULT_LIMIT as L
 
 if TYPE_CHECKING:
     from .engine import CodeMap
