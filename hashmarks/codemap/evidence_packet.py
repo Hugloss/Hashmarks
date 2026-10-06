@@ -17,7 +17,10 @@ from hashmarks.operation_contract import (
 
 from .configuration_evidence import ConfigurationEvidenceMixin
 from .decision_session import decision_scoped
-from .evidence_decision_packet import DecisionPacketMixin
+from .evidence_decision_packet import (
+    TASK_DECISION_DEFAULT_OPTIONS,
+    DecisionPacketMixin,
+)
 from .evidence_freshness import freshness_state
 from .model import EvidenceVisibility, SearchHit
 from .python_ast import estimate_tokens
@@ -69,9 +72,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         self,
         task: str,
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 512,
+        limit: int = TASK_DECISION_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_DECISION_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_DECISION_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, object]:
         """Return the minimal trustworthy first-stage action projection.
 
