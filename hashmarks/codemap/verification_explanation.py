@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import diagnostic_producer
-from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -80,7 +80,7 @@ class VerificationExplanationMixin:
         task: str,
         member_path: str | Path | None = None,
         *,
-        limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
+        limit: int = VERIFICATION_RELEVANCE_DEFAULTS.limit,
         candidate_limit: int = 16,
     ) -> dict[str, object]:
         """Explain selection/non-selection without adding execution semantics."""
