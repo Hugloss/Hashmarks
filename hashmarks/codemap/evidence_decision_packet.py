@@ -14,6 +14,18 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+@dataclass(frozen=True, slots=True)
+class TaskDecisionOptions:
+    """Default bounds shared by the decision packet and its brief projection."""
+
+    limit: int = 20
+    per_role: int = 3
+    token_budget: int = 512
+
+
+TASK_DECISION_DEFAULT_OPTIONS = TaskDecisionOptions()
+
+
 def _append_decision_candidate(
     row: object, candidates: list[dict[str, object]], seen: set[str]
 ) -> None:
@@ -217,9 +229,9 @@ class DecisionPacketMixin:
         self,
         task: str,
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 512,
+        limit: int = TASK_DECISION_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_DECISION_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_DECISION_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, object]:
         """Return bounded repository evidence for one task decision."""
         if TYPE_CHECKING:
