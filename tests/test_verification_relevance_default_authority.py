@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.evidence_verification import (
+from hashmarks.codemap.verification_defaults import (
     VERIFICATION_RELEVANCE_DEFAULT_OPTIONS,
     VerificationRelevanceOptions,
 )
@@ -43,9 +43,7 @@ def test_verification_relevance_defaults_have_one_owner(
         add_common_arguments=lambda _parser, *, inherited=False: None,
     )
     relevance = parser.parse_args(["verification-relevance", "inspect widget"])
-    ownership = parser.parse_args(
-        ["map", "verification-ownership", "inspect widget"]
-    )
+    ownership = parser.parse_args(["map", "verification-ownership", "inspect widget"])
     for args in (relevance, ownership):
         assert args.limit == defaults.limit
         assert args.candidate_limit == defaults.candidate_limit
