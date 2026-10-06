@@ -4,6 +4,7 @@ import argparse
 from typing import TYPE_CHECKING, Any, Literal
 
 from ._version import __version__
+from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from .errors import OptionalFeatureError, UserFacingError
 from .mcp_contract import (
     MCP_READ_ONLY_ANNOTATIONS,
@@ -141,7 +142,10 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         annotations=annotations,
     )
     def task_evidence(
-        task: str, limit: int = 20, per_role: int = 3, token_budget: int = 1536
+        task: str,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, object]:
         return _call_surface(
             task_evidence_contract,
@@ -236,7 +240,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         task: str,
         changed_paths: list[str],
         previous_evidence: dict[str, Any],
-        token_budget: int = 1536,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, object]:
         return _call_surface(
             post_change_contract,
