@@ -88,14 +88,8 @@ def test_verification_cli_defaults_consume_core_authority() -> None:
 
     relevance = parser.parse_args(["verification-relevance", "inspect widget"])
     assert relevance.limit == VERIFICATION_RELEVANCE_DEFAULTS.limit
-    assert (
-        relevance.candidate_limit
-        == VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
-    )
+    assert relevance.candidate_limit == VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
 
     ownership = parser.parse_args(["map", "verification-ownership", "inspect widget"])
     assert ownership.limit == VERIFICATION_RELEVANCE_DEFAULTS.limit
-    assert (
-        ownership.candidate_limit
-        == VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
-    )
+    assert ownership.candidate_limit == VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
