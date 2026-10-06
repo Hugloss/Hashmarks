@@ -21,7 +21,10 @@ from hashmarks.paths import canonical_host_path
 
 from .change_impact import CHANGE_IMPACT_DEFAULT_OPTIONS, ChangeImpactOptions
 from .engine import CodeMap
-from .evidence_packet import TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
+from .evidence_packet import (
+    TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS,
+    TASK_EVIDENCE_DEFAULT_OPTIONS,
+)
 from .post_change import POST_CHANGE_DEFAULT_OPTIONS, PostChangeOptions
 from .repository_intelligence_query import (
     REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
@@ -455,8 +458,13 @@ class CodeMapService:
         return {"ok": True, "ownership_relation_graph": result}
 
     def _task_evidence_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        task, limit, per_role = self._task_context(request)
-        token_budget = self._bounded_int(request, "token_budget", 1536, 1, 100_000)
+        defaults = TASK_EVIDENCE_DEFAULT_OPTIONS
+        task = self._task(request)
+        limit = self._bounded_int(request, "limit", defaults.limit, 1, 100)
+        per_role = int(request.get("per_role", defaults.per_role))
+        token_budget = self._bounded_int(
+            request, "token_budget", defaults.token_budget, 1, 100_000
+        )
         result = self._map().task_evidence(
             task,
             limit=limit,
@@ -972,9 +980,9 @@ class CodeMapServiceClient:
         self,
         task: str,
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 1536,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, Any]:
         return dict(
             self.request(
