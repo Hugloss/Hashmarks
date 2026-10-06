@@ -332,3 +332,13 @@ def test_codex_agent_economics_make_alias_delegates_root_default() -> None:
     preflight = "\n".join(_make_recipe(text, "codex-agent-economics-preflight"))
     assert "--preflight" in preflight
     assert "--output .hashmarks/metrics/codex-agent-preflight.json" in preflight
+
+
+def test_codex_selective_scout_make_alias_delegates_root_default() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+    recipe = _make_recipe(text, "codex-selective-scout-economics")
+    joined = "\n".join(recipe)
+
+    assert "scripts.agent_evaluation.codex_selective_scout_economics" in joined
+    assert "--output .hashmarks/metrics/codex-selective-scout-latest.json" in joined
+    assert "--root .hashmarks/benchmarks/codex-selective-scout" not in joined

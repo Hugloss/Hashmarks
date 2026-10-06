@@ -782,3 +782,16 @@ def test_codex_agent_economics_parser_owns_normal_root_default() -> None:
     assert args.timeout == 900
     assert args.preflight is False
     assert args.output is None
+
+
+def test_codex_selective_scout_parser_owns_normal_root_default() -> None:
+    module = importlib.import_module(
+        "scripts.agent_evaluation.codex_selective_scout_economics"
+    )
+    args = module._parser().parse_args([])
+
+    assert args.root == Path(".hashmarks/benchmarks/codex-selective-scout")
+    assert args.codex_bin == "codex"
+    assert args.sandbox == "read-only"
+    assert args.timeout == 900
+    assert args.output is None
