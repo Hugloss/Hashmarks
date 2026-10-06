@@ -30,6 +30,18 @@ TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS = (64, 128, 192, 256, 384, 512)
 
 
 @dataclass(frozen=True, slots=True)
+class TaskEvidenceOptions:
+    """Default bounds for one public task-evidence request."""
+
+    limit: int = 20
+    per_role: int = 3
+    token_budget: int = 1536
+
+
+TASK_EVIDENCE_DEFAULT_OPTIONS = TaskEvidenceOptions()
+
+
+@dataclass(frozen=True, slots=True)
 class _TaskEvidenceRange:
     path: str
     role: str
@@ -1286,9 +1298,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         self,
         task: str,
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 1536,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, object]:
         """Return role-separated repository evidence for an external consumer."""
         if TYPE_CHECKING:
