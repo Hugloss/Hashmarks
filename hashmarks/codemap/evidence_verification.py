@@ -1324,9 +1324,7 @@ class VerificationMixin:
         task: str,
         *,
         limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
-        candidate_limit: int = (
-            VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit
-        ),
+        candidate_limit: int = (VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit),
     ) -> dict[str, object]:
         """Expose verification owners and their evidence-backed edit-authority links."""
         if TYPE_CHECKING:
