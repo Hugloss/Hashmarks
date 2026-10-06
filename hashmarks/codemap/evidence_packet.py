@@ -1286,18 +1286,70 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         }
 
     @staticmethod
-    def _task_evidence_discrimination_candidate(
+    def _task_evidence_structural_discrimination_candidate(
         action: Mapping[str, object],
-    ) -> tuple[Mapping[str, object], Mapping[str, object]] | None:
+        ambiguity: Mapping[str, object],
+    ) -> Mapping[str, object] | None:
+        """Return one non-authoritative candidate from complete structural observation."""
+        starts = action.get("structural_starts")
+        if not isinstance(starts, Mapping):
+            return None
+        if (
+            starts.get("status") != "observed"
+            or starts.get("observation_complete") is not True
+        ):
+            return None
+        observed = [
+            str(path)
+            for path in starts.get("observed_owners") or []
+            if str(path)
+        ]
+        unique_owners = tuple(dict.fromkeys(observed))
+        if len(unique_owners) != 1:
+            return None
+        owner_path = unique_owners[0]
+
+        candidates = ambiguity.get("candidates")
+        if isinstance(candidates, list):
+            for row in candidates:
+                if (
+                    isinstance(row, Mapping)
+                    and str(row.get("path") or "") == owner_path
+                ):
+                    return row
+
+        canonical = action.get("canonical")
+        if isinstance(canonical, list):
+            for row in canonical:
+                if (
+                    isinstance(row, Mapping)
+                    and str(row.get("path") or "") == owner_path
+                ):
+                    return row
+        return {"path": owner_path}
+
+    @classmethod
+    def _task_evidence_discrimination_candidate(
+        cls,
+        action: Mapping[str, object],
+    ) -> tuple[Mapping[str, object], Mapping[str, object], str] | None:
         ambiguity = action.get("ambiguity")
         if not isinstance(ambiguity, Mapping) or not bool(ambiguity.get("ambiguous")):
             return None
+
+        structural = cls._task_evidence_structural_discrimination_candidate(
+            action,
+            ambiguity,
+        )
+        if structural is not None:
+            return ambiguity, structural, "unique-complete-structural-owner"
+
         candidates = ambiguity.get("candidates")
         if not isinstance(candidates, list):
             return None
         for row in candidates:
             if isinstance(row, Mapping) and row.get("path"):
-                return ambiguity, row
+                return ambiguity, row, "ambiguity-candidate-order"
         return None
 
     def _task_evidence_discrimination_next_read(
@@ -1308,7 +1360,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         selected = self._task_evidence_discrimination_candidate(action)
         if selected is None:
             return None
-        ambiguity, candidate = selected
+        ambiguity, candidate, selection_basis = selected
 
         path = str(candidate.get("path") or "")
         visibility, denied = self._task_evidence_path_admission(
@@ -1319,11 +1371,17 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "path": path,
             "reason": "ownership-ambiguity-discrimination",
             "ambiguity_reason": str(ambiguity.get("reason") or "ownership-ambiguous"),
+            "selection_basis": selection_basis,
             "authority": "non-authoritative-discrimination",
         }
         discriminator = candidate.get("discriminator")
         if discriminator:
             result["discriminator"] = str(discriminator)
+        elif selection_basis == "unique-complete-structural-owner":
+            result["discriminator"] = (
+                "inspect the uniquely observed task-local structural owner; "
+                "ownership remains unadmitted until repository authority is complete"
+            )
         if denied is not None:
             result["availability_reason"] = str(
                 denied.get("reason") or "source-evidence-unavailable"
