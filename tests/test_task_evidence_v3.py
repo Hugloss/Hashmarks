@@ -155,9 +155,143 @@ def test_task_evidence_v3_keeps_ambiguity_independent_from_freshness(
     assert next_read["end_line"] == 2
     assert next_read["reason"] == "ownership-ambiguity-discrimination"
     assert next_read["ambiguity_reason"]
+    assert next_read["selection_basis"] == "ambiguity-candidate-order"
     assert next_read["authority"] == "non-authoritative-discrimination"
     assert next_read["discriminator"]
     assert packet["freshness"]["state"] in {"unknown", "current", "stale"}
+
+
+def test_task_evidence_v3_prefers_complete_unique_structural_owner_for_discrimination(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/ranked.py",
+        "def ranked_candidate():\n    return 'ranked'\n",
+    )
+    _write(
+        tmp_path,
+        "src/structural.py",
+        "def structural_owner():\n    return 'owner'\n",
+    )
+    action = {
+        "ambiguity": {
+            "ambiguous": True,
+            "reason": "competing-action-roles",
+            "candidates": [
+                {
+                    "path": "src/ranked.py",
+                    "name": "ranked_candidate",
+                    "start_line": 1,
+                    "end_line": 2,
+                    "discriminator": "inspect ranked candidate",
+                },
+                {
+                    "path": "src/structural.py",
+                    "name": "structural_owner",
+                    "start_line": 1,
+                    "end_line": 2,
+                },
+            ],
+        },
+        "structural_starts": {
+            "status": "observed",
+            "observation_complete": True,
+            "observed_owners": ["src/structural.py"],
+        },
+        "canonical": [],
+    }
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        next_read = codemap._task_evidence_discrimination_next_read(action)
+
+    assert next_read is not None
+    assert next_read["path"] == "src/structural.py"
+    assert next_read["selection_basis"] == "unique-complete-structural-owner"
+    assert next_read["authority"] == "non-authoritative-discrimination"
+    assert "ownership remains unadmitted" in next_read["discriminator"]
+
+
+def test_task_evidence_v3_structural_discrimination_fails_closed_on_incomplete_observation(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/ranked.py",
+        "def ranked_candidate():\n    return 'ranked'\n",
+    )
+    _write(
+        tmp_path,
+        "src/structural.py",
+        "def structural_owner():\n    return 'owner'\n",
+    )
+    action = {
+        "ambiguity": {
+            "ambiguous": True,
+            "reason": "structural-start-observation-incomplete",
+            "candidates": [
+                {
+                    "path": "src/ranked.py",
+                    "name": "ranked_candidate",
+                    "start_line": 1,
+                    "end_line": 2,
+                    "discriminator": "inspect ranked candidate",
+                },
+                {
+                    "path": "src/structural.py",
+                    "name": "structural_owner",
+                    "start_line": 1,
+                    "end_line": 2,
+                },
+            ],
+        },
+        "structural_starts": {
+            "status": "observed",
+            "observation_complete": False,
+            "observed_owners": ["src/structural.py"],
+        },
+        "canonical": [],
+    }
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        next_read = codemap._task_evidence_discrimination_next_read(action)
+
+    assert next_read is not None
+    assert next_read["path"] == "src/ranked.py"
+    assert next_read["selection_basis"] == "ambiguity-candidate-order"
+
+
+def test_task_evidence_v3_structural_discrimination_fails_closed_on_multiple_owners(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "src/a.py", "def owner_a():\n    return 'a'\n")
+    _write(tmp_path, "src/b.py", "def owner_b():\n    return 'b'\n")
+    action = {
+        "ambiguity": {
+            "ambiguous": True,
+            "reason": "multiple-task-local-structural-owners",
+            "candidates": [
+                {"path": "src/a.py", "name": "owner_a", "start_line": 1, "end_line": 2},
+                {"path": "src/b.py", "name": "owner_b", "start_line": 1, "end_line": 2},
+            ],
+        },
+        "structural_starts": {
+            "status": "observed",
+            "observation_complete": True,
+            "observed_owners": ["src/a.py", "src/b.py"],
+        },
+        "canonical": [],
+    }
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        next_read = codemap._task_evidence_discrimination_next_read(action)
+
+    assert next_read is not None
+    assert next_read["path"] == "src/a.py"
+    assert next_read["selection_basis"] == "ambiguity-candidate-order"
 
 
 def test_task_evidence_v3_owner_is_invariant_to_bounded_retrieval(
