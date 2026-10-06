@@ -748,9 +748,21 @@ def _add_change_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
         required=True,
         help="JSON file containing the exact prior task-evidence packet",
     )
-    post_change.add_argument("--budget", type=int, default=1536)
-    post_change.add_argument("--limit", type=int, default=20)
-    post_change.add_argument("--per-role", type=int, default=3)
+    post_change.add_argument(
+        "--budget",
+        type=int,
+        default=TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+    )
+    post_change.add_argument(
+        "--limit",
+        type=int,
+        default=TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+    )
+    post_change.add_argument(
+        "--per-role",
+        type=int,
+        default=TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+    )
     post_change.set_defaults(func=_post_change_code, automatic_update_check=True)
 
 
