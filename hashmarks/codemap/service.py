@@ -19,7 +19,10 @@ from hashmarks.operation_contract import (
 )
 from hashmarks.paths import canonical_host_path
 
-from .change_impact import CHANGE_IMPACT_DEFAULT_OPTIONS, ChangeImpactOptions
+from .change_impact import (
+    CHANGE_IMPACT_DEFAULT_REQUEST,
+    ChangeImpactOptions,
+)
 from .engine import CodeMap
 from .evidence_decision_packet import TASK_DECISION_DEFAULT_OPTIONS
 from .evidence_packet import (
@@ -497,22 +500,26 @@ class CodeMapService:
         )
 
     def _change_impact_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        task, changed, limit, per_role, _budget = self._changed_context(request)
-        defaults = CHANGE_IMPACT_DEFAULT_OPTIONS
+        defaults = CHANGE_IMPACT_DEFAULT_REQUEST
+        options = defaults.options
+        task = self._task(request)
+        changed = self._string_list(request, "changed_paths", required=True)
+        limit = self._bounded_int(request, "limit", defaults.limit, 1, 100)
+        per_role = self._bounded_int(request, "per_role", defaults.per_role, 1, 20)
         impact_limit = self._bounded_int(
             request,
             "impact_limit_per_surface",
-            defaults.impact_limit_per_surface,
+            options.impact_limit_per_surface,
             1,
             100,
         )
-        max_depth = self._bounded_int(request, "max_depth", defaults.max_depth, 1, 32)
-        raw_limit = request.get("project_impact_limit", defaults.project_impact_limit)
+        max_depth = self._bounded_int(request, "max_depth", options.max_depth, 1, 32)
+        raw_limit = request.get("project_impact_limit", options.project_impact_limit)
         project_limit = None if raw_limit is None else int(raw_limit)
         if project_limit is not None and not 1 <= project_limit <= 100_000:
             raise ValueError("project_impact_limit must be between 1 and 100000")
         encoding = str(
-            request.get("project_impact_encoding", defaults.project_impact_encoding)
+            request.get("project_impact_encoding", options.project_impact_encoding)
         )
         if encoding not in {"verbose", "compact"}:
             raise ValueError("project_impact_encoding must be verbose or compact")
@@ -1071,9 +1078,9 @@ class CodeMapServiceClient:
         task: str,
         changed_paths: tuple[str, ...] | list[str],
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        options: ChangeImpactOptions = CHANGE_IMPACT_DEFAULT_OPTIONS,
+        limit: int = CHANGE_IMPACT_DEFAULT_REQUEST.limit,
+        per_role: int = CHANGE_IMPACT_DEFAULT_REQUEST.per_role,
+        options: ChangeImpactOptions = CHANGE_IMPACT_DEFAULT_REQUEST.options,
     ) -> dict[str, Any]:
         return dict(
             self.request(
