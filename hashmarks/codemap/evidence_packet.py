@@ -809,11 +809,15 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
     @staticmethod
     def _task_evidence_retrieval_locator(
         row: Mapping[str, object],
+        *,
+        fallback_rank: int | None = None,
     ) -> dict[str, object]:
         """Project one retrieval candidate into a compact non-authoritative locator."""
         result: dict[str, object] = {"path": str(row.get("path") or "")}
 
         rank = row.get("canonical_rank")
+        if not isinstance(rank, int) or rank <= 0:
+            rank = fallback_rank
         if isinstance(rank, int) and rank > 0:
             result["rank"] = rank
 
@@ -827,6 +831,19 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
 
         start = row.get("start_line")
         end = row.get("end_line")
+        lines = row.get("lines")
+        if (
+            (not isinstance(start, int) or start <= 0)
+            and isinstance(lines, list)
+            and lines
+        ):
+            start = lines[0]
+        if (
+            (not isinstance(end, int) or end <= 0)
+            and isinstance(lines, list)
+            and len(lines) > 1
+        ):
+            end = lines[1]
         if isinstance(start, int) and start > 0:
             result["start_line"] = start
         if isinstance(end, int) and end > 0:
@@ -853,8 +870,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         if not isinstance(current, list):
             raise AssertionError("task evidence retrieval results must be a list")
         retrieval["results"] = [
-            self._task_evidence_retrieval_locator(row)
-            for row in current
+            self._task_evidence_retrieval_locator(row, fallback_rank=rank)
+            for rank, row in enumerate(current, 1)
             if isinstance(row, Mapping)
         ]
         retrieval["presentation"] = "compact-locators-v1"
