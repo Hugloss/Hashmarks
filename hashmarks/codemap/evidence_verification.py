@@ -23,20 +23,10 @@ from .model import EvidenceVisibility
 from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_index_store import git_base_identity
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 
 if TYPE_CHECKING:
     from .engine import CodeMap
-
-
-@dataclass(frozen=True, slots=True)
-class VerificationRelevanceOptions:
-    """Default bounds for public verification relevance projections."""
-
-    limit: int = 20
-    candidate_limit: int = 8
-
-
-VERIFICATION_RELEVANCE_DEFAULT_OPTIONS = VerificationRelevanceOptions()
 
 
 @dataclass(frozen=True)
