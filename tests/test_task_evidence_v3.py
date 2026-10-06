@@ -80,6 +80,8 @@ def test_task_evidence_v3_retrieval_is_compact_non_authoritative_projection(
     assert projected.get("symbol") == (internal.get("qualname") or internal.get("name"))
     assert projected.get("roles") == internal.get("roles")
     assert projected.get("evidence_visibility") == internal.get("evidence_visibility")
+    assert projected.get("start_line") == internal.get("start_line")
+    assert projected.get("end_line") == internal.get("end_line")
     for internal_only in (
         "canonical_rank",
         "canonical_score",
@@ -605,6 +607,8 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
         assert projected.get("evidence_visibility") == internal.get(
             "evidence_visibility"
         )
+        assert projected.get("start_line") == internal.get("start_line")
+        assert projected.get("end_line") == internal.get("end_line")
         assert "signature" not in projected
         assert "canonical_score" not in projected
         assert "domains" not in projected
