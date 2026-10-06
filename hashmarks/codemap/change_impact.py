@@ -358,8 +358,17 @@ class ChangeImpactMixin:
         if self._decision_session_depth <= 0:
             return None
         bounds = action.get("bounds")
-        limit = int(bounds.get("limit", 20)) if isinstance(bounds, dict) else 20
-        per_role = int(bounds.get("per_role", 3)) if isinstance(bounds, dict) else 3
+        defaults = CHANGE_IMPACT_DEFAULT_REQUEST
+        limit = (
+            int(bounds.get("limit", defaults.limit))
+            if isinstance(bounds, dict)
+            else defaults.limit
+        )
+        per_role = (
+            int(bounds.get("per_role", defaults.per_role))
+            if isinstance(bounds, dict)
+            else defaults.per_role
+        )
         generation = int(self._decision_session_generation or self.store.generation())
         return generation, task, limit, per_role
 
