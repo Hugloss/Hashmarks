@@ -339,7 +339,7 @@ def test_canonical_service_admission_fails_before_work(
         projected.append(request)
         return {
             "ok": True,
-            "task_evidence": {"schema": "hashmarks.task-evidence.v2"},
+            "task_evidence": {"schema": operation_schema("task_evidence")},
         }
 
     monkeypatch.setattr(service_module, "require_registered_operation", reject)
