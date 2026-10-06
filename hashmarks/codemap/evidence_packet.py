@@ -25,6 +25,10 @@ from .evidence_freshness import freshness_state
 from .model import EvidenceVisibility, SearchHit
 from .python_ast import estimate_tokens
 from .task_action_projection import TASK_ACTION_DEFAULT_OPTIONS
+from .task_evidence_discrimination import (
+    STRUCTURAL_SELECTION_BASIS,
+    select_task_evidence_discrimination_candidate,
+)
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -1285,79 +1289,12 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "reason": provenance.get("freshness_reason"),
         }
 
-    @staticmethod
-    def _task_evidence_structural_discrimination_candidate(
-        action: Mapping[str, object],
-        ambiguity: Mapping[str, object],
-    ) -> Mapping[str, object] | None:
-        """Return one non-authoritative candidate from complete structural observation."""
-        starts = action.get("structural_starts")
-        if not isinstance(starts, Mapping):
-            return None
-        if (
-            starts.get("status") != "observed"
-            or starts.get("observation_complete") is not True
-        ):
-            return None
-        observed = [
-            str(path)
-            for path in starts.get("observed_owners") or []
-            if str(path)
-        ]
-        unique_owners = tuple(dict.fromkeys(observed))
-        if len(unique_owners) != 1:
-            return None
-        owner_path = unique_owners[0]
-
-        candidates = ambiguity.get("candidates")
-        if isinstance(candidates, list):
-            for row in candidates:
-                if (
-                    isinstance(row, Mapping)
-                    and str(row.get("path") or "") == owner_path
-                ):
-                    return row
-
-        canonical = action.get("canonical")
-        if isinstance(canonical, list):
-            for row in canonical:
-                if (
-                    isinstance(row, Mapping)
-                    and str(row.get("path") or "") == owner_path
-                ):
-                    return row
-        return {"path": owner_path}
-
-    @classmethod
-    def _task_evidence_discrimination_candidate(
-        cls,
-        action: Mapping[str, object],
-    ) -> tuple[Mapping[str, object], Mapping[str, object], str] | None:
-        ambiguity = action.get("ambiguity")
-        if not isinstance(ambiguity, Mapping) or not bool(ambiguity.get("ambiguous")):
-            return None
-
-        structural = cls._task_evidence_structural_discrimination_candidate(
-            action,
-            ambiguity,
-        )
-        if structural is not None:
-            return ambiguity, structural, "unique-complete-structural-owner"
-
-        candidates = ambiguity.get("candidates")
-        if not isinstance(candidates, list):
-            return None
-        for row in candidates:
-            if isinstance(row, Mapping) and row.get("path"):
-                return ambiguity, row, "ambiguity-candidate-order"
-        return None
-
     def _task_evidence_discrimination_next_read(
         self,
         action: Mapping[str, object],
     ) -> dict[str, object] | None:
         """Project one existing ambiguity candidate into a non-authoritative read."""
-        selected = self._task_evidence_discrimination_candidate(action)
+        selected = select_task_evidence_discrimination_candidate(action)
         if selected is None:
             return None
         ambiguity, candidate, selection_basis = selected
@@ -1377,7 +1314,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         discriminator = candidate.get("discriminator")
         if discriminator:
             result["discriminator"] = str(discriminator)
-        elif selection_basis == "unique-complete-structural-owner":
+        elif selection_basis == STRUCTURAL_SELECTION_BASIS:
             result["discriminator"] = (
                 "inspect the uniquely observed task-local structural owner; "
                 "ownership remains unadmitted until repository authority is complete"
