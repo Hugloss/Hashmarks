@@ -277,7 +277,7 @@ def test_service_registry_owns_handler_selection(
         seen.append(request)
         return {
             "ok": True,
-            "task_evidence": {"schema": "hashmarks.task-evidence.v2"},
+            "task_evidence": {"schema": "hashmarks.task-evidence.v3"},
         }
 
     monkeypatch.setattr(service, "_task_evidence_response", project)
@@ -338,7 +338,7 @@ def test_canonical_service_admission_fails_before_work(
         projected.append(request)
         return {
             "ok": True,
-            "task_evidence": {"schema": "hashmarks.task-evidence.v2"},
+            "task_evidence": {"schema": "hashmarks.task-evidence.v3"},
         }
 
     monkeypatch.setattr(service_module, "require_registered_operation", reject)
