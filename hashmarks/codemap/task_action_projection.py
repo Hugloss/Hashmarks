@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_response, operation_schema
@@ -25,6 +26,17 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+@dataclass(frozen=True, slots=True)
+class TaskActionOptions:
+    """Default selection bounds for public task-action projections."""
+
+    limit: int = 20
+    per_role: int = 3
+
+
+TASK_ACTION_DEFAULT_OPTIONS = TaskActionOptions()
+
+
 class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
     @operation_response("task_action_map")
     @decision_scoped
@@ -33,8 +45,8 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         self,
         task: str,
         *,
-        limit: int = 20,
-        per_role: int = 3,
+        limit: int = TASK_ACTION_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_ACTION_DEFAULT_OPTIONS.per_role,
     ) -> dict[str, object]:
         """Translate canonical task evidence into worker actions without reranking it.
 

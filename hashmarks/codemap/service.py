@@ -26,6 +26,7 @@ from .change_impact import (
 from .engine import CodeMap
 from .evidence_decision_packet import TASK_DECISION_DEFAULT_OPTIONS
 from .evidence_packet import (
+    TASK_ACTION_BRIEF_BUDGET_DEFAULT_OPTIONS,
     TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS,
     TASK_EVIDENCE_DEFAULT_OPTIONS,
 )
@@ -34,6 +35,7 @@ from .repository_intelligence_query import (
     REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
     RepositoryIntelligenceQueryOptions,
 )
+from .task_action_projection import TASK_ACTION_DEFAULT_OPTIONS
 
 PROTOCOL = "hashmarks.codemap-service.v2"
 MAX_REQUEST = 1024 * 1024
@@ -434,8 +436,16 @@ class CodeMapService:
             int(request.get("per_role", 3)),
         )
 
+    def _task_action_context(self, request: dict[str, Any]) -> tuple[str, int, int]:
+        defaults = TASK_ACTION_DEFAULT_OPTIONS
+        return (
+            self._task(request),
+            self._bounded_int(request, "limit", defaults.limit, 1, 100),
+            self._bounded_int(request, "per_role", defaults.per_role, 1, 20),
+        )
+
     def _task_action_map_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        task, limit, per_role = self._task_context(request)
+        task, limit, per_role = self._task_action_context(request)
         result = self._map().task_action_map(task, limit=limit, per_role=per_role)
         return {"ok": True, "action_map": result}
 
@@ -676,8 +686,10 @@ class CodeMapService:
         return {"ok": True, "decision_brief": result}
 
     def _task_action_brief_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        task, limit, per_role = self._task_context(request)
-        raw_budget = request.get("token_budget")
+        task, limit, per_role = self._task_action_context(request)
+        raw_budget = request.get(
+            "token_budget", TASK_ACTION_BRIEF_BUDGET_DEFAULT_OPTIONS.token_budget
+        )
         budget = None if raw_budget is None else int(raw_budget)
         if budget is not None and not 1 <= budget <= 100_000:
             raise ValueError("token_budget must be between 1 and 100000")
@@ -919,7 +931,11 @@ class CodeMapServiceClient:
         return list(self.request("find_task", task=task, limit=limit)["hits"])
 
     def task_action_map(
-        self, task: str, *, limit: int = 20, per_role: int = 3
+        self,
+        task: str,
+        *,
+        limit: int = TASK_ACTION_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_ACTION_DEFAULT_OPTIONS.per_role,
     ) -> dict[str, Any]:
         return dict(
             self.request(
@@ -994,9 +1010,11 @@ class CodeMapServiceClient:
         self,
         task: str,
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int | None = None,
+        limit: int = TASK_ACTION_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_ACTION_DEFAULT_OPTIONS.per_role,
+        token_budget: int | None = (
+            TASK_ACTION_BRIEF_BUDGET_DEFAULT_OPTIONS.token_budget
+        ),
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {"task": task, "limit": limit, "per_role": per_role}
         if token_budget is not None:
