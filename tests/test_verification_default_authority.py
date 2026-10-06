@@ -8,7 +8,7 @@ import pytest
 
 from hashmarks.cli import _add_common_arguments
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.evidence_verification import (
+from hashmarks.codemap.verification_defaults import (
     VERIFICATION_RELEVANCE_DEFAULT_OPTIONS,
     VerificationRelevanceOptions,
 )
