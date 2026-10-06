@@ -24,12 +24,35 @@ from .evidence_decision_packet import (
 from .evidence_freshness import freshness_state
 from .model import EvidenceVisibility, SearchHit
 from .python_ast import estimate_tokens
+from .task_action_projection import TASK_ACTION_DEFAULT_OPTIONS
 
 if TYPE_CHECKING:
     from .engine import CodeMap
 
 
 TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS = (64, 128, 192, 256, 384, 512)
+
+
+@dataclass(frozen=True, slots=True)
+class TaskActionBriefBudgetOptions:
+    """Adaptive budget defaults for the model-facing task-action brief."""
+
+    token_budget: int | None = None
+    candidate_budgets: tuple[int, ...] = (
+        32,
+        64,
+        96,
+        128,
+        192,
+        256,
+        384,
+        512,
+        768,
+        1024,
+    )
+
+
+TASK_ACTION_BRIEF_BUDGET_DEFAULT_OPTIONS = TaskActionBriefBudgetOptions()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1375,20 +1398,11 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         self,
         task: str,
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int | None = None,
+        limit: int = TASK_ACTION_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_ACTION_DEFAULT_OPTIONS.per_role,
+        token_budget: int | None = TASK_ACTION_BRIEF_BUDGET_DEFAULT_OPTIONS.token_budget,
         candidate_budgets: Sequence[int] = (
-            32,
-            64,
-            96,
-            128,
-            192,
-            256,
-            384,
-            512,
-            768,
-            1024,
+            TASK_ACTION_BRIEF_BUDGET_DEFAULT_OPTIONS.candidate_budgets
         ),
     ) -> dict[str, object]:
         """Return the smallest model-facing Stage-1 action contract.
