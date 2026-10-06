@@ -814,7 +814,7 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         result: dict[str, object] = {"path": str(row.get("path") or "")}
 
         rank = row.get("canonical_rank")
-        if isinstance(rank, int) and rank > 0:
+        if rank is not None:
             result["rank"] = rank
 
         symbol = row.get("qualname") or row.get("name")
