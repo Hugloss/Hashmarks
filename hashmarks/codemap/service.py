@@ -433,9 +433,7 @@ class CodeMapService:
             int(request.get("per_role", 3)),
         )
 
-    def _task_action_context(
-        self, request: dict[str, Any]
-    ) -> tuple[str, int, int]:
+    def _task_action_context(self, request: dict[str, Any]) -> tuple[str, int, int]:
         defaults = TASK_ACTION_DEFAULT_OPTIONS
         return (
             self._task(request),
