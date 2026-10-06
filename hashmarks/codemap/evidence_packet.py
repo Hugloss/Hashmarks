@@ -1285,6 +1285,65 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             "reason": provenance.get("freshness_reason"),
         }
 
+    @staticmethod
+    def _task_evidence_discrimination_candidate(
+        action: Mapping[str, object],
+    ) -> tuple[Mapping[str, object], Mapping[str, object]] | None:
+        ambiguity = action.get("ambiguity")
+        if not isinstance(ambiguity, Mapping) or not bool(ambiguity.get("ambiguous")):
+            return None
+        candidates = ambiguity.get("candidates")
+        if not isinstance(candidates, list):
+            return None
+        for row in candidates:
+            if isinstance(row, Mapping) and row.get("path"):
+                return ambiguity, row
+        return None
+
+    def _task_evidence_discrimination_next_read(
+        self,
+        action: Mapping[str, object],
+    ) -> dict[str, object] | None:
+        """Project one existing ambiguity candidate into a non-authoritative read."""
+        selected = self._task_evidence_discrimination_candidate(action)
+        if selected is None:
+            return None
+        ambiguity, candidate = selected
+
+        path = str(candidate.get("path") or "")
+        visibility, denied = self._task_evidence_path_admission(
+            path,
+            "ownership-discrimination",
+        )
+        result: dict[str, object] = {
+            "path": path,
+            "reason": "ownership-ambiguity-discrimination",
+            "ambiguity_reason": str(ambiguity.get("reason") or "ownership-ambiguous"),
+            "authority": "non-authoritative-discrimination",
+        }
+        discriminator = candidate.get("discriminator")
+        if discriminator:
+            result["discriminator"] = str(discriminator)
+        if denied is not None:
+            result["availability_reason"] = str(
+                denied.get("reason") or "source-evidence-unavailable"
+            )
+            return result
+        assert visibility is not None
+
+        qualname, name, _signature, start, end = self._task_evidence_current_range(
+            path, candidate
+        )
+        symbol = qualname or name
+        if symbol:
+            result["symbol"] = symbol
+        if start is not None:
+            result["start_line"] = start
+        if end is not None:
+            result["end_line"] = end
+        result["evidence_visibility"] = visibility.value
+        return result
+
     def _task_evidence_attach_owner_source(
         self,
         result: dict[str, object],
@@ -1316,6 +1375,8 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 token_budget=token_budget,
             )
         )
+        if ownership.get("status") == "ambiguous":
+            compact_pending = self._task_evidence_discrimination_next_read(action)
         ownership["source_evidence"] = compact_item
         ownership["next_read"] = compact_pending
         ownership["source_budget"] = source_budget
