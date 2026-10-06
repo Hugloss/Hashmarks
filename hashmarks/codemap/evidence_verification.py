@@ -25,6 +25,9 @@ from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_index_store import git_base_identity
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 
+_DEFAULT_LIMIT = _DEFAULT_LIMIT
+_DEFAULT_CANDIDATE_LIMIT = _DEFAULT_CANDIDATE_LIMIT
+
 if TYPE_CHECKING:
     from .engine import CodeMap
 
@@ -1088,7 +1091,7 @@ class VerificationMixin:
         edit: Mapping[str, object] | None,
         current_verify: Mapping[str, object] | None,
         rows: Sequence[Mapping[str, object]],
-        limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
+        limit: int = _DEFAULT_CANDIDATE_LIMIT,
     ) -> dict[str, object]:
         """Rank bounded verification surfaces around an already-selected edit owner."""
         if limit < 1:
@@ -1130,8 +1133,8 @@ class VerificationMixin:
         self,
         task: str,
         *,
-        limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
-        candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
+        limit: int = _DEFAULT_LIMIT,
+        candidate_limit: int = _DEFAULT_CANDIDATE_LIMIT,
     ) -> dict[str, object]:
         """Return the task's bounded verification relevance evidence."""
         if TYPE_CHECKING:
@@ -1310,11 +1313,7 @@ class VerificationMixin:
 
     @operation_response("verification_ownership")
     def verification_ownership_graph(
-        self,
-        task: str,
-        *,
-        limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
-        candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
+        self, task: str, *, limit: int = _DEFAULT_LIMIT, candidate_limit: int = _DEFAULT_CANDIDATE_LIMIT
     ) -> dict[str, object]:
         """Expose verification owners and their evidence-backed edit-authority links."""
         if TYPE_CHECKING:
