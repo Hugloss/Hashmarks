@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, TypeVar
 from hashmarks._command_output import log_command_output
 
 from .codemap.change_impact import ChangeImpactOptions
+from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from .errors import RepositoryCliError
 from .operation_contract import validate_operation_response
 from .repository_retry import (
@@ -666,11 +667,15 @@ def _add_task_evidence_cli(sub, *, add_common_arguments: Callable[..., None]) ->
     task_evidence.add_argument(
         "--budget",
         type=int,
-        default=1536,
+        default=TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
         help="maximum estimated tokens of source evidence",
     )
-    task_evidence.add_argument("--limit", type=int, default=20)
-    task_evidence.add_argument("--per-role", type=int, default=3)
+    task_evidence.add_argument(
+        "--limit", type=int, default=TASK_EVIDENCE_DEFAULT_OPTIONS.limit
+    )
+    task_evidence.add_argument(
+        "--per-role", type=int, default=TASK_EVIDENCE_DEFAULT_OPTIONS.per_role
+    )
     task_evidence.set_defaults(func=_task_evidence_code, automatic_update_check=True)
 
     verification_relevance = sub.add_parser(
