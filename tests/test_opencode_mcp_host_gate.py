@@ -295,7 +295,7 @@ def test_selection_result_keeps_native_calls_and_validates_hashmarks() -> None:
     events = [
         _tool_event("grep", {"matches": 2}),
         _tool_event(
-            "hashmarks_task_evidence", {"schema": "hashmarks.task-evidence.v2"}
+            "hashmarks_task_evidence", {"schema": "hashmarks.task-evidence.v3"}
         ),
         {
             "type": "text",
@@ -611,7 +611,7 @@ def test_host_gate_runs_both_protocol_phases_and_binds_receipt(
         _tool_event(
             "hashmarks_task_evidence",
             {
-                "schema": "hashmarks.task-evidence.v2",
+                "schema": "hashmarks.task-evidence.v3",
                 "ownership": {
                     "status": "resolved",
                     "owner": {"path": host_gate.CHANGED_PATH},
