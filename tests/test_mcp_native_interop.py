@@ -60,8 +60,7 @@ def _assert_find_defaults(
     schemas: dict[str, dict[str, object]],
 ) -> None:
     assert (
-        schemas["find"]["properties"]["limit"]["default"]
-        == FIND_DEFAULT_OPTIONS.limit
+        schemas["find"]["properties"]["limit"]["default"] == FIND_DEFAULT_OPTIONS.limit
     )
 
 
