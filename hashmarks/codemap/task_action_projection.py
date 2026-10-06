@@ -9,7 +9,6 @@ from hashmarks.operation_contract import operation_response, operation_schema
 
 from ..ownership_decision import bounded_presentation_contract
 from .decision_session import decision_scoped, diagnostic_producer
-from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 from .model import EvidenceVisibility
 from .repository_domains import RepositoryDomain
 from .task_action_owner_resolution import TaskActionOwnerResolutionMixin
@@ -22,6 +21,7 @@ from .task_action_types import (
     _TaskActionProjectionChoices,
     _TaskActionSelectionState,
 )
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 
 if TYPE_CHECKING:
     from .engine import CodeMap
