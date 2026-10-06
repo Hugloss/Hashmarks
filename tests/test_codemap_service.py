@@ -9,6 +9,7 @@ from hashmarks.codemap import CodeMap, CodeMapService, CodeMapServiceClient
 from hashmarks.codemap.evidence_packet import (
     TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS,
 )
+from hashmarks.operation_contract import operation_schema
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -228,7 +229,7 @@ def test_service_agent_task_start_returns_bounded_source_evidence(
             "Change normalize_widget to lowercase the trimmed value and verify normalize_widget",
             token_budget=512,
         )
-        assert start["schema"] == "hashmarks.task-evidence.v2"
+        assert start["schema"] == operation_schema("task_evidence")
         ownership = start["ownership"]
         assert ownership["status"] == "resolved"
         assert ownership["owner"]["path"] == "src/engine.py"
