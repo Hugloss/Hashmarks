@@ -12,7 +12,6 @@ from .decision_session import decision_scoped, diagnostic_producer
 from .model import EvidenceVisibility
 from .repository_domains import RepositoryDomain
 from .task_action_owner_resolution import TaskActionOwnerResolutionMixin
-from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .task_action_types import (
     _TaskActionAmbiguityPayloadState,
     _TaskActionFinalState,
@@ -22,6 +21,7 @@ from .task_action_types import (
     _TaskActionProjectionChoices,
     _TaskActionSelectionState,
 )
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 if TYPE_CHECKING:
     from .engine import CodeMap
