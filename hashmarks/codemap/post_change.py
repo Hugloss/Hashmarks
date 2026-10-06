@@ -32,6 +32,9 @@ class PostChangeOptions:
     token_budget: int = 512
 
 
+POST_CHANGE_DEFAULT_OPTIONS = PostChangeOptions()
+
+
 class PostChangeMixin(ChangeImpactMixin):
     @staticmethod
     def _post_change_previous_value(packet: Mapping[str, object], key: str) -> object:
@@ -438,7 +441,7 @@ class PostChangeMixin(ChangeImpactMixin):
         task: str,
         changed_paths: Sequence[str | Path],
         *,
-        options: PostChangeOptions = PostChangeOptions(),
+        options: PostChangeOptions = POST_CHANGE_DEFAULT_OPTIONS,
     ) -> dict[str, object]:
         """Refresh changed paths and expose only changed action anchors."""
         self = cast("CodeMap", self)
@@ -506,9 +509,9 @@ class PostChangeMixin(ChangeImpactMixin):
         task: str,
         changed_paths: Sequence[str | Path],
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 512,
+        limit: int = POST_CHANGE_DEFAULT_OPTIONS.limit,
+        per_role: int = POST_CHANGE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = POST_CHANGE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, object]:
         """Refresh changed paths and return a compact post-refresh decision."""
         if TYPE_CHECKING:
@@ -551,9 +554,9 @@ class PostChangeMixin(ChangeImpactMixin):
         task: str,
         changed_paths: Sequence[str | Path],
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 512,
+        limit: int = POST_CHANGE_DEFAULT_OPTIONS.limit,
+        per_role: int = POST_CHANGE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = POST_CHANGE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, object]:
         """Refresh only changed repository paths, then emit fresh repository task evidence.
 
