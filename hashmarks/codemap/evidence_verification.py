@@ -23,20 +23,10 @@ from .model import EvidenceVisibility
 from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_index_store import git_base_identity
+from .verification_relevance_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 
 if TYPE_CHECKING:
     from .engine import CodeMap
-
-
-@dataclass(frozen=True, slots=True)
-class VerificationRelevanceOptions:
-    """Default bounds for verification relevance and its ownership projection."""
-
-    limit: int = 20
-    candidate_limit: int = 8
-
-
-VERIFICATION_RELEVANCE_DEFAULT_OPTIONS = VerificationRelevanceOptions()
 
 
 @dataclass(frozen=True)
@@ -1320,10 +1310,7 @@ class VerificationMixin:
 
     @operation_response("verification_ownership")
     def verification_ownership_graph(
-        self,
-        task: str,
-        *,
-        limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
+        self, task: str, *, limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
         candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
     ) -> dict[str, object]:
         """Expose verification owners and their evidence-backed edit-authority links."""
