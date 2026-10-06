@@ -22,7 +22,7 @@ from hashmarks.paths import canonical_host_path
 from .change_impact import CHANGE_IMPACT_DEFAULT_OPTIONS, ChangeImpactOptions
 from .engine import CodeMap
 from .evidence_packet import TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
-from .post_change import PostChangeOptions
+from .post_change import POST_CHANGE_DEFAULT_OPTIONS, PostChangeOptions
 from .repository_intelligence_query import (
     REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
     RepositoryIntelligenceQueryOptions,
@@ -473,6 +473,20 @@ class CodeMapService:
         token_budget = self._bounded_int(request, "token_budget", 512, 1, 100_000)
         return task, changed, limit, per_role, token_budget
 
+    def _refresh_context(
+        self, request: dict[str, Any]
+    ) -> tuple[str, list[str], int, int, int]:
+        defaults = POST_CHANGE_DEFAULT_OPTIONS
+        return (
+            self._task(request),
+            self._string_list(request, "changed_paths", required=True),
+            self._bounded_int(request, "limit", defaults.limit, 1, 100),
+            self._bounded_int(request, "per_role", defaults.per_role, 1, 20),
+            self._bounded_int(
+                request, "token_budget", defaults.token_budget, 1, 100_000
+            ),
+        )
+
     def _change_impact_response(self, request: dict[str, Any]) -> dict[str, Any]:
         task, changed, limit, per_role, _budget = self._changed_context(request)
         defaults = CHANGE_IMPACT_DEFAULT_OPTIONS
@@ -585,13 +599,18 @@ class CodeMapService:
         return {"ok": True, "post_change_delta": result}
 
     def _refresh_delta_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        task, changed, limit, per_role, budget = self._changed_context(request)
+        task, changed, limit, per_role, budget = self._refresh_context(request)
+        defaults = POST_CHANGE_DEFAULT_OPTIONS
         result = self._map().refresh_after_change_delta(
             task,
             changed,
             options=PostChangeOptions(
-                previous_edit_path=request.get("previous_edit_path"),
-                previous_verify_path=request.get("previous_verify_path"),
+                previous_edit_path=request.get(
+                    "previous_edit_path", defaults.previous_edit_path
+                ),
+                previous_verify_path=request.get(
+                    "previous_verify_path", defaults.previous_verify_path
+                ),
                 limit=limit,
                 per_role=per_role,
                 token_budget=budget,
@@ -600,7 +619,7 @@ class CodeMapService:
         return {"ok": True, "refresh_delta": result}
 
     def _refresh_brief_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        task, changed, limit, per_role, budget = self._changed_context(request)
+        task, changed, limit, per_role, budget = self._refresh_context(request)
         result = self._map().refresh_after_change_brief(
             task,
             changed,
@@ -611,7 +630,7 @@ class CodeMapService:
         return {"ok": True, "refresh_brief": result}
 
     def _refresh_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        task, changed, limit, per_role, budget = self._changed_context(request)
+        task, changed, limit, per_role, budget = self._refresh_context(request)
         result = self._map().refresh_after_change(
             task,
             changed,
@@ -904,9 +923,9 @@ class CodeMapServiceClient:
         self,
         task: str,
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 512,
+        limit: int = POST_CHANGE_DEFAULT_OPTIONS.limit,
+        per_role: int = POST_CHANGE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = POST_CHANGE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, Any]:
         return dict(
             self.request(
@@ -922,9 +941,9 @@ class CodeMapServiceClient:
         self,
         task: str,
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 512,
+        limit: int = POST_CHANGE_DEFAULT_OPTIONS.limit,
+        per_role: int = POST_CHANGE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = POST_CHANGE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, Any]:
         return dict(
             self.request(
@@ -1072,7 +1091,7 @@ class CodeMapServiceClient:
         task: str,
         changed_paths: tuple[str, ...] | list[str],
         *,
-        options: PostChangeOptions = PostChangeOptions(),
+        options: PostChangeOptions = POST_CHANGE_DEFAULT_OPTIONS,
     ) -> dict[str, Any]:
         return dict(
             self.request(
