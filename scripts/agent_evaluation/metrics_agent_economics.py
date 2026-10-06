@@ -307,12 +307,17 @@ def collect(
     }
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser()
     p.add_argument("--root", type=Path, required=True)
     p.add_argument("--mode", choices=["native", "paired"], default="paired")
     p.add_argument("--limit", type=int, default=20)
     p.add_argument("--output", type=Path)
+    return p
+
+
+def main() -> int:
+    p = _parser()
     a = p.parse_args()
     strategies = ("native",) if a.mode == "native" else ("native", "hashmarks")
     result = collect(a.root, strategies=strategies, limit=a.limit)

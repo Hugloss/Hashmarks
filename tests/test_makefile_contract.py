@@ -271,3 +271,14 @@ def test_blind_worker_make_alias_owns_only_repo_local_paths() -> None:
     assert "--root .hashmarks/benchmarks/blind-worker-ab" in joined
     assert "--output .hashmarks/metrics/blind-worker-ab-latest.json" in joined
     assert "--limit 20" not in joined
+
+
+def test_agent_economics_make_alias_delegates_default_mode() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+    recipe = _make_recipe(text, "metrics-agent-economics")
+    joined = "\n".join(recipe)
+
+    assert "scripts.agent_evaluation.metrics_agent_economics" in joined
+    assert "--root .hashmarks/benchmarks/agent-economics" in joined
+    assert "--output .hashmarks/metrics/agent-economics-latest.json" in joined
+    assert "--mode paired" not in joined
