@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import sys
 import types
@@ -9,6 +10,7 @@ import pytest
 
 from hashmarks import mcp_server, mcp_surface, repository_retry
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from hashmarks.file_store import UnstableFileError
 from hashmarks.mcp_contract import tool_contract
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
@@ -518,6 +520,19 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
         )
 
 
+def _assert_registered_task_evidence_defaults(
+    registered: list[dict[str, object]],
+) -> None:
+    task_evidence_tool = next(
+        row["fn"] for row in registered if row["name"] == "task_evidence"
+    )
+    parameters = inspect.signature(task_evidence_tool).parameters
+    defaults = TASK_EVIDENCE_DEFAULT_OPTIONS
+    assert parameters["limit"].default == defaults.limit
+    assert parameters["per_role"].default == defaults.per_role
+    assert parameters["token_budget"].default == defaults.token_budget
+
+
 def test_mcp_server_registers_exact_small_read_only_tool_catalog(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -598,9 +613,10 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             }
             assert len(str(row["description"])) < 220
 
-        find_tool = next(row["fn"] for row in registered if row["name"] == "find")
+        _assert_registered_task_evidence_defaults(registered)
+
         with pytest.raises(FakeToolError, match="query must not be empty"):
-            find_tool(" ", limit=5)
+            next(row["fn"] for row in registered if row["name"] == "find")(" ", limit=5)
         with pytest.raises(McpSurfaceError, match="query must not be empty"):
             server._hashmarks_surface.find(" ", limit=5)
 
