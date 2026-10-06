@@ -58,9 +58,7 @@ def test_task_action_defaults_have_one_owner(
             token_budget: int | None,
         ) -> dict[str, object]:
             del task
-            captured.append(
-                ("brief", TaskActionOptions(limit, per_role), token_budget)
-            )
+            captured.append(("brief", TaskActionOptions(limit, per_role), token_budget))
             return {"schema": "hashmarks.task-action-brief.v1"}
 
     service = CodeMapService(tmp_path, socket_path=tmp_path / "service.sock")
