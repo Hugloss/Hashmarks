@@ -1227,7 +1227,11 @@ class OwnershipGraphMixin:
         return default if value is None else value
 
     def _structural_owner_candidate(
-        self, start_path: str, *, max_depth: int = 2, task: str = ""
+        self,
+        start_path: str,
+        *,
+        max_depth: int = OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth,
+        task: str = "",
     ) -> dict[str, object] | None:
         """Project the selected typed ownership relation into the action anchor shape."""
         graph = self.ownership_relation_graph(task, start_path, max_depth=max_depth)

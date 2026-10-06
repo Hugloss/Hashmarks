@@ -22,6 +22,7 @@ def test_ownership_relation_defaults_have_one_owner(
     defaults = OWNERSHIP_RELATION_DEFAULT_OPTIONS
     for owner in (
         CodeMap.ownership_relation_graph,
+        CodeMap._structural_owner_candidate,
         CodeMapServiceClient.ownership_relation_graph,
     ):
         parameters = inspect.signature(owner).parameters
