@@ -545,7 +545,7 @@ codex-agent-economics-preflight:
 	$(UV_RUN) --offline python -m scripts.agent_evaluation.codex_agent_economics --preflight --output .hashmarks/metrics/codex-agent-preflight.json
 
 codex-agent-economics:
-	$(UV_RUN) --offline python -m scripts.agent_evaluation.codex_agent_economics --root .hashmarks/benchmarks/codex-agent-economics --output .hashmarks/metrics/codex-agent-economics-latest.json
+	$(UV_RUN) --offline python -m scripts.agent_evaluation.codex_agent_economics --output .hashmarks/metrics/codex-agent-economics-latest.json
 
 .PHONY: codex-selective-scout-economics
 codex-selective-scout-economics:
