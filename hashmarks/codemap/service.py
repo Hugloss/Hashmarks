@@ -25,7 +25,6 @@ from .change_impact import (
 )
 from .engine import CodeMap
 from .evidence_decision_packet import TASK_DECISION_DEFAULT_OPTIONS
-from .evidence_verification import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 from .evidence_packet import (
     TASK_ACTION_BRIEF_BUDGET_DEFAULT_OPTIONS,
     TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS,
@@ -37,6 +36,7 @@ from .repository_intelligence_query import (
     RepositoryIntelligenceQueryOptions,
 )
 from .task_action_projection import TASK_ACTION_DEFAULT_OPTIONS
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 
 PROTOCOL = "hashmarks.codemap-service.v2"
 MAX_REQUEST = 1024 * 1024
