@@ -31,6 +31,14 @@ def test_task_decision_packet_and_brief_defaults_have_one_owner(
         assert parameters["per_role"].default == defaults.per_role
         assert parameters["token_budget"].default == defaults.token_budget
 
+    for owner in (
+        CodeMap.task_decision_brief_budget_sweep,
+        CodeMapServiceClient.task_decision_brief_budget_sweep,
+    ):
+        parameters = inspect.signature(owner).parameters
+        assert parameters["limit"].default == defaults.limit
+        assert parameters["per_role"].default == defaults.per_role
+
     captured: list[TaskDecisionOptions] = []
 
     class _Map:
@@ -70,10 +78,29 @@ def test_task_decision_packet_and_brief_defaults_have_one_owner(
             )
             return {"schema": "hashmarks.task-decision-brief.v1"}
 
+        def task_decision_brief_budget_sweep(
+            self,
+            task: str,
+            *,
+            budgets: list[int],
+            limit: int,
+            per_role: int,
+        ) -> dict[str, object]:
+            del task, budgets
+            captured.append(
+                TaskDecisionOptions(
+                    limit=limit,
+                    per_role=per_role,
+                    token_budget=defaults.token_budget,
+                )
+            )
+            return {"schema": "hashmarks.task-decision-brief-budget-sweep.v1"}
+
     service = CodeMapService(tmp_path, socket_path=tmp_path / "service.sock")
     monkeypatch.setattr(service, "_map", lambda: _Map())
 
     service._decision_packet_response({"task": "inspect widget"})
     service._decision_brief_response({"task": "inspect widget"})
+    service._budget_sweep_response({"task": "inspect widget"})
 
-    assert captured == [defaults, defaults]
+    assert captured == [defaults, defaults, defaults]
