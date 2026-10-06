@@ -27,7 +27,6 @@ from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 _LIMIT = VERIFICATION_RELEVANCE_DEFAULTS.limit
 _CANDIDATES = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
-
 if TYPE_CHECKING:
     from .engine import CodeMap
 
