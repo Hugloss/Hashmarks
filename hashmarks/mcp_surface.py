@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from . import repository_retry
 from .codemap import ChangeImpactOptions, CodeMap
+from .codemap.change_impact import CHANGE_IMPACT_DEFAULT_REQUEST
 from .codemap.evidence_correlation import (
     CORRELATION_PACKET_MAX_BYTES,
     CORRELATION_REQUEST_MAX_BYTES,
@@ -248,20 +249,27 @@ class HashmarksMcpSurface:
         )
 
     def change_impact(
-        self, task: str, changed_paths: list[str], *, max_depth: int = 4
+        self,
+        task: str,
+        changed_paths: list[str],
+        *,
+        max_depth: int = CHANGE_IMPACT_DEFAULT_REQUEST.options.max_depth,
     ) -> dict[str, object]:
         task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
         paths = _changed_paths(changed_paths)
         max_depth = _bounded_int(max_depth, name="max_depth", minimum=1, maximum=12)
+        defaults = CHANGE_IMPACT_DEFAULT_REQUEST
+        options = defaults.options
         return self._read(
             lambda: self._map.task_change_impact(
                 task,
                 paths,
-                limit=20,
-                per_role=3,
+                limit=defaults.limit,
+                per_role=defaults.per_role,
                 options=ChangeImpactOptions(
-                    impact_limit_per_surface=6,
+                    impact_limit_per_surface=options.impact_limit_per_surface,
                     max_depth=max_depth,
+                    project_impact_limit=options.project_impact_limit,
                     project_impact_encoding="compact",
                 ),
             )
