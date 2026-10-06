@@ -260,3 +260,14 @@ def test_worker_inspection_make_alias_delegates_normal_defaults() -> None:
         "--limit 20",
     ):
         assert stale not in joined
+
+
+def test_blind_worker_make_alias_owns_only_repo_local_paths() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+    recipe = _make_recipe(text, "metrics-blind-worker-ab")
+    joined = "\n".join(recipe)
+
+    assert "scripts.agent_evaluation.metrics_blind_worker_ab" in joined
+    assert "--root .hashmarks/benchmarks/blind-worker-ab" in joined
+    assert "--output .hashmarks/metrics/blind-worker-ab-latest.json" in joined
+    assert "--limit 20" not in joined
