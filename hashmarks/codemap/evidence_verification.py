@@ -1141,9 +1141,7 @@ class VerificationMixin:
         task: str,
         *,
         limit: int = VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit,
-        candidate_limit: int = (
-            VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit
-        ),
+        candidate_limit: int = (VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit),
     ) -> dict[str, object]:
         """Return the task's bounded verification relevance evidence."""
         if TYPE_CHECKING:
