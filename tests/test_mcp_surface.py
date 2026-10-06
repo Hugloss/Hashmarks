@@ -520,6 +520,19 @@ def test_mcp_server_boundary_translates_only_surface_errors() -> None:
         )
 
 
+def _assert_registered_task_evidence_defaults(
+    registered: list[dict[str, object]],
+) -> None:
+    task_evidence_tool = next(
+        row["fn"] for row in registered if row["name"] == "task_evidence"
+    )
+    parameters = inspect.signature(task_evidence_tool).parameters
+    defaults = TASK_EVIDENCE_DEFAULT_OPTIONS
+    assert parameters["limit"].default == defaults.limit
+    assert parameters["per_role"].default == defaults.per_role
+    assert parameters["token_budget"].default == defaults.token_budget
+
+
 def test_mcp_server_registers_exact_small_read_only_tool_catalog(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -600,22 +613,7 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             }
             assert len(str(row["description"])) < 220
 
-        task_evidence_tool = next(
-            row["fn"] for row in registered if row["name"] == "task_evidence"
-        )
-        task_evidence_parameters = inspect.signature(task_evidence_tool).parameters
-        assert (
-            task_evidence_parameters["limit"].default
-            == TASK_EVIDENCE_DEFAULT_OPTIONS.limit
-        )
-        assert (
-            task_evidence_parameters["per_role"].default
-            == TASK_EVIDENCE_DEFAULT_OPTIONS.per_role
-        )
-        assert (
-            task_evidence_parameters["token_budget"].default
-            == TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget
-        )
+        _assert_registered_task_evidence_defaults(registered)
 
         find_tool = next(row["fn"] for row in registered if row["name"] == "find")
         with pytest.raises(FakeToolError, match="query must not be empty"):
