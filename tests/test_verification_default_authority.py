@@ -33,9 +33,7 @@ def test_verification_defaults_have_one_core_owner(
         assert parameters["limit"].default == defaults.limit
         assert parameters["candidate_limit"].default == defaults.candidate_limit
 
-    explanation = inspect.signature(
-        CodeMap.explain_verification_selection
-    ).parameters
+    explanation = inspect.signature(CodeMap.explain_verification_selection).parameters
     assert explanation["limit"].default == defaults.limit
     assert explanation["candidate_limit"].default == 16
 
@@ -95,9 +93,7 @@ def test_verification_cli_defaults_consume_core_authority() -> None:
         == VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit
     )
 
-    ownership = parser.parse_args(
-        ["map", "verification-ownership", "inspect widget"]
-    )
+    ownership = parser.parse_args(["map", "verification-ownership", "inspect widget"])
     assert ownership.limit == VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit
     assert (
         ownership.candidate_limit
