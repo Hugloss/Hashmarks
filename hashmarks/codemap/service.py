@@ -591,11 +591,17 @@ class CodeMapService:
         return {"ok": True, "repository_intelligence_query": result}
 
     def _post_change_delta_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        task, changed, limit, per_role, _budget = self._changed_context(request)
+        defaults = TASK_EVIDENCE_DEFAULT_OPTIONS
+        task = self._task(request)
+        changed = self._string_list(request, "changed_paths", required=True)
+        limit = self._bounded_int(request, "limit", defaults.limit, 1, 100)
+        per_role = self._bounded_int(request, "per_role", defaults.per_role, 1, 20)
         previous_evidence = request.get("previous_evidence")
         if not isinstance(previous_evidence, dict):
             raise ValueError("previous_evidence must be an object")
-        token_budget = self._bounded_int(request, "token_budget", 1536, 1, 100_000)
+        token_budget = self._bounded_int(
+            request, "token_budget", defaults.token_budget, 1, 100_000
+        )
         result = self._map().task_post_change_delta(
             task,
             changed,
@@ -1078,9 +1084,9 @@ class CodeMapServiceClient:
         changed_paths: tuple[str, ...] | list[str],
         *,
         previous_evidence: dict[str, Any],
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 1536,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, Any]:
         return dict(
             self.request(
