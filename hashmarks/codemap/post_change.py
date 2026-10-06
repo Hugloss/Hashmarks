@@ -14,6 +14,7 @@ from hashmarks.operation_contract import (
 from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactMixin
+from .evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -338,9 +339,9 @@ class PostChangeMixin(ChangeImpactMixin):
         changed_paths: Sequence[str | Path],
         *,
         previous_evidence: dict[str, object],
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 1536,
+        limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, object]:
         """Refresh changed paths and report role-separated evidence invalidation."""
         if TYPE_CHECKING:
