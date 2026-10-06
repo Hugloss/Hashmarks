@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 from hashmarks.codemap.verification_defaults import (
     VERIFICATION_RELEVANCE_DEFAULT_OPTIONS,
     VerificationRelevanceOptions,
 )
-from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 from hashmarks.repository_cli import add_repository_cli
 
 if TYPE_CHECKING:
