@@ -51,6 +51,18 @@ CHANGE_IMPACT_DEFAULT_OPTIONS = ChangeImpactOptions()
 
 
 @dataclass(frozen=True)
+class ChangeImpactRequestDefaults:
+    """Default retrieval bounds plus semantic options for change-impact requests."""
+
+    limit: int = 20
+    per_role: int = 3
+    options: ChangeImpactOptions = CHANGE_IMPACT_DEFAULT_OPTIONS
+
+
+CHANGE_IMPACT_DEFAULT_REQUEST = ChangeImpactRequestDefaults()
+
+
+@dataclass(frozen=True)
 class _ImpactCandidate:
     path: str
     depth: int
@@ -585,9 +597,9 @@ class ChangeImpactMixin:
         task: str,
         changed_paths: Sequence[str | Path],
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        options: ChangeImpactOptions = CHANGE_IMPACT_DEFAULT_OPTIONS,
+        limit: int = CHANGE_IMPACT_DEFAULT_REQUEST.limit,
+        per_role: int = CHANGE_IMPACT_DEFAULT_REQUEST.per_role,
+        options: ChangeImpactOptions = CHANGE_IMPACT_DEFAULT_REQUEST.options,
     ) -> dict[str, object]:
         """Expose bounded changed-code impact and verification relevance.
 
