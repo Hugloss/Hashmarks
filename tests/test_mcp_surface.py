@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import sys
 import types
@@ -9,6 +10,7 @@ import pytest
 
 from hashmarks import mcp_server, mcp_surface, repository_retry
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from hashmarks.file_store import UnstableFileError
 from hashmarks.mcp_contract import tool_contract
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
@@ -597,6 +599,23 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
                 "open_world_hint": False,
             }
             assert len(str(row["description"])) < 220
+
+        task_evidence_tool = next(
+            row["fn"] for row in registered if row["name"] == "task_evidence"
+        )
+        task_evidence_parameters = inspect.signature(task_evidence_tool).parameters
+        assert (
+            task_evidence_parameters["limit"].default
+            == TASK_EVIDENCE_DEFAULT_OPTIONS.limit
+        )
+        assert (
+            task_evidence_parameters["per_role"].default
+            == TASK_EVIDENCE_DEFAULT_OPTIONS.per_role
+        )
+        assert (
+            task_evidence_parameters["token_budget"].default
+            == TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget
+        )
 
         find_tool = next(row["fn"] for row in registered if row["name"] == "find")
         with pytest.raises(FakeToolError, match="query must not be empty"):
