@@ -11,6 +11,7 @@ from hashmarks.codemap.post_change import PostChangeOptions
 from hashmarks.codemap.repository_intelligence_query import (
     RepositoryIntelligenceQueryOptions,
 )
+from hashmarks.operation_contract import operation_schema
 
 
 class _FakeSocket:
@@ -277,7 +278,7 @@ def test_service_registry_owns_handler_selection(
         seen.append(request)
         return {
             "ok": True,
-            "task_evidence": {"schema": "hashmarks.task-evidence.v2"},
+            "task_evidence": {"schema": operation_schema("task_evidence")},
         }
 
     monkeypatch.setattr(service, "_task_evidence_response", project)
