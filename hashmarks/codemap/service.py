@@ -680,7 +680,10 @@ class CodeMapService:
         return {"ok": True, "task_action_brief": result}
 
     def _budget_sweep_response(self, request: dict[str, Any]) -> dict[str, Any]:
-        task, limit, per_role = self._task_context(request)
+        defaults = TASK_DECISION_DEFAULT_OPTIONS
+        task = self._task(request)
+        limit = self._bounded_int(request, "limit", defaults.limit, 1, 100)
+        per_role = self._bounded_int(request, "per_role", defaults.per_role, 1, 20)
         budgets = request.get(
             "budgets", list(TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS)
         )
@@ -1018,8 +1021,8 @@ class CodeMapServiceClient:
         budgets: tuple[int, ...] | list[int] = (
             TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS
         ),
-        limit: int = 20,
-        per_role: int = 3,
+        limit: int = TASK_DECISION_DEFAULT_OPTIONS.limit,
+        per_role: int = TASK_DECISION_DEFAULT_OPTIONS.per_role,
     ) -> dict[str, Any]:
         return dict(
             self.request(
