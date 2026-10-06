@@ -549,7 +549,7 @@ codex-agent-economics:
 
 .PHONY: codex-selective-scout-economics
 codex-selective-scout-economics:
-	$(UV_RUN) --offline python -m scripts.agent_evaluation.codex_selective_scout_economics --root .hashmarks/benchmarks/codex-selective-scout --output .hashmarks/metrics/codex-selective-scout-latest.json
+	$(UV_RUN) --offline python -m scripts.agent_evaluation.codex_selective_scout_economics --output .hashmarks/metrics/codex-selective-scout-latest.json
 
 .PHONY: codex-economics-matrix-plan
 codex-economics-matrix-plan:
