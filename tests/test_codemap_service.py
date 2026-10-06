@@ -228,7 +228,7 @@ def test_service_agent_task_start_returns_bounded_source_evidence(
             "Change normalize_widget to lowercase the trimmed value and verify normalize_widget",
             token_budget=512,
         )
-        assert start["schema"] == "hashmarks.task-evidence.v2"
+        assert start["schema"] == "hashmarks.task-evidence.v3"
         ownership = start["ownership"]
         assert ownership["status"] == "resolved"
         assert ownership["owner"]["path"] == "src/engine.py"
