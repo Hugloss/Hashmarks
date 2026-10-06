@@ -13,7 +13,7 @@ from .codemap.change_impact import (
     ChangeImpactOptions,
 )
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
-from .codemap.verification_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
+from .codemap.verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .errors import RepositoryCliError
 from .operation_contract import validate_operation_response
 from .repository_retry import (
@@ -487,12 +487,12 @@ def _add_map_ownership_cli(
     add_common_arguments(map_verification_ownership, inherited=True)
     map_verification_ownership.add_argument("task")
     map_verification_ownership.add_argument(
-        "--limit", type=int, default=VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit
+        "--limit", type=int, default=VERIFICATION_RELEVANCE_DEFAULTS.limit
     )
     map_verification_ownership.add_argument(
         "--candidate-limit",
         type=int,
-        default=VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
+        default=VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit,
     )
     map_verification_ownership.set_defaults(
         func=_map_verification_ownership, automatic_update_check=True
@@ -695,12 +695,12 @@ def _add_task_evidence_cli(sub, *, add_common_arguments: Callable[..., None]) ->
     add_common_arguments(verification_relevance, inherited=True)
     verification_relevance.add_argument("task")
     verification_relevance.add_argument(
-        "--limit", type=int, default=VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.limit
+        "--limit", type=int, default=VERIFICATION_RELEVANCE_DEFAULTS.limit
     )
     verification_relevance.add_argument(
         "--candidate-limit",
         type=int,
-        default=VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
+        default=VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit,
     )
     verification_relevance.set_defaults(
         func=_verification_relevance_code, automatic_update_check=True
