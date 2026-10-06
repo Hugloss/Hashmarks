@@ -12,6 +12,7 @@ from .decision_session import decision_scoped, diagnostic_producer
 from .model import EvidenceVisibility
 from .repository_domains import RepositoryDomain
 from .task_action_owner_resolution import TaskActionOwnerResolutionMixin
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .task_action_types import (
     _TaskActionAmbiguityPayloadState,
     _TaskActionFinalState,
@@ -21,7 +22,6 @@ from .task_action_types import (
     _TaskActionProjectionChoices,
     _TaskActionSelectionState,
 )
-from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -278,7 +278,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 edit=edit,
                 current_verify=selection.verify,
                 rows=context.rows,
-                limit=VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
+                limit=VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit,
             )
         else:
             current_verify_path = (

@@ -770,3 +770,15 @@ def test_agent_suite_parser_owns_normal_workload_defaults() -> None:
     assert args.max_average_find_ms is None
     assert args.max_average_context_ms is None
     assert args.output is None
+
+
+def test_codex_agent_economics_parser_owns_normal_root_default() -> None:
+    module = importlib.import_module("scripts.agent_evaluation.codex_agent_economics")
+    args = module._parser().parse_args([])
+
+    assert args.root == Path(".hashmarks/benchmarks/codex-agent-economics")
+    assert args.codex_bin == "codex"
+    assert args.sandbox == "read-only"
+    assert args.timeout == 900
+    assert args.preflight is False
+    assert args.output is None

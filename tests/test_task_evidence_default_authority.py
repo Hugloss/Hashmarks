@@ -55,6 +55,20 @@ def test_task_evidence_defaults_have_one_owner(
     assert args.per_role == defaults.per_role
     assert args.budget == defaults.token_budget
 
+    post_change_args = parser.parse_args(
+        [
+            "post-change",
+            "inspect widget",
+            "--changed",
+            "src/widget.py",
+            "--previous-evidence",
+            "previous.json",
+        ]
+    )
+    assert post_change_args.limit == defaults.limit
+    assert post_change_args.per_role == defaults.per_role
+    assert post_change_args.budget == defaults.token_budget
+
     captured: dict[str, object] = {}
 
     class _Map:
