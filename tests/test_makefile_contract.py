@@ -293,3 +293,28 @@ def test_worker_behavior_make_alias_owns_only_repo_local_paths() -> None:
     assert "--root .hashmarks/benchmarks/worker-behavior-ab" in joined
     assert "--output .hashmarks/metrics/worker-behavior-ab-latest.json" in joined
     assert "--limit 20" not in joined
+
+
+def test_agent_suite_make_alias_keeps_only_repo_and_qualification_policy() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+    recipe = _make_recipe(text, "metrics-agent-suite")
+    joined = "\n".join(recipe)
+
+    assert (
+        "$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_suite"
+        in joined
+    )
+    assert '--repo "hashmarks=.::benchmarks/agent_tasks.json"' in joined
+    assert (
+        '--repo "oh-goon=$(OH_GOON)::'
+        'benchmarks/external/oh_goon_1267_0_49_agent_tasks.json"' in joined
+    )
+    assert "--min-file-recall 1" in joined
+    assert "--min-symbol-recall 1" in joined
+    assert "--max-fallback-rate 0" in joined
+    assert "--max-average-find-ms 60" in joined
+    assert "--max-average-context-ms 80" in joined
+    assert "--output .hashmarks/metrics/agent-suite-latest.json" in joined
+
+    for stale in ("--budget 1200", "--limit 20"):
+        assert stale not in joined

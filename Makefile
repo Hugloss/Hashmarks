@@ -504,7 +504,6 @@ metrics-agent-suite: bootstrap
 	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_suite \
 	  --repo "hashmarks=.::benchmarks/agent_tasks.json" \
 	  --repo "oh-goon=$(OH_GOON)::benchmarks/external/oh_goon_1267_0_49_agent_tasks.json" \
-	  --budget 1200 --limit 20 \
 	  --min-file-recall 1 --min-symbol-recall 1 --max-fallback-rate 0 \
 	  --max-average-find-ms 60 --max-average-context-ms 80 \
 	  --output .hashmarks/metrics/agent-suite-latest.json

@@ -754,3 +754,19 @@ def test_codex_economics_matrix_plan_is_fail_closed_without_codex(
     assert value["execution_units"] == 18 + 18 + 21 + 18
     assert len(value["variants"]) == 4
     assert value["variants"][2]["strategy"] == "selective-real"
+
+
+def test_agent_suite_parser_owns_normal_workload_defaults() -> None:
+    suite = importlib.import_module("scripts.agent_evaluation.metrics_agent_suite")
+    args = suite._parser().parse_args(
+        ["--repo", "hashmarks=.::benchmarks/agent_tasks.json"]
+    )
+
+    assert args.budget == 1200
+    assert args.limit == 20
+    assert args.min_file_recall == 0.0
+    assert args.min_symbol_recall == 0.0
+    assert args.max_fallback_rate == 1.0
+    assert args.max_average_find_ms is None
+    assert args.max_average_context_ms is None
+    assert args.output is None

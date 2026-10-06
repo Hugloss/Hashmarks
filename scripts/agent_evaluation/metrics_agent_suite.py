@@ -138,7 +138,7 @@ def collect_suite(
     }
 
 
-def main() -> None:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Replay agent-localization corpora across multiple repositories"
     )
@@ -157,6 +157,11 @@ def main() -> None:
     parser.add_argument("--max-fallback-rate", type=float, default=1.0)
     parser.add_argument("--max-average-find-ms", type=float)
     parser.add_argument("--max-average-context-ms", type=float)
+    return parser
+
+
+def main() -> None:
+    parser = _parser()
     args = parser.parse_args()
     payload = collect_suite(args.repo, budget=args.budget, limit=args.limit)
     rendered = json.dumps(payload, indent=2, sort_keys=True)
