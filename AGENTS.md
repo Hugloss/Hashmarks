@@ -352,6 +352,10 @@ The full-suite runtime profile is owned by `make test-profile` and reports the s
 
 `scripts.agent_evaluation.metrics_blind_worker_ab` owns the normal 20-result query limit for both benchmark and worker modes. `make metrics-blind-worker-ab` owns only the repository-local benchmark root and stable latest-receipt path; it must not restate the script's query-limit default.
 
+### Worker-behavior A/B metrics defaults have one owner
+
+`scripts.agent_evaluation.metrics_worker_behavior_ab` owns the normal 20-result query limit for both benchmark and worker modes. `make metrics-worker-behavior-ab` owns only the repository-local benchmark root and stable latest-receipt path; it must not restate the script's query-limit default.
+
 ### Worker-inspection A/B metrics defaults have one owner
 
 `scripts.agent_evaluation.metrics_worker_inspection_ab` owns the normal benchmark materialization root and 20-result query limit. `make metrics-worker-inspection-ab` owns only the stable repository-local latest-receipt destination and must not restate those workload defaults.
