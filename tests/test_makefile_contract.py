@@ -282,3 +282,14 @@ def test_agent_economics_make_alias_delegates_default_mode() -> None:
     assert "--root .hashmarks/benchmarks/agent-economics" in joined
     assert "--output .hashmarks/metrics/agent-economics-latest.json" in joined
     assert "--mode paired" not in joined
+
+
+def test_worker_behavior_make_alias_delegates_default_limit() -> None:
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
+    recipe = _make_recipe(text, "metrics-worker-behavior-ab")
+    joined = "\n".join(recipe)
+
+    assert "scripts.agent_evaluation.metrics_worker_behavior_ab" in joined
+    assert "--root .hashmarks/benchmarks/worker-behavior-ab" in joined
+    assert "--output .hashmarks/metrics/worker-behavior-ab-latest.json" in joined
+    assert "--limit 20" not in joined

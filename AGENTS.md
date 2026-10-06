@@ -368,6 +368,10 @@ The full-suite runtime profile is owned by `make test-profile` and reports the s
 
 `scripts.agent_evaluation.metrics_agent_economics` owns the normal strategy mode and defaults it to `paired`. `make metrics-agent-economics` owns the repository-local benchmark root and stable latest-receipt destination, but it must not restate the producer's mode default.
 
+### Worker-behavior A/B query limit has one owner
+
+`scripts.agent_evaluation.metrics_worker_behavior_ab` owns the normal 20-result query limit. `make metrics-worker-behavior-ab` owns the repository-local benchmark root and stable latest-receipt destination, but it must not restate the producer's query-limit default.
+
 ### Development-tool configuration has one owner
 
 `pyproject.toml` owns the Ruff dependency and rule configuration. Developer hooks, Make targets, and CI must invoke that configured Ruff rather than maintaining parallel min/latest compatibility paths. Do not add tests whose only assertion is that tool configuration, docs, and version strings agree. If a real tool upgrade breaks Hashmarks behavior, reproduce the failure and change the single project declaration or the affected behavior. Ruff remains diagnostic-only and never creates or transfers canonical promotion authority.

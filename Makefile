@@ -472,7 +472,6 @@ metrics-blind-worker-ab: bootstrap
 metrics-worker-behavior-ab: bootstrap
 	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_worker_behavior_ab \
 	  --root .hashmarks/benchmarks/worker-behavior-ab \
-	  --limit 20 \
 	  --output .hashmarks/metrics/worker-behavior-ab-latest.json
 
 metrics-worker-inspection-ab: bootstrap
