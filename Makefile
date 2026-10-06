@@ -490,7 +490,6 @@ metrics-worker-failed-verification-ab: bootstrap
 metrics-agent-economics: bootstrap
 	$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_economics \
 	  --root .hashmarks/benchmarks/agent-economics \
-	  --mode paired \
 	  --output .hashmarks/metrics/agent-economics-latest.json
 
 metrics-bm25-economics: bootstrap
