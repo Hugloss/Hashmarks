@@ -30,6 +30,7 @@ from .evidence_packet import (
     TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS,
     TASK_EVIDENCE_DEFAULT_OPTIONS,
 )
+from .ownership_relation_defaults import OWNERSHIP_RELATION_DEFAULT_OPTIONS
 from .post_change import POST_CHANGE_DEFAULT_OPTIONS, PostChangeOptions
 from .repository_intelligence_query import (
     REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
@@ -472,7 +473,9 @@ class CodeMapService:
         start_path = request.get("start_path")
         if not isinstance(start_path, str) or not start_path.strip():
             raise ValueError("start_path must be a non-empty string")
-        max_depth = int(request.get("max_depth", 2))
+        max_depth = int(
+            request.get("max_depth", OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth)
+        )
         result = self._map().ownership_relation_graph(
             task, start_path, max_depth=max_depth
         )
@@ -974,7 +977,11 @@ class CodeMapServiceClient:
         )
 
     def ownership_relation_graph(
-        self, task: str, start_path: str, *, max_depth: int = 2
+        self,
+        task: str,
+        start_path: str,
+        *,
+        max_depth: int = OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth,
     ) -> dict[str, Any]:
         return dict(
             self.request(
