@@ -923,9 +923,9 @@ class CodeMapServiceClient:
         self,
         task: str,
         *,
-        limit: int = POST_CHANGE_DEFAULT_OPTIONS.limit,
-        per_role: int = POST_CHANGE_DEFAULT_OPTIONS.per_role,
-        token_budget: int = POST_CHANGE_DEFAULT_OPTIONS.token_budget,
+        limit: int = 20,
+        per_role: int = 3,
+        token_budget: int = 512,
     ) -> dict[str, Any]:
         return dict(
             self.request(
@@ -941,9 +941,9 @@ class CodeMapServiceClient:
         self,
         task: str,
         *,
-        limit: int = POST_CHANGE_DEFAULT_OPTIONS.limit,
-        per_role: int = POST_CHANGE_DEFAULT_OPTIONS.per_role,
-        token_budget: int = POST_CHANGE_DEFAULT_OPTIONS.token_budget,
+        limit: int = 20,
+        per_role: int = 3,
+        token_budget: int = 512,
     ) -> dict[str, Any]:
         return dict(
             self.request(
@@ -1111,9 +1111,9 @@ class CodeMapServiceClient:
         task: str,
         changed_paths: tuple[str, ...] | list[str],
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 512,
+        limit: int = POST_CHANGE_DEFAULT_OPTIONS.limit,
+        per_role: int = POST_CHANGE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = POST_CHANGE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, Any]:
         return dict(
             self.request(
@@ -1131,9 +1131,9 @@ class CodeMapServiceClient:
         task: str,
         changed_paths: tuple[str, ...] | list[str],
         *,
-        limit: int = 20,
-        per_role: int = 3,
-        token_budget: int = 512,
+        limit: int = POST_CHANGE_DEFAULT_OPTIONS.limit,
+        per_role: int = POST_CHANGE_DEFAULT_OPTIONS.per_role,
+        token_budget: int = POST_CHANGE_DEFAULT_OPTIONS.token_budget,
     ) -> dict[str, Any]:
         return dict(
             self.request(
