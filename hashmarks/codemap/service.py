@@ -30,7 +30,7 @@ from .evidence_packet import (
     TASK_DECISION_BRIEF_BUDGET_SWEEP_DEFAULTS,
     TASK_EVIDENCE_DEFAULT_OPTIONS,
 )
-from .evidence_verification import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 from .post_change import POST_CHANGE_DEFAULT_OPTIONS, PostChangeOptions
 from .repository_intelligence_query import (
     REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
