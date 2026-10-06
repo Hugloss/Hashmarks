@@ -807,7 +807,28 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         }
 
     @staticmethod
+    def _task_evidence_positive_int(value: object) -> int | None:
+        return value if isinstance(value, int) and value > 0 else None
+
+    @classmethod
+    def _task_evidence_retrieval_range(
+        cls,
+        row: Mapping[str, object],
+    ) -> tuple[int | None, int | None]:
+        start = cls._task_evidence_positive_int(row.get("start_line"))
+        end = cls._task_evidence_positive_int(row.get("end_line"))
+        lines = row.get("lines")
+        if not isinstance(lines, list):
+            return start, end
+        if start is None and lines:
+            start = cls._task_evidence_positive_int(lines[0])
+        if end is None and len(lines) > 1:
+            end = cls._task_evidence_positive_int(lines[1])
+        return start, end
+
+    @classmethod
     def _task_evidence_retrieval_locator(
+        cls,
         row: Mapping[str, object],
         *,
         fallback_rank: int | None = None,
@@ -815,10 +836,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         """Project one retrieval candidate into a compact non-authoritative locator."""
         result: dict[str, object] = {"path": str(row.get("path") or "")}
 
-        rank = row.get("canonical_rank")
-        if not isinstance(rank, int) or rank <= 0:
-            rank = fallback_rank
-        if isinstance(rank, int) and rank > 0:
+        rank = cls._task_evidence_positive_int(row.get("canonical_rank"))
+        rank = rank or cls._task_evidence_positive_int(fallback_rank)
+        if rank is not None:
             result["rank"] = rank
 
         symbol = row.get("qualname") or row.get("name")
@@ -829,24 +849,10 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
         if isinstance(roles, list) and roles:
             result["roles"] = [str(role) for role in roles if str(role)]
 
-        start = row.get("start_line")
-        end = row.get("end_line")
-        lines = row.get("lines")
-        if (
-            (not isinstance(start, int) or start <= 0)
-            and isinstance(lines, list)
-            and lines
-        ):
-            start = lines[0]
-        if (
-            (not isinstance(end, int) or end <= 0)
-            and isinstance(lines, list)
-            and len(lines) > 1
-        ):
-            end = lines[1]
-        if isinstance(start, int) and start > 0:
+        start, end = cls._task_evidence_retrieval_range(row)
+        if start is not None:
             result["start_line"] = start
-        if isinstance(end, int) and end > 0:
+        if end is not None:
             result["end_line"] = end
 
         visibility = row.get("evidence_visibility")
