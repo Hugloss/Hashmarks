@@ -9,6 +9,7 @@ from hashmarks.operation_contract import operation_response, operation_schema
 
 from ..ownership_decision import bounded_presentation_contract
 from .decision_session import decision_scoped, diagnostic_producer
+from .evidence_verification import VERIFICATION_RELEVANCE_DEFAULT_OPTIONS
 from .model import EvidenceVisibility
 from .repository_domains import RepositoryDomain
 from .task_action_owner_resolution import TaskActionOwnerResolutionMixin
@@ -277,7 +278,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 edit=edit,
                 current_verify=selection.verify,
                 rows=context.rows,
-                limit=8,
+                limit=VERIFICATION_RELEVANCE_DEFAULT_OPTIONS.candidate_limit,
             )
         else:
             current_verify_path = (
