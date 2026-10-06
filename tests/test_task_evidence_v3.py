@@ -133,14 +133,29 @@ def test_task_evidence_v3_keeps_ambiguity_independent_from_freshness(
     _write(tmp_path, "src/a.py", "def calculate_value():\n    return 1\n")
     _write(tmp_path, "src/b.py", "def calculate_value():\n    return 2\n")
 
+    task = "fix calculate_value"
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        packet = codemap.task_evidence("fix calculate_value", token_budget=256)
+        action = codemap.task_action_map(task)
+        packet = codemap.task_evidence(task, token_budget=256)
 
-    assert packet["ownership"]["status"] == "ambiguous"
-    assert packet["ownership"]["owner"] is None
-    assert packet["ownership"]["ambiguity"]["ambiguous"] is True
-    assert packet["ownership"]["source_evidence"] is None
+    ownership = packet["ownership"]
+    assert ownership["status"] == "ambiguous"
+    assert ownership["owner"] is None
+    assert ownership["ambiguity"]["ambiguous"] is True
+    assert ownership["source_evidence"] is None
+    assert ownership["authority_proof_identity"] == (
+        action["ownership_authority"]["authority_proof_identity"]
+    )
+    next_read = ownership["next_read"]
+    assert next_read["path"] in {"src/a.py", "src/b.py"}
+    assert str(next_read["symbol"]).endswith("calculate_value")
+    assert next_read["start_line"] == 1
+    assert next_read["end_line"] == 2
+    assert next_read["reason"] == "ownership-ambiguity-discrimination"
+    assert next_read["ambiguity_reason"]
+    assert next_read["authority"] == "non-authoritative-discrimination"
+    assert next_read["discriminator"]
     assert packet["freshness"]["state"] in {"unknown", "current", "stale"}
 
 
