@@ -76,10 +76,15 @@ def test_task_evidence_v3_retrieval_is_compact_non_authoritative_projection(
     projected = retrieval["results"][0]
     internal = action["canonical"][0]
     assert projected["path"] == internal["path"]
-    assert projected["rank"] == internal["canonical_rank"]
+    assert projected["rank"] == 1
     assert projected.get("symbol") == (internal.get("qualname") or internal.get("name"))
     assert projected.get("roles") == internal.get("roles")
     assert projected.get("evidence_visibility") == internal.get("evidence_visibility")
+    lines = internal.get("lines")
+    if isinstance(lines, list) and lines:
+        assert projected.get("start_line") == lines[0]
+        if len(lines) > 1:
+            assert projected.get("end_line") == lines[1]
     for internal_only in (
         "canonical_rank",
         "canonical_score",
@@ -588,13 +593,16 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
     assert 1 <= len(supplements) <= 2
     assert len(results) <= 20
     canonical_prefix = results[: -len(supplements)]
-    for projected, internal in zip(
-        canonical_prefix,
-        action["canonical"][: len(canonical_prefix)],
-        strict=True,
+    for rank, (projected, internal) in enumerate(
+        zip(
+            canonical_prefix,
+            action["canonical"][: len(canonical_prefix)],
+            strict=True,
+        ),
+        1,
     ):
         assert projected["path"] == internal["path"]
-        assert projected["rank"] == internal["canonical_rank"]
+        assert projected["rank"] == rank
         assert projected.get("symbol") == (
             internal.get("qualname") or internal.get("name")
         )
@@ -602,6 +610,11 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
         assert projected.get("evidence_visibility") == internal.get(
             "evidence_visibility"
         )
+        lines = internal.get("lines")
+        if isinstance(lines, list) and lines:
+            assert projected.get("start_line") == lines[0]
+            if len(lines) > 1:
+                assert projected.get("end_line") == lines[1]
         assert "signature" not in projected
         assert "canonical_score" not in projected
         assert "domains" not in projected
