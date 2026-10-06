@@ -33,6 +33,9 @@ def test_verification_defaults_have_one_core_owner(
         assert parameters["limit"].default == defaults.limit
         assert parameters["candidate_limit"].default == defaults.candidate_limit
 
+    private_parameters = inspect.signature(CodeMap._verification_relevance).parameters
+    assert private_parameters["limit"].default == defaults.candidate_limit
+
     explanation = inspect.signature(CodeMap.explain_verification_selection).parameters
     assert explanation["limit"].default == defaults.limit
     assert explanation["candidate_limit"].default == 16

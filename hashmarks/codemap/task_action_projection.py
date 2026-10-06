@@ -21,6 +21,7 @@ from .task_action_types import (
     _TaskActionProjectionChoices,
     _TaskActionSelectionState,
 )
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -277,7 +278,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 edit=edit,
                 current_verify=selection.verify,
                 rows=context.rows,
-                limit=8,
+                limit=VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit,
             )
         else:
             current_verify_path = (

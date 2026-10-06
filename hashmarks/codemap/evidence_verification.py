@@ -1090,7 +1090,7 @@ class VerificationMixin:
         edit: Mapping[str, object] | None,
         current_verify: Mapping[str, object] | None,
         rows: Sequence[Mapping[str, object]],
-        limit: int = 8,
+        limit: int = _CANDIDATES,
     ) -> dict[str, object]:
         """Rank bounded verification surfaces around an already-selected edit owner."""
         if limit < 1:
