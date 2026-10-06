@@ -9,6 +9,7 @@ from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped
 from .model import EvidenceVisibility
+from .ownership_relation_defaults import OWNERSHIP_RELATION_DEFAULT_OPTIONS
 from .python_ast import estimate_tokens
 from .query_primitives import _WORD_RE, _query_terms
 from .query_router import QueryRoute, route_query
@@ -16,9 +17,6 @@ from .repository_domains import RepositoryDomain, classify_repository_path
 
 if TYPE_CHECKING:
     from .engine import CodeMap
-
-
-OWNERSHIP_RELATION_DEFAULT_MAX_DEPTH = 2
 
 
 @dataclass
@@ -1144,7 +1142,7 @@ class OwnershipGraphMixin:
         task: str,
         start_path: str,
         *,
-        max_depth: int = OWNERSHIP_RELATION_DEFAULT_MAX_DEPTH,
+        max_depth: int = OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth,
     ) -> dict[str, object]:
         """Project a bounded, cycle-safe ownership relation graph."""
         if TYPE_CHECKING:
@@ -1232,7 +1230,7 @@ class OwnershipGraphMixin:
         self,
         start_path: str,
         *,
-        max_depth: int = OWNERSHIP_RELATION_DEFAULT_MAX_DEPTH,
+        max_depth: int = OWNERSHIP_RELATION_DEFAULT_OPTIONS.max_depth,
         task: str = "",
     ) -> dict[str, object] | None:
         """Project the selected typed ownership relation into the action anchor shape."""
