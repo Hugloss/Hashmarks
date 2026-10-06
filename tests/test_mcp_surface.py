@@ -615,9 +615,10 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
 
         _assert_registered_task_evidence_defaults(registered)
 
-        find_tool = next(row["fn"] for row in registered if row["name"] == "find")
         with pytest.raises(FakeToolError, match="query must not be empty"):
-            find_tool(" ", limit=5)
+            next(row["fn"] for row in registered if row["name"] == "find")(
+                " ", limit=5
+            )
         with pytest.raises(McpSurfaceError, match="query must not be empty"):
             server._hashmarks_surface.find(" ", limit=5)
 
