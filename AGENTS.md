@@ -376,9 +376,9 @@ The full-suite runtime profile is owned by `make test-profile` and reports the s
 
 `scripts.agent_evaluation.metrics_agent_suite` owns the normal replay workload defaults, including the 1,200-token context budget and 20-result limit. `make metrics-agent-suite` owns the selected repository/corpus set, stricter qualification thresholds, required external `OH_GOON` binding, and stable latest-receipt destination. It must not restate the script's normal budget or limit defaults.
 
-### Codex agent-economics root default has one owner
+### Codex agent-economics defaults have one owner
 
-`scripts.agent_evaluation.codex_agent_economics` owns the normal benchmark materialization root `.hashmarks/benchmarks/codex-agent-economics`. `make codex-agent-economics` owns only the stable repository-local latest-receipt destination and must not restate that root default.
+`scripts.agent_evaluation.codex_agent_economics` owns the normal benchmark materialization root and the remaining CLI defaults used by both normal and preflight modes. `make codex-agent-economics` owns only the stable latest-receipt destination and must not restate the script's default root. `make codex-agent-economics-preflight` is a distinct mode selector and may own its preflight receipt path.
 
 ### Development-tool configuration has one owner
 

@@ -320,7 +320,7 @@ def test_agent_suite_make_alias_keeps_only_repo_and_qualification_policy() -> No
         assert stale not in joined
 
 
-def test_codex_agent_economics_make_alias_delegates_default_root() -> None:
+def test_codex_agent_economics_make_alias_delegates_root_default() -> None:
     text = (ROOT / "Makefile").read_text(encoding="utf-8")
     recipe = _make_recipe(text, "codex-agent-economics")
     joined = "\n".join(recipe)
@@ -328,3 +328,7 @@ def test_codex_agent_economics_make_alias_delegates_default_root() -> None:
     assert "scripts.agent_evaluation.codex_agent_economics" in joined
     assert "--output .hashmarks/metrics/codex-agent-economics-latest.json" in joined
     assert "--root .hashmarks/benchmarks/codex-agent-economics" not in joined
+
+    preflight = "\n".join(_make_recipe(text, "codex-agent-economics-preflight"))
+    assert "--preflight" in preflight
+    assert "--output .hashmarks/metrics/codex-agent-preflight.json" in preflight
