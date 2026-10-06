@@ -36,6 +36,7 @@ from .repository_intelligence_query import (
     RepositoryIntelligenceQueryOptions,
 )
 from .task_action_projection import TASK_ACTION_DEFAULT_OPTIONS
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 PROTOCOL = "hashmarks.codemap-service.v2"
 MAX_REQUEST = 1024 * 1024
@@ -413,9 +414,12 @@ class CodeMapService:
     def _verification_ownership_response(
         self, request: dict[str, Any]
     ) -> dict[str, Any]:
+        defaults = VERIFICATION_RELEVANCE_DEFAULTS
         task = self._task(request)
-        limit = self._bounded_int(request, "limit", 20, 1, 100)
-        candidate_limit = self._bounded_int(request, "candidate_limit", 8, 1, 16)
+        limit = self._bounded_int(request, "limit", defaults.limit, 1, 100)
+        candidate_limit = self._bounded_int(
+            request, "candidate_limit", defaults.candidate_limit, 1, 16
+        )
         graph = self._map().verification_ownership_graph(
             task, limit=limit, candidate_limit=candidate_limit
         )
@@ -452,9 +456,12 @@ class CodeMapService:
     def _verification_relevance_response(
         self, request: dict[str, Any]
     ) -> dict[str, Any]:
+        defaults = VERIFICATION_RELEVANCE_DEFAULTS
         task = self._task(request)
-        limit = self._bounded_int(request, "limit", 20, 1, 100)
-        candidate_limit = self._bounded_int(request, "candidate_limit", 8, 1, 16)
+        limit = self._bounded_int(request, "limit", defaults.limit, 1, 100)
+        candidate_limit = self._bounded_int(
+            request, "candidate_limit", defaults.candidate_limit, 1, 16
+        )
         result = self._map().verification_relevance(
             task, limit=limit, candidate_limit=candidate_limit
         )
@@ -885,7 +892,11 @@ class CodeMapServiceClient:
         return dict(self.request("concurrency_risk", **payload)["concurrency_risk"])
 
     def verification_ownership_graph(
-        self, task: str, *, limit: int = 20, candidate_limit: int = 8
+        self,
+        task: str,
+        *,
+        limit: int = VERIFICATION_RELEVANCE_DEFAULTS.limit,
+        candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit,
     ) -> dict[str, Any]:
         return dict(
             self.request(
@@ -947,7 +958,11 @@ class CodeMapServiceClient:
         )
 
     def verification_relevance(
-        self, task: str, *, limit: int = 20, candidate_limit: int = 8
+        self,
+        task: str,
+        *,
+        limit: int = VERIFICATION_RELEVANCE_DEFAULTS.limit,
+        candidate_limit: int = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit,
     ) -> dict[str, Any]:
         return dict(
             self.request(
