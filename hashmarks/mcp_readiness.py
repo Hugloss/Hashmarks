@@ -35,9 +35,7 @@ def mcp_readiness(
     )
     tools = summary.get("tools")
     normalized_tools = (
-        tuple(str(value) for value in tools)
-        if isinstance(tools, list)
-        else ()
+        tuple(str(value) for value in tools) if isinstance(tools, list) else ()
     )
     ready = (
         normalized_tools == MCP_TOOL_NAMES
