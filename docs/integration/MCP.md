@@ -43,6 +43,28 @@ hashmarks --workspace . mcp
 
 One server process binds one canonical workspace. Start another process for another repository. The first repository-intelligence tool call may build or reconcile the CodeMap; MCP discovery itself does not pre-index the repository.
 
+
+### Machine-readable readiness
+
+Hosts and external evaluators can ask Hashmarks to qualify its local MCP surface
+without changing host configuration:
+
+```bash
+hashmarks --workspace . doctor --mcp
+```
+
+The normal doctor payload gains an `mcp` object with schema
+`hashmarks.mcp-readiness.v1`. It reports the canonical workspace, stdio launch
+arguments, read-only status, server version, tool catalog, and MCP/operation contract
+identities. The receipt is explicitly `diagnostic-only` and sets
+`consumer_verification_required=true`: a benchmark, coding harness, or host must
+still prove which executable it launched, that the process is bound to the intended
+workspace, and that the host-visible catalog matches the admitted contract.
+
+This is useful for trial-scoped integrations such as agentsCookbook or Harbor because
+they can fail before model work when the Hashmarks runtime is not ready, without
+requiring a global Codex/OpenCode/Claude registration.
+
 ### ChatGPT through Secure MCP Tunnel
 
 ChatGPT does not connect directly to a local stdio MCP process. OpenAI Secure MCP Tunnel can own the remote transport while launching Hashmarks through its existing local stdio command, so Hashmarks does **not** need a second HTTP server or public ingress.
