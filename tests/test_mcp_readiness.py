@@ -1,0 +1,115 @@
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+import hashmarks.cli as cli
+import hashmarks.mcp_readiness as readiness
+from hashmarks.mcp_contract import MCP_TOOL_NAMES
+from hashmarks.mcp_readiness import MCP_READINESS_SCHEMA, mcp_readiness
+
+
+def test_mcp_readiness_projects_contract_and_launch(
+    tmp_path: Path, monkeypatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    state = workspace / ".state"
+    monkeypatch.setattr(
+        readiness,
+        "current_contract_summary",
+        lambda _workspace, *, state_dir=None: {
+            "schema": "hashmarks.mcp-contract.v1",
+            "contract_identity": "sha256:contract",
+            "server_version": "0.test",
+            "tools": list(MCP_TOOL_NAMES),
+            "operation_contract_identity": "sha256:operations",
+            "error_schema": "hashmarks.mcp-error.v1",
+            "error_reasons": [],
+            "error_recovery_authority": "consumer-owned",
+        },
+    )
+
+    result = mcp_readiness(workspace, state_dir=state)
+
+    assert result == {
+        "schema": MCP_READINESS_SCHEMA,
+        "ready": True,
+        "authority": "diagnostic-only",
+        "consumer_verification_required": True,
+        "workspace": str(workspace.resolve()),
+        "transport": "stdio",
+        "read_only": True,
+        "server_version": "0.test",
+        "contract_identity": "sha256:contract",
+        "operation_contract_identity": "sha256:operations",
+        "tool_count": len(MCP_TOOL_NAMES),
+        "tools": list(MCP_TOOL_NAMES),
+        "launch": {
+            "args": [
+                "--workspace",
+                str(workspace.resolve()),
+                "--state-dir",
+                str(state.resolve()),
+                "mcp",
+            ],
+            "state_dir": str(state.resolve()),
+        },
+    }
+
+
+def test_doctor_mcp_is_opt_in_and_machine_readable(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    class Identity:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+        def doctor(self) -> dict[str, object]:
+            return {"identity": "ready"}
+
+    monkeypatch.setattr(cli, "RepositoryIdentity", Identity)
+    monkeypatch.setattr(
+        readiness,
+        "mcp_readiness",
+        lambda *_args, **_kwargs: {
+            "schema": MCP_READINESS_SCHEMA,
+            "ready": True,
+        },
+    )
+
+    args = argparse.Namespace(
+        workspace=tmp_path,
+        state_dir=None,
+        mode="auto",
+        timeout=1.0,
+        mcp=True,
+    )
+    assert cli._doctor(args) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {
+        "identity": "ready",
+        "mcp": {
+            "schema": MCP_READINESS_SCHEMA,
+            "ready": True,
+        },
+    }
+
+
+def test_doctor_parser_exposes_explicit_mcp_probe() -> None:
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="command", required=True)
+    cli._add_identity_cli(sub)
+
+    plain = parser.parse_args(["doctor"])
+    probed = parser.parse_args(["doctor", "--mcp"])
+
+    assert plain.mcp is False
+    assert probed.mcp is True
