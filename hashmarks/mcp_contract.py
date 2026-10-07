@@ -438,11 +438,15 @@ def contract_summary(manifest: dict[str, object]) -> dict[str, object]:
     }
 
 
-async def _current_contract_summary(workspace: str) -> dict[str, object]:
+async def _current_contract_summary(
+    workspace: str,
+    *,
+    state_dir: str | None = None,
+) -> dict[str, object]:
     from ._version import __version__
     from .mcp_server import build_server
 
-    server = build_server(workspace)
+    server = build_server(workspace, state_dir=state_dir)
     try:
         tools = await server.list_tools()
         return contract_summary(contract_from_tool_models(__version__, tools))
@@ -450,15 +454,34 @@ async def _current_contract_summary(workspace: str) -> dict[str, object]:
         server._hashmarks_surface.close()
 
 
+def current_contract_summary(
+    workspace: str = ".",
+    *,
+    state_dir: str | None = None,
+) -> dict[str, object]:
+    """Return the current local MCP contract summary for diagnostics."""
+
+    return asyncio.run(
+        _current_contract_summary(
+            workspace,
+            state_dir=state_dir,
+        )
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Emit the canonical contract identity for one installed Hashmarks MCP server."
     )
     parser.add_argument("--workspace", default=".")
+    parser.add_argument("--state-dir", default=None)
     args = parser.parse_args(argv)
     sys.stdout.write(
         json.dumps(
-            asyncio.run(_current_contract_summary(args.workspace)),
+            current_contract_summary(
+                args.workspace,
+                state_dir=args.state_dir,
+            ),
             sort_keys=True,
         )
         + "\n"
