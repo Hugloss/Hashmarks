@@ -331,6 +331,8 @@ Hashmarks may prove the repository-side identity, provenance, conservation, or r
 
 Experiments may use real or simulated agents, retries, model calls, execution, or orchestration to **measure Hashmarks**. That is evaluation infrastructure, not product admission.
 
+Hashmarks may expose a neutral diagnostic that describes whether its own repository-intelligence transport is locally ready—for example the read-only MCP contract identity and launch projection. Such a diagnostic must remain descriptive and consumer-independent. It may not decide benchmark admission, select a harness, configure a host, certify a run, or replace the evaluator's independent proof of executable identity and workspace binding.
+
 Production code must not absorb experimental workflow merely because a benchmark uses it. When an experiment discovers a useful capability, re-run the admission gate and extract only the repository-intelligence primitive that belongs in Hashmarks.
 
 ## Change record
