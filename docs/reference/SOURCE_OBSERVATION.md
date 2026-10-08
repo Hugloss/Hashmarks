@@ -146,6 +146,79 @@ Multiple same-fact candidates remain unresolved. Without independently qualified
 source-span relocation evidence, matching diagnostic messages is insufficient
 to assert identical diagnostic identity.
 
+### Producer-claimed source revisions (Hermes file-version borrowing)
+
+A diagnostic batch can now preserve **which exact Hashmarks file revisions its
+external producer claims to have observed**, independently of message, line,
+column, diagnostic identity, and collection completeness:
+
+```python
+diagnostic = RepositoryDeltaMixin.external_diagnostic_observation(
+    producer="pyright",
+    binding=RepositoryGenerationBinding("repo-id", 7),
+    outcome="fail",
+    collection_state="fresh-complete",
+    scope_paths=["src/example.py"],
+    source_revisions={"src/example.py": claimed_member_revision},
+    diagnostics=[{"tool": "pyright", "rule": "E1", "path": "src/example.py"}],
+)
+```
+
+`source_revisions` is optional and never backfilled from a later source
+observation. Entries are **producer-claimed** 64-character lowercase Hex file
+revisions in the same digest domain as
+`source_observation["member"]["member_revision"]`. They are *not* Git SHAs,
+document-version counters, or new evidence identities. The existing diagnostic
+identity excludes this provenance so the same diagnostic fact does not appear
+added or removed merely because its revision claim changed.
+
+Claims are limited to 32 normalized, explicitly scoped members; absolute or
+escaping paths, duplicate normalized aliases, wrong digest format, and claims
+outside the collection's declared path scope fail before rows are published.
+Omitting a claim means **unknown**, not unchanged source. The supplied scope
+and collection-state claims remain external producer authority.
+
+After obtaining explicit up-to-date `CodeMap.source_observation` member
+packets, the consumer may compare them **without launching** a diagnostic
+producer or letting Hashmarks track agent reads:
+
+```python
+source = codemap.source_observation("src/example.py")
+evidence = RepositoryDeltaMixin.diagnostic_source_revision_evidence(
+    diagnostic, [source]
+)
+```
+
+Schema: `hashmarks.diagnostic-source-revision-evidence.v1`. For each declared
+path, the comparison reports `matching`, `different`, or `unknown` with
+producer-claimed and observed member revisions, source observation identity,
+source generation and freshness, and exact qualifications:
+
+- **matching** means a claimed revision equals a single caller-supplied,
+  current, complete, stable canonical member observation; it does **not** prove
+  the LSP read those bytes or that repository-wide verification is current.
+- **different** means the observed member bytes differ from the claimed
+  source revision; it does **not** decide whether or how to rerun verification.
+- **unknown** means absent/ambiguous source packets, unreadable/denied/oversized
+  source, incomplete/truncated source evidence, unsupported source schemas, or
+  stale/unknown repository freshness. It is not a file-absence assertion.
+
+Diagnostic collection outcomes and repository generation remain separate;
+different diagnostic/source generations are exposed without inventing
+cross-generation history. The comparison is **caller-retained endpoint
+evidence**, not an independently authenticated execution trace. Its
+`complete-for-declared-members` coverage applies only to the claimed member
+set, not every source file or diagnostic path. Unclaimed diagnostic paths and
+ignored source packets are counted separately.
+
+The producer owns acquisition timing and LSP document versions; the agent
+harness owns read/edit coordination, verification execution and decisions.
+Hashmarks keeps only descriptive revision correspondence, reusing its existing
+member observation and diagnostic normalization. No persistent history, LSP
+engine, external runner, or ninth MCP tool is added.
+
+Regression tests: `tests/test_diagnostic_source_revisions.py`.
+
 ### Source-backed diagnostic line correspondence
 
 The canonical `CodeMap.source_observation(path, lines=[N])` can now include up to
