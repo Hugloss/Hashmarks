@@ -146,6 +146,58 @@ Multiple same-fact candidates remain unresolved. Without independently qualified
 source-span relocation evidence, matching diagnostic messages is insufficient
 to assert identical diagnostic identity.
 
+### Source-backed diagnostic line correspondence
+
+The canonical `CodeMap.source_observation(path, lines=[N])` can now include up to
+32 explicitly requested **physical-line anchors**. Anchors are derived from the
+same stable, visibility-checked source bytes and carry the canonical member
+revision, exact byte-line SHA-256 digest, number of identical nonblank lines in
+the fully observed member, and the explicit physical line number. No line text,
+secondary repository history, or new persistent index is introduced. Blank,
+out-of-range, denied, stale and unreadable lines remain unknown.
+
+A caller retains the before and after source observations and supplies them
+together with the corresponding external diagnostic observations:
+
+```python
+delta = RepositoryDeltaMixin.diagnostic_observation_delta(
+    diagnostic_before,
+    diagnostic_after,
+    before_source=source_before,
+    after_source=source_after,
+)
+correspondence = delta["diagnostics"]["source_correspondence"]
+```
+
+The optional projection describes `supported` source-line correspondences
+separately from `unresolved` candidate reasons. It requires both source packets
+to have complete line evidence, matching diagnostic generations, stable
+revision-verified member bytes (never `stale`), different canonical member
+revisions from distinct admitted CodeMap generations, the same admitted path, the same nonblank
+producer/repository/environment identity, eligible diagnostic
+collection states, and explicit diagnostic scopes containing the source path.
+
+The repository-wide freshness axis remains explicit: a directly read,
+revision-verified member can support a **source-local** byte correspondence
+even when daemon-wide freshness is `unknown`. In that case the supported row
+includes both endpoint repository freshness states and does **not** upgrade
+them to `current`. A source packet marked `stale` cannot support correspondence.
+
+A candidate is supported only when its exact physical source line is
+**byte-identical, nonblank and unique in both member revisions**, and its
+diagnostic column remains unchanged. A preserved error message or shifted line
+number is insufficient. Duplicated lines, changed content/columns, mismatched
+generations, missing anchors or blocked observation fail closed with a reason.
+
+`state: source-line-correspondence` means only that the same unique
+source line can be located after the edit. It **does not claim the diagnostic
+is the same semantic fault**, certify a fix, replace the strict diagnostic
+identity, infer runtime behavior, or suppress raw added/removed rows. Source
+correspondence is a descriptive projection from caller-retained endpoint facts,
+not a stored history/merge/tracking engine. The byte-derivation helpers are
+stateless; all source admission and freshness remain with the existing CodeMap
+member owner.
+
 ### Diagnostic delta claim qualification
 
 The diagnostic delta preserves raw `added` and `removed` identity comparisons;
