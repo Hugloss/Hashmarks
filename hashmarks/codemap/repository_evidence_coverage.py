@@ -380,9 +380,8 @@ class RepositoryEvidenceCoverageMixin:
         repository_identity: str,
         bindings_identity: object,
     ) -> None:
-        if (
-            binding_delta.get("schema")
-            != operation_schema("evidence_comparison", "bindings")
+        if binding_delta.get("schema") != operation_schema(
+            "evidence_comparison", "bindings"
         ):
             raise ValueError(
                 "binding_delta must be a repository evidence binding delta"

@@ -10,16 +10,16 @@ from typing import Any
 import pytest
 
 from hashmarks.codemap import CodeMap
-from hashmarks.codemap.repository_intelligence_query import (
-    QUERY_SURFACES,
-    RepositoryIntelligenceQueryOptions,
-)
 from hashmarks.codemap.repository_delta import (
     RepositoryDeltaMixin,
     RepositoryGenerationBinding,
 )
-from hashmarks.codemap.structural_locality import structural_locality_delta
+from hashmarks.codemap.repository_intelligence_query import (
+    QUERY_SURFACES,
+    RepositoryIntelligenceQueryOptions,
+)
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
+from hashmarks.codemap.structural_locality import structural_locality_delta
 from hashmarks.evidence_presentation import (
     FORMATS,
     present_repository_evidence,
@@ -38,6 +38,28 @@ _MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
 def _findings(projection: dict[str, Any]) -> list[dict[str, Any]]:
     return [row for group in projection["groups"] for row in group["findings"]]
+
+
+def _fixture_diagnostic_delta(paths: list[str]) -> dict[str, object]:
+    """Use one exact externally claimed endpoint without another analyzer."""
+    external = RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="test-diagnostics",
+        binding=RepositoryGenerationBinding("fixture-repository", 1),
+        diagnostics=[
+            {
+                "tool": "pyright",
+                "rule": "fixture",
+                "path": paths[0],
+                "line": 2,
+                "message": "fixture diagnostic",
+            }
+        ],
+        outcome="fail",
+        environment_identity="fixture-env",
+        scope_paths=paths,
+        collection_state="fresh-complete",
+    )
+    return RepositoryDeltaMixin.diagnostic_observation_delta(external, external)
 
 
 @pytest.fixture(scope="module")
@@ -126,23 +148,6 @@ def native_packets(
         observation = codemap.dependency_resolution_evidence(dependency)
         declarations = codemap.repository_declarations([group])
         locality = codemap.structural_locality("src/owner.py::widget")
-        external = RepositoryDeltaMixin.external_diagnostic_observation(
-            producer="test-diagnostics",
-            binding=RepositoryGenerationBinding("fixture-repository", 1),
-            diagnostics=[
-                {
-                    "tool": "pyright",
-                    "rule": "fixture",
-                    "path": paths[0],
-                    "line": 2,
-                    "message": "fixture diagnostic",
-                }
-            ],
-            outcome="fail",
-            environment_identity="fixture-env",
-            scope_paths=paths,
-            collection_state="fresh-complete",
-        )
         packets = [
             ("repository_context", "default", codemap.orient()),
             ("find", "default", codemap.find_packet("widget")),
@@ -207,7 +212,7 @@ def native_packets(
             (
                 "evidence_comparison",
                 "diagnostics",
-                RepositoryDeltaMixin.diagnostic_observation_delta(external, external),
+                _fixture_diagnostic_delta(paths),
             ),
         ]
         owner.write_text("import sys\ndef widget(): return 2\n", encoding="utf-8")
