@@ -114,12 +114,41 @@ or creates source-history ownership. See [SOURCE_OBSERVATION.md](SOURCE_OBSERVAT
 
 ## Scope-sensitive freshness
 
-External observations may declare the repository paths they directly observed. Freshness is not automatically destroyed by every repository generation change. When Hashmarks can prove that all changed paths are outside the observation and dependency scope, the observation remains fresh and the reason records that proof.
+External observations may declare the repository paths they directly observed.
+Freshness is not automatically destroyed by every repository generation change,
+but **a disjoint partial changed-path list does not prove freshness**. This follows
+the same fail-closed negative-evidence rule as diagnostic disappearance.
 
-The rule fails closed: an observation with no declared scope becomes stale after repository/generation change. A direct or dependency-scope intersection also makes it stale. This avoids both false reuse and the opposite economics failure where an unrelated documentation edit invalidates a focused test observation.
+`RepositoryDeltaMixin.external_observation_freshness` now accepts the optional
+`change_set_complete` boolean (default `False`). This is a **caller assertion**
+about the *entire* repository change set between the bound observation and
+current endpoint, **not** an independently verified CodeMap/Git receipt.
 
-Dependency scope is supplied by repository-intelligence relationships; it is not inferred by the consumer.
+| Endpoint and changed-path evidence | Freshness | Reason |
+| --- | --- | --- |
+| Repository identity **and** generation unchanged | `current` | Same observed endpoint |
+| Changed endpoint; direct/dependency-scope intersection observed | `stale` | Relevant edit, even for partial change sets |
+| Changed endpoint; no declared observation/dependency scope | `stale` | Scope absent; cannot safely reuse |
+| Changed endpoint; disjoint or empty changed-path list, completeness not asserted | `unknown` | Unreported relevant edits remain possible |
+| Changed endpoint; completeness asserted, but zero changed paths supplied | `unknown` | Changed endpoint not explained by path evidence |
+| Changed endpoint; nonempty, disjoint, caller-asserted complete path set | `current` | **Conditional on the caller's completeness claim** |
 
+The result preserves `change_set_completeness` separately:
+`caller-claimed-complete` or `unknown`. The latter is **not** a proven
+absence of changes. Even conditional `current` says nothing about whether a
+producer actually ran against current source bytes: producer freshness,
+collection completeness, repository binding, execution outcome, and path scope
+remain separate evidence dimensions.
+
+Consumers that can independently prove a complete changed-path set may pass
+`change_set_complete=True`; callers with a filtered `git diff`, sampled
+watcher events, or otherwise partial set must leave the default unchanged.
+Hashmarks does not run verification, read the consumer's session history, or
+certify the caller's completeness claim. A canonically qualified repository
+observation should be preferred when available.
+
+Regression coverage: `tests/test_external_verification_coverage.py` and
+`tests/test_repository_intelligence_delta.py`.
 
 ## Verification relationship evidence
 
