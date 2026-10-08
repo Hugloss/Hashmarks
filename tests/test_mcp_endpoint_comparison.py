@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import importlib.util
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -8,10 +11,17 @@ from hashmarks.codemap.repository_delta import (
     RepositoryDeltaMixin,
     RepositoryGenerationBinding,
 )
-from hashmarks.evidence_presentation import present_repository_evidence
+from hashmarks.evidence_presentation import (
+    FORMATS,
+    present_repository_evidence,
+    presentation_response,
+)
 from hashmarks.mcp_contract import tool_contract
+from hashmarks.mcp_server import build_server
 from hashmarks.mcp_surface import HashmarksMcpSurface, McpSurfaceError
 from hashmarks.operation_contract import operation_schema
+
+_MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
 
 def _repo(root: Path) -> Path:
@@ -36,18 +46,30 @@ def _diagnostic(*, collection: str, rows: list[dict[str, object]]) -> dict[str, 
     )
 
 
-def test_structural_comparison_preserves_incomparability(tmp_path: Path) -> None:
+@pytest.mark.parametrize("format", ["structured", "compact", "text"])
+def test_structural_comparison_preserves_incomparability(
+    tmp_path: Path, format: str
+) -> None:
     surface = HashmarksMcpSurface(
         str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
     )
     try:
-        before = {"schema": operation_schema("structural_locality"), "target": "owner"}
-        after = {"schema": operation_schema("structural_locality"), "target": "owner"}
+        before = {
+            "schema": operation_schema("structural_locality"),
+            "target": "owner",
+            "nodes": [{"symbol_id": "unqualified:old"}],
+            "dimensions": {"symbol_count": 1},
+        }
+        after = {
+            **before,
+            "nodes": [{"symbol_id": "unqualified:new"}],
+            "dimensions": {"symbol_count": 2},
+        }
         result = surface.evidence_comparison(before, after)
         assert result["schema"] == operation_schema("evidence_comparison", "structural")
         assert result["comparable"] is False
         assert result["incomparability_reasons"]
-        projection = present_repository_evidence(result, format="structured")
+        projection = present_repository_evidence(result, format=format)
         assert projection["supported"] is True
         assert projection["groups"][0]["family"] == "qualification"
         assert projection["groups"][0]["findings"][0]["kind"] == (
@@ -56,6 +78,18 @@ def test_structural_comparison_preserves_incomparability(tmp_path: Path) -> None
         row = projection["groups"][0]["findings"][0]
         assert row["source_refs"] == ["/incomparability_reasons"]
         assert row["details"] == result["incomparability_reasons"]
+        context = projection["source_context"][0]["details"]
+        assert context["comparable"] is False
+        assert context["incomparability_reasons"] == result["incomparability_reasons"]
+        excluded = {
+            section["source_ref"]: section
+            for section in projection["unprojected_sections"]
+        }
+        for field in ("introduced_symbol_ids", "removed_symbol_ids", "dimension_delta"):
+            assert excluded["/" + field]["native_item_count"] == 1
+        if format == "text":
+            assert '"comparable":false' in projection["text"]
+            assert '"source_ref":"/dimension_delta"' in projection["text"]
         assert all(
             row["assertion"] != "observed_change"
             for group in projection["groups"]
@@ -185,3 +219,71 @@ def test_comparable_structural_measurement_retains_exact_source_reference() -> N
     assert measurement["source_refs"] == ["/dimension_delta"]
     assert measurement["details"] == {"static_callers": 2}
     assert measurement["assertion"] == "observed_change"
+
+
+@pytest.mark.host_mcp_sdk
+@pytest.mark.skipif(not _MCP_AVAILABLE, reason="MCP extra is not installed")
+def test_sdk_comparisons_preserve_real_endpoints_in_all_formats(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    server: Any = build_server(repo, state_dir=tmp_path / "state")
+    surface = server._hashmarks_surface
+
+    async def exercise() -> None:
+        before = surface.structural_locality("src/owner.py::owner")
+        (repo / "src" / "owner.py").write_text(
+            "def helper(value: int) -> int:\n    return value + 2\n\n"
+            "def owner(value: int) -> int:\n    return helper(value)\n",
+            encoding="utf-8",
+        )
+        after = surface.structural_locality("src/owner.py::owner")
+        binding = surface.repository_evidence(
+            {
+                "bindings": [
+                    {
+                        "binding_id": "sdk:scope",
+                        "evidence": [{"scope": "member", "path": "src/owner.py"}],
+                    }
+                ],
+                "include_relationships": False,
+            }
+        )
+        diagnostic_before = _diagnostic(
+            collection="fresh-complete",
+            rows=[{"path": "src/owner.py", "line": 2, "message": "fixture diagnostic"}],
+        )
+        diagnostic_after = _diagnostic(collection="fresh-partial", rows=[])
+        for mode, left, right in (
+            ("structural", before, after),
+            ("structural", before, before),
+            ("bindings", binding, binding),
+            ("diagnostics", diagnostic_before, diagnostic_after),
+        ):
+            request = {"before": left, "after": right, "result_mode": mode}
+            baseline = await server.call_tool("evidence_comparison", request)
+            assert baseline.is_error is not True
+            native = baseline.structured_content
+            assert isinstance(native, dict)
+            if mode == "structural":
+                assert native["comparable"] is (left is not right)
+                if native["comparable"]:
+                    assert native["dimension_delta"]["symbol_count"] == 1
+            if mode == "diagnostics":
+                assert (
+                    native["diagnostics"]["qualification"][
+                        "qualified_removed_identities"
+                    ]
+                    == []
+                )
+            for format in FORMATS:
+                result = await server.call_tool(
+                    "evidence_comparison", {**request, "presentation": format}
+                )
+                assert result.is_error is not True
+                assert result.structured_content == presentation_response(
+                    "evidence_comparison", native, format=format, result_mode=mode
+                )
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        surface.close()

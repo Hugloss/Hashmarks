@@ -87,6 +87,8 @@ _CONTEXT_KEYS = frozenset(
         "causation",
         "precision",
         "comparability",
+        "comparable",
+        "incomparability_reasons",
         "measurement",
         "storage",
         "definition_options",
@@ -986,7 +988,6 @@ def _structural_comparison(
             (*ref, "incomparability_reasons"),
             ctx,
         )
-        p.used.update(_pointer((*ref, key)) for key in packet)
         return
     for key, family in (
         ("introduced_symbol_ids", "source"),
@@ -1012,7 +1013,6 @@ def _structural_comparison(
             ctx,
             assertion="observed_change",
         )
-    p.account(packet, ref, {})
 
 
 def _projectors() -> dict[str, Any]:

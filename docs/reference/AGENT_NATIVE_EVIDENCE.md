@@ -124,6 +124,10 @@ Two packets are required and individually bounded. This tool never starts
 a diagnostic producer, runs tests, mutates Git, derives historical snapshots,
 or chooses an agent action. The structural presenter renders incomparable
 endpoints as qualification evidence rather than observed change claims.
+Their native comparability flag and reasons remain visible outside row caps;
+suppressed change collections are listed in `unprojected_sections` with native
+item counts. Comparable dimension deltas retain the exact native mapping and
+its source reference.
 
 ## Qualification and ownership
 

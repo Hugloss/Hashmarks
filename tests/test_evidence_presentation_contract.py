@@ -4,6 +4,7 @@ import asyncio
 import copy
 import importlib.util
 import json
+from itertools import product
 from pathlib import Path
 from typing import Any
 
@@ -223,6 +224,15 @@ def native_packets(
                 codemap.task_post_change_delta(task, paths, previous_evidence=previous),
             )
         )
+        packets.append(
+            (
+                "evidence_comparison",
+                "structural",
+                structural_locality_delta(
+                    locality, codemap.structural_locality("src/owner.py::widget")
+                ),
+            )
+        )
         for surface in QUERY_SURFACES:
             profiles = (
                 ("compact", "standard", "audit")
@@ -250,6 +260,12 @@ def native_packets(
 def test_every_native_mode_is_preserved_and_projected_without_reads(
     native_packets, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    assert {
+        (contract.operation, mode)
+        for contract in MCP_TOOL_CONTRACTS
+        for mode in contract.response_modes
+    } <= {(operation, mode) for operation, mode, _packet in native_packets}
+
     def no_read(*_args, **_kwargs):
         raise AssertionError("presentation must not read repository files")
 
@@ -560,12 +576,25 @@ def test_sdk_calls_all_tools_with_native_defaults_and_optional_formats(
                 contract.operation, native, format=contract.default_presentation
             )
             assert default.structured_content == expected
-            for format in FORMATS:
-                called = await server.call_tool(
-                    contract.name, {**arguments[contract.name], "presentation": format}
+            for mode, format in product(contract.response_modes, FORMATS):
+                request = {
+                    **arguments[contract.name],
+                    "presentation": format,
+                    **(
+                        {"result_mode": mode}
+                        if len(contract.response_modes) > 1
+                        else {}
+                    ),
+                }
+                called = await server.call_tool(contract.name, request)
+                contract.validate_response(
+                    called.structured_content, result_mode=mode, presentation=format
                 )
-                tool_contract(contract.name).validate_response(
-                    called.structured_content, presentation=format
+                assert called.structured_content == presentation_response(
+                    contract.operation,
+                    packets[contract.operation, mode],
+                    format=format,
+                    result_mode=mode,
                 )
 
     try:
