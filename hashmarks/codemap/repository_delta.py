@@ -990,50 +990,35 @@ class RepositoryDeltaMixin:
         dependency_paths: Sequence[str] = (),
         change_set_complete: bool = False,
     ) -> dict[str, object]:
-        """Describe scoped freshness without treating an incomplete change set as absence.
-
-        The change-set completeness flag is a caller claim, not a canonical
-        reconciliation receipt. A disjoint *partial* list of changed paths
-        cannot prove that previously observed evidence remains current.
-        """
+        """Scoped external freshness; disjoint partial changes prove no absence."""
         if not isinstance(change_set_complete, bool):
             raise ValueError("change_set_complete must be a boolean")
-        observed_repository = str(observation.get("repository_identity") or "")
-        observed_generation = observation.get("codemap_generation")
         raw_scope = observation.get("scope_paths")
-        scope = (
-            {str(path) for path in raw_scope} if isinstance(raw_scope, list) else set()
+        scope = set(map(str, raw_scope)) if isinstance(raw_scope, list) else set()
+        dependencies = set(map(str, dependency_paths))
+        changed = set(map(str, changed_paths))
+        intersection = sorted(changed & (scope | dependencies))
+        repository_changed = (
+            str(observation.get("repository_identity") or "")
+            != current_repository_identity
         )
-        dependencies = {str(path) for path in dependency_paths}
-        relevant = scope | dependencies
-        changed = {str(path) for path in changed_paths}
-        intersection = sorted(relevant & changed)
-        repository_changed = observed_repository != current_repository_identity
-        generation_changed = observed_generation != current_generation
+        generation_changed = observation.get("codemap_generation") != current_generation
 
         if not repository_changed and not generation_changed:
-            state = "current"
-            reason = "repository-and-generation-unchanged"
-        elif not relevant:
-            state = "stale"
-            reason = "repository-changed-without-declared-observation-scope"
+            state, reason = "current", "repository-and-generation-unchanged"
+        elif not (scope or dependencies):
+            state, reason = "stale", "repository-changed-without-declared-observation-scope"
         elif intersection:
-            # An observed relevant edit invalidates the old observation even
-            # when the caller only supplied part of the changed-path universe.
-            state = "stale"
-            reason = "relevant-repository-evidence-changed"
+            state, reason = "stale", "relevant-repository-evidence-changed"
         elif not change_set_complete:
-            state = "unknown"
-            reason = "change-set-completeness-unproven"
+            state, reason = "unknown", "change-set-completeness-unproven"
         elif not changed:
-            # A changed endpoint with zero listed paths may represent an
-            # observer/capability or unreported metadata transition.
-            state = "unknown"
-            reason = "changed-endpoint-without-path-change-evidence"
+            state, reason = "unknown", "changed-endpoint-without-path-change-evidence"
         else:
             state = "current"
             reason = "declared-complete-change-set-outside-observation-scope"
 
+        completeness = "caller-claimed-complete" if change_set_complete else "unknown"
         return {
             "schema": "hashmarks.external-observation-freshness.v1",
             "state": state,
@@ -1043,9 +1028,7 @@ class RepositoryDeltaMixin:
             "observation_scope": sorted(scope),
             "dependency_scope": sorted(dependencies),
             "changed_paths": sorted(changed),
-            "change_set_completeness": (
-                "caller-claimed-complete" if change_set_complete else "unknown"
-            ),
+            "change_set_completeness": completeness,
             "intersection": intersection,
             "authority": "observation-freshness-only",
             "execution_effect": "none",
