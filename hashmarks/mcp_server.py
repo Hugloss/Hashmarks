@@ -21,7 +21,10 @@ from .mcp_contract import (
     MCP_SERVER_DESCRIPTION,
     MCP_SERVER_INSTRUCTIONS,
     MCP_SERVER_NAME,
+    MCP_TOOL_NAMES,
     McpToolContract,
+    mcp_projection_instructions,
+    normalize_mcp_tool_names,
     tool_contract,
 )
 from .mcp_surface import HashmarksMcpSurface, McpSurfaceError
@@ -288,15 +291,21 @@ def _register_evidence_comparison_tool(
         )
 
 
-def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = None):
+def build_server(
+    workspace: str | Path = ".",
+    *,
+    state_dir: str | Path | None = None,
+    tool_names: tuple[str, ...] | list[str] | None = None,
+):
     MCPServer, ToolAnnotations, ToolError = _sdk()
+    selected_tools = normalize_mcp_tool_names(tool_names)
     surface = HashmarksMcpSurface(
         str(workspace), state_dir=None if state_dir is None else str(state_dir)
     )
     server = MCPServer(
         MCP_SERVER_NAME,
         description=MCP_SERVER_DESCRIPTION,
-        instructions=MCP_SERVER_INSTRUCTIONS,
+        instructions=mcp_projection_instructions(selected_tools),
         version=__version__,
     )
     annotations = ToolAnnotations(
@@ -478,14 +487,27 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     _register_agent_evidence_tools(server, surface, annotations, ToolError)
     _register_evidence_comparison_tool(server, surface, annotations, ToolError)
 
+    selected = set(selected_tools)
+    for name in MCP_TOOL_NAMES:
+        if name not in selected:
+            server.remove_tool(name)
+
     server._hashmarks_surface = surface
+    server._hashmarks_projection_tools = selected_tools
     return server
 
 
 def run_stdio(
-    workspace: str | Path = ".", *, state_dir: str | Path | None = None
+    workspace: str | Path = ".",
+    *,
+    state_dir: str | Path | None = None,
+    tool_names: tuple[str, ...] | list[str] | None = None,
 ) -> None:
-    server = build_server(workspace, state_dir=state_dir)
+    server = build_server(
+        workspace,
+        state_dir=state_dir,
+        tool_names=tool_names,
+    )
     try:
         server.run(transport="stdio")
     finally:
@@ -501,11 +523,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--state-dir", default=None)
+    parser.add_argument(
+        "--tool",
+        action="append",
+        choices=MCP_TOOL_NAMES,
+        default=None,
+        help="repeat to expose only the selected canonical MCP tools",
+    )
     args = parser.parse_args(argv)
     workspace = canonical_host_path(args.workspace)
     state_dir = None if args.state_dir is None else canonical_host_path(args.state_dir)
     try:
-        run_stdio(workspace, state_dir=state_dir)
+        run_stdio(workspace, state_dir=state_dir, tool_names=args.tool)
     except (UserFacingError, McpSurfaceError) as exc:
         raise SystemExit(str(exc)) from exc
     return 0
