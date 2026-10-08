@@ -16,11 +16,7 @@ if TYPE_CHECKING:
 
 def test_exact_member_occurrences_and_physical_source_shape(tmp_path: Path) -> None:
     path = tmp_path / "example.py"
-    path.write_bytes(
-        b"def example():\r\n"
-        b"    first = 'needle'\n"
-        b"    return 'needle'\n"
-    )
+    path.write_bytes(b"def example():\r\n    first = 'needle'\n    return 'needle'\n")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         packet = codemap.source_observation(
@@ -32,10 +28,13 @@ def test_exact_member_occurrences_and_physical_source_shape(tmp_path: Path) -> N
     assert packet["observation_scope"] == "exact-admitted-repository-member"
     assert packet["observed_match_count"] == 2
     assert [item["line"] for item in packet["occurrences"]] == [2, 3]
-    assert all(item["occurrence_kind"] == "string-literal"
-               for item in packet["occurrences"])
-    assert all(item["member_revision"] == packet["member"]["member_revision"]
-               for item in packet["occurrences"])
+    assert all(
+        item["occurrence_kind"] == "string-literal" for item in packet["occurrences"]
+    )
+    assert all(
+        item["member_revision"] == packet["member"]["member_revision"]
+        for item in packet["occurrences"]
+    )
     assert packet["source_shape"]["physical_lines"] == 3
     assert packet["source_shape"]["lf_terminators"] == 3
     assert packet["source_shape"]["crlf_terminators"] == 1
@@ -69,16 +68,16 @@ def test_python_token_kinds_distinguish_comment_identifier_and_literal(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "example.py").write_text(
-        "def needle():\n"
-        "    # needle\n"
-        "    return 'needle'\n",
+        "def needle():\n    # needle\n    return 'needle'\n",
         encoding="utf-8",
     )
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         rows = codemap.source_observation("example.py", literal="needle")
     assert [row["occurrence_kind"] for row in rows["occurrences"]] == [
-        "identifier", "comment", "string-literal",
+        "identifier",
+        "comment",
+        "string-literal",
     ]
 
 
@@ -99,7 +98,9 @@ def test_preflight_coverage_does_not_invent_pruned_member_counts(
     assert coverage["absence_outside_admitted_scope"] == "not-admissible"
 
 
-def test_changed_unreconciled_member_never_returns_old_source_hits(tmp_path: Path) -> None:
+def test_changed_unreconciled_member_never_returns_old_source_hits(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "example.py"
     path.write_text("def example(): return 'old'\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
@@ -120,9 +121,7 @@ def test_denied_and_oversized_members_return_no_source(tmp_path: Path) -> None:
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
         denied = codemap.source_observation(".env", literal="private")
-        oversized = codemap.source_observation(
-            "big.py", literal="y", max_bytes=32
-        )
+        oversized = codemap.source_observation("big.py", literal="y", max_bytes=32)
     assert denied["occurrences"] == []
     assert denied["source_shape"] is None
     assert denied["negative_evidence"] == "not-admissible"
