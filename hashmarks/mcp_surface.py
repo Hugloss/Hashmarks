@@ -13,11 +13,11 @@ from .codemap.evidence_correlation import (
 )
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from .codemap.find_engine import FIND_DEFAULT_OPTIONS
-from .codemap.repository_intelligence_query import RepositoryIntelligenceQueryOptions
 from .codemap.repository_declaration_contract import (
     MAX_PACKET_BYTES,
     MAX_REQUEST_BYTES,
 )
+from .codemap.repository_intelligence_query import RepositoryIntelligenceQueryOptions
 from .file_store import UnstableFileError
 from .mcp_contract import (
     MCP_ERROR_REASONS,

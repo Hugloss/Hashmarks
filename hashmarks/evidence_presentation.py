@@ -42,7 +42,16 @@ def _add(
         "assertion": assertion,
         "basis": basis,
     }
-    for key in ("path", "name", "qualname", "from", "to", "reason", "state", "component_id"):
+    for key in (
+        "path",
+        "name",
+        "qualname",
+        "from",
+        "to",
+        "reason",
+        "state",
+        "component_id",
+    ):
         if key in row and key != "kind":
             entry[key] = row[key]
     if isinstance(value, bool):
@@ -83,7 +92,6 @@ def _delta(
                 basis="same-name-kind-candidate",
             )
     _delta_qualifications(grouped, semantic, payload)
-
 
 
 def _delta_qualifications(
@@ -129,7 +137,6 @@ def _delta_qualifications(
         )
 
 
-
 def _snapshot_members(
     grouped: dict[str, list[dict[str, object]]], payload: Mapping[str, object]
 ) -> None:
@@ -145,7 +152,6 @@ def _snapshot_members(
                 {"path": path},
                 basis="repository-snapshot",
             )
-
 
 
 def _snapshot_affected(
@@ -164,7 +170,6 @@ def _snapshot_affected(
                         row,
                         basis="bounded-repository-impact",
                     )
-
 
 
 def _snapshot(
@@ -266,7 +271,6 @@ def _project_source(
     return supported
 
 
-
 def _present_groups(
     grouped: dict[str, list[dict[str, object]]], format: str
 ) -> list[dict[str, object]]:
@@ -288,7 +292,6 @@ def _present_groups(
             }
         )
     return groups
-
 
 
 def present_repository_evidence(

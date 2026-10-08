@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
-from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.evidence_presentation import present_repository_evidence
+from hashmarks.operation_contract import operation_response, operation_schema
 
 from .change_impact import ChangeImpactOptions
 from .freshness_map import FreshnessMapOptions
@@ -62,7 +62,9 @@ class RepositoryIntelligenceQueryMixin:
         format: str,
     ) -> None:
         if format != "none":
-            envelope["presentation"] = present_repository_evidence(producer, format=format)
+            envelope["presentation"] = present_repository_evidence(
+                producer, format=format
+            )
 
     @operation_response("repository_intelligence_query")
     def repository_intelligence_query(

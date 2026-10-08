@@ -171,7 +171,6 @@ def _register_agent_evidence_tools(
         )
 
 
-
 def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = None):
     MCPServer, ToolAnnotations, ToolError = _sdk()
     surface = HashmarksMcpSurface(
