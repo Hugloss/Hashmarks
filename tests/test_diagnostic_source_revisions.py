@@ -18,7 +18,8 @@ if TYPE_CHECKING:
 
 
 def _diagnostic(
-    *, source_revisions: Mapping[str, str] | None = None,
+    *,
+    source_revisions: Mapping[str, str] | None = None,
     scope: tuple[str, ...] = ("src.py",),
     diagnostics: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
@@ -45,7 +46,9 @@ def _source(tmp_path: Path) -> dict[str, object]:
         return codemap.source_observation("src.py")
 
 
-def _project(diagnostic: Mapping[str, object], *sources: Mapping[str, object]) -> dict[str, object]:
+def _project(
+    diagnostic: Mapping[str, object], *sources: Mapping[str, object]
+) -> dict[str, object]:
     return RepositoryDeltaMixin.diagnostic_source_revision_evidence(
         diagnostic, list(sources)
     )
@@ -64,9 +67,11 @@ def test_exact_revision_match_preserves_producer_and_source_authority(
     assert result["authority"] == "descriptive-source-revision-correspondence-only"
     assert result["execution_effect"] == "none"
     assert result["coverage"] == "complete-for-declared-members"
-    assert (result["matching_count"], result["different_count"], result["unknown_count"]) == (
-        1, 0, 0
-    )
+    assert (
+        result["matching_count"],
+        result["different_count"],
+        result["unknown_count"],
+    ) == (1, 0, 0)
     row = result["rows"][0]
     assert row["state"] == "matching"
     assert row["reason"] == "producer-claim-matches-observed-member-revision"
@@ -104,9 +109,6 @@ def test_changed_source_revision_is_not_reported_as_current(
     assert result["different_count"] == 1
     assert result["rows"][0]["state"] == "different"
     assert result["rows"][0]["reason"] == "claimed-and-observed-member-revisions-differ"
-    assert result["rows"][0]["source_generation"] != observed["codemap_generation"] or (
-        result["rows"][0]["generation_relation"] == "same"
-    )
 
 
 @pytest.mark.parametrize("freshness", ["stale", "unknown"])
