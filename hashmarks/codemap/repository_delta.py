@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.digest import Digest
-from hashmarks.freshness import freshness_state
 from hashmarks.file_store import UnstableFileError
+from hashmarks.freshness import freshness_state
 from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactOptions
@@ -419,7 +419,6 @@ class RepositoryDeltaMixin:
             "basis": "stable-canonical-member-bytes",
         }
 
-
     @staticmethod
     def _python_source_token_kinds(
         text: str, path: str
@@ -453,8 +452,7 @@ class RepositoryDeltaMixin:
         text: str,
         literal: str,
         *,
-        path: str,
-        revision: str,
+        member: Mapping[str, object],
         limit: int,
         symbols: Sequence[Mapping[str, object]],
         token_kinds: Mapping[int, Sequence[tuple[int, int, str]]],
@@ -472,7 +470,9 @@ class RepositoryDeltaMixin:
                         for row in symbols
                         if row.get("start_line") is not None
                         and row.get("end_line") is not None
-                        and int(row["start_line"]) <= line_number <= int(row["end_line"])
+                        and int(row["start_line"])
+                        <= line_number
+                        <= int(row["end_line"])
                     ]
                     owner = min(
                         owners,
@@ -494,10 +494,11 @@ class RepositoryDeltaMixin:
                         "occurrence_kind": occurrence_kind,
                         "kind_basis": (
                             "python-tokenizer"
-                            if occurrence_kind != "unknown" else "unknown"
+                            if occurrence_kind != "unknown"
+                            else "unknown"
                         ),
-                        "path": path,
-                        "member_revision": revision,
+                        "path": member["path"],
+                        "member_revision": member["member_revision"],
                         "line": line_number,
                         "column": column + 1,
                         "column_unit": "unicode-codepoint",
@@ -508,12 +509,110 @@ class RepositoryDeltaMixin:
                             else None
                         ),
                         "symbol_basis": (
-                            "indexed-containing-range" if owner is not None else "unknown"
+                            "indexed-containing-range"
+                            if owner is not None
+                            else "unknown"
                         ),
                     }
                     hits.append(fact)
                 column += len(literal)
         return hits, count
+
+    @staticmethod
+    def _validate_source_observation(
+        literal: str | None,
+        limit: int,
+        max_bytes: int,
+        long_line_threshold: int,
+    ) -> None:
+        if not 1 <= limit <= 500 or not 1 <= max_bytes <= 8_388_608:
+            raise ValueError("source observation bounds are outside supported limits")
+        if not 1 <= long_line_threshold <= 1_000_000:
+            raise ValueError("long_line_threshold must be between 1 and 1000000")
+        if literal is not None and (
+            not literal or len(literal) > 256 or "\r" in literal or "\n" in literal
+        ):
+            raise ValueError(
+                "literal must be a nonempty single-line query <=256 characters"
+            )
+
+    def _bounded_source_observation(
+        self, relpath: str, max_bytes: int
+    ) -> tuple[dict[str, object], bytes | None]:
+        """Enforce the source budget while reusing canonical member authority."""
+        candidate = self._repository_member_source(relpath)
+        if isinstance(candidate, dict):
+            return candidate, None
+        try:
+            oversized = candidate.path.stat().st_size > max_bytes
+        except OSError:
+            oversized = False
+        if oversized:
+            return {
+                "path": candidate.rel,
+                "state": "unknown",
+                "reason": "source-size-bound",
+            }, None
+        member, raw = self._repository_member_observation(
+            relpath, include_bytes=True
+        )
+        if raw is not None and len(raw) > max_bytes:
+            return {
+                "path": member["path"],
+                "state": "unknown",
+                "reason": "source-size-bound",
+            }, None
+        return member, raw
+
+    def _source_observation_from_bytes(
+        self, packet: dict[str, object], raw: bytes
+    ) -> None:
+        """Complete a qualified single-member observation from the same byte capture."""
+        limit = cast("dict[str, int]", packet["limits"])["results"]
+        member = cast("dict[str, object]", packet["member"])
+        literal = cast("str | None", packet["literal_query"])
+        packet["source_shape"] = self._source_shape(
+            raw,
+            long_line_threshold=cast("int", packet["long_line_threshold"]),
+        )
+        if b"\x00" in raw:
+            packet["availability"] = "unsupported"
+            packet["reason"] = "null-byte-text"
+            return
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            packet["availability"] = "unsupported"
+            packet["reason"] = "invalid-utf8"
+            return
+
+        packet["completeness"] = "complete"
+        packet["truncation"] = "complete"
+        if literal is None:
+            return
+        symbols = (
+            self.store.symbols_for_path(str(member["path"]))
+            if member.get("index_state") == "indexed"
+            else []
+        )
+        hits, count = self._source_occurrences(
+            text,
+            literal,
+            member=member,
+            limit=limit,
+            symbols=symbols,
+            token_kinds=self._python_source_token_kinds(text, str(member["path"])),
+        )
+        for hit in hits:
+            hit["evidence_identity"] = self._evidence_identity(
+                "hashmarks.source-occurrence.v1", hit
+            )
+        packet["occurrences"] = hits
+        packet["observed_match_count"] = count
+        packet["truncation"] = "truncated" if count > limit else "complete"
+        packet["completeness"] = "incomplete" if count > limit else "complete"
+        if count == 0 and packet["freshness"] == "current":
+            packet["negative_evidence"] = "admissible-within-exact-member"
 
     def source_observation(
         self,
@@ -524,56 +623,26 @@ class RepositoryDeltaMixin:
         max_bytes: int = 1_048_576,
         long_line_threshold: int = 2_000,
     ) -> dict[str, object]:
-        """Observe exact single-member text occurrences and physical source shape.
-
-        Uses canonical repository admission and stable member-read authority.
-        No repository-wide absence, write policy, or agent execution is inferred.
-        """
-        if not 1 <= limit <= 500 or not 1 <= max_bytes <= 8_388_608:
-            raise ValueError("source observation bounds are outside supported limits")
-        if not 1 <= long_line_threshold <= 1_000_000:
-            raise ValueError("long_line_threshold must be between 1 and 1000000")
-        if literal is not None and (
-            not literal or len(literal) > 256 or "\r" in literal or "\n" in literal
-        ):
-            raise ValueError("literal must be a nonempty single-line query <=256 characters")
-        candidate = self._repository_member_source(relpath)
-        member: dict[str, object]
-        raw: bytes | None = None
-        if isinstance(candidate, dict):
-            member = candidate
-        else:
-            try:
-                oversized = candidate.path.stat().st_size > max_bytes
-            except OSError:
-                oversized = False
-            if oversized:
-                member = {
-                    "path": candidate.rel,
-                    "state": "unknown",
-                    "reason": "source-size-bound",
-                }
-            else:
-                member, raw = self._repository_member_observation(
-                    relpath, include_bytes=True
-                )
-        if raw is not None and len(raw) > max_bytes:
-            raw = None
-            member = {
-                "path": member["path"],
-                "state": "unknown",
-                "reason": "source-size-bound",
-            }
-
+        """Describe one stable source member, with no repository-wide absence claim."""
+        self._validate_source_observation(
+            literal, limit, max_bytes, long_line_threshold
+        )
+        generation_before = self.store.generation()
+        member, raw = self._bounded_source_observation(relpath, max_bytes)
         generation, identity_generation, stale = self._generation_status()
         packet: dict[str, object] = {
             "schema": "hashmarks.source-observation.v1",
             "member": member,
             "generation": generation,
             "identity_generation": identity_generation,
-            "freshness": freshness_state(stale),
+            "freshness": (
+                "stale"
+                if generation != generation_before
+                else freshness_state(stale)
+            ),
             "observation_scope": "exact-admitted-repository-member",
             "limits": {"max_bytes": max_bytes, "results": limit},
+            "long_line_threshold": long_line_threshold,
             "availability": "observed" if raw is not None else "unavailable",
             "completeness": "unknown",
             "source_shape": None,
@@ -587,47 +656,9 @@ class RepositoryDeltaMixin:
         }
         if raw is None:
             return packet
-        packet["source_shape"] = self._source_shape(
-            raw, long_line_threshold=long_line_threshold
-        )
-        if b"\x00" in raw:
-            packet["availability"] = "unsupported"
-            packet["reason"] = "null-byte-text"
+        self._source_observation_from_bytes(packet, raw)
+        if packet["availability"] != "observed":
             return packet
-        try:
-            text = raw.decode("utf-8")
-        except UnicodeDecodeError:
-            packet["availability"] = "unsupported"
-            packet["reason"] = "invalid-utf8"
-            return packet
-
-        packet["completeness"] = "complete"
-        packet["truncation"] = "complete"
-        if literal is not None:
-            symbols = (
-                self.store.symbols_for_path(str(member["path"]))
-                if member.get("index_state") == "indexed"
-                else []
-            )
-            hits, count = self._source_occurrences(
-                text, literal, path=str(member["path"]),
-                revision=str(member["member_revision"]),
-                limit=limit,
-                symbols=symbols,
-                token_kinds=self._python_source_token_kinds(
-                    text, str(member["path"])
-                ),
-            )
-            for hit in hits:
-                hit["evidence_identity"] = self._evidence_identity(
-                    "hashmarks.source-occurrence.v1", hit
-                )
-            packet["occurrences"] = hits
-            packet["observed_match_count"] = count
-            packet["truncation"] = "truncated" if count > limit else "complete"
-            packet["completeness"] = "incomplete" if count > limit else "complete"
-            if count == 0 and packet["freshness"] == "current":
-                packet["negative_evidence"] = "admissible-within-exact-member"
         packet["observation_identity"] = self._evidence_identity(
             "hashmarks.source-observation.v1",
             {
