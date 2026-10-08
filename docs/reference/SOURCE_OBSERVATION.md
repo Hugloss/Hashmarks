@@ -145,6 +145,31 @@ Multiple same-fact candidates remain unresolved. Without independently qualified
 source-span relocation evidence, matching diagnostic messages is insufficient
 to assert identical diagnostic identity.
 
+### Diagnostic delta claim qualification
+
+The diagnostic delta preserves raw `added` and `removed` identity comparisons;
+these rows mean **seen in one supplied observation, not the other**. They are
+not automatically evidence that the diagnostic appeared or was resolved.
+
+`diagnostics.qualification` separately reports qualified and unqualified
+identity lists. Claim qualification requires both observations to share a
+nonempty repository identity, producer and environment identity; both must
+represent executed `pass` or `fail` outcomes; and the diagnostic's
+explicit path must be in both declared collection scopes.
+
+A **newly observed** diagnostic is qualified only when the earlier collection
+was `fresh-complete` and the later one was `fresh-complete` or
+`fresh-partial`. A **no-longer-observed** diagnostic is qualified
+only when the later collection was `fresh-complete` and the earlier
+collection was `fresh-complete` or `fresh-partial`.
+Timeout, blocked execution, unavailable sources, source mismatch, unknown
+coverage, absent scope, or changed environment never prove absence.
+
+All collection qualifiers are **producer-claimed**, not independent verification
+of the producer, causal error resolution, source-span continuity, or execution
+authority. The strict existing diagnostic identity and non-authoritative
+possible relocation projection remain unchanged.
+
 ## Existing owners and non-goals
 
 All new facts stay within `RepositoryDeltaMixin` and its existing canonical
