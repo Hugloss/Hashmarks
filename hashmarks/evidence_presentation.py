@@ -42,7 +42,7 @@ def _add(
         "assertion": assertion,
         "basis": basis,
     }
-    for key in ("path", "name", "qualname", "kind", "from", "to", "reason", "state"):
+    for key in ("path", "name", "qualname", "from", "to", "reason", "state", "component_id"):
         if key in row and key != "kind":
             entry[key] = row[key]
     if isinstance(value, bool):
@@ -82,6 +82,15 @@ def _delta(
                 row,
                 basis="same-name-kind-candidate",
             )
+    _delta_qualifications(grouped, semantic, payload)
+
+
+
+def _delta_qualifications(
+    grouped: dict[str, list[dict[str, object]]],
+    semantic: Mapping[str, object],
+    payload: Mapping[str, object],
+) -> None:
     for key, family in (
         ("ownership_changed", "relationship_change"),
         ("impact_changed", "relationship_change"),
@@ -120,7 +129,8 @@ def _delta(
         )
 
 
-def _snapshot(
+
+def _snapshot_members(
     grouped: dict[str, list[dict[str, object]]], payload: Mapping[str, object]
 ) -> None:
     paths = _mapping(payload.get("paths"))
@@ -135,16 +145,12 @@ def _snapshot(
                 {"path": path},
                 basis="repository-snapshot",
             )
-    verification = _mapping(payload.get("verification"))
-    if verification.get("member"):
-        _add(
-            grouped,
-            "verification_evidence",
-            "observed_fact",
-            "verification_candidate_observed",
-            {"path": verification["member"], "reason": verification.get("reason")},
-            basis="bounded-verification-relevance",
-        )
+
+
+
+def _snapshot_affected(
+    grouped: dict[str, list[dict[str, object]]], payload: Mapping[str, object]
+) -> None:
     affected = _mapping(payload.get("affected"))
     for role, rows in sorted(affected.items()):
         if isinstance(rows, list):
@@ -158,6 +164,24 @@ def _snapshot(
                         row,
                         basis="bounded-repository-impact",
                     )
+
+
+
+def _snapshot(
+    grouped: dict[str, list[dict[str, object]]], payload: Mapping[str, object]
+) -> None:
+    _snapshot_members(grouped, payload)
+    verification = _mapping(payload.get("verification"))
+    if verification.get("member"):
+        _add(
+            grouped,
+            "verification_evidence",
+            "observed_fact",
+            "verification_candidate_observed",
+            {"path": verification["member"], "reason": verification.get("reason")},
+            basis="bounded-verification-relevance",
+        )
+    _snapshot_affected(grouped, payload)
     freshness = payload.get("freshness")
     if freshness is not None:
         _add(
@@ -202,18 +226,11 @@ def _diagnostic(
             )
 
 
-def present_repository_evidence(
-    packet: Mapping[str, object], *, format: str = "compact"
-) -> dict[str, object]:
-    """Render typed findings without changing canonical producer authority.
-
-    An unsupported source schema returns explicit unsupported coverage rather
-    than guessing from loosely matching field names.
-    """
-    if format not in FORMATS or format == "none":
-        raise ValueError("presentation must be one of: structured, compact, text")
-    schema = packet.get("schema")
-    grouped: dict[str, list[dict[str, object]]] = {family: [] for family in FAMILIES}
+def _project_source(
+    grouped: dict[str, list[dict[str, object]]],
+    packet: Mapping[str, object],
+    schema: object,
+) -> bool:
     supported = False
     if schema == "hashmarks.repository-intelligence-delta.v1":
         _delta(grouped, packet)
@@ -233,6 +250,26 @@ def present_repository_evidence(
     elif schema == "hashmarks.diagnostic-observation-delta.v1":
         _diagnostic(grouped, packet)
         supported = True
+    elif schema == "hashmarks.dependency-resolution-delta.v3":
+        transitions = packet.get("component_selection_transitions")
+        if isinstance(transitions, list):
+            for row in transitions:
+                _add(
+                    grouped,
+                    "dependency_change",
+                    "observed_change",
+                    "component_selection_transition",
+                    row,
+                    basis="qualified-dependency-endpoints",
+                )
+        supported = True
+    return supported
+
+
+
+def _present_groups(
+    grouped: dict[str, list[dict[str, object]]], format: str
+) -> list[dict[str, object]]:
     groups: list[dict[str, object]] = []
     for family in FAMILIES:
         entries = grouped[family]
@@ -250,6 +287,24 @@ def present_repository_evidence(
                 "omitted_from_presentation": len(entries) - len(selected),
             }
         )
+    return groups
+
+
+
+def present_repository_evidence(
+    packet: Mapping[str, object], *, format: str = "compact"
+) -> dict[str, object]:
+    """Render typed findings without changing canonical producer authority.
+
+    An unsupported source schema returns explicit unsupported coverage rather
+    than guessing from loosely matching field names.
+    """
+    if format not in FORMATS or format == "none":
+        raise ValueError("presentation must be one of: structured, compact, text")
+    schema = packet.get("schema")
+    grouped: dict[str, list[dict[str, object]]] = {family: [] for family in FAMILIES}
+    supported = _project_source(grouped, packet, schema)
+    groups = _present_groups(grouped, format)
     result: dict[str, object] = {
         "source_schema": schema,
         "source_evidence_identity": (
