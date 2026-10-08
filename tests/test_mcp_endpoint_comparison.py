@@ -180,9 +180,7 @@ def test_comparable_structural_measurement_retains_exact_source_reference() -> N
         "dimension_delta": {"static_callers": 2},
     }
     projection = present_repository_evidence(packet, format="structured")
-    rows = [
-        row for group in projection["groups"] for row in group["findings"]
-    ]
+    rows = [row for group in projection["groups"] for row in group["findings"]]
     measurement = next(row for row in rows if row["kind"] == "dimension_delta")
     assert measurement["source_refs"] == ["/dimension_delta"]
     assert measurement["details"] == {"static_callers": 2}
