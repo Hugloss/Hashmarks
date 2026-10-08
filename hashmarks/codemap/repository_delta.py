@@ -18,6 +18,7 @@ from .source_line_correspondence import (
     diagnostic_line_correspondence,
     source_line_anchors,
     source_shape,
+    validated_source_lines,
 )
 
 if TYPE_CHECKING:
@@ -679,13 +680,7 @@ class RepositoryDeltaMixin:
         self._validate_source_observation(
             literal, limit, max_bytes, long_line_threshold
         )
-        if (
-            isinstance(lines, (str, bytes))
-            or len(lines) > 32
-            or any(type(line) is not int or line < 1 for line in lines)
-        ):
-            raise ValueError("lines must be up to 32 positive integers")
-        requested = sorted(set(lines))
+        requested = validated_source_lines(lines)
         generation_before = self.store.generation()
         member, raw = self._bounded_source_observation(relpath, max_bytes)
         generation, identity_generation, stale = self._generation_status()
