@@ -403,16 +403,16 @@ class RepositoryDeltaMixin:
     @staticmethod
     def _source_shape(raw: bytes, *, long_line_threshold: int) -> dict[str, object]:
         """Measure physical source properties without creating a second file index."""
-        parts = raw.split(b"\\n")
-        physical = parts[:-1] if raw.endswith(b"\\n") else parts if raw else []
+        parts = raw.split(b"\n")
+        physical = parts[:-1] if raw.endswith(b"\n") else parts if raw else []
         widths = [len(part) for part in physical]
         return {
             "bytes": len(raw),
             "physical_lines": len(physical),
-            "lf_terminators": raw.count(b"\\n"),
-            "crlf_terminators": sum(part.endswith(b"\\r") for part in parts[:-1]),
-            "final_lf": raw.endswith(b"\\n"),
-            "utf8_bom": raw.startswith(b"\\xef\\xbb\\xbf"),
+            "lf_terminators": raw.count(b"\n"),
+            "crlf_terminators": sum(part.endswith(b"\r") for part in parts[:-1]),
+            "final_lf": raw.endswith(b"\n"),
+            "utf8_bom": raw.startswith(b"\xef\xbb\xbf"),
             "maximum_physical_line_bytes": max(widths, default=0),
             "long_line_threshold_bytes": long_line_threshold,
             "long_line_count": sum(width > long_line_threshold for width in widths),
@@ -432,7 +432,7 @@ class RepositoryDeltaMixin:
         """Bound returned locations, not the count over the admitted member."""
         hits: list[dict[str, object]] = []
         count = 0
-        for line_number, line in enumerate(text.split("\\n"), 1):
+        for line_number, line in enumerate(text.split("\n"), 1):
             column = 0
             while (column := line.find(literal, column)) >= 0:
                 count += 1
@@ -491,7 +491,7 @@ class RepositoryDeltaMixin:
         if not 1 <= long_line_threshold <= 1_000_000:
             raise ValueError("long_line_threshold must be between 1 and 1000000")
         if literal is not None and (
-            not literal or len(literal) > 256 or "\\r" in literal or "\\n" in literal
+            not literal or len(literal) > 256 or "\r" in literal or "\n" in literal
         ):
             raise ValueError("literal must be a nonempty single-line query <=256 characters")
         candidate = self._repository_member_source(relpath)
@@ -547,7 +547,7 @@ class RepositoryDeltaMixin:
         packet["source_shape"] = self._source_shape(
             raw, long_line_threshold=long_line_threshold
         )
-        if b"\\x00" in raw:
+        if b"\x00" in raw:
             packet["availability"] = "unsupported"
             packet["reason"] = "null-byte-text"
             return packet
