@@ -244,6 +244,7 @@ def test_same_generation_unadmitted_source_change_cannot_prove_movement() -> Non
         **source_before,
         "member": {**source_before["member"], "member_revision": "second"},
     }
-    assert _source_pair_reason(
-        before, after, source_before, source_after
-    ) == "source-change-not-generation-bound"
+    assert (
+        _source_pair_reason(before, after, source_before, source_after)
+        == "source-change-not-generation-bound"
+    )
