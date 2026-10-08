@@ -34,6 +34,7 @@ _DependencyCodemapResultMode = Literal[*tuple(operation_modes("dependency_codema
 _RepositoryDeclarationsResultMode = Literal[
     *tuple(operation_modes("repository_declarations"))
 ]
+_SourceObservationResultMode = Literal[*tuple(operation_modes("source_observation"))]
 
 
 def _sdk():
@@ -257,6 +258,75 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
             changed_paths,
             previous_evidence,
             token_budget=token_budget,
+        )
+
+    intelligence_contract = tool_contract("repository_intelligence_query")
+
+    @server.tool(
+        name=intelligence_contract.name,
+        description=intelligence_contract.description,
+        annotations=annotations,
+    )
+    def repository_intelligence_query(
+        surface_name: str,
+        task: str,
+        changed_paths: list[str] | None = None,
+        profile: str = "compact",
+        presentation: str = "compact",
+        member_path: str | None = None,
+        previous_snapshot: dict[str, Any] | None = None,
+    ) -> dict[str, object]:
+        return _call_surface(
+            intelligence_contract,
+            ToolError,
+            surface.repository_intelligence_query,
+            surface_name,
+            task,
+            changed_paths,
+            profile=profile,
+            presentation=presentation,
+            member_path=member_path,
+            previous_snapshot=previous_snapshot,
+        )
+
+    source_contract = tool_contract("source_observation")
+
+    @server.tool(
+        name=source_contract.name,
+        description=source_contract.description,
+        annotations=annotations,
+    )
+    def source_observation(
+        paths: list[str],
+        literal: str | None = None,
+        result_mode: _SourceObservationResultMode = source_contract.default_response_mode,
+        limit: int = 50,
+    ) -> dict[str, object]:
+        return _call_surface(
+            source_contract,
+            ToolError,
+            surface.source_observation,
+            paths,
+            literal=literal,
+            result_mode=result_mode,
+            response_mode=result_mode,
+            limit=limit,
+        )
+
+    locality_contract = tool_contract("structural_locality")
+
+    @server.tool(
+        name=locality_contract.name,
+        description=locality_contract.description,
+        annotations=annotations,
+    )
+    def structural_locality(target: str, max_depth: int = 2) -> dict[str, object]:
+        return _call_surface(
+            locality_contract,
+            ToolError,
+            surface.structural_locality,
+            target,
+            max_depth=max_depth,
         )
 
     server._hashmarks_surface = surface

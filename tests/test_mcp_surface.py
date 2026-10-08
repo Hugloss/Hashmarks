@@ -667,6 +667,9 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             "dependency_codemap",
             "repository_declarations",
             "post_change",
+            "repository_intelligence_query",
+            "source_observation",
+            "structural_locality",
         ]
         for row in registered:
             annotations = row["annotations"]

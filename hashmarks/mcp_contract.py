@@ -165,6 +165,31 @@ MCP_TOOL_CONTRACTS = (
         ),
         "post_change",
     ),
+    McpToolContract(
+        "repository_intelligence_query",
+        (
+            "Read-only bounded repository-intelligence facets: change description, "
+            "profile, snapshot, delta, freshness, verification explanation, "
+            "cross-repository and evidence economics. Previous snapshots are caller-supplied."
+        ),
+        "repository_intelligence_query",
+    ),
+    McpToolContract(
+        "source_observation",
+        (
+            "Observe exact source occurrences for one member or an explicit bounded "
+            "member set, with exact revisions, coverage and qualified absence."
+        ),
+        "source_observation",
+    ),
+    McpToolContract(
+        "structural_locality",
+        (
+            "Observe bounded static calls, exact callers, unresolved targets, "
+            "structural locality and related verifier paths for one exact symbol."
+        ),
+        "structural_locality",
+    ),
 )
 
 MCP_TOOL_NAMES = tuple(contract.name for contract in MCP_TOOL_CONTRACTS)

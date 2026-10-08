@@ -13,6 +13,7 @@ from .codemap.evidence_correlation import (
 )
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from .codemap.find_engine import FIND_DEFAULT_OPTIONS
+from .codemap.repository_intelligence_query import RepositoryIntelligenceQueryOptions
 from .codemap.repository_declaration_contract import (
     MAX_PACKET_BYTES,
     MAX_REQUEST_BYTES,
@@ -401,6 +402,98 @@ class HashmarksMcpSurface:
                     previous_observation=previous,
                     result_mode=mode,
                 )
+            except ValueError as exc:
+                raise _surface_value_error(exc) from exc
+
+        return self._read(project)
+
+    def repository_intelligence_query(
+        self,
+        surface: str,
+        task: str,
+        changed_paths: list[str] | None = None,
+        *,
+        profile: str = "compact",
+        presentation: str = "compact",
+        member_path: str | None = None,
+        previous_snapshot: dict[str, Any] | None = None,
+    ) -> dict[str, object]:
+        surface = _bounded_text(surface, name="surface", maximum=48)
+        task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
+        paths = _changed_paths(changed_paths) if changed_paths else []
+        if previous_snapshot is not None:
+            previous_snapshot = _bounded_json(
+                previous_snapshot,
+                name="previous_snapshot",
+                maximum=1_048_576,
+                expected_type=dict,
+            )
+        if member_path is not None:
+            member_path = _bounded_text(member_path, name="member_path", maximum=2_048)
+        profile = _bounded_text(profile, name="profile", maximum=16)
+        presentation = _bounded_text(presentation, name="presentation", maximum=16)
+
+        def project() -> dict[str, object]:
+            try:
+                return self._map.repository_intelligence_query(
+                    surface,
+                    task,
+                    paths,
+                    options=RepositoryIntelligenceQueryOptions(
+                        member_path=member_path,
+                        profile=profile,
+                        previous_snapshot=previous_snapshot,
+                        presentation=presentation,
+                    ),
+                )
+            except ValueError as exc:
+                raise _surface_value_error(exc) from exc
+
+        return self._read(project)
+
+    def source_observation(
+        self,
+        paths: list[str],
+        *,
+        literal: str | None = None,
+        result_mode: str = operation_default_mode("source_observation"),
+        limit: int = 50,
+    ) -> dict[str, object]:
+        if not isinstance(paths, list) or not 1 <= len(paths) <= 32:
+            raise McpSurfaceError("paths must contain between 1 and 32 explicit members")
+        if not all(isinstance(path, str) and path for path in paths):
+            raise McpSurfaceError("paths must contain nonblank strings")
+        if result_mode not in ("member", "scope"):
+            raise McpSurfaceError("result_mode must be one of: member, scope")
+        if result_mode == "member" and len(paths) != 1:
+            raise McpSurfaceError("member mode requires exactly one path")
+        if literal is not None:
+            literal = _bounded_text(literal, name="literal", maximum=_MAX_QUERY_CHARS)
+        if result_mode == "scope" and literal is None:
+            raise McpSurfaceError("scope mode requires a literal")
+        limit = _bounded_int(limit, name="limit", minimum=1, maximum=50)
+
+        def project() -> dict[str, object]:
+            try:
+                self._map.sync(paths)
+                if result_mode == "member":
+                    return self._map.source_observation(paths[0], literal=literal, limit=limit)
+                assert literal is not None
+                return self._map.scoped_source_occurrences(paths, literal, limit=limit)
+            except ValueError as exc:
+                raise _surface_value_error(exc) from exc
+
+        return self._read(project)
+
+    def structural_locality(
+        self, target: str, *, max_depth: int = 2
+    ) -> dict[str, object]:
+        target = _bounded_text(target, name="target", maximum=_MAX_QUERY_CHARS)
+        max_depth = _bounded_int(max_depth, name="max_depth", minimum=1, maximum=6)
+
+        def project() -> dict[str, object]:
+            try:
+                return self._map.structural_locality(target, max_depth=max_depth)
             except ValueError as exc:
                 raise _surface_value_error(exc) from exc
 

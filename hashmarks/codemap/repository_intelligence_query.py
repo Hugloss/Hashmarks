@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.operation_contract import operation_response, operation_schema
+from hashmarks.evidence_presentation import present_repository_evidence
 
 from .change_impact import ChangeImpactOptions
 from .freshness_map import FreshnessMapOptions
@@ -32,6 +33,7 @@ class RepositoryIntelligenceQueryOptions:
 
     member_path: str | None = None
     profile: str = "compact"
+    presentation: str = "none"
     negative_members: Sequence[str | Path] = ()
     previous_map: Mapping[str, object] | None = None
     previous_snapshot: Mapping[str, object] | None = None
@@ -164,6 +166,10 @@ class RepositoryIntelligenceQueryMixin:
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
         }
+        if options.presentation != "none":
+            envelope["presentation"] = present_repository_evidence(
+                result, format=options.presentation
+            )
         envelope["query_identity"] = "sha256:" + self._packet_digest(
             operation_schema("repository_intelligence_query"),
             envelope,

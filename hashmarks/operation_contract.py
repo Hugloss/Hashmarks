@@ -89,6 +89,13 @@ OPERATION_CONTRACTS = (
         "post_change",
         (("default", "hashmarks.task-post-change-delta.v2"),),
     ),
+    OperationContract(
+        "source_observation",
+        (
+            ("member", "hashmarks.source-observation.v1"),
+            ("scope", "hashmarks.scoped-source-occurrences.v1"),
+        ),
+    ),
     OperationContract("projects", (("default", "hashmarks.codemap-projects.v1"),)),
     OperationContract("outline", (("default", "hashmarks.outline.v1"),)),
     OperationContract("grep", (("default", "hashmarks.grep.v1"),)),
