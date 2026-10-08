@@ -485,8 +485,7 @@ def test_unrelated_edit_does_not_destroy_scoped_observation_freshness() -> None:
 
     assert freshness["state"] == "current"
     assert (
-        freshness["reason"]
-        == "declared-complete-change-set-outside-observation-scope"
+        freshness["reason"] == "declared-complete-change-set-outside-observation-scope"
     )
     assert freshness["change_set_completeness"] == "caller-claimed-complete"
     assert freshness["intersection"] == []
