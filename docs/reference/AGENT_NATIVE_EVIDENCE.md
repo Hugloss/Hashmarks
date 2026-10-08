@@ -6,9 +6,9 @@ engine, repository mutator, or execution/certification authority.
 
 ## Finding vocabulary
 
-Seven families describe different kinds of facts: `source_change`,
-`relationship_change`, `dependency_change`, `diagnostic_observation`,
-`verification_evidence`, `correspondence`, and `evidence_qualification`.
+Seven families describe different kinds of facts: `source`,
+`relationship`, `dependency`, `diagnostic`,
+`verification`, `correspondence`, and `qualification`.
 
 Assertions distinguish `observed_fact`, `observed_change`,
 `candidate_correspondence`, and `producer_claim`. The last never becomes

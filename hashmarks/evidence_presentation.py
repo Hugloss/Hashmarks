@@ -9,13 +9,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 FAMILIES = (
-    "source_change",
-    "relationship_change",
-    "dependency_change",
-    "diagnostic_observation",
-    "verification_evidence",
+    "source",
+    "relationship",
+    "dependency",
+    "diagnostic",
+    "verification",
     "correspondence",
-    "evidence_qualification",
+    "qualification",
 )
 FORMATS = frozenset({"none", "structured", "compact", "text"})
 _MAX_PRESENTED_ROWS = 48
@@ -64,10 +64,10 @@ def _delta(
 ) -> None:
     semantic = _mapping(payload.get("semantic"))
     for key, family, kind in (
-        ("symbols_added", "source_change", "symbol_added"),
-        ("symbols_removed", "source_change", "symbol_removed"),
-        ("dependencies_added", "relationship_change", "dependency_edge_added"),
-        ("dependencies_removed", "relationship_change", "dependency_edge_removed"),
+        ("symbols_added", "source", "symbol_added"),
+        ("symbols_removed", "source", "symbol_removed"),
+        ("dependencies_added", "relationship", "dependency_edge_added"),
+        ("dependencies_removed", "relationship", "dependency_edge_removed"),
     ):
         rows = semantic.get(key)
         if isinstance(rows, list):
@@ -100,11 +100,11 @@ def _delta_qualifications(
     payload: Mapping[str, object],
 ) -> None:
     for key, family in (
-        ("ownership_changed", "relationship_change"),
-        ("impact_changed", "relationship_change"),
-        ("verification_changed", "verification_evidence"),
-        ("freshness_changed", "evidence_qualification"),
-        ("project_provenance_changed", "evidence_qualification"),
+        ("ownership_changed", "relationship"),
+        ("impact_changed", "relationship"),
+        ("verification_changed", "verification"),
+        ("freshness_changed", "qualification"),
+        ("project_provenance_changed", "qualification"),
     ):
         if semantic.get(key) is True:
             _add(
@@ -119,7 +119,7 @@ def _delta_qualifications(
     if qualification.get("changed") is True:
         _add(
             grouped,
-            "evidence_qualification",
+            "qualification",
             "observed_change",
             "completeness_changed",
             True,
@@ -129,7 +129,7 @@ def _delta_qualifications(
     if observer.get("changed") is True:
         _add(
             grouped,
-            "evidence_qualification",
+            "qualification",
             "observed_change",
             "observer_capability_changed",
             True,
@@ -146,7 +146,7 @@ def _snapshot_members(
         if row.get("revision") is not None:
             _add(
                 grouped,
-                "evidence_qualification",
+                "qualification",
                 "observed_fact",
                 "member_revision_observed",
                 {"path": path},
@@ -164,7 +164,7 @@ def _snapshot_affected(
                 if isinstance(row, Mapping) and row.get("path"):
                     _add(
                         grouped,
-                        "relationship_change",
+                        "relationship",
                         "observed_fact",
                         "related_surface:" + str(role),
                         row,
@@ -180,7 +180,7 @@ def _snapshot(
     if verification.get("member"):
         _add(
             grouped,
-            "verification_evidence",
+            "verification",
             "observed_fact",
             "verification_candidate_observed",
             {"path": verification["member"], "reason": verification.get("reason")},
@@ -191,7 +191,7 @@ def _snapshot(
     if freshness is not None:
         _add(
             grouped,
-            "evidence_qualification",
+            "qualification",
             "observed_fact",
             "freshness_observed",
             {},
@@ -212,7 +212,7 @@ def _diagnostic(
             for row in rows:
                 _add(
                     grouped,
-                    "diagnostic_observation",
+                    "diagnostic",
                     "producer_claim",
                     kind,
                     row,
@@ -261,7 +261,7 @@ def _project_source(
             for row in transitions:
                 _add(
                     grouped,
-                    "dependency_change",
+                    "dependency",
                     "observed_change",
                     "component_selection_transition",
                     row,

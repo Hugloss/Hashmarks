@@ -36,24 +36,24 @@ def test_findings_separate_observation_move_candidate_and_capability_change() ->
     result = present_repository_evidence(delta, format="structured")
     groups = {g["family"]: g for g in result["groups"]}
     assert tuple(FAMILIES) == (
-        "source_change",
-        "relationship_change",
-        "dependency_change",
-        "diagnostic_observation",
-        "verification_evidence",
+        "source",
+        "relationship",
+        "dependency",
+        "diagnostic",
+        "verification",
         "correspondence",
-        "evidence_qualification",
+        "qualification",
     )
-    assert groups["source_change"]["findings"][0]["assertion"] == "observed_change"
+    assert groups["source"]["findings"][0]["assertion"] == "observed_change"
     assert (
         groups["correspondence"]["findings"][0]["assertion"]
         == "candidate_correspondence"
     )
     assert (
-        groups["relationship_change"]["findings"][0]["kind"]
+        groups["relationship"]["findings"][0]["kind"]
         == "dependency_edge_removed"
     )
-    assert groups["evidence_qualification"]["count_observed_in_packet"] == 3
+    assert groups["qualification"]["count_observed_in_packet"] == 3
     assert result["source_evidence_identity"] == "test-identity"
     assert present_repository_evidence(delta, format="compact")["format"] == "compact"
     assert (
@@ -74,7 +74,7 @@ def test_diagnostic_disappearance_remains_only_a_producer_claim() -> None:
         },
     }
     groups = present_repository_evidence(packet, format="structured")["groups"]
-    assert groups[0]["family"] == "diagnostic_observation"
+    assert groups[0]["family"] == "diagnostic"
     assert groups[0]["findings"][0]["kind"] == "diagnostic_missing_after"
     assert groups[0]["findings"][0]["assertion"] == "producer_claim"
     assert groups[1]["family"] == "correspondence"
