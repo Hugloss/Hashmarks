@@ -37,6 +37,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 
 ## Qualification
 
+- [`qualification/AGENT_EVIDENCE_FORMATS.md`](qualification/AGENT_EVIDENCE_FORMATS.md) — paired evidence-presentation export and external agent grading.
 - [`qualification/REPOSITORY_QUALITY.md`](qualification/REPOSITORY_QUALITY.md) — repository-quality qualification semantics.
 - [`qualification/TEST_RUNTIME_ECONOMICS.md`](qualification/TEST_RUNTIME_ECONOMICS.md) — test-proof scope and runtime-economics guidance.
 
