@@ -290,6 +290,7 @@ def _capture_audit(
     trial_by_key = {(row["case_id"], row["variant"]): row for row in trials}
     observations: dict[tuple[str, str, str], bool] = {}
     mismatches: list[dict[str, str]] = []
+    capture_digests: list[dict[str, object]] = []
     for capture in captures:
         key, trial, visible = _validate_host_capture(
             capture, trial_by_key, models
@@ -298,6 +299,16 @@ def _capture_audit(
             raise ValueError("duplicate host capture")
         equivalent = _capture_equivalent(trial, visible)
         observations[key] = equivalent
+        capture_digests.append(
+            {
+                "case_id": key[0],
+                "model": key[1],
+                "variant": key[2],
+                "model_visible_sha256": "sha256:"
+                + hashlib.sha256(visible.encode("utf-8")).hexdigest(),
+                "content_equivalent": equivalent,
+            }
+        )
         if not equivalent:
             mismatches.append(
                 {"case_id": key[0], "model": key[1], "variant": key[2]}
@@ -310,6 +321,7 @@ def _capture_audit(
             "expected_captures": len(trials) * len(models),
             "observed_captures": len(observations),
             "content_equivalent_captures": len(verified),
+            "capture_digests": capture_digests,
             "content_mismatches": mismatches,
             "missing_captures": [
                 {"case_id": row["case_id"], "model": model, "variant": row["variant"]}
@@ -323,13 +335,20 @@ def _capture_audit(
 
 
 def _capture_subset(
-    captures: list[dict[str, Any]],
+    captures: list[dict[str, Any]] | None,
     trials: list[dict[str, Any]],
     models: list[str],
     pairs: dict[tuple[str, str], dict[str, dict[str, Any]]],
     expected: dict[str, set[str]],
     complete_keys: list[tuple[str, str]],
-) -> tuple[dict[str, object], list[dict[str, dict[str, Any]]], list[dict[str, str]]]:
+) -> dict[str, object]:
+    if captures is None:
+        return {
+            "capture_audit": None,
+            "capture_equivalent_complete_pairs": None,
+            "capture_equivalent_arms": None,
+            "capture_unqualified_complete_pairs": None,
+        }
     report, equivalent = _capture_audit(captures, trials=trials, models=models)
     captured_pairs: list[dict[str, dict[str, Any]]] = []
     unqualified: list[dict[str, str]] = []
@@ -338,7 +357,17 @@ def _capture_subset(
             captured_pairs.append(pairs[case, model])
         else:
             unqualified.append({"case_id": case, "model": model})
-    return report, captured_pairs, unqualified
+    variants = [
+        row["variant"] for row in trials if row["case_id"] == next(iter(expected))
+    ]
+    return {
+        "capture_audit": report,
+        "capture_equivalent_complete_pairs": len(captured_pairs),
+        "capture_equivalent_arms": [
+            _arm(variant, captured_pairs) for variant in variants
+        ],
+        "capture_unqualified_complete_pairs": unqualified,
+    }
 
 
 def summarize_grades(
@@ -374,13 +403,9 @@ def summarize_grades(
     variants = [
         row["variant"] for row in trials if row["case_id"] == next(iter(expected))
     ]
-    capture_report: dict[str, object] | None = None
-    captured_pairs: list[dict[str, dict[str, Any]]] = []
-    unqualified: list[dict[str, str]] = []
-    if captures is not None:
-        capture_report, captured_pairs, unqualified = _capture_subset(
-            captures, trials, models, pairs, expected, complete_keys
-        )
+    capture_fields = _capture_subset(
+        captures, trials, models, pairs, expected, complete_keys
+    )
     return {
         "schema": "hashmarks.agent-evidence-format-study.v1",
         "study_axis": trials[0]["study_axis"],
@@ -389,18 +414,7 @@ def summarize_grades(
         "incomplete_pairs_excluded": len(excluded),
         "excluded_pairs": excluded,
         "arms": [_arm(variant, complete) for variant in variants],
-        "capture_audit": capture_report,
-        "capture_equivalent_complete_pairs": (
-            len(captured_pairs) if captures is not None else None
-        ),
-        "capture_equivalent_arms": (
-            [_arm(variant, captured_pairs) for variant in variants]
-            if captures is not None
-            else None
-        ),
-        "capture_unqualified_complete_pairs": (
-            unqualified if captures is not None else None
-        ),
+        **capture_fields,
         "ranking_authority": "external-consumer",
     }
 

@@ -64,7 +64,9 @@ content equivalent to the exported native response; this is not byte-for-byte
 rendering identity, and host formatting can still affect tokens. For
 `encoding-only`, the entire visible text must match the selected encoding
 exactly (including whitespace and field order). A different string cannot be
-credited as evidence for the claimed encoding.
+credited as evidence for the claimed encoding. The audit retains the SHA-256
+digest of each *exact captured UTF-8 text*, independently of the semantic
+content comparison, so host text reformatting remains visible to reviewers.
 
 Results distinguish **all externally graded complete pairs** (`arms`) from
 `capture_equivalent_arms`, whose *every* variant in the pair has an equivalent

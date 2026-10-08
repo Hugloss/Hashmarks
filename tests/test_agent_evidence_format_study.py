@@ -192,6 +192,10 @@ def test_capture_equivalence_requires_same_frozen_trial_and_actual_content(
     assert qualified["capture_audit"]["observed_captures"] == len(trials)
     assert qualified["capture_audit"]["host_authenticity_proven"] is False
     assert qualified["capture_audit"]["content_mismatches"] == []
+    assert all(
+        item["model_visible_sha256"].startswith("sha256:")
+        for item in qualified["capture_audit"]["capture_digests"]
+    )
     assert qualified["capture_equivalent_arms"] == qualified["arms"]
 
     contaminated = copy.deepcopy(captures)
