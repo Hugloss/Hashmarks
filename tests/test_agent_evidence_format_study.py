@@ -38,7 +38,10 @@ def test_format_study_exports_four_fixed_task_arms_without_oracle_leak() -> None
     assert len(first) == 4
     assert len({row["prompt"] for row in first}) == 1
     assert [row["variant"] for row in first] == [
-        "native-json", "typed-json", "compact-json", "grouped-text"
+        "native-json",
+        "typed-json",
+        "compact-json",
+        "grouped-text",
     ]
     assert all("oracle" not in json.dumps(row) for row in first)
     assert first[1]["tool_response"]["groups"][0]["findings"][0]["assertion"] == (
@@ -59,10 +62,16 @@ def test_format_study_only_scores_complete_paired_runs() -> None:
         }
         for index, variant in enumerate(variants)
     ]
-    grades.append({
-        "case_id": "case2", "model": "model-x", "variant": "native-json",
-        "correct": True, "unsupported_claims": 0, "tokens": 10
-    })
+    grades.append(
+        {
+            "case_id": "case2",
+            "model": "model-x",
+            "variant": "native-json",
+            "correct": True,
+            "unsupported_claims": 0,
+            "tokens": 10,
+        }
+    )
     result = summarize_grades(grades)
     assert result["complete_pairs"] == 1
     assert result["incomplete_pairs_excluded"] == 1

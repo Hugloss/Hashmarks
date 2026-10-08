@@ -47,14 +47,16 @@ def emit_trials(manifest: dict[str, Any]) -> list[dict[str, object]]:
             "grouped-text": rendered["text"]["text"],
         }
         for variant in _VARIANTS:
-            rows.append({
-                "case_id": case_id,
-                "variant": variant,
-                "prompt": prompt,
-                "tool_response": evidence[variant],
-                "study_axis": "presentation-and-information-density",
-                "source_schema": packet["schema"],
-            })
+            rows.append(
+                {
+                    "case_id": case_id,
+                    "variant": variant,
+                    "prompt": prompt,
+                    "tool_response": evidence[variant],
+                    "study_axis": "presentation-and-information-density",
+                    "source_schema": packet["schema"],
+                }
+            )
     return rows
 
 
@@ -63,7 +65,9 @@ def summarize_grades(grades: list[dict[str, Any]]) -> dict[str, object]:
     pairs: dict[tuple[str, str], dict[str, dict[str, Any]]] = defaultdict(dict)
     for grade in grades:
         case_id, model, variant = (
-            grade.get("case_id"), grade.get("model"), grade.get("variant")
+            grade.get("case_id"),
+            grade.get("model"),
+            grade.get("variant"),
         )
         if not all(isinstance(x, str) and x for x in (case_id, model, variant)):
             raise ValueError("grades require case_id, model and variant")
@@ -86,14 +90,18 @@ def summarize_grades(grades: list[dict[str, Any]]) -> dict[str, object]:
             or row["tokens"] < 0
             for row in arm
         ):
-            raise ValueError("paired grades require boolean correct and nonnegative integer metrics")
-        results.append({
-            "variant": variant,
-            "paired_runs": len(arm),
-            "correct": sum(bool(row["correct"]) for row in arm),
-            "unsupported_claims": sum(row["unsupported_claims"] for row in arm),
-            "total_tokens": sum(row["tokens"] for row in arm),
-        })
+            raise ValueError(
+                "paired grades require boolean correct and nonnegative integer metrics"
+            )
+        results.append(
+            {
+                "variant": variant,
+                "paired_runs": len(arm),
+                "correct": sum(bool(row["correct"]) for row in arm),
+                "unsupported_claims": sum(row["unsupported_claims"] for row in arm),
+                "total_tokens": sum(row["tokens"] for row in arm),
+            }
+        )
     return {
         "schema": "hashmarks.agent-evidence-format-study.v1",
         "complete_pairs": len(complete),
@@ -119,9 +127,9 @@ def main(argv: list[str] | None = None) -> int:
     else:
         if not isinstance(value, list):
             raise ValueError("grades must be an array")
-        serialized = json.dumps(
-            summarize_grades(value), sort_keys=True, indent=2
-        ) + "\n"
+        serialized = (
+            json.dumps(summarize_grades(value), sort_keys=True, indent=2) + "\n"
+        )
     args.output.write_text(serialized, encoding="utf-8")
     return 0
 

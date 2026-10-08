@@ -550,9 +550,7 @@ class HashmarksMcpSurface:
 
         return self._read(project)
 
-    def repository_findings(
-        self, paths: list[str] | None = None
-    ) -> dict[str, object]:
+    def repository_findings(self, paths: list[str] | None = None) -> dict[str, object]:
         bounded = _changed_paths(paths) if paths else None
 
         def project() -> dict[str, object]:
