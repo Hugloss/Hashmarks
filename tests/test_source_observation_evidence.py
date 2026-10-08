@@ -242,8 +242,7 @@ def test_scoped_occurrences_have_exact_member_provenance_and_stable_order(
         "beta.py",
     ]
     revisions = {
-        row["path"]: row["member_revision"]
-        for row in packet["member_observations"]
+        row["path"]: row["member_revision"] for row in packet["member_observations"]
     }
     assert all(
         row["evidence_identity"].startswith("sha256:")
@@ -395,7 +394,8 @@ def test_diagnostic_qualified_removal_requires_complete_after_collection() -> No
 
 
 @pytest.mark.parametrize(
-    "collection", ["fresh-partial", "timed-out", "unavailable", "source-mismatch", "unknown"]
+    "collection",
+    ["fresh-partial", "timed-out", "unavailable", "source-mismatch", "unknown"],
 )
 def test_incomplete_diagnostic_collection_does_not_prove_absence(
     collection: str,
@@ -417,9 +417,7 @@ def test_partial_after_collection_can_qualify_newly_seen_diagnostics() -> None:
     after = _qualified_observation([_diagnostic(4)], collection="fresh-partial")
     delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
     proof = delta["diagnostics"]["qualification"]
-    assert proof["qualified_added_identities"] == [
-        after["diagnostics"][0]["identity"]
-    ]
+    assert proof["qualified_added_identities"] == [after["diagnostics"][0]["identity"]]
     assert proof["unqualified_added_identities"] == []
 
 
