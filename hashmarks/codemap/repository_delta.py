@@ -695,7 +695,8 @@ class RepositoryDeltaMixin:
         return "sha256:" + hashlib.sha256(raw).hexdigest()
 
     @staticmethod
-    def external_diagnostic_observation(
+    def external_diagnostic_observation(  # noqa: PLR0913 - additive producer fields
+
         *,
         producer: str,
         binding: RepositoryGenerationBinding,
