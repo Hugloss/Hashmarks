@@ -27,17 +27,24 @@ def installed_mcp_command(
     workspace: str | Path,
     *,
     state_dir: str | Path | None = None,
+    tool_names: tuple[str, ...] | list[str] | None = None,
 ) -> tuple[str, ...]:
     return (
         str(executable),
-        *mcp_server_args(workspace, state_dir=state_dir),
+        *mcp_server_args(
+            workspace,
+            state_dir=state_dir,
+            tool_names=tool_names,
+        ),
     )
 
 
 def source_mcp_command(
     workspace: str | Path = ".",
+    *,
+    tool_names: tuple[str, ...] | list[str] | None = None,
 ) -> tuple[str, ...]:
     return (
         *SOURCE_MCP_PREFIX,
-        *mcp_server_args(workspace),
+        *mcp_server_args(workspace, tool_names=tool_names),
     )
