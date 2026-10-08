@@ -125,6 +125,8 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 | `repository_intelligence_query` | expose existing bounded profiles, snapshots, deltas, freshness, verification explanations, and cross-repository evidence |
 | `source_observation` | exact revision-bound source occurrences for one member or an explicit bounded member set |
 | `structural_locality` | static structural locality, exact callers and unresolved candidates for one symbol |
+| `repository_evidence` | exact evidence bindings or explicit changed-path coverage, using existing core producers and native qualification |
+| `repository_findings` | existing bounded import, cache, and concurrency repository findings |
 
 Typed finding presentations and conservative assertion semantics are specified in
 [Agent-native evidence](../reference/AGENT_NATIVE_EVIDENCE.md). These projections

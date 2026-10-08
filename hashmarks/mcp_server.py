@@ -35,6 +35,7 @@ _RepositoryDeclarationsResultMode = Literal[
     *tuple(operation_modes("repository_declarations"))
 ]
 _SourceObservationResultMode = Literal[*tuple(operation_modes("source_observation"))]
+_RepositoryEvidenceResultMode = Literal[*tuple(operation_modes("repository_evidence"))]
 
 
 def _sdk():
@@ -152,6 +153,41 @@ def _register_agent_evidence_tools(
             result_mode=result_mode,
             response_mode=result_mode,
             limit=limit,
+        )
+
+    binding_contract = tool_contract("repository_evidence")
+
+    @server.tool(
+        name=binding_contract.name,
+        description=binding_contract.description,
+        annotations=annotations,
+    )
+    def repository_evidence(
+        request: dict[str, Any],
+        result_mode: _RepositoryEvidenceResultMode = binding_contract.default_response_mode,
+    ) -> dict[str, object]:
+        return _call_surface(
+            binding_contract,
+            tool_error,
+            surface.repository_evidence,
+            request,
+            result_mode=result_mode,
+            response_mode=result_mode,
+        )
+
+    findings_contract = tool_contract("repository_findings")
+
+    @server.tool(
+        name=findings_contract.name,
+        description=findings_contract.description,
+        annotations=annotations,
+    )
+    def repository_findings(paths: list[str] | None = None) -> dict[str, object]:
+        return _call_surface(
+            findings_contract,
+            tool_error,
+            surface.repository_findings,
+            paths,
         )
 
     locality_contract = tool_contract("structural_locality")

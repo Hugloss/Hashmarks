@@ -96,6 +96,13 @@ OPERATION_CONTRACTS = (
             ("scope", "hashmarks.scoped-source-occurrences.v1"),
         ),
     ),
+    OperationContract(
+        "repository_evidence",
+        (
+            ("observation", "hashmarks.repository-evidence-bindings.v1"),
+            ("coverage", "hashmarks.repository-evidence-coverage.v1"),
+        ),
+    ),
     OperationContract("projects", (("default", "hashmarks.codemap-projects.v1"),)),
     OperationContract("outline", (("default", "hashmarks.outline.v1"),)),
     OperationContract("grep", (("default", "hashmarks.grep.v1"),)),

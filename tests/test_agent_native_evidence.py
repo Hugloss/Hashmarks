@@ -140,3 +140,40 @@ def test_core_presentation_does_not_replace_snapshot_or_mutate_producer(
         assert rendered["source_evidence_identity"] == snapshot["snapshot_identity"]
         assert rendered["authority"] == "descriptive-only"
         assert rendered == present_repository_evidence(snapshot, format="structured")
+
+
+def test_mcp_evidence_binding_and_coverage_reuse_core_qualification(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path)
+    surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
+    try:
+        binding = surface.repository_evidence(
+            {
+                "bindings": [
+                    {
+                        "binding_id": "case:alpha",
+                        "evidence": [{"scope": "member", "path": "src/alpha.py"}],
+                    }
+                ],
+                "include_relationships": False,
+            }
+        )
+        assert binding["schema"] == "hashmarks.repository-evidence-bindings.v1"
+        coverage = surface.repository_evidence(
+            {
+                "bindings_packet": binding,
+                "changed_paths": ["src/alpha.py"],
+                "change_set_complete": False,
+            },
+            result_mode="coverage",
+        )
+        assert coverage["schema"] == "hashmarks.repository-evidence-coverage.v1"
+        assert coverage["coverage"]["state"] == "incomplete"
+        assert surface.repository_findings(["src/alpha.py"])["schema"] == (
+            "hashmarks.repository-findings.v1"
+        )
+        with pytest.raises(McpSurfaceError, match="result_mode must be"):
+            surface.repository_evidence({}, result_mode="unsupported")
+    finally:
+        surface.close()

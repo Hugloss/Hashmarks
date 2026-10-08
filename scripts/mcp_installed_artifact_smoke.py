@@ -24,6 +24,8 @@ _EXPECTED_TOOLS = [
     "post_change",
     "repository_intelligence_query",
     "source_observation",
+    "repository_evidence",
+    "repository_findings",
     "structural_locality",
 ]
 

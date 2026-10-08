@@ -183,6 +183,22 @@ MCP_TOOL_CONTRACTS = (
         "source_observation",
     ),
     McpToolContract(
+        "repository_evidence",
+        (
+            "Project existing exact evidence bindings or classify caller-supplied "
+            "changed-path coverage; preserve scope and native completeness."
+        ),
+        "repository_evidence",
+    ),
+    McpToolContract(
+        "repository_findings",
+        (
+            "Read existing repository import, cache-ownership, and concurrency "
+            "findings without starting analysis tools or choosing repairs."
+        ),
+        "repository_findings",
+    ),
+    McpToolContract(
         "structural_locality",
         (
             "Observe bounded static calls, exact callers, unresolved targets, "

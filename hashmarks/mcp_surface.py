@@ -495,6 +495,64 @@ class HashmarksMcpSurface:
 
         return self._read(project)
 
+    def repository_evidence(
+        self,
+        request: dict[str, Any],
+        *,
+        result_mode: str = operation_default_mode("repository_evidence"),
+    ) -> dict[str, object]:
+        request = _bounded_json(
+            request, name="request", maximum=1_048_576, expected_type=dict
+        )
+        if result_mode not in ("observation", "coverage"):
+            raise McpSurfaceError("result_mode must be one of: observation, coverage")
+
+        def project() -> dict[str, object]:
+            try:
+                self._map.sync()
+                if result_mode == "observation":
+                    bindings = request.get("bindings")
+                    if not isinstance(bindings, list):
+                        raise ValueError("bindings must be a list")
+                    extra = set(request) - {
+                        "bindings", "dependency_paths", "include_relationships"
+                    }
+                    if extra:
+                        raise ValueError("unsupported evidence observation request fields")
+                    return self._map.repository_evidence_bindings(
+                        bindings,
+                        dependency_paths=request.get("dependency_paths"),
+                        include_relationships=request.get("include_relationships", True),
+                    )
+                extra = set(request) - {
+                    "bindings_packet", "changed_paths", "change_set_complete"
+                }
+                if extra:
+                    raise ValueError("unsupported evidence coverage request fields")
+                packet = request.get("bindings_packet")
+                if not isinstance(packet, dict):
+                    raise ValueError("bindings_packet must be an object")
+                return self._map.repository_evidence_coverage(
+                    packet,
+                    changed_paths=request.get("changed_paths"),
+                    change_set_complete=request.get("change_set_complete"),
+                )
+            except ValueError as exc:
+                raise _surface_value_error(exc) from exc
+
+        return self._read(project)
+
+    def repository_findings(
+        self, paths: list[str] | None = None
+    ) -> dict[str, object]:
+        bounded = _changed_paths(paths) if paths else None
+
+        def project() -> dict[str, object]:
+            self._map.sync()
+            return self._map.repository_findings(bounded)
+
+        return self._read(project)
+
     def structural_locality(
         self, target: str, *, max_depth: int = 2
     ) -> dict[str, object]:

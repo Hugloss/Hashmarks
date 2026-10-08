@@ -60,6 +60,10 @@ _EXPECTED = {
         "member": "hashmarks.source-observation.v1",
         "scope": "hashmarks.scoped-source-occurrences.v1",
     },
+    "repository_evidence": {
+        "observation": "hashmarks.repository-evidence-bindings.v1",
+        "coverage": "hashmarks.repository-evidence-coverage.v1",
+    },
     "projects": {"default": "hashmarks.codemap-projects.v1"},
     "outline": {"default": "hashmarks.outline.v1"},
     "grep": {"default": "hashmarks.grep.v1"},
