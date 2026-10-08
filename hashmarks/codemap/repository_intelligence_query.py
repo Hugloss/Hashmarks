@@ -55,6 +55,15 @@ class RepositoryIntelligenceQueryMixin:
     existing producer that already owns the requested semantics.
     """
 
+    @staticmethod
+    def _include_presentation(
+        envelope: dict[str, object],
+        producer: dict[str, object],
+        format: str,
+    ) -> None:
+        if format != "none":
+            envelope["presentation"] = present_repository_evidence(producer, format=format)
+
     @operation_response("repository_intelligence_query")
     def repository_intelligence_query(
         self,
@@ -166,10 +175,7 @@ class RepositoryIntelligenceQueryMixin:
             "authority": "repository-intelligence-only",
             "execution_effect": "none",
         }
-        if options.presentation != "none":
-            envelope["presentation"] = present_repository_evidence(
-                result, format=options.presentation
-            )
+        self._include_presentation(envelope, result, options.presentation)
         envelope["query_identity"] = "sha256:" + self._packet_digest(
             operation_schema("repository_intelligence_query"),
             envelope,

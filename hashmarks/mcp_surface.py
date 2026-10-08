@@ -407,7 +407,7 @@ class HashmarksMcpSurface:
 
         return self._read(project)
 
-    def repository_intelligence_query(
+    def repository_intelligence_query(  # noqa: PLR0913 - explicit MCP query dimensions
         self,
         surface: str,
         task: str,
@@ -451,14 +451,10 @@ class HashmarksMcpSurface:
 
         return self._read(project)
 
-    def source_observation(
-        self,
-        paths: list[str],
-        *,
-        literal: str | None = None,
-        result_mode: str = operation_default_mode("source_observation"),
-        limit: int = 50,
-    ) -> dict[str, object]:
+    @staticmethod
+    def _validate_source_request(
+        paths: list[str], literal: str | None, result_mode: str
+    ) -> None:
         if not isinstance(paths, list) or not 1 <= len(paths) <= 32:
             raise McpSurfaceError(
                 "paths must contain between 1 and 32 explicit members"
@@ -469,10 +465,20 @@ class HashmarksMcpSurface:
             raise McpSurfaceError("result_mode must be one of: member, scope")
         if result_mode == "member" and len(paths) != 1:
             raise McpSurfaceError("member mode requires exactly one path")
-        if literal is not None:
-            literal = _bounded_text(literal, name="literal", maximum=_MAX_QUERY_CHARS)
         if result_mode == "scope" and literal is None:
             raise McpSurfaceError("scope mode requires a literal")
+
+    def source_observation(
+        self,
+        paths: list[str],
+        *,
+        literal: str | None = None,
+        result_mode: str = operation_default_mode("source_observation"),
+        limit: int = 50,
+    ) -> dict[str, object]:
+        self._validate_source_request(paths, literal, result_mode)
+        if literal is not None:
+            literal = _bounded_text(literal, name="literal", maximum=_MAX_QUERY_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=50)
 
         def project() -> dict[str, object]:
