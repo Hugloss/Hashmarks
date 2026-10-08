@@ -31,6 +31,11 @@ def test_mcp_readiness_projects_contract_and_launch(
         },
     )
 
+    async def observed(*_args, **_kwargs):
+        return MCP_TOOL_NAMES
+
+    monkeypatch.setattr(readiness, "_observed_projection_tools", observed)
+
     result = mcp_readiness(workspace, state_dir=state)
 
     assert result == {
@@ -91,6 +96,7 @@ def test_doctor_mcp_is_opt_in_and_machine_readable(
         mode="auto",
         timeout=1.0,
         mcp=True,
+        mcp_tool=None,
     )
     assert cli._doctor(args) == 0
     payload = json.loads(capsys.readouterr().out)
@@ -101,6 +107,60 @@ def test_doctor_mcp_is_opt_in_and_machine_readable(
             "ready": True,
         },
     }
+
+
+def test_mcp_readiness_qualifies_explicit_tool_projection(
+    tmp_path: Path, monkeypatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    canonical = {
+        "schema": "hashmarks.mcp-contract.v1",
+        "contract_identity": "sha256:contract",
+        "server_version": "0.test",
+        "tools": list(MCP_TOOL_NAMES),
+        "operation_contract_identity": "sha256:operations",
+        "error_schema": "hashmarks.mcp-error.v1",
+        "error_reasons": [],
+        "error_recovery_authority": "consumer-owned",
+    }
+    monkeypatch.setattr(
+        readiness,
+        "current_contract_summary",
+        lambda *_args, **_kwargs: canonical,
+    )
+
+    async def observed(*_args, **_kwargs):
+        return ("task_evidence",)
+
+    monkeypatch.setattr(readiness, "_observed_projection_tools", observed)
+
+    result = mcp_readiness(
+        workspace,
+        tool_names=("task_evidence",),
+    )
+
+    assert result["ready"] is True
+    assert result["tools"] == list(MCP_TOOL_NAMES)
+    assert result["projection"]["tools"] == ["task_evidence"]
+    assert result["projection"]["observed_tools"] == ["task_evidence"]
+    assert str(result["projection"]["projection_identity"]).startswith("sha256:")
+    assert result["launch"]["args"][-3:] == [
+        "mcp",
+        "--tool",
+        "task_evidence",
+    ]
+
+
+def test_doctor_parser_exposes_mcp_projection_tools() -> None:
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="command", required=True)
+    cli._add_identity_cli(sub)
+
+    parsed = parser.parse_args(["doctor", "--mcp", "--mcp-tool", "task_evidence"])
+
+    assert parsed.mcp is True
+    assert parsed.mcp_tool == ["task_evidence"]
 
 
 def test_doctor_parser_exposes_explicit_mcp_probe() -> None:

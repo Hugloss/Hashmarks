@@ -139,6 +139,30 @@ def test_mcp_native_server_catalog_and_structured_call(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(not _MCP_AVAILABLE, reason=_NATIVE_REASON)
+def test_mcp_native_server_can_expose_one_explicit_tool_projection(
+    tmp_path: Path,
+) -> None:
+    from hashmarks.mcp_contract import mcp_projection_instructions
+    from hashmarks.mcp_server import build_server
+
+    server = build_server(
+        _repo(tmp_path),
+        state_dir=tmp_path / "state",
+        tool_names=("task_evidence",),
+    )
+
+    async def exercise() -> None:
+        tools = await server.list_tools()
+        assert [tool.name for tool in tools] == ["task_evidence"]
+        assert server.instructions == mcp_projection_instructions(("task_evidence",))
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        server._hashmarks_surface.close()
+
+
+@pytest.mark.skipif(not _MCP_AVAILABLE, reason=_NATIVE_REASON)
 def test_mcp_native_stdio_initialize_catalog_call_and_error(tmp_path: Path) -> None:
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client

@@ -302,6 +302,7 @@ def _doctor(args) -> int:
             "mcp": mcp_readiness(
                 args.workspace,
                 state_dir=args.state_dir,
+                tool_names=args.mcp_tool,
             ),
         }
     _print(value)
@@ -311,7 +312,7 @@ def _doctor(args) -> int:
 def _mcp(args) -> int:
     from .mcp_server import run_stdio
 
-    run_stdio(args.workspace, state_dir=args.state_dir)
+    run_stdio(args.workspace, state_dir=args.state_dir, tool_names=args.tool)
     return 0
 
 
@@ -440,6 +441,15 @@ def _add_identity_cli(sub) -> None:
             "diagnostic-only machine-readable readiness receipt"
         ),
     )
+    from .mcp_contract import MCP_TOOL_NAMES
+
+    doctor.add_argument(
+        "--mcp-tool",
+        action="append",
+        choices=MCP_TOOL_NAMES,
+        default=None,
+        help="with --mcp, qualify an explicit canonical tool projection",
+    )
     doctor.set_defaults(func=_doctor, automatic_update_check=True)
 
 
@@ -459,6 +469,15 @@ def main(argv: list[str] | None = None) -> int:
         "mcp", help="serve this workspace as a local read-only MCP stdio server"
     )
     _add_common_arguments(mcp, inherited=True)
+    from .mcp_contract import MCP_TOOL_NAMES
+
+    mcp.add_argument(
+        "--tool",
+        action="append",
+        choices=MCP_TOOL_NAMES,
+        default=None,
+        help="repeat to expose only the selected canonical MCP tools",
+    )
     mcp.set_defaults(func=_mcp, automatic_update_check=False)
     install = sub.add_parser(
         "install", help="register the installed Hashmarks executable with agent hosts"
