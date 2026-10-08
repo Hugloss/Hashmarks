@@ -291,6 +291,13 @@ def _register_evidence_comparison_tool(
         )
 
 
+def _apply_tool_projection(server: Any, selected_tools: tuple[str, ...]) -> None:
+    selected = set(selected_tools)
+    for name in MCP_TOOL_NAMES:
+        if name not in selected:
+            server.remove_tool(name)
+
+
 def build_server(
     workspace: str | Path = ".",
     *,
@@ -487,10 +494,7 @@ def build_server(
     _register_agent_evidence_tools(server, surface, annotations, ToolError)
     _register_evidence_comparison_tool(server, surface, annotations, ToolError)
 
-    selected = set(selected_tools)
-    for name in MCP_TOOL_NAMES:
-        if name not in selected:
-            server.remove_tool(name)
+    _apply_tool_projection(server, selected_tools)
 
     server._hashmarks_surface = surface
     server._hashmarks_projection_tools = selected_tools
