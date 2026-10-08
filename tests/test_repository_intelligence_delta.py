@@ -480,10 +480,15 @@ def test_unrelated_edit_does_not_destroy_scoped_observation_freshness() -> None:
         current_repository_identity="sha256:repo-b",
         current_generation=42,
         changed_paths=["docs/guide.md"],
+        change_set_complete=True,
     )
 
     assert freshness["state"] == "current"
-    assert freshness["reason"] == "changed-paths-proven-outside-observation-scope"
+    assert (
+        freshness["reason"]
+        == "declared-complete-change-set-outside-observation-scope"
+    )
+    assert freshness["change_set_completeness"] == "caller-claimed-complete"
     assert freshness["intersection"] == []
 
 
