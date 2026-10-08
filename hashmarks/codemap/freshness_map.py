@@ -34,6 +34,9 @@ class FreshnessMapOptions:
     max_depth: int = 3
 
 
+FRESHNESS_MAP_SCHEMA = "hashmarks.evidence-freshness-map.v1"
+
+
 class EvidenceFreshnessMapMixin:
     """Derived freshness projection over existing repository-intelligence facts.
 
@@ -94,7 +97,7 @@ class EvidenceFreshnessMapMixin:
         *,
         expected_task_identity: str,
     ) -> tuple[str, str]:
-        if previous_map.get("schema") != "hashmarks.evidence-freshness-map.v1":
+        if previous_map.get("schema") != FRESHNESS_MAP_SCHEMA:
             raise ValueError(
                 "previous_map must be a hashmarks.evidence-freshness-map.v1 packet"
             )
@@ -431,7 +434,7 @@ class EvidenceFreshnessMapMixin:
             task_identity=scope.task_identity,
         )
         payload: dict[str, object] = {
-            "schema": "hashmarks.evidence-freshness-map.v1",
+            "schema": FRESHNESS_MAP_SCHEMA,
             "repository": {
                 "repository_identity": scope.repository_identity,
                 "codemap_generation": generation,

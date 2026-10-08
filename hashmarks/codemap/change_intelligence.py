@@ -13,6 +13,9 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+CHANGE_INTELLIGENCE_SCHEMA = "hashmarks.change-intelligence-brief.v1"
+
+
 class ChangeIntelligenceMixin:
     """Compact product projection over existing change/selection authority."""
 
@@ -100,7 +103,7 @@ class ChangeIntelligenceMixin:
             impact.get("surfaces") if isinstance(impact.get("surfaces"), dict) else {}
         )
         payload: dict[str, object] = {
-            "schema": "hashmarks.change-intelligence-brief.v1",
+            "schema": CHANGE_INTELLIGENCE_SCHEMA,
             "repository": {
                 "repository_identity": self._repository_packet_identity(),
                 "source_identity": self._source_packet_identity(
@@ -137,7 +140,7 @@ class ChangeIntelligenceMixin:
         if "project_impact" in impact:
             payload["project_impact"] = impact["project_impact"]
         payload["brief_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.change-intelligence-brief.v1",
+            CHANGE_INTELLIGENCE_SCHEMA,
             payload,
         )
         return payload

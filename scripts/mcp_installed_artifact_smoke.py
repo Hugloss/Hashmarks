@@ -22,6 +22,11 @@ _EXPECTED_TOOLS = [
     "dependency_codemap",
     "repository_declarations",
     "post_change",
+    "repository_intelligence_query",
+    "source_observation",
+    "repository_evidence",
+    "repository_findings",
+    "structural_locality",
 ]
 
 
@@ -52,6 +57,7 @@ async def _exercise(
 ) -> None:
     params = StdioServerParameters(
         command=str(executable),
+        env={"XDG_CACHE_HOME": str(state_dir.parent / "cache")},
         args=[
             "--workspace",
             str(repo),
@@ -81,6 +87,37 @@ async def _exercise(
                     row["path"] == "src/feature.py"
                     for row in found.structured_content["results"]
                 )
+
+                formatted = await session.call_tool(
+                    "find",
+                    arguments={"query": "flare041", "limit": 5, "presentation": "text"},
+                )
+                assert formatted.is_error is not True
+                assert formatted.structured_content is not None
+                envelope = formatted.structured_content
+                assert (
+                    envelope["schema"] == "hashmarks.evidence-presentation-envelope.v1"
+                )
+                assert envelope["operation"] == "find"
+                assert envelope["result"] == found.structured_content
+                assert envelope["presentation"]["format"] == "text"
+                assert "flare041" in envelope["presentation"]["text"]
+
+                query = await session.call_tool(
+                    "repository_intelligence_query",
+                    arguments={
+                        "surface_name": "profile",
+                        "task": "inspect flare041",
+                        "changed_paths": ["src/feature.py"],
+                    },
+                )
+                assert query.is_error is not True
+                assert query.structured_content is not None
+                assert (
+                    query.structured_content["schema"]
+                    == "hashmarks.repository-intelligence-query.v1"
+                )
+                assert query.structured_content["presentation"]["format"] == "compact"
 
                 declarations = await session.call_tool(
                     "repository_declarations",

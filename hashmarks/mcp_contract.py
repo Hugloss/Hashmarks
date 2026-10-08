@@ -8,6 +8,12 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
+from .evidence_presentation import (
+    FORMATS,
+    presentation_source_identities,
+    presentation_source_identity,
+    validate_presentation,
+)
 from .operation_contract import (
     operation_contract_manifest,
     operation_default_mode,
@@ -66,6 +72,20 @@ class McpToolContract:
         require_registered_operation(self.operation)
 
     @property
+    def default_presentation(self) -> str:
+        return (
+            "compact" if self.operation == "repository_intelligence_query" else "none"
+        )
+
+    @property
+    def presentation_response_schema(self) -> str:
+        return (
+            self.default_response_schema
+            if self.operation == "repository_intelligence_query"
+            else operation_schema("evidence_presentation", "envelope")
+        )
+
+    @property
     def response_modes(self) -> tuple[str, ...]:
         return tuple(operation_modes(self.operation))
 
@@ -81,20 +101,84 @@ class McpToolContract:
     def default_response_schema(self) -> str:
         return operation_schema(self.operation)
 
-    def response_schema_for_mode(self, result_mode: str | None = None) -> str:
-        return operation_schema(self.operation, result_mode)
+    def response_schema_for_mode(
+        self, result_mode: str | None = None, *, presentation: str = "none"
+    ) -> str:
+        validate_presentation(presentation)
+        native = operation_schema(self.operation, result_mode)
+        return native if presentation == "none" else self.presentation_response_schema
 
     def validate_response(
         self,
         value: object,
         *,
         result_mode: str | None = None,
+        presentation: str | None = None,
     ) -> dict[str, object]:
-        return validate_operation_response(
-            self.operation,
-            value,
-            mode=result_mode,
+        selected = (
+            self.default_presentation
+            if presentation is None
+            else validate_presentation(presentation)
         )
+        mode = self.default_response_mode if result_mode is None else result_mode
+        if selected == "none":
+            result = validate_operation_response(self.operation, value, mode=mode)
+            if (
+                self.operation == "repository_intelligence_query"
+                and "presentation" in result
+            ):
+                raise RuntimeError("unexpected query presentation")
+            return result
+        if self.operation == "repository_intelligence_query":
+            result = validate_operation_response(self.operation, value, mode=mode)
+            native = result.get("result")
+            if not isinstance(native, dict) or result.get(
+                "producer_schema"
+            ) != native.get("schema"):
+                raise RuntimeError("query producer schema drift")
+        else:
+            result = validate_operation_response(
+                "evidence_presentation", value, mode="envelope"
+            )
+            if (
+                result.get("operation") != self.operation
+                or result.get("result_mode") != mode
+            ):
+                raise RuntimeError("presentation operation or result mode drift")
+            if (
+                result.get("authority") != "descriptive-only"
+                or result.get("execution_effect") != "none"
+            ):
+                raise RuntimeError("presentation authority drift")
+            native = validate_operation_response(
+                self.operation, result.get("result"), mode=mode
+            )
+        _validate_projection(result, native, selected)
+
+        return result
+
+
+def _validate_projection(
+    result: dict[str, object], native: dict[str, object], selected: str
+) -> None:
+    projection = validate_operation_response(
+        "evidence_presentation", result.get("presentation"), mode="projection"
+    )
+    if projection.get("source_evidence_identity") != presentation_source_identity(
+        native
+    ):
+        raise RuntimeError("presentation source identity drift")
+    if projection.get("source_identities") != presentation_source_identities(native):
+        raise RuntimeError("presentation source identities drift")
+    if projection.get("format") != selected or projection.get(
+        "source_schema"
+    ) != native.get("schema"):
+        raise RuntimeError("presentation format or source schema drift")
+    if (
+        projection.get("authority") != "descriptive-only"
+        or projection.get("execution_effect") != "none"
+    ):
+        raise RuntimeError("presentation authority drift")
 
 
 MCP_TOOL_CONTRACTS = (
@@ -165,6 +249,47 @@ MCP_TOOL_CONTRACTS = (
         ),
         "post_change",
     ),
+    McpToolContract(
+        "repository_intelligence_query",
+        (
+            "Read-only bounded repository-intelligence facets: change description, "
+            "profile, snapshot, delta, freshness, verification explanation, "
+            "cross-repository and evidence economics. Previous snapshots are caller-supplied."
+        ),
+        "repository_intelligence_query",
+    ),
+    McpToolContract(
+        "source_observation",
+        (
+            "Observe exact source occurrences for one member or an explicit bounded "
+            "member set, with exact revisions, coverage and qualified absence."
+        ),
+        "source_observation",
+    ),
+    McpToolContract(
+        "repository_evidence",
+        (
+            "Project existing exact evidence bindings or classify caller-supplied "
+            "changed-path coverage; preserve scope and native completeness."
+        ),
+        "repository_evidence",
+    ),
+    McpToolContract(
+        "repository_findings",
+        (
+            "Read existing repository import, cache-ownership, and concurrency "
+            "findings without starting analysis tools or choosing repairs."
+        ),
+        "repository_findings",
+    ),
+    McpToolContract(
+        "structural_locality",
+        (
+            "Observe bounded static calls, exact callers, unresolved targets, "
+            "structural locality and related verifier paths for one exact symbol."
+        ),
+        "structural_locality",
+    ),
 )
 
 MCP_TOOL_NAMES = tuple(contract.name for contract in MCP_TOOL_CONTRACTS)
@@ -194,8 +319,12 @@ def response_schemas(name: str) -> tuple[str, ...]:
     return tool_contract(name).response_schemas
 
 
-def response_schema_for_mode(name: str, result_mode: str | None = None) -> str:
-    return tool_contract(name).response_schema_for_mode(result_mode)
+def response_schema_for_mode(
+    name: str, result_mode: str | None = None, *, presentation: str = "none"
+) -> str:
+    return tool_contract(name).response_schema_for_mode(
+        result_mode, presentation=presentation
+    )
 
 
 def validate_tool_response(
@@ -203,10 +332,12 @@ def validate_tool_response(
     value: object,
     *,
     result_mode: str | None = None,
+    presentation: str | None = None,
 ) -> dict[str, object]:
     return tool_contract(name).validate_response(
         value,
         result_mode=result_mode,
+        presentation=presentation,
     )
 
 
@@ -253,35 +384,49 @@ def _canonical_tool_input_schema(
     value: object,
 ) -> dict[str, Any]:
     schema = _canonical_schema(value, label=f"{expected.name} input schema")
-    if len(expected.response_modes) <= 1:
-        return schema
-
     properties = schema.get("properties")
     if not isinstance(properties, dict):
         raise ValueError(
-            f"Hashmarks MCP {expected.name} result_mode schema is unavailable"
+            f"Hashmarks MCP {expected.name} input properties are unavailable"
         )
-    result_mode = properties.get("result_mode")
-    if not isinstance(result_mode, dict):
-        raise ValueError(
-            f"Hashmarks MCP {expected.name} result_mode schema is unavailable"
+    selectors = {"presentation": (FORMATS, expected.default_presentation)}
+    if len(expected.response_modes) > 1:
+        selectors["result_mode"] = (
+            expected.response_modes,
+            expected.default_response_mode,
         )
-    if result_mode.get("enum") != list(expected.response_modes):
-        raise ValueError(
-            f"Hashmarks MCP {expected.name} result_mode enum differs from "
-            "the operation contract"
-        )
-    if result_mode.get("default") != expected.default_response_mode:
-        raise ValueError(
-            f"Hashmarks MCP {expected.name} result_mode default differs from "
-            "the operation contract"
-        )
-    required = schema.get("required", [])
-    if isinstance(required, list) and "result_mode" in required:
-        raise ValueError(
-            f"Hashmarks MCP {expected.name} result_mode default is not omittable"
-        )
+    if expected.operation == "repository_intelligence_query":
+        from .codemap.evidence_profiles import PROFILE_NAMES
+        from .codemap.repository_intelligence_query import QUERY_SURFACES
+
+        selectors["surface_name"] = (QUERY_SURFACES, None)
+        selectors["profile"] = (PROFILE_NAMES, "compact")
+    for key, (choices, default) in selectors.items():
+        _validate_selector(expected.name, schema, key, choices, default)
+
     return schema
+
+
+def _validate_selector(
+    name: str,
+    schema: dict[str, Any],
+    key: str,
+    choices: tuple[str, ...],
+    default: str | None,
+) -> None:
+    field = schema["properties"].get(key)
+    if not isinstance(field, dict):
+        raise ValueError(f"Hashmarks MCP {name} {key} schema is unavailable")
+    if field.get("enum") != list(choices):
+        raise ValueError(
+            f"Hashmarks MCP {name} {key} enum differs from the operation contract"
+        )
+    if default is not None and field.get("default") != default:
+        raise ValueError(
+            f"Hashmarks MCP {name} {key} default differs from the operation contract"
+        )
+    if default is not None and key in schema.get("required", []):
+        raise ValueError(f"Hashmarks MCP {name} {key} default is not omittable")
 
 
 def _contract_identity(value: dict[str, object]) -> str:
@@ -333,6 +478,14 @@ def _qualified_tool(
         "operation": expected.operation,
         "response_schemas": list(expected.response_schemas),
         "response_modes": operation_modes(expected.operation),
+        "presentation": {
+            "formats": list(FORMATS),
+            "default": expected.default_presentation,
+            "projection_schema": operation_schema(
+                "evidence_presentation", "projection"
+            ),
+            "response_schema": expected.presentation_response_schema,
+        },
     }
 
 

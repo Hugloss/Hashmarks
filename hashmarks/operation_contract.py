@@ -51,6 +51,13 @@ class OperationContract:
 
 OPERATION_CONTRACTS = (
     OperationContract(
+        "evidence_presentation",
+        (
+            ("projection", "hashmarks.evidence-presentation.v1"),
+            ("envelope", "hashmarks.evidence-presentation-envelope.v1"),
+        ),
+    ),
+    OperationContract(
         "repository_context",
         (("default", "hashmarks.repository-capsule.v1"),),
     ),
@@ -88,6 +95,20 @@ OPERATION_CONTRACTS = (
     OperationContract(
         "post_change",
         (("default", "hashmarks.task-post-change-delta.v2"),),
+    ),
+    OperationContract(
+        "source_observation",
+        (
+            ("member", "hashmarks.source-observation.v1"),
+            ("scope", "hashmarks.scoped-source-occurrences.v1"),
+        ),
+    ),
+    OperationContract(
+        "repository_evidence",
+        (
+            ("observation", "hashmarks.repository-evidence-bindings.v1"),
+            ("coverage", "hashmarks.repository-evidence-coverage.v1"),
+        ),
     ),
     OperationContract("projects", (("default", "hashmarks.codemap-projects.v1"),)),
     OperationContract("outline", (("default", "hashmarks.outline.v1"),)),

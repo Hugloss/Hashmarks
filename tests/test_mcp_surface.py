@@ -667,6 +667,11 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             "dependency_codemap",
             "repository_declarations",
             "post_change",
+            "repository_intelligence_query",
+            "source_observation",
+            "repository_evidence",
+            "repository_findings",
+            "structural_locality",
         ]
         for row in registered:
             annotations = row["annotations"]
@@ -815,6 +820,11 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             "dependency_codemap",
             "repository_declarations",
             "post_change",
+            "repository_intelligence_query",
+            "source_observation",
+            "repository_evidence",
+            "repository_findings",
+            "structural_locality",
         ]
         # Construction may initialize empty SQLite files, but it must not build a generation.
         status = server._hashmarks_surface._map.status()

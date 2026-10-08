@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+VERIFICATION_EXPLANATION_SCHEMA = "hashmarks.verification-selection-explanation.v1"
+
+
 class VerificationExplanationMixin:
     """Bounded explanations over existing verification-selection semantics."""
 
@@ -118,7 +121,7 @@ class VerificationExplanationMixin:
 
         generation, identity_generation, stale = self._generation_status()
         payload: dict[str, object] = {
-            "schema": "hashmarks.verification-selection-explanation.v1",
+            "schema": VERIFICATION_EXPLANATION_SCHEMA,
             "repository_identity": self._repository_packet_identity(),
             "source_identity": self._source_packet_identity(
                 generation=generation,
@@ -136,7 +139,7 @@ class VerificationExplanationMixin:
             "execution_effect": "none",
         }
         payload["explanation_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.verification-selection-explanation.v1",
+            VERIFICATION_EXPLANATION_SCHEMA,
             payload,
         )
         return payload

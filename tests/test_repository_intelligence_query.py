@@ -11,8 +11,10 @@ from hashmarks import CodeMap
 from hashmarks.codemap.repository_intelligence_query import (
     REPOSITORY_INTELLIGENCE_QUERY_DEFAULT_OPTIONS,
     RepositoryIntelligenceQueryOptions,
+    repository_query_response,
 )
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
+from hashmarks.evidence_presentation import FORMATS, present_repository_evidence
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -98,6 +100,11 @@ def test_query_facade_delta_matches_direct_delta(tmp_path: Path) -> None:
             options=RepositoryIntelligenceQueryOptions(previous_snapshot=previous),
         )
     assert query["result"] == direct
+    rendered = present_repository_evidence(direct, format="text")
+    assert "member_revision_changed" in rendered["text"]
+    assert "src/owner.py" in rendered["text"]
+    assert not direct["semantic"].get("symbols_added")
+    assert not direct["semantic"].get("symbols_removed")
 
 
 def test_query_facade_is_deterministic_and_fails_closed(tmp_path: Path) -> None:
@@ -231,15 +238,25 @@ def test_query_facade_service_roundtrip(tmp_path: Path) -> None:
             time.sleep(0.01)
     try:
         client.sync()
-        result = client.repository_intelligence_query(
-            "profile",
-            task,
-            ["src/owner.py"],
-            options=RepositoryIntelligenceQueryOptions(profile="compact"),
-        )
-        assert result["schema"] == "hashmarks.repository-intelligence-query.v1"
-        assert result["producer_schema"] == "hashmarks.evidence-profile.v1"
-        assert result["result"]["profile"] == "compact"
+        native = None
+        for format in FORMATS:
+            result = client.repository_intelligence_query(
+                "profile",
+                task,
+                ["src/owner.py"],
+                options=RepositoryIntelligenceQueryOptions(
+                    profile="compact", presentation=format
+                ),
+            )
+            if native is None:
+                native = result["result"]
+            assert result["result"] == native
+            assert result == repository_query_response(
+                "profile", native, presentation=format
+            )
+            assert result["schema"] == "hashmarks.repository-intelligence-query.v1"
+            assert result["producer_schema"] == "hashmarks.evidence-profile.v1"
+            assert result["result"]["profile"] == "compact"
     finally:
         client.stop()
         thread.join(timeout=5)

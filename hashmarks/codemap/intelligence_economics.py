@@ -13,6 +13,9 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+INTELLIGENCE_ECONOMICS_SCHEMA = "hashmarks.intelligence-economics-receipt.v1"
+
+
 class IntelligenceEconomicsMixin:
     """Deterministic economics of Hashmarks-owned repository-intelligence evidence.
 
@@ -108,7 +111,7 @@ class IntelligenceEconomicsMixin:
         }
 
         payload: dict[str, object] = {
-            "schema": "hashmarks.intelligence-economics-receipt.v1",
+            "schema": INTELLIGENCE_ECONOMICS_SCHEMA,
             "source_snapshot_identity": snapshot["snapshot_identity"],
             "profile_economics": profile_economics,
             "evidence_counts": self._economics_counts(snapshot),
@@ -160,7 +163,7 @@ class IntelligenceEconomicsMixin:
             }
 
         payload["receipt_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.intelligence-economics-receipt.v1",
+            INTELLIGENCE_ECONOMICS_SCHEMA,
             payload,
         )
         return payload

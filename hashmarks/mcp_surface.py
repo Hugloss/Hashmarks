@@ -17,6 +17,7 @@ from .codemap.repository_declaration_contract import (
     MAX_PACKET_BYTES,
     MAX_REQUEST_BYTES,
 )
+from .codemap.repository_intelligence_query import RepositoryIntelligenceQueryOptions
 from .file_store import UnstableFileError
 from .mcp_contract import (
     MCP_ERROR_REASONS,
@@ -401,6 +402,172 @@ class HashmarksMcpSurface:
                     previous_observation=previous,
                     result_mode=mode,
                 )
+            except ValueError as exc:
+                raise _surface_value_error(exc) from exc
+
+        return self._read(project)
+
+    def repository_intelligence_query(  # noqa: PLR0913 - explicit MCP query dimensions
+        self,
+        surface: str,
+        task: str,
+        changed_paths: list[str] | None = None,
+        *,
+        profile: str = "compact",
+        presentation: str = "compact",
+        member_path: str | None = None,
+        previous_snapshot: dict[str, Any] | None = None,
+    ) -> dict[str, object]:
+        surface = _bounded_text(surface, name="surface", maximum=48)
+        task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
+        paths = _changed_paths(changed_paths) if changed_paths else []
+        if previous_snapshot is not None:
+            previous_snapshot = _bounded_json(
+                previous_snapshot,
+                name="previous_snapshot",
+                maximum=1_048_576,
+                expected_type=dict,
+            )
+        if member_path is not None:
+            member_path = _bounded_text(member_path, name="member_path", maximum=2_048)
+        profile = _bounded_text(profile, name="profile", maximum=16)
+        presentation = _bounded_text(presentation, name="presentation", maximum=16)
+
+        def project() -> dict[str, object]:
+            try:
+                return self._map.repository_intelligence_query(
+                    surface,
+                    task,
+                    paths,
+                    options=RepositoryIntelligenceQueryOptions(
+                        member_path=member_path,
+                        profile=profile,
+                        previous_snapshot=previous_snapshot,
+                        presentation=presentation,
+                    ),
+                )
+            except ValueError as exc:
+                raise _surface_value_error(exc) from exc
+
+        return self._read(project)
+
+    @staticmethod
+    def _validate_source_request(
+        paths: list[str], literal: str | None, result_mode: str
+    ) -> None:
+        if not isinstance(paths, list) or not 1 <= len(paths) <= 32:
+            raise McpSurfaceError(
+                "paths must contain between 1 and 32 explicit members"
+            )
+        if not all(isinstance(path, str) and path for path in paths):
+            raise McpSurfaceError("paths must contain nonblank strings")
+        if result_mode not in ("member", "scope"):
+            raise McpSurfaceError("result_mode must be one of: member, scope")
+        if result_mode == "member" and len(paths) != 1:
+            raise McpSurfaceError("member mode requires exactly one path")
+        if result_mode == "scope" and literal is None:
+            raise McpSurfaceError("scope mode requires a literal")
+
+    def source_observation(
+        self,
+        paths: list[str],
+        *,
+        literal: str | None = None,
+        result_mode: str = operation_default_mode("source_observation"),
+        limit: int = 50,
+    ) -> dict[str, object]:
+        self._validate_source_request(paths, literal, result_mode)
+        if literal is not None:
+            literal = _bounded_text(literal, name="literal", maximum=_MAX_QUERY_CHARS)
+        limit = _bounded_int(limit, name="limit", minimum=1, maximum=50)
+
+        def project() -> dict[str, object]:
+            try:
+                self._map.sync(paths)
+                if result_mode == "member":
+                    return self._map.source_observation(
+                        paths[0], literal=literal, limit=limit
+                    )
+                assert literal is not None
+                return self._map.scoped_source_occurrences(paths, literal, limit=limit)
+            except ValueError as exc:
+                raise _surface_value_error(exc) from exc
+
+        return self._read(project)
+
+    def _repository_binding_observation(
+        self, request: dict[str, Any]
+    ) -> dict[str, object]:
+        fields = {"bindings", "dependency_paths", "include_relationships"}
+        if set(request) - fields:
+            raise ValueError("unsupported evidence observation request fields")
+        bindings = request.get("bindings")
+        if not isinstance(bindings, list):
+            raise ValueError("bindings must be a list")
+        return self._map.repository_evidence_bindings(
+            bindings,
+            dependency_paths=request.get("dependency_paths"),
+            include_relationships=request.get("include_relationships", True),
+        )
+
+    def _repository_binding_coverage(
+        self, request: dict[str, Any]
+    ) -> dict[str, object]:
+        fields = {"bindings_packet", "changed_paths", "change_set_complete"}
+        if set(request) - fields:
+            raise ValueError("unsupported evidence coverage request fields")
+        packet = request.get("bindings_packet")
+        if not isinstance(packet, dict):
+            raise ValueError("bindings_packet must be an object")
+        return self._map.repository_evidence_coverage(
+            packet,
+            changed_paths=request.get("changed_paths"),
+            change_set_complete=request.get("change_set_complete"),
+        )
+
+    def repository_evidence(
+        self,
+        request: dict[str, Any],
+        *,
+        result_mode: str = operation_default_mode("repository_evidence"),
+    ) -> dict[str, object]:
+        request = _bounded_json(
+            request, name="request", maximum=1_048_576, expected_type=dict
+        )
+        if result_mode not in ("observation", "coverage"):
+            raise McpSurfaceError("result_mode must be one of: observation, coverage")
+
+        def project() -> dict[str, object]:
+            try:
+                self._map.sync()
+                producers = {
+                    "observation": self._repository_binding_observation,
+                    "coverage": self._repository_binding_coverage,
+                }
+                return producers[result_mode](request)
+            except ValueError as exc:
+                raise _surface_value_error(exc) from exc
+
+        return self._read(project)
+
+    def repository_findings(self, paths: list[str] | None = None) -> dict[str, object]:
+        bounded = _changed_paths(paths) if paths else None
+
+        def project() -> dict[str, object]:
+            self._map.sync()
+            return self._map.repository_findings(bounded)
+
+        return self._read(project)
+
+    def structural_locality(
+        self, target: str, *, max_depth: int = 2
+    ) -> dict[str, object]:
+        target = _bounded_text(target, name="target", maximum=_MAX_QUERY_CHARS)
+        max_depth = _bounded_int(max_depth, name="max_depth", minimum=1, maximum=6)
+
+        def project() -> dict[str, object]:
+            try:
+                return self._map.structural_locality(target, max_depth=max_depth)
             except ValueError as exc:
                 raise _surface_value_error(exc) from exc
 

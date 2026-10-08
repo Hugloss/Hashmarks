@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+CROSS_REPOSITORY_SCHEMA = "hashmarks.cross-repository-evidence-packet.v1"
+
+
 class CrossRepositoryEvidenceMixin:
     """Bounded cross-repository projection over existing Hashmarks authorities.
 
@@ -203,7 +206,7 @@ class CrossRepositoryEvidenceMixin:
         )
 
         payload: dict[str, object] = {
-            "schema": "hashmarks.cross-repository-evidence-packet.v1",
+            "schema": CROSS_REPOSITORY_SCHEMA,
             "source": {
                 "repository_identity": (
                     freshness.get("repository", {}).get("repository_identity")
@@ -245,7 +248,7 @@ class CrossRepositoryEvidenceMixin:
             "execution_effect": "none",
         }
         payload["packet_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.cross-repository-evidence-packet.v1",
+            CROSS_REPOSITORY_SCHEMA,
             payload,
         )
         return payload

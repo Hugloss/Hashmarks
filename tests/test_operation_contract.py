@@ -41,6 +41,10 @@ from hashmarks.operation_contract import (
 ROOT = Path(__file__).resolve().parents[1]
 
 _EXPECTED = {
+    "evidence_presentation": {
+        "projection": "hashmarks.evidence-presentation.v1",
+        "envelope": "hashmarks.evidence-presentation-envelope.v1",
+    },
     "repository_context": {"default": "hashmarks.repository-capsule.v1"},
     "find": {"default": "hashmarks.find.v2"},
     "task_evidence": {"default": "hashmarks.task-evidence.v5"},
@@ -56,6 +60,14 @@ _EXPECTED = {
         "explain": "hashmarks.repository-declaration-explain.v1",
     },
     "post_change": {"default": "hashmarks.task-post-change-delta.v2"},
+    "source_observation": {
+        "member": "hashmarks.source-observation.v1",
+        "scope": "hashmarks.scoped-source-occurrences.v1",
+    },
+    "repository_evidence": {
+        "observation": "hashmarks.repository-evidence-bindings.v1",
+        "coverage": "hashmarks.repository-evidence-coverage.v1",
+    },
     "projects": {"default": "hashmarks.codemap-projects.v1"},
     "outline": {"default": "hashmarks.outline.v1"},
     "grep": {"default": "hashmarks.grep.v1"},

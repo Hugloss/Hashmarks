@@ -8,6 +8,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 
 ## Reference
 
+- [`reference/AGENT_NATIVE_EVIDENCE.md`](reference/AGENT_NATIVE_EVIDENCE.md) — agent-facing typed evidence and bounded MCP exposure.
 - [`reference/ARCHITECTURE.md`](reference/ARCHITECTURE.md) — architecture and authority model.
 - [`reference/API_STABILITY.md`](reference/API_STABILITY.md) — supported Python/CLI surface and pre-1.0 compatibility policy.
 - [`reference/EVIDENCE_CORRELATION.md`](reference/EVIDENCE_CORRELATION.md) — bounded external-observation correlation and authority limits.
@@ -36,6 +37,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 
 ## Qualification
 
+- [`qualification/AGENT_EVIDENCE_FORMATS.md`](qualification/AGENT_EVIDENCE_FORMATS.md) — paired evidence-presentation export and external agent grading.
 - [`qualification/REPOSITORY_QUALITY.md`](qualification/REPOSITORY_QUALITY.md) — repository-quality qualification semantics.
 - [`qualification/TEST_RUNTIME_ECONOMICS.md`](qualification/TEST_RUNTIME_ECONOMICS.md) — test-proof scope and runtime-economics guidance.
 

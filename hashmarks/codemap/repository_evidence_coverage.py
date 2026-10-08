@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.client import RepositoryObservation
 from hashmarks.observation import ObservationState
+from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
 if TYPE_CHECKING:
@@ -574,7 +575,7 @@ class RepositoryEvidenceCoverageMixin:
             dependency_paths=dependency_paths,
         )
         payload: dict[str, object] = {
-            "schema": "hashmarks.repository-evidence-coverage.v1",
+            "schema": operation_schema("repository_evidence", "coverage"),
             "changed_paths": changed,
             "change_set": change_set,
             "classification": classification,
@@ -603,6 +604,6 @@ class RepositoryEvidenceCoverageMixin:
             "execution_effect": "none",
         }
         payload["coverage_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.repository-evidence-coverage.v1", payload
+            operation_schema("repository_evidence", "coverage"), payload
         )
         return payload

@@ -144,6 +144,26 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 | `dependency_codemap` | qualify dependency observations, explain their authority, compare explicit endpoints, or run bounded factual queries |
 | `repository_declarations` | bind declarations to exact repository evidence and return the qualified observation or typed explanation |
 | `post_change` | refresh changed paths against a previous `task_evidence` packet and return evidence deltas |
+| `repository_intelligence_query` | expose existing bounded profiles, snapshots, deltas, freshness, verification explanations, and cross-repository evidence |
+| `source_observation` | exact revision-bound source occurrences for one member or an explicit bounded member set |
+| `structural_locality` | static structural locality, exact callers and unresolved candidates for one symbol |
+| `repository_evidence` | exact evidence bindings or explicit changed-path coverage, using existing core producers and native qualification |
+| `repository_findings` | existing bounded import, cache, and concurrency repository findings |
+
+Typed finding presentations and conservative assertion semantics are specified in
+[Agent-native evidence](../reference/AGENT_NATIVE_EVIDENCE.md). These projections
+are not action recommendations and do not promote partial or producer-claimed
+observations into repository-wide truth.
+
+Every tool accepts optional `presentation`: `none`, `structured`, `compact`, or
+`text`. The default remains `compact` for `repository_intelligence_query` and
+`none` for the other tools. `none` preserves the native response. Other formats
+use `hashmarks.evidence-presentation-envelope.v1` with the intact native `result`
+and a `hashmarks.evidence-presentation.v1` projection. The query tool keeps its
+existing query envelope with a sibling presentation. Native response modes and
+schemas remain separately advertised; display bounds never establish absence,
+completeness, or unique ownership. See the presentation contract above for exact
+row caps, source references, qualification metadata, and omission accounting.
 
 The tools are read-only from the repository consumer's perspective. Hashmarks may update its own disposable derived cache while answering them.
 

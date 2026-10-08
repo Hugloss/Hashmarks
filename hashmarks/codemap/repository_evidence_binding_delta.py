@@ -4,8 +4,13 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_schema
+
 if TYPE_CHECKING:
     from .engine import CodeMap
+
+
+REPOSITORY_BINDING_DELTA_SCHEMA = "hashmarks.repository-evidence-binding-delta.v1"
 
 
 class RepositoryEvidenceBindingDeltaMixin:
@@ -488,11 +493,13 @@ class RepositoryEvidenceBindingDeltaMixin:
         *,
         name: str,
     ) -> None:
-        if packet.get("schema") != "hashmarks.repository-evidence-bindings.v1":
+        if packet.get("schema") != operation_schema(
+            "repository_evidence", "observation"
+        ):
             raise ValueError(f"{name} must be a repository evidence bindings packet")
         identity = packet.get("bindings_identity")
         expected_identity = "sha256:" + self._packet_digest(
-            "hashmarks.repository-evidence-bindings.v1",
+            operation_schema("repository_evidence", "observation"),
             {key: value for key, value in packet.items() if key != "bindings_identity"},
         )
         if not isinstance(identity, str) or identity != expected_identity:
@@ -564,7 +571,7 @@ class RepositoryEvidenceBindingDeltaMixin:
             else:
                 changed.append({"binding_id": binding_id, **row})
         payload: dict[str, object] = {
-            "schema": "hashmarks.repository-evidence-binding-delta.v1",
+            "schema": REPOSITORY_BINDING_DELTA_SCHEMA,
             "repository": {
                 "before": deepcopy(before.get("repository")),
                 "after": deepcopy(after.get("repository")),
@@ -588,6 +595,6 @@ class RepositoryEvidenceBindingDeltaMixin:
             "execution_effect": "none",
         }
         payload["delta_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.repository-evidence-binding-delta.v1", payload
+            REPOSITORY_BINDING_DELTA_SCHEMA, payload
         )
         return payload
