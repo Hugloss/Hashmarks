@@ -679,8 +679,10 @@ class RepositoryDeltaMixin:
         self._validate_source_observation(
             literal, limit, max_bytes, long_line_threshold
         )
-        if isinstance(lines, (str, bytes)) or len(lines) > 32 or any(
-            type(line) is not int or line < 1 for line in lines
+        if (
+            isinstance(lines, (str, bytes))
+            or len(lines) > 32
+            or any(type(line) is not int or line < 1 for line in lines)
         ):
             raise ValueError("lines must be up to 32 positive integers")
         requested = sorted(set(lines))
@@ -1187,7 +1189,9 @@ class RepositoryDeltaMixin:
             before, after, removed, added
         )
         if (before_source is None) != (after_source is None):
-            raise ValueError("source correspondence requires both endpoint observations")
+            raise ValueError(
+                "source correspondence requires both endpoint observations"
+            )
         source_correspondence = (
             diagnostic_line_correspondence(
                 candidates=possible_relocations,
