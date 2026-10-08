@@ -35,11 +35,13 @@ agentsCookbook
          +-- exact admitted Enola executable
 ```
 
-For native OpenCode trials, agentsCookbook also supplies the temporary
-trial-scoped MCP exposure for the selected subject. A Hashmarks/OpenCode
-registration in project or user configuration is **not benchmark authority** and
-is not required for the OpenCode benchmark. OpenCode remains authoritative for
-model, provider, authentication, permissions, and user configuration.
+For native OpenCode and Codex trials, agentsCookbook supplies the selected
+subject as a temporary **trial-scoped MCP exposure**. Project or user MCP
+registration is not benchmark authority and is not required for either benchmark
+arm. Each host remains authoritative for its model, provider, authentication,
+permissions, and normal user configuration; agentsCookbook owns only the
+experiment-scoped subject overlay and independently proves the exact executable,
+workspace binding, and exposure identity before agent work.
 
 Start from this Hashmarks checkout with the adjacent `agentsCookbook` checkout:
 
@@ -79,43 +81,33 @@ The run uses your installed native CLI model/provider/auth settings. Check that
 model. The benchmark never chooses or rewrites either host's model/provider/auth
 configuration.
 
-Codex still uses its native MCP registrations. Register `hashmarks` and `enola`
-there as stdio MCP servers. The Hashmarks server command must resolve to this
-checkout's `.venv/bin/hashmarks` through `PATH`; use
-`hashmarks --workspace . mcp` from the trial working directory. The Enola server
-should use `enola` with no args, so it observes the trial working directory. For
-Codex, the global `~/.codex/config.toml` can contain:
-
-```toml
-[mcp_servers.hashmarks]
-command = "hashmarks"
-args = ["--workspace", ".", "mcp"]
-cwd = "."
-
-[mcp_servers.enola]
-command = "enola"
-args = []
-cwd = "."
-```
-
-Keep your existing Codex model and authentication fields.
-
-Native OpenCode is intentionally different. It does **not** need a pre-existing
-Hashmarks or Enola MCP registration for the benchmark. agentsCookbook resolves the
-selected subject from the benchmark environment, records the exact executable identity,
-and supplies a temporary trial-scoped MCP exposure through OpenCode's native runtime
-configuration. OpenCode still owns model/provider/auth/permissions. Any project or
-global `mcp.hashmarks` / `mcp.enola` entry is observed but may be shadowed for the
-trial; it does not choose the executable under test. End-user
-`hashmarks install --opencode` registration is therefore not benchmark authority.
+Neither native host needs a pre-existing Hashmarks or Enola MCP registration
+for benchmark execution. agentsCookbook resolves the selected subject from the
+benchmark environment, records its exact identity, disables unrelated subject
+entries for the trial where the host supports that control, and injects the selected
+stdio MCP command against the disposable trial workspace. End-user host registration
+such as `hashmarks install --opencode` remains useful outside the benchmark but does
+not select the benchmark executable.
 
 The benchmark puts this checkout's `.venv/bin` first on `PATH` and proves the
 selected Hashmarks executable, exposure digest, and workspace binding before agent
-work. For OpenCode, a missing subject executable, changed exposure identity, or
-unprovable workspace binding yields `INCOMPLETE`; a missing native OpenCode subject
-registration does not. For Codex, stale or absent native MCP registration still yields
-`INCOMPLETE`. `codex mcp list --json` remains useful for Codex host checks. Enola
-hooks are excluded; only MCP access varies between arms.
+work. A missing subject executable, changed exposure identity, or unprovable workspace
+binding yields `INCOMPLETE` before scored work. Native host configuration can still
+supply model/provider/authentication choices, but stale or unrelated MCP registration
+cannot silently choose the subject under test. Enola hooks are excluded; only the
+explicit MCP exposure varies between arms.
+
+For external harnesses such as Harbor, Hashmarks exposes a diagnostic-only readiness
+projection:
+
+```sh
+hashmarks --workspace . doctor --mcp
+```
+
+The nested `hashmarks.mcp-readiness.v1` object reports the local stdio launch
+projection and canonical MCP contract identity. It is intentionally **not** admission
+authority: agentsCookbook or another external evaluator must still independently
+verify the exact executable, workspace binding, and host-visible catalog.
 
 The earlier `codex-agent-economics` evaluation remains available through its
 separate Make targets. The native matrix compares subject assistance within each

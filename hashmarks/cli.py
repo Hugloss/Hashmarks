@@ -293,7 +293,18 @@ def _doctor(args) -> int:
         mode=args.mode,
         timeout=args.timeout,
     ) as identity:
-        _print(identity.doctor())
+        value = identity.doctor()
+    if args.mcp:
+        from .mcp_readiness import mcp_readiness
+
+        value = {
+            **value,
+            "mcp": mcp_readiness(
+                args.workspace,
+                state_dir=args.state_dir,
+            ),
+        }
+    _print(value)
     return 0
 
 
@@ -421,6 +432,14 @@ def _add_identity_cli(sub) -> None:
     doctor = sub.add_parser("doctor")
     _add_common_arguments(doctor, inherited=True)
     _add_mode_argument(doctor)
+    doctor.add_argument(
+        "--mcp",
+        action="store_true",
+        help=(
+            "also qualify the local read-only MCP catalog and emit a "
+            "diagnostic-only machine-readable readiness receipt"
+        ),
+    )
     doctor.set_defaults(func=_doctor, automatic_update_check=True)
 
 
