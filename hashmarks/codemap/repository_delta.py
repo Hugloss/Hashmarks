@@ -62,20 +62,19 @@ class _ScopedSourceAggregation:
         """Accumulate only actually scanned bytes and emitted match locations."""
         shape = packet.get("source_shape")
         if isinstance(shape, Mapping):
-            self.consumed_bytes += int(shape.get("bytes") or 0)
+            self.consumed_bytes += cast("int", shape.get("bytes") or 0)
         count = packet.get("observed_match_count")
         observed = packet.get("availability") == "observed" and isinstance(count, int)
         self.complete = self.complete and observed
         self.members_fresh = self.members_fresh and packet.get("freshness") == "current"
+        source_rows = cast("list[dict[str, object]]", packet["occurrences"])
         selected = (
-            deepcopy(packet["occurrences"])[
-                : max(0, self.limit - len(self.occurrences))
-            ]
+            deepcopy(source_rows[: max(0, self.limit - len(self.occurrences))])
             if observed
             else []
         )
         if observed:
-            self.match_count += int(count)
+            self.match_count += cast("int", count)
             self.occurrences.extend(selected)
         member = cast("Mapping[str, object]", packet["member"])
         self.members.append(
