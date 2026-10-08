@@ -49,10 +49,7 @@ def test_findings_separate_observation_move_candidate_and_capability_change() ->
         groups["correspondence"]["findings"][0]["assertion"]
         == "candidate_correspondence"
     )
-    assert (
-        groups["relationship"]["findings"][0]["kind"]
-        == "dependency_edge_removed"
-    )
+    assert groups["relationship"]["findings"][0]["kind"] == "dependency_edge_removed"
     assert groups["qualification"]["count_observed_in_packet"] == 3
     assert result["source_evidence_identity"] == "test-identity"
     assert present_repository_evidence(delta, format="compact")["format"] == "compact"
