@@ -836,9 +836,6 @@ class StructuralLocalityMixin:
         """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        self._validate_locality_bounds(
-            max_depth, call_limit_per_symbol, ref_limit_per_symbol
-        )
         self._ensure_map_ready()
         target_row = self._exact_locality_target(target)
 

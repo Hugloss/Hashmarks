@@ -35,10 +35,12 @@ class StandaloneUpgradeError(RuntimeError):
 class ReleaseInfo:
     current_version: str
     latest_version: str
+    current_key: tuple[int, int, int]
+    latest_key: tuple[int, int, int]
 
     @property
     def update_available(self) -> bool:
-        return _version_key(self.latest_version) > _version_key(self.current_version)
+        return self.latest_key > self.current_key
 
 
 def _version_key(version: str) -> tuple[int, int, int]:
@@ -48,10 +50,9 @@ def _version_key(version: str) -> tuple[int, int, int]:
     return int(major), int(minor), int(patch)
 
 
-def _strip_tag(tag: str) -> str:
+def _parse_release_tag(tag: str) -> tuple[str, tuple[int, int, int]]:
     version = tag[1:] if tag.startswith("v") else tag
-    _version_key(version)
-    return version
+    return version, _version_key(version)
 
 
 def _request(url: str) -> Request:
@@ -94,7 +95,7 @@ def fetch_latest_release(
     timeout: float = 1.0,
 ) -> ReleaseInfo:
     try:
-        _version_key(current_version)
+        current_key = _version_key(current_version)
     except ValueError as exc:
         raise ReleaseCheckError(
             "current Hashmarks version is not a stable release"
@@ -112,10 +113,15 @@ def fetch_latest_release(
     if not isinstance(tag, str):
         raise ReleaseCheckError("latest release metadata has no release tag")
     try:
-        latest = _strip_tag(tag)
+        latest, latest_key = _parse_release_tag(tag)
     except ValueError as exc:
         raise ReleaseCheckError("latest release tag is not a stable version") from exc
-    return ReleaseInfo(current_version=current_version, latest_version=latest)
+    return ReleaseInfo(
+        current_version=current_version,
+        latest_version=latest,
+        current_key=current_key,
+        latest_key=latest_key,
+    )
 
 
 def _cache_path(environ: Mapping[str, str] = os.environ) -> Path:

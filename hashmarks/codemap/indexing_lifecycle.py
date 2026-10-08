@@ -296,6 +296,15 @@ class _SyncIdentity:
 
 
 @dataclass(frozen=True)
+class _AnalysisScopeConformance:
+    """One scope observation and its canonical encoding and identity."""
+
+    payload: dict[str, object]
+    encoded: str
+    identity: str
+
+
+@dataclass(frozen=True)
 class _FileReuseState:
     digest: str | None
     artifact: str | None
@@ -361,19 +370,24 @@ class IndexingLifecycleMixin:
             "internal_state_path": self._state_rel or "",
         }
 
-    def _analysis_scope_conformance_identity(self) -> str:
+    def _analysis_scope_conformance(self) -> _AnalysisScopeConformance:
         """Bind the inputs that decide whether persisted repository rows are admissible."""
         payload = self._analysis_scope_conformance_payload()
-        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
-            "utf-8"
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return _AnalysisScopeConformance(
+            payload=payload,
+            encoded=encoded,
+            identity="sha256:" + hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
         )
-        return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
-    def _persisted_analysis_scope_requires_full_discovery(self) -> bool:
+    def _persisted_analysis_scope_requires_full_discovery(
+        self,
+        conformance: _AnalysisScopeConformance,
+    ) -> bool:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         persisted = self.store.meta("analysis_scope_conformance_identity", "")
-        if not persisted or persisted == self._analysis_scope_conformance_identity():
+        if not persisted or persisted == conformance.identity:
             return False
         try:
             previous = json.loads(
@@ -381,7 +395,7 @@ class IndexingLifecycleMixin:
             )
         except (TypeError, ValueError):
             return True
-        current = self._analysis_scope_conformance_payload()
+        current = dict(conformance.payload)
         if not isinstance(previous, dict):
             return True
         previous_encoded = json.dumps(
@@ -408,7 +422,10 @@ class IndexingLifecycleMixin:
             b"hashmarks.codemap-workspace.v1\0" + fingerprint_blob
         ).hexdigest()
 
-    def _reconcile_persisted_analysis_scope(self) -> int:
+    def _reconcile_persisted_analysis_scope(
+        self,
+        conformance: _AnalysisScopeConformance,
+    ) -> int:
         """Retire persisted rows admitted under an older analysis-scope contract.
 
         Reconciliation is paid only when the scope contract or repository context
@@ -417,8 +434,10 @@ class IndexingLifecycleMixin:
         """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        identity = self._analysis_scope_conformance_identity()
-        if self.store.meta("analysis_scope_conformance_identity", "") == identity:
+        if (
+            self.store.meta("analysis_scope_conformance_identity", "")
+            == conformance.identity
+        ):
             return 0
         rejected = tuple(
             sorted(
@@ -436,14 +455,10 @@ class IndexingLifecycleMixin:
             self.store.set_meta(
                 "workspace_fingerprint", self._workspace_fingerprint_from_store()
             )
-        self.store.set_meta("analysis_scope_conformance_identity", identity)
+        self.store.set_meta("analysis_scope_conformance_identity", conformance.identity)
         self.store.set_meta(
             "analysis_scope_conformance_payload",
-            json.dumps(
-                self._analysis_scope_conformance_payload(),
-                sort_keys=True,
-                separators=(",", ":"),
-            ),
+            conformance.encoded,
         )
         return removed
 
@@ -868,6 +883,7 @@ class IndexingLifecycleMixin:
         overlay_paths: set[str] | None,
         base_snapshot_payload: dict[str, object] | None,
         state: _SyncIndexState,
+        module_name: str,
     ) -> bool:
         """Reuse a base artifact only when every current semantic authority matches."""
         if TYPE_CHECKING:
@@ -881,7 +897,6 @@ class IndexingLifecycleMixin:
             return False
         rel = item.rel
         row = self.store.file_row(rel)
-        module_name = _module_name(rel, self._python_import_roots) or ""
         if row is not None and self._sync_file_reusable(
             self._sync_reuse_state(rel, row),
             digest_hash=artifact.file_digest,
@@ -994,6 +1009,7 @@ class IndexingLifecycleMixin:
         state: _SyncIndexState,
         digest=None,
         row=None,
+        module_name: str,
     ) -> None:
         """Reuse or parse one already-discovered repository file and persist its evidence."""
         if TYPE_CHECKING:
@@ -1011,9 +1027,6 @@ class IndexingLifecycleMixin:
             digest.hash,
             item.language,
             range_provider=self.range_provider,
-        )
-        module_name = (
-            _module_name(item.rel, getattr(self, "_python_import_roots", ())) or ""
         )
         if row is not None and self._sync_file_reusable(
             self._sync_reuse_state(item.rel, row),
@@ -1070,17 +1083,19 @@ class IndexingLifecycleMixin:
                 }
             )
 
-        candidates: list[_DiscoveredFile] = []
+        candidates: list[tuple[_DiscoveredFile, str]] = []
         for item in discovered:
             state.present.add(item.rel)
+            module_name = _module_name(item.rel, self._python_import_roots) or ""
             if self._sync_base_entry(
                 item,
                 overlay_paths=overlay_paths,
                 base_snapshot_payload=base_snapshot_payload,
                 state=state,
+                module_name=module_name,
             ):
                 continue
-            candidates.append(item)
+            candidates.append((item, module_name))
 
         # Persistent digest metadata is itself a repository-wide cache.  Load it in
         # bounded SQLite batches rather than issuing one lookup per file on warm
@@ -1092,7 +1107,7 @@ class IndexingLifecycleMixin:
             batch = candidates[start : start + digest_batch_size]
             try:
                 info = self.file_store.digest_many_info(
-                    ((item.path, item.rel) for item in batch),
+                    ((item.path, item.rel) for item, _module in batch),
                     workspace=self.workspace,
                 )
             except (OSError, UnstableFileError):
@@ -1100,22 +1115,17 @@ class IndexingLifecycleMixin:
             for rel, (digest, _executable) in info.items():
                 digests[rel] = digest
 
-        candidate_paths = [item.rel for item in candidates]
+        candidate_paths = [item.rel for item, _module in candidates]
         reuse_rows = self.store.file_reuse_rows(candidate_paths)
         with self.store.bulk_file_writes(batch_size=32, on_commit=publish_persisted):
-            for item in candidates:
-                rel, path, language, visibility = (
-                    item.rel,
-                    item.path,
-                    item.language,
-                    item.visibility,
-                )
+            for item, module_name in candidates:
                 self._sync_index_file(
                     item=item,
                     warnings=warnings,
                     state=state,
-                    digest=digests.get(rel),
-                    row=reuse_rows.get(rel),
+                    digest=digests.get(item.rel),
+                    row=reuse_rows.get(item.rel),
+                    module_name=module_name,
                 )
         return state
 
@@ -1211,16 +1221,20 @@ class IndexingLifecycleMixin:
             affected.update(self.store.paths_under(root))
         return affected
 
-    def _sync_expand_python_reprojection(
+    def _sync_refresh_python_projection(
         self,
         discovered: list[_DiscoveredFile],
         *,
         full: bool,
-        previous_roots: Sequence[str],
+        requested_paths: Sequence[str],
     ) -> int:
         """Re-index persisted Python files whose import identity changed with packaging authority."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
+        previous_roots = self._python_import_roots
+        self._sync_refresh_python_import_roots(
+            discovered, full=full, requested_paths=requested_paths
+        )
         if full or tuple(previous_roots) == tuple(self._python_import_roots):
             return 0
         seen = {item.rel for item in discovered}
@@ -1253,38 +1267,32 @@ class IndexingLifecycleMixin:
 
     def sync(self, paths: Iterable[str | Path] | None = None) -> SyncResult:
         # A semantic policy change changes both negative and positive admission.
-        # Re-enter once without a path bound so newly denied rows retire and
+        # Discover without a path bound so newly denied rows retire and
         # newly admitted paths are discovered from the same authority cut.
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if self._refresh_context_policy():
-            return self.sync()
-        if (
-            paths is not None
-            and self._persisted_analysis_scope_requires_full_discovery()
+            paths = None
+        conformance = self._analysis_scope_conformance()
+        if paths is not None and self._persisted_analysis_scope_requires_full_discovery(
+            conformance
         ):
-            return self.sync()
+            paths = None
         started = time.perf_counter()
         warnings: list[str] = []
         # One BEGIN IMMEDIATE owns both cross-process writer admission and the
         # publication boundary. WAL readers continue to see the previously
         # complete generation until rows + generation + COMPLETE commit together.
         with self.store.publication_transaction():
-            removed = self._reconcile_persisted_analysis_scope()
+            removed = self._reconcile_persisted_analysis_scope(conformance)
             identity_generation_before = getattr(
                 self._daemon_observation(), "generation", None
             )
             discovery = self._sync_discovery(paths, warnings)
-            previous_python_import_roots = self._python_import_roots
-            self._sync_refresh_python_import_roots(
+            removed += self._sync_refresh_python_projection(
                 discovery.files,
                 full=discovery.full,
                 requested_paths=discovery.requested_paths,
-            )
-            reprojection_removed = self._sync_expand_python_reprojection(
-                discovery.files,
-                full=discovery.full,
-                previous_roots=previous_python_import_roots,
             )
             preflight = self._preflight_from_discovered(discovery.files)
             cache_state = self._sync_begin_build(
@@ -1300,7 +1308,7 @@ class IndexingLifecycleMixin:
                 base_snapshot_payload=base.payload,
                 warnings=warnings,
             )
-            removed += reprojection_removed + self._sync_remove_stale_paths(
+            removed += self._sync_remove_stale_paths(
                 full=discovery.full,
                 present=state.present,
                 discovered=discovery.files,

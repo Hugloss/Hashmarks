@@ -1,6 +1,9 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
+import hashmarks.codemap.indexing_lifecycle as lifecycle
 from hashmarks.codemap.engine import CodeMap
 
 
@@ -43,3 +46,28 @@ def test_incremental_subtree_carries_measured_size_into_preflight(
         assert preflight["source_bytes"] == item.size
     finally:
         codemap.close()
+
+
+@pytest.mark.parametrize("mode", ["cold", "warm", "incremental"])
+def test_sync_projects_module_identity_once_per_file(tmp_path: Path, mode: str) -> None:
+    source = tmp_path / "src" / "pkg" / "module.py"
+    source.parent.mkdir(parents=True)
+    source.write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.setuptools.package-dir]\n"" = "src"\n', encoding="utf-8"
+    )
+
+    with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
+        if mode != "cold":
+            codemap.sync()
+        with patch.object(
+            lifecycle, "_module_name", wraps=lifecycle._module_name
+        ) as project:
+            codemap.sync(["src/pkg/module.py"] if mode == "incremental" else None)
+        assert (
+            sum(call.args[0] == "src/pkg/module.py" for call in project.call_args_list)
+            == 1
+        )
+        row = codemap.store.file_row("src/pkg/module.py")
+        assert row is not None
+        assert row["module_name"] == "pkg.module"

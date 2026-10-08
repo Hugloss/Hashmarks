@@ -33,12 +33,13 @@ def encode_metadata_fields(
     values: tuple[int, int, int, int, int],
 ) -> tuple[tuple[int, int, int, int, int], bytes | None]:
     _require_metadata_integers(values)
-    if all(_is_sqlite_integer(value) for value in values):
+    is_sqlite = tuple(_is_sqlite_integer(v) for v in values)
+    if all(is_sqlite):
         return values, None
     encoded = ",".join(str(value) for value in values).encode("ascii")
     if len(encoded) > _METADATA_OVERFLOW_MAX_BYTES:
         raise MetadataCodecError("filesystem metadata overflow payload is too large")
-    stored = tuple(value if _is_sqlite_integer(value) else 0 for value in values)
+    stored = tuple(value if ok else 0 for value, ok in zip(values, is_sqlite))
     return stored, encoded  # type: ignore[return-value]
 
 

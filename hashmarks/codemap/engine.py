@@ -412,12 +412,14 @@ class CodeMap(
         # construction-time snapshot. Stable policy checks are one exact-file
         # read; semantic changes reconcile once before persisted evidence returns.
         self._reconcile_context_policy_for_query()
-        if self.store.meta("analysis_scope_conformance_identity", "") != (
-            self._analysis_scope_conformance_identity()
+        conformance = self._analysis_scope_conformance()
+        if (
+            self.store.meta("analysis_scope_conformance_identity", "")
+            != conformance.identity
         ):
             self.sync()
             return self._daemon_observation()
-        self._reconcile_persisted_analysis_scope()
+        self._reconcile_persisted_analysis_scope(conformance)
         if not self.store.has_files():
             self.sync()
             return self._daemon_observation()

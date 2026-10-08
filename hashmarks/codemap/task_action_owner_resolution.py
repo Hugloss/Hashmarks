@@ -127,7 +127,7 @@ class TaskActionOwnerResolutionMixin:
         request: _TaskActionOwnerResolutionRequest,
         edit: dict[str, object] | None,
         literal_task_path: str,
-        structural_owner: dict[str, object] | None,
+        blocked: bool,
     ) -> tuple[
         _TaskActionExactIdentifierEvidence,
         dict[str, object] | None,
@@ -136,14 +136,6 @@ class TaskActionOwnerResolutionMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         evidence = _TaskActionExactIdentifierEvidence([], None, ())
-        blocked = any(
-            (
-                structural_owner is not None,
-                request.surface.localized_config_edit,
-                request.surface.explicit_config_surface_request,
-                request.surface.explicit_edit_surface_selected,
-            )
-        )
         owner_basis = "literal-path" if literal_task_path else None
         if not blocked:
             evidence = self._task_action_exact_identifier_edit_candidates(
@@ -568,8 +560,16 @@ class TaskActionOwnerResolutionMixin:
         )
         edit = request.surface.edit
         edit, literal_task_path = self._task_action_literal_owner(request, edit)
+        blocked = any(
+            (
+                structural_owner is not None,
+                request.surface.localized_config_edit,
+                request.surface.explicit_config_surface_request,
+                request.surface.explicit_edit_surface_selected,
+            )
+        )
         exact_identifier_evidence, edit, exact_basis = self._task_action_exact_owner(
-            request, edit, literal_task_path, structural_owner
+            request, edit, literal_task_path, blocked
         )
         exact_identifier_edits = exact_identifier_evidence.candidates
         owner_basis = exact_basis or owner_basis
@@ -617,14 +617,6 @@ class TaskActionOwnerResolutionMixin:
             return self._task_action_owner_state(candidate)
         if len(exact_identifier_edits) == 1:
             return self._task_action_owner_state(candidate)
-        blocked = any(
-            (
-                structural_owner is not None,
-                request.surface.localized_config_edit,
-                request.surface.explicit_config_surface_request,
-                request.surface.explicit_edit_surface_selected,
-            )
-        )
         if blocked:
             return self._task_action_owner_state(candidate)
         return self._task_action_structural_owner(request, candidate)

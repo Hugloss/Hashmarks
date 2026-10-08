@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -59,9 +59,12 @@ class _TaskActionAmbiguityPayloadState:
 
 @dataclass
 class _TaskActionConfigState:
+    """Request-local scores over the original term-frequency population."""
+
     task_terms: list[str]
     row_text: dict[int, str]
     term_rows: dict[str, int]
+    specificity: dict[int, float] = field(default_factory=dict)
 
 
 @dataclass

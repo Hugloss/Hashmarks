@@ -404,6 +404,7 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             per_role=per_role,
             compact=False,
         )
+        search_complete = selection.exact_identifier_search_complete
         return {
             "schema": operation_schema("task_action_map"),
             "task": task,
@@ -419,31 +420,25 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             "owner_basis": selection.owner_basis,
             **ownership,
             "exact_identifier_search": {
-                "evaluation": (
-                    "not-evaluated"
-                    if selection.exact_identifier_search_complete is None
-                    else "evaluated"
-                ),
+                "evaluation": "evaluated"
+                if search_complete is not None
+                else "not-evaluated",
                 "completeness": (
                     "complete"
-                    if selection.exact_identifier_search_complete is True
+                    if search_complete is True
                     else "incomplete"
-                    if selection.exact_identifier_search_complete is False
+                    if search_complete is False
                     else "unknown"
                 ),
                 "truncation": (
                     "complete"
-                    if selection.exact_identifier_search_complete is True
+                    if search_complete is True
                     else "truncated"
-                    if selection.exact_identifier_search_complete is False
+                    if search_complete is False
                     else "unknown"
                 ),
-                "negative_evidence_admissible": (
-                    selection.exact_identifier_search_complete is True
-                ),
-                "uniqueness_admissible": (
-                    selection.exact_identifier_search_complete is True
-                ),
+                "negative_evidence_admissible": search_complete is True,
+                "uniqueness_admissible": search_complete is True,
                 "bound_reasons": list(selection.exact_identifier_search_bound_reasons),
             },
             "verification_relevance": final.verification_relevance,
@@ -688,6 +683,13 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             )
         if anchor is None or not config_candidates:
             return edit, False, explicit_config_surface_request
+        # Local siblings use the original term-frequency population. Their
+        # admission supplies row text without reweighting the selected anchor.
+        config_state.row_text.update(
+            (id(row), self._task_action_discrimination_text(row))
+            for row in config_candidates
+            if id(row) not in config_state.row_text
+        )
         local_config = self._local_config_for_anchor(
             anchor, config_candidates, config_state
         )
@@ -915,10 +917,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
         verification_identity_ambiguity = bool(
             choices.verification_relevance.get("qualified_identity_ambiguous")
         )
-        ambiguity_flags = (
-            multi_structural_owner_ambiguity,
-            verification_identity_ambiguity,
-        )
         (
             exact_identifier_ambiguity,
             multi_identifier_edit_ambiguity,
@@ -927,13 +925,19 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             context,
             selection,
             choices,
-            ambiguity_flags,
+            (multi_structural_owner_ambiguity, verification_identity_ambiguity),
         )
         weak_contract_anchor_ambiguity = self._task_action_weak_contract_ambiguity(
             context,
             selection,
             choices,
             decisive_qualified_verification,
+        )
+        exact_search_incomplete = self._task_action_exact_identifier_search_incomplete(
+            selection
+        )
+        structural_search_incomplete = self._task_action_structural_search_incomplete(
+            selection
         )
         ambiguous = self._task_action_global_ambiguity(
             choices.edit,
@@ -955,44 +959,49 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
                 exact_identifier_ambiguity,
                 multi_identifier_edit_ambiguity,
                 weak_contract_anchor_ambiguity,
-                self._task_action_exact_identifier_search_incomplete(selection),
+                exact_search_incomplete,
                 multi_structural_owner_ambiguity,
-                self._task_action_structural_search_incomplete(selection),
+                structural_search_incomplete,
                 verification_identity_ambiguity,
             ),
         )
-        reason = self._task_action_ambiguity_reason(
-            choices.edit,
-            (
-                (
-                    "ambiguous-explicit-task-surface",
-                    selection.explicit_surface_ambiguity,
-                ),
-                ("weak-task-anchor", weak_contract_anchor_ambiguity),
-                (
-                    "exact-identifier-search-bounded",
-                    self._task_action_exact_identifier_search_incomplete(selection),
-                ),
-                (
-                    "multiple-task-local-structural-owners",
-                    multi_structural_owner_ambiguity,
-                ),
-                (
-                    "unresolved-qualified-import-identity",
-                    verification_identity_ambiguity,
-                ),
-                ("multiple-exact-identifier-edit-owners", exact_identifier_ambiguity),
-                ("multiple-identifier-edit-owners", multi_identifier_edit_ambiguity),
-                (
-                    "structural-start-observation-incomplete",
-                    self._task_action_structural_search_incomplete(selection),
-                ),
-            ),
-            ambiguous,
-        )
         return {
             "ambiguous": ambiguous,
-            "reason": reason,
+            "reason": self._task_action_ambiguity_reason(
+                choices.edit,
+                (
+                    (
+                        "ambiguous-explicit-task-surface",
+                        selection.explicit_surface_ambiguity,
+                    ),
+                    ("weak-task-anchor", weak_contract_anchor_ambiguity),
+                    (
+                        "exact-identifier-search-bounded",
+                        exact_search_incomplete,
+                    ),
+                    (
+                        "multiple-task-local-structural-owners",
+                        multi_structural_owner_ambiguity,
+                    ),
+                    (
+                        "unresolved-qualified-import-identity",
+                        verification_identity_ambiguity,
+                    ),
+                    (
+                        "multiple-exact-identifier-edit-owners",
+                        exact_identifier_ambiguity,
+                    ),
+                    (
+                        "multiple-identifier-edit-owners",
+                        multi_identifier_edit_ambiguity,
+                    ),
+                    (
+                        "structural-start-observation-incomplete",
+                        structural_search_incomplete,
+                    ),
+                ),
+                ambiguous,
+            ),
             "candidates": self._task_action_ambiguity_candidates(
                 choices.edit, competing, per_role
             ),
@@ -1000,10 +1009,6 @@ class TaskActionProjectionMixin(TaskActionOwnerResolutionMixin):
             "structural_owners": task_local_structural_owners,
             "verification_origins": task_local_verification_origins,
             "multi_structural_owner_ambiguity": multi_structural_owner_ambiguity,
-            "structural_search_incomplete": (
-                self._task_action_structural_search_incomplete(selection)
-            ),
-            "exact_identifier_search_incomplete": (
-                self._task_action_exact_identifier_search_incomplete(selection)
-            ),
+            "structural_search_incomplete": structural_search_incomplete,
+            "exact_identifier_search_incomplete": exact_search_incomplete,
         }

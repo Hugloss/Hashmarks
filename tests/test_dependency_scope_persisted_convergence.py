@@ -1,3 +1,5 @@
+import hashlib
+import json
 import tomllib
 from pathlib import Path
 from unittest.mock import patch
@@ -67,6 +69,32 @@ def test_stable_scope_identity_avoids_repeated_repository_map_scan(
         ):
             assert {hit.path for hit in codemap.find("owned")} == {"src/app.py"}
             assert codemap.symbol("owned")["matches"][0]["path"] == "src/app.py"
+
+
+@pytest.mark.parametrize("paths", [None, ["src/app.py"]])
+def test_scope_reconciliation_persists_one_complete_conformance_snapshot(
+    tmp_path: Path, paths: list[str] | None
+) -> None:
+    _write(tmp_path / "src/app.py", "def owned():\n    return 1\n")
+    _write(tmp_path / "src/other.py", "def other():\n    return 2\n")
+    with CodeMap(tmp_path, artifact_db=tmp_path / "artifacts.sqlite3") as codemap:
+        codemap.sync()
+        codemap.store.set_meta("analysis_scope_conformance_identity", "old-scope")
+        with patch.object(
+            codemap,
+            "_analysis_scope_conformance_payload",
+            wraps=codemap._analysis_scope_conformance_payload,
+        ) as observe:
+            result = codemap.sync(paths)
+        assert observe.call_count == 1
+        assert result.discovered == 2
+        encoded = codemap.store.meta("analysis_scope_conformance_payload")
+        assert encoded is not None
+        assert "pruned_segments" in json.loads(encoded)
+        assert (
+            codemap.store.meta("analysis_scope_conformance_identity")
+            == "sha256:" + hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+        )
 
 
 def test_context_policy_change_retires_historical_rows_on_reopen(

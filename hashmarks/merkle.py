@@ -545,6 +545,8 @@ class MerkleTree:
         self, path: str | Path = "", *, verify: bool = False
     ) -> Digest:
         rel = self._relative(path)
+        if self._is_mandatory_excluded(rel):
+            raise ValueError(f"input path is excluded from identity: {rel}")
         return self._run_reconciled(lambda: self._directory_digest(rel, verify=verify))
 
     def _directory_file_items(
@@ -594,9 +596,6 @@ class MerkleTree:
         return nodes
 
     def _directory_digest(self, rel: str, *, verify: bool) -> Digest:
-        if self._is_mandatory_excluded(rel):
-            raise ValueError(f"input path is excluded from identity: {rel}")
-
         with self._lock:
             if not verify and rel not in self._dirty_dirs:
                 cached = self._dir_cache.get(rel)

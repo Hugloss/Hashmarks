@@ -699,24 +699,20 @@ class TaskActionEvidenceMixin:
         concrete: Sequence[dict[str, object]],
         state: _TaskActionConfigState,
     ) -> dict[str, object] | None:
-        if len(concrete) == 1:
-            return concrete[0]
         if not concrete:
             return None
-        ranked = sorted(
-            concrete,
-            key=lambda row: cls._task_action_config_specificity(row, state),
-            reverse=True,
-        )
-        best_score = cls._task_action_config_specificity(ranked[0], state)
+        if len(concrete) == 1:
+            return concrete[0]
+        scored = [
+            (cls._task_action_config_specificity(row, state), row) for row in concrete
+        ]
+        scored.sort(key=lambda item: item[0], reverse=True)
+        best_score, best_row = scored[0]
         if best_score <= 0.0:
             return None
-        if (
-            len(ranked) > 1
-            and cls._task_action_config_specificity(ranked[1], state) == best_score
-        ):
+        if len(scored) > 1 and scored[1][0] == best_score:
             return None
-        return ranked[0]
+        return best_row
 
     @classmethod
     def _local_config_for_anchor(
@@ -763,12 +759,15 @@ class TaskActionEvidenceMixin:
     def _task_action_config_specificity(
         row: dict[str, object], state: _TaskActionConfigState
     ) -> float:
-        text = state.row_text[id(row)]
-        return sum(
-            1.0 / state.term_rows[term]
-            for term in state.task_terms
-            if state.term_rows[term] and term in text
-        )
+        row_id = id(row)
+        if row_id not in state.specificity:
+            text = state.row_text[row_id]
+            state.specificity[row_id] = sum(
+                1.0 / state.term_rows[term]
+                for term in state.task_terms
+                if state.term_rows[term] and term in text
+            )
+        return state.specificity[row_id]
 
     @classmethod
     def _task_action_config_anchor(
@@ -779,14 +778,14 @@ class TaskActionEvidenceMixin:
             RepositoryDomain.BUILD.value,
             RepositoryDomain.PLAN.value,
         }
-        anchors = [
+        candidates = [
             row
             for row in rows
-            if cls._task_action_config_specificity(row, state) > 0.0
-            and not excluded.intersection(row["domains"])
+            if not excluded.intersection(row["domains"])
+            and cls._task_action_config_specificity(row, state) > 0.0
         ]
         return max(
-            anchors,
+            candidates,
             key=lambda row: (
                 cls._task_action_config_specificity(row, state),
                 -int(row.get("canonical_rank") or 10_000),
@@ -820,9 +819,9 @@ class TaskActionEvidenceMixin:
         candidates = [
             row
             for row in rows
-            if cls._task_action_config_specificity(row, state) > 0.0
-            and RepositoryDomain.TEST.value not in row["domains"]
+            if RepositoryDomain.TEST.value not in row["domains"]
             and source_domains.intersection(row["domains"])
+            and cls._task_action_config_specificity(row, state) > 0.0
         ]
         return max(
             candidates,

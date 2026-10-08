@@ -12,6 +12,13 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+@dataclass(frozen=True)
+class _CoverageBindingPaths:
+    binding_id: str
+    evidence_paths: set[str]
+    dependency_paths: set[str]
+
+
 @dataclass
 class _CoverageBindingChanges:
     direct_changed: set[str] = field(default_factory=set)
@@ -56,26 +63,25 @@ class RepositoryEvidenceCoverageMixin:
         )
 
     @classmethod
-    def _coverage_binding_paths(
+    def _coverage_bindings(
         cls, packet: Mapping[str, object]
+    ) -> list[_CoverageBindingPaths]:
+        return [
+            _CoverageBindingPaths(
+                str(binding.get("binding_id") or ""), *cls._binding_paths(binding)
+            )
+            for binding in cls._binding_rows(packet)
+        ]
+
+    @staticmethod
+    def _coverage_binding_paths(
+        bindings: Sequence[_CoverageBindingPaths],
     ) -> tuple[set[str], set[str]]:
         evidence_paths: set[str] = set()
         dependency_paths: set[str] = set()
-        for binding in cls._binding_rows(packet):
-            evidence = binding.get("evidence")
-            if isinstance(evidence, list):
-                evidence_paths.update(
-                    str(row.get("path") or "")
-                    for row in evidence
-                    if isinstance(row, Mapping) and row.get("path")
-                )
-            dependencies = binding.get("dependencies")
-            if isinstance(dependencies, list):
-                dependency_paths.update(
-                    str(row.get("path") or "")
-                    for row in dependencies
-                    if isinstance(row, Mapping) and row.get("path")
-                )
+        for binding in bindings:
+            evidence_paths.update(binding.evidence_paths)
+            dependency_paths.update(binding.dependency_paths)
         return evidence_paths, dependency_paths
 
     @staticmethod
@@ -217,30 +223,28 @@ class RepositoryEvidenceCoverageMixin:
     @classmethod
     def _binding_impacts(
         cls,
-        packet: Mapping[str, object],
         changed_paths: set[str],
         binding_delta: Mapping[str, object] | None,
+        bindings: Sequence[_CoverageBindingPaths],
     ) -> list[dict[str, object]]:
         changed_bindings = cls._changed_binding_index(binding_delta)
         result: list[dict[str, object]] = []
-        for binding in cls._binding_rows(packet):
-            binding_id = str(binding.get("binding_id") or "")
-            evidence_paths, dependency_paths = cls._binding_paths(binding)
-            detail = changed_bindings.get(binding_id)
+        for binding in bindings:
+            detail = changed_bindings.get(binding.binding_id)
             reasons = (
                 cls._binding_impact_reasons(detail) if detail is not None else set()
             )
-            if detail is None and changed_paths & evidence_paths:
+            if detail is None and changed_paths & binding.evidence_paths:
                 reasons.add("bound-member-precision-unknown")
             if (
-                changed_paths & dependency_paths
+                changed_paths & binding.dependency_paths
                 and "declared-dependency-changed" not in reasons
             ):
                 reasons.add("declared-dependency-path-changed")
             if reasons:
                 result.append(
                     {
-                        "binding_id": binding_id,
+                        "binding_id": binding.binding_id,
                         "reasons": sorted(reasons),
                     }
                 )
@@ -509,13 +513,13 @@ class RepositoryEvidenceCoverageMixin:
     @classmethod
     def _coverage_classification(
         cls,
-        bindings_packet: Mapping[str, object],
         changed_set: set[str],
         *,
         complete: bool,
         binding_delta: Mapping[str, object] | None,
+        evidence_paths: set[str],
+        dependency_paths: set[str],
     ) -> dict[str, object]:
-        evidence_paths, dependency_paths = cls._coverage_binding_paths(bindings_packet)
         bound_members = changed_set & evidence_paths
         declared_dependencies_changed = (changed_set & dependency_paths) - bound_members
         outside = changed_set - evidence_paths - dependency_paths
@@ -560,11 +564,14 @@ class RepositoryEvidenceCoverageMixin:
             changed_paths, change_set_complete, repository_observation
         )
         changed_set = set(changed)
+        bindings = self._coverage_bindings(bindings_packet)
+        evidence_paths, dependency_paths = self._coverage_binding_paths(bindings)
         classification = self._coverage_classification(
-            bindings_packet,
             changed_set,
             complete=complete,
             binding_delta=binding_delta,
+            evidence_paths=evidence_paths,
+            dependency_paths=dependency_paths,
         )
         payload: dict[str, object] = {
             "schema": "hashmarks.repository-evidence-coverage.v1",
@@ -572,7 +579,7 @@ class RepositoryEvidenceCoverageMixin:
             "change_set": change_set,
             "classification": classification,
             "binding_impacts": self._binding_impacts(
-                bindings_packet, changed_set, binding_delta
+                changed_set, binding_delta, bindings
             ),
             "precision": {
                 "bound_range": "known" if binding_delta is not None else "unknown",

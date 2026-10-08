@@ -44,6 +44,49 @@ def _next_patch_version() -> str:
     return f"{major}.{minor}.{patch + 1}"
 
 
+def _release(current_version: str, latest_version: str) -> ReleaseInfo:
+    return ReleaseInfo(
+        current_version=current_version,
+        latest_version=latest_version,
+        current_key=release_update._version_key(current_version),
+        latest_key=release_update._version_key(latest_version),
+    )
+
+
+@pytest.mark.parametrize(
+    ("current", "latest", "available"),
+    [
+        ("0.9.0", "0.10.0", True),
+        ("0.25.0", "0.25.0", False),
+        ("1.0.0", "0.99.0", False),
+    ],
+)
+def test_release_comparisons_reuse_qualified_version_keys(
+    monkeypatch: pytest.MonkeyPatch, current: str, latest: str, available: bool
+) -> None:
+    parsed: list[str] = []
+    version_key = release_update._version_key
+
+    def parse(version: str) -> tuple[int, int, int]:
+        parsed.append(version)
+        return version_key(version)
+
+    monkeypatch.setattr(release_update, "_version_key", parse)
+    monkeypatch.setattr(
+        release_update,
+        "urlopen",
+        lambda request, *, timeout: _Response(_latest(latest)),
+    )
+
+    release = release_update.fetch_latest_release(current)
+
+    assert release.current_version == current
+    assert release.latest_version == latest
+    assert release.update_available is available
+    assert release.update_available is available
+    assert parsed == [current, latest]
+
+
 def test_latest_release_request_is_public_and_repository_neutral(monkeypatch) -> None:
     seen: list[Request] = []
 
@@ -56,7 +99,7 @@ def test_latest_release_request_is_public_and_repository_neutral(monkeypatch) ->
 
     release = release_update.fetch_latest_release("0.24.0")
 
-    assert release == ReleaseInfo(current_version="0.24.0", latest_version="0.25.0")
+    assert release == _release(current_version="0.24.0", latest_version="0.25.0")
     assert release.update_available is True
     assert len(seen) == 1
     request = seen[0]
@@ -97,7 +140,7 @@ def test_periodic_check_is_cached_outside_repository_state(
 
     def fetch(current_version: str, *, timeout: float) -> ReleaseInfo:
         calls.append(f"{current_version}:{timeout}")
-        return ReleaseInfo(current_version=current_version, latest_version="0.25.0")
+        return _release(current_version=current_version, latest_version="0.25.0")
 
     monkeypatch.setattr(release_update, "fetch_latest_release", fetch)
     environ = {"XDG_CACHE_HOME": str(tmp_path / "cache")}
@@ -115,7 +158,7 @@ def test_periodic_check_is_cached_outside_repository_state(
         now=1001.0,
     )
 
-    assert first == ReleaseInfo(current_version="0.24.0", latest_version="0.25.0")
+    assert first == _release(current_version="0.24.0", latest_version="0.25.0")
     assert second is None
     assert calls == ["0.24.0:1.0"]
     cache = tmp_path / "cache" / "hashmarks" / "update-check.json"
@@ -132,7 +175,7 @@ def test_corrupt_periodic_cache_is_disposable(monkeypatch, tmp_path: Path) -> No
     monkeypatch.setattr(
         release_update,
         "fetch_latest_release",
-        lambda current_version, *, timeout: ReleaseInfo(
+        lambda current_version, *, timeout: _release(
             current_version=current_version,
             latest_version="0.25.0",
         ),
@@ -205,7 +248,7 @@ def test_external_python_upgrade_reports_native_tool_handoff_without_mutation(
     monkeypatch.setattr(
         cli,
         "fetch_latest_release",
-        lambda current_version, *, timeout: ReleaseInfo(
+        lambda current_version, *, timeout: _release(
             current_version=current_version,
             latest_version=latest_version,
         ),
@@ -308,7 +351,7 @@ def test_periodic_external_installation_reports_update_without_manager_selection
     monkeypatch.setattr(
         cli,
         "periodic_release_check",
-        lambda current_version, *, interactive: ReleaseInfo(
+        lambda current_version, *, interactive: _release(
             current_version=current_version,
             latest_version="0.25.0",
         ),
@@ -335,7 +378,7 @@ def test_cli_upgrade_reports_up_to_date_without_installation_detection(
     monkeypatch.setattr(
         cli,
         "fetch_latest_release",
-        lambda current_version, *, timeout: ReleaseInfo(
+        lambda current_version, *, timeout: _release(
             current_version=current_version,
             latest_version=current_version,
         ),
@@ -398,7 +441,7 @@ def test_standalone_upgrade_offers_two_explicit_choices_and_skip_does_not_mutate
     monkeypatch.setattr(
         cli,
         "fetch_latest_release",
-        lambda current_version, *, timeout: ReleaseInfo(
+        lambda current_version, *, timeout: _release(
             current_version=current_version,
             latest_version=latest_version,
         ),
@@ -437,7 +480,7 @@ def test_cli_executes_the_exact_displayed_standalone_command(
     monkeypatch.setattr(
         cli,
         "fetch_latest_release",
-        lambda current_version, *, timeout: ReleaseInfo(
+        lambda current_version, *, timeout: _release(
             current_version=current_version,
             latest_version=latest_version,
         ),
@@ -476,7 +519,7 @@ def test_standalone_prerequisites_are_resolved_only_after_upgrade_consent(
     monkeypatch.setattr(
         cli,
         "fetch_latest_release",
-        lambda current_version, *, timeout: ReleaseInfo(
+        lambda current_version, *, timeout: _release(
             current_version=current_version,
             latest_version=latest_version,
         ),
@@ -508,7 +551,7 @@ def test_standalone_upgrade_noninteractive_prints_command_without_mutation(
     monkeypatch.setattr(
         cli,
         "fetch_latest_release",
-        lambda current_version, *, timeout: ReleaseInfo(
+        lambda current_version, *, timeout: _release(
             current_version=current_version,
             latest_version=latest_version,
         ),
