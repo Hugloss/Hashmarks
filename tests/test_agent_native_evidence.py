@@ -59,7 +59,10 @@ def test_findings_separate_observation_move_candidate_and_capability_change() ->
     assert (
         "correspondence:" in present_repository_evidence(delta, format="text")["text"]
     )
-    assert "candidate_correspondence" in present_repository_evidence(delta, format="text")["text"]
+    assert (
+        "candidate_correspondence"
+        in present_repository_evidence(delta, format="text")["text"]
+    )
 
 
 def test_diagnostic_disappearance_remains_only_a_producer_claim() -> None:

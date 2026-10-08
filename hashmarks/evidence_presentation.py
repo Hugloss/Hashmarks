@@ -316,7 +316,6 @@ def _text_view(groups: list[dict[str, object]]) -> str:
     return "\n".join(lines)
 
 
-
 def present_repository_evidence(
     packet: Mapping[str, object], *, format: str = "compact"
 ) -> dict[str, object]:
