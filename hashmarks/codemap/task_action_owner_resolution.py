@@ -20,6 +20,21 @@ if TYPE_CHECKING:
 
 
 class TaskActionOwnerResolutionMixin:
+    @staticmethod
+    def _task_action_class_is_method_scope(
+        task: str, candidate: dict[str, object] | None
+    ) -> bool:
+        """A named class scopes a method request; it is not that method's owner."""
+        if candidate is None or re.search(r"\bmethod\b", task, re.I) is None:
+            return False
+        name = str(candidate.get("name") or "")
+        signature = str(candidate.get("signature") or "")
+        return bool(
+            name
+            and signature.startswith("class ")
+            and re.search(rf"\b{re.escape(name)}\b", task)
+        )
+
     def _task_action_literal_task_paths(
         self,
         task: str,
@@ -134,18 +149,24 @@ class TaskActionOwnerResolutionMixin:
             evidence = self._task_action_exact_identifier_edit_candidates(
                 request.task, request.context.rows, request.context.failed
             )
-            exact_identifier_edits = evidence.candidates
+            exact_identifier_edits = [
+                row
+                for row in evidence.candidates
+                if not self._task_action_class_is_method_scope(request.task, row)
+            ]
+            if self._task_action_class_is_method_scope(request.task, edit):
+                edit = None
             if literal_task_path:
                 exact_identifier_edits = [
                     row
                     for row in exact_identifier_edits
                     if str(row.get("path") or "") == literal_task_path
                 ]
-                evidence = _TaskActionExactIdentifierEvidence(
-                    exact_identifier_edits,
-                    evidence.search_complete,
-                    evidence.bound_reasons,
-                )
+            evidence = _TaskActionExactIdentifierEvidence(
+                exact_identifier_edits,
+                evidence.search_complete,
+                evidence.bound_reasons,
+            )
             if len(exact_identifier_edits) == 1:
                 edit = exact_identifier_edits[0]
                 if not literal_task_path and evidence.search_complete is True:

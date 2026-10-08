@@ -43,7 +43,7 @@ ROOT = Path(__file__).resolve().parents[1]
 _EXPECTED = {
     "repository_context": {"default": "hashmarks.repository-capsule.v1"},
     "find": {"default": "hashmarks.find.v2"},
-    "task_evidence": {"default": "hashmarks.task-evidence.v4"},
+    "task_evidence": {"default": "hashmarks.task-evidence.v5"},
     "change_impact": {"default": "hashmarks.task-change-impact.v1"},
     "correlate_evidence": {"default": "hashmarks.evidence-correlation.v2"},
     "dependency_codemap": {

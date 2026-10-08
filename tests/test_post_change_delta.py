@@ -77,6 +77,33 @@ def test_task_post_change_delta_noop_keeps_generation_and_revision_reusable(
     assert "candidate-source-revision" in delta["reused"]
 
 
+def test_task_post_change_delta_verifies_historical_v4_packet_identity(
+    tmp_path: Path,
+) -> None:
+    source, task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        previous = codemap.task_evidence(task)
+        previous["schema"] = "hashmarks.task-evidence.v4"
+        bounds = previous["retrieval"]["bounds"]
+        for key in ("canonical_completeness", "canonical_truncation", "bound_reasons"):
+            bounds.pop(key)
+        previous["evidence_packet_identity"] = "sha256:" + codemap._packet_digest(
+            previous["schema"],
+            {
+                key: value
+                for key, value in previous.items()
+                if key != "evidence_packet_identity"
+            },
+        )
+        source.write_text("def widget(): return 'new'\n", encoding="utf-8")
+        delta = codemap.task_post_change_delta(
+            task, ["src/owner.py"], previous_evidence=previous
+        )
+
+    assert delta["change"] == "changed"
+
+
 def test_task_post_change_delta_reports_new_owner_without_replaying_unchanged_verification(
     tmp_path: Path,
 ) -> None:
@@ -126,7 +153,7 @@ def test_task_post_change_delta_rejects_non_start_packet(tmp_path: Path) -> None
                 task, ["src/owner.py"], previous_evidence={"schema": "wrong"}
             )
         except ValueError as exc:
-            assert "hashmarks.task-evidence.v4" in str(exc)
+            assert "hashmarks.task-evidence.v5" in str(exc)
         else:
             raise AssertionError("invalid previous_evidence must fail closed")
 

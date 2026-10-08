@@ -29,6 +29,7 @@ from .task_evidence_discrimination import (
     STRUCTURAL_SELECTION_BASIS,
     select_task_evidence_discrimination_candidate,
 )
+from .task_evidence_scoped_method import TaskEvidenceScopedMethodMixin
 
 if TYPE_CHECKING:
     from .engine import CodeMap
@@ -82,7 +83,9 @@ class _TaskEvidenceRange:
     end: int | None
 
 
-class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
+class TaskEvidencePacketMixin(
+    TaskEvidenceScopedMethodMixin, ConfigurationEvidenceMixin, DecisionPacketMixin
+):
     @staticmethod
     def _task_decision_anchor(value: object) -> dict[str, object] | None:
         if not isinstance(value, dict) or not value.get("path"):
@@ -1132,6 +1135,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
             for word in re.findall(r"[A-Za-z]+", query.lower())
         )
         total, frequencies = self._session_lexical_document_frequencies(terms)
+        scoped = self._task_evidence_scoped_method_supplement(
+            task, query_tokens, frequencies, total, existing_keys
+        )
         bound_reasons: set[str] = set()
         paths = self._task_evidence_natural_candidate_paths(
             query, existing, terms, bound_reasons
@@ -1172,7 +1178,9 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                     )
                 )
         scored_rows.sort(key=lambda row: (-row[0], row[1], row[2]))
-        return [row[3] for row in scored_rows[:2]]
+        return ([scoped] if scoped is not None else []) + [
+            row[3] for row in scored_rows[: 2 - int(scoped is not None)]
+        ]
 
     def _task_evidence_attach_retrieval_supplements(
         self,
@@ -1411,6 +1419,20 @@ class TaskEvidencePacketMixin(ConfigurationEvidenceMixin, DecisionPacketMixin):
                 action,
                 evidence_receipt,
                 verification_plan,
+            )
+            canonical = self._find_task_evidence_impl(task, limit=limit)
+            retrieval = result["retrieval"]
+            assert isinstance(retrieval, dict)
+            bounds = retrieval["bounds"]
+            assert isinstance(bounds, dict)
+            bounds.update(
+                {
+                    "canonical_completeness": (
+                        "complete" if canonical.complete else "incomplete"
+                    ),
+                    "canonical_truncation": canonical.truncation,
+                    "bound_reasons": list(canonical.bound_reasons),
+                }
             )
             self._task_evidence_compact_retrieval(result)
             self._task_evidence_attach_retrieval_supplements(

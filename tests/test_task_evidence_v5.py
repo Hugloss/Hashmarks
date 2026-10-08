@@ -17,7 +17,42 @@ def _write(root: Path, rel: str, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def test_task_evidence_v4_separates_retrieval_ownership_and_freshness(
+def test_named_class_scopes_method_evidence_without_resolving_class_as_method(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "src/surface.py",
+        "class WidgetSurface:\n"
+        "    def task_evidence(self, task, limit=20):\n"
+        "        if limit < 1:\n"
+        "            raise ValueError(limit)\n"
+        "        return {'task': task}\n"
+        "\n"
+        "    def other(self):\n"
+        "        return None\n",
+    )
+    task = (
+        "Identify the consumer-facing WidgetSurface semantic method that "
+        "validates bounded input and returns task evidence."
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.task_evidence(task)
+        exact = codemap.task_evidence("Change WidgetSurface.task_evidence method")
+
+    assert packet["ownership"]["status"] != "resolved"
+    assert packet["ownership"]["owner"] is None
+    assert packet["explicit_target"]["status"] == "not-explicit"
+    assert any(
+        row.get("symbol") == "WidgetSurface.task_evidence"
+        for row in packet["retrieval"]["results"]
+    )
+    assert exact["ownership"]["status"] == "resolved"
+    assert exact["ownership"]["owner"]["qualname"] == "WidgetSurface.task_evidence"
+
+
+def test_task_evidence_v5_separates_retrieval_ownership_and_freshness(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -37,9 +72,11 @@ def test_task_evidence_v4_separates_retrieval_ownership_and_freshness(
         codemap.sync()
         packet = codemap.task_evidence("change target_impl behavior", token_budget=256)
 
-    assert packet["schema"] == "hashmarks.task-evidence.v4"
+    assert packet["schema"] == "hashmarks.task-evidence.v5"
     assert "status" not in packet
     assert packet["retrieval"]["ownership_authority"] is False
+    assert packet["retrieval"]["bounds"]["canonical_completeness"] == "complete"
+    assert packet["retrieval"]["bounds"]["canonical_truncation"] == "complete"
     assert packet["ownership"]["status"] == "resolved"
     assert packet["ownership"]["owner"]["path"] == "src/owner.py"
     assert packet["ownership"]["basis"] in {"unique-exact-symbol", "exact-symbol"}
@@ -49,7 +86,7 @@ def test_task_evidence_v4_separates_retrieval_ownership_and_freshness(
     assert packet["consumer_action"] == "external"
 
 
-def test_task_evidence_v4_retrieval_is_compact_non_authoritative_projection(
+def test_task_evidence_v5_retrieval_is_compact_non_authoritative_projection(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -93,7 +130,7 @@ def test_task_evidence_v4_retrieval_is_compact_non_authoritative_projection(
         assert internal_only not in projected
 
 
-def test_task_evidence_v4_consumes_canonical_admitted_edit(
+def test_task_evidence_v5_consumes_canonical_admitted_edit(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -127,7 +164,7 @@ def test_task_evidence_v4_consumes_canonical_admitted_edit(
     assert packet["explicit_target"]["path"] == "src/owner.py"
 
 
-def test_task_evidence_v4_keeps_ambiguity_independent_from_freshness(
+def test_task_evidence_v5_keeps_ambiguity_independent_from_freshness(
     tmp_path: Path,
 ) -> None:
     _write(tmp_path, "src/a.py", "def calculate_value():\n    return 1\n")
@@ -148,20 +185,11 @@ def test_task_evidence_v4_keeps_ambiguity_independent_from_freshness(
         ownership["authority_proof_identity"]
         == action["ownership_authority"]["authority_proof_identity"]
     )
-    next_read = ownership["next_read"]
-    assert next_read["path"] in {"src/a.py", "src/b.py"}
-    assert str(next_read["symbol"]).endswith("calculate_value")
-    assert next_read["start_line"] == 1
-    assert next_read["end_line"] == 2
-    assert next_read["reason"] == "ownership-ambiguity-discrimination"
-    assert next_read["ambiguity_reason"]
-    assert next_read["selection_basis"] == "ambiguity-candidate-order"
-    assert next_read["authority"] == "non-authoritative-discrimination"
-    assert next_read["discriminator"]
+    assert ownership["next_read"] is None
     assert packet["freshness"]["state"] in {"unknown", "current", "stale"}
 
 
-def test_task_evidence_v4_prefers_complete_unique_structural_owner_for_discrimination(
+def test_task_evidence_v5_prefers_complete_unique_structural_owner_for_discrimination(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -213,7 +241,7 @@ def test_task_evidence_v4_prefers_complete_unique_structural_owner_for_discrimin
     assert "ownership remains unadmitted" in next_read["discriminator"]
 
 
-def test_task_evidence_v4_structural_discrimination_fails_closed_on_incomplete_observation(
+def test_task_evidence_v5_structural_discrimination_fails_closed_on_incomplete_observation(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -258,12 +286,10 @@ def test_task_evidence_v4_structural_discrimination_fails_closed_on_incomplete_o
         codemap.sync()
         next_read = codemap._task_evidence_discrimination_next_read(action)
 
-    assert next_read is not None
-    assert next_read["path"] == "src/ranked.py"
-    assert next_read["selection_basis"] == "ambiguity-candidate-order"
+    assert next_read is None
 
 
-def test_task_evidence_v4_structural_discrimination_fails_closed_on_multiple_owners(
+def test_task_evidence_v5_structural_discrimination_fails_closed_on_multiple_owners(
     tmp_path: Path,
 ) -> None:
     _write(tmp_path, "src/a.py", "def owner_a():\n    return 'a'\n")
@@ -289,12 +315,10 @@ def test_task_evidence_v4_structural_discrimination_fails_closed_on_multiple_own
         codemap.sync()
         next_read = codemap._task_evidence_discrimination_next_read(action)
 
-    assert next_read is not None
-    assert next_read["path"] == "src/a.py"
-    assert next_read["selection_basis"] == "ambiguity-candidate-order"
+    assert next_read is None
 
 
-def test_task_evidence_v4_owner_is_invariant_to_bounded_retrieval(
+def test_task_evidence_v5_owner_is_invariant_to_bounded_retrieval(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -327,7 +351,7 @@ def test_task_evidence_v4_owner_is_invariant_to_bounded_retrieval(
     assert wide["ownership"]["basis"] in {"exact-symbol", "unique-exact-symbol"}
 
 
-def test_task_evidence_v4_keeps_dependency_as_related_evidence_not_owner(
+def test_task_evidence_v5_keeps_dependency_as_related_evidence_not_owner(
     tmp_path: Path,
 ) -> None:
     _write(tmp_path, "src/publish.py", "def publish_result(value):\n    return value\n")
@@ -696,7 +720,7 @@ def _dense_prefix_repository(root: Path) -> tuple[Path, str]:
     return owner, task
 
 
-def test_task_evidence_v4_compact_retrieval_is_materially_smaller_than_internal_rows(
+def test_task_evidence_v5_compact_retrieval_is_materially_smaller_than_internal_rows(
     tmp_path: Path,
 ) -> None:
     _owner, task = _dense_prefix_repository(tmp_path)
@@ -769,6 +793,10 @@ def test_task_evidence_supplements_account_for_displaced_canonical_hits(
     assert retrieval["supplemental_results"] == len(supplements)
     assert retrieval["supplemental_authority"] is False
     assert retrieval["ordering"] == "canonical-then-bounded-natural-language"
+    assert retrieval["bounds"]["canonical_completeness"] == "incomplete"
+    assert retrieval["bounds"]["canonical_truncation"] == "truncated"
+    assert "task-result-limit" in retrieval["bounds"]["bound_reasons"]
+    assert "canonical_omitted_results" not in retrieval["bounds"]
     assert any(
         str(row.get("symbol") or "").rsplit(".", 1)[-1] == "paths_under"
         for row in supplements

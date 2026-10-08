@@ -190,8 +190,9 @@ class PostChangeMixin(ChangeImpactMixin):
         if not context["valid"]:
             reasons.extend(str(reason) for reason in context["reasons"])
         packet_identity = previous_evidence.get("evidence_packet_identity")
+        packet_schema = str(previous_evidence.get("schema") or "")
         expected_packet_identity = "sha256:" + self._packet_digest(
-            operation_schema("task_evidence"),
+            packet_schema,
             {
                 key: value
                 for key, value in previous_evidence.items()
@@ -350,9 +351,10 @@ class PostChangeMixin(ChangeImpactMixin):
             raise ValueError("token_budget must be >= 1")
         if not isinstance(previous_evidence, dict) or previous_evidence.get(
             "schema"
-        ) != operation_schema("task_evidence"):
+        ) not in {"hashmarks.task-evidence.v4", operation_schema("task_evidence")}:
             raise ValueError(
-                f"previous_evidence must be a {operation_schema('task_evidence')} packet"
+                "previous_evidence must be a hashmarks.task-evidence.v4 "
+                f"or {operation_schema('task_evidence')} packet"
             )
         normalized = tuple(
             dict.fromkeys(

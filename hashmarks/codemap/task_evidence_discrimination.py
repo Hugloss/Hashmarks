@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 STRUCTURAL_SELECTION_BASIS = "unique-complete-structural-owner"
-FALLBACK_SELECTION_BASIS = "ambiguity-candidate-order"
 
 
 def _ambiguity_payload(
@@ -59,18 +58,6 @@ def _structural_candidate(
     )
 
 
-def _fallback_candidate(
-    ambiguity: Mapping[str, object],
-) -> Mapping[str, object] | None:
-    candidates = ambiguity.get("candidates")
-    if not isinstance(candidates, list):
-        return None
-    return next(
-        (row for row in candidates if isinstance(row, Mapping) and row.get("path")),
-        None,
-    )
-
-
 def select_task_evidence_discrimination_candidate(
     action: Mapping[str, object],
 ) -> tuple[Mapping[str, object], Mapping[str, object], str] | None:
@@ -82,8 +69,4 @@ def select_task_evidence_discrimination_candidate(
     structural = _structural_candidate(action, ambiguity)
     if structural is not None:
         return ambiguity, structural, STRUCTURAL_SELECTION_BASIS
-
-    fallback = _fallback_candidate(ambiguity)
-    if fallback is None:
-        return None
-    return ambiguity, fallback, FALLBACK_SELECTION_BASIS
+    return None
