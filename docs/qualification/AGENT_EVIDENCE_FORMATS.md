@@ -79,6 +79,49 @@ grade the answer. The external harness must persist its own native trace,
 host delivery evidence and answer oracle. Treat any equivalence result as a
 reproducibility check, not a causal explanation or a format winner.
 
+## Fixed MCP exposure for format comparisons
+
+Hashmarks now supports optional binding to the explicit MCP tool projections
+introduced by the canonical MCP projection contract. For a controlled
+format-only study, use the `projection` object from
+`hashmarks doctor --mcp --mcp-tool find --mcp-tool task_evidence` as the
+top-level `mcp_projection` in the export manifest. It is normalized to its
+canonical `schema`, `source_contract_identity`, ordered `tools`,
+`instructions`, and `projection_identity` fields. Invalid projections,
+unknown tools, duplicate tools, arbitrary instructions and forged identities
+fail admission. The same projection is frozen into every format arm and its
+`trial_identity`; the tool response itself does not gain experimental
+metadata.
+
+For a projection-bound case, each consumer-supplied host capture also provides:
+
+```json
+{
+  "observed_tools": ["find", "task_evidence"],
+  "observed_contract_identity": "sha256:<contract-digest>",
+  "observed_projection_identity": "sha256:<projection-digest>"
+}
+```
+
+These fields are added to the `model_visible_response` capture envelope
+documented above. A pair enters `capture_equivalent_arms` only if *every*
+variant has both content-equivalent response bytes (according to the study
+axis) **and** an exactly matching observed tool catalog, contract identity,
+and projection identity. Unknown, reordered, omitted or extra observed tools
+cannot masquerade as a controlled format experiment. Content and catalog
+failures are reported separately: `content_mismatches` versus
+`projection_catalog_mismatches`. Missing projection reports leave the
+format pair unqualified; an unprojected legacy manifest reports a null
+projection-equivalent count, not false proof of verified tool exposure.
+
+This is **not** tool-exposure ablation: format comparisons must hold one MCP
+projection constant across every case and arm. Actual ablation with different
+tool catalogs is a distinct experiment in the external harness, which owns
+runtime model execution, assignment, trajectory evidence and correctness.
+Consumer-reported catalogs are not authenticated MCP transcripts. Hashmarks
+checks internal consistency with the frozen experiment, not whether the host
+honestly reported what the model saw.
+
 ## External execution and grades
 
 Use agentsCookbook or another external harness to run held-out prompts against

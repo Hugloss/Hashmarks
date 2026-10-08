@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from hashmarks.codemap.repository_intelligence_query import repository_query_response
+from hashmarks.mcp_contract import mcp_projection_summary
 from scripts.agent_evaluation.agent_evidence_format_study import (
     emit_trials,
     summarize_grades,
@@ -264,3 +265,155 @@ def test_encoding_capture_checks_exact_text_not_only_equivalent_json() -> None:
         _grades(trials), trials=trials, models=["model-x"], captures=captures
     )
     assert summary["capture_equivalent_complete_pairs"] == 0
+
+
+def _projection(names: tuple[str, ...] = ("find",)) -> dict[str, Any]:
+    return mcp_projection_summary(
+        {"contract_identity": "sha256:" + "a" * 64}, names
+    )
+
+
+def _projected_trials(axis: str = "production-response") -> list[dict[str, Any]]:
+    manifest = _manifest()
+    manifest["mcp_projection"] = _projection(("find", "task_evidence"))
+    return emit_trials(manifest, axis=axis)
+
+
+def _projected_capture(trial: dict[str, Any]) -> dict[str, Any]:
+    capture = _host_capture(trial)
+    projection = trial["mcp_projection"]
+    return {
+        **capture,
+        "observed_tools": projection["tools"],
+        "observed_contract_identity": projection["source_contract_identity"],
+        "observed_projection_identity": projection["projection_identity"],
+    }
+
+
+@pytest.mark.parametrize("axis", ["production-response", "encoding-only"])
+def test_projection_is_frozen_in_each_format_arm_without_oracle_leak(axis: str) -> None:
+    manifest = _manifest()
+    manifest["cases"][0]["oracle"] = "private answer"
+    manifest["mcp_projection"] = _projection(("find", "task_evidence"))
+    trials = emit_trials(manifest, axis=axis)
+    assert len(trials) == (4 if axis == "production-response" else 3)
+    assert all(row["mcp_projection"] == manifest["mcp_projection"] for row in trials)
+    assert all(row["trial_identity"] == trial_identity(row) for row in trials)
+    assert all("private answer" not in json.dumps(row) for row in trials)
+    assert len({row["trial_identity"] for row in trials}) == len(trials)
+    assert all("mcp_projection" not in row["tool_response"] for row in trials
+               if isinstance(row["tool_response"], dict))
+    different = copy.deepcopy(trials[0])
+    different["mcp_projection"] = _projection(("task_evidence",))
+    assert trial_identity(different) != trials[0]["trial_identity"]
+
+
+@pytest.mark.parametrize("axis", ["production-response", "encoding-only"])
+def test_model_visible_tool_catalog_qualifies_only_matching_projection(
+    axis: str,
+) -> None:
+    trials = _projected_trials(axis)
+    grades = _grades(trials)
+    captures = [_projected_capture(trial) for trial in trials]
+    result = summarize_grades(
+        grades, trials=trials, models=["model-x"], captures=captures
+    )
+    assert result["capture_equivalent_complete_pairs"] == 1
+    assert result["capture_audit"]["projection_equivalent_captures"] == len(trials)
+    assert result["capture_audit"]["projection_catalog_mismatches"] == []
+    assert result["capture_equivalent_arms"] == result["arms"]
+    altered = copy.deepcopy(captures)
+    altered[0]["observed_tools"] = ["find", "task_evidence", "structural_locality"]
+    rejected = summarize_grades(
+        grades, trials=trials, models=["model-x"], captures=altered
+    )
+    assert rejected["capture_equivalent_complete_pairs"] == 0
+    assert rejected["capture_audit"]["content_equivalent_captures"] == len(trials)
+    assert rejected["capture_audit"]["content_mismatches"] == []
+    assert rejected["capture_audit"]["projection_equivalent_captures"] == len(trials) - 1
+    assert rejected["capture_audit"]["projection_catalog_mismatches"] == [
+        {
+            "case_id": trials[0]["case_id"],
+            "model": "model-x",
+            "variant": trials[0]["variant"],
+        }
+    ]
+
+
+def test_missing_or_foreign_host_projection_never_qualifies_pair() -> None:
+    trials = _projected_trials()
+    grades = _grades(trials)
+    for update in (
+        {"observed_tools": None},
+        {"observed_contract_identity": "sha256:" + "b" * 64},
+        {"observed_projection_identity": "sha256:" + "c" * 64},
+        {"observed_tools": list(reversed(trials[0]["mcp_projection"]["tools"]))},
+    ):
+        captures = [_projected_capture(trial) for trial in trials]
+        captures[0].update(update)
+        result = summarize_grades(
+            grades, trials=trials, models=["model-x"], captures=captures
+        )
+        assert result["capture_equivalent_complete_pairs"] == 0
+        assert result["capture_audit"]["projection_catalog_mismatches"]
+    with pytest.raises(ValueError, match="observed_tools"):
+        captures = [_projected_capture(trial) for trial in trials]
+        captures[0]["observed_tools"] = "find"
+        summarize_grades(grades, trials=trials, models=["model-x"], captures=captures)
+
+
+def test_projection_manifest_rejects_unknown_tools_reordering_and_forgery() -> None:
+    invalid = [
+        {"tools": []},
+        {"tools": ["invented_tool"]},
+        {"tools": ["find", "find"]},
+        {"tools": ["task_evidence", "find"]},
+        {"source_contract_identity": "not-a-sha256"},
+        {"projection_identity": "sha256:wrong"},
+        {"instructions": "consumer override"},
+    ]
+    for changes in invalid:
+        manifest = _manifest()
+        manifest["mcp_projection"] = {**_projection(("find", "task_evidence")), **changes}
+        with pytest.raises(ValueError):
+            emit_trials(manifest)
+    manifest = _manifest()
+    manifest["mcp_projection"] = None
+    with pytest.raises(ValueError, match="must be an object"):
+        emit_trials(manifest)
+
+
+def test_mixed_projection_or_changed_trial_identity_rejected_before_grading() -> None:
+    trials = _projected_trials()
+    tampered = copy.deepcopy(trials)
+    tampered[0]["mcp_projection"]["instructions"] = "overridden"
+    tampered[0]["trial_identity"] = trial_identity(tampered[0])
+    with pytest.raises(ValueError, match="canonical"):
+        summarize_grades([], trials=tampered, models=["model-x"])
+    mixed = copy.deepcopy(trials)
+    mixed[0].pop("mcp_projection")
+    mixed[0]["trial_identity"] = trial_identity(mixed[0])
+    with pytest.raises(ValueError, match="one fixed MCP tool projection"):
+        summarize_grades([], trials=mixed, models=["model-x"])
+    different = copy.deepcopy(trials)
+    different[0]["mcp_projection"] = _projection(("find",))
+    different[0]["trial_identity"] = trial_identity(different[0])
+    with pytest.raises(ValueError, match="one fixed MCP tool projection"):
+        summarize_grades([], trials=different, models=["model-x"])
+
+
+def test_legacy_trial_without_projection_keeps_unqualified_catalog_authority() -> None:
+    trials = emit_trials(_manifest())
+    result = summarize_grades(
+        _grades(trials),
+        trials=trials,
+        models=["model-x"],
+        captures=[_host_capture(trial) for trial in trials],
+    )
+    assert result["capture_equivalent_complete_pairs"] == 1
+    assert result["capture_audit"]["projection_equivalent_captures"] is None
+    assert result["capture_audit"]["projection_catalog_mismatches"] == []
+    assert all(
+        item["projection_equivalent"] is None
+        for item in result["capture_audit"]["capture_digests"]
+    )
