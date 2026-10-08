@@ -1,0 +1,215 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import pytest
+
+from hashmarks import CodeMap
+from hashmarks.codemap.repository_delta import (
+    RepositoryDeltaMixin,
+    RepositoryGenerationBinding,
+)
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+def test_exact_member_occurrences_and_physical_source_shape(tmp_path: Path) -> None:
+    path = tmp_path / "example.py"
+    path.write_bytes(b"def example():\r\n    first = 'needle'\n    return 'needle'\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.source_observation(
+            "example.py", literal="needle", long_line_threshold=10
+        )
+    assert packet["schema"] == "hashmarks.source-observation.v1"
+    assert packet["member"]["state"] == "known-present"
+    assert packet["availability"] == "observed"
+    assert packet["observation_scope"] == "exact-admitted-repository-member"
+    assert packet["observed_match_count"] == 2
+    assert [item["line"] for item in packet["occurrences"]] == [2, 3]
+    assert all(
+        item["occurrence_kind"] == "string-literal" for item in packet["occurrences"]
+    )
+    assert all(
+        item["member_revision"] == packet["member"]["member_revision"]
+        for item in packet["occurrences"]
+    )
+    assert packet["source_shape"]["physical_lines"] == 3
+    assert packet["source_shape"]["lf_terminators"] == 3
+    assert packet["source_shape"]["crlf_terminators"] == 1
+    assert packet["source_shape"]["long_line_count"] >= 1
+    assert packet["completeness"] == "complete"
+    assert packet["truncation"] == "complete"
+    assert packet["negative_evidence"] == "not-admissible"
+
+
+def test_truncated_occurrences_do_not_claim_complete_or_absent(tmp_path: Path) -> None:
+    (tmp_path / "example.py").write_text(
+        "def test():\n    return 'hit hit hit'\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.source_observation("example.py", literal="hit", limit=1)
+        absent = codemap.source_observation("example.py", literal="unseen")
+    assert packet["observed_match_count"] == 3
+    assert len(packet["occurrences"]) == 1
+    assert packet["truncation"] == "truncated"
+    assert packet["completeness"] == "incomplete"
+    assert packet["negative_evidence"] == "not-admissible"
+    assert absent["observed_match_count"] == 0
+    assert absent["completeness"] == "complete"
+    if absent["freshness"] == "current":
+        assert absent["negative_evidence"] == "admissible-within-exact-member"
+    assert absent["observation_scope"] == "exact-admitted-repository-member"
+
+
+def test_python_token_kinds_distinguish_comment_identifier_and_literal(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "example.py").write_text(
+        "def needle():\n    # needle\n    return 'needle'\n",
+        encoding="utf-8",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        rows = codemap.source_observation("example.py", literal="needle")
+    assert [row["occurrence_kind"] for row in rows["occurrences"]] == [
+        "identifier",
+        "comment",
+        "string-literal",
+    ]
+
+
+def test_preflight_coverage_does_not_invent_pruned_member_counts(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "example.py").write_text("x = 1\n", encoding="utf-8")
+    excluded = tmp_path / "node_modules"
+    excluded.mkdir()
+    (excluded / "secret.js").write_text("ignored\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        packet = codemap.index_preflight()
+    coverage = packet["observation_coverage"]
+    assert coverage["scope"] == "discovered-policy-admitted-indexable-members"
+    assert "node_modules" in coverage["known_pruned_directory_classes"]
+    assert coverage["pruned_member_count"] is None
+    assert coverage["repository_wide_completeness"] == "not-claimed"
+    assert coverage["absence_outside_admitted_scope"] == "not-admissible"
+
+
+def test_changed_unreconciled_member_never_returns_old_source_hits(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "example.py"
+    path.write_text("def example(): return 'old'\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.source_observation("example.py", literal="old")
+        path.write_text("def example(): return 'new'\n", encoding="utf-8")
+        after = codemap.source_observation("example.py", literal="old")
+    assert before["observed_match_count"] == 1
+    assert after["availability"] == "unavailable"
+    assert after["member"]["state"] == "unknown"
+    assert after["occurrences"] == []
+    assert after["negative_evidence"] == "not-admissible"
+
+
+def test_denied_and_oversized_members_return_no_source(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text("SECRET=private\n", encoding="utf-8")
+    (tmp_path / "big.py").write_text("x = '" + "y" * 1024 + "'\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        denied = codemap.source_observation(".env", literal="private")
+        oversized = codemap.source_observation("big.py", literal="y", max_bytes=32)
+    assert denied["occurrences"] == []
+    assert denied["source_shape"] is None
+    assert denied["negative_evidence"] == "not-admissible"
+    assert oversized["member"]["reason"] == "source-size-bound"
+    assert oversized["observed_match_count"] is None
+    assert oversized["negative_evidence"] == "not-admissible"
+
+
+def test_binary_invalid_utf8_and_source_shape_are_distinct() -> None:
+    shape = RepositoryDeltaMixin._source_shape(
+        b"\xef\xbb\xbfA\r\n" + b"a" * 30, long_line_threshold=10
+    )
+    assert shape["utf8_bom"] is True
+    assert shape["physical_lines"] == 2
+    assert shape["crlf_terminators"] == 1
+    assert shape["long_line_count"] == 1
+
+
+@pytest.mark.parametrize(
+    ("argument", "value"),
+    [
+        ("literal", ""),
+        ("literal", "line\nbreak"),
+        ("limit", 0),
+        ("max_bytes", 0),
+        ("long_line_threshold", 0),
+    ],
+)
+def test_source_observation_rejects_invalid_bounds(
+    tmp_path: Path, argument: str, value: object
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        with pytest.raises(ValueError):
+            codemap.source_observation("source.py", **{argument: value})
+
+
+def _observation(
+    rows: list[dict[str, object]], *, collection: str = "fresh-complete"
+) -> dict[str, object]:
+    return RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="pyright",
+        binding=RepositoryGenerationBinding(
+            repository_identity="repo:fixture", codemap_generation=5
+        ),
+        diagnostics=rows,
+        outcome="fail",
+        collection_state=collection,
+        scope_paths=["example.py"],
+    )
+
+
+def _diagnostic(line: int, message: str = "undefined") -> dict[str, object]:
+    return {
+        "tool": "pyright",
+        "rule": "reportUndefinedVariable",
+        "path": "example.py",
+        "symbol": "example",
+        "line": line,
+        "column": 3,
+        "message": message,
+    }
+
+
+def test_diagnostic_shift_is_candidate_not_proven_identity() -> None:
+    before = _observation([_diagnostic(4)])
+    after = _observation([_diagnostic(14)], collection="fresh-partial")
+    delta = RepositoryDeltaMixin.diagnostic_observation_delta(
+        before, after, changed_paths=["example.py"]
+    )
+    relocations = delta["diagnostics"]["possible_relocations"]
+    assert len(relocations) == 1
+    assert relocations[0]["state"] == "possible"
+    assert relocations[0]["identity_authority"] is False
+    assert relocations[0]["before_line"] == 4
+    assert relocations[0]["after_line"] == 14
+    assert len(delta["diagnostics"]["added"]) == 1
+    assert len(delta["diagnostics"]["removed"]) == 1
+    assert delta["collection"]["before"]["state"] == "fresh-complete"
+    assert delta["collection"]["after"]["state"] == "fresh-partial"
+
+
+def test_diagnostic_ambiguous_shift_is_not_correlated() -> None:
+    before = _observation([_diagnostic(4), _diagnostic(5)])
+    after = _observation([_diagnostic(14)])
+    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    assert delta["diagnostics"]["possible_relocations"] == []
+
+
+def test_diagnostic_collection_state_is_validated() -> None:
+    with pytest.raises(ValueError, match="collection state"):
+        _observation([_diagnostic(4)], collection="not-a-state")

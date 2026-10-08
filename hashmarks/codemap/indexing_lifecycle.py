@@ -589,6 +589,7 @@ class IndexingLifecycleMixin:
             },
             "estimated_lexical_rows": None,
             "estimated_lexical_rows_reason": "not guessed before parsing",
+            "observation_coverage": self._repository_discovery_coverage(count),
         }
 
     def index_preflight(self) -> dict[str, object]:

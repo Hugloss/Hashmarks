@@ -17,6 +17,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 - [`reference/PRODUCT_BOUNDARY.md`](reference/PRODUCT_BOUNDARY.md) — normative feature-admission and ownership contract.
 - [`reference/REPOSITORY_EVIDENCE_BINDINGS.md`](reference/REPOSITORY_EVIDENCE_BINDINGS.md) — repository evidence bindings and change semantics.
 - [`reference/REPOSITORY_DECLARATIONS.md`](reference/REPOSITORY_DECLARATIONS.md) — cross-artifact declaration correspondence, exact evidence, ambiguity, qualified absence, and factual deltas.
+- [`reference/SOURCE_OBSERVATION.md`](reference/SOURCE_OBSERVATION.md) — bounded source occurrences, observable scope, diagnostic correspondence, and source-shape evidence.
 - [`reference/STATE_AND_SEMANTIC_OWNERS.md`](reference/STATE_AND_SEMANTIC_OWNERS.md) — canonical state families, semantic owners, and reuse-before-new-owner rules.
 - [`reference/STRUCTURAL_LOCALITY.md`](reference/STRUCTURAL_LOCALITY.md) — bounded structural-locality evidence for repository symbols.
 

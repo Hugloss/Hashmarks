@@ -63,6 +63,23 @@ The projection reports added, removed, unchanged, and newly added diagnostics in
 Environment identity is optional provenance for externally supplied observations and must not be confused with repository identity.
 
 
+## Exact source and observability evidence
+
+The existing repository member observer additionally exposes bounded, exact
+single-member literal occurrences and physical UTF-8 source shape through
+`CodeMap.source_observation`. Its member revision and stable byte-read authority
+are reused from the canonical member owner; the projection does not create a
+parallel full-text index or claim repository-wide search completeness.
+
+`index_preflight` includes descriptive discovery scope, known pruned directory
+classes and explicit unknown excluded/unreadable member counts. An omitted
+subtree must never be converted into a proven empty subtree.
+
+External diagnostic observations may preserve producer-claimed collection state
+independently from execution outcome. Location-shift candidate correspondence
+is non-authoritative: unchanged diagnostic messages do not prove identical
+source-span identity. See [SOURCE_OBSERVATION.md](SOURCE_OBSERVATION.md).
+
 ## Scope-sensitive freshness
 
 External observations may declare the repository paths they directly observed. Freshness is not automatically destroyed by every repository generation change. When Hashmarks can prove that all changed paths are outside the observation and dependency scope, the observation remains fresh and the reason records that proof.
