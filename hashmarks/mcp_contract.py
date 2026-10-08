@@ -24,6 +24,7 @@ from .operation_contract import (
 )
 
 MCP_CONTRACT_SCHEMA = "hashmarks.mcp-contract.v1"
+MCP_PROJECTION_SCHEMA = "hashmarks.mcp-projection.v1"
 MCP_ERROR_SCHEMA = "hashmarks.mcp-error.v1"
 MCP_ERROR_REASONS = (
     "invalid-request",
@@ -310,6 +311,66 @@ MCP_WORKFLOW_HOST_QUALIFICATION_TOOLS = (
     "post_change",
 )
 _TOOL_BY_NAME = {contract.name: contract for contract in MCP_TOOL_CONTRACTS}
+
+
+def normalize_mcp_tool_names(names: tuple[str, ...] | list[str] | None) -> tuple[str, ...]:
+    """Return one canonical-order tool projection or the complete MCP surface."""
+
+    if names is None:
+        return MCP_TOOL_NAMES
+    requested = tuple(str(name) for name in names)
+    if not requested:
+        raise ValueError("MCP tool projection must expose at least one tool")
+    if len(set(requested)) != len(requested):
+        raise ValueError("MCP tool projection contains duplicate tools")
+    unknown = sorted(set(requested) - set(MCP_TOOL_NAMES))
+    if unknown:
+        raise ValueError(
+            "unknown Hashmarks MCP projection tool(s): " + ", ".join(unknown)
+        )
+    selected = set(requested)
+    return tuple(name for name in MCP_TOOL_NAMES if name in selected)
+
+
+def mcp_projection_instructions(names: tuple[str, ...] | list[str] | None) -> str:
+    selected = normalize_mcp_tool_names(names)
+    if selected == MCP_TOOL_NAMES:
+        return MCP_SERVER_INSTRUCTIONS
+    return (
+        "Hashmarks read-only MCP tool projection derived from the canonical "
+        "repository-intelligence contract. Available tools: "
+        + ", ".join(selected)
+        + ". Use only advertised tools; unavailable Hashmarks tools are intentionally "
+        "withheld by the caller's experiment. Hashmarks remains descriptive repository "
+        "intelligence and does not replace editing, shell, tests, or git."
+    )
+
+
+def mcp_projection_summary(
+    canonical_summary: dict[str, object],
+    names: tuple[str, ...] | list[str],
+) -> dict[str, object]:
+    selected = normalize_mcp_tool_names(names)
+    contract_identity = canonical_summary.get("contract_identity")
+    if not isinstance(contract_identity, str):
+        raise ValueError("canonical MCP contract identity is unavailable")
+    instructions = mcp_projection_instructions(selected)
+    payload = {
+        "schema": MCP_PROJECTION_SCHEMA,
+        "source_contract_identity": contract_identity,
+        "tools": list(selected),
+        "instructions": instructions,
+    }
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return {
+        **payload,
+        "projection_identity": "sha256:" + hashlib.sha256(encoded).hexdigest(),
+    }
 
 
 def tool_contract(name: str) -> McpToolContract:
