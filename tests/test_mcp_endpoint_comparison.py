@@ -53,6 +53,9 @@ def test_structural_comparison_preserves_incomparability(tmp_path: Path) -> None
         assert projection["groups"][0]["findings"][0]["kind"] == (
             "structural_endpoints_incomparable"
         )
+        row = projection["groups"][0]["findings"][0]
+        assert row["source_refs"] == ["/incomparability_reasons"]
+        assert row["details"] == result["incomparability_reasons"]
         assert all(
             row["assertion"] != "observed_change"
             for group in projection["groups"]
@@ -163,3 +166,24 @@ def test_comparison_contract_is_mode_specific_and_read_only() -> None:
     assert contract.validate_response(correct, result_mode="diagnostics") == correct
     with pytest.raises(RuntimeError, match="response schema drift"):
         contract.validate_response(correct, result_mode="structural")
+
+
+def test_comparable_structural_measurement_retains_exact_source_reference() -> None:
+    packet = {
+        "schema": operation_schema("evidence_comparison", "structural"),
+        "comparable": True,
+        "incomparability_reasons": [],
+        "introduced_symbol_ids": ["src/owner.py::renamed"],
+        "removed_symbol_ids": [],
+        "verification_paths_added": [],
+        "verification_paths_removed": [],
+        "dimension_delta": {"static_callers": 2},
+    }
+    projection = present_repository_evidence(packet, format="structured")
+    rows = [
+        row for group in projection["groups"] for row in group["findings"]
+    ]
+    measurement = next(row for row in rows if row["kind"] == "dimension_delta")
+    assert measurement["source_refs"] == ["/dimension_delta"]
+    assert measurement["details"] == {"static_callers": 2}
+    assert measurement["assertion"] == "observed_change"

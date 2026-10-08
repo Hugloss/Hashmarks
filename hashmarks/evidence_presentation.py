@@ -982,10 +982,7 @@ def _structural_comparison(
         p.add(
             "qualification",
             "structural_endpoints_incomparable",
-            {
-                "reasons": packet.get("incomparability_reasons"),
-                "comparable": False,
-            },
+            packet.get("incomparability_reasons"),
             (*ref, "incomparability_reasons"),
             ctx,
         )
@@ -1006,7 +1003,15 @@ def _structural_comparison(
             assertion="observed_change",
             shape="values",
         )
-    p.field(packet, "dimension_delta", "evidence_measurement", ref, ctx, shape="keyed")
+    if "dimension_delta" in packet:
+        p.add(
+            "evidence_measurement",
+            "dimension_delta",
+            packet["dimension_delta"],
+            (*ref, "dimension_delta"),
+            ctx,
+            assertion="observed_change",
+        )
     p.account(packet, ref, {})
 
 
