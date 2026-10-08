@@ -4,7 +4,11 @@ import json
 import tomllib
 from pathlib import Path
 
-from hashmarks.mcp_launch import installed_mcp_command, mcp_server_args, source_mcp_command
+from hashmarks.mcp_launch import (
+    installed_mcp_command,
+    mcp_server_args,
+    source_mcp_command,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
