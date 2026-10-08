@@ -136,6 +136,21 @@ def _diagnostic_context_reason(
     return None
 
 
+def _source_lineage_reason(
+    before_source: Mapping[str, object],
+    after_source: Mapping[str, object],
+) -> str | None:
+    prior = cast("Mapping[str, object]", before_source["member"])
+    later = cast("Mapping[str, object]", after_source["member"])
+    if prior.get("path") != later.get("path"):
+        return "different-source-path"
+    if prior["member_revision"] == later["member_revision"]:
+        return "identical-member-revision"
+    if before_source.get("generation") == after_source.get("generation"):
+        return "source-change-not-generation-bound"
+    return None
+
+
 def _source_pair_reason(
     before_diagnostic: Mapping[str, object],
     after_diagnostic: Mapping[str, object],
@@ -149,17 +164,15 @@ def _source_pair_reason(
         reason = _source_endpoint_reason(diagnostic, source)
         if reason is not None:
             return reason
-    prior = cast("Mapping[str, object]", before_source["member"])
-    later = cast("Mapping[str, object]", after_source["member"])
-    if prior.get("path") != later.get("path"):
-        return "different-source-path"
-    if prior["member_revision"] == later["member_revision"]:
-        return "identical-member-revision"
+    reason = _source_lineage_reason(before_source, after_source)
+    if reason is not None:
+        return reason
     reason = _diagnostic_context_reason(before_diagnostic, after_diagnostic)
     if reason is not None:
         return reason
     for diagnostic in (before_diagnostic, after_diagnostic):
-        reason = _diagnostic_scope_reason(diagnostic, prior["path"])
+        member = cast("Mapping[str, object]", before_source["member"])
+        reason = _diagnostic_scope_reason(diagnostic, member["path"])
         if reason is not None:
             return reason
     return None

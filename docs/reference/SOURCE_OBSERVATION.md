@@ -172,7 +172,7 @@ The optional projection describes `supported` source-line correspondences
 separately from `unresolved` candidate reasons. It requires both source packets
 to have complete line evidence, matching diagnostic generations, stable
 revision-verified member bytes (never `stale`), different canonical member
-revisions, the same admitted path, the same nonblank
+revisions from distinct admitted CodeMap generations, the same admitted path, the same nonblank
 producer/repository/environment identity, eligible diagnostic
 collection states, and explicit diagnostic scopes containing the source path.
 

@@ -219,3 +219,31 @@ def test_mismatched_source_generation_never_supports_correspondence(
     )["diagnostics"]["source_correspondence"]
     assert result["supported"] == []
     assert result["unresolved"][0]["reason"] == "missing-canonical-member"
+
+
+def test_same_generation_unadmitted_source_change_cannot_prove_movement() -> None:
+    from hashmarks.codemap.source_line_correspondence import _source_pair_reason
+
+    before = _diagnostics(5, 2)
+    after = _diagnostics(5, 3)
+    source_before = {
+        "schema": "hashmarks.source-observation.v1",
+        "availability": "observed",
+        "freshness": "unknown",
+        "line_coverage": "complete",
+        "completeness": "complete",
+        "observation_identity": "sha256:fixture",
+        "generation": 5,
+        "member": {
+            "path": "src.py",
+            "state": "known-present",
+            "member_revision": "first",
+        },
+    }
+    source_after = {
+        **source_before,
+        "member": {**source_before["member"], "member_revision": "second"},
+    }
+    assert _source_pair_reason(
+        before, after, source_before, source_after
+    ) == "source-change-not-generation-bound"
