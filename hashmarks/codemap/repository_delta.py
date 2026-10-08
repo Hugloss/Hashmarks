@@ -419,6 +419,35 @@ class RepositoryDeltaMixin:
             "basis": "stable-canonical-member-bytes",
         }
 
+
+    @staticmethod
+    def _python_source_token_kinds(
+        text: str, path: str
+    ) -> dict[int, list[tuple[int, int, str]]]:
+        """Classify exact lexical tokens without guessing semantic ownership."""
+        if not path.endswith((".py", ".pyi")):
+            return {}
+        import io
+        import tokenize
+
+        kinds: dict[int, list[tuple[int, int, str]]] = {}
+        names = {
+            tokenize.NAME: "identifier",
+            tokenize.STRING: "string-literal",
+            tokenize.COMMENT: "comment",
+        }
+        try:
+            for token in tokenize.generate_tokens(io.StringIO(text).readline):
+                kind = names.get(token.type)
+                if kind is None or token.start[0] != token.end[0]:
+                    continue
+                kinds.setdefault(token.start[0], []).append(
+                    (token.start[1], token.end[1], kind)
+                )
+        except (tokenize.TokenError, IndentationError, SyntaxError):
+            return {}
+        return kinds
+
     @staticmethod
     def _source_occurrences(
         text: str,
@@ -428,6 +457,7 @@ class RepositoryDeltaMixin:
         revision: str,
         limit: int,
         symbols: Sequence[Mapping[str, object]],
+        token_kinds: Mapping[int, Sequence[tuple[int, int, str]]],
     ) -> tuple[list[dict[str, object]], int]:
         """Bound returned locations, not the count over the admitted member."""
         hits: list[dict[str, object]] = []
@@ -452,7 +482,20 @@ class RepositoryDeltaMixin:
                         ),
                         default=None,
                     )
+                    occurrence_kind = next(
+                        (
+                            kind
+                            for start, end, kind in token_kinds.get(line_number, ())
+                            if start <= column and column + len(literal) <= end
+                        ),
+                        "unknown",
+                    )
                     fact = {
+                        "occurrence_kind": occurrence_kind,
+                        "kind_basis": (
+                            "python-tokenizer"
+                            if occurrence_kind != "unknown" else "unknown"
+                        ),
                         "path": path,
                         "member_revision": revision,
                         "line": line_number,
@@ -569,7 +612,11 @@ class RepositoryDeltaMixin:
             hits, count = self._source_occurrences(
                 text, literal, path=str(member["path"]),
                 revision=str(member["member_revision"]),
-                limit=limit, symbols=symbols,
+                limit=limit,
+                symbols=symbols,
+                token_kinds=self._python_source_token_kinds(
+                    text, str(member["path"])
+                ),
             )
             for hit in hits:
                 hit["evidence_identity"] = self._evidence_identity(
