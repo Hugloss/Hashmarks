@@ -47,7 +47,6 @@ def trial_identity(trial: dict[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
-
 def _case(case: object, seen: set[str]) -> tuple[str, str, dict[str, Any]]:
     if not isinstance(case, dict):
         raise ValueError("each case must be an object")
@@ -175,7 +174,9 @@ def _expected_trials(
     axes: set[str] = set()
     for trial in trials:
         case, variant, axis = _trial_key(trial)
-        if "trial_identity" in trial and trial["trial_identity"] != trial_identity(trial):
+        if "trial_identity" in trial and trial["trial_identity"] != trial_identity(
+            trial
+        ):
             raise ValueError("trial identity mismatch")
         if variant in expected[case]:
             raise ValueError("duplicate expected trial")
@@ -239,7 +240,6 @@ def _arm(variant: str, complete: list[dict[str, dict[str, Any]]]) -> dict[str, o
     return result
 
 
-
 def _capture_equivalent(trial: dict[str, Any], visible: str) -> bool:
     """Content comparison, never proof of what the external model actually saw."""
     if trial["study_axis"] == "encoding-only":
@@ -251,6 +251,35 @@ def _capture_equivalent(trial: dict[str, Any], visible: str) -> bool:
     return parsed == trial["tool_response"]
 
 
+def _validate_host_capture(
+    capture: object,
+    trial_by_key: dict[tuple[str, str], dict[str, Any]],
+    models: list[str],
+) -> tuple[tuple[str, str, str], dict[str, Any], str]:
+    if not isinstance(capture, dict):
+        raise ValueError("each host capture must be an object")
+    case, model, variant = (
+        capture.get("case_id"),
+        capture.get("model"),
+        capture.get("variant"),
+    )
+    if not all(isinstance(v, str) and v for v in (case, model, variant)):
+        raise ValueError("host captures require case_id, model and variant")
+    if model not in models or (case, variant) not in trial_by_key:
+        raise ValueError("unexpected host capture")
+    trial = trial_by_key[case, variant]
+    if not isinstance(capture.get("trial_identity"), str) or capture[
+        "trial_identity"
+    ] != trial_identity(trial):
+        raise ValueError("host capture trial identity mismatch")
+    visible = capture.get("model_visible_response")
+    if not isinstance(visible, str):
+        raise ValueError("model_visible_response must be a string")
+    if len(visible.encode("utf-8")) > _MAX_VISIBLE_CAPTURE_BYTES:
+        raise ValueError("model_visible_response exceeds capture byte limit")
+    return (case, model, variant), trial, visible
+
+
 def _capture_audit(
     captures: list[dict[str, Any]],
     *,
@@ -258,42 +287,20 @@ def _capture_audit(
     models: list[str],
 ) -> tuple[dict[str, object], set[tuple[str, str, str]]]:
     """Bind caller-supplied host captures to frozen trials; no host authentication."""
-    trial_by_key = {
-        (row["case_id"], row["variant"]): row for row in trials
-    }
+    trial_by_key = {(row["case_id"], row["variant"]): row for row in trials}
     observations: dict[tuple[str, str, str], bool] = {}
     mismatches: list[dict[str, str]] = []
     for capture in captures:
-        if not isinstance(capture, dict):
-            raise ValueError("each host capture must be an object")
-        case, model, variant = (
-            capture.get("case_id"),
-            capture.get("model"),
-            capture.get("variant"),
+        key, trial, visible = _validate_host_capture(
+            capture, trial_by_key, models
         )
-        if not all(isinstance(v, str) and v for v in (case, model, variant)):
-            raise ValueError("host captures require case_id, model and variant")
-        key = (case, model, variant)
-        if model not in models or (case, variant) not in trial_by_key:
-            raise ValueError("unexpected host capture")
         if key in observations:
             raise ValueError("duplicate host capture")
-        trial = trial_by_key[case, variant]
-        if (
-            not isinstance(capture.get("trial_identity"), str)
-            or capture["trial_identity"] != trial_identity(trial)
-        ):
-            raise ValueError("host capture trial identity mismatch")
-        visible = capture.get("model_visible_response")
-        if not isinstance(visible, str):
-            raise ValueError("model_visible_response must be a string")
-        if len(visible.encode("utf-8")) > _MAX_VISIBLE_CAPTURE_BYTES:
-            raise ValueError("model_visible_response exceeds capture byte limit")
         equivalent = _capture_equivalent(trial, visible)
         observations[key] = equivalent
         if not equivalent:
             mismatches.append(
-                {"case_id": case, "model": model, "variant": variant}
+                {"case_id": key[0], "model": key[1], "variant": key[2]}
             )
     verified = {key for key, valid in observations.items() if valid}
     return (
@@ -313,6 +320,25 @@ def _capture_audit(
         },
         verified,
     )
+
+
+def _capture_subset(
+    captures: list[dict[str, Any]],
+    trials: list[dict[str, Any]],
+    models: list[str],
+    pairs: dict[tuple[str, str], dict[str, dict[str, Any]]],
+    expected: dict[str, set[str]],
+    complete_keys: list[tuple[str, str]],
+) -> tuple[dict[str, object], list[dict[str, dict[str, Any]]], list[dict[str, str]]]:
+    report, equivalent = _capture_audit(captures, trials=trials, models=models)
+    captured_pairs: list[dict[str, dict[str, Any]]] = []
+    unqualified: list[dict[str, str]] = []
+    for case, model in complete_keys:
+        if all((case, model, variant) in equivalent for variant in expected[case]):
+            captured_pairs.append(pairs[case, model])
+        else:
+            unqualified.append({"case_id": case, "model": model})
+    return report, captured_pairs, unqualified
 
 
 def summarize_grades(
@@ -352,14 +378,9 @@ def summarize_grades(
     captured_pairs: list[dict[str, dict[str, Any]]] = []
     unqualified: list[dict[str, str]] = []
     if captures is not None:
-        capture_report, equivalent = _capture_audit(
-            captures, trials=trials, models=models
+        capture_report, captured_pairs, unqualified = _capture_subset(
+            captures, trials, models, pairs, expected, complete_keys
         )
-        for case, model in complete_keys:
-            if all((case, model, variant) in equivalent for variant in expected[case]):
-                captured_pairs.append(pairs[case, model])
-            else:
-                unqualified.append({"case_id": case, "model": model})
     return {
         "schema": "hashmarks.agent-evidence-format-study.v1",
         "study_axis": trials[0]["study_axis"],

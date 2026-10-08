@@ -203,7 +203,11 @@ def test_capture_equivalence_requires_same_frozen_trial_and_actual_content(
     assert rejected["capture_equivalent_complete_pairs"] == 0
     assert rejected["capture_equivalent_arms"][0]["paired_runs"] == 0
     assert rejected["capture_audit"]["content_mismatches"] == [
-        {"case_id": trials[0]["case_id"], "model": "model-x", "variant": trials[0]["variant"]}
+        {
+            "case_id": trials[0]["case_id"],
+            "model": "model-x",
+            "variant": trials[0]["variant"],
+        }
     ]
 
 
