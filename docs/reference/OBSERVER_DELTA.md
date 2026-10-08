@@ -89,6 +89,18 @@ Partial member coverage, read-budget exhaustion, result truncation and stale
 revisions have distinct representations; absence is qualified only within
 the complete explicit member set. See [SOURCE_OBSERVATION.md](SOURCE_OBSERVATION.md).
 
+## Diagnostic delta collection qualification
+
+A raw removed identity means absent from the *supplied after observation*,
+not necessarily absent from the repository or fixed. The diagnostic delta
+now also includes `diagnostics.qualification`, partitioning changed row
+identities by whether producer-claimed completeness, outcome, shared
+repository/producer/environment binding and explicit overlapping path scope
+permit a bounded presence/absence comparison. Partial or timed-out observations
+never silently certify disappearance. This is a projection over existing
+external observations, not an execution check, workflow authority, or
+diagnostic identity replacement.
+
 ## Scope-sensitive freshness
 
 External observations may declare the repository paths they directly observed. Freshness is not automatically destroyed by every repository generation change. When Hashmarks can prove that all changed paths are outside the observation and dependency scope, the observation remains fresh and the reason records that proof.
