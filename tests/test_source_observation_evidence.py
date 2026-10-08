@@ -213,3 +213,149 @@ def test_diagnostic_ambiguous_shift_is_not_correlated() -> None:
 def test_diagnostic_collection_state_is_validated() -> None:
     with pytest.raises(ValueError, match="collection state"):
         _observation([_diagnostic(4)], collection="not-a-state")
+
+
+def test_scoped_occurrences_have_exact_member_provenance_and_stable_order(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "alpha.py").write_text("needle = 1\n", encoding="utf-8")
+    (tmp_path / "beta.py").write_text(
+        "def needle():\n    return 'needle'\n", encoding="utf-8"
+    )
+    (tmp_path / "unrelated.py").write_text("needle = 3\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.scoped_source_occurrences(
+            ["beta.py", "alpha.py", "alpha.py"], "needle"
+        )
+    assert packet["schema"] == "hashmarks.scoped-source-occurrences.v1"
+    assert packet["paths"] == ["alpha.py", "beta.py"]
+    assert packet["observation_scope"] == "explicit-member-set-only"
+    assert packet["member_count"] == 2
+    assert packet["source_coverage"] == "complete"
+    assert packet["observed_match_count"] == 3
+    assert packet["exact_match_count"] == 3
+    assert packet["completeness"] == "complete"
+    assert [row["path"] for row in packet["occurrences"]] == [
+        "alpha.py",
+        "beta.py",
+        "beta.py",
+    ]
+    revisions = {
+        row["path"]: row["member_revision"]
+        for row in packet["member_observations"]
+    }
+    assert all(
+        row["evidence_identity"].startswith("sha256:")
+        and row["member_revision"] == revisions[row["path"]]
+        for row in packet["occurrences"]
+    )
+    assert packet["observed_source_bytes"] > 0
+    assert packet["negative_evidence"] == "not-admissible"
+
+
+def test_scoped_absence_never_becomes_repository_wide_absence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "inside.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "outside.py").write_text("needle = 1\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.scoped_source_occurrences(["inside.py"], "needle")
+    assert packet["observed_match_count"] == 0
+    assert packet["exact_match_count"] == 0
+    assert packet["source_coverage"] == "complete"
+    assert packet["observation_scope"] == "explicit-member-set-only"
+    if packet["freshness"] == "current":
+        assert packet["negative_evidence"] == "admissible-within-explicit-member-set"
+
+
+def test_scoped_result_limit_does_not_change_exact_observed_counts(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.py").write_text("x = 'hit hit hit'\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("y = 'hit hit'\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.scoped_source_occurrences(["a.py", "b.py"], "hit", limit=1)
+    assert len(packet["occurrences"]) == 1
+    assert packet["observed_match_count"] == 5
+    assert packet["exact_match_count"] == 5
+    assert packet["source_coverage"] == "complete"
+    assert packet["truncation"] == "truncated"
+    assert packet["completeness"] == "incomplete"
+    assert packet["negative_evidence"] == "not-admissible"
+
+
+def test_scoped_visibility_and_pruning_keep_coverage_unknown(tmp_path: Path) -> None:
+    (tmp_path / "safe.py").write_text("needle = 1\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("needle=secret\n", encoding="utf-8")
+    nested = tmp_path / "node_modules"
+    nested.mkdir()
+    (nested / "hidden.py").write_text("needle=hidden\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.scoped_source_occurrences(
+            ["safe.py", ".env", "node_modules/hidden.py"], "needle"
+        )
+    assert packet["observed_match_count"] == 1
+    assert packet["exact_match_count"] is None
+    assert packet["source_coverage"] == "unknown"
+    assert packet["completeness"] == "unknown"
+    assert packet["negative_evidence"] == "not-admissible"
+    denied = {row["path"]: row for row in packet["member_observations"]}
+    assert denied[".env"]["availability"] == "unavailable"
+    assert denied["node_modules/hidden.py"]["availability"] == "unavailable"
+
+
+def test_scoped_total_byte_budget_fails_closed_without_reading_next_member(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.py").write_text("x = 'hit'\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("y = 'hit'\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        packet = codemap.scoped_source_occurrences(
+            ["a.py", "b.py"], "hit", max_total_bytes=10
+        )
+    assert packet["observed_source_bytes"] == 10
+    assert packet["observed_match_count"] == 1
+    assert packet["exact_match_count"] is None
+    assert packet["member_observations"][1]["reason"] == "scope-byte-budget-exhausted"
+    assert packet["source_coverage"] == "unknown"
+    assert packet["negative_evidence"] == "not-admissible"
+
+
+def test_scoped_member_edit_fails_closed_before_reindex(tmp_path: Path) -> None:
+    source = tmp_path / "changed.py"
+    source.write_text("x = 'old'\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        before = codemap.scoped_source_occurrences(["changed.py"], "old")
+        source.write_text("x = 'new'\n", encoding="utf-8")
+        after = codemap.scoped_source_occurrences(["changed.py"], "old")
+    assert before["exact_match_count"] == 1
+    assert after["exact_match_count"] is None
+    assert after["source_coverage"] == "unknown"
+    assert after["negative_evidence"] == "not-admissible"
+
+
+@pytest.mark.parametrize("paths", [[], ["../outside.py"], ["x.py"] * 33])
+def test_scoped_source_rejects_invalid_scope_before_observation(
+    tmp_path: Path, paths: list[str]
+) -> None:
+    with CodeMap(tmp_path) as codemap:
+        with pytest.raises(ValueError):
+            codemap.scoped_source_occurrences(paths, "needle")
+
+
+def test_scoped_scope_identity_is_stable_across_request_order(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.py").write_text("needle = 1\n", encoding="utf-8")
+    (tmp_path / "b.py").write_text("needle = 2\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        first = codemap.scoped_source_occurrences(["b.py", "a.py"], "needle")
+        second = codemap.scoped_source_occurrences(["a.py", "b.py"], "needle")
+    assert first["observation_identity"] == second["observation_identity"]
