@@ -1095,15 +1095,17 @@ class RepositoryDeltaMixin:
         current_scope = after.get("scope_paths")
         before_paths = set(prior_scope) if isinstance(prior_scope, list) else set()
         after_paths = set(current_scope) if isinstance(current_scope, list) else set()
-        same_context = bool(
-            before.get("producer")
-            and before.get("producer") == after.get("producer")
-            and before.get("repository_identity")
-            and before.get("repository_identity") == after.get("repository_identity")
-            and before.get("environment_identity")
-            and before.get("environment_identity") == after.get("environment_identity")
-            and before.get("outcome") in {"pass", "fail"}
-            and after.get("outcome") in {"pass", "fail"}
+        same_context = all(
+            (
+                before.get("producer"),
+                before.get("producer") == after.get("producer"),
+                before.get("repository_identity"),
+                before.get("repository_identity") == after.get("repository_identity"),
+                before.get("environment_identity"),
+                before.get("environment_identity") == after.get("environment_identity"),
+                before.get("outcome") in {"pass", "fail"},
+                after.get("outcome") in {"pass", "fail"},
+            )
         )
         qualified_added = sorted(
             str(row["identity"])
