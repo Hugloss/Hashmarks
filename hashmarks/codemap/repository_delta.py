@@ -750,11 +750,13 @@ class RepositoryDeltaMixin:
             )
             scope_complete = scope_complete and observed
             member_fresh = member_fresh and packet.get("freshness") == "current"
+            selected = (
+                deepcopy(packet["occurrences"])[: max(0, limit - len(matches))]
+                if observed else []
+            )
             if observed:
                 observed_count += int(count)
-                matches.extend(
-                    deepcopy(packet["occurrences"])[:max(0, limit - len(matches))]
-                )
+                matches.extend(selected)
             member = packet["member"]
             members.append({
                 "path": path,
@@ -763,10 +765,7 @@ class RepositoryDeltaMixin:
                 "member_revision": member.get("member_revision"),
                 "availability": packet["availability"],
                 "observed_match_count": count,
-                "returned_occurrence_count": (
-                    min(len(packet["occurrences"]), max(0, limit))
-                    if observed else 0
-                ),
+                "returned_occurrence_count": len(selected),
             })
         generation, identity_generation, stale = self._generation_status()
         freshness = (
