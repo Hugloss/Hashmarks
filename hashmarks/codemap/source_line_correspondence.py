@@ -47,20 +47,29 @@ def source_line_anchors(
     for line in requested:
         if line > len(physical) or not physical[line - 1].strip():
             coverage = "unknown"
-            rows.append({"line": line, "state": "unknown",
-                         "reason": "line-unavailable-or-blank"})
+            rows.append(
+                {
+                    "line": line,
+                    "state": "unknown",
+                    "reason": "line-unavailable-or-blank",
+                }
+            )
             continue
         content = physical[line - 1]
-        rows.append({
-            "line": line,
-            "state": "observed",
-            "path": member["path"],
-            "member_revision": member["member_revision"],
-            "line_sha256": sha256(b"hashmarks.source-line.v1\0" + content).hexdigest(),
-            "matching_physical_lines": counts[content],
-            "line_bytes": len(content),
-            "basis": "exact-physical-line-bytes",
-        })
+        rows.append(
+            {
+                "line": line,
+                "state": "observed",
+                "path": member["path"],
+                "member_revision": member["member_revision"],
+                "line_sha256": sha256(
+                    b"hashmarks.source-line.v1\0" + content
+                ).hexdigest(),
+                "matching_physical_lines": counts[content],
+                "line_bytes": len(content),
+                "basis": "exact-physical-line-bytes",
+            }
+        )
     return rows, coverage
 
 
@@ -106,8 +115,9 @@ def _diagnostic_context_reason(
     before: Mapping[str, object], after: Mapping[str, object]
 ) -> str | None:
     required = ("repository_identity", "producer", "environment_identity")
-    if any(not before.get(key) or before.get(key) != after.get(key)
-           for key in required):
+    if any(
+        not before.get(key) or before.get(key) != after.get(key) for key in required
+    ):
         return "diagnostic-context-changed"
     return None
 
@@ -196,19 +206,17 @@ def _candidate_anchor_reason(
         return "source-line-anchor-unavailable"
     for anchor, source in ((previous, before_source), (current, after_source)):
         member = cast("Mapping[str, object]", source["member"])
-        if (
-            anchor.get("member_revision") != member.get("member_revision")
-            or anchor.get("path") != member.get("path")
-        ):
+        if anchor.get("member_revision") != member.get("member_revision") or anchor.get(
+            "path"
+        ) != member.get("path"):
             return "source-anchor-binding-mismatch"
     if (
         previous.get("matching_physical_lines") != 1
         or current.get("matching_physical_lines") != 1
     ):
         return "source-line-not-unique"
-    if (
-        previous.get("line_sha256") != current.get("line_sha256")
-        or not previous.get("line_sha256")
+    if previous.get("line_sha256") != current.get("line_sha256") or not previous.get(
+        "line_sha256"
     ):
         return "source-line-bytes-changed"
     return None
