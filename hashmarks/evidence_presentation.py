@@ -294,6 +294,29 @@ def _present_groups(
     return groups
 
 
+def _text_view(groups: list[dict[str, object]]) -> str:
+    """Keep assertion, kind and bounded locator visible in the text rendering."""
+    lines: list[str] = []
+    for group in groups:
+        lines.append(
+            f"{group['family']}: {group['count_observed_in_packet']} observed "
+            f"({group['omitted_from_presentation']} omitted from presentation)"
+        )
+        for item in group["findings"]:
+            if isinstance(item, Mapping):
+                locator = (
+                    item.get("path")
+                    or item.get("component_id")
+                    or item.get("name")
+                    or ""
+                )
+                lines.append(
+                    f"  [{item.get('assertion')}] {item.get('kind')} {locator}".rstrip()
+                )
+    return "\n".join(lines)
+
+
+
 def present_repository_evidence(
     packet: Mapping[str, object], *, format: str = "compact"
 ) -> dict[str, object]:
@@ -323,9 +346,7 @@ def present_repository_evidence(
         "execution_effect": "none",
     }
     if format == "text":
-        result["text"] = "\n".join(
-            f"{group['family']}: {group['count_observed_in_packet']} observed "
-            f"({group['omitted_from_presentation']} omitted from presentation)"
-            for group in groups
-        ) or ("No supported findings" if supported else "Unsupported evidence schema")
+        result["text"] = _text_view(groups) or (
+            "No supported findings" if supported else "Unsupported evidence schema"
+        )
     return result

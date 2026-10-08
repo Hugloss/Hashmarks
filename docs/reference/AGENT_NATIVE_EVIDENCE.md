@@ -40,6 +40,12 @@ snapshot identity and payloads are unchanged.
   occurrence evidence with native freshness, limits, and uncertainty.
 * `structural_locality`: existing bounded exact-symbol structural and
   caller evidence, including unresolved references.
+* `repository_evidence`: existing exact evidence bindings and qualified
+  changed-path coverage with independent observation/coverage modes.
+* `repository_findings`: existing bounded import, cache and concurrency facts.
+
+The paired-format export and externally graded comparison are described in
+[Format qualification](../qualification/AGENT_EVIDENCE_FORMATS.md).
 
 MCP is a transport. It must obtain schemas from
 `hashmarks.operation_contract` and validate returned core schemas.

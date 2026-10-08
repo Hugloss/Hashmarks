@@ -495,6 +495,36 @@ class HashmarksMcpSurface:
 
         return self._read(project)
 
+    def _repository_binding_observation(
+        self, request: dict[str, Any]
+    ) -> dict[str, object]:
+        fields = {"bindings", "dependency_paths", "include_relationships"}
+        if set(request) - fields:
+            raise ValueError("unsupported evidence observation request fields")
+        bindings = request.get("bindings")
+        if not isinstance(bindings, list):
+            raise ValueError("bindings must be a list")
+        return self._map.repository_evidence_bindings(
+            bindings,
+            dependency_paths=request.get("dependency_paths"),
+            include_relationships=request.get("include_relationships", True),
+        )
+
+    def _repository_binding_coverage(
+        self, request: dict[str, Any]
+    ) -> dict[str, object]:
+        fields = {"bindings_packet", "changed_paths", "change_set_complete"}
+        if set(request) - fields:
+            raise ValueError("unsupported evidence coverage request fields")
+        packet = request.get("bindings_packet")
+        if not isinstance(packet, dict):
+            raise ValueError("bindings_packet must be an object")
+        return self._map.repository_evidence_coverage(
+            packet,
+            changed_paths=request.get("changed_paths"),
+            change_set_complete=request.get("change_set_complete"),
+        )
+
     def repository_evidence(
         self,
         request: dict[str, Any],
@@ -510,33 +540,11 @@ class HashmarksMcpSurface:
         def project() -> dict[str, object]:
             try:
                 self._map.sync()
-                if result_mode == "observation":
-                    bindings = request.get("bindings")
-                    if not isinstance(bindings, list):
-                        raise ValueError("bindings must be a list")
-                    extra = set(request) - {
-                        "bindings", "dependency_paths", "include_relationships"
-                    }
-                    if extra:
-                        raise ValueError("unsupported evidence observation request fields")
-                    return self._map.repository_evidence_bindings(
-                        bindings,
-                        dependency_paths=request.get("dependency_paths"),
-                        include_relationships=request.get("include_relationships", True),
-                    )
-                extra = set(request) - {
-                    "bindings_packet", "changed_paths", "change_set_complete"
+                producers = {
+                    "observation": self._repository_binding_observation,
+                    "coverage": self._repository_binding_coverage,
                 }
-                if extra:
-                    raise ValueError("unsupported evidence coverage request fields")
-                packet = request.get("bindings_packet")
-                if not isinstance(packet, dict):
-                    raise ValueError("bindings_packet must be an object")
-                return self._map.repository_evidence_coverage(
-                    packet,
-                    changed_paths=request.get("changed_paths"),
-                    change_set_complete=request.get("change_set_complete"),
-                )
+                return producers[result_mode](request)
             except ValueError as exc:
                 raise _surface_value_error(exc) from exc
 
