@@ -101,6 +101,17 @@ never silently certify disappearance. This is a projection over existing
 external observations, not an execution check, workflow authority, or
 diagnostic identity replacement.
 
+## Source-backed location correspondence
+
+The member observer may emit bounded exact physical-line fingerprints for
+explicit requested lines. The existing diagnostic delta can compare
+caller-retained before/after canonical member observations to distinguish
+a **unique preserved source line** from message-only possible relocation.
+Proof is deliberately restricted to byte-identical unique lines, consistent
+columns, exact member revisions, generation/source freshness, collection and
+scope provenance. It never upgrades diagnostic identity, masks raw changes,
+or creates source-history ownership. See [SOURCE_OBSERVATION.md](SOURCE_OBSERVATION.md).
+
 ## Scope-sensitive freshness
 
 External observations may declare the repository paths they directly observed. Freshness is not automatically destroyed by every repository generation change. When Hashmarks can prove that all changed paths are outside the observation and dependency scope, the observation remains fresh and the reason records that proof.
