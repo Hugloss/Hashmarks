@@ -237,7 +237,9 @@ def test_scoped_occurrences_have_exact_member_provenance_and_stable_order(
     assert packet["exact_match_count"] == 3
     assert packet["completeness"] == "complete"
     assert [row["path"] for row in packet["occurrences"]] == [
-        "alpha.py", "beta.py", "beta.py"
+        "alpha.py",
+        "beta.py",
+        "beta.py",
     ]
     assert all(
         row["evidence_identity"].startswith("sha256:")
@@ -271,9 +273,7 @@ def test_scoped_result_limit_does_not_change_exact_observed_counts(
     (tmp_path / "b.py").write_text("y = 'hit hit'\n", encoding="utf-8")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        packet = codemap.scoped_source_occurrences(
-            ["a.py", "b.py"], "hit", limit=1
-        )
+        packet = codemap.scoped_source_occurrences(["a.py", "b.py"], "hit", limit=1)
     assert len(packet["occurrences"]) == 1
     assert packet["observed_match_count"] == 5
     assert packet["exact_match_count"] == 5
