@@ -540,6 +540,8 @@ class RepositoryDeltaMixin:
         self, relpath: str, max_bytes: int
     ) -> tuple[dict[str, object], bytes | None]:
         """Enforce the source budget while reusing canonical member authority."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         candidate = self._repository_member_source(relpath)
         if isinstance(candidate, dict):
             return candidate, None
@@ -568,6 +570,8 @@ class RepositoryDeltaMixin:
         self, packet: dict[str, object], raw: bytes
     ) -> None:
         """Complete a qualified single-member observation from the same byte capture."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         limit = cast("dict[str, int]", packet["limits"])["results"]
         member = cast("dict[str, object]", packet["member"])
         literal = cast("str | None", packet["literal_query"])
@@ -624,6 +628,8 @@ class RepositoryDeltaMixin:
         long_line_threshold: int = 2_000,
     ) -> dict[str, object]:
         """Describe one stable source member, with no repository-wide absence claim."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
         self._validate_source_observation(
             literal, limit, max_bytes, long_line_threshold
         )
