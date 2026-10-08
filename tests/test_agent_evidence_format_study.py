@@ -268,9 +268,7 @@ def test_encoding_capture_checks_exact_text_not_only_equivalent_json() -> None:
 
 
 def _projection(names: tuple[str, ...] = ("find",)) -> dict[str, Any]:
-    return mcp_projection_summary(
-        {"contract_identity": "sha256:" + "a" * 64}, names
-    )
+    return mcp_projection_summary({"contract_identity": "sha256:" + "a" * 64}, names)
 
 
 def _projected_trials(axis: str = "production-response") -> list[dict[str, Any]]:
@@ -301,8 +299,11 @@ def test_projection_is_frozen_in_each_format_arm_without_oracle_leak(axis: str) 
     assert all(row["trial_identity"] == trial_identity(row) for row in trials)
     assert all("private answer" not in json.dumps(row) for row in trials)
     assert len({row["trial_identity"] for row in trials}) == len(trials)
-    assert all("mcp_projection" not in row["tool_response"] for row in trials
-               if isinstance(row["tool_response"], dict))
+    assert all(
+        "mcp_projection" not in row["tool_response"]
+        for row in trials
+        if isinstance(row["tool_response"], dict)
+    )
     different = copy.deepcopy(trials[0])
     different["mcp_projection"] = _projection(("task_evidence",))
     assert trial_identity(different) != trials[0]["trial_identity"]
@@ -330,7 +331,9 @@ def test_model_visible_tool_catalog_qualifies_only_matching_projection(
     assert rejected["capture_equivalent_complete_pairs"] == 0
     assert rejected["capture_audit"]["content_equivalent_captures"] == len(trials)
     assert rejected["capture_audit"]["content_mismatches"] == []
-    assert rejected["capture_audit"]["projection_equivalent_captures"] == len(trials) - 1
+    assert (
+        rejected["capture_audit"]["projection_equivalent_captures"] == len(trials) - 1
+    )
     assert rejected["capture_audit"]["projection_catalog_mismatches"] == [
         {
             "case_id": trials[0]["case_id"],
@@ -374,7 +377,10 @@ def test_projection_manifest_rejects_unknown_tools_reordering_and_forgery() -> N
     ]
     for changes in invalid:
         manifest = _manifest()
-        manifest["mcp_projection"] = {**_projection(("find", "task_evidence")), **changes}
+        manifest["mcp_projection"] = {
+            **_projection(("find", "task_evidence")),
+            **changes,
+        }
         with pytest.raises(ValueError):
             emit_trials(manifest)
     manifest = _manifest()
