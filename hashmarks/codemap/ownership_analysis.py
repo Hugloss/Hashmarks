@@ -8,12 +8,11 @@ from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 from hashmarks.python_ast_cache import read_python_ast
 
-from .cache_invalidation import analyze_python_cache_invalidators
-from .cache_ownership import analyze_python_cache_ownership
-from .concurrency_risk import analyze_python_concurrency_risk
 from .decision_session import decision_scoped
-from .import_ownership import analyze_python_import_ownership
-from .repository_domains import RepositoryDomain, classify_repository_path
+from .ownership.cache_invalidation import CacheInvalidationAnalyzer
+from .ownership.cache_ownership import CacheOwnershipAnalyzer
+from .ownership.concurrency_risk import ConcurrencyRiskAnalyzer
+from .ownership.import_ownership import ImportOwnershipAnalyzer
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -28,9 +27,8 @@ class OwnershipAnalysisMixin:
         """Make requested paths current, then snapshot repository rows once.
 
         The returned rows are request-local composition input, not persistent cache
-        state.  Making explicit paths current before materializing rows preserves the
-        lazy-refresh contract while allowing composed ownership analyses to reuse one
-        repository snapshot.
+        state. Making explicit paths current before materializing rows preserves the
+        lazy-refresh contract while allowing composed analyses to reuse one snapshot.
         """
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
@@ -44,80 +42,8 @@ class OwnershipAnalysisMixin:
                 self._ensure_path_current(rel)
                 current.append(rel)
             normalized = tuple(current)
+
         return normalized, self.store.all_file_rows()
-
-    def _import_ownership_findings(
-        self,
-        paths: tuple[str, ...] | None,
-        all_rows: Sequence[dict[str, object]],
-    ) -> dict[str, object]:
-        """Report repository-owned Python loaders that bypass normal module identity.
-
-        This is repository-intelligence evidence only: it never imports, executes,
-        rewrites, or certifies repository code.
-        """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        repository_paths = {str(row["path"]) for row in all_rows}
-        python_paths = {
-            str(row["path"])
-            for row in all_rows
-            if str(row.get("language") or "") == "python"
-        }
-        if paths is not None:
-            candidates = []
-            for rel in paths:
-                if rel in python_paths or (self.workspace / rel).suffix in {
-                    ".py",
-                    ".pyi",
-                }:
-                    candidates.append(rel)
-        else:
-            # Use persisted lexical knowledge only to shortlist files; AST owns the
-            # finding, so lexical matches are nomination rather than authority.
-            rows = self.store.lexical_file_candidates(
-                ["spec_from_file_location", "module_from_spec", "exec_module"],
-                limit=max(256, min(10_000, len(python_paths) or 256)),
-            )
-            candidates = [
-                str(row["path"])
-                for row in rows
-                if str(row.get("language") or "") == "python"
-            ]
-
-        findings: list[dict[str, object]] = []
-        for rel in sorted(set(candidates)):
-            self._ensure_path_current(rel)
-            source_path = self.workspace / rel
-            try:
-                snapshot = read_python_ast(source_path, errors="replace")
-            except (OSError, UnicodeError, SyntaxError, ValueError):
-                continue
-            findings.extend(
-                finding.as_dict()
-                for finding in analyze_python_import_ownership(
-                    path=rel,
-                    source=snapshot.source,
-                    repository_paths=repository_paths,
-                    tree=snapshot.tree,
-                )
-            )
-        generation, identity_generation, stale = self._generation_status()
-        warnings = sum(1 for finding in findings if finding["severity"] == "warning")
-        advisories = len(findings) - warnings
-        return {
-            "schema": operation_schema("import_ownership"),
-            "generation": generation,
-            "identity_generation": identity_generation,
-            "stale": stale,
-            "summary": {
-                "files_considered": len(set(candidates)),
-                "findings": len(findings),
-                "warnings": warnings,
-                "advisories": advisories,
-            },
-            "findings": findings,
-        }
 
     @operation_response("import_ownership")
     @decision_scoped
@@ -128,7 +54,8 @@ class OwnershipAnalysisMixin:
             self = cast("CodeMap", self)
         self._ensure_map_ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
-        return self._import_ownership_findings(normalized, all_rows)
+        result = ImportOwnershipAnalyzer().analyze(self, normalized, all_rows)
+        return cast(dict[str, object], result)
 
     @staticmethod
     def _repository_finding_from_import(
@@ -188,7 +115,9 @@ class OwnershipAnalysisMixin:
         """Attach interpretation state without erasing analyzer observations."""
         evidence = finding.get("evidence")
         counter_evidence: list[dict[str, object]] = []
-        if isinstance(evidence, dict) and bool(evidence.get("guarded")):
+        if isinstance(evidence, dict) and bool(
+            cast("dict[str, object]", evidence).get("guarded")
+        ):
             counter_evidence.append(
                 {
                     "kind": "visible-guard",
@@ -219,16 +148,18 @@ class OwnershipAnalysisMixin:
             self = cast("CodeMap", self)
         self._ensure_map_ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
-        import_result = self._import_ownership_findings(normalized, all_rows)
+        import_result = ImportOwnershipAnalyzer().analyze(self, normalized, all_rows)
         repository_import_result = (
             import_result
             if normalized is None
-            else self._import_ownership_findings(None, all_rows)
+            else ImportOwnershipAnalyzer().analyze(self, None, all_rows)
         )
-        cache_result = self._cache_ownership_findings(
-            normalized, all_rows, repository_import_result
+        cache_result = CacheOwnershipAnalyzer().analyze(
+            self, normalized, all_rows, import_result=repository_import_result
         )
-        concurrency_result = self._concurrency_risk_findings(normalized, all_rows)
+        concurrency_result = ConcurrencyRiskAnalyzer().analyze(
+            self, normalized, all_rows
+        )
 
         findings = [
             *(
@@ -288,72 +219,6 @@ class OwnershipAnalysisMixin:
             ),
         }
 
-    def _concurrency_risk_findings(
-        self,
-        paths: tuple[str, ...] | None,
-        all_rows: Sequence[dict[str, object]],
-    ) -> dict[str, object]:
-        """Nominate lexical read-modify-write sequences; never claims runtime races as proven."""
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        python_paths = {
-            str(row["path"])
-            for row in all_rows
-            if str(row.get("language") or "") == "python"
-        }
-        if paths is None:
-            rows = self.store.lexical_file_candidates(
-                [
-                    "read",
-                    "get",
-                    "generation",
-                    "write",
-                    "set",
-                    "update",
-                    "commit",
-                    "execute",
-                ],
-                limit=max(256, min(10_000, len(python_paths) or 256)),
-            )
-            candidates = [
-                str(row["path"])
-                for row in rows
-                if str(row.get("language") or "") == "python"
-                and RepositoryDomain.TEST
-                not in set(classify_repository_path(str(row["path"])))
-            ]
-        else:
-            candidates = []
-            for rel in paths:
-                if rel in python_paths:
-                    candidates.append(rel)
-        findings = []
-        for rel in sorted(set(candidates)):
-            try:
-                snapshot = read_python_ast(self.workspace / rel, errors="replace")
-            except (OSError, UnicodeError, SyntaxError, ValueError):
-                continue
-            findings.extend(
-                x.as_dict()
-                for x in analyze_python_concurrency_risk(
-                    path=rel, source=snapshot.source, tree=snapshot.tree
-                )
-            )
-        generation, identity_generation, stale = self._generation_status()
-        return {
-            "schema": operation_schema("concurrency_risk"),
-            "generation": generation,
-            "identity_generation": identity_generation,
-            "stale": stale,
-            "summary": {
-                "files_considered": len(set(candidates)),
-                "sequences": len(findings),
-                "unguarded": sum(1 for x in findings if not x["guarded"]),
-            },
-            "findings": findings,
-            "boundary": "static risk nomination only; concurrency admission/execution remains external",
-        }
-
     @operation_response("concurrency_risk")
     @decision_scoped
     def concurrency_risk_findings(
@@ -363,7 +228,8 @@ class OwnershipAnalysisMixin:
             self = cast("CodeMap", self)
         self._ensure_map_ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
-        return self._concurrency_risk_findings(normalized, all_rows)
+        result = ConcurrencyRiskAnalyzer().analyze(self, normalized, all_rows)
+        return cast(dict[str, object], result)
 
     def _python_module_for_path(self, path: str) -> str | None:
         if TYPE_CHECKING:
@@ -603,26 +469,28 @@ class OwnershipAnalysisMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         normalized, all_rows = self._ownership_analysis_inputs(paths)
-        import_result = self._import_ownership_findings(normalized, all_rows)
+        import_result = ImportOwnershipAnalyzer().analyze(self, normalized, all_rows)
         repository_import_result = (
             import_result
             if normalized is None
-            else self._import_ownership_findings(None, all_rows)
+            else ImportOwnershipAnalyzer().analyze(self, None, all_rows)
         )
-        cache_result = self._cache_ownership_findings(
-            normalized, all_rows, repository_import_result
+        cache_result = CacheOwnershipAnalyzer().analyze(
+            self, normalized, all_rows, import_result=repository_import_result
         )
         repository_cache_result = (
             cache_result
             if normalized is None
-            else self._cache_ownership_findings(
-                None, all_rows, repository_import_result
+            else CacheOwnershipAnalyzer().analyze(
+                self, None, all_rows, import_result=repository_import_result
             )
         )
-        invalidation_result = self._cache_invalidation_ownership_graph(
-            normalized, all_rows, repository_cache_result
+        invalidation_result = CacheInvalidationAnalyzer().analyze(
+            self, normalized, all_rows, cache_result=repository_cache_result
         )
-        concurrency_result = self._concurrency_risk_findings(normalized, all_rows)
+        concurrency_result = ConcurrencyRiskAnalyzer().analyze(
+            self, normalized, all_rows
+        )
         return import_result, cache_result, invalidation_result, concurrency_result
 
     @operation_response("repository_ownership")
@@ -679,168 +547,6 @@ class OwnershipAnalysisMixin:
             "boundary": "repository-evidence-only; no execution/admission/certification authority",
         }
 
-    def _cache_owner_modules(
-        self, cache_result: dict[str, object]
-    ) -> tuple[list[dict[str, object]], dict[tuple[str, str], str]]:
-        owners: list[dict[str, object]] = []
-        owner_ids: dict[tuple[str, str], str] = {}
-        for owner in cache_result["owners"]:
-            path = str(owner["path"])
-            module = self._python_module_for_path(path)
-            if not module:
-                continue
-            enriched = dict(owner)
-            enriched["module"] = module
-            owners.append(enriched)
-            owner_ids[(module, str(owner["owner"]))] = f"cache:{path}:{owner['owner']}"
-        return owners, owner_ids
-
-    def _python_candidates(
-        self,
-        paths: tuple[str, ...] | None,
-        all_rows: Sequence[dict[str, object]],
-    ) -> list[str]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        python_paths = {
-            str(row["path"])
-            for row in all_rows
-            if str(row.get("language") or "") == "python"
-        }
-        if paths is None:
-            return sorted(python_paths)
-        candidates: list[str] = []
-        for rel in paths:
-            if rel in python_paths or (self.workspace / rel).suffix in {".py", ".pyi"}:
-                candidates.append(rel)
-        return sorted(set(candidates))
-
-    def _cache_invalidator_findings(
-        self, candidates: list[str], owners: list[dict[str, object]]
-    ) -> list[dict[str, object]]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        findings: list[dict[str, object]] = []
-        for rel in candidates:
-            module = self._python_module_for_path(rel)
-            if not module:
-                continue
-            path_obj = PurePosixPath(rel)
-            current_package = (
-                module
-                if path_obj.stem == "__init__"
-                else (module.rsplit(".", 1)[0] if "." in module else None)
-            )
-            try:
-                snapshot = read_python_ast(self.workspace / rel, errors="replace")
-            except (OSError, UnicodeError, SyntaxError, ValueError):
-                continue
-            findings.extend(
-                item.as_dict()
-                for item in analyze_python_cache_invalidators(
-                    path=rel,
-                    source=snapshot.source,
-                    current_module=module,
-                    current_package=current_package,
-                    cache_owners=owners,
-                    tree=snapshot.tree,
-                )
-            )
-        return findings
-
-    @staticmethod
-    def _cache_owner_nodes(owners, owner_ids) -> dict[str, dict[str, object]]:
-        nodes: dict[str, dict[str, object]] = {}
-        for owner in owners:
-            cid = owner_ids[(str(owner["module"]), str(owner["owner"]))]
-            nodes[cid] = {
-                "id": cid,
-                "kind": "cache",
-                "path": owner["path"],
-                "module": owner["module"],
-                "owner": owner["owner"],
-                "scope": owner["scope"],
-                "invalidation": owner["invalidation"],
-            }
-        return nodes
-
-    @staticmethod
-    def _cache_invalidation_edges(
-        findings, owner_ids, nodes
-    ) -> tuple[list[dict[str, object]], set[str]]:
-        edges: list[dict[str, object]] = []
-        invalidated: set[str] = set()
-        for finding in findings:
-            source_id = f"invalidator:{finding['path']}:{finding['invalidator']}"
-            target_id = owner_ids.get(
-                (str(finding["target_module"]), str(finding["target_owner"]))
-            )
-            if target_id is None:
-                continue
-            nodes.setdefault(
-                source_id,
-                {
-                    "id": source_id,
-                    "kind": "invalidator",
-                    "path": finding["path"],
-                    "owner": finding["invalidator"],
-                },
-            )
-            edges.append(
-                {
-                    "source": source_id,
-                    "target": target_id,
-                    "relation": "invalidates-cache",
-                    "method": finding["method"],
-                    "confidence": finding["confidence"],
-                    "line": finding["line"],
-                }
-            )
-            invalidated.add(target_id)
-        return edges, invalidated
-
-    def _cache_invalidation_ownership_graph(
-        self,
-        paths: tuple[str, ...] | None,
-        all_rows: Sequence[dict[str, object]],
-        cache_result: dict[str, object],
-    ) -> dict[str, object]:
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        owners, owner_ids = self._cache_owner_modules(cache_result)
-        candidates = self._python_candidates(paths, all_rows)
-        findings = self._cache_invalidator_findings(candidates, owners)
-        nodes = self._cache_owner_nodes(owners, owner_ids)
-        edges, invalidated = self._cache_invalidation_edges(findings, owner_ids, nodes)
-        unresolved = sorted(cid for cid in owner_ids.values() if cid not in invalidated)
-        generation, identity_generation, stale = self._generation_status()
-        return {
-            "schema": operation_schema("cache_invalidation_ownership"),
-            "generation": generation,
-            "identity_generation": identity_generation,
-            "stale": stale,
-            "summary": {
-                "files_considered": len(candidates),
-                "cache_owners": len(owners),
-                "invalidators": sum(
-                    1 for node in nodes.values() if node.get("kind") == "invalidator"
-                ),
-                "invalidation_edges": len(edges),
-                "owners_without_resolved_invalidator": len(unresolved),
-            },
-            "nodes": sorted(nodes.values(), key=lambda node: str(node["id"])),
-            "edges": sorted(
-                edges,
-                key=lambda edge: (
-                    str(edge["source"]),
-                    str(edge["target"]),
-                    int(edge["line"]),
-                ),
-            ),
-            "unresolved_cache_owners": unresolved,
-            "boundary": "repository-evidence-only; cache mutation/execution authority remains external",
-        }
-
     @operation_response("cache_invalidation_ownership")
     @decision_scoped
     def cache_invalidation_ownership_graph(
@@ -851,103 +557,14 @@ class OwnershipAnalysisMixin:
             self = cast("CodeMap", self)
         self._ensure_map_ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
-        import_result = self._import_ownership_findings(normalized, all_rows)
-        repository_import_result = (
-            import_result
-            if normalized is None
-            else self._import_ownership_findings(None, all_rows)
+        import_result = ImportOwnershipAnalyzer().analyze(self, None, all_rows)
+        repository_cache_result = CacheOwnershipAnalyzer().analyze(
+            self, None, all_rows, import_result=import_result
         )
-        repository_cache_result = self._cache_ownership_findings(
-            None, all_rows, repository_import_result
+        result = CacheInvalidationAnalyzer().analyze(
+            self, normalized, all_rows, cache_result=repository_cache_result
         )
-        return self._cache_invalidation_ownership_graph(
-            normalized, all_rows, repository_cache_result
-        )
-
-    def _cache_ownership_findings(
-        self,
-        paths: tuple[str, ...] | None,
-        all_rows: Sequence[dict[str, object]],
-        import_result: dict[str, object],
-    ) -> dict[str, object]:
-        """Map process-local Python cache owners and invalidation evidence.
-
-        Repository intelligence only: never imports, executes, clears, or rewrites cache state.
-        """
-        if TYPE_CHECKING:
-            self = cast("CodeMap", self)
-        python_paths = {
-            str(row["path"])
-            for row in all_rows
-            if str(row.get("language") or "") == "python"
-        }
-        if paths is None:
-            rows = self.store.lexical_file_candidates(
-                [
-                    "cache",
-                    "memo",
-                    "registry",
-                    "singleton",
-                    "pool",
-                    "lru_cache",
-                    "cached_property",
-                ],
-                limit=max(256, min(10_000, len(python_paths) or 256)),
-            )
-            candidates = [
-                str(row["path"])
-                for row in rows
-                if str(row.get("language") or "") == "python"
-            ]
-        else:
-            candidates = []
-            for rel in paths:
-                if rel in python_paths or (self.workspace / rel).suffix in {
-                    ".py",
-                    ".pyi",
-                }:
-                    candidates.append(rel)
-        risky_targets = {
-            str(f["target_path"])
-            for f in import_result["findings"]
-            if f.get("target_path")
-            and f.get("code")
-            in {
-                "python-dynamic-module-identity-bypass",
-                "python-duplicate-module-identity",
-            }
-        }
-        findings: list[dict[str, object]] = []
-        for rel in sorted(set(candidates)):
-            try:
-                snapshot = read_python_ast(self.workspace / rel, errors="replace")
-            except (OSError, UnicodeError, SyntaxError, ValueError):
-                continue
-            findings.extend(
-                item.as_dict()
-                for item in analyze_python_cache_ownership(
-                    path=rel,
-                    source=snapshot.source,
-                    import_risk_targets=risky_targets,
-                    tree=snapshot.tree,
-                )
-            )
-        generation, identity_generation, stale = self._generation_status()
-        risky = sum(1 for f in findings if f["import_identity_risk"])
-        unresolved = sum(1 for f in findings if f["invalidation"] == "not-proven")
-        return {
-            "schema": operation_schema("cache_ownership"),
-            "generation": generation,
-            "identity_generation": identity_generation,
-            "stale": stale,
-            "summary": {
-                "files_considered": len(set(candidates)),
-                "owners": len(findings),
-                "import_identity_risks": risky,
-                "invalidation_not_proven": unresolved,
-            },
-            "owners": findings,
-        }
+        return cast(dict[str, object], result)
 
     @operation_response("cache_ownership")
     @decision_scoped
@@ -958,5 +575,8 @@ class OwnershipAnalysisMixin:
             self = cast("CodeMap", self)
         self._ensure_map_ready()
         normalized, all_rows = self._ownership_analysis_inputs(paths)
-        import_result = self._import_ownership_findings(None, all_rows)
-        return self._cache_ownership_findings(normalized, all_rows, import_result)
+        import_result = ImportOwnershipAnalyzer().analyze(self, None, all_rows)
+        result = CacheOwnershipAnalyzer().analyze(
+            self, normalized, all_rows, import_result=import_result
+        )
+        return cast(dict[str, object], result)

@@ -46,7 +46,7 @@ def index_surface_for_path(path: str) -> str:
     if (
         lower.startswith(("tests/", "test/"))
         or "/tests/" in lower
-        or name.startswith("test_")
+        or (name.startswith("test_") and "src" not in parts)
         or name.endswith((".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx"))
     ):
         return "test"
