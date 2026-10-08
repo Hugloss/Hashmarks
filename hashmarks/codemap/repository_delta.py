@@ -64,13 +64,13 @@ class _ScopedSourceAggregation:
         if isinstance(shape, Mapping):
             self.consumed_bytes += int(shape.get("bytes") or 0)
         count = packet.get("observed_match_count")
-        observed = packet.get("availability") == "observed" and isinstance(
-            count, int
-        )
+        observed = packet.get("availability") == "observed" and isinstance(count, int)
         self.complete = self.complete and observed
         self.members_fresh = self.members_fresh and packet.get("freshness") == "current"
         selected = (
-            deepcopy(packet["occurrences"])[: max(0, self.limit - len(self.occurrences))]
+            deepcopy(packet["occurrences"])[
+                : max(0, self.limit - len(self.occurrences))
+            ]
             if observed
             else []
         )
@@ -768,8 +768,11 @@ class RepositoryDeltaMixin:
         )
         truncated = batch.match_count > len(batch.occurrences)
         completeness = (
-            "unknown" if not coverage_complete
-            else "incomplete" if truncated else "complete"
+            "unknown"
+            if not coverage_complete
+            else "incomplete"
+            if truncated
+            else "complete"
         )
         result: dict[str, object] = {
             "schema": "hashmarks.scoped-source-occurrences.v1",
@@ -789,11 +792,14 @@ class RepositoryDeltaMixin:
             "truncation": (
                 "truncated"
                 if truncated
-                else "complete" if coverage_complete else "unknown"
+                else "complete"
+                if coverage_complete
+                else "unknown"
             ),
             "negative_evidence": (
                 "admissible-within-explicit-member-set"
-                if coverage_complete and batch.match_count == 0
+                if coverage_complete
+                and batch.match_count == 0
                 and freshness == "current"
                 else "not-admissible"
             ),
@@ -840,9 +846,9 @@ class RepositoryDeltaMixin:
         if literal is None:
             raise ValueError("scoped source observations require a literal")
         batch = _ScopedSourceAggregation(
-            paths=sorted({
-                normalize_relative_path(path, allow_root=False) for path in paths
-            }),
+            paths=sorted(
+                {normalize_relative_path(path, allow_root=False) for path in paths}
+            ),
             literal=literal,
             limit=limit,
             max_total_bytes=max_total_bytes,
