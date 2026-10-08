@@ -886,7 +886,9 @@ class RepositoryDeltaMixin:
         """Canonical diagnostic identity independent of aggregate count/order."""
         return diagnostic_identity(row)
 
-    diagnostic_source_revision_evidence = staticmethod(diagnostic_source_revision_evidence)
+    diagnostic_source_revision_evidence = staticmethod(
+        diagnostic_source_revision_evidence
+    )
 
     @staticmethod
     def external_diagnostic_observation(  # noqa: PLR0913 - additive producer fields
