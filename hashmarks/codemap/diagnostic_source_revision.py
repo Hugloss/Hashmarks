@@ -17,6 +17,7 @@ from hashmarks.paths import normalize_relative_path
 
 _FILE_REVISION = re.compile(r"[0-9a-f]{64}\Z")
 _MAX_MEMBERS = 32
+EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA = "hashmarks.external-diagnostic-observation.v1"
 
 
 def diagnostic_identity(row: Mapping[str, object]) -> str:
@@ -115,8 +116,6 @@ def _member_comparison(
 def diagnostic_source_revision_evidence(
     diagnostic: Mapping[str, object],
     source_observations: Sequence[Mapping[str, object]],
-    *,
-    diagnostic_schema: str,
 ) -> dict[str, object]:
     """Compare claimed source revisions with explicitly retained member evidence.
 
@@ -124,7 +123,7 @@ def diagnostic_source_revision_evidence(
     caller-supplied source observation. It cannot prove an LSP executed against
     those bytes, or that verification is valid for the repository as a whole.
     """
-    if diagnostic.get("schema") != diagnostic_schema:
+    if diagnostic.get("schema") != EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA:
         raise ValueError("unsupported diagnostic observation schema")
     if len(source_observations) > _MAX_MEMBERS:
         raise ValueError("source_observations exceeds 32 members")
