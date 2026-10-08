@@ -399,7 +399,6 @@ class RepositoryDeltaMixin:
             }
         return rows
 
-
     @staticmethod
     def _source_shape(raw: bytes, *, long_line_threshold: int) -> dict[str, object]:
         """Measure physical source properties without creating a second file index."""
@@ -555,9 +554,7 @@ class RepositoryDeltaMixin:
                 "state": "unknown",
                 "reason": "source-size-bound",
             }, None
-        member, raw = self._repository_member_observation(
-            relpath, include_bytes=True
-        )
+        member, raw = self._repository_member_observation(relpath, include_bytes=True)
         if raw is not None and len(raw) > max_bytes:
             return {
                 "path": member["path"],
@@ -642,9 +639,7 @@ class RepositoryDeltaMixin:
             "generation": generation,
             "identity_generation": identity_generation,
             "freshness": (
-                "stale"
-                if generation != generation_before
-                else freshness_state(stale)
+                "stale" if generation != generation_before else freshness_state(stale)
             ),
             "observation_scope": "exact-admitted-repository-member",
             "limits": {"max_bytes": max_bytes, "results": limit},
@@ -720,8 +715,12 @@ class RepositoryDeltaMixin:
         if outcome not in allowed_outcomes:
             raise ValueError("unsupported external observation outcome")
         if collection_state is not None and collection_state not in {
-            "fresh-complete", "fresh-partial", "timed-out",
-            "unavailable", "source-mismatch", "unknown",
+            "fresh-complete",
+            "fresh-partial",
+            "timed-out",
+            "unavailable",
+            "source-mismatch",
+            "unknown",
         }:
             raise ValueError("unsupported diagnostic collection state")
         rows = []
@@ -742,7 +741,8 @@ class RepositoryDeltaMixin:
             "diagnostic_count": len(rows),
             "collection": (
                 {"state": collection_state, "authority": "producer-claimed"}
-                if collection_state is not None else None
+                if collection_state is not None
+                else None
             ),
             "authority": "observation-only",
             "execution_effect": "none",
@@ -835,10 +835,9 @@ class RepositoryDeltaMixin:
         added: Sequence[Mapping[str, object]],
     ) -> list[dict[str, object]]:
         """Non-authoritative candidates; never suppress added/removed evidence."""
-        if (
-            before.get("repository_identity") != after.get("repository_identity")
-            or before.get("producer") != after.get("producer")
-        ):
+        if before.get("repository_identity") != after.get(
+            "repository_identity"
+        ) or before.get("producer") != after.get("producer"):
             return []
 
         def facts(row: Mapping[str, object]) -> tuple[object, ...]:
