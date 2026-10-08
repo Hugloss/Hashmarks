@@ -313,7 +313,9 @@ MCP_WORKFLOW_HOST_QUALIFICATION_TOOLS = (
 _TOOL_BY_NAME = {contract.name: contract for contract in MCP_TOOL_CONTRACTS}
 
 
-def normalize_mcp_tool_names(names: tuple[str, ...] | list[str] | None) -> tuple[str, ...]:
+def normalize_mcp_tool_names(
+    names: tuple[str, ...] | list[str] | None,
+) -> tuple[str, ...]:
     """Return one canonical-order tool projection or the complete MCP surface."""
 
     if names is None:
