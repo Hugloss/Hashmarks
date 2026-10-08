@@ -13,10 +13,14 @@ from hashmarks.mcp_contract import (
     MCP_READ_ONLY_ANNOTATIONS,
     MCP_SERVER_INSTRUCTIONS,
     MCP_SERVER_NAME,
+    MCP_PROJECTION_SCHEMA,
     MCP_TOOL_CONTRACTS,
     MCP_TOOL_NAMES,
     McpToolContract,
     contract_summary,
+    mcp_projection_instructions,
+    mcp_projection_summary,
+    normalize_mcp_tool_names,
     qualification_response_schemas,
     qualify_mcp_observation,
     response_schema_for_mode,
@@ -308,3 +312,39 @@ def test_host_schema_expectations_derive_from_canonical_contract() -> None:
         "hashmarks_repository_context": "hashmarks.repository-capsule.v1",
         "hashmarks_find": "hashmarks.find.v2",
     }
+
+
+def test_mcp_tool_projection_is_canonical_order_and_identity_bound() -> None:
+    canonical = {
+        "contract_identity": "sha256:canonical",
+    }
+    assert normalize_mcp_tool_names(["task_evidence", "find"]) == (
+        "find",
+        "task_evidence",
+    )
+    summary = mcp_projection_summary(
+        canonical,
+        ("task_evidence",),
+    )
+    assert summary["schema"] == MCP_PROJECTION_SCHEMA
+    assert summary["source_contract_identity"] == "sha256:canonical"
+    assert summary["tools"] == ["task_evidence"]
+    assert str(summary["projection_identity"]).startswith("sha256:")
+    assert "task_evidence" in str(summary["instructions"])
+    assert "intentionally withheld" in str(summary["instructions"])
+
+    changed = mcp_projection_summary(canonical, ("find",))
+    assert changed["projection_identity"] != summary["projection_identity"]
+
+
+def test_mcp_tool_projection_rejects_empty_duplicate_and_unknown_tools() -> None:
+    with pytest.raises(ValueError, match="at least one"):
+        normalize_mcp_tool_names([])
+    with pytest.raises(ValueError, match="duplicate"):
+        normalize_mcp_tool_names(["find", "find"])
+    with pytest.raises(ValueError, match="unknown"):
+        normalize_mcp_tool_names(["not-a-tool"])
+
+
+def test_full_projection_preserves_canonical_server_instructions() -> None:
+    assert mcp_projection_instructions(MCP_TOOL_NAMES) == MCP_SERVER_INSTRUCTIONS
