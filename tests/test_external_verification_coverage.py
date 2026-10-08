@@ -72,9 +72,7 @@ def test_disjoint_declared_complete_change_set_yields_conditional_current() -> N
     )
 
     assert packet["state"] == "current"
-    assert (
-        packet["reason"] == "declared-complete-change-set-outside-observation-scope"
-    )
+    assert packet["reason"] == "declared-complete-change-set-outside-observation-scope"
     assert packet["change_set_completeness"] == "caller-claimed-complete"
 
 
