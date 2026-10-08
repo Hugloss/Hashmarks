@@ -14,6 +14,11 @@ from hashmarks.codemap.repository_intelligence_query import (
     QUERY_SURFACES,
     RepositoryIntelligenceQueryOptions,
 )
+from hashmarks.codemap.repository_delta import (
+    RepositoryDeltaMixin,
+    RepositoryGenerationBinding,
+)
+from hashmarks.codemap.structural_locality import structural_locality_delta
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
 from hashmarks.evidence_presentation import (
     FORMATS,
@@ -120,6 +125,24 @@ def native_packets(
         )
         observation = codemap.dependency_resolution_evidence(dependency)
         declarations = codemap.repository_declarations([group])
+        locality = codemap.structural_locality("src/owner.py::widget")
+        external = RepositoryDeltaMixin.external_diagnostic_observation(
+            producer="test-diagnostics",
+            binding=RepositoryGenerationBinding("fixture-repository", 1),
+            diagnostics=[
+                {
+                    "tool": "pyright",
+                    "rule": "fixture",
+                    "path": paths[0],
+                    "line": 2,
+                    "message": "fixture diagnostic",
+                }
+            ],
+            outcome="fail",
+            environment_identity="fixture-env",
+            scope_paths=paths,
+            collection_state="fresh-complete",
+        )
         packets = [
             ("repository_context", "default", codemap.orient()),
             ("find", "default", codemap.find_packet("widget")),
@@ -169,7 +192,22 @@ def native_packets(
             (
                 "structural_locality",
                 "default",
-                codemap.structural_locality("src/owner.py::widget"),
+                locality,
+            ),
+            (
+                "evidence_comparison",
+                "structural",
+                structural_locality_delta(locality, locality),
+            ),
+            (
+                "evidence_comparison",
+                "bindings",
+                codemap.repository_evidence_binding_delta(binding, binding),
+            ),
+            (
+                "evidence_comparison",
+                "diagnostics",
+                RepositoryDeltaMixin.diagnostic_observation_delta(external, external),
             ),
         ]
         owner.write_text("import sys\ndef widget(): return 2\n", encoding="utf-8")
@@ -393,7 +431,7 @@ def test_actual_sdk_advertises_all_format_selectors(tmp_path: Path) -> None:
     try:
         tools = asyncio.run(server.list_tools())
         manifest: dict[str, Any] = contract_from_tool_models("test", tuple(tools))
-        assert len(manifest["tools"]) == 13
+        assert len(manifest["tools"]) == 14
         for tool, contract in zip(tools, MCP_TOOL_CONTRACTS, strict=True):
             field = tool.input_schema["properties"]["presentation"]
             assert field["enum"] == list(FORMATS)
@@ -485,6 +523,7 @@ def test_sdk_calls_all_tools_with_native_defaults_and_optional_formats(
         "repository_evidence": {"request": {}},
         "repository_findings": {},
         "structural_locality": {"target": "src/owner.py::widget"},
+        "evidence_comparison": {"before": {}, "after": {}},
     }
 
     def frozen_producer(contract):

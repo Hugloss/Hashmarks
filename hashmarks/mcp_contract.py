@@ -283,20 +283,20 @@ MCP_TOOL_CONTRACTS = (
         "repository_findings",
     ),
     McpToolContract(
-        "evidence_comparison",
-        (
-            "Compare structural, binding, or diagnostic observation endpoints. "
-            "Keep native incomparability and collection uncertainty; never infer fixes."
-        ),
-        "evidence_comparison",
-    ),
-    McpToolContract(
         "structural_locality",
         (
             "Observe bounded static calls, exact callers, unresolved targets, "
             "structural locality and related verifier paths for one exact symbol."
         ),
         "structural_locality",
+    ),
+    McpToolContract(
+        "evidence_comparison",
+        (
+            "Compare structural, binding, or diagnostic observation endpoints. "
+            "Keep native incomparability and collection uncertainty; never infer fixes."
+        ),
+        "evidence_comparison",
     ),
 )
 

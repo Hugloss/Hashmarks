@@ -561,9 +561,12 @@ class HashmarksMcpSurface:
 
     @staticmethod
     def _diagnostic_endpoint(packet: dict[str, Any], *, name: str) -> None:
-        from .codemap.repository_delta import RepositoryDeltaMixin
+        from .codemap.repository_delta import (
+            EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA,
+            RepositoryDeltaMixin,
+        )
 
-        if packet.get("schema") != "hashmarks.external-diagnostic-observation.v1":
+        if packet.get("schema") != EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA:
             raise ValueError(f"{name} must be an external diagnostic observation")
         if not isinstance(packet.get("diagnostics"), list):
             raise ValueError(f"{name} diagnostics must be a list")
