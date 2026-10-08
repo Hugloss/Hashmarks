@@ -14,10 +14,11 @@ from hashmarks import CodeMap
 with CodeMap(".") as codemap:
     codemap.sync()
     observation = codemap.source_observation(
-        "src/example.py", literal="example", limit=50,
+        "src/example.py",
+        literal="example",
+        limit=50,
     )
 ```
-
 
 Schema: `hashmarks.source-observation.v1`.
 
@@ -65,15 +66,20 @@ from hashmarks.codemap.repository_delta import (
 before = RepositoryDeltaMixin.external_diagnostic_observation(
     producer="pyright",
     binding=RepositoryGenerationBinding("repository-id", 7),
-    diagnostics=[{"tool": "pyright", "rule": "E1",
-                  "path": "src/example.py", "line": 10,
-                  "message": "Undefined variable"}],
+    diagnostics=[
+        {
+            "tool": "pyright",
+            "rule": "E1",
+            "path": "src/example.py",
+            "line": 10,
+            "message": "Undefined variable",
+        }
+    ],
     outcome="fail",
     collection_state="fresh-complete",
     scope_paths=["src/example.py"],
 )
 ```
-
 
 The optional `collection_state` field is explicitly **producer-claimed** and is
 not silently upgraded to canonical repository or execution authority. Supported
