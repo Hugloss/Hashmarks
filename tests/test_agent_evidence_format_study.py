@@ -93,6 +93,7 @@ def test_summary_accounts_for_wholly_missing_expected_pairs_and_names_exclusions
     second = copy.deepcopy(trials)
     for row in second:
         row["case_id"] = "missing-case"
+        row["trial_identity"] = trial_identity(row)
     result: dict[str, Any] = summarize_grades(
         _grades(trials), trials=trials + second, models=["model-x", "model-y"]
     )
