@@ -560,9 +560,7 @@ class HashmarksMcpSurface:
         return self._read(project)
 
     @staticmethod
-    def _diagnostic_endpoint(
-        packet: dict[str, Any], *, name: str
-    ) -> None:
+    def _diagnostic_endpoint(packet: dict[str, Any], *, name: str) -> None:
         from .codemap.repository_delta import RepositoryDeltaMixin
 
         if packet.get("schema") != "hashmarks.external-diagnostic-observation.v1":
@@ -614,9 +612,7 @@ class HashmarksMcpSurface:
         before = _bounded_json(
             before, name="before", maximum=524_288, expected_type=dict
         )
-        after = _bounded_json(
-            after, name="after", maximum=524_288, expected_type=dict
-        )
+        after = _bounded_json(after, name="after", maximum=524_288, expected_type=dict)
         if result_mode != "diagnostics" and changed_paths:
             raise McpSurfaceError("changed_paths is only valid for diagnostics mode")
         paths = _changed_paths(changed_paths) if changed_paths else []

@@ -67,19 +67,21 @@ def test_binding_comparison_reuses_current_repository_identity(tmp_path: Path) -
         str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
     )
     try:
-        current = surface.repository_evidence({
-            "bindings": [
-                {
-                    "binding_id": "consumer:scope",
-                    "evidence": [{"scope": "member", "path": "src/owner.py"}],
-                }
-            ],
-            "include_relationships": False,
-        })
-        assert current["schema"] == operation_schema("repository_evidence", "observation")
-        result = surface.evidence_comparison(
-            current, current, result_mode="bindings"
+        current = surface.repository_evidence(
+            {
+                "bindings": [
+                    {
+                        "binding_id": "consumer:scope",
+                        "evidence": [{"scope": "member", "path": "src/owner.py"}],
+                    }
+                ],
+                "include_relationships": False,
+            }
         )
+        assert current["schema"] == operation_schema(
+            "repository_evidence", "observation"
+        )
+        result = surface.evidence_comparison(current, current, result_mode="bindings")
         assert result["schema"] == operation_schema("evidence_comparison", "bindings")
         assert result["bindings"]["preserved"] == ["consumer:scope"]
         assert result["bindings"]["changed"] == []
@@ -108,7 +110,8 @@ def test_incomplete_diagnostics_never_imply_resolution(tmp_path: Path) -> None:
     )
     try:
         delta = surface.evidence_comparison(
-            before, after,
+            before,
+            after,
             result_mode="diagnostics",
             changed_paths=["src/owner.py"],
         )
@@ -131,7 +134,9 @@ def test_incomplete_diagnostics_never_imply_resolution(tmp_path: Path) -> None:
         surface.close()
 
 
-def test_comparison_rejects_unsupported_modes_and_irrelevant_scope(tmp_path: Path) -> None:
+def test_comparison_rejects_unsupported_modes_and_irrelevant_scope(
+    tmp_path: Path,
+) -> None:
     surface = HashmarksMcpSurface(
         str(_repo(tmp_path)), state_dir=str(tmp_path / "state")
     )
