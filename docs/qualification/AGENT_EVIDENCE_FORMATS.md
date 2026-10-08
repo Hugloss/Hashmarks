@@ -35,6 +35,48 @@ uv run --frozen -m scripts.agent_evaluation.agent_evidence_format_study emit \
   --output encoding-trials.jsonl
 ```
 
+## Frozen trial identities and host-capture reconciliation
+
+Every emitted trial has a deterministic `trial_identity` SHA-256 digest of
+its case, variant, prompt, axis, source schema, and exact `tool_response`.
+This is **experimental payload identity**, never repository evidence authority,
+a signed receipt, a host attestation, or evidence of model comprehension.
+Changing a payload after emission invalidates that trial identity.
+
+External harnesses may supply `--captures host-captures.json` when summarizing
+grades. The JSON array contains one record per received variant and model:
+
+```json
+{
+  "case_id": "candidate-not-move",
+  "model": "model-a",
+  "variant": "compact-json",
+  "trial_identity": "sha256:<digest-from-exported-trial>",
+  "model_visible_response": "<exact UTF-8 text handed to the model>"
+}
+```
+
+The model-visible text is recorded by the **consumer harness**, not generated
+by Hashmarks. Missing, duplicated, mismatched or unexpected capture identities
+cannot silently become verified evidence. A capture may be at most 1 MiB in UTF-8.
+For `production-response`, the model-visible text must parse as JSON with
+content equivalent to the exported native response; this is not byte-for-byte
+rendering identity, and host formatting can still affect tokens. For
+`encoding-only`, the entire visible text must match the selected encoding
+exactly (including whitespace and field order). A different string cannot be
+credited as evidence for the claimed encoding.
+
+Results distinguish **all externally graded complete pairs** (`arms`) from
+`capture_equivalent_arms`, whose *every* variant in the pair has an equivalent
+host capture. Missing or differing captures remain explicit. Without
+`--captures`, the capture audit and equivalent-pair count are null, **not
+zero verified pairs**. The audit's authority is
+`consumer-supplied-capture-content-only`: Hashmarks cannot independently
+authenticate the execution host, verify the model actually saw the bytes, or
+grade the answer. The external harness must persist its own native trace,
+host delivery evidence and answer oracle. Treat any equivalence result as a
+reproducibility check, not a causal explanation or a format winner.
+
 ## External execution and grades
 
 Use agentsCookbook or another external harness to run held-out prompts against
@@ -56,7 +98,8 @@ so an entirely missing case or model cannot disappear from the denominator:
 ```bash
 uv run --frozen -m scripts.agent_evaluation.agent_evidence_format_study summarize \
   --input external-grades.json --trials production-trials.jsonl \
-  --model model-a --model model-b --output production-comparison.json
+  --model model-a --model model-b \
+  --captures host-captures.json --output production-comparison.json
 ```
 
 The summary reports expected and complete pairs, names every excluded pair and
