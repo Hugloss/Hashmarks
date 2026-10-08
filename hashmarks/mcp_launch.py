@@ -11,11 +11,14 @@ def mcp_server_args(
     workspace: str | Path,
     *,
     state_dir: str | Path | None = None,
+    tool_names: tuple[str, ...] | list[str] | None = None,
 ) -> tuple[str, ...]:
     args = ["--workspace", str(workspace)]
     if state_dir is not None:
         args.extend(("--state-dir", str(state_dir)))
     args.append("mcp")
+    for name in tool_names or ():
+        args.extend(("--tool", str(name)))
     return tuple(args)
 
 
