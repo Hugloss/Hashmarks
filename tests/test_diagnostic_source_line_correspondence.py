@@ -40,8 +40,7 @@ def _capture(
     new: str,
     old_line: int,
     new_line: int,
-    old_column: int = 12,
-    new_column: int = 12,
+    columns: tuple[int, int] = (12, 12),
 ) -> dict[str, object]:
     file = tmp_path / "src.py"
     file.write_text(old, encoding="utf-8")
@@ -49,13 +48,13 @@ def _capture(
         codemap.sync()
         before_source = codemap.source_observation("src.py", lines=[old_line])
         before = _diagnostics(
-            int(before_source["generation"]), old_line, column=old_column
+            int(before_source["generation"]), old_line, column=columns[0]
         )
         file.write_text(new, encoding="utf-8")
         codemap.sync()
         after_source = codemap.source_observation("src.py", lines=[new_line])
         after = _diagnostics(
-            int(after_source["generation"]), new_line, column=new_column
+            int(after_source["generation"]), new_line, column=columns[1]
         )
     return RepositoryDeltaMixin.diagnostic_observation_delta(
         before, after, before_source=before_source, after_source=after_source
@@ -119,7 +118,7 @@ def test_changed_diagnostic_column_does_not_prove_correspondence(
         new="def example():\n    y = 1\n    print(missing)\n",
         old_line=2,
         new_line=3,
-        new_column=14,
+        columns=(12, 14),
     )["diagnostics"]["source_correspondence"]
     assert result["supported"] == []
     assert result["unresolved"][0]["reason"] == "diagnostic-column-not-preserved"
