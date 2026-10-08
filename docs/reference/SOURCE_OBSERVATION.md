@@ -29,6 +29,10 @@ completeness claim. The observer:
 - Returns literal case-sensitive, non-overlapping occurrences with 1-based physical
   line and Unicode-codepoint column coordinates. Enclosing symbols are reported
   only when a containing indexed symbol range is present.
+- For Python sources, attaches tokenizer-qualified `identifier`, `string-literal`,
+  or `comment` occurrence kinds when the entire occurrence fits one supported
+  single-line token. Other languages and ambiguous tokens report `unknown`; this
+  is lexical classification, not runtime or semantic identity.
 - Records the canonical member revision on each occurrence, and a deterministic
   occurrence identity. It never invents ownership or dynamic binding.
 - Reports UTF-8 BOM, byte size, physical line count, LF/CRLF terminators, maximum
