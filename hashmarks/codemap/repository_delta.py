@@ -998,10 +998,7 @@ class RepositoryDeltaMixin:
         dependencies = set(map(str, dependency_paths))
         changed = set(map(str, changed_paths))
         intersection = sorted(changed & (scope | dependencies))
-        repository_changed = (
-            str(observation.get("repository_identity") or "")
-            != current_repository_identity
-        )
+        repository_changed = observation.get("repository_identity") != current_repository_identity
         generation_changed = observation.get("codemap_generation") != current_generation
 
         if not repository_changed and not generation_changed:
