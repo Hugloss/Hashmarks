@@ -7,6 +7,7 @@ harness. Byte counts alone do not establish comprehension or agent benefit.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections import defaultdict
 from copy import deepcopy
@@ -23,6 +24,28 @@ from hashmarks.operation_contract import operation_schema, validate_operation_re
 AXES = ("production-response", "encoding-only")
 _PRODUCTION_VARIANTS = ("native-json", "typed-json", "compact-json", "grouped-text")
 _ENCODING_VARIANTS = ("typed-json", "compact-json", "grouped-text")
+_TRIAL_FIELDS = (
+    "case_id",
+    "variant",
+    "prompt",
+    "tool_response",
+    "study_axis",
+    "source_schema",
+)
+_MAX_VISIBLE_CAPTURE_BYTES = 1_048_576
+
+
+def trial_identity(trial: dict[str, Any]) -> str:
+    """Digest the frozen study trial, not a repository or verifier authority."""
+    raw = json.dumps(
+        {name: trial[name] for name in _TRIAL_FIELDS},
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
 
 
 def _case(case: object, seen: set[str]) -> tuple[str, str, dict[str, Any]]:
@@ -102,16 +125,16 @@ def emit_trials(
             else _encoding_arms(packet)
         )
         for variant, response in arms.items():
-            records.append(
-                {
-                    "case_id": case_id,
-                    "variant": variant,
-                    "prompt": prompt,
-                    "tool_response": response,
-                    "study_axis": axis,
-                    "source_schema": packet["schema"],
-                }
-            )
+            trial = {
+                "case_id": case_id,
+                "variant": variant,
+                "prompt": prompt,
+                "tool_response": response,
+                "study_axis": axis,
+                "source_schema": packet["schema"],
+            }
+            trial["trial_identity"] = trial_identity(trial)
+            records.append(trial)
     return records
 
 
@@ -152,6 +175,8 @@ def _expected_trials(
     axes: set[str] = set()
     for trial in trials:
         case, variant, axis = _trial_key(trial)
+        if "trial_identity" in trial and trial["trial_identity"] != trial_identity(trial):
+            raise ValueError("trial identity mismatch")
         if variant in expected[case]:
             raise ValueError("duplicate expected trial")
         axes.add(axis)
@@ -214,8 +239,88 @@ def _arm(variant: str, complete: list[dict[str, dict[str, Any]]]) -> dict[str, o
     return result
 
 
+
+def _capture_equivalent(trial: dict[str, Any], visible: str) -> bool:
+    """Content comparison, never proof of what the external model actually saw."""
+    if trial["study_axis"] == "encoding-only":
+        return visible == trial["tool_response"]
+    try:
+        parsed = json.loads(visible)
+    except (ValueError, TypeError):
+        return False
+    return parsed == trial["tool_response"]
+
+
+def _capture_audit(
+    captures: list[dict[str, Any]],
+    *,
+    trials: list[dict[str, Any]],
+    models: list[str],
+) -> tuple[dict[str, object], set[tuple[str, str, str]]]:
+    """Bind caller-supplied host captures to frozen trials; no host authentication."""
+    trial_by_key = {
+        (row["case_id"], row["variant"]): row for row in trials
+    }
+    observations: dict[tuple[str, str, str], bool] = {}
+    mismatches: list[dict[str, str]] = []
+    for capture in captures:
+        if not isinstance(capture, dict):
+            raise ValueError("each host capture must be an object")
+        case, model, variant = (
+            capture.get("case_id"),
+            capture.get("model"),
+            capture.get("variant"),
+        )
+        if not all(isinstance(v, str) and v for v in (case, model, variant)):
+            raise ValueError("host captures require case_id, model and variant")
+        key = (case, model, variant)
+        if model not in models or (case, variant) not in trial_by_key:
+            raise ValueError("unexpected host capture")
+        if key in observations:
+            raise ValueError("duplicate host capture")
+        trial = trial_by_key[case, variant]
+        if (
+            not isinstance(capture.get("trial_identity"), str)
+            or capture["trial_identity"] != trial_identity(trial)
+        ):
+            raise ValueError("host capture trial identity mismatch")
+        visible = capture.get("model_visible_response")
+        if not isinstance(visible, str):
+            raise ValueError("model_visible_response must be a string")
+        if len(visible.encode("utf-8")) > _MAX_VISIBLE_CAPTURE_BYTES:
+            raise ValueError("model_visible_response exceeds capture byte limit")
+        equivalent = _capture_equivalent(trial, visible)
+        observations[key] = equivalent
+        if not equivalent:
+            mismatches.append(
+                {"case_id": case, "model": model, "variant": variant}
+            )
+    verified = {key for key, valid in observations.items() if valid}
+    return (
+        {
+            "authority": "consumer-supplied-capture-content-only",
+            "host_authenticity_proven": False,
+            "expected_captures": len(trials) * len(models),
+            "observed_captures": len(observations),
+            "content_equivalent_captures": len(verified),
+            "content_mismatches": mismatches,
+            "missing_captures": [
+                {"case_id": row["case_id"], "model": model, "variant": row["variant"]}
+                for row in trials
+                for model in models
+                if (row["case_id"], model, row["variant"]) not in observations
+            ],
+        },
+        verified,
+    )
+
+
 def summarize_grades(
-    grades: list[dict[str, Any]], *, trials: list[dict[str, Any]], models: list[str]
+    grades: list[dict[str, Any]],
+    *,
+    trials: list[dict[str, Any]],
+    models: list[str],
+    captures: list[dict[str, Any]] | None = None,
 ) -> dict[str, object]:
     """Account for every expected case/model, including completely missing runs."""
     expected = _expected_trials(trials, models)
@@ -228,7 +333,7 @@ def summarize_grades(
         if variant in pairs[case, model]:
             raise ValueError("duplicate grade for model, case and variant")
         pairs[case, model][variant] = grade
-    complete, excluded = [], []
+    complete, complete_keys, excluded = [], [], []
     for case, variants in expected.items():
         for model in models:
             pair = pairs[case, model]
@@ -239,9 +344,22 @@ def summarize_grades(
                 )
             else:
                 complete.append(pair)
+                complete_keys.append((case, model))
     variants = [
         row["variant"] for row in trials if row["case_id"] == next(iter(expected))
     ]
+    capture_report: dict[str, object] | None = None
+    captured_pairs: list[dict[str, dict[str, Any]]] = []
+    unqualified: list[dict[str, str]] = []
+    if captures is not None:
+        capture_report, equivalent = _capture_audit(
+            captures, trials=trials, models=models
+        )
+        for case, model in complete_keys:
+            if all((case, model, variant) in equivalent for variant in expected[case]):
+                captured_pairs.append(pairs[case, model])
+            else:
+                unqualified.append({"case_id": case, "model": model})
     return {
         "schema": "hashmarks.agent-evidence-format-study.v1",
         "study_axis": trials[0]["study_axis"],
@@ -250,6 +368,18 @@ def summarize_grades(
         "incomplete_pairs_excluded": len(excluded),
         "excluded_pairs": excluded,
         "arms": [_arm(variant, complete) for variant in variants],
+        "capture_audit": capture_report,
+        "capture_equivalent_complete_pairs": (
+            len(captured_pairs) if captures is not None else None
+        ),
+        "capture_equivalent_arms": (
+            [_arm(variant, captured_pairs) for variant in variants]
+            if captures is not None
+            else None
+        ),
+        "capture_unqualified_complete_pairs": (
+            unqualified if captures is not None else None
+        ),
         "ranking_authority": "external-consumer",
     }
 
@@ -261,6 +391,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--axis", choices=AXES, default="production-response")
     parser.add_argument("--trials", type=Path)
+    parser.add_argument("--captures", type=Path)
     parser.add_argument("--model", action="append", default=[])
     args = parser.parse_args(argv)
     value = json.loads(args.input.read_text(encoding="utf-8"))
@@ -279,9 +410,18 @@ def main(argv: list[str] | None = None) -> int:
             for line in args.trials.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
+        captures = (
+            json.loads(args.captures.read_text(encoding="utf-8"))
+            if args.captures is not None
+            else None
+        )
+        if captures is not None and not isinstance(captures, list):
+            raise ValueError("--captures must contain a JSON array")
         serialized = (
             json.dumps(
-                summarize_grades(value, trials=trials, models=args.model),
+                summarize_grades(
+                    value, trials=trials, models=args.model, captures=captures
+                ),
                 sort_keys=True,
                 indent=2,
             )
