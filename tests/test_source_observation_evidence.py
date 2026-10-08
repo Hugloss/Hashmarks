@@ -32,6 +32,8 @@ def test_exact_member_occurrences_and_physical_source_shape(tmp_path: Path) -> N
     assert packet["observation_scope"] == "exact-admitted-repository-member"
     assert packet["observed_match_count"] == 2
     assert [item["line"] for item in packet["occurrences"]] == [2, 3]
+    assert all(item["occurrence_kind"] == "string-literal"
+               for item in packet["occurrences"])
     assert all(item["member_revision"] == packet["member"]["member_revision"]
                for item in packet["occurrences"])
     assert packet["source_shape"]["physical_lines"] == 3
@@ -61,6 +63,40 @@ def test_truncated_occurrences_do_not_claim_complete_or_absent(tmp_path: Path) -
     if absent["freshness"] == "current":
         assert absent["negative_evidence"] == "admissible-within-exact-member"
     assert absent["observation_scope"] == "exact-admitted-repository-member"
+
+
+def test_python_token_kinds_distinguish_comment_identifier_and_literal(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "example.py").write_text(
+        "def needle():\n"
+        "    # needle\n"
+        "    return 'needle'\n",
+        encoding="utf-8",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.sync()
+        rows = codemap.source_observation("example.py", literal="needle")
+    assert [row["occurrence_kind"] for row in rows["occurrences"]] == [
+        "identifier", "comment", "string-literal",
+    ]
+
+
+def test_preflight_coverage_does_not_invent_pruned_member_counts(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "example.py").write_text("x = 1\n", encoding="utf-8")
+    excluded = tmp_path / "node_modules"
+    excluded.mkdir()
+    (excluded / "secret.js").write_text("ignored\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        packet = codemap.index_preflight()
+    coverage = packet["observation_coverage"]
+    assert coverage["scope"] == "discovered-policy-admitted-indexable-members"
+    assert "node_modules" in coverage["known_pruned_directory_classes"]
+    assert coverage["pruned_member_count"] is None
+    assert coverage["repository_wide_completeness"] == "not-claimed"
+    assert coverage["absence_outside_admitted_scope"] == "not-admissible"
 
 
 def test_changed_unreconciled_member_never_returns_old_source_hits(tmp_path: Path) -> None:
