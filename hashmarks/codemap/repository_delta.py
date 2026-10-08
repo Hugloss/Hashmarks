@@ -1074,6 +1074,72 @@ class RepositoryDeltaMixin:
         return possible
 
     @staticmethod
+    def _diagnostic_claim_qualification(
+        before: Mapping[str, object],
+        after: Mapping[str, object],
+        added: Sequence[Mapping[str, object]],
+        removed: Sequence[Mapping[str, object]],
+    ) -> dict[str, object]:
+        """Qualify diagnostic absence using declared external collection coverage.
+
+        Raw identity additions/removals are retained; this only marks which
+        claims can be drawn from producer-claimed collection completeness.
+        """
+        prior = before.get("collection")
+        current = after.get("collection")
+        prior_state = prior.get("state") if isinstance(prior, Mapping) else None
+        current_state = current.get("state") if isinstance(current, Mapping) else None
+        prior_scope = before.get("scope_paths")
+        current_scope = after.get("scope_paths")
+        before_paths = set(prior_scope) if isinstance(prior_scope, list) else set()
+        after_paths = set(current_scope) if isinstance(current_scope, list) else set()
+        same_context = all(
+            (
+                before.get("producer"),
+                before.get("producer") == after.get("producer"),
+                before.get("repository_identity"),
+                before.get("repository_identity") == after.get("repository_identity"),
+                before.get("environment_identity"),
+                before.get("environment_identity") == after.get("environment_identity"),
+                before.get("outcome") in {"pass", "fail"},
+                after.get("outcome") in {"pass", "fail"},
+            )
+        )
+        qualified_added = sorted(
+            str(row["identity"])
+            for row in added
+            if same_context
+            and prior_state == "fresh-complete"
+            and current_state in {"fresh-complete", "fresh-partial"}
+            and row.get("path") in before_paths & after_paths
+        )
+        qualified_removed = sorted(
+            str(row["identity"])
+            for row in removed
+            if same_context
+            and prior_state in {"fresh-complete", "fresh-partial"}
+            and current_state == "fresh-complete"
+            and row.get("path") in before_paths & after_paths
+        )
+        return {
+            "schema": "hashmarks.diagnostic-delta-qualification.v1",
+            "basis": "producer-claimed-collection-and-explicit-path-scope",
+            "shared_context": same_context,
+            "collection_before": prior_state or "unknown",
+            "collection_after": current_state or "unknown",
+            "qualified_added_identities": qualified_added,
+            "qualified_removed_identities": qualified_removed,
+            "unqualified_added_identities": sorted(
+                {str(row["identity"]) for row in added} - set(qualified_added)
+            ),
+            "unqualified_removed_identities": sorted(
+                {str(row["identity"]) for row in removed} - set(qualified_removed)
+            ),
+            "identity_authority": False,
+            "execution_effect": "none",
+        }
+
+    @staticmethod
     def diagnostic_observation_delta(
         before: Mapping[str, object],
         after: Mapping[str, object],
@@ -1137,6 +1203,9 @@ class RepositoryDeltaMixin:
                 "unchanged_count": len(old_ids & new_ids),
                 "added_in_changed_scope": added_in_changed_scope,
                 "possible_relocations": possible_relocations,
+                "qualification": RepositoryDeltaMixin._diagnostic_claim_qualification(
+                    before, after, added, removed
+                ),
             },
             "authority": "observation-only",
             "execution_effect": "none",

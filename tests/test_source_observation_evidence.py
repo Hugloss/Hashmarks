@@ -242,8 +242,7 @@ def test_scoped_occurrences_have_exact_member_provenance_and_stable_order(
         "beta.py",
     ]
     revisions = {
-        row["path"]: row["member_revision"]
-        for row in packet["member_observations"]
+        row["path"]: row["member_revision"] for row in packet["member_observations"]
     }
     assert all(
         row["evidence_identity"].startswith("sha256:")
@@ -359,3 +358,108 @@ def test_scoped_scope_identity_is_stable_across_request_order(
         first = codemap.scoped_source_occurrences(["b.py", "a.py"], "needle")
         second = codemap.scoped_source_occurrences(["a.py", "b.py"], "needle")
     assert first["observation_identity"] == second["observation_identity"]
+
+
+def _qualified_observation(
+    rows: list[dict[str, object]],
+    *,
+    collection: str = "fresh-complete",
+    outcome: str = "fail",
+    scope: tuple[str, ...] = ("example.py",),
+    environment: str | None = "pyright:fixture",
+    repository: str = "repo:fixture",
+) -> dict[str, object]:
+    return RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="pyright",
+        binding=RepositoryGenerationBinding(repository, 5),
+        diagnostics=rows,
+        outcome=outcome,
+        environment_identity=environment,
+        collection_state=collection,
+        scope_paths=scope,
+    )
+
+
+def test_diagnostic_qualified_removal_requires_complete_after_collection() -> None:
+    before = _qualified_observation([_diagnostic(4)])
+    after = _qualified_observation([], outcome="pass")
+    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    proof = delta["diagnostics"]["qualification"]
+    diagnostic_identity = before["diagnostics"][0]["identity"]
+    assert len(delta["diagnostics"]["removed"]) == 1
+    assert proof["qualified_removed_identities"] == [diagnostic_identity]
+    assert proof["unqualified_removed_identities"] == []
+    assert proof["shared_context"] is True
+    assert proof["identity_authority"] is False
+
+
+@pytest.mark.parametrize(
+    "collection",
+    ["fresh-partial", "timed-out", "unavailable", "source-mismatch", "unknown"],
+)
+def test_incomplete_diagnostic_collection_does_not_prove_absence(
+    collection: str,
+) -> None:
+    before = _qualified_observation([_diagnostic(4)])
+    after = _qualified_observation([], collection=collection, outcome="fail")
+    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    proof = delta["diagnostics"]["qualification"]
+    assert len(delta["diagnostics"]["removed"]) == 1
+    assert proof["qualified_removed_identities"] == []
+    assert proof["unqualified_removed_identities"] == [
+        before["diagnostics"][0]["identity"]
+    ]
+    assert proof["collection_after"] == collection
+
+
+def test_partial_after_collection_can_qualify_newly_seen_diagnostics() -> None:
+    before = _qualified_observation([])
+    after = _qualified_observation([_diagnostic(4)], collection="fresh-partial")
+    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    proof = delta["diagnostics"]["qualification"]
+    assert proof["qualified_added_identities"] == [after["diagnostics"][0]["identity"]]
+    assert proof["unqualified_added_identities"] == []
+
+
+def test_partial_before_collection_cannot_prove_new_diagnostic() -> None:
+    before = _qualified_observation([], collection="fresh-partial")
+    after = _qualified_observation([_diagnostic(4)])
+    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    proof = delta["diagnostics"]["qualification"]
+    assert proof["qualified_added_identities"] == []
+    assert proof["unqualified_added_identities"] == [
+        after["diagnostics"][0]["identity"]
+    ]
+
+
+@pytest.mark.parametrize(
+    "different_after",
+    [
+        {"environment": "pyright:other"},
+        {"environment": None},
+        {"scope": ("other.py",)},
+        {"repository": "repo:foreign"},
+        {"outcome": "blocked-environment"},
+    ],
+)
+def test_changed_producer_context_never_upgrades_diagnostic_absence(
+    different_after: dict[str, object],
+) -> None:
+    before = _qualified_observation([_diagnostic(4)])
+    after = _qualified_observation([], **different_after)
+    delta = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)
+    proof = delta["diagnostics"]["qualification"]
+    assert proof["qualified_removed_identities"] == []
+    assert proof["unqualified_removed_identities"] == [
+        before["diagnostics"][0]["identity"]
+    ]
+
+
+def test_missing_explicit_producer_scope_cannot_prove_absence() -> None:
+    before = _qualified_observation([_diagnostic(4)], scope=())
+    after = _qualified_observation([], scope=())
+    proof = RepositoryDeltaMixin.diagnostic_observation_delta(before, after)[
+        "diagnostics"
+    ]["qualification"]
+    assert proof["qualified_removed_identities"] == []
+    assert len(proof["unqualified_removed_identities"]) == 1
