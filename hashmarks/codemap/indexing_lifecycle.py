@@ -589,18 +589,7 @@ class IndexingLifecycleMixin:
             },
             "estimated_lexical_rows": None,
             "estimated_lexical_rows_reason": "not guessed before parsing",
-            "observation_coverage": {
-                "scope": "discovered-policy-admitted-indexable-members",
-                "admitted_member_count": count,
-                "known_pruned_directory_classes": sorted(
-                    repository_file_discovery._PRUNE_DIRS
-                ),
-                "pruned_member_count": None,
-                "unreadable_member_count": None,
-                "repository_wide_completeness": "not-claimed",
-                "absence_outside_admitted_scope": "not-admissible",
-                "basis": "canonical-repository-file-discovery",
-            },
+            "observation_coverage": self._repository_discovery_coverage(count),
         }
 
     def index_preflight(self) -> dict[str, object]:
