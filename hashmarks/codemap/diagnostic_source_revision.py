@@ -57,6 +57,40 @@ def normalize_source_revision_claims(
     return dict(sorted(normalized.items()))
 
 
+def _source_member_qualified(
+    source: Mapping[str, object], member: Mapping[str, object], path: str
+) -> bool:
+    revision = member.get("member_revision")
+    return isinstance(revision, str) and all(
+        (
+            member.get("path") == path,
+            member.get("state") == "known-present",
+            source.get("availability") == "observed",
+            source.get("completeness") == "complete",
+            bool(source.get("observation_identity")),
+            bool(_FILE_REVISION.fullmatch(revision)),
+        )
+    )
+
+
+def _indexed_source_packets(
+    source_observations: Sequence[Mapping[str, object]],
+    claims: Mapping[str, str],
+) -> tuple[dict[str, list[Mapping[str, object]]], int]:
+    endpoints: dict[str, list[Mapping[str, object]]] = {}
+    unused = 0
+    for source in source_observations:
+        if not isinstance(source, Mapping):
+            raise ValueError("source_observations must contain mappings")
+        member = source.get("member")
+        path = member.get("path") if isinstance(member, Mapping) else None
+        if not isinstance(path, str) or path not in claims:
+            unused += 1
+            continue
+        endpoints.setdefault(path, []).append(source)
+    return endpoints, unused
+
+
 def _member_comparison(
     path: str,
     claimed: str,
@@ -74,7 +108,11 @@ def _member_comparison(
     }
     if len(endpoints) != 1:
         state = "unknown"
-        reason = "source-observation-missing" if not endpoints else "ambiguous-source-observations"
+        reason = (
+            "source-observation-missing"
+            if not endpoints
+            else "ambiguous-source-observations"
+        )
     else:
         source = endpoints[0]
         member = source.get("member")
@@ -88,22 +126,17 @@ def _member_comparison(
         )
         if source.get("schema") != operation_schema("source_observation", "member"):
             state, reason = "unknown", "unsupported-source-observation-schema"
-        elif (
-            member.get("path") != path
-            or member.get("state") != "known-present"
-            or source.get("availability") != "observed"
-            or source.get("completeness") != "complete"
-            or not source.get("observation_identity")
-            or not isinstance(member.get("member_revision"), str)
-            or not _FILE_REVISION.fullmatch(member["member_revision"])
-        ):
+        elif not _source_member_qualified(source, member, path):
             state, reason = "unknown", "source-member-not-revision-qualified"
         elif source.get("freshness") != "current":
             state, reason = "unknown", "source-observation-freshness-unproven"
         elif claimed != member["member_revision"]:
             state, reason = "different", "claimed-and-observed-member-revisions-differ"
         else:
-            state, reason = "matching", "producer-claim-matches-observed-member-revision"
+            state, reason = (
+                "matching",
+                "producer-claim-matches-observed-member-revision",
+            )
     return {
         **row,
         "state": state,
@@ -132,21 +165,9 @@ def diagnostic_source_revision_evidence(
         claims = {}
     if not isinstance(claims, Mapping):
         raise ValueError("diagnostic source_revisions must be a mapping")
-    scoped = normalize_source_revision_claims(
-        claims, diagnostic.get("scope_paths", ())
-    )
+    scoped = normalize_source_revision_claims(claims, diagnostic.get("scope_paths", ()))
     claims_by_path = scoped or {}
-    endpoints: dict[str, list[Mapping[str, object]]] = {}
-    unused = 0
-    for source in source_observations:
-        if not isinstance(source, Mapping):
-            raise ValueError("source_observations must contain mappings")
-        member = source.get("member")
-        path = member.get("path") if isinstance(member, Mapping) else None
-        if not isinstance(path, str) or path not in claims_by_path:
-            unused += 1
-            continue
-        endpoints.setdefault(path, []).append(source)
+    endpoints, unused = _indexed_source_packets(source_observations, claims_by_path)
     rows = [
         _member_comparison(
             path, claimed, endpoints.get(path, []), diagnostic.get("codemap_generation")
