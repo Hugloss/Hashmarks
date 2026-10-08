@@ -688,9 +688,8 @@ class RepositoryDeltaMixin:
         ).encode("utf-8")
         return "sha256:" + hashlib.sha256(raw).hexdigest()
 
-    @classmethod
+    @staticmethod
     def external_diagnostic_observation(
-        cls,
         *,
         producer: str,
         binding: RepositoryGenerationBinding,
@@ -721,7 +720,7 @@ class RepositoryDeltaMixin:
         rows = []
         for raw in diagnostics:
             row = dict(raw)
-            row["identity"] = cls._diagnostic_identity(row)
+            row["identity"] = RepositoryDeltaMixin._diagnostic_identity(row)
             rows.append(row)
         rows.sort(key=lambda row: str(row["identity"]))
         return {
@@ -822,6 +821,60 @@ class RepositoryDeltaMixin:
         }
 
     @staticmethod
+    def _possible_diagnostic_relocations(
+        before: Mapping[str, object],
+        after: Mapping[str, object],
+        removed: Sequence[Mapping[str, object]],
+        added: Sequence[Mapping[str, object]],
+    ) -> list[dict[str, object]]:
+        """Non-authoritative candidates; never suppress added/removed evidence."""
+        if (
+            before.get("repository_identity") != after.get("repository_identity")
+            or before.get("producer") != after.get("producer")
+        ):
+            return []
+
+        def facts(row: Mapping[str, object]) -> tuple[object, ...]:
+            return tuple(
+                row.get(field)
+                for field in ("tool", "rule", "path", "symbol", "message")
+            )
+
+        old: dict[tuple[object, ...], list[Mapping[str, object]]] = {}
+        new: dict[tuple[object, ...], list[Mapping[str, object]]] = {}
+        for row in removed:
+            old.setdefault(facts(row), []).append(row)
+        for row in added:
+            new.setdefault(facts(row), []).append(row)
+        possible: list[dict[str, object]] = []
+        for key in sorted(old, key=repr):
+            before_rows = old[key]
+            after_rows = new.get(key, [])
+            if len(before_rows) != 1 or len(after_rows) != 1:
+                continue
+            prior, subsequent = before_rows[0], after_rows[0]
+            if (
+                prior.get("line") is None
+                or subsequent.get("line") is None
+                or (prior.get("line"), prior.get("column"))
+                == (subsequent.get("line"), subsequent.get("column"))
+            ):
+                continue
+            possible.append(
+                {
+                    "before_identity": prior["identity"],
+                    "after_identity": subsequent["identity"],
+                    "before_line": prior["line"],
+                    "after_line": subsequent["line"],
+                    "path": prior.get("path"),
+                    "basis": "unique-equal-nonlocational-diagnostic-fields",
+                    "state": "possible",
+                    "identity_authority": False,
+                }
+            )
+        return possible
+
+    @staticmethod
     def diagnostic_observation_delta(
         before: Mapping[str, object],
         after: Mapping[str, object],
@@ -852,44 +905,9 @@ class RepositoryDeltaMixin:
         added_in_changed_scope = [
             row for row in added if str(row.get("path") or "") in scope
         ]
-        # A same-message location shift is only a possible correspondence.
-        # Without source-span relocation proof it must NOT erase add/remove
-        # evidence or become a diagnostic identity.
-        def facts(row: Mapping[str, object]) -> tuple[object, ...]:
-            return tuple(
-                row.get(field)
-                for field in ("tool", "rule", "path", "symbol", "message")
-            )
-
-        removed_by_fact: dict[tuple[object, ...], list[Mapping[str, object]]] = {}
-        added_by_fact: dict[tuple[object, ...], list[Mapping[str, object]]] = {}
-        for row in removed:
-            removed_by_fact.setdefault(facts(row), []).append(row)
-        for row in added:
-            added_by_fact.setdefault(facts(row), []).append(row)
-        possible_relocations: list[dict[str, object]] = []
-        for key in sorted(removed_by_fact, key=repr):
-            before_rows = removed_by_fact[key]
-            after_rows = added_by_fact.get(key, [])
-            if len(before_rows) != 1 or len(after_rows) != 1:
-                continue
-            prior, subsequent = before_rows[0], after_rows[0]
-            if (
-                prior.get("line") is None or subsequent.get("line") is None
-                or (prior.get("line"), prior.get("column"))
-                == (subsequent.get("line"), subsequent.get("column"))
-            ):
-                continue
-            possible_relocations.append({
-                "before_identity": prior["identity"],
-                "after_identity": subsequent["identity"],
-                "before_line": prior["line"],
-                "after_line": subsequent["line"],
-                "path": prior.get("path"),
-                "basis": "unique-equal-nonlocational-diagnostic-fields",
-                "state": "possible",
-                "identity_authority": False,
-            })
+        possible_relocations = RepositoryDeltaMixin._possible_diagnostic_relocations(
+            before, after, removed, added
+        )
 
         return {
             "schema": "hashmarks.diagnostic-observation-delta.v1",
