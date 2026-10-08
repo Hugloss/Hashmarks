@@ -87,6 +87,8 @@ _CONTEXT_KEYS = frozenset(
         "causation",
         "precision",
         "comparability",
+        "comparable",
+        "incomparability_reasons",
         "measurement",
         "storage",
         "definition_options",
@@ -971,6 +973,48 @@ def _findings(
     p.field(packet, "findings", "diagnostic", ref, ctx, assertion="producer_claim")
 
 
+def _structural_comparison(
+    p: _Projection,
+    packet: Mapping[str, object],
+    ref: tuple[object, ...],
+    ctx: Mapping[str, object],
+) -> None:
+    """Keep structural incomparability separate from observed endpoint changes."""
+    if packet.get("comparable") is not True:
+        p.add(
+            "qualification",
+            "structural_endpoints_incomparable",
+            packet.get("incomparability_reasons"),
+            (*ref, "incomparability_reasons"),
+            ctx,
+        )
+        return
+    for key, family in (
+        ("introduced_symbol_ids", "source"),
+        ("removed_symbol_ids", "source"),
+        ("verification_paths_added", "verification"),
+        ("verification_paths_removed", "verification"),
+    ):
+        p.field(
+            packet,
+            key,
+            family,
+            ref,
+            ctx,
+            assertion="observed_change",
+            shape="values",
+        )
+    if "dimension_delta" in packet:
+        p.add(
+            "evidence_measurement",
+            "dimension_delta",
+            packet["dimension_delta"],
+            (*ref, "dimension_delta"),
+            ctx,
+            assertion="observed_change",
+        )
+
+
 def _projectors() -> dict[str, Any]:
     # Producer constants are loaded after CodeMap initialization to avoid cycles.
     from hashmarks.codemap.change_intelligence import CHANGE_INTELLIGENCE_SCHEMA
@@ -1007,6 +1051,7 @@ def _projectors() -> dict[str, Any]:
         SCHEMA_V3: _dependency,
         CORRELATION_DELTA_SCHEMA: _correlation,
         REPOSITORY_BINDING_DELTA_SCHEMA: _binding_delta,
+        operation_schema("structural_locality_delta"): _structural_comparison,
         operation_schema("repository_context"): _context_packet,
         operation_schema("find"): _find,
         operation_schema("task_evidence"): _task,

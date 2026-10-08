@@ -110,6 +110,14 @@ OPERATION_CONTRACTS = (
             ("coverage", "hashmarks.repository-evidence-coverage.v1"),
         ),
     ),
+    OperationContract(
+        "evidence_comparison",
+        (
+            ("structural", "hashmarks.structural-locality-delta.v1"),
+            ("bindings", "hashmarks.repository-evidence-binding-delta.v1"),
+            ("diagnostics", "hashmarks.diagnostic-observation-delta.v1"),
+        ),
+    ),
     OperationContract("projects", (("default", "hashmarks.codemap-projects.v1"),)),
     OperationContract("outline", (("default", "hashmarks.outline.v1"),)),
     OperationContract("grep", (("default", "hashmarks.grep.v1"),)),

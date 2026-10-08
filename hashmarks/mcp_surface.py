@@ -559,6 +559,77 @@ class HashmarksMcpSurface:
 
         return self._read(project)
 
+    @staticmethod
+    def _diagnostic_endpoint(packet: dict[str, Any], *, name: str) -> None:
+        from .codemap.repository_delta import (
+            EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA,
+            RepositoryDeltaMixin,
+        )
+
+        if packet.get("schema") != EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA:
+            raise ValueError(f"{name} must be an external diagnostic observation")
+        if not isinstance(packet.get("diagnostics"), list):
+            raise ValueError(f"{name} diagnostics must be a list")
+        for row in packet["diagnostics"]:
+            if (
+                not isinstance(row, dict)
+                or not isinstance(row.get("identity"), str)
+                or row["identity"] != RepositoryDeltaMixin._diagnostic_identity(row)
+            ):
+                raise ValueError(f"{name} diagnostic identity mismatch")
+
+    def _compare_native_evidence(
+        self,
+        before: dict[str, Any],
+        after: dict[str, Any],
+        *,
+        result_mode: str,
+        changed_paths: list[str],
+    ) -> dict[str, object]:
+        if result_mode == "structural":
+            from .codemap.structural_locality import structural_locality_delta
+
+            return structural_locality_delta(before, after)
+        if result_mode == "bindings":
+            self._map.sync()
+            return self._map.repository_evidence_binding_delta(before, after)
+        self._diagnostic_endpoint(before, name="before")
+        self._diagnostic_endpoint(after, name="after")
+        return self._map.diagnostic_observation_delta(
+            before, after, changed_paths=changed_paths
+        )
+
+    def evidence_comparison(
+        self,
+        before: dict[str, Any],
+        after: dict[str, Any],
+        *,
+        result_mode: str = operation_default_mode("evidence_comparison"),
+        changed_paths: list[str] | None = None,
+    ) -> dict[str, object]:
+        """Transport two explicit packets to their existing native comparison owner."""
+        if result_mode not in ("structural", "bindings", "diagnostics"):
+            raise McpSurfaceError(
+                "result_mode must be one of: structural, bindings, diagnostics"
+            )
+        before = _bounded_json(
+            before, name="before", maximum=524_288, expected_type=dict
+        )
+        after = _bounded_json(after, name="after", maximum=524_288, expected_type=dict)
+        if result_mode != "diagnostics" and changed_paths:
+            raise McpSurfaceError("changed_paths is only valid for diagnostics mode")
+        paths = _changed_paths(changed_paths) if changed_paths else []
+
+        def project() -> dict[str, object]:
+            try:
+                return self._compare_native_evidence(
+                    before, after, result_mode=result_mode, changed_paths=paths
+                )
+            except ValueError as exc:
+                raise _surface_value_error(exc) from exc
+
+        return self._read(project)
+
     def structural_locality(
         self, target: str, *, max_depth: int = 2
     ) -> dict[str, object]:

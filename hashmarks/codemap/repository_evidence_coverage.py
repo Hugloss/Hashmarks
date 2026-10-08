@@ -380,16 +380,15 @@ class RepositoryEvidenceCoverageMixin:
         repository_identity: str,
         bindings_identity: object,
     ) -> None:
-        if (
-            binding_delta.get("schema")
-            != "hashmarks.repository-evidence-binding-delta.v1"
+        if binding_delta.get("schema") != operation_schema(
+            "evidence_comparison", "bindings"
         ):
             raise ValueError(
                 "binding_delta must be a repository evidence binding delta"
             )
         delta_identity = binding_delta.get("delta_identity")
         expected_delta_identity = "sha256:" + self._packet_digest(
-            "hashmarks.repository-evidence-binding-delta.v1",
+            operation_schema("evidence_comparison", "bindings"),
             {
                 key: value
                 for key, value in binding_delta.items()

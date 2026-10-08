@@ -6,9 +6,9 @@ changes no producer identity, and acquires no reasoning or execution authority.
 
 ## Optional MCP formats
 
-All thirteen current MCP tools accept `presentation` with the ordered values
+All fourteen current MCP tools accept `presentation` with the ordered values
 `none`, `structured`, `compact`, and `text`. The default remains `compact` for
-`repository_intelligence_query` and `none` for the other twelve tools.
+`repository_intelligence_query` and `none` for the other thirteen tools.
 Snapshot density (`compact`, `standard`, `audit`) is an independent selector.
 
 `none` returns the native response unchanged. For the other tools, a selected
@@ -100,6 +100,34 @@ source moves or diagnostic relocations remain candidates. Dependency additions,
 removals, transitions, and change axes retain endpoint provenance. Declaration
 claims stay explicit and producer-owned: no transitive correspondence,
 provider-name joins, or previous-observation replay state is introduced.
+
+## Qualified endpoint comparisons
+
+The read-only `evidence_comparison` MCP tool transports two explicit,
+caller-supplied producer packets to their existing CodeMap comparison owners.
+Its `result_mode` is one of `structural`, `bindings` or `diagnostics`.
+Each mode retains its native schema; no additional persistent history, new
+observation or Git lifecycle is created.
+
+- `structural` invokes the existing locality delta. Unmatched provider,
+  target, evidence identity, measurement settings, freshness or repository
+  state yields explicit incomparability, not a proven structural change.
+- `bindings` invokes the current repository binding delta, which rejects
+  invalid, foreign or mismatched binding packets.
+- `diagnostics` accepts existing producer-claimed diagnostic observation
+  packets with normalized diagnostic identities. Added/removed identities
+  remain observations; disappearance is not a proven fix. Producer collection
+  completeness, environment, path scope and candidate relocation authority
+  stay visible. `changed_paths` is accepted only in this mode.
+
+Two packets are required and individually bounded. This tool never starts
+a diagnostic producer, runs tests, mutates Git, derives historical snapshots,
+or chooses an agent action. The structural presenter renders incomparable
+endpoints as qualification evidence rather than observed change claims.
+Their native comparability flag and reasons remain visible outside row caps;
+suppressed change collections are listed in `unprojected_sections` with native
+item counts. Comparable dimension deltas retain the exact native mapping and
+its source reference.
 
 ## Qualification and ownership
 

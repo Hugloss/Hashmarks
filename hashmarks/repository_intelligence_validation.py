@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from .codemap.decision_contract import DecisionPacketContract
+from .codemap.repository_delta import EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA
 from .operation_contract import operation_schema
 from .producer_identity import native_producer_implementation_identity
 
@@ -31,8 +32,8 @@ _CURRENT_EVIDENCE_KINDS: dict[str, str] = {
     _TASK_ACTION_MAP_SCHEMA: "action-map",
     "hashmarks.repository-intelligence-snapshot.v1": "repository-snapshot",
     "hashmarks.repository-intelligence-delta.v1": "repository-delta",
-    "hashmarks.external-diagnostic-observation.v1": "diagnostic-observation",
-    "hashmarks.diagnostic-observation-delta.v1": "diagnostic-delta",
+    EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA: "diagnostic-observation",
+    operation_schema("evidence_comparison", "diagnostics"): "diagnostic-delta",
     "hashmarks.external-observation-freshness.v1": "observation-freshness",
 }
 
@@ -371,8 +372,8 @@ _VALIDATORS = {
     _TASK_ACTION_MAP_SCHEMA: _action_map,
     "hashmarks.repository-intelligence-snapshot.v1": _repository_snapshot,
     "hashmarks.repository-intelligence-delta.v1": _repository_delta,
-    "hashmarks.external-diagnostic-observation.v1": _diagnostic_observation,
-    "hashmarks.diagnostic-observation-delta.v1": _diagnostic_delta,
+    EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA: _diagnostic_observation,
+    operation_schema("evidence_comparison", "diagnostics"): _diagnostic_delta,
     "hashmarks.external-observation-freshness.v1": _observation_freshness,
 }
 

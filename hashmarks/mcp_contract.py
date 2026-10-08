@@ -290,6 +290,14 @@ MCP_TOOL_CONTRACTS = (
         ),
         "structural_locality",
     ),
+    McpToolContract(
+        "evidence_comparison",
+        (
+            "Compare structural, binding, or diagnostic observation endpoints. "
+            "Keep native incomparability and collection uncertainty; never infer fixes."
+        ),
+        "evidence_comparison",
+    ),
 )
 
 MCP_TOOL_NAMES = tuple(contract.name for contract in MCP_TOOL_CONTRACTS)

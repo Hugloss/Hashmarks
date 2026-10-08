@@ -4,17 +4,23 @@ import asyncio
 import copy
 import importlib.util
 import json
+from itertools import product
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.repository_delta import (
+    RepositoryDeltaMixin,
+    RepositoryGenerationBinding,
+)
 from hashmarks.codemap.repository_intelligence_query import (
     QUERY_SURFACES,
     RepositoryIntelligenceQueryOptions,
 )
 from hashmarks.codemap.service import CodeMapService, CodeMapServiceClient
+from hashmarks.codemap.structural_locality import structural_locality_delta
 from hashmarks.evidence_presentation import (
     FORMATS,
     present_repository_evidence,
@@ -33,6 +39,28 @@ _MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
 def _findings(projection: dict[str, Any]) -> list[dict[str, Any]]:
     return [row for group in projection["groups"] for row in group["findings"]]
+
+
+def _fixture_diagnostic_delta(paths: list[str]) -> dict[str, object]:
+    """Use one exact externally claimed endpoint without another analyzer."""
+    external = RepositoryDeltaMixin.external_diagnostic_observation(
+        producer="test-diagnostics",
+        binding=RepositoryGenerationBinding("fixture-repository", 1),
+        diagnostics=[
+            {
+                "tool": "pyright",
+                "rule": "fixture",
+                "path": paths[0],
+                "line": 2,
+                "message": "fixture diagnostic",
+            }
+        ],
+        outcome="fail",
+        environment_identity="fixture-env",
+        scope_paths=paths,
+        collection_state="fresh-complete",
+    )
+    return RepositoryDeltaMixin.diagnostic_observation_delta(external, external)
 
 
 @pytest.fixture(scope="module")
@@ -120,6 +148,7 @@ def native_packets(
         )
         observation = codemap.dependency_resolution_evidence(dependency)
         declarations = codemap.repository_declarations([group])
+        locality = codemap.structural_locality("src/owner.py::widget")
         packets = [
             ("repository_context", "default", codemap.orient()),
             ("find", "default", codemap.find_packet("widget")),
@@ -169,7 +198,22 @@ def native_packets(
             (
                 "structural_locality",
                 "default",
-                codemap.structural_locality("src/owner.py::widget"),
+                locality,
+            ),
+            (
+                "evidence_comparison",
+                "structural",
+                structural_locality_delta(locality, locality),
+            ),
+            (
+                "evidence_comparison",
+                "bindings",
+                codemap.repository_evidence_binding_delta(binding, binding),
+            ),
+            (
+                "evidence_comparison",
+                "diagnostics",
+                _fixture_diagnostic_delta(paths),
             ),
         ]
         owner.write_text("import sys\ndef widget(): return 2\n", encoding="utf-8")
@@ -178,6 +222,15 @@ def native_packets(
                 "post_change",
                 "default",
                 codemap.task_post_change_delta(task, paths, previous_evidence=previous),
+            )
+        )
+        packets.append(
+            (
+                "evidence_comparison",
+                "structural",
+                structural_locality_delta(
+                    locality, codemap.structural_locality("src/owner.py::widget")
+                ),
             )
         )
         for surface in QUERY_SURFACES:
@@ -207,6 +260,12 @@ def native_packets(
 def test_every_native_mode_is_preserved_and_projected_without_reads(
     native_packets, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    assert {
+        (contract.operation, mode)
+        for contract in MCP_TOOL_CONTRACTS
+        for mode in contract.response_modes
+    } <= {(operation, mode) for operation, mode, _packet in native_packets}
+
     def no_read(*_args, **_kwargs):
         raise AssertionError("presentation must not read repository files")
 
@@ -393,7 +452,7 @@ def test_actual_sdk_advertises_all_format_selectors(tmp_path: Path) -> None:
     try:
         tools = asyncio.run(server.list_tools())
         manifest: dict[str, Any] = contract_from_tool_models("test", tuple(tools))
-        assert len(manifest["tools"]) == 13
+        assert len(manifest["tools"]) == 14
         for tool, contract in zip(tools, MCP_TOOL_CONTRACTS, strict=True):
             field = tool.input_schema["properties"]["presentation"]
             assert field["enum"] == list(FORMATS)
@@ -485,6 +544,7 @@ def test_sdk_calls_all_tools_with_native_defaults_and_optional_formats(
         "repository_evidence": {"request": {}},
         "repository_findings": {},
         "structural_locality": {"target": "src/owner.py::widget"},
+        "evidence_comparison": {"before": {}, "after": {}},
     }
 
     def frozen_producer(contract):
@@ -516,12 +576,25 @@ def test_sdk_calls_all_tools_with_native_defaults_and_optional_formats(
                 contract.operation, native, format=contract.default_presentation
             )
             assert default.structured_content == expected
-            for format in FORMATS:
-                called = await server.call_tool(
-                    contract.name, {**arguments[contract.name], "presentation": format}
+            for mode, format in product(contract.response_modes, FORMATS):
+                request = {
+                    **arguments[contract.name],
+                    "presentation": format,
+                    **(
+                        {"result_mode": mode}
+                        if len(contract.response_modes) > 1
+                        else {}
+                    ),
+                }
+                called = await server.call_tool(contract.name, request)
+                contract.validate_response(
+                    called.structured_content, result_mode=mode, presentation=format
                 )
-                tool_contract(contract.name).validate_response(
-                    called.structured_content, presentation=format
+                assert called.structured_content == presentation_response(
+                    contract.operation,
+                    packets[contract.operation, mode],
+                    format=format,
+                    result_mode=mode,
                 )
 
     try:

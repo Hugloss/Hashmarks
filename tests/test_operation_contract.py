@@ -68,6 +68,11 @@ _EXPECTED = {
         "observation": "hashmarks.repository-evidence-bindings.v1",
         "coverage": "hashmarks.repository-evidence-coverage.v1",
     },
+    "evidence_comparison": {
+        "structural": "hashmarks.structural-locality-delta.v1",
+        "bindings": "hashmarks.repository-evidence-binding-delta.v1",
+        "diagnostics": "hashmarks.diagnostic-observation-delta.v1",
+    },
     "projects": {"default": "hashmarks.codemap-projects.v1"},
     "outline": {"default": "hashmarks.outline.v1"},
     "grep": {"default": "hashmarks.grep.v1"},

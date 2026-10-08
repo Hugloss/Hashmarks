@@ -146,6 +146,7 @@ Hashmarks intentionally exposes a small read-only repository-intelligence tool c
 | `post_change` | refresh changed paths against a previous `task_evidence` packet and return evidence deltas |
 | `repository_intelligence_query` | expose existing bounded profiles, snapshots, deltas, freshness, verification explanations, and cross-repository evidence |
 | `source_observation` | exact revision-bound source occurrences for one member or an explicit bounded member set |
+| `evidence_comparison` | caller-supplied structural-locality, binding, or external diagnostic endpoint comparison, preserving native uncertainty and completeness |
 | `structural_locality` | static structural locality, exact callers and unresolved candidates for one symbol |
 | `repository_evidence` | exact evidence bindings or explicit changed-path coverage, using existing core producers and native qualification |
 | `repository_findings` | existing bounded import, cache, and concurrency repository findings |
