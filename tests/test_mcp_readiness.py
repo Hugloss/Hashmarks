@@ -31,13 +31,9 @@ def test_mcp_readiness_projects_contract_and_launch(
         },
     )
 
-    monkeypatch.setattr(
-        readiness,
-        "_observed_projection_tools",
-        lambda *_args, **_kwargs: None,
-    )
     async def observed(*_args, **_kwargs):
         return MCP_TOOL_NAMES
+
     monkeypatch.setattr(readiness, "_observed_projection_tools", observed)
 
     result = mcp_readiness(workspace, state_dir=state)
@@ -113,8 +109,6 @@ def test_doctor_mcp_is_opt_in_and_machine_readable(
     }
 
 
-
-
 def test_mcp_readiness_qualifies_explicit_tool_projection(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -163,12 +157,11 @@ def test_doctor_parser_exposes_mcp_projection_tools() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     cli._add_identity_cli(sub)
 
-    parsed = parser.parse_args(
-        ["doctor", "--mcp", "--mcp-tool", "task_evidence"]
-    )
+    parsed = parser.parse_args(["doctor", "--mcp", "--mcp-tool", "task_evidence"])
 
     assert parsed.mcp is True
     assert parsed.mcp_tool == ["task_evidence"]
+
 
 def test_doctor_parser_exposes_explicit_mcp_probe() -> None:
     parser = argparse.ArgumentParser()
