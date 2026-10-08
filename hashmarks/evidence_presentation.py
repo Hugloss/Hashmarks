@@ -3,6 +3,7 @@
 No source reads, secondary semantics, or agent policy. The canonical producer
 packet stays available next to this bounded *presentation* projection.
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -49,7 +50,9 @@ def _add(
     grouped[family].append(entry)
 
 
-def _delta(grouped: dict[str, list[dict[str, object]]], payload: Mapping[str, object]) -> None:
+def _delta(
+    grouped: dict[str, list[dict[str, object]]], payload: Mapping[str, object]
+) -> None:
     semantic = _mapping(payload.get("semantic"))
     for key, family, kind in (
         ("symbols_added", "source_change", "symbol_added"),
@@ -60,12 +63,25 @@ def _delta(grouped: dict[str, list[dict[str, object]]], payload: Mapping[str, ob
         rows = semantic.get(key)
         if isinstance(rows, list):
             for row in rows:
-                _add(grouped, family, "observed_change", kind, row, basis="repository-delta")
+                _add(
+                    grouped,
+                    family,
+                    "observed_change",
+                    kind,
+                    row,
+                    basis="repository-delta",
+                )
     moves = semantic.get("possible_symbol_moves")
     if isinstance(moves, list):
         for row in moves:
-            _add(grouped, "correspondence", "candidate_correspondence",
-                 "possible_symbol_move", row, basis="same-name-kind-candidate")
+            _add(
+                grouped,
+                "correspondence",
+                "candidate_correspondence",
+                "possible_symbol_move",
+                row,
+                basis="same-name-kind-candidate",
+            )
     for key, family in (
         ("ownership_changed", "relationship_change"),
         ("impact_changed", "relationship_change"),
@@ -74,59 +90,116 @@ def _delta(grouped: dict[str, list[dict[str, object]]], payload: Mapping[str, ob
         ("project_provenance_changed", "evidence_qualification"),
     ):
         if semantic.get(key) is True:
-            _add(grouped, family, "observed_change", key, True, basis="projection-difference")
+            _add(
+                grouped,
+                family,
+                "observed_change",
+                key,
+                True,
+                basis="projection-difference",
+            )
     qualification = _mapping(payload.get("completeness"))
     if qualification.get("changed") is True:
-        _add(grouped, "evidence_qualification", "observed_change",
-             "completeness_changed", True, basis="explicit-completeness-transition")
+        _add(
+            grouped,
+            "evidence_qualification",
+            "observed_change",
+            "completeness_changed",
+            True,
+            basis="explicit-completeness-transition",
+        )
     observer = _mapping(payload.get("observer"))
     if observer.get("changed") is True:
-        _add(grouped, "evidence_qualification", "observed_change",
-             "observer_capability_changed", True, basis="observer-identity-transition")
+        _add(
+            grouped,
+            "evidence_qualification",
+            "observed_change",
+            "observer_capability_changed",
+            True,
+            basis="observer-identity-transition",
+        )
 
 
-def _snapshot(grouped: dict[str, list[dict[str, object]]], payload: Mapping[str, object]) -> None:
+def _snapshot(
+    grouped: dict[str, list[dict[str, object]]], payload: Mapping[str, object]
+) -> None:
     paths = _mapping(payload.get("paths"))
     for path, value in sorted(paths.items()):
         row = _mapping(value)
         if row.get("revision") is not None:
-            _add(grouped, "evidence_qualification", "observed_fact",
-                 "member_revision_observed", {"path": path},
-                 basis="repository-snapshot")
+            _add(
+                grouped,
+                "evidence_qualification",
+                "observed_fact",
+                "member_revision_observed",
+                {"path": path},
+                basis="repository-snapshot",
+            )
     verification = _mapping(payload.get("verification"))
     if verification.get("member"):
-        _add(grouped, "verification_evidence", "observed_fact",
-             "verification_candidate_observed",
-             {"path": verification["member"], "reason": verification.get("reason")},
-             basis="bounded-verification-relevance")
+        _add(
+            grouped,
+            "verification_evidence",
+            "observed_fact",
+            "verification_candidate_observed",
+            {"path": verification["member"], "reason": verification.get("reason")},
+            basis="bounded-verification-relevance",
+        )
     affected = _mapping(payload.get("affected"))
     for role, rows in sorted(affected.items()):
         if isinstance(rows, list):
             for row in rows:
                 if isinstance(row, Mapping) and row.get("path"):
-                    _add(grouped, "relationship_change", "observed_fact",
-                         "related_surface:" + str(role), row,
-                         basis="bounded-repository-impact")
+                    _add(
+                        grouped,
+                        "relationship_change",
+                        "observed_fact",
+                        "related_surface:" + str(role),
+                        row,
+                        basis="bounded-repository-impact",
+                    )
     freshness = payload.get("freshness")
     if freshness is not None:
-        _add(grouped, "evidence_qualification", "observed_fact",
-             "freshness_observed", {}, basis="bounded-freshness-map")
+        _add(
+            grouped,
+            "evidence_qualification",
+            "observed_fact",
+            "freshness_observed",
+            {},
+            basis="bounded-freshness-map",
+        )
 
 
-def _diagnostic(grouped: dict[str, list[dict[str, object]]], payload: Mapping[str, object]) -> None:
+def _diagnostic(
+    grouped: dict[str, list[dict[str, object]]], payload: Mapping[str, object]
+) -> None:
     diagnostics = _mapping(payload.get("diagnostics"))
-    for field, kind in (("added", "diagnostic_added"), ("removed", "diagnostic_missing_after")):
+    for field, kind in (
+        ("added", "diagnostic_added"),
+        ("removed", "diagnostic_missing_after"),
+    ):
         rows = diagnostics.get(field)
         if isinstance(rows, list):
             for row in rows:
-                _add(grouped, "diagnostic_observation", "producer_claim",
-                     kind, row, basis="external-diagnostic-identity-delta")
+                _add(
+                    grouped,
+                    "diagnostic_observation",
+                    "producer_claim",
+                    kind,
+                    row,
+                    basis="external-diagnostic-identity-delta",
+                )
     moves = diagnostics.get("possible_relocations")
     if isinstance(moves, list):
         for row in moves:
-            _add(grouped, "correspondence", "candidate_correspondence",
-                 "possible_diagnostic_relocation", row,
-                 basis="external-diagnostic-correspondence")
+            _add(
+                grouped,
+                "correspondence",
+                "candidate_correspondence",
+                "possible_diagnostic_relocation",
+                row,
+                basis="external-diagnostic-correspondence",
+            )
 
 
 def present_repository_evidence(
@@ -150,7 +223,11 @@ def present_repository_evidence(
         supported = True
     elif schema == "hashmarks.evidence-profile.v1":
         evidence = _mapping(packet.get("evidence"))
-        source = _mapping(evidence.get("snapshot")) if packet.get("profile") == "audit" else evidence
+        source = (
+            _mapping(evidence.get("snapshot"))
+            if packet.get("profile") == "audit"
+            else evidence
+        )
         _snapshot(grouped, source)
         supported = True
     elif schema == "hashmarks.diagnostic-observation-delta.v1":
@@ -165,12 +242,14 @@ def present_repository_evidence(
             selected = entries[:_MAX_PRESENTED_ROWS]
         else:
             selected = entries[:5]
-        groups.append({
-            "family": family,
-            "count_observed_in_packet": len(entries),
-            "findings": selected,
-            "omitted_from_presentation": len(entries) - len(selected),
-        })
+        groups.append(
+            {
+                "family": family,
+                "count_observed_in_packet": len(entries),
+                "findings": selected,
+                "omitted_from_presentation": len(entries) - len(selected),
+            }
+        )
     result: dict[str, object] = {
         "source_schema": schema,
         "source_evidence_identity": (

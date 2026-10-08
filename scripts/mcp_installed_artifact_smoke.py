@@ -22,6 +22,9 @@ _EXPECTED_TOOLS = [
     "dependency_codemap",
     "repository_declarations",
     "post_change",
+    "repository_intelligence_query",
+    "source_observation",
+    "structural_locality",
 ]
 
 

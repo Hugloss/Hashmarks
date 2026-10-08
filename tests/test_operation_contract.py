@@ -56,6 +56,10 @@ _EXPECTED = {
         "explain": "hashmarks.repository-declaration-explain.v1",
     },
     "post_change": {"default": "hashmarks.task-post-change-delta.v2"},
+    "source_observation": {
+        "member": "hashmarks.source-observation.v1",
+        "scope": "hashmarks.scoped-source-occurrences.v1",
+    },
     "projects": {"default": "hashmarks.codemap-projects.v1"},
     "outline": {"default": "hashmarks.outline.v1"},
     "grep": {"default": "hashmarks.grep.v1"},

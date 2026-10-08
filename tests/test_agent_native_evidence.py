@@ -36,17 +36,29 @@ def test_findings_separate_observation_move_candidate_and_capability_change() ->
     result = present_repository_evidence(delta, format="structured")
     groups = {g["family"]: g for g in result["groups"]}
     assert tuple(FAMILIES) == (
-        "source_change", "relationship_change", "dependency_change",
-        "diagnostic_observation", "verification_evidence", "correspondence",
+        "source_change",
+        "relationship_change",
+        "dependency_change",
+        "diagnostic_observation",
+        "verification_evidence",
+        "correspondence",
         "evidence_qualification",
     )
     assert groups["source_change"]["findings"][0]["assertion"] == "observed_change"
-    assert groups["correspondence"]["findings"][0]["assertion"] == "candidate_correspondence"
-    assert groups["relationship_change"]["findings"][0]["kind"] == "dependency_edge_removed"
+    assert (
+        groups["correspondence"]["findings"][0]["assertion"]
+        == "candidate_correspondence"
+    )
+    assert (
+        groups["relationship_change"]["findings"][0]["kind"]
+        == "dependency_edge_removed"
+    )
     assert groups["evidence_qualification"]["count_observed_in_packet"] == 3
     assert result["source_evidence_identity"] == "test-identity"
     assert present_repository_evidence(delta, format="compact")["format"] == "compact"
-    assert "correspondence:" in present_repository_evidence(delta, format="text")["text"]
+    assert (
+        "correspondence:" in present_repository_evidence(delta, format="text")["text"]
+    )
 
 
 def test_diagnostic_disappearance_remains_only_a_producer_claim() -> None:
@@ -74,7 +86,9 @@ def test_presentation_rejects_unknown_modes_and_preserves_unknown_schema() -> No
     assert result["coverage"] == "unsupported"
 
 
-def test_mcp_exposes_existing_authoritative_source_and_query_evidence(tmp_path: Path) -> None:
+def test_mcp_exposes_existing_authoritative_source_and_query_evidence(
+    tmp_path: Path,
+) -> None:
     repo = _repo(tmp_path)
     surface = HashmarksMcpSurface(str(repo), state_dir=str(tmp_path / "state"))
     try:
@@ -90,7 +104,9 @@ def test_mcp_exposes_existing_authoritative_source_and_query_evidence(tmp_path: 
         )
         assert profile["schema"] == "hashmarks.repository-intelligence-query.v1"
         assert profile["presentation"]["supported"]
-        assert profile["presentation"]["source_schema"] == "hashmarks.evidence-profile.v1"
+        assert (
+            profile["presentation"]["source_schema"] == "hashmarks.evidence-profile.v1"
+        )
         with pytest.raises(McpSurfaceError, match="requires exactly one"):
             surface.source_observation(
                 ["src/alpha.py", "src/beta.py"], literal="target"
@@ -101,14 +117,18 @@ def test_mcp_exposes_existing_authoritative_source_and_query_evidence(tmp_path: 
             surface.source_observation(["src/alpha.py"], result_mode="invalid")
         with pytest.raises(McpSurfaceError, match="presentation must be"):
             surface.repository_intelligence_query(
-                "profile", "Explain target", ["src/alpha.py"],
+                "profile",
+                "Explain target",
+                ["src/alpha.py"],
                 presentation="unsafe",
             )
     finally:
         surface.close()
 
 
-def test_core_presentation_does_not_replace_snapshot_or_mutate_producer(tmp_path: Path) -> None:
+def test_core_presentation_does_not_replace_snapshot_or_mutate_producer(
+    tmp_path: Path,
+) -> None:
     repo = _repo(tmp_path)
     with CodeMap(repo) as codemap:
         codemap.sync()

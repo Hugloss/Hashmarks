@@ -460,7 +460,9 @@ class HashmarksMcpSurface:
         limit: int = 50,
     ) -> dict[str, object]:
         if not isinstance(paths, list) or not 1 <= len(paths) <= 32:
-            raise McpSurfaceError("paths must contain between 1 and 32 explicit members")
+            raise McpSurfaceError(
+                "paths must contain between 1 and 32 explicit members"
+            )
         if not all(isinstance(path, str) and path for path in paths):
             raise McpSurfaceError("paths must contain nonblank strings")
         if result_mode not in ("member", "scope"):
@@ -477,7 +479,9 @@ class HashmarksMcpSurface:
             try:
                 self._map.sync(paths)
                 if result_mode == "member":
-                    return self._map.source_observation(paths[0], literal=literal, limit=limit)
+                    return self._map.source_observation(
+                        paths[0], literal=literal, limit=limit
+                    )
                 assert literal is not None
                 return self._map.scoped_source_occurrences(paths, literal, limit=limit)
             except ValueError as exc:

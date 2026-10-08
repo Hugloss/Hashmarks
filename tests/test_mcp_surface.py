@@ -818,6 +818,9 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             "dependency_codemap",
             "repository_declarations",
             "post_change",
+            "repository_intelligence_query",
+            "source_observation",
+            "structural_locality",
         ]
         # Construction may initialize empty SQLite files, but it must not build a generation.
         status = server._hashmarks_surface._map.status()

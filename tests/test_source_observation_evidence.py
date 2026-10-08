@@ -242,8 +242,7 @@ def test_scoped_occurrences_have_exact_member_provenance_and_stable_order(
         "beta.py",
     ]
     revisions = {
-        row["path"]: row["member_revision"]
-        for row in packet["member_observations"]
+        row["path"]: row["member_revision"] for row in packet["member_observations"]
     }
     assert all(
         row["evidence_identity"].startswith("sha256:")

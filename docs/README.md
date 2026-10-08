@@ -8,6 +8,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 
 ## Reference
 
+- [`reference/AGENT_NATIVE_EVIDENCE.md`](reference/AGENT_NATIVE_EVIDENCE.md) — agent-facing typed evidence and bounded MCP exposure.
 - [`reference/ARCHITECTURE.md`](reference/ARCHITECTURE.md) — architecture and authority model.
 - [`reference/API_STABILITY.md`](reference/API_STABILITY.md) — supported Python/CLI surface and pre-1.0 compatibility policy.
 - [`reference/EVIDENCE_CORRELATION.md`](reference/EVIDENCE_CORRELATION.md) — bounded external-observation correlation and authority limits.
