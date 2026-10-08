@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast, get_args
 
 from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
@@ -12,7 +12,11 @@ if TYPE_CHECKING:
 
     from .engine import CodeMap
 
-_PROFILE_NAMES = frozenset({"compact", "standard", "audit"})
+ProfileName = Literal["compact", "standard", "audit"]
+PROFILE_NAMES = get_args(ProfileName)
+
+
+EVIDENCE_PROFILE_SCHEMA = "hashmarks.evidence-profile.v1"
 
 
 class EvidenceProfilesMixin:
@@ -129,7 +133,7 @@ class EvidenceProfilesMixin:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         profile_name = str(profile).strip().lower()
-        if profile_name not in _PROFILE_NAMES:
+        if profile_name not in PROFILE_NAMES:
             raise ValueError("profile must be one of: audit, compact, standard")
         if snapshot.get("schema") != "hashmarks.repository-intelligence-snapshot.v1":
             raise ValueError(
@@ -147,7 +151,7 @@ class EvidenceProfilesMixin:
             evidence = self._audit_profile_evidence(snapshot)
 
         payload: dict[str, object] = {
-            "schema": "hashmarks.evidence-profile.v1",
+            "schema": EVIDENCE_PROFILE_SCHEMA,
             "profile": profile_name,
             "source_snapshot_identity": snapshot_identity,
             "storage": "derived-not-persisted",
@@ -156,7 +160,7 @@ class EvidenceProfilesMixin:
             "evidence": evidence,
         }
         payload["profile_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.evidence-profile.v1",
+            EVIDENCE_PROFILE_SCHEMA,
             payload,
         )
         return payload

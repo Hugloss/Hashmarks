@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped
@@ -386,7 +387,7 @@ class RepositoryEvidenceBindingsMixin:
             rows.append(self._observe_binding(raw_binding, request))
         rows.sort(key=lambda row: str(row["binding_id"]))
         payload: dict[str, object] = {
-            "schema": "hashmarks.repository-evidence-bindings.v1",
+            "schema": operation_schema("repository_evidence", "observation"),
             "observer": self._repository_observer_packet(),
             "repository": {
                 "repository_identity": self._repository_packet_identity(),
@@ -409,6 +410,6 @@ class RepositoryEvidenceBindingsMixin:
             "execution_effect": "none",
         }
         payload["bindings_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.repository-evidence-bindings.v1", payload
+            operation_schema("repository_evidence", "observation"), payload
         )
         return payload

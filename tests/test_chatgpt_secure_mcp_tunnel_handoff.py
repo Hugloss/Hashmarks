@@ -8,6 +8,9 @@ from unittest import mock
 
 import pytest
 
+from hashmarks.codemap.evidence_profiles import PROFILE_NAMES
+from hashmarks.codemap.repository_intelligence_query import QUERY_SURFACES
+from hashmarks.evidence_presentation import FORMATS
 from hashmarks.mcp_contract import (
     MCP_READ_ONLY_ANNOTATIONS,
     MCP_SERVER_INSTRUCTIONS,
@@ -29,7 +32,16 @@ _MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
 
 def _input_schema(contract: McpToolContract) -> dict[str, object]:
-    properties: dict[str, object] = {}
+    properties: dict[str, object] = {
+        "presentation": {
+            "type": "string",
+            "enum": list(FORMATS),
+            "default": contract.default_presentation,
+        }
+    }
+    if contract.name == "repository_intelligence_query":
+        properties["surface_name"] = {"enum": list(QUERY_SURFACES)}
+        properties["profile"] = {"enum": list(PROFILE_NAMES), "default": "compact"}
     if len(contract.response_modes) > 1:
         properties["result_mode"] = {
             "type": "string",

@@ -51,6 +51,13 @@ class OperationContract:
 
 OPERATION_CONTRACTS = (
     OperationContract(
+        "evidence_presentation",
+        (
+            ("projection", "hashmarks.evidence-presentation.v1"),
+            ("envelope", "hashmarks.evidence-presentation-envelope.v1"),
+        ),
+    ),
+    OperationContract(
         "repository_context",
         (("default", "hashmarks.repository-capsule.v1"),),
     ),

@@ -1,47 +1,72 @@
 # Evidence format qualification
 
-This is an **experimental export and score aggregation** boundary; it does not
-launch an agent and cannot assert which evidence format an agent prefers.
+This experiment exports frozen evidence and aggregates external grades. It
+launches no agents, issues no winner, and cannot establish comprehension gains
+from byte savings alone. Model execution and grading remain external.
 
-Use frozen repository evidence and the same held-out prompt across four arms:
+## Two distinct study axes
 
-* `native-json`: original producer packet.
-* `typed-json`: structured typed finding projection.
-* `compact-json`: bounded finding projection.
-* `grouped-text`: concise, assertion-labeled finding text.
+`production-response` reproduces the live response shape. Its four arms are
+`native-json` (`none`), `typed-json` (`structured`), `compact-json` (`compact`),
+and `grouped-text` (`text`). Formatted responses retain the canonical native
+result alongside their presentation. Query responses retain their query envelope
+and owner-derived query identity. This measures the actual optional product
+contract, including information density and envelope overhead.
 
-The arms may carry **different information densities**. Do not attribute a gain
-to encoding alone without a separate information-matched experiment.
-Do not put an oracle, answer key, or grading metadata into agent tool payloads.
+`encoding-only` renders one compact selection three ways: pretty JSON,
+minified JSON, and grouped text. All three retain the same selected records,
+qualifications, identities, references, and exclusions. Raw native JSON is not
+an information-matched arm. Neither experiment rescans the repository between
+arms.
 
-A sample manifest contains `cases`, each with `id`, `prompt`, and
-`packet` (the existing schema-bearing Hashmarks producer response). Optionally
-keep an `oracle` outside the exported arm: it is not transported.
-
-Export with the repository's locked uv environment:
+A manifest contains `cases`, each with unique `id`, `prompt`, and a frozen
+schema-bearing `packet`. Production cases also require `operation` and
+`result_mode` describing the canonical native response. A query case supplies
+the native query envelope, including its `surface` and `result`. Grading oracles
+may remain in the input case metadata but are never exported into trials or
+model-visible tool responses.
 
 ```bash
 uv run --frozen -m scripts.agent_evaluation.agent_evidence_format_study emit \
-  --input evidence-cases.json --output evidence-trials.jsonl
+  --axis production-response --input evidence-cases.json \
+  --output production-trials.jsonl
+uv run --frozen -m scripts.agent_evaluation.agent_evidence_format_study emit \
+  --axis encoding-only --input evidence-cases.json \
+  --output encoding-trials.jsonl
 ```
 
-Run the generated trials through agentsCookbook or another *external* agent
-harness. Grade answers against held-out task truth, not against Hashmarks's
-presentation wording. Record model, case_id, variant, correct (boolean),
-unsupported_claims (nonnegative integer) and tokens (nonnegative integer).
-Include nonresponses and failures in the harness's authoritative report;
-do not reclassify them as correct.
+## External execution and grades
 
-For the exact, complete paired subset, aggregate already-graded run records:
+Use agentsCookbook or another external harness to run held-out prompts against
+at least two models. Preserve the exported trial, actual serialized MCP/host
+response delivered to the model, answer trace, and grading evidence. The export
+alone is not a measurement of what a host ultimately exposes.
+
+Each grade names `case_id`, `model`, and `variant`. `status` is `completed`
+(default), `failure`, or `nonresponse`. Completed responses require boolean
+`correct`; failures and nonresponses count as incorrect. `tokens` and
+`unsupported_claims` are nonnegative integers or null/missing when unknown.
+Booleans are not integer metrics. Unknown metrics remain unknown rather than
+becoming zero. Other costs, tool calls, redundant reads, and wall time remain in
+the external harness report.
+
+Summarization requires the emitted trial manifest and explicit expected models,
+so an entirely missing case or model cannot disappear from the denominator:
 
 ```bash
 uv run --frozen -m scripts.agent_evaluation.agent_evidence_format_study summarize \
-  --input external-grades.json --output format-comparison.json
+  --input external-grades.json --trials production-trials.jsonl \
+  --model model-a --model model-b --output production-comparison.json
 ```
 
-The result names incomplete pairs excluded from the paired comparison. It does
-not issue a winning-format recommendation. Compare correctness, false claims,
-actual total tokens, tool calls and wall time in the external harness before
-choosing any default. Test more than one agent/model and include ambiguous
-symbols, shifted diagnostics, stale/partial observations and real dependency
-upgrades. Preserve both the original packet and exact answer traces for review.
+The summary reports expected and complete pairs, names every excluded pair and
+missing variant, and aggregates the complete paired subset. Every supplied grade
+is validated, including excluded pairs. Duplicate or unexpected grades fail.
+Partial metric sums are labelled observed sums with unknown-run counts; the
+authoritative total stays null when any paired measurement is unknown.
+
+Use ambiguous owners, possible moves, shifted diagnostics, partial and stale
+observations, qualified negative evidence, dependency version changes, body-only
+revisions, and bounded projections in held-out cases. Review correctness and
+unsupported claims before choosing defaults. No new default or demonstrated
+agent benefit follows from the repository-only tests.

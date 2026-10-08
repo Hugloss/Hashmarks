@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from hashmarks.client import default_runtime_dir
+from hashmarks.evidence_presentation import validate_presentation
 from hashmarks.ipc_boundary import dispatch_json_request
 from hashmarks.operation_contract import (
     require_registered_operation,
@@ -590,6 +591,9 @@ class CodeMapService:
             options=RepositoryIntelligenceQueryOptions(
                 member_path=member_path,
                 profile=str(request.get("profile", defaults.profile)),
+                presentation=validate_presentation(
+                    request.get("presentation", defaults.presentation)
+                ),
                 negative_members=negative_members,
                 previous_map=previous_map,
                 previous_snapshot=previous_snapshot,
@@ -1096,6 +1100,7 @@ class CodeMapServiceClient:
             "task": task,
             "changed_paths": list(changed_paths),
             "profile": options.profile,
+            "presentation": validate_presentation(options.presentation),
             "negative_members": list(options.negative_members),
             "limit": options.limit,
             "per_role": options.per_role,
@@ -1109,12 +1114,21 @@ class CodeMapServiceClient:
             payload["previous_map"] = options.previous_map
         if options.previous_snapshot is not None:
             payload["previous_snapshot"] = options.previous_snapshot
-        return dict(
-            self.request(
-                "repository_intelligence_query",
-                **payload,
-            )["repository_intelligence_query"]
+        result = dict(
+            self.request("repository_intelligence_query", **payload)[
+                "repository_intelligence_query"
+            ]
         )
+        if options.presentation != "none":
+            projection = result.get("presentation")
+            if (
+                not isinstance(projection, dict)
+                or projection.get("format") != options.presentation
+            ):
+                raise ValueError(
+                    "unsupported presentation: service did not honor requested format"
+                )
+        return result
 
     def task_change_impact(
         self,

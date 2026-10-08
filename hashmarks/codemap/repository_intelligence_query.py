@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast, get_args
 
-from hashmarks.evidence_presentation import present_repository_evidence
+from hashmarks.evidence_presentation import (
+    present_repository_evidence,
+    validate_presentation,
+)
 from hashmarks.operation_contract import operation_response, operation_schema
 
 from .change_impact import ChangeImpactOptions
+from .evidence_verification import VerificationMixin
 from .freshness_map import FreshnessMapOptions
 
 if TYPE_CHECKING:
@@ -15,7 +19,7 @@ if TYPE_CHECKING:
 
     from .engine import CodeMap
 
-_QUERY_SURFACES = (
+QuerySurface = Literal[
     "change-intelligence",
     "verification-explanation",
     "freshness",
@@ -24,7 +28,8 @@ _QUERY_SURFACES = (
     "delta",
     "cross-repository",
     "economics",
-)
+]
+QUERY_SURFACES = get_args(QuerySurface)
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,17 +60,6 @@ class RepositoryIntelligenceQueryMixin:
     existing producer that already owns the requested semantics.
     """
 
-    @staticmethod
-    def _include_presentation(
-        envelope: dict[str, object],
-        producer: dict[str, object],
-        format: str,
-    ) -> None:
-        if format != "none":
-            envelope["presentation"] = present_repository_evidence(
-                producer, format=format
-            )
-
     @operation_response("repository_intelligence_query")
     def repository_intelligence_query(
         self,
@@ -78,8 +72,9 @@ class RepositoryIntelligenceQueryMixin:
         ),
     ) -> dict[str, object]:
         self = cast("CodeMap", self)
-        if surface not in _QUERY_SURFACES:
-            raise ValueError(f"surface must be one of {list(_QUERY_SURFACES)}")
+        validate_presentation(options.presentation)
+        if surface not in QUERY_SURFACES:
+            raise ValueError(f"surface must be one of {list(QUERY_SURFACES)}")
         if not task.strip():
             raise ValueError("task must not be empty")
 
@@ -167,19 +162,32 @@ class RepositoryIntelligenceQueryMixin:
             else:
                 result = producers[surface]()
 
-        producer_schema = str(result.get("schema") or "")
-        envelope: dict[str, object] = {
-            "schema": operation_schema("repository_intelligence_query"),
-            "surface": surface,
-            "producer_schema": producer_schema,
-            "result": result,
-            "storage": "derived-not-persisted",
-            "authority": "repository-intelligence-only",
-            "execution_effect": "none",
-        }
-        self._include_presentation(envelope, result, options.presentation)
-        envelope["query_identity"] = "sha256:" + self._packet_digest(
-            operation_schema("repository_intelligence_query"),
-            envelope,
+        return repository_query_response(
+            surface, result, presentation=options.presentation
         )
-        return envelope
+
+
+def repository_query_response(
+    surface: str, result: Mapping[str, object], *, presentation: str = "none"
+) -> dict[str, object]:
+    """Build the query envelope from one frozen producer response."""
+    validate_presentation(presentation)
+    if surface not in QUERY_SURFACES:
+        raise ValueError(f"surface must be one of {list(QUERY_SURFACES)}")
+    envelope: dict[str, object] = {
+        "schema": operation_schema("repository_intelligence_query"),
+        "surface": surface,
+        "producer_schema": result.get("schema"),
+        "result": dict(result),
+        "storage": "derived-not-persisted",
+        "authority": "repository-intelligence-only",
+        "execution_effect": "none",
+    }
+    if presentation != "none":
+        envelope["presentation"] = present_repository_evidence(
+            result, format=presentation
+        )
+    envelope["query_identity"] = "sha256:" + VerificationMixin._packet_digest(
+        operation_schema("repository_intelligence_query"), envelope
+    )
+    return envelope

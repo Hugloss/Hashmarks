@@ -41,6 +41,10 @@ from hashmarks.operation_contract import (
 ROOT = Path(__file__).resolve().parents[1]
 
 _EXPECTED = {
+    "evidence_presentation": {
+        "projection": "hashmarks.evidence-presentation.v1",
+        "envelope": "hashmarks.evidence-presentation-envelope.v1",
+    },
     "repository_context": {"default": "hashmarks.repository-capsule.v1"},
     "find": {"default": "hashmarks.find.v2"},
     "task_evidence": {"default": "hashmarks.task-evidence.v5"},

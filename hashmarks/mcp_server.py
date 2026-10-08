@@ -6,8 +6,16 @@ from typing import TYPE_CHECKING, Any, Literal
 from ._version import __version__
 from .codemap.change_impact import CHANGE_IMPACT_DEFAULT_REQUEST
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
+from .codemap.evidence_profiles import ProfileName
 from .codemap.find_engine import FIND_DEFAULT_OPTIONS
+from .codemap.repository_intelligence_query import QuerySurface
 from .errors import OptionalFeatureError, UserFacingError
+from .evidence_presentation import (
+    FORMATS,
+    PresentationFormat,
+    presentation_response,
+    validate_presentation,
+)
 from .mcp_contract import (
     MCP_READ_ONLY_ANNOTATIONS,
     MCP_SERVER_DESCRIPTION,
@@ -29,6 +37,10 @@ _INSTALL_HINT = (
 )
 
 _SERVER_INSTRUCTIONS = MCP_SERVER_INSTRUCTIONS
+
+_Presentation = PresentationFormat
+_QuerySurface = QuerySurface
+_Profile = ProfileName
 
 _DependencyCodemapResultMode = Literal[*tuple(operation_modes("dependency_codemap"))]
 _RepositoryDeclarationsResultMode = Literal[
@@ -55,15 +67,37 @@ def _call_surface(
     /,
     *args: Any,
     response_mode: str | None = None,
+    presentation: str = "none",
     **kwargs: Any,
 ) -> dict[str, object]:
     """Translate consumer errors and enforce the canonical response contract."""
 
     try:
+        if presentation not in FORMATS:
+            raise McpSurfaceError(f"presentation must be one of: {', '.join(FORMATS)}")
+        validate_presentation(presentation)
+        if contract.operation == "repository_intelligence_query":
+            kwargs["presentation"] = presentation
         result = operation(*args, **kwargs)
+        contract.validate_response(
+            result,
+            result_mode=response_mode,
+            presentation=presentation
+            if contract.operation == "repository_intelligence_query"
+            else "none",
+        )
+        if contract.operation != "repository_intelligence_query":
+            result = presentation_response(
+                contract.operation,
+                result,
+                format=presentation,
+                result_mode=response_mode,
+            )
     except McpSurfaceError as exc:
         raise tool_error(exc.transport_message()) from exc
-    return contract.validate_response(result, result_mode=response_mode)
+    return contract.validate_response(
+        result, result_mode=response_mode, presentation=presentation
+    )
 
 
 def _register_repository_declarations_tool(
@@ -83,6 +117,7 @@ def _register_repository_declarations_tool(
         groups: list[dict[str, Any]],
         previous_observation: dict[str, Any] | None = None,
         result_mode: _RepositoryDeclarationsResultMode = contract.default_response_mode,
+        presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
             contract,
@@ -92,6 +127,7 @@ def _register_repository_declarations_tool(
             previous_observation=previous_observation,
             result_mode=result_mode,
             response_mode=result_mode,
+            presentation=presentation,
         )
 
 
@@ -110,11 +146,11 @@ def _register_agent_evidence_tools(
         annotations=annotations,
     )
     def repository_intelligence_query(  # noqa: PLR0913 - explicit MCP query inputs
-        surface_name: str,
+        surface_name: _QuerySurface,
         task: str,
         changed_paths: list[str] | None = None,
-        profile: str = "compact",
-        presentation: str = "compact",
+        profile: _Profile = "compact",
+        presentation: _Presentation = "compact",
         member_path: str | None = None,
         previous_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, object]:
@@ -143,6 +179,7 @@ def _register_agent_evidence_tools(
         literal: str | None = None,
         result_mode: _SourceObservationResultMode = source_contract.default_response_mode,
         limit: int = 50,
+        presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
             source_contract,
@@ -153,6 +190,7 @@ def _register_agent_evidence_tools(
             result_mode=result_mode,
             response_mode=result_mode,
             limit=limit,
+            presentation=presentation,
         )
 
     binding_contract = tool_contract("repository_evidence")
@@ -165,6 +203,7 @@ def _register_agent_evidence_tools(
     def repository_evidence(
         request: dict[str, Any],
         result_mode: _RepositoryEvidenceResultMode = binding_contract.default_response_mode,
+        presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
             binding_contract,
@@ -173,6 +212,7 @@ def _register_agent_evidence_tools(
             request,
             result_mode=result_mode,
             response_mode=result_mode,
+            presentation=presentation,
         )
 
     findings_contract = tool_contract("repository_findings")
@@ -182,12 +222,15 @@ def _register_agent_evidence_tools(
         description=findings_contract.description,
         annotations=annotations,
     )
-    def repository_findings(paths: list[str] | None = None) -> dict[str, object]:
+    def repository_findings(
+        paths: list[str] | None = None, presentation: _Presentation = "none"
+    ) -> dict[str, object]:
         return _call_surface(
             findings_contract,
             tool_error,
             surface.repository_findings,
             paths,
+            presentation=presentation,
         )
 
     locality_contract = tool_contract("structural_locality")
@@ -197,13 +240,16 @@ def _register_agent_evidence_tools(
         description=locality_contract.description,
         annotations=annotations,
     )
-    def structural_locality(target: str, max_depth: int = 2) -> dict[str, object]:
+    def structural_locality(
+        target: str, max_depth: int = 2, presentation: _Presentation = "none"
+    ) -> dict[str, object]:
         return _call_surface(
             locality_contract,
             tool_error,
             surface.structural_locality,
             target,
             max_depth=max_depth,
+            presentation=presentation,
         )
 
 
@@ -232,12 +278,15 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         description=repository_context_contract.description,
         annotations=annotations,
     )
-    def repository_context(max_areas: int = 12) -> dict[str, object]:
+    def repository_context(
+        max_areas: int = 12, presentation: _Presentation = "none"
+    ) -> dict[str, object]:
         return _call_surface(
             repository_context_contract,
             ToolError,
             surface.repository_context,
             max_areas=max_areas,
+            presentation=presentation,
         )
 
     find_contract = tool_contract("find")
@@ -250,8 +299,16 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
     def find(
         query: str,
         limit: int = FIND_DEFAULT_OPTIONS.limit,
+        presentation: _Presentation = "none",
     ) -> dict[str, object]:
-        return _call_surface(find_contract, ToolError, surface.find, query, limit=limit)
+        return _call_surface(
+            find_contract,
+            ToolError,
+            surface.find,
+            query,
+            limit=limit,
+            presentation=presentation,
+        )
 
     task_evidence_contract = tool_contract("task_evidence")
 
@@ -265,6 +322,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
             task_evidence_contract,
@@ -274,6 +332,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
             limit=limit,
             per_role=per_role,
             token_budget=token_budget,
+            presentation=presentation,
         )
 
     change_impact_contract = tool_contract("change_impact")
@@ -287,6 +346,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         task: str,
         changed_paths: list[str],
         max_depth: int = CHANGE_IMPACT_DEFAULT_REQUEST.options.max_depth,
+        presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
             change_impact_contract,
@@ -295,6 +355,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
             task,
             changed_paths,
             max_depth=max_depth,
+            presentation=presentation,
         )
 
     correlate_evidence_contract = tool_contract("correlate_evidence")
@@ -310,6 +371,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         previous_correlation: dict[str, Any] | None = None,
         include_relationships: bool = True,
         relationship_limit_per_path: int = 100,
+        presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
             correlate_evidence_contract,
@@ -320,6 +382,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
             previous_correlation=previous_correlation,
             include_relationships=include_relationships,
             relationship_limit_per_path=relationship_limit_per_path,
+            presentation=presentation,
         )
 
     dependency_codemap_contract = tool_contract("dependency_codemap")
@@ -336,6 +399,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         result_mode: _DependencyCodemapResultMode = (
             dependency_codemap_contract.default_response_mode
         ),
+        presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
             dependency_codemap_contract,
@@ -346,6 +410,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
             previous_observation=previous_observation,
             result_mode=result_mode,
             response_mode=result_mode,
+            presentation=presentation,
         )
 
     _register_repository_declarations_tool(server, surface, annotations, ToolError)
@@ -362,6 +427,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         changed_paths: list[str],
         previous_evidence: dict[str, Any],
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
             post_change_contract,
@@ -371,6 +437,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
             changed_paths,
             previous_evidence,
             token_budget=token_budget,
+            presentation=presentation,
         )
 
     _register_agent_evidence_tools(server, surface, annotations, ToolError)

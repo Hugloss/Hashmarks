@@ -28,7 +28,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _input_schema(contract: McpToolContract) -> dict[str, object]:
-    properties: dict[str, object] = {"fixture": {"type": "string"}}
+    properties: dict[str, object] = {
+        "fixture": {"type": "string"},
+        "presentation": {
+            "type": "string",
+            "enum": ["none", "structured", "compact", "text"],
+            "default": contract.default_presentation,
+        },
+    }
+    if contract.name == "repository_intelligence_query":
+        from hashmarks.codemap.evidence_profiles import PROFILE_NAMES
+        from hashmarks.codemap.repository_intelligence_query import QUERY_SURFACES
+
+        properties["surface_name"] = {"enum": list(QUERY_SURFACES)}
+        properties["profile"] = {"enum": list(PROFILE_NAMES), "default": "compact"}
     if len(contract.response_modes) > 1:
         properties["result_mode"] = {
             "type": "string",

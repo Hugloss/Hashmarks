@@ -133,6 +133,16 @@ Typed finding presentations and conservative assertion semantics are specified i
 are not action recommendations and do not promote partial or producer-claimed
 observations into repository-wide truth.
 
+Every tool accepts optional `presentation`: `none`, `structured`, `compact`, or
+`text`. The default remains `compact` for `repository_intelligence_query` and
+`none` for the other tools. `none` preserves the native response. Other formats
+use `hashmarks.evidence-presentation-envelope.v1` with the intact native `result`
+and a `hashmarks.evidence-presentation.v1` projection. The query tool keeps its
+existing query envelope with a sibling presentation. Native response modes and
+schemas remain separately advertised; display bounds never establish absence,
+completeness, or unique ownership. See the presentation contract above for exact
+row caps, source references, qualification metadata, and omission accounting.
+
 The tools are read-only from the repository consumer's perspective. Hashmarks may update its own disposable derived cache while answering them.
 
 ### Canonical operation schema authority

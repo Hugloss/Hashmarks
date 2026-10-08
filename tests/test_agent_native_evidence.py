@@ -43,6 +43,10 @@ def test_findings_separate_observation_move_candidate_and_capability_change() ->
         "verification",
         "correspondence",
         "qualification",
+        "repository_structure",
+        "retrieval_evidence",
+        "ownership_evidence",
+        "evidence_measurement",
     )
     assert groups["source"]["findings"][0]["assertion"] == "observed_change"
     assert (

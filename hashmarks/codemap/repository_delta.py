@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.digest import Digest
 from hashmarks.file_store import UnstableFileError
 from hashmarks.freshness import freshness_state
+from hashmarks.operation_contract import operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactOptions
@@ -106,6 +107,11 @@ def _observer_descriptor() -> dict[str, object]:
             "verification",
         ],
     }
+
+
+REPOSITORY_SNAPSHOT_SCHEMA = "hashmarks.repository-intelligence-snapshot.v1"
+REPOSITORY_DELTA_SCHEMA = "hashmarks.repository-intelligence-delta.v1"
+DIAGNOSTIC_DELTA_SCHEMA = "hashmarks.diagnostic-observation-delta.v1"
 
 
 class RepositoryDeltaMixin:
@@ -683,7 +689,7 @@ class RepositoryDeltaMixin:
         member, raw = self._bounded_source_observation(relpath, max_bytes)
         generation, identity_generation, stale = self._generation_status()
         packet: dict[str, object] = {
-            "schema": "hashmarks.source-observation.v1",
+            "schema": operation_schema("source_observation", "member"),
             "member": member,
             "generation": generation,
             "identity_generation": identity_generation,
@@ -710,7 +716,7 @@ class RepositoryDeltaMixin:
         if packet["availability"] != "observed":
             return packet
         packet["observation_identity"] = self._evidence_identity(
-            "hashmarks.source-observation.v1",
+            operation_schema("source_observation", "member"),
             {
                 "member": member,
                 "literal_query": literal,
@@ -774,7 +780,7 @@ class RepositoryDeltaMixin:
             else "complete"
         )
         result: dict[str, object] = {
-            "schema": "hashmarks.scoped-source-occurrences.v1",
+            "schema": operation_schema("source_observation", "scope"),
             "observation_scope": "explicit-member-set-only",
             "paths": batch.paths,
             "literal": batch.literal,
@@ -812,7 +818,7 @@ class RepositoryDeltaMixin:
             "execution_effect": "none",
         }
         result["observation_identity"] = self._evidence_identity(
-            "hashmarks.scoped-source-occurrences.v1",
+            operation_schema("source_observation", "scope"),
             {
                 "paths": batch.paths,
                 "literal": batch.literal,
@@ -1109,7 +1115,7 @@ class RepositoryDeltaMixin:
         )
 
         return {
-            "schema": "hashmarks.diagnostic-observation-delta.v1",
+            "schema": DIAGNOSTIC_DELTA_SCHEMA,
             "producer": after.get("producer"),
             "repository": {
                 "before": before.get("repository_identity"),
@@ -1201,7 +1207,7 @@ class RepositoryDeltaMixin:
             ),
         )
         payload: dict[str, object] = {
-            "schema": "hashmarks.repository-intelligence-snapshot.v1",
+            "schema": REPOSITORY_SNAPSHOT_SCHEMA,
             "observer": self._repository_observer_packet(),
             "repository": deepcopy(brief["repository"]),
             "task_identity": brief["task_identity"],
@@ -1223,7 +1229,7 @@ class RepositoryDeltaMixin:
         if "project_impact" in brief:
             payload["project_impact"] = deepcopy(brief["project_impact"])
         payload["snapshot_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.repository-intelligence-snapshot.v1", payload
+            REPOSITORY_SNAPSHOT_SCHEMA, payload
         )
         if snapshot_key is not None:
             self._decision_snapshot_cache[snapshot_key] = deepcopy(payload)
@@ -1236,10 +1242,7 @@ class RepositoryDeltaMixin:
     ) -> tuple[Mapping[str, object], str]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        if (
-            previous_snapshot.get("schema")
-            != "hashmarks.repository-intelligence-snapshot.v1"
-        ):
+        if previous_snapshot.get("schema") != REPOSITORY_SNAPSHOT_SCHEMA:
             raise ValueError(
                 "previous_snapshot must be a hashmarks.repository-intelligence-snapshot.v1 packet"
             )
@@ -1254,7 +1257,7 @@ class RepositoryDeltaMixin:
             raise ValueError("previous_snapshot task-mismatch")
         identity = previous_snapshot.get("snapshot_identity")
         expected_identity = "sha256:" + self._packet_digest(
-            "hashmarks.repository-intelligence-snapshot.v1",
+            REPOSITORY_SNAPSHOT_SCHEMA,
             {
                 key: value
                 for key, value in previous_snapshot.items()
@@ -1468,7 +1471,7 @@ class RepositoryDeltaMixin:
             current.get("completeness"), field="current.completeness"
         )
         payload: dict[str, object] = {
-            "schema": "hashmarks.repository-intelligence-delta.v1",
+            "schema": REPOSITORY_DELTA_SCHEMA,
             "repository_identity": repository_identity,
             "task_identity": current["task_identity"],
             "from": {
@@ -1498,6 +1501,6 @@ class RepositoryDeltaMixin:
             "execution_effect": "none",
         }
         payload["delta_identity"] = "sha256:" + self._packet_digest(
-            "hashmarks.repository-intelligence-delta.v1", payload
+            REPOSITORY_DELTA_SCHEMA, payload
         )
         return payload
