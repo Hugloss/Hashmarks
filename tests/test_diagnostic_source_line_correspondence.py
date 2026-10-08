@@ -15,7 +15,10 @@ if TYPE_CHECKING:
 
 
 def _diagnostics(
-    generation: int, line: int, *, column: int = 12,
+    generation: int,
+    line: int,
+    *,
+    column: int = 12,
     collection: str = "fresh-complete",
 ) -> dict[str, object]:
     return RepositoryDeltaMixin.external_diagnostic_observation(
@@ -25,11 +28,17 @@ def _diagnostics(
         scope_paths=["src.py"],
         collection_state=collection,
         outcome="fail",
-        diagnostics=[{
-            "tool": "pyright", "rule": "unknown-name",
-            "path": "src.py", "symbol": "example", "line": line,
-            "column": column, "message": "undefined name",
-        }],
+        diagnostics=[
+            {
+                "tool": "pyright",
+                "rule": "unknown-name",
+                "path": "src.py",
+                "symbol": "example",
+                "line": line,
+                "column": column,
+                "message": "undefined name",
+            }
+        ],
     )
 
 
@@ -149,9 +158,10 @@ def test_source_line_anchor_is_exact_revision_bound_and_unique(tmp_path: Path) -
         row["member_revision"] == packet["member"]["member_revision"]
         for row in packet["line_anchors"]
     )
-    assert packet["line_anchors"][0]["line_sha256"] != packet["line_anchors"][1][
-        "line_sha256"
-    ]
+    assert (
+        packet["line_anchors"][0]["line_sha256"]
+        != packet["line_anchors"][1]["line_sha256"]
+    )
 
 
 @pytest.mark.parametrize("lines", [[0], [-1], [True], [1] * 33])
@@ -194,14 +204,16 @@ def test_mismatched_source_generation_never_supports_correspondence(
         tmp_path,
         old="def example():\n    print(missing)\n",
         new="def example():\n    other = 1\n    print(missing)\n",
-        old_line=2, new_line=3,
+        old_line=2,
+        new_line=3,
     )
     before = _diagnostics(987654, 2)
     after = _diagnostics(987655, 3)
     source_pair = delta["diagnostics"]["source_correspondence"]
     assert len(source_pair["supported"]) == 1
     result = RepositoryDeltaMixin.diagnostic_observation_delta(
-        before, after,
+        before,
+        after,
         before_source={"schema": "hashmarks.source-observation.v1"},
         after_source={"schema": "hashmarks.source-observation.v1"},
     )["diagnostics"]["source_correspondence"]
