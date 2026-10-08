@@ -1088,9 +1088,7 @@ class RepositoryDeltaMixin:
         prior = before.get("collection")
         current = after.get("collection")
         prior_state = prior.get("state") if isinstance(prior, Mapping) else None
-        current_state = (
-            current.get("state") if isinstance(current, Mapping) else None
-        )
+        current_state = current.get("state") if isinstance(current, Mapping) else None
         prior_scope = before.get("scope_paths")
         current_scope = after.get("scope_paths")
         before_paths = set(prior_scope) if isinstance(prior_scope, list) else set()
