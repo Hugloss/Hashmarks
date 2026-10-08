@@ -14,6 +14,11 @@ from hashmarks.paths import normalize_relative_path
 from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
 from .freshness_map import FreshnessMapOptions
+from .source_line_correspondence import (
+    diagnostic_line_correspondence,
+    source_line_anchors,
+    source_shape,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -454,24 +459,7 @@ class RepositoryDeltaMixin:
             }
         return rows
 
-    @staticmethod
-    def _source_shape(raw: bytes, *, long_line_threshold: int) -> dict[str, object]:
-        """Measure physical source properties without creating a second file index."""
-        parts = raw.split(b"\n")
-        physical = parts[:-1] if raw.endswith(b"\n") else parts if raw else []
-        widths = [len(part) for part in physical]
-        return {
-            "bytes": len(raw),
-            "physical_lines": len(physical),
-            "lf_terminators": raw.count(b"\n"),
-            "crlf_terminators": sum(part.endswith(b"\r") for part in parts[:-1]),
-            "final_lf": raw.endswith(b"\n"),
-            "utf8_bom": raw.startswith(b"\xef\xbb\xbf"),
-            "maximum_physical_line_bytes": max(widths, default=0),
-            "long_line_threshold_bytes": long_line_threshold,
-            "long_line_count": sum(width > long_line_threshold for width in widths),
-            "basis": "stable-canonical-member-bytes",
-        }
+    _source_shape = staticmethod(source_shape)
 
     @staticmethod
     def _python_source_token_kinds(
@@ -644,6 +632,11 @@ class RepositoryDeltaMixin:
 
         packet["completeness"] = "complete"
         packet["truncation"] = "complete"
+        requested = cast("list[int]", packet["requested_lines"])
+        if requested:
+            packet["line_anchors"], packet["line_coverage"] = source_line_anchors(
+                raw, requested=requested, member=member
+            )
         if literal is None:
             return
         symbols = (
@@ -678,6 +671,7 @@ class RepositoryDeltaMixin:
         limit: int = 50,
         max_bytes: int = 1_048_576,
         long_line_threshold: int = 2_000,
+        lines: Sequence[int] = (),
     ) -> dict[str, object]:
         """Describe one stable source member, with no repository-wide absence claim."""
         if TYPE_CHECKING:
@@ -685,6 +679,11 @@ class RepositoryDeltaMixin:
         self._validate_source_observation(
             literal, limit, max_bytes, long_line_threshold
         )
+        if isinstance(lines, (str, bytes)) or len(lines) > 32 or any(
+            type(line) is not int or line < 1 for line in lines
+        ):
+            raise ValueError("lines must be up to 32 positive integers")
+        requested = sorted(set(lines))
         generation_before = self.store.generation()
         member, raw = self._bounded_source_observation(relpath, max_bytes)
         generation, identity_generation, stale = self._generation_status()
@@ -703,6 +702,9 @@ class RepositoryDeltaMixin:
             "completeness": "unknown",
             "source_shape": None,
             "literal_query": literal,
+            "requested_lines": requested,
+            "line_anchors": [],
+            "line_coverage": "unknown" if requested else "not-requested",
             "occurrences": [],
             "observed_match_count": None,
             "truncation": "unknown",
@@ -721,6 +723,9 @@ class RepositoryDeltaMixin:
                 "member": member,
                 "literal_query": literal,
                 "source_shape": packet["source_shape"],
+                "requested_lines": requested,
+                "line_anchors": packet["line_anchors"],
+                "line_coverage": packet["line_coverage"],
                 "occurrences": packet["occurrences"],
                 "observed_match_count": packet["observed_match_count"],
                 "truncation": packet["truncation"],
@@ -1151,6 +1156,8 @@ class RepositoryDeltaMixin:
         after: Mapping[str, object],
         *,
         changed_paths: Sequence[str] = (),
+        before_source: Mapping[str, object] | None = None,
+        after_source: Mapping[str, object] | None = None,
     ) -> dict[str, object]:
         """Compare diagnostic identities; counts alone are never delta authority."""
 
@@ -1178,6 +1185,19 @@ class RepositoryDeltaMixin:
         ]
         possible_relocations = RepositoryDeltaMixin._possible_diagnostic_relocations(
             before, after, removed, added
+        )
+        if (before_source is None) != (after_source is None):
+            raise ValueError("source correspondence requires both endpoint observations")
+        source_correspondence = (
+            diagnostic_line_correspondence(
+                candidates=possible_relocations,
+                before_diagnostic=before,
+                after_diagnostic=after,
+                before_source=before_source,
+                after_source=after_source,
+            )
+            if before_source is not None and after_source is not None
+            else None
         )
 
         return {
@@ -1209,6 +1229,7 @@ class RepositoryDeltaMixin:
                 "unchanged_count": len(old_ids & new_ids),
                 "added_in_changed_scope": added_in_changed_scope,
                 "possible_relocations": possible_relocations,
+                "source_correspondence": source_correspondence,
                 "qualification": RepositoryDeltaMixin._diagnostic_claim_qualification(
                     before, after, added, removed
                 ),
