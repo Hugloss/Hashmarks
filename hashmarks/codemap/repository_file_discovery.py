@@ -52,6 +52,20 @@ class _AdmittedRepositoryFile:
 class RepositoryFileDiscoveryMixin:
     """Canonical admission and traversal for repository-owned file surfaces."""
 
+    @staticmethod
+    def _repository_discovery_coverage(admitted_count: int) -> dict[str, object]:
+        """Project known admission scope without enumerating excluded members."""
+        return {
+            "scope": "discovered-policy-admitted-indexable-members",
+            "admitted_member_count": admitted_count,
+            "known_pruned_directory_classes": sorted(_PRUNE_DIRS),
+            "pruned_member_count": None,
+            "unreadable_member_count": None,
+            "repository_wide_completeness": "not-claimed",
+            "absence_outside_admitted_scope": "not-admissible",
+            "basis": "canonical-repository-file-discovery",
+        }
+
     def _inside_nested_repository(self, rel: str) -> bool:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
