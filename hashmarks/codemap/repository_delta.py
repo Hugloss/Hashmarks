@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.digest import Digest
+from hashmarks.freshness import freshness_state
 from hashmarks.file_store import UnstableFileError
 from hashmarks.paths import normalize_relative_path
 
@@ -398,6 +399,201 @@ class RepositoryDeltaMixin:
             }
         return rows
 
+
+    @staticmethod
+    def _source_shape(raw: bytes, *, long_line_threshold: int) -> dict[str, object]:
+        """Measure physical source properties without creating a second file index."""
+        parts = raw.split(b"\\n")
+        physical = parts[:-1] if raw.endswith(b"\\n") else parts if raw else []
+        widths = [len(part) for part in physical]
+        return {
+            "bytes": len(raw),
+            "physical_lines": len(physical),
+            "lf_terminators": raw.count(b"\\n"),
+            "crlf_terminators": sum(part.endswith(b"\\r") for part in parts[:-1]),
+            "final_lf": raw.endswith(b"\\n"),
+            "utf8_bom": raw.startswith(b"\\xef\\xbb\\xbf"),
+            "maximum_physical_line_bytes": max(widths, default=0),
+            "long_line_threshold_bytes": long_line_threshold,
+            "long_line_count": sum(width > long_line_threshold for width in widths),
+            "basis": "stable-canonical-member-bytes",
+        }
+
+    @staticmethod
+    def _source_occurrences(
+        text: str,
+        literal: str,
+        *,
+        path: str,
+        revision: str,
+        limit: int,
+        symbols: Sequence[Mapping[str, object]],
+    ) -> tuple[list[dict[str, object]], int]:
+        """Bound returned locations, not the count over the admitted member."""
+        hits: list[dict[str, object]] = []
+        count = 0
+        for line_number, line in enumerate(text.split("\\n"), 1):
+            column = 0
+            while (column := line.find(literal, column)) >= 0:
+                count += 1
+                if len(hits) < limit:
+                    owners = [
+                        row
+                        for row in symbols
+                        if row.get("start_line") is not None
+                        and row.get("end_line") is not None
+                        and int(row["start_line"]) <= line_number <= int(row["end_line"])
+                    ]
+                    owner = min(
+                        owners,
+                        key=lambda row: (
+                            int(row["end_line"]) - int(row["start_line"]),
+                            str(row.get("qualname") or ""),
+                        ),
+                        default=None,
+                    )
+                    fact = {
+                        "path": path,
+                        "member_revision": revision,
+                        "line": line_number,
+                        "column": column + 1,
+                        "column_unit": "unicode-codepoint",
+                        "literal": literal,
+                        "enclosing_symbol": (
+                            str(owner.get("qualname") or owner.get("name") or "")
+                            if owner is not None
+                            else None
+                        ),
+                        "symbol_basis": (
+                            "indexed-containing-range" if owner is not None else "unknown"
+                        ),
+                    }
+                    hits.append(fact)
+                column += len(literal)
+        return hits, count
+
+    def source_observation(
+        self,
+        relpath: str,
+        *,
+        literal: str | None = None,
+        limit: int = 50,
+        max_bytes: int = 1_048_576,
+        long_line_threshold: int = 2_000,
+    ) -> dict[str, object]:
+        """Observe exact single-member text occurrences and physical source shape.
+
+        Uses canonical repository admission and stable member-read authority.
+        No repository-wide absence, write policy, or agent execution is inferred.
+        """
+        if not 1 <= limit <= 500 or not 1 <= max_bytes <= 8_388_608:
+            raise ValueError("source observation bounds are outside supported limits")
+        if not 1 <= long_line_threshold <= 1_000_000:
+            raise ValueError("long_line_threshold must be between 1 and 1000000")
+        if literal is not None and (
+            not literal or len(literal) > 256 or "\\r" in literal or "\\n" in literal
+        ):
+            raise ValueError("literal must be a nonempty single-line query <=256 characters")
+        candidate = self._repository_member_source(relpath)
+        member: dict[str, object]
+        raw: bytes | None = None
+        if isinstance(candidate, dict):
+            member = candidate
+        else:
+            try:
+                oversized = candidate.path.stat().st_size > max_bytes
+            except OSError:
+                oversized = False
+            if oversized:
+                member = {
+                    "path": candidate.rel,
+                    "state": "unknown",
+                    "reason": "source-size-bound",
+                }
+            else:
+                member, raw = self._repository_member_observation(
+                    relpath, include_bytes=True
+                )
+        if raw is not None and len(raw) > max_bytes:
+            raw = None
+            member = {
+                "path": member["path"],
+                "state": "unknown",
+                "reason": "source-size-bound",
+            }
+
+        generation, identity_generation, stale = self._generation_status()
+        packet: dict[str, object] = {
+            "schema": "hashmarks.source-observation.v1",
+            "member": member,
+            "generation": generation,
+            "identity_generation": identity_generation,
+            "freshness": freshness_state(stale),
+            "observation_scope": "exact-admitted-repository-member",
+            "limits": {"max_bytes": max_bytes, "results": limit},
+            "availability": "observed" if raw is not None else "unavailable",
+            "completeness": "unknown",
+            "source_shape": None,
+            "literal_query": literal,
+            "occurrences": [],
+            "observed_match_count": None,
+            "truncation": "unknown",
+            "negative_evidence": "not-admissible",
+            "authority": "repository-evidence-only",
+            "execution_effect": "none",
+        }
+        if raw is None:
+            return packet
+        packet["source_shape"] = self._source_shape(
+            raw, long_line_threshold=long_line_threshold
+        )
+        if b"\\x00" in raw:
+            packet["availability"] = "unsupported"
+            packet["reason"] = "null-byte-text"
+            return packet
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            packet["availability"] = "unsupported"
+            packet["reason"] = "invalid-utf8"
+            return packet
+
+        packet["completeness"] = "complete"
+        packet["truncation"] = "complete"
+        if literal is not None:
+            symbols = (
+                self.store.symbols_for_path(str(member["path"]))
+                if member.get("index_state") == "indexed"
+                else []
+            )
+            hits, count = self._source_occurrences(
+                text, literal, path=str(member["path"]),
+                revision=str(member["member_revision"]),
+                limit=limit, symbols=symbols,
+            )
+            for hit in hits:
+                hit["evidence_identity"] = self._evidence_identity(
+                    "hashmarks.source-occurrence.v1", hit
+                )
+            packet["occurrences"] = hits
+            packet["observed_match_count"] = count
+            packet["truncation"] = "truncated" if count > limit else "complete"
+            packet["completeness"] = "incomplete" if count > limit else "complete"
+            if count == 0 and packet["freshness"] == "current":
+                packet["negative_evidence"] = "admissible-within-exact-member"
+        packet["observation_identity"] = self._evidence_identity(
+            "hashmarks.source-observation.v1",
+            {
+                "member": member,
+                "literal_query": literal,
+                "source_shape": packet["source_shape"],
+                "occurrences": packet["occurrences"],
+                "observed_match_count": packet["observed_match_count"],
+                "truncation": packet["truncation"],
+            },
+        )
+        return packet
+
     @staticmethod
     def _diagnostic_identity(row: Mapping[str, object]) -> str:
         """Canonical diagnostic identity independent of aggregate count/order."""
@@ -424,6 +620,7 @@ class RepositoryDeltaMixin:
         outcome: str,
         environment_identity: str | None = None,
         scope_paths: Sequence[str] = (),
+        collection_state: str | None = None,
     ) -> dict[str, object]:
         """Normalize externally produced diagnostics without executing the tool."""
         allowed_outcomes = {
@@ -438,6 +635,11 @@ class RepositoryDeltaMixin:
         }
         if outcome not in allowed_outcomes:
             raise ValueError("unsupported external observation outcome")
+        if collection_state is not None and collection_state not in {
+            "fresh-complete", "fresh-partial", "timed-out",
+            "unavailable", "source-mismatch", "unknown",
+        }:
+            raise ValueError("unsupported diagnostic collection state")
         rows = []
         for raw in diagnostics:
             row = dict(raw)
@@ -454,6 +656,10 @@ class RepositoryDeltaMixin:
             "outcome": outcome,
             "diagnostics": rows,
             "diagnostic_count": len(rows),
+            "collection": (
+                {"state": collection_state, "authority": "producer-claimed"}
+                if collection_state is not None else None
+            ),
             "authority": "observation-only",
             "execution_effect": "none",
         }
@@ -568,6 +774,45 @@ class RepositoryDeltaMixin:
         added_in_changed_scope = [
             row for row in added if str(row.get("path") or "") in scope
         ]
+        # A same-message location shift is only a possible correspondence.
+        # Without source-span relocation proof it must NOT erase add/remove
+        # evidence or become a diagnostic identity.
+        def facts(row: Mapping[str, object]) -> tuple[object, ...]:
+            return tuple(
+                row.get(field)
+                for field in ("tool", "rule", "path", "symbol", "message")
+            )
+
+        removed_by_fact: dict[tuple[object, ...], list[Mapping[str, object]]] = {}
+        added_by_fact: dict[tuple[object, ...], list[Mapping[str, object]]] = {}
+        for row in removed:
+            removed_by_fact.setdefault(facts(row), []).append(row)
+        for row in added:
+            added_by_fact.setdefault(facts(row), []).append(row)
+        possible_relocations: list[dict[str, object]] = []
+        for key in sorted(removed_by_fact, key=repr):
+            before_rows = removed_by_fact[key]
+            after_rows = added_by_fact.get(key, [])
+            if len(before_rows) != 1 or len(after_rows) != 1:
+                continue
+            prior, subsequent = before_rows[0], after_rows[0]
+            if (
+                prior.get("line") is None or subsequent.get("line") is None
+                or (prior.get("line"), prior.get("column"))
+                == (subsequent.get("line"), subsequent.get("column"))
+            ):
+                continue
+            possible_relocations.append({
+                "before_identity": prior["identity"],
+                "after_identity": subsequent["identity"],
+                "before_line": prior["line"],
+                "after_line": subsequent["line"],
+                "path": prior.get("path"),
+                "basis": "unique-equal-nonlocational-diagnostic-fields",
+                "state": "possible",
+                "identity_authority": False,
+            })
+
         return {
             "schema": "hashmarks.diagnostic-observation-delta.v1",
             "producer": after.get("producer"),
@@ -585,6 +830,10 @@ class RepositoryDeltaMixin:
                 "before": before.get("outcome"),
                 "after": after.get("outcome"),
             },
+            "collection": {
+                "before": before.get("collection"),
+                "after": after.get("collection"),
+            },
             "diagnostics": {
                 "before_count": len(old),
                 "after_count": len(new),
@@ -592,6 +841,7 @@ class RepositoryDeltaMixin:
                 "removed": removed,
                 "unchanged_count": len(old_ids & new_ids),
                 "added_in_changed_scope": added_in_changed_scope,
+                "possible_relocations": possible_relocations,
             },
             "authority": "observation-only",
             "execution_effect": "none",
