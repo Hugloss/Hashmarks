@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.digest import Digest
@@ -39,6 +39,56 @@ class _RepositoryMemberSource:
 class _RepositoryMemberRead:
     raw: bytes | None
     digest: Digest | None
+
+
+@dataclass(slots=True)
+class _ScopedSourceAggregation:
+    """Ephemeral request-only accumulator; not a source or index authority."""
+
+    paths: list[str]
+    literal: str
+    limit: int
+    max_total_bytes: int
+    max_member_bytes: int
+    start_generation: int
+    members: list[dict[str, object]] = field(default_factory=list)
+    occurrences: list[dict[str, object]] = field(default_factory=list)
+    match_count: int = 0
+    consumed_bytes: int = 0
+    complete: bool = True
+    members_fresh: bool = True
+
+    def add(self, path: str, packet: Mapping[str, object]) -> None:
+        """Accumulate only actually scanned bytes and emitted match locations."""
+        shape = packet.get("source_shape")
+        if isinstance(shape, Mapping):
+            self.consumed_bytes += int(shape.get("bytes") or 0)
+        count = packet.get("observed_match_count")
+        observed = packet.get("availability") == "observed" and isinstance(
+            count, int
+        )
+        self.complete = self.complete and observed
+        self.members_fresh = self.members_fresh and packet.get("freshness") == "current"
+        selected = (
+            deepcopy(packet["occurrences"])[: max(0, self.limit - len(self.occurrences))]
+            if observed
+            else []
+        )
+        if observed:
+            self.match_count += int(count)
+            self.occurrences.extend(selected)
+        member = cast("Mapping[str, object]", packet["member"])
+        self.members.append(
+            {
+                "path": path,
+                "state": member["state"],
+                "reason": member.get("reason"),
+                "member_revision": member.get("member_revision"),
+                "availability": packet["availability"],
+                "observed_match_count": count,
+                "returned_occurrence_count": len(selected),
+            }
+        )
 
 
 def _observer_descriptor() -> dict[str, object]:
@@ -684,12 +734,14 @@ class RepositoryDeltaMixin:
         """Observe one selected member, or record an explicit exhausted budget."""
         if available_bytes < 1:
             return {
-                "member": {"path": path, "state": "unknown",
-                           "reason": "scope-byte-budget-exhausted"},
+                "member": {
+                    "path": path,
+                    "state": "unknown",
+                    "reason": "scope-byte-budget-exhausted",
+                },
                 "availability": "unavailable",
                 "observed_match_count": None,
                 "occurrences": [],
-                "truncation": "unknown",
                 "freshness": "unknown",
                 "source_shape": None,
             }
@@ -700,6 +752,74 @@ class RepositoryDeltaMixin:
             max_bytes=min(available_bytes, member_max_bytes),
         )
 
+    def _scoped_source_result(
+        self, batch: _ScopedSourceAggregation
+    ) -> dict[str, object]:
+        """Project request-local scan facts using the canonical generation owner."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        generation, identity_generation, stale = self._generation_status()
+        generation_matches = generation == batch.start_generation
+        coverage_complete = batch.complete and generation_matches
+        freshness = (
+            freshness_state(stale)
+            if generation_matches and batch.members_fresh
+            else "stale"
+        )
+        truncated = batch.match_count > len(batch.occurrences)
+        completeness = (
+            "unknown" if not coverage_complete
+            else "incomplete" if truncated else "complete"
+        )
+        result: dict[str, object] = {
+            "schema": "hashmarks.scoped-source-occurrences.v1",
+            "observation_scope": "explicit-member-set-only",
+            "paths": batch.paths,
+            "literal": batch.literal,
+            "generation": generation,
+            "identity_generation": identity_generation,
+            "freshness": freshness,
+            "member_count": len(batch.paths),
+            "member_observations": batch.members,
+            "source_coverage": "complete" if coverage_complete else "unknown",
+            "observed_match_count": batch.match_count,
+            "exact_match_count": batch.match_count if coverage_complete else None,
+            "occurrences": batch.occurrences,
+            "completeness": completeness,
+            "truncation": (
+                "truncated"
+                if truncated
+                else "complete" if coverage_complete else "unknown"
+            ),
+            "negative_evidence": (
+                "admissible-within-explicit-member-set"
+                if coverage_complete and batch.match_count == 0
+                and freshness == "current"
+                else "not-admissible"
+            ),
+            "limits": {
+                "returned_occurrences": batch.limit,
+                "max_total_bytes": batch.max_total_bytes,
+                "max_member_bytes": batch.max_member_bytes,
+            },
+            "observed_source_bytes": batch.consumed_bytes,
+            "authority": "repository-evidence-only",
+            "execution_effect": "none",
+        }
+        result["observation_identity"] = self._evidence_identity(
+            "hashmarks.scoped-source-occurrences.v1",
+            {
+                "paths": batch.paths,
+                "literal": batch.literal,
+                "members": batch.members,
+                "matches": batch.occurrences,
+                "source_coverage": result["source_coverage"],
+                "observed_match_count": batch.match_count,
+                "truncation": result["truncation"],
+            },
+        )
+        return result
+
     def scoped_source_occurrences(
         self,
         paths: Sequence[str],
@@ -709,122 +829,38 @@ class RepositoryDeltaMixin:
         max_total_bytes: int = 4_194_304,
         max_member_bytes: int = 1_048_576,
     ) -> dict[str, object]:
-        """Exact textual facts over an explicit member set; never a whole-repo search.
-
-        Canonical member access, source visibility, source revision, and freshness
-        remain owned by source_observation(). Limited results never imply that a
-        matching member or repository-wide match is absent.
-        """
+        """Observe an explicit member set; never imply repository-wide absence."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         if isinstance(paths, (str, bytes)) or not 1 <= len(paths) <= 32:
             raise ValueError("scope must contain between 1 and 32 explicit paths")
         if not 1 <= max_total_bytes <= 8_388_608:
             raise ValueError("max_total_bytes must be between 1 and 8388608")
-        self._validate_source_observation(
-            literal, limit, max_member_bytes, 2_000
-        )
+        self._validate_source_observation(literal, limit, max_member_bytes, 2_000)
         if literal is None:
             raise ValueError("scoped source observations require a literal")
-        admitted_paths = sorted({
-            normalize_relative_path(path, allow_root=False) for path in paths
-        })
-        start_generation = self.store.generation()
-        matches: list[dict[str, object]] = []
-        members: list[dict[str, object]] = []
-        observed_count = 0
-        consumed_bytes = 0
-        scope_complete = True
-        member_fresh = True
-        for path in admitted_paths:
-            packet = self._scoped_source_member(
-                path, literal, max(1, limit - len(matches)),
-                max_total_bytes - consumed_bytes, max_member_bytes
-            )
-            shape = packet.get("source_shape")
-            if isinstance(shape, Mapping):
-                consumed_bytes += int(shape.get("bytes") or 0)
-            count = packet.get("observed_match_count")
-            observed = packet.get("availability") == "observed" and isinstance(
-                count, int
-            )
-            scope_complete = scope_complete and observed
-            member_fresh = member_fresh and packet.get("freshness") == "current"
-            selected = (
-                deepcopy(packet["occurrences"])[: max(0, limit - len(matches))]
-                if observed else []
-            )
-            if observed:
-                observed_count += int(count)
-                matches.extend(selected)
-            member = packet["member"]
-            members.append({
-                "path": path,
-                "state": member["state"],
-                "reason": member.get("reason"),
-                "member_revision": member.get("member_revision"),
-                "availability": packet["availability"],
-                "observed_match_count": count,
-                "returned_occurrence_count": len(selected),
-            })
-        generation, identity_generation, stale = self._generation_status()
-        freshness = (
-            freshness_state(stale)
-            if generation == start_generation and member_fresh
-            else "stale"
+        batch = _ScopedSourceAggregation(
+            paths=sorted({
+                normalize_relative_path(path, allow_root=False) for path in paths
+            }),
+            literal=literal,
+            limit=limit,
+            max_total_bytes=max_total_bytes,
+            max_member_bytes=max_member_bytes,
+            start_generation=self.store.generation(),
         )
-        coverage_complete = scope_complete and generation == start_generation
-        truncated = observed_count > len(matches)
-        completeness = (
-            "unknown" if not coverage_complete
-            else "incomplete" if truncated else "complete"
-        )
-        packet_out: dict[str, object] = {
-            "schema": "hashmarks.scoped-source-occurrences.v1",
-            "observation_scope": "explicit-member-set-only",
-            "paths": admitted_paths,
-            "literal": literal,
-            "generation": generation,
-            "identity_generation": identity_generation,
-            "freshness": freshness,
-            "member_count": len(admitted_paths),
-            "member_observations": members,
-            "source_coverage": "complete" if coverage_complete else "unknown",
-            "observed_match_count": observed_count,
-            "exact_match_count": observed_count if coverage_complete else None,
-            "occurrences": matches,
-            "completeness": completeness,
-            "truncation": (
-                "truncated" if truncated else
-                "complete" if coverage_complete else "unknown"
-            ),
-            "negative_evidence": (
-                "admissible-within-explicit-member-set"
-                if coverage_complete and observed_count == 0
-                and freshness == "current" else "not-admissible"
-            ),
-            "limits": {
-                "returned_occurrences": limit,
-                "max_total_bytes": max_total_bytes,
-                "max_member_bytes": max_member_bytes,
-            },
-            "observed_source_bytes": consumed_bytes,
-            "authority": "repository-evidence-only",
-            "execution_effect": "none",
-        }
-        packet_out["observation_identity"] = self._evidence_identity(
-            "hashmarks.scoped-source-occurrences.v1",
-            {
-                "paths": admitted_paths,
-                "literal": literal,
-                "members": members,
-                "matches": matches,
-                "source_coverage": packet_out["source_coverage"],
-                "observed_match_count": observed_count,
-                "truncation": packet_out["truncation"],
-            },
-        )
-        return packet_out
+        for path in batch.paths:
+            batch.add(
+                path,
+                self._scoped_source_member(
+                    path,
+                    literal,
+                    max(1, limit - len(batch.occurrences)),
+                    max_total_bytes - batch.consumed_bytes,
+                    max_member_bytes,
+                ),
+            )
+        return self._scoped_source_result(batch)
 
     @staticmethod
     def _diagnostic_identity(row: Mapping[str, object]) -> str:
