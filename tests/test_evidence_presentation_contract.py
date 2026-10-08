@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import importlib.util
 import json
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,8 @@ from hashmarks.mcp_contract import (
 )
 from hashmarks.mcp_server import _call_surface, build_server
 from hashmarks.operation_contract import operation_schema
+
+_MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
 
 def _findings(projection: dict[str, Any]) -> list[dict[str, Any]]:
@@ -383,6 +386,8 @@ def test_mcp_rejects_invalid_presentation_before_producer_and_wrapper_drift() ->
             tool_contract("find").validate_response(changed, presentation="compact")
 
 
+@pytest.mark.host_mcp_sdk
+@pytest.mark.skipif(not _MCP_AVAILABLE, reason="MCP extra is not installed")
 def test_actual_sdk_advertises_all_format_selectors(tmp_path: Path) -> None:
     server: Any = build_server(tmp_path, state_dir=tmp_path / "state")
     try:
@@ -447,6 +452,8 @@ def test_service_transports_presentation_and_rejects_older_service(
         )
 
 
+@pytest.mark.host_mcp_sdk
+@pytest.mark.skipif(not _MCP_AVAILABLE, reason="MCP extra is not installed")
 def test_sdk_calls_all_tools_with_native_defaults_and_optional_formats(
     native_packets, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
