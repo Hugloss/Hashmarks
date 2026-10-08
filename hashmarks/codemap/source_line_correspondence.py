@@ -11,6 +11,8 @@ from collections.abc import Mapping, Sequence
 from hashlib import sha256
 from typing import cast
 
+from hashmarks.operation_contract import operation_schema
+
 
 def validated_source_lines(lines: Sequence[int]) -> list[int]:
     """Fail before source reads on invalid explicit line requests."""
@@ -92,9 +94,10 @@ def _source_endpoint_reason(
     if not isinstance(member, Mapping):
         return "missing-canonical-member"
     required = (
-        source.get("schema") == "hashmarks.source-observation.v1",
+        source.get("schema") == operation_schema("source_observation", "member"),
         source.get("availability") == "observed",
-        source.get("freshness") == "current",
+        source.get("freshness") in {"current", "unknown"},
+        member.get("state") == "known-present",
         source.get("line_coverage") == "complete",
         source.get("completeness") == "complete",
         bool(source.get("observation_identity")),
@@ -271,6 +274,10 @@ def _candidate_correspondence(
         "basis": "unique-exact-physical-line-bytes-and-same-column",
         "state": "source-line-correspondence",
         "diagnostic_identity_authority": False,
+        "repository_freshness": {
+            "before": before_source.get("freshness"),
+            "after": after_source.get("freshness"),
+        },
     }
 
 
