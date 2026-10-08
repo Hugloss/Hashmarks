@@ -691,7 +691,6 @@ class RepositoryDeltaMixin:
 
     @staticmethod
     def external_diagnostic_observation(  # noqa: PLR0913 - additive producer fields
-
         *,
         producer: str,
         binding: RepositoryGenerationBinding,
