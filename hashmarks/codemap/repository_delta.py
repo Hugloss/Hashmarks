@@ -998,13 +998,14 @@ class RepositoryDeltaMixin:
         dependencies = set(map(str, dependency_paths))
         changed = set(map(str, changed_paths))
         intersection = sorted(changed & (scope | dependencies))
-        repository_changed = observation.get("repository_identity") != current_repository_identity
+        observed_repo = observation.get("repository_identity")
+        repository_changed = observed_repo != current_repository_identity
         generation_changed = observation.get("codemap_generation") != current_generation
-
         if not repository_changed and not generation_changed:
             state, reason = "current", "repository-and-generation-unchanged"
         elif not (scope or dependencies):
-            state, reason = "stale", "repository-changed-without-declared-observation-scope"
+            state = "stale"
+            reason = "repository-changed-without-declared-observation-scope"
         elif intersection:
             state, reason = "stale", "relevant-repository-evidence-changed"
         elif not change_set_complete:
@@ -1014,7 +1015,6 @@ class RepositoryDeltaMixin:
         else:
             state = "current"
             reason = "declared-complete-change-set-outside-observation-scope"
-
         completeness = "caller-claimed-complete" if change_set_complete else "unknown"
         return {
             "schema": "hashmarks.external-observation-freshness.v1",
