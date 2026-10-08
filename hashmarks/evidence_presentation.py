@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from hashmarks.operation_contract import operation_schema
+
 FAMILIES = (
     "source",
     "relationship",
@@ -255,7 +257,7 @@ def _project_source(
     elif schema == "hashmarks.diagnostic-observation-delta.v1":
         _diagnostic(grouped, packet)
         supported = True
-    elif schema == "hashmarks.dependency-resolution-delta.v3":
+    elif schema == operation_schema("dependency_codemap", "compare"):
         transitions = packet.get("component_selection_transitions")
         if isinstance(transitions, list):
             for row in transitions:
