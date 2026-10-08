@@ -19,6 +19,7 @@ from hashmarks.evidence_presentation import (
     present_repository_evidence,
     presentation_response,
 )
+from hashmarks.mcp_contract import mcp_projection_summary
 from hashmarks.operation_contract import operation_schema, validate_operation_response
 
 AXES = ("production-response", "encoding-only")
@@ -35,10 +36,38 @@ _TRIAL_FIELDS = (
 _MAX_VISIBLE_CAPTURE_BYTES = 1_048_576
 
 
+def _canonical_projection(value: object) -> dict[str, object]:
+    """Admit only a canonical projection over one claimed MCP contract."""
+    if not isinstance(value, dict):
+        raise ValueError("mcp_projection must be an object")
+    tools = value.get("tools")
+    identity = value.get("source_contract_identity")
+    if (
+        not isinstance(tools, list)
+        or not tools
+        or any(not isinstance(name, str) for name in tools)
+    ):
+        raise ValueError("mcp_projection tools must be nonempty string names")
+    if (
+        not isinstance(identity, str)
+        or not identity.startswith("sha256:")
+        or len(identity) != 71
+        or any(ch not in "0123456789abcdef" for ch in identity[7:])
+    ):
+        raise ValueError("mcp_projection requires a SHA-256 source contract identity")
+    canonical = mcp_projection_summary({"contract_identity": identity}, tools)
+    if any(value.get(key) != expected for key, expected in canonical.items()):
+        raise ValueError("mcp_projection differs from canonical MCP tool projection")
+    return canonical
+
+
 def trial_identity(trial: dict[str, Any]) -> str:
     """Digest the frozen study trial, not a repository or verifier authority."""
+    payload = {name: trial[name] for name in _TRIAL_FIELDS}
+    if "mcp_projection" in trial:
+        payload["mcp_projection"] = trial["mcp_projection"]
     raw = json.dumps(
-        {name: trial[name] for name in _TRIAL_FIELDS},
+        payload,
         sort_keys=True,
         ensure_ascii=False,
         separators=(",", ":"),
@@ -114,6 +143,11 @@ def emit_trials(
     cases = manifest.get("cases")
     if not isinstance(cases, list) or not 1 <= len(cases) <= 1000:
         raise ValueError("cases must be a nonempty bounded list")
+    projection = (
+        _canonical_projection(manifest["mcp_projection"])
+        if "mcp_projection" in manifest
+        else None
+    )
     records: list[dict[str, object]] = []
     seen: set[str] = set()
     for case in cases:
@@ -132,6 +166,8 @@ def emit_trials(
                 "study_axis": axis,
                 "source_schema": packet["schema"],
             }
+            if projection is not None:
+                trial["mcp_projection"] = deepcopy(projection)
             trial["trial_identity"] = trial_identity(trial)
             records.append(trial)
     return records
@@ -172,8 +208,15 @@ def _expected_trials(
         raise ValueError("nonempty trials and unique expected models are required")
     expected: dict[str, set[str]] = defaultdict(set)
     axes: set[str] = set()
+    projections: set[str] = set()
     for trial in trials:
         case, variant, axis = _trial_key(trial)
+        projection = (
+            _canonical_projection(trial["mcp_projection"])
+            if "mcp_projection" in trial
+            else None
+        )
+        projections.add(json.dumps(projection, sort_keys=True))
         if "trial_identity" in trial and trial["trial_identity"] != trial_identity(
             trial
         ):
@@ -184,6 +227,8 @@ def _expected_trials(
         expected[case].add(variant)
     if len(axes) != 1:
         raise ValueError("summarize one study axis at a time")
+    if len(projections) != 1:
+        raise ValueError("format comparisons require one fixed MCP tool projection")
     required = set(
         _PRODUCTION_VARIANTS if axes == {"production-response"} else _ENCODING_VARIANTS
     )
@@ -280,6 +325,28 @@ def _validate_host_capture(
     return (case, model, variant), trial, visible
 
 
+def _projection_equivalent(
+    trial: dict[str, Any], capture: dict[str, Any]
+) -> bool | None:
+    """Compare host-reported tool exposure without authenticating the host."""
+    projection = trial.get("mcp_projection")
+    if projection is None:
+        return None
+    observed = capture.get("observed_tools")
+    if observed is not None and (
+        not isinstance(observed, list)
+        or any(not isinstance(name, str) for name in observed)
+    ):
+        raise ValueError("observed_tools must be a list of strings")
+    return (
+        observed == projection["tools"]
+        and capture.get("observed_contract_identity")
+        == projection["source_contract_identity"]
+        and capture.get("observed_projection_identity")
+        == projection["projection_identity"]
+    )
+
+
 def _capture_audit(
     captures: list[dict[str, Any]],
     *,
@@ -290,13 +357,23 @@ def _capture_audit(
     trial_by_key = {(row["case_id"], row["variant"]): row for row in trials}
     observations: dict[tuple[str, str, str], bool] = {}
     mismatches: list[dict[str, str]] = []
+    projection_mismatches: list[dict[str, str]] = []
+    content_count = 0
+    projection_count = 0
     capture_digests: list[dict[str, object]] = []
     for capture in captures:
         key, trial, visible = _validate_host_capture(capture, trial_by_key, models)
         if key in observations:
             raise ValueError("duplicate host capture")
-        equivalent = _capture_equivalent(trial, visible)
-        observations[key] = equivalent
+        content_equivalent = _capture_equivalent(trial, visible)
+        projection_equivalent = _projection_equivalent(trial, capture)
+        observations[key] = content_equivalent and projection_equivalent is not False
+        content_count += int(content_equivalent)
+        projection_count += int(projection_equivalent is True)
+        if projection_equivalent is False:
+            projection_mismatches.append(
+                {"case_id": key[0], "model": key[1], "variant": key[2]}
+            )
         capture_digests.append(
             {
                 "case_id": key[0],
@@ -304,10 +381,11 @@ def _capture_audit(
                 "variant": key[2],
                 "model_visible_sha256": "sha256:"
                 + hashlib.sha256(visible.encode("utf-8")).hexdigest(),
-                "content_equivalent": equivalent,
+                "content_equivalent": content_equivalent,
+                "projection_equivalent": projection_equivalent,
             }
         )
-        if not equivalent:
+        if not content_equivalent:
             mismatches.append({"case_id": key[0], "model": key[1], "variant": key[2]})
     verified = {key for key, valid in observations.items() if valid}
     return (
@@ -316,9 +394,13 @@ def _capture_audit(
             "host_authenticity_proven": False,
             "expected_captures": len(trials) * len(models),
             "observed_captures": len(observations),
-            "content_equivalent_captures": len(verified),
+            "content_equivalent_captures": content_count,
+            "projection_equivalent_captures": (
+                projection_count if "mcp_projection" in trials[0] else None
+            ),
             "capture_digests": capture_digests,
             "content_mismatches": mismatches,
+            "projection_catalog_mismatches": projection_mismatches,
             "missing_captures": [
                 {"case_id": row["case_id"], "model": model, "variant": row["variant"]}
                 for row in trials
