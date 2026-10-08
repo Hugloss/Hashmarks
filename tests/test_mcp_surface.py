@@ -671,6 +671,7 @@ def test_mcp_server_registers_exact_small_read_only_tool_catalog(
             "source_observation",
             "repository_evidence",
             "repository_findings",
+            "evidence_comparison",
             "structural_locality",
         ]
         for row in registered:
@@ -824,6 +825,7 @@ def test_mcp_server_construction_does_not_scan_or_build_repository(
             "source_observation",
             "repository_evidence",
             "repository_findings",
+            "evidence_comparison",
             "structural_locality",
         ]
         # Construction may initialize empty SQLite files, but it must not build a generation.

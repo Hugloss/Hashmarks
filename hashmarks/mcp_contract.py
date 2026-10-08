@@ -283,6 +283,16 @@ MCP_TOOL_CONTRACTS = (
         "repository_findings",
     ),
     McpToolContract(
+        "evidence_comparison",
+        (
+            "Compare two explicit producer observations using their existing "
+            "structural-locality, repository-binding, or external-diagnostic "
+            "comparison authority. Incomparability and incomplete collection "
+            "never become proof of repairs."
+        ),
+        "evidence_comparison",
+    ),
+    McpToolContract(
         "structural_locality",
         (
             "Observe bounded static calls, exact callers, unresolved targets, "

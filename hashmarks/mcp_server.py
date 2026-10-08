@@ -48,6 +48,7 @@ _RepositoryDeclarationsResultMode = Literal[
 ]
 _SourceObservationResultMode = Literal[*tuple(operation_modes("source_observation"))]
 _RepositoryEvidenceResultMode = Literal[*tuple(operation_modes("repository_evidence"))]
+_EvidenceComparisonResultMode = Literal[*tuple(operation_modes("evidence_comparison"))]
 
 
 def _sdk():
@@ -253,6 +254,40 @@ def _register_agent_evidence_tools(
         )
 
 
+def _register_evidence_comparison_tool(
+    server: Any,
+    surface: HashmarksMcpSurface,
+    annotations: Any,
+    tool_error: type[Exception],
+) -> None:
+    """Expose native two-endpoint comparisons with no history or execution state."""
+    contract = tool_contract("evidence_comparison")
+
+    @server.tool(
+        name=contract.name,
+        description=contract.description,
+        annotations=annotations,
+    )
+    def evidence_comparison(
+        before: dict[str, Any],
+        after: dict[str, Any],
+        result_mode: _EvidenceComparisonResultMode = contract.default_response_mode,
+        changed_paths: list[str] | None = None,
+        presentation: _Presentation = "none",
+    ) -> dict[str, object]:
+        return _call_surface(
+            contract,
+            tool_error,
+            surface.evidence_comparison,
+            before,
+            after,
+            result_mode=result_mode,
+            response_mode=result_mode,
+            changed_paths=changed_paths,
+            presentation=presentation,
+        )
+
+
 def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = None):
     MCPServer, ToolAnnotations, ToolError = _sdk()
     surface = HashmarksMcpSurface(
@@ -441,6 +476,7 @@ def build_server(workspace: str | Path = ".", *, state_dir: str | Path | None = 
         )
 
     _register_agent_evidence_tools(server, surface, annotations, ToolError)
+    _register_evidence_comparison_tool(server, surface, annotations, ToolError)
 
     server._hashmarks_surface = surface
     return server

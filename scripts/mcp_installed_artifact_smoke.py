@@ -26,6 +26,7 @@ _EXPECTED_TOOLS = [
     "source_observation",
     "repository_evidence",
     "repository_findings",
+    "evidence_comparison",
     "structural_locality",
 ]
 

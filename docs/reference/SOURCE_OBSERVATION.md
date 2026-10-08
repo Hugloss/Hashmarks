@@ -52,8 +52,9 @@ No file is read in full if its preliminary size check already exceeds the bound;
 stable reads and the post-read bound protect against concurrent enlargement.
 No recursive dependency or repository scan is performed by this projection.
 
-This is currently a Python CodeMap API. No new MCP tool, CLI command, or execution
-backend is implied by its presence.
+The exact member source observation is now also exposed through the existing
+read-only `source_observation` MCP tool. This is transport over the same CodeMap
+owner; it adds no independent index or execution backend.
 
 ## Exact scoped multi-member observation (H1 follow-up)
 
@@ -98,9 +99,9 @@ asserts repository-wide absence. Partial, stale or mixed-generation batches
 refuse negative evidence. Every emitted location retains its original exact
 member revision and evidence identity.
 
-This remains a Python CodeMap evidence surface. It does not change the MCP
-tool roster, cause editor actions, schedule verification, or make a new source
-index.
+The same scoped observation is also available through the `source_observation`
+MCP tool in `scope` mode. Neither Python nor MCP requests expand the given
+scope, schedule verification, or create a new source index.
 
 ## External diagnostic collection and correspondence (H2)
 

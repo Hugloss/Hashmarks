@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
-REPOSITORY_BINDING_DELTA_SCHEMA = "hashmarks.repository-evidence-binding-delta.v1"
+REPOSITORY_BINDING_DELTA_SCHEMA = operation_schema("evidence_comparison", "bindings")
 
 
 class RepositoryEvidenceBindingDeltaMixin:

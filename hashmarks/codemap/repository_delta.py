@@ -111,7 +111,7 @@ def _observer_descriptor() -> dict[str, object]:
 
 REPOSITORY_SNAPSHOT_SCHEMA = "hashmarks.repository-intelligence-snapshot.v1"
 REPOSITORY_DELTA_SCHEMA = "hashmarks.repository-intelligence-delta.v1"
-DIAGNOSTIC_DELTA_SCHEMA = "hashmarks.diagnostic-observation-delta.v1"
+DIAGNOSTIC_DELTA_SCHEMA = operation_schema("evidence_comparison", "diagnostics")
 
 
 class RepositoryDeltaMixin:
