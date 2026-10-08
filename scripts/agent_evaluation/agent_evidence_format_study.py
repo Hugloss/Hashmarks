@@ -292,9 +292,7 @@ def _capture_audit(
     mismatches: list[dict[str, str]] = []
     capture_digests: list[dict[str, object]] = []
     for capture in captures:
-        key, trial, visible = _validate_host_capture(
-            capture, trial_by_key, models
-        )
+        key, trial, visible = _validate_host_capture(capture, trial_by_key, models)
         if key in observations:
             raise ValueError("duplicate host capture")
         equivalent = _capture_equivalent(trial, visible)
@@ -310,9 +308,7 @@ def _capture_audit(
             }
         )
         if not equivalent:
-            mismatches.append(
-                {"case_id": key[0], "model": key[1], "variant": key[2]}
-            )
+            mismatches.append({"case_id": key[0], "model": key[1], "variant": key[2]})
     verified = {key for key, valid in observations.items() if valid}
     return (
         {
