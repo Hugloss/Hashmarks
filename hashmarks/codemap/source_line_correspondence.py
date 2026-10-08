@@ -12,6 +12,17 @@ from hashlib import sha256
 from typing import cast
 
 
+def validated_source_lines(lines: Sequence[int]) -> list[int]:
+    """Fail before source reads on invalid explicit line requests."""
+    if (
+        isinstance(lines, (str, bytes))
+        or len(lines) > 32
+        or any(type(line) is not int or line < 1 for line in lines)
+    ):
+        raise ValueError("lines must be up to 32 positive integers")
+    return sorted(set(lines))
+
+
 def source_shape(raw: bytes, *, long_line_threshold: int) -> dict[str, object]:
     """Measure physical source properties over the canonical stable byte capture."""
     parts = raw.split(b"\n")
