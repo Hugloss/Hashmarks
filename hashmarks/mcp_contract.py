@@ -285,10 +285,8 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "evidence_comparison",
         (
-            "Compare two explicit producer observations using their existing "
-            "structural-locality, repository-binding, or external-diagnostic "
-            "comparison authority. Incomparability and incomplete collection "
-            "never become proof of repairs."
+            "Compare structural, binding, or diagnostic observation endpoints. "
+            "Keep native incomparability and collection uncertainty; never infer fixes."
         ),
         "evidence_comparison",
     ),
