@@ -4,7 +4,7 @@ import json
 import tomllib
 from pathlib import Path
 
-from hashmarks.mcp_launch import installed_mcp_command, source_mcp_command
+from hashmarks.mcp_launch import installed_mcp_command, mcp_server_args, source_mcp_command
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -80,3 +80,16 @@ def test_mcp_launch_consumers_do_not_reconstruct_launch_semantics() -> None:
         assert owner in text
         for stale in stale_owners:
             assert stale not in text
+
+
+def test_mcp_launch_can_project_tools_without_changing_default() -> None:
+    assert mcp_server_args(
+        "/workspace",
+        tool_names=("task_evidence",),
+    ) == (
+        "--workspace",
+        "/workspace",
+        "mcp",
+        "--tool",
+        "task_evidence",
+    )
