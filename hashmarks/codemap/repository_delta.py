@@ -673,6 +673,160 @@ class RepositoryDeltaMixin:
         )
         return packet
 
+    def _scoped_source_member(
+        self,
+        path: str,
+        literal: str,
+        limit: int,
+        available_bytes: int,
+        member_max_bytes: int,
+    ) -> dict[str, object]:
+        """Observe one selected member, or record an explicit exhausted budget."""
+        if available_bytes < 1:
+            return {
+                "member": {"path": path, "state": "unknown",
+                           "reason": "scope-byte-budget-exhausted"},
+                "availability": "unavailable",
+                "observed_match_count": None,
+                "occurrences": [],
+                "truncation": "unknown",
+                "freshness": "unknown",
+                "source_shape": None,
+            }
+        return self.source_observation(
+            path,
+            literal=literal,
+            limit=limit,
+            max_bytes=min(available_bytes, member_max_bytes),
+        )
+
+    def scoped_source_occurrences(
+        self,
+        paths: Sequence[str],
+        literal: str,
+        *,
+        limit: int = 100,
+        max_total_bytes: int = 4_194_304,
+        max_member_bytes: int = 1_048_576,
+    ) -> dict[str, object]:
+        """Exact textual facts over an explicit member set; never a whole-repo search.
+
+        Canonical member access, source visibility, source revision, and freshness
+        remain owned by source_observation(). Limited results never imply that a
+        matching member or repository-wide match is absent.
+        """
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if isinstance(paths, (str, bytes)) or not 1 <= len(paths) <= 32:
+            raise ValueError("scope must contain between 1 and 32 explicit paths")
+        if not 1 <= max_total_bytes <= 8_388_608:
+            raise ValueError("max_total_bytes must be between 1 and 8388608")
+        self._validate_source_observation(
+            literal, limit, max_member_bytes, 2_000
+        )
+        if literal is None:
+            raise ValueError("scoped source observations require a literal")
+        admitted_paths = sorted({
+            normalize_relative_path(path, allow_root=False) for path in paths
+        })
+        start_generation = self.store.generation()
+        matches: list[dict[str, object]] = []
+        members: list[dict[str, object]] = []
+        observed_count = 0
+        consumed_bytes = 0
+        scope_complete = True
+        member_fresh = True
+        for path in admitted_paths:
+            packet = self._scoped_source_member(
+                path, literal, max(1, limit - len(matches)),
+                max_total_bytes - consumed_bytes, max_member_bytes
+            )
+            shape = packet.get("source_shape")
+            if isinstance(shape, Mapping):
+                consumed_bytes += int(shape.get("bytes") or 0)
+            count = packet.get("observed_match_count")
+            observed = packet.get("availability") == "observed" and isinstance(
+                count, int
+            )
+            scope_complete = scope_complete and observed
+            member_fresh = member_fresh and packet.get("freshness") == "current"
+            if observed:
+                observed_count += int(count)
+                matches.extend(
+                    deepcopy(packet["occurrences"])[:max(0, limit - len(matches))]
+                )
+            member = packet["member"]
+            members.append({
+                "path": path,
+                "state": member["state"],
+                "reason": member.get("reason"),
+                "member_revision": member.get("member_revision"),
+                "availability": packet["availability"],
+                "observed_match_count": count,
+                "returned_occurrence_count": (
+                    min(len(packet["occurrences"]), max(0, limit))
+                    if observed else 0
+                ),
+            })
+        generation, identity_generation, stale = self._generation_status()
+        freshness = (
+            freshness_state(stale)
+            if generation == start_generation and member_fresh
+            else "stale"
+        )
+        coverage_complete = scope_complete and generation == start_generation
+        truncated = observed_count > len(matches)
+        completeness = (
+            "unknown" if not coverage_complete
+            else "incomplete" if truncated else "complete"
+        )
+        packet_out: dict[str, object] = {
+            "schema": "hashmarks.scoped-source-occurrences.v1",
+            "observation_scope": "explicit-member-set-only",
+            "paths": admitted_paths,
+            "literal": literal,
+            "generation": generation,
+            "identity_generation": identity_generation,
+            "freshness": freshness,
+            "member_count": len(admitted_paths),
+            "member_observations": members,
+            "source_coverage": "complete" if coverage_complete else "unknown",
+            "observed_match_count": observed_count,
+            "exact_match_count": observed_count if coverage_complete else None,
+            "occurrences": matches,
+            "completeness": completeness,
+            "truncation": (
+                "truncated" if truncated else
+                "complete" if coverage_complete else "unknown"
+            ),
+            "negative_evidence": (
+                "admissible-within-explicit-member-set"
+                if coverage_complete and observed_count == 0
+                and freshness == "current" else "not-admissible"
+            ),
+            "limits": {
+                "returned_occurrences": limit,
+                "max_total_bytes": max_total_bytes,
+                "max_member_bytes": max_member_bytes,
+            },
+            "observed_source_bytes": consumed_bytes,
+            "authority": "repository-evidence-only",
+            "execution_effect": "none",
+        }
+        packet_out["observation_identity"] = self._evidence_identity(
+            "hashmarks.scoped-source-occurrences.v1",
+            {
+                "paths": admitted_paths,
+                "literal": literal,
+                "members": members,
+                "matches": matches,
+                "source_coverage": packet_out["source_coverage"],
+                "observed_match_count": observed_count,
+                "truncation": packet_out["truncation"],
+            },
+        )
+        return packet_out
+
     @staticmethod
     def _diagnostic_identity(row: Mapping[str, object]) -> str:
         """Canonical diagnostic identity independent of aggregate count/order."""
