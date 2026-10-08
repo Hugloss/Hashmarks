@@ -55,6 +55,53 @@ No recursive dependency or repository scan is performed by this projection.
 This is currently a Python CodeMap API. No new MCP tool, CLI command, or execution
 backend is implied by its presence.
 
+## Exact scoped multi-member observation (H1 follow-up)
+
+```python
+with CodeMap(".") as codemap:
+    codemap.sync()
+    packet = codemap.scoped_source_occurrences(
+        ["src/core.py", "tests/test_core.py"],
+        "example",
+        limit=100,
+        max_total_bytes=4_194_304,
+        max_member_bytes=1_048_576,
+    )
+```
+
+Schema: `hashmarks.scoped-source-occurrences.v1`. This is a request-local
+composition of the **same** source-observation owner, never another index,
+repository crawler, persistent cache, or agent tool-routing policy.
+
+The caller provides a nonempty explicit path set (at most 32 requested entries).
+Paths are validated before work, deduplicated, and sorted deterministically.
+Discovery does **not** expand directories or silently add other files.
+
+Each path goes through canonical admission, source visibility, stable byte reads,
+member revision and repository generation checks. The batch has a bounded total
+source-byte budget (4 MiB by default, hard maximum 8 MiB) as well as the
+per-member byte bound. Exhaustion, ignored/denied paths, missing members,
+unreconciled edits, binary/invalid text and unstable reads remain observable
+as per-member unknown/unsupported outcomes; none become zero matches.
+
+`observed_match_count` is the number of matches in successfully scanned
+members. `exact_match_count` is reported **only** when *all* requested
+members were successfully scanned in the same repository generation. Result
+locations may still be truncated by the independent `limit`; the exact count
+remains valid because the underlying member observer scans the entire bounded
+member. Per-member summaries explain unavailable and budget-exhausted members,
+the count observed, and the number of emitted locations.
+
+A qualified zero-match claim is **restricted to the exact explicitly named
+set**, requires complete source coverage and current freshness, and never
+asserts repository-wide absence. Partial, stale or mixed-generation batches
+refuse negative evidence. Every emitted location retains its original exact
+member revision and evidence identity.
+
+This remains a Python CodeMap evidence surface. It does not change the MCP
+tool roster, cause editor actions, schedule verification, or make a new source
+index.
+
 ## External diagnostic collection and correspondence (H2)
 
 ```python
