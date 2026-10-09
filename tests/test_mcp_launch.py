@@ -86,6 +86,24 @@ def test_mcp_launch_consumers_do_not_reconstruct_launch_semantics() -> None:
             assert stale not in text
 
 
+def test_mcp_launch_can_project_repository_intelligence_query_surfaces() -> None:
+    assert mcp_server_args(
+        "/workspace",
+        tool_names=("repository_intelligence_query",),
+        query_surfaces=("verification-explanation", "freshness"),
+    ) == (
+        "--workspace",
+        "/workspace",
+        "mcp",
+        "--tool",
+        "repository_intelligence_query",
+        "--query-surface",
+        "verification-explanation",
+        "--query-surface",
+        "freshness",
+    )
+
+
 def test_mcp_launch_can_project_tools_without_changing_default() -> None:
     assert mcp_server_args(
         "/workspace",
