@@ -570,7 +570,7 @@ class RepositoryDeltaMixin:
 
     @staticmethod
     def _source_context_excerpt(
-        text: str,
+        lines: Sequence[str],
         *,
         line: int,
         column: int,
@@ -581,9 +581,6 @@ class RepositoryDeltaMixin:
         Column coordinates and occurrence identities continue to refer to the
         original source. Never read again to construct context.
         """
-        lines = text.split("\n")
-        if text.endswith("\n"):
-            lines.pop()
         excerpt: list[dict[str, object]] = []
         for number in range(max(1, line - 1), min(len(lines), line + 1) + 1):
             source = lines[number - 1]
@@ -661,13 +658,16 @@ class RepositoryDeltaMixin:
         context_lines: int,
     ) -> None:
         """Attach stable location IDs before optional display-only excerpts."""
+        source_lines = text.split("\n") if context_lines else []
+        if source_lines and text.endswith("\n"):
+            source_lines.pop()
         for hit in hits:
             hit["evidence_identity"] = self._evidence_identity(
                 "hashmarks.source-occurrence.v1", hit
             )
             if context_lines:
                 hit["context_excerpt"] = self._source_context_excerpt(
-                    text,
+                    source_lines,
                     line=cast("int", hit["line"]),
                     column=cast("int", hit["column"]),
                     literal_length=len(literal),
@@ -719,11 +719,9 @@ class RepositoryDeltaMixin:
             symbols=symbols,
             token_kinds=self._python_source_token_kinds(text, str(member["path"])),
         )
+        context_lines = cast("dict[str, int]", packet["limits"]).get("context_lines", 0)
         self._source_evidenced_hits(
-            hits,
-            text=text,
-            literal=literal,
-            context_lines=cast("dict[str, int]", packet["limits"]).get("context_lines", 0),
+            hits, text=text, literal=literal, context_lines=context_lines
         )
         packet["occurrences"] = hits
         packet["observed_match_count"] = count
