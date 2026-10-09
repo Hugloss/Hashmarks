@@ -28,7 +28,9 @@ def test_opt_in_line_context_preserves_legacy_anchors_and_identity(
     assert old == zero
     assert old["line_anchors"][0]["state"] == "observed"
     assert "context_excerpt" not in old["line_anchors"][0]
-    assert old["line_anchors"][0]["line_sha256"] == new["line_anchors"][0]["line_sha256"]
+    assert (
+        old["line_anchors"][0]["line_sha256"] == new["line_anchors"][0]["line_sha256"]
+    )
     assert new["limits"]["anchor_context_lines"] == 1
     assert "anchor_context_lines" not in old["limits"]
     assert new["observation_identity"] != old["observation_identity"]
@@ -96,9 +98,7 @@ def test_denied_unreconciled_oversized_and_invalid_utf8_never_expose_context(
     (tmp_path / "bad.py").write_bytes(b"invalid=\xff\n")
     with CodeMap(tmp_path) as codemap:
         codemap.sync()
-        denied = codemap.source_observation(
-            ".env", lines=(1,), anchor_context_lines=1
-        )
+        denied = codemap.source_observation(".env", lines=(1,), anchor_context_lines=1)
         oversized = codemap.source_observation(
             "sample.py", lines=(1,), anchor_context_lines=1, max_bytes=1
         )
@@ -122,7 +122,9 @@ def test_invalid_native_line_context_fails_before_source_read(
     with CodeMap(tmp_path) as codemap:
         with pytest.raises(ValueError, match="anchor_context_lines"):
             codemap.source_observation(
-                "not-present.py", lines=(1,), anchor_context_lines=bad  # type: ignore[arg-type]
+                "not-present.py",
+                lines=(1,),
+                anchor_context_lines=bad,  # type: ignore[arg-type]
             )
 
 
@@ -155,7 +157,9 @@ def test_mcp_line_context_transports_without_changing_literal_context(
         assert anchor["details"]["context_excerpt"][1]["text"] == "needle"
         assert anchor["details"]["context_excerpt"][1]["role"] == "anchor"
         assert source == original
-        literal = surface.source_observation(["a.py"], literal="needle", context_lines=1)
+        literal = surface.source_observation(
+            ["a.py"], literal="needle", context_lines=1
+        )
         assert literal["occurrences"][0]["context_excerpt"][1]["role"] == "match"
     finally:
         surface.close()
@@ -186,12 +190,16 @@ def test_mcp_invalid_line_requests_fail_before_source_sync(
             surface.source_observation(["unreadable.py"], context_lines=context)
         with pytest.raises(McpSurfaceError, match="line context"):
             surface.source_observation(
-                ["unreadable.py"], literal="needle", context_lines={"lines": [1], "radius": 1}
+                ["unreadable.py"],
+                literal="needle",
+                context_lines={"lines": [1], "radius": 1},
             )
         with pytest.raises(McpSurfaceError, match="line context"):
             surface.source_observation(
-                ["unreadable.py"], result_mode="scope", literal="needle",
-                context_lines={"lines": [1], "radius": 1}
+                ["unreadable.py"],
+                result_mode="scope",
+                literal="needle",
+                context_lines={"lines": [1], "radius": 1},
             )
     finally:
         surface.close()
