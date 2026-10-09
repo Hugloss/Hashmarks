@@ -93,7 +93,7 @@ The default receipt is `dist/chatgpt-secure-mcp-tunnel-handoff.json`. It binds:
 - for source-managed handoffs, the actual imported Hashmarks source root and canonical repository content identity;
 - the exact stdio `mcp_command_argv` and shell-safe `mcp_command`;
 - the negotiated MCP protocol/server identity/version and server instructions, with CLI and MCP versions required to agree;
-- the exact eight-tool read-only catalog and annotations;
+- the complete current fourteen-tool read-only catalog and annotations;
 - explicit authority that Secure MCP Tunnel, ChatGPT configuration, and credentials remain external.
 
 To hand that already-qualified stdio command to OpenAI's tunnel client, create/select a tunnel in the OpenAI Platform first, then keep the runtime API key outside Hashmarks and run the OpenAI-owned client. For example:
