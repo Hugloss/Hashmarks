@@ -271,11 +271,13 @@ def _register_evidence_comparison_tool(
         description=contract.description,
         annotations=annotations,
     )
-    def evidence_comparison(
+    def evidence_comparison(  # noqa: PLR0913 - explicit diagnostic qualification inputs
         before: dict[str, Any],
         after: dict[str, Any],
         result_mode: _EvidenceComparisonResultMode = contract.default_response_mode,
         changed_paths: list[str] | None = None,
+        change_set_complete: bool = False,
+        relationship_evidence: dict[str, Any] | None = None,
         presentation: _Presentation = "none",
     ) -> dict[str, object]:
         return _call_surface(
@@ -287,6 +289,8 @@ def _register_evidence_comparison_tool(
             result_mode=result_mode,
             response_mode=result_mode,
             changed_paths=changed_paths,
+            change_set_complete=change_set_complete,
+            relationship_evidence=relationship_evidence,
             presentation=presentation,
         )
 
