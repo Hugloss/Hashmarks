@@ -46,6 +46,7 @@ class _SourceObservationLineOptions(TypedDict, total=False):
 
     lines: Sequence[int]
     context_lines: int
+    anchor_context_lines: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -582,6 +583,7 @@ class RepositoryDeltaMixin:
         line: int,
         column: int,
         literal_length: int,
+        anchor_role: str = "match",
     ) -> list[dict[str, object]]:
         """Bounded display-only context from the same admitted UTF-8 byte capture.
 
@@ -601,7 +603,7 @@ class RepositoryDeltaMixin:
             excerpt.append(
                 {
                     "line": number,
-                    "role": "match" if number == line else "context",
+                    "role": anchor_role if number == line else "context",
                     "start_column": start + 1,
                     "text": source[start : start + 320],
                     "truncated_left": start > 0,
@@ -711,6 +713,20 @@ class RepositoryDeltaMixin:
             packet["line_anchors"], packet["line_coverage"] = source_line_anchors(
                 raw, requested=requested, member=member
             )
+            if cast("dict[str, int]", packet["limits"]).get("anchor_context_lines", 0):
+                source_lines = text.split("\n")
+                if text.endswith("\n"):
+                    source_lines.pop()
+                for anchor in cast("list[dict[str, object]]", packet["line_anchors"]):
+                    if anchor["state"] != "observed":
+                        continue
+                    anchor["context_excerpt"] = self._source_context_excerpt(
+                        source_lines,
+                        line=cast("int", anchor["line"]),
+                        column=1,
+                        literal_length=0,
+                        anchor_role="anchor",
+                    )
         if literal is None:
             return
         symbols = (
@@ -748,11 +764,16 @@ class RepositoryDeltaMixin:
         **line_options: Unpack[_SourceObservationLineOptions],
     ) -> dict[str, object]:
         """Describe one stable source member, with no repository-wide absence claim."""
-        unexpected = set(line_options) - {"lines", "context_lines"}
+        unexpected = set(line_options) - {
+            "lines",
+            "context_lines",
+            "anchor_context_lines",
+        }
         if unexpected:
             raise TypeError(f"unexpected source observation keyword: {min(unexpected)}")
         lines = line_options.get("lines", ())
         context_lines = line_options.get("context_lines", 0)
+        anchor_context_lines = line_options.get("anchor_context_lines", 0)
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         self._validate_source_observation(
@@ -763,6 +784,10 @@ class RepositoryDeltaMixin:
         if context_lines and literal is None:
             raise ValueError("context_lines requires a literal")
         requested = validated_source_lines(lines)
+        if type(anchor_context_lines) is not int or anchor_context_lines not in (0, 1):
+            raise ValueError("anchor_context_lines must be 0 or 1")
+        if anchor_context_lines and not 1 <= len(requested) <= 8:
+            raise ValueError("anchor_context_lines requires 1 to 8 explicit lines")
         generation_before = self.store.generation()
         member, raw = self._bounded_source_observation(relpath, max_bytes)
         generation, identity_generation, stale = self._generation_status()
@@ -793,6 +818,10 @@ class RepositoryDeltaMixin:
         }
         if context_lines:
             cast("dict[str, int]", packet["limits"])["context_lines"] = context_lines
+        if anchor_context_lines:
+            cast("dict[str, int]", packet["limits"])["anchor_context_lines"] = (
+                anchor_context_lines
+            )
         if raw is None:
             return packet
         self._source_observation_from_bytes(packet, raw)
