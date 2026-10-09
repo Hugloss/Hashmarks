@@ -712,6 +712,7 @@ def _locality(
             ("nodes", "repository_structure", "records"),
             ("edges", "relationship", "records"),
             ("unresolved_calls", "relationship", "records"),
+            ("native_semantic_relationships", "relationship", "record"),
             ("external_or_unindexed_calls", "relationship", "records"),
             ("verification_paths", "verification", "values"),
             ("dimensions", "evidence_measurement", "record"),
