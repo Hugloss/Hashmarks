@@ -21,6 +21,7 @@ from hashmarks.mcp_contract import (
     contract_summary,
     mcp_projection_instructions,
     mcp_projection_summary,
+    normalize_mcp_query_surfaces,
     normalize_mcp_tool_names,
     qualification_response_schemas,
     qualify_mcp_observation,
@@ -346,6 +347,60 @@ def test_mcp_tool_projection_is_canonical_order_and_identity_bound() -> None:
 
     changed = mcp_projection_summary(canonical, ("find",))
     assert changed["projection_identity"] != summary["projection_identity"]
+
+
+def test_mcp_query_surface_projection_is_canonical_and_identity_bound() -> None:
+    canonical = {"contract_identity": "sha256:canonical"}
+
+    assert normalize_mcp_query_surfaces(
+        ["verification-explanation", "freshness"]
+    ) == (
+        "verification-explanation",
+        "freshness",
+    )
+    summary = mcp_projection_summary(
+        canonical,
+        ("repository_intelligence_query",),
+        query_surfaces=("verification-explanation",),
+    )
+    assert summary["tools"] == ["repository_intelligence_query"]
+    assert summary["repository_intelligence_query_surfaces"] == [
+        "verification-explanation"
+    ]
+    assert "verification-explanation" in str(summary["instructions"])
+    assert str(summary["projection_identity"]).startswith("sha256:")
+
+    changed = mcp_projection_summary(
+        canonical,
+        ("repository_intelligence_query",),
+        query_surfaces=("freshness",),
+    )
+    assert changed["projection_identity"] != summary["projection_identity"]
+
+
+def test_mcp_query_surface_projection_rejects_invalid_authority() -> None:
+    canonical = {"contract_identity": "sha256:canonical"}
+
+    with pytest.raises(ValueError, match="at least one surface"):
+        normalize_mcp_query_surfaces([])
+    with pytest.raises(ValueError, match="duplicate surfaces"):
+        normalize_mcp_query_surfaces(["freshness", "freshness"])
+    with pytest.raises(ValueError, match="unknown"):
+        normalize_mcp_query_surfaces(["not-a-surface"])
+    with pytest.raises(ValueError, match="requires repository_intelligence_query"):
+        mcp_projection_summary(
+            canonical,
+            ("find",),
+            query_surfaces=("freshness",),
+        )
+
+
+def test_query_surface_projection_does_not_change_legacy_tool_projection() -> None:
+    canonical = {"contract_identity": "sha256:canonical"}
+    legacy = mcp_projection_summary(canonical, ("task_evidence",))
+
+    assert "repository_intelligence_query_surfaces" not in legacy
+    assert mcp_projection_instructions(MCP_TOOL_NAMES) == MCP_SERVER_INSTRUCTIONS
 
 
 def test_mcp_tool_projection_rejects_empty_duplicate_and_unknown_tools() -> None:
