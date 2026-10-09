@@ -862,6 +862,48 @@ class StructuralLocalityMixin:
         target_node = next(
             row for row in ordered_nodes if row["symbol_id"] == _symbol_id(target_row)
         )
+        # Direct SCIP facts belong to the target's exact definition. Their
+        # relation flags are producer claims, not inferred repository graph
+        # edges, resolved call sites, or safe-refactor recommendations.
+        native_definitions = self._fresh_native_definitions_for_path(
+            str(target_row["path"]), limit=129
+        )
+        native_rows = [
+            row
+            for row in native_definitions[:128]
+            if str(row["display_name"]) == str(target_row["name"])
+            and int(row["line"]) == int(target_row["start_line"])
+        ]
+        native_relations = sorted(
+            [
+                {
+                    "producer": row["producer"],
+                    "path": row["path"],
+                    "line": row["line"],
+                    "source_symbol": row["symbol"],
+                    "kind": item["kind"],
+                    "target_symbol": item["target_symbol"],
+                    "source_identity": target_node["symbol_source_identity"],
+                }
+                for row in native_rows
+                for item in json.loads(str(row["relationships_json"]))
+            ],
+            key=lambda item: (
+                str(item["producer"]),
+                str(item["source_symbol"]),
+                str(item["kind"]),
+                str(item["target_symbol"]),
+            ),
+        )
+        native_semantic_relationships = {
+            "authority": "scip-producer-claim-only",
+            "scope": "target-definition-start-line-only",
+            "producer_bindings": sorted({str(row["producer"]) for row in native_rows}),
+            "truncated": len(native_definitions) > 128
+            or any(bool(row["relationships_truncated"]) for row in native_rows),
+            "negative_evidence_admissible": False,
+            "relationships": native_relations,
+        }
         dimensions = {
             "symbol_count": len(ordered_nodes),
             "file_count": len(files),
@@ -941,6 +983,7 @@ class StructuralLocalityMixin:
                 ),
             ),
             "verification_paths": verification_paths,
+            "native_semantic_relationships": native_semantic_relationships,
             "dimensions": dimensions,
             "claims": {
                 "refactor_recommendation": False,
@@ -1073,6 +1116,30 @@ def _integer_dimension_delta(
     return delta, True
 
 
+def _native_relation_evidence(
+    packet: Mapping[str, object],
+) -> tuple[set[str], set[tuple[str, str, str, str, str]], bool]:
+    raw = packet.get("native_semantic_relationships")
+    if not isinstance(raw, Mapping) or raw.get("truncated") is not False:
+        return set(), set(), False
+    producers = raw.get("producer_bindings")
+    rows = raw.get("relationships")
+    if not isinstance(producers, list) or not isinstance(rows, list):
+        return set(), set(), False
+    keys = {
+        (
+            str(row["producer"]),
+            str(row["source_symbol"]),
+            str(row["kind"]),
+            str(row["target_symbol"]),
+            str(row["line"]),
+        )
+        for row in rows
+        if isinstance(row, Mapping)
+    }
+    return {str(value) for value in producers}, keys, True
+
+
 def _string_set(packet: Mapping[str, object], key: str) -> set[str]:
     values = packet.get(key, [])
     if not isinstance(values, Sequence) or isinstance(values, (str, bytes, bytearray)):
@@ -1094,6 +1161,19 @@ def structural_locality_delta(
         issues.append("dimensions")
     before_verifiers = _string_set(before, "verification_paths")
     after_verifiers = _string_set(after, "verification_paths")
+    before_producers, before_relations, before_valid = _native_relation_evidence(
+        before
+    )
+    after_producers, after_relations, after_valid = _native_relation_evidence(
+        after
+    )
+    native_comparable = (
+        before_valid
+        and after_valid
+        and bool(before_producers)
+        and before_producers == after_producers
+    )
+    # No comparable producer at either endpoint means no absence claim.
     semantic = {
         "schema": STRUCTURAL_LOCALITY_DELTA_SCHEMA,
         "target": before.get("target"),
@@ -1111,6 +1191,13 @@ def structural_locality_delta(
         "dimension_delta": dimension_delta,
         "verification_paths_added": sorted(after_verifiers - before_verifiers),
         "verification_paths_removed": sorted(before_verifiers - after_verifiers),
+        "native_relationships_comparable": native_comparable,
+        "native_relationships_added": sorted(after_relations - before_relations)
+        if native_comparable
+        else [],
+        "native_relationships_removed": sorted(before_relations - after_relations)
+        if native_comparable
+        else [],
         "claims": {
             "architectural_improvement": False,
             "refactor_recommendation": False,
