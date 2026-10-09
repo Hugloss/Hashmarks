@@ -8,7 +8,6 @@ from pathlib import Path
 from hashmarks.codemap import CodeMap
 from hashmarks.evidence_presentation import present_repository_evidence
 
-
 _SYMBOL = "scip-python python example 0.1.0 `src.engine`/normalize_widget()."
 _TARGET = "scip-python python example 0.1.0 `src.types`/Widget#"
 _TASK = (
