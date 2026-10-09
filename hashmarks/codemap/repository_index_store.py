@@ -1071,14 +1071,15 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         return [dict(row) for row in rows]
 
     def native_definitions_for_path(
-        self, path: str, limit: int = 129
+        self, path: str, *, name: str, line: int, limit: int = 129
     ) -> list[dict]:
-        """Bounded SCIP definition evidence in one admitted member."""
+        """Bounded SCIP definitions for one exact admitted source locator."""
         with self._lock:
             rows = self._db.execute(
-                "SELECT * FROM native_definition WHERE path=? "
-                "ORDER BY line,symbol,producer LIMIT ?",
-                (path, limit),
+                "SELECT * FROM native_definition "
+                "WHERE path=? AND display_name=? AND line=? "
+                "ORDER BY symbol,producer LIMIT ?",
+                (path, name, line, limit),
             ).fetchall()
         return [dict(row) for row in rows]
 
