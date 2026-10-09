@@ -100,15 +100,44 @@ Hashmarks exposes one local, read-only **stdio MCP server** with a focused repos
 | MCP tool | What it gives the coding agent |
 | --- | --- |
 | `repository_context` | compact repository orientation, languages, projects, generation and freshness |
-| `find` | bounded codebase search across paths and symbols |
-| `task_evidence` | role-separated retrieval, ownership, ambiguity, verification, freshness and next-read evidence |
-| `change_impact` | structural impact for changed or candidate paths |
+| `find` | bounded exact path and symbol lookup with completeness qualifications |
+| `task_evidence` | role-separated behavior localization, owner/source, ambiguity, verification and next-read evidence |
+| `change_impact` | structural impact for caller-reported changed paths |
 | `correlate_evidence` | bounded external/derived observations correlated to canonical repository evidence |
 | `dependency_codemap` | producer-neutral dependency observations and factual dependency queries |
 | `repository_declarations` | cross-file/format declarations with exact evidence, ambiguity, qualified absence, and disagreement |
 | `post_change` | refreshed evidence and deltas after the caller changes files |
+| `repository_intelligence_query` | existing snapshot, profile, verification explanation, freshness and delta facets |
+| `source_observation` | exact revision-bound literal occurrences for explicit members or a bounded member set |
+| `repository_evidence` | exact evidence bindings and caller-supplied changed-path coverage |
+| `repository_findings` | bounded repository import, cache and concurrency findings |
+| `structural_locality` | static calls, callers and related verifier paths for an exact symbol |
+| `evidence_comparison` | caller-supplied structural, binding or diagnostic endpoint comparison |
 
 You normally **do not start Hashmarks MCP by hand**. Put the MCP configuration in the **target project** you want the agent to analyze. The agent host starts `hashmarks --workspace . mcp` as a stdio child process.
+
+### From exploratory grep to qualified evidence
+
+When the task names behavior but not its implementation path, call MCP
+`task_evidence` before broad `rg`/`grep` searches. Its native packet separates
+retrieval candidates from admitted ownership, source ranges or non-authoritative
+next-reads, verification relevance, and freshness. The optional `compact`,
+`structured`, and `text` presentations now expose those source, owner, and
+verifier records separately with exact JSON-pointer references to the native
+packet; the producer's evidence and authority do not change.
+
+Once the agent knows the paths, `source_observation` supports **one exact literal**
+per call over one member or up to 32 explicitly named members. It reports qualified
+line/column occurrences, revisions, completeness, and scoped negative evidence.
+For example, after localizing archive generation, observe the literal `ZipInfo`
+in the returned source and test paths rather than re-scanning those known files.
+It is not regex search and cannot establish repository-wide absence.
+
+Use direct source reads when an exact file is already known or the actual code
+body matters. Source declarations such as Makefile targets can still require
+native inspection; Hashmarks never executes `make`, tests, or another command.
+The agent retains responsibility for all next-tool, edit and verification
+decisions. See [MCP repository-discovery examples](docs/integration/MCP.md).
 
 ### Claude Code MCP server
 
