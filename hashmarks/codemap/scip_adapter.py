@@ -116,9 +116,14 @@ def parse_scip_json(value: dict[str, Any]) -> tuple[str, tuple[ScipOccurrence, .
                     ("isDefinition", "is_definition", "definition"),
                 ):
                     if _field(relation, camel, snake, False) is True:
-                        by_symbol.setdefault(owner, set()).add(
-                            ScipRelationship(kind=kind, target_symbol=target)
-                        )
+                        bucket = by_symbol.setdefault(owner, set())
+                        bucket.add(ScipRelationship(kind=kind, target_symbol=target))
+                        # Keep only the smallest 65 identities. The extra row
+                        # proves truncation without unbounded relationship state.
+                        if len(bucket) > 65:
+                            bucket.remove(
+                                max(bucket, key=lambda row: (row.kind, row.target_symbol))
+                            )
         for occurrence in document.get("occurrences") or ():
             if not isinstance(occurrence, dict):
                 continue
