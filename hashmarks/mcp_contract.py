@@ -206,9 +206,9 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "task_evidence",
         (
-            "Semantic first choice for unknown-path behavior. Prefer before exploratory "
-            "grep/read: separates retrieval from ownership, resolves owner/ambiguity, "
-            "and returns source/next-read, verification, freshness."
+            "Semantic first choice for unknown-path behavior before exploratory "
+            "grep/read. Separates retrieval from ownership; resolves owner/ambiguity, "
+            "returns source/next-read, verification, freshness and bounded SCIP evidence."
         ),
         "task_evidence",
     ),
@@ -289,8 +289,9 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "structural_locality",
         (
-            "Observe bounded static calls, exact callers, unresolved targets, "
-            "structural locality and related verifier paths for one exact symbol."
+            "Observe static calls, exact callers, unresolved targets, verifier paths "
+            "and direct SCIP relationship claims for one exact symbol; preserve "
+            "provenance, coverage and uncertainty."
         ),
         "structural_locality",
     ),

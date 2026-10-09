@@ -1464,6 +1464,7 @@ class TaskEvidencePacketMixin(
             selection_generation=selection_generation,
             verification_stale=verification_stale,
         )
+        self._task_evidence_attach_scip_discovery(result)
         result["evidence_packet_identity"] = "sha256:" + self._packet_digest(
             operation_schema("task_evidence"),
             result,

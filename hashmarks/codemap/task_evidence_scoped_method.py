@@ -91,3 +91,58 @@ class TaskEvidenceScopedMethodMixin:
                     path, member, score=score, visibility=visibility
                 )
         return None
+
+    @staticmethod
+    def _task_evidence_scip_owner_claim(
+        packet: Mapping[str, object],
+    ) -> Mapping[str, object] | None:
+        """Use only the complete, admitted owner; never a retrieval candidate."""
+        ownership = packet.get("ownership")
+        if not isinstance(ownership, Mapping):
+            return None
+        if (
+            ownership.get("status") != "resolved"
+            or ownership.get("proof_scope_complete") is not True
+            or ownership.get("authority") != "repository-ownership-only"
+        ):
+            return None
+        owner = ownership.get("owner")
+        return owner if isinstance(owner, Mapping) else None
+
+    def _task_evidence_current_scip_symbol(
+        self, owner: Mapping[str, object]
+    ) -> Mapping[str, object] | None:
+        """Rebind the admitted locator to an exact, visible current symbol."""
+        path = str(owner.get("path") or "")
+        qualname = str(owner.get("qualname") or "")
+        if not path or not qualname:
+            return None
+        if self._task_evidence_visibility(path) not in {
+            EvidenceVisibility.SOURCE,
+            EvidenceVisibility.OUTLINE,
+        }:
+            return None
+        if (
+            self.policy.decide(path).evidence_visibility is EvidenceVisibility.DENY
+            or not self._indexed_path_current(path)
+        ):
+            return None
+        return self.store.symbol_at(path, qualname)
+
+    def _task_evidence_attach_scip_discovery(self, packet: dict[str, object]) -> None:
+        """Expose retained SCIP observations without changing task ownership."""
+        owner = self._task_evidence_scip_owner_claim(packet)
+        freshness = packet.get("freshness")
+        if owner is None or not isinstance(freshness, Mapping):
+            return
+        if freshness.get("state") not in {"current", "unknown"}:
+            return
+        current = self._task_evidence_current_scip_symbol(owner)
+        if current is None:
+            return
+        discovery = self._scip_compact_discovery(current)
+        if discovery is not None:
+            packet["semantic_relationships"] = {
+                **discovery,
+                "repository_freshness": freshness["state"],
+            }
