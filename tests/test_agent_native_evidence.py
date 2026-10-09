@@ -277,7 +277,7 @@ def test_task_evidence_ambiguous_next_read_remains_non_authoritative() -> None:
     assert next_read["details"]["authority"] == "non-authoritative-discrimination"
 
 
-def test_compact_scoped_source_projection_prioritizes_hits_over_member_inventory() -> None:
+def test_compact_source_hits_precede_member_inventory() -> None:
     native = {
         "schema": "hashmarks.scoped-source-occurrences.v1",
         "member_observations": [
@@ -307,7 +307,6 @@ def test_compact_scoped_source_projection_prioritizes_hits_over_member_inventory
     assert sources["findings"][0]["source_refs"] == ["/occurrences/0"]
     assert sources["findings"][0]["path"] == "src/member_7.py"
     assert projection["coverage"] == "projection-only"
-    assert any(
-        item["source_ref"] == "" or item["source_ref"] == "/occurrences"
-        for item in projection["source_context"]
+    assert projection["source_context"][0]["details"]["negative_evidence"] == (
+        "not-admissible"
     )
