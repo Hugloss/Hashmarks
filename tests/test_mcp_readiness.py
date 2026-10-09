@@ -152,6 +152,118 @@ def test_mcp_readiness_qualifies_explicit_tool_projection(
     ]
 
 
+def test_mcp_readiness_qualifies_query_surface_projection(
+    tmp_path: Path, monkeypatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    canonical = {
+        "schema": "hashmarks.mcp-contract.v1",
+        "contract_identity": "sha256:contract",
+        "server_version": "0.test",
+        "tools": list(MCP_TOOL_NAMES),
+        "operation_contract_identity": "sha256:operations",
+        "error_schema": "hashmarks.mcp-error.v1",
+        "error_reasons": [],
+        "error_recovery_authority": "consumer-owned",
+    }
+    monkeypatch.setattr(
+        readiness,
+        "current_contract_summary",
+        lambda *_args, **_kwargs: canonical,
+    )
+
+    async def observed_tools(*_args, **_kwargs):
+        return ("repository_intelligence_query",)
+
+    async def observed_surfaces(*_args, **_kwargs):
+        return ("verification-explanation",)
+
+    monkeypatch.setattr(
+        readiness,
+        "_observed_projection_tools",
+        observed_tools,
+    )
+    monkeypatch.setattr(
+        readiness,
+        "_observed_projection_query_surfaces",
+        observed_surfaces,
+    )
+
+    result = mcp_readiness(
+        workspace,
+        tool_names=("repository_intelligence_query",),
+        query_surfaces=("verification-explanation",),
+    )
+
+    projection = result["projection"]
+    assert result["ready"] is True
+    assert projection["tools"] == ["repository_intelligence_query"]
+    assert projection["repository_intelligence_query_surfaces"] == [
+        "verification-explanation"
+    ]
+    assert projection[
+        "observed_repository_intelligence_query_surfaces"
+    ] == ["verification-explanation"]
+    assert result["launch"]["args"][-5:] == [
+        "mcp",
+        "--tool",
+        "repository_intelligence_query",
+        "--query-surface",
+        "verification-explanation",
+    ]
+
+
+def test_mcp_readiness_fails_closed_on_query_surface_observation_drift(
+    tmp_path: Path, monkeypatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    canonical = {
+        "schema": "hashmarks.mcp-contract.v1",
+        "contract_identity": "sha256:contract",
+        "server_version": "0.test",
+        "tools": list(MCP_TOOL_NAMES),
+        "operation_contract_identity": "sha256:operations",
+        "error_schema": "hashmarks.mcp-error.v1",
+        "error_reasons": [],
+        "error_recovery_authority": "consumer-owned",
+    }
+    monkeypatch.setattr(
+        readiness,
+        "current_contract_summary",
+        lambda *_args, **_kwargs: canonical,
+    )
+
+    async def observed_tools(*_args, **_kwargs):
+        return ("repository_intelligence_query",)
+
+    async def observed_surfaces(*_args, **_kwargs):
+        return ("freshness",)
+
+    monkeypatch.setattr(
+        readiness,
+        "_observed_projection_tools",
+        observed_tools,
+    )
+    monkeypatch.setattr(
+        readiness,
+        "_observed_projection_query_surfaces",
+        observed_surfaces,
+    )
+
+    result = mcp_readiness(
+        workspace,
+        tool_names=("repository_intelligence_query",),
+        query_surfaces=("verification-explanation",),
+    )
+
+    assert result["ready"] is False
+    assert result["projection"][
+        "observed_repository_intelligence_query_surfaces"
+    ] == ["freshness"]
+
+
 def test_doctor_parser_exposes_mcp_projection_tools() -> None:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
@@ -161,6 +273,27 @@ def test_doctor_parser_exposes_mcp_projection_tools() -> None:
 
     assert parsed.mcp is True
     assert parsed.mcp_tool == ["task_evidence"]
+
+
+def test_doctor_parser_exposes_mcp_query_surface_projection() -> None:
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="command", required=True)
+    cli._add_identity_cli(sub)
+
+    parsed = parser.parse_args(
+        [
+            "doctor",
+            "--mcp",
+            "--mcp-tool",
+            "repository_intelligence_query",
+            "--mcp-query-surface",
+            "verification-explanation",
+        ]
+    )
+
+    assert parsed.mcp is True
+    assert parsed.mcp_tool == ["repository_intelligence_query"]
+    assert parsed.mcp_query_surface == ["verification-explanation"]
 
 
 def test_doctor_parser_exposes_explicit_mcp_probe() -> None:
