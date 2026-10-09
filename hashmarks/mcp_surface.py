@@ -492,7 +492,9 @@ class HashmarksMcpSurface:
                 self._map.sync(paths)
                 if result_mode == "member":
                     return self._map.source_observation(
-                        paths[0], literal=literal, limit=limit,
+                        paths[0],
+                        literal=literal,
+                        limit=limit,
                         context_lines=context_lines,
                     )
                 assert literal is not None
