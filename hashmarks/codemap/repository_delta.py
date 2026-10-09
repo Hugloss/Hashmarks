@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypedDict, Unpack, cast
 
 from hashmarks.digest import Digest
 from hashmarks.file_store import UnstableFileError
@@ -41,6 +41,13 @@ if TYPE_CHECKING:
     from .engine import CodeMap
 
 
+class _SourceObservationLineOptions(TypedDict, total=False):
+    """Typed optional line selectors; public keywords remain backward compatible."""
+
+    lines: Sequence[int]
+    context_lines: int
+
+
 @dataclass(frozen=True, slots=True)
 class _RepositoryMemberSource:
     rel: str
@@ -66,6 +73,7 @@ class _ScopedSourceAggregation:
     max_total_bytes: int
     max_member_bytes: int
     start_generation: int
+    context_lines: int = 0
     members: list[dict[str, object]] = field(default_factory=list)
     occurrences: list[dict[str, object]] = field(default_factory=list)
     match_count: int = 0
@@ -568,6 +576,41 @@ class RepositoryDeltaMixin:
         return hits, count
 
     @staticmethod
+    def _source_context_excerpt(
+        lines: Sequence[str],
+        *,
+        line: int,
+        column: int,
+        literal_length: int,
+    ) -> list[dict[str, object]]:
+        """Bounded display-only context from the same admitted UTF-8 byte capture.
+
+        Column coordinates and occurrence identities continue to refer to the
+        original source. Never read again to construct context.
+        """
+        excerpt: list[dict[str, object]] = []
+        for number in range(max(1, line - 1), min(len(lines), line + 1) + 1):
+            source = lines[number - 1]
+            if source.endswith("\r"):
+                source = source[:-1]
+            # Reserve room for the entire <=256-character literal and nearby
+            # source even when the match is deep in a very long physical line.
+            start = max(0, column - 1 - 32) if number == line else 0
+            if number == line and start + 320 < column - 1 + literal_length:
+                start = column - 1 + literal_length - 320
+            excerpt.append(
+                {
+                    "line": number,
+                    "role": "match" if number == line else "context",
+                    "start_column": start + 1,
+                    "text": source[start : start + 320],
+                    "truncated_left": start > 0,
+                    "truncated_right": start + 320 < len(source),
+                }
+            )
+        return excerpt
+
+    @staticmethod
     def _validate_source_observation(
         literal: str | None,
         limit: int,
@@ -612,6 +655,30 @@ class RepositoryDeltaMixin:
                 "reason": "source-size-bound",
             }, None
         return member, raw
+
+    def _source_evidenced_hits(
+        self,
+        hits: list[dict[str, object]],
+        *,
+        text: str,
+        literal: str,
+        context_lines: int,
+    ) -> None:
+        """Attach stable location IDs before optional display-only excerpts."""
+        source_lines = text.split("\n") if context_lines else []
+        if source_lines and text.endswith("\n"):
+            source_lines.pop()
+        for hit in hits:
+            hit["evidence_identity"] = self._evidence_identity(
+                "hashmarks.source-occurrence.v1", hit
+            )
+            if context_lines:
+                hit["context_excerpt"] = self._source_context_excerpt(
+                    source_lines,
+                    line=cast("int", hit["line"]),
+                    column=cast("int", hit["column"]),
+                    literal_length=len(literal),
+                )
 
     def _source_observation_from_bytes(
         self, packet: dict[str, object], raw: bytes
@@ -659,10 +726,10 @@ class RepositoryDeltaMixin:
             symbols=symbols,
             token_kinds=self._python_source_token_kinds(text, str(member["path"])),
         )
-        for hit in hits:
-            hit["evidence_identity"] = self._evidence_identity(
-                "hashmarks.source-occurrence.v1", hit
-            )
+        context_lines = cast("dict[str, int]", packet["limits"]).get("context_lines", 0)
+        self._source_evidenced_hits(
+            hits, text=text, literal=literal, context_lines=context_lines
+        )
         packet["occurrences"] = hits
         packet["observed_match_count"] = count
         packet["truncation"] = "truncated" if count > limit else "complete"
@@ -678,14 +745,23 @@ class RepositoryDeltaMixin:
         limit: int = 50,
         max_bytes: int = 1_048_576,
         long_line_threshold: int = 2_000,
-        lines: Sequence[int] = (),
+        **line_options: Unpack[_SourceObservationLineOptions],
     ) -> dict[str, object]:
         """Describe one stable source member, with no repository-wide absence claim."""
+        unexpected = set(line_options) - {"lines", "context_lines"}
+        if unexpected:
+            raise TypeError(f"unexpected source observation keyword: {min(unexpected)}")
+        lines = line_options.get("lines", ())
+        context_lines = line_options.get("context_lines", 0)
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         self._validate_source_observation(
             literal, limit, max_bytes, long_line_threshold
         )
+        if type(context_lines) is not int or context_lines not in (0, 1):
+            raise ValueError("context_lines must be 0 or 1")
+        if context_lines and literal is None:
+            raise ValueError("context_lines requires a literal")
         requested = validated_source_lines(lines)
         generation_before = self.store.generation()
         member, raw = self._bounded_source_observation(relpath, max_bytes)
@@ -715,6 +791,8 @@ class RepositoryDeltaMixin:
             "authority": "repository-evidence-only",
             "execution_effect": "none",
         }
+        if context_lines:
+            cast("dict[str, int]", packet["limits"])["context_lines"] = context_lines
         if raw is None:
             return packet
         self._source_observation_from_bytes(packet, raw)
@@ -743,6 +821,7 @@ class RepositoryDeltaMixin:
         limit: int,
         available_bytes: int,
         member_max_bytes: int,
+        context_lines: int,
     ) -> dict[str, object]:
         """Observe one selected member, or record an explicit exhausted budget."""
         if available_bytes < 1:
@@ -763,6 +842,7 @@ class RepositoryDeltaMixin:
             literal=literal,
             limit=limit,
             max_bytes=min(available_bytes, member_max_bytes),
+            context_lines=context_lines,
         )
 
     def _scoped_source_result(
@@ -825,6 +905,10 @@ class RepositoryDeltaMixin:
             "authority": "repository-evidence-only",
             "execution_effect": "none",
         }
+        if batch.context_lines:
+            cast("dict[str, int]", result["limits"])["context_lines"] = (
+                batch.context_lines
+            )
         result["observation_identity"] = self._evidence_identity(
             operation_schema("source_observation", "scope"),
             {
@@ -847,6 +931,7 @@ class RepositoryDeltaMixin:
         limit: int = 100,
         max_total_bytes: int = 4_194_304,
         max_member_bytes: int = 1_048_576,
+        context_lines: int = 0,
     ) -> dict[str, object]:
         """Observe an explicit member set; never imply repository-wide absence."""
         if TYPE_CHECKING:
@@ -856,6 +941,8 @@ class RepositoryDeltaMixin:
         if not 1 <= max_total_bytes <= 8_388_608:
             raise ValueError("max_total_bytes must be between 1 and 8388608")
         self._validate_source_observation(literal, limit, max_member_bytes, 2_000)
+        if type(context_lines) is not int or context_lines not in (0, 1):
+            raise ValueError("context_lines must be 0 or 1")
         if literal is None:
             raise ValueError("scoped source observations require a literal")
         batch = _ScopedSourceAggregation(
@@ -867,6 +954,7 @@ class RepositoryDeltaMixin:
             max_total_bytes=max_total_bytes,
             max_member_bytes=max_member_bytes,
             start_generation=self.store.generation(),
+            context_lines=context_lines,
         )
         for path in batch.paths:
             batch.add(
@@ -877,6 +965,7 @@ class RepositoryDeltaMixin:
                     max(1, limit - len(batch.occurrences)),
                     max_total_bytes - batch.consumed_bytes,
                     max_member_bytes,
+                    context_lines,
                 ),
             )
         return self._scoped_source_result(batch)
