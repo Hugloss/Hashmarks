@@ -172,8 +172,7 @@ def _register_agent_evidence_tools(
         if surface_name not in query_surfaces:
             error = McpSurfaceError(
                 "repository_intelligence_query surface is unavailable in this "
-                "server projection: "
-                + str(surface_name)
+                "server projection: " + str(surface_name)
             )
             raise tool_error(error.transport_message())
         return _call_surface(
@@ -322,14 +321,10 @@ def _apply_tool_projection(server: Any, selected_tools: tuple[str, ...]) -> None
             server.remove_tool(name)
 
 
-def build_server(
-    workspace: str | Path = ".",
-    *,
-    state_dir: str | Path | None = None,
-    tool_names: tuple[str, ...] | list[str] | None = None,
-    query_surfaces: tuple[str, ...] | list[str] | None = None,
-):
-    MCPServer, ToolAnnotations, ToolError = _sdk()
+def _server_projection_selection(
+    tool_names: tuple[str, ...] | list[str] | None,
+    query_surfaces: tuple[str, ...] | list[str] | None,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
     selected_tools = normalize_mcp_tool_names(tool_names)
     selected_query_surfaces = normalize_mcp_query_surfaces(query_surfaces)
     if (
@@ -340,6 +335,21 @@ def build_server(
             "repository_intelligence_query surface projection requires "
             "repository_intelligence_query to be exposed"
         )
+    return selected_tools, selected_query_surfaces
+
+
+def build_server(
+    workspace: str | Path = ".",
+    *,
+    state_dir: str | Path | None = None,
+    tool_names: tuple[str, ...] | list[str] | None = None,
+    query_surfaces: tuple[str, ...] | list[str] | None = None,
+):
+    MCPServer, ToolAnnotations, ToolError = _sdk()
+    selected_tools, selected_query_surfaces = _server_projection_selection(
+        tool_names,
+        query_surfaces,
+    )
     surface = HashmarksMcpSurface(
         str(workspace), state_dir=None if state_dir is None else str(state_dir)
     )
