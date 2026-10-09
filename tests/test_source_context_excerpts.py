@@ -190,6 +190,7 @@ def test_source_line_keywords_remain_supported_but_typos_fail_early(
     assert observed["line_coverage"] == "complete"
     assert observed["occurrences"][0]["context_excerpt"][0]["role"] == "match"
 
+
 def test_context_requires_literal_and_does_not_read_file_for_preview(
     tmp_path: Path,
 ) -> None:
