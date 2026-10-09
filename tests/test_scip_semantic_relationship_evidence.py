@@ -105,8 +105,8 @@ def test_scip_relationship_flags_are_direct_and_provenance_bound(
             encoding="utf-8",
         )
         cm.sync(["code.py"])
-        assert _relations(cm)["relationships"] == []
-        assert _relations(cm)["negative_evidence_admissible"] is False
+        stale = cm.structural_locality("code.py::Impl", refresh=False)
+        assert "native_semantic_relationships" not in stale
 
 
 def test_scip_relationship_truncation_and_reimport_replacement(
