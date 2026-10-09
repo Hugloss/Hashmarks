@@ -738,6 +738,8 @@ class RepositoryDeltaMixin:
         )
         if type(context_lines) is not int or context_lines not in (0, 1):
             raise ValueError("context_lines must be 0 or 1")
+        if context_lines and literal is None:
+            raise ValueError("context_lines requires a literal")
         requested = validated_source_lines(lines)
         generation_before = self.store.generation()
         member, raw = self._bounded_source_observation(relpath, max_bytes)
