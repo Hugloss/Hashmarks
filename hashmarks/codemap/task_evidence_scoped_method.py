@@ -104,7 +104,7 @@ class TaskEvidenceScopedMethodMixin:
             ownership.get("status") != "resolved"
             or ownership.get("proof_scope_complete") is not True
             or ownership.get("authority") != "repository-ownership-only"
-            or freshness.get("state") != "current"
+            or freshness.get("state") not in {"current", "unknown"}
         ):
             return
         owner = ownership.get("owner")
@@ -129,4 +129,7 @@ class TaskEvidenceScopedMethodMixin:
             return
         discovery = self._scip_compact_discovery(current)
         if discovery is not None:
-            packet["semantic_relationships"] = discovery
+            packet["semantic_relationships"] = {
+                **discovery,
+                "repository_freshness": freshness["state"],
+            }
