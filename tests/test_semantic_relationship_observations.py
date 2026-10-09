@@ -457,6 +457,29 @@ def test_lsp_buffer_mismatch_is_preserved_and_blocks_repository_resolution(
     assert claim["source"]["resolution"]["candidates"]
 
 
+def test_lsp_unadmitted_document_snapshots_remain_explicitly_accounted(
+    tmp_path: Path,
+) -> None:
+    _repository(tmp_path)
+    capture = _capture(tmp_path)
+    capture["documents"]["ignored.py"] = {
+        "revision": "a" * 64,
+        "provenance": _provenance(),
+    }
+    with CodeMap(tmp_path) as cm:
+        cm.sync()
+        packet = _observe(cm, [capture])
+    observation = packet["observations"][0]
+    assert observation["accounting"]["documents_received"] == 3
+    assert observation["accounting"]["documents_unadmitted"] == 1
+    ignored = next(
+        row for row in observation["source_bindings"] if row["path"] == "ignored.py"
+    )
+    assert ignored["state"] == "unknown"
+    assert ignored["reason"] == "member-not-present"
+    assert validate_repository_intelligence_evidence(packet)["valid"] is True
+
+
 def test_lsp_document_version_changes_are_a_separate_delta_axis(tmp_path: Path) -> None:
     _repository(tmp_path)
     capture = _capture(tmp_path)

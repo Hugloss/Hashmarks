@@ -365,11 +365,18 @@ def lsp_relationship_observation(
     )
     locations = _locations(capture)
     unique = {content_identity(row): row for row in locations}
+    documents = capture["documents"]
+    document_bindings = [
+        resolver.binding(path, snapshot) for path, snapshot in sorted(documents.items())
+    ]
+    unadmitted_documents = sum(not resolver.admitted(path) for path in documents)
     observation.accounting = {
         "received": len(locations),
         "duplicates": len(locations) - len(unique),
         "denied_or_unadmitted": 0,
         "omitted_locations": max(0, len(unique) - CLAIM_LIMIT),
+        "documents_received": len(documents),
+        "documents_unadmitted": unadmitted_documents,
     }
     observation.truncated = len(unique) > CLAIM_LIMIT
     for _identity, location in sorted(unique.items())[:CLAIM_LIMIT]:
@@ -397,9 +404,8 @@ def lsp_relationship_observation(
                 },
             )
         )
-    observation.source_bindings = [
-        resolver.binding(path, snapshot)
-        for path, snapshot in sorted(capture["documents"].items())
-        if resolver.admitted(path)
-    ]
+    # Preserve every supplied snapshot.  An unadmitted path remains an
+    # explicit unknown/unsupported source binding instead of disappearing
+    # behind the capture identity.
+    observation.source_bindings = document_bindings
     return observation.packet()

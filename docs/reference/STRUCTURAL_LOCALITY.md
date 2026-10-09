@@ -241,7 +241,10 @@ Snapshots accept `revision` instead of `text`; text is hashed and discarded
 after normalization, while its revision and producer provenance remain.
 Contradictory supplied text/revision pairs fail before repository reads.
 External locations remain uncorrelated claims without dependency traversal;
-denied or unadmitted repository locations are excluded with accounting.
+denied or unadmitted repository locations are excluded with accounting. Every
+supplied document snapshot is retained as a source binding; a snapshot that
+cannot be admitted remains an explicit unknown/unsupported binding with its
+document count and unadmitted count exposed.
 Captures affect only the current observation or comparison and never hydrate
 durable provider state or later calls.
 
