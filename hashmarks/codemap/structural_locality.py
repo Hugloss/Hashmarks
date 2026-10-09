@@ -859,7 +859,9 @@ class StructuralLocalityMixin:
             "native_semantic_relationships": {
                 "authority": "scip-producer-claim-only",
                 "scope": "target-definition-start-line-only",
-                "producer_bindings": sorted({str(row["producer"]) for row in native_rows}),
+                "producer_bindings": sorted(
+                    {str(row["producer"]) for row in native_rows}
+                ),
                 "truncated": truncated
                 or any(bool(row["relationships_truncated"]) for row in native_rows),
                 "negative_evidence_admissible": False,
