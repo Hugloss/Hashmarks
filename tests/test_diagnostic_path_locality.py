@@ -200,7 +200,7 @@ def test_invalid_reported_changed_paths_fail_before_locality_projection(
 ) -> None:
     before = _observation([])
     after = _observation([_diagnostic(_DIRECT, "new")])
-    with pytest.raises(ValueError, match="changed_paths|relative"):
+    with pytest.raises(ValueError, match="changed_paths|input path"):
         RepositoryDeltaMixin.diagnostic_observation_delta(
             before,
             after,
