@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypedDict, Unpack, cast
 
 from hashmarks.digest import Digest
 from hashmarks.file_store import UnstableFileError
@@ -39,6 +39,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from .engine import CodeMap
+
+
+class _SourceObservationLineOptions(TypedDict, total=False):
+    """Typed optional line selectors; public keywords remain backward compatible."""
+
+    lines: Sequence[int]
+    context_lines: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -738,10 +745,14 @@ class RepositoryDeltaMixin:
         limit: int = 50,
         max_bytes: int = 1_048_576,
         long_line_threshold: int = 2_000,
-        lines: Sequence[int] = (),
-        context_lines: int = 0,
-    ) -> dict[str, object]:  # noqa: PLR0913 - preserve public source API compatibility
+        **line_options: Unpack[_SourceObservationLineOptions],
+    ) -> dict[str, object]:
         """Describe one stable source member, with no repository-wide absence claim."""
+        unexpected = set(line_options) - {"lines", "context_lines"}
+        if unexpected:
+            raise TypeError(f"unexpected source observation keyword: {min(unexpected)}")
+        lines = line_options.get("lines", ())
+        context_lines = line_options.get("context_lines", 0)
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
         self._validate_source_observation(
