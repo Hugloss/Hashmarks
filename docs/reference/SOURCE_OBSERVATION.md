@@ -111,6 +111,61 @@ agent tool selection, arbitrary regex search, code-editing, or runtime
 read-deduplication. Regression coverage:
 `tests/test_source_context_excerpts.py`.
 
+## Explicit diagnostic-line context (Hermes follow-up)
+
+An LSP/compiler diagnostic often supplies a known path and physical line but
+no literal to search. The existing single-member source observer can return
+bounded display excerpts next to its **existing exact byte-line anchors**,
+without launching an LSP, resolving a symbol, rereading a source file, or
+asserting that the external diagnostic is correct:
+
+```python
+with CodeMap(".") as codemap:
+    codemap.sync()
+    packet = codemap.source_observation(
+        "src/example.py", lines=(12,), anchor_context_lines=1
+    )
+    rows = packet["line_anchors"][0]["context_excerpt"]
+```
+
+The existing MCP `source_observation` tool also supports this in `member`
+mode with **no literal**:
+
+```json
+{
+  "paths": ["src/example.py"],
+  "result_mode": "member",
+  "context_lines": {"lines": [12], "radius": 1},
+  "presentation": "compact"
+}
+```
+
+The numeric `context_lines=0/1` form still means **literal match** context.
+The object form selects explicit physical lines only; it does not search.
+It requires exactly `lines` (1–8 distinct positive integers) and
+`radius: 1`. A requested blank or out-of-range line remains an **unknown
+anchor with no excerpt**; it never becomes a zero-match or missing-diagnostic
+claim. The default Python `anchor_context_lines=0` preserves the existing
+line-anchor packet, identity and byte-line digest. An opt-in context-bearing
+observation has a different observation identity, while the original
+`line_sha256`, coordinates and source revision remain unchanged.
+
+Only an already admitted, stable, complete UTF-8 member capture supplies
+context. Denied, oversized, binary, invalid-UTF-8, changed/unreconciled and
+unstable members disclose no excerpt. Each anchor excerpt has at most three
+physical lines, each clipped to 320 Unicode codepoints with original 1-based
+line/start-column and explicit left/right truncation. Its center
+`role: "anchor"` distinguishes a known line from literal `role: "match"`;
+neighbors have `role: "context"`. CRLF trailing carriage returns are
+omitted from displayed text, not from the original byte-line digest.
+
+Agent-native source presentation places explicit `line_anchors` after
+literal `occurrences`, before member inventories. All details and exact
+`/line_anchors/N` pointers survive compact rendering; omitted row counts
+remain projection-only. The native packet remains the sole source authority,
+and line excerpt display does not imply that the diagnostic producer observed
+these bytes, passed verification, or reached a complete diagnostic collection.
+
 ## Exact scoped multi-member observation (H1 follow-up)
 
 ```python

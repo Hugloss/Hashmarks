@@ -111,6 +111,35 @@ def _bounded_int(value: int, *, name: str, minimum: int, maximum: int) -> int:
     return value
 
 
+def _source_context_request(
+    context_lines: int | dict[str, object],
+    *,
+    literal: str | None,
+    result_mode: str,
+) -> tuple[int, list[int], int]:
+    """Validate exact line-context selection before CodeMap sync or source reads."""
+    if not isinstance(context_lines, dict):
+        radius = _bounded_int(context_lines, name="context_lines", minimum=0, maximum=1)
+        if literal is None and radius:
+            raise McpSurfaceError("context_lines requires a literal")
+        return radius, [], 0
+    if set(context_lines) != {"lines", "radius"}:
+        raise McpSurfaceError("context_lines object requires exactly lines and radius")
+    if result_mode != "member" or literal is not None:
+        raise McpSurfaceError("line context requires member mode without a literal")
+    if type(context_lines["radius"]) is not int or context_lines["radius"] != 1:
+        raise McpSurfaceError("line context radius must be 1")
+    requested = context_lines["lines"]
+    if (
+        not isinstance(requested, list)
+        or not 1 <= len(requested) <= 8
+        or any(type(line) is not int or line < 1 for line in requested)
+        or len(set(requested)) != len(requested)
+    ):
+        raise McpSurfaceError("line context requires 1 to 8 distinct positive lines")
+    return 0, sorted(requested), 1
+
+
 def _previous_evidence(value: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise McpSurfaceError("previous_evidence must be an object")
@@ -475,17 +504,15 @@ class HashmarksMcpSurface:
         literal: str | None = None,
         result_mode: str = operation_default_mode("source_observation"),
         limit: int = 50,
-        context_lines: int = 0,
+        context_lines: int | dict[str, object] = 0,
     ) -> dict[str, object]:
         self._validate_source_request(paths, literal, result_mode)
         if literal is not None:
             literal = _bounded_text(literal, name="literal", maximum=_MAX_QUERY_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=50)
-        context_lines = _bounded_int(
-            context_lines, name="context_lines", minimum=0, maximum=1
+        literal_context, requested_lines, anchor_context = _source_context_request(
+            context_lines, literal=literal, result_mode=result_mode
         )
-        if literal is None and context_lines:
-            raise McpSurfaceError("context_lines requires a literal")
 
         def project() -> dict[str, object]:
             try:
@@ -495,11 +522,13 @@ class HashmarksMcpSurface:
                         paths[0],
                         literal=literal,
                         limit=limit,
-                        context_lines=context_lines,
+                        context_lines=literal_context,
+                        lines=requested_lines,
+                        anchor_context_lines=anchor_context,
                     )
                 assert literal is not None
                 return self._map.scoped_source_occurrences(
-                    paths, literal, limit=limit, context_lines=context_lines
+                    paths, literal, limit=limit, context_lines=literal_context
                 )
             except ValueError as exc:
                 raise _surface_value_error(exc) from exc

@@ -689,6 +689,7 @@ def _source(
             # Literal hits are more useful to an agent than a long member
             # inventory; compact presentation must show hits before inventory.
             ("occurrences", "source", "records"),
+            ("line_anchors", "source", "records"),
             ("member", "source", "record"),
             ("member_observations", "source", "records"),
             ("source_shape", "evidence_measurement", "record"),
