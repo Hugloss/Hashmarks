@@ -909,41 +909,41 @@ def _task_ownership(
     ctx: Mapping[str, object],
 ) -> None:
     """Present existing ownership facts without choosing or upgrading an owner."""
-        ownership = packet.get("ownership")
-        if isinstance(ownership, Mapping):
-            owner = ownership.get("owner")
-            owner_path = owner.get("path") if isinstance(owner, Mapping) else None
-            ownership_context = {
-                **ctx,
-                "task_ownership": {
-                    "status": ownership.get("status"),
-                    "authority": ownership.get("authority"),
-                    "proof_scope_complete": ownership.get("proof_scope_complete"),
-                    "owner_path": owner_path,
-                },
-            }
-            for key, family, kind, assertion in (
-                ("owner", "ownership_evidence", "qualified_owner", "observed_fact"),
-                ("candidate", "ownership_evidence", "owner_candidate", "producer_claim"),
-                ("source_evidence", "source", "owner_source_evidence", "observed_fact"),
-                (
-                    "next_read",
-                    "ownership_evidence",
-                    "discrimination_read",
-                    "producer_claim",
-                ),
-            ):
-                if isinstance(ownership.get(key), Mapping):
-                    p.field(
-                        ownership,
-                        key,
-                        family,
-                        (*ref, "ownership"),
-                        ownership_context,
-                        kind=kind,
-                        shape="record",
-                        assertion=assertion,
-                    )
+    ownership = packet.get("ownership")
+    if isinstance(ownership, Mapping):
+        owner = ownership.get("owner")
+        owner_path = owner.get("path") if isinstance(owner, Mapping) else None
+        ownership_context = {
+            **ctx,
+            "task_ownership": {
+                "status": ownership.get("status"),
+                "authority": ownership.get("authority"),
+                "proof_scope_complete": ownership.get("proof_scope_complete"),
+                "owner_path": owner_path,
+            },
+        }
+        for key, family, kind, assertion in (
+            ("owner", "ownership_evidence", "qualified_owner", "observed_fact"),
+            ("candidate", "ownership_evidence", "owner_candidate", "producer_claim"),
+            ("source_evidence", "source", "owner_source_evidence", "observed_fact"),
+            (
+                "next_read",
+                "ownership_evidence",
+                "discrimination_read",
+                "producer_claim",
+            ),
+        ):
+            if isinstance(ownership.get(key), Mapping):
+                p.field(
+                    ownership,
+                    key,
+                    family,
+                    (*ref, "ownership"),
+                    ownership_context,
+                    kind=kind,
+                    shape="record",
+                    assertion=assertion,
+                )
 
 def _task_verification(
     p: _Projection,
@@ -952,27 +952,27 @@ def _task_verification(
     ctx: Mapping[str, object],
 ) -> None:
     """Show producer-owned verification choices without executing them."""
-        verification = packet.get("verification")
-        if isinstance(verification, Mapping):
-            verification_context = {
-                **ctx,
-                "verification_authority": verification.get("authority"),
-            }
-            for key, kind in (
-                ("selected", "selected_verifier"),
-                ("plan", "verification_plan"),
-            ):
-                if isinstance(verification.get(key), Mapping):
-                    p.field(
-                        verification,
-                        key,
-                        "verification",
-                        (*ref, "verification"),
-                        verification_context,
-                        kind=kind,
-                        shape="record",
-                        assertion="producer_claim",
-                    )
+    verification = packet.get("verification")
+    if isinstance(verification, Mapping):
+        verification_context = {
+            **ctx,
+            "verification_authority": verification.get("authority"),
+        }
+        for key, kind in (
+            ("selected", "selected_verifier"),
+            ("plan", "verification_plan"),
+        ):
+            if isinstance(verification.get(key), Mapping):
+                p.field(
+                    verification,
+                    key,
+                    "verification",
+                    (*ref, "verification"),
+                    verification_context,
+                    kind=kind,
+                    shape="record",
+                    assertion="producer_claim",
+                )
 
 
 def _task(
