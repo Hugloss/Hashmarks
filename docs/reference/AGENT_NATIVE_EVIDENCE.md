@@ -161,6 +161,36 @@ or agent-routing layer. The consumer uses `task_evidence` for unknown-path
 semantic localization, `source_observation` for exact literals in known
 paths, and native source reads when the full implementation matters.
 
+### Direct SCIP relationship discovery on an admitted owner
+
+`task_evidence` optionally emits `semantic_relationships` only when the
+canonical ownership result has a resolved, complete, admitted owner and
+Hashmarks can observe producer-current SCIP relationship flags at that exact
+indexed symbol definition. This is a **separate repository evidence claim**,
+not a different ownership selector or a reason to choose an action.
+
+The compact record reports an exact `path::qualname` subject, direct observed
+relationship count and kinds, SCIP producer bindings, truncation, and the
+existing `structural_locality` detail surface. It never includes the full
+relationship graph, callers, source bodies, or a second semantic index.
+A provider-current import is not proof that the external SCIP index was
+generated from the same source bytes: `source_equivalence` and
+`completeness` remain `unknown`, with
+`negative_evidence_admissible: false`. Repository freshness is carried
+separately (`current` or `unknown`); a stale task packet is not enriched.
+
+No direct SCIP flags, no admitted owner, no unique current indexed symbol,
+a deny policy, or invalidated SCIP generation means this optional record is
+absent. **Absence of the record does not prove absence of relationships.**
+If the consumer needs individual target resolutions, it can query the
+unchanged `structural_locality` surface with that exact subject.
+
+The structured evidence presentation exposes
+`/semantic_relationships` as `scip_semantic_discovery` with
+`assertion: producer_claim`, before the aggregate related-evidence
+projection. The existing source/owner/verification authority and MCP tool
+count are unchanged.
+
 ## Qualified endpoint comparisons
 
 The read-only `evidence_comparison` MCP tool transports two explicit,
