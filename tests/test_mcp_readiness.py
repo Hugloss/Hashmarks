@@ -74,6 +74,16 @@ def test_mcp_readiness_projects_contract_and_launch(
         "operation_contract_identity": "sha256:operations",
         "tool_count": len(MCP_TOOL_NAMES),
         "tools": list(MCP_TOOL_NAMES),
+        "repository_intelligence_query_surfaces": [
+            "change-intelligence",
+            "verification-explanation",
+            "freshness",
+            "snapshot",
+            "profile",
+            "delta",
+            "cross-repository",
+            "economics",
+        ],
         "launch": {
             "args": [
                 "--workspace",
