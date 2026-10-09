@@ -13,6 +13,7 @@ from hashmarks.paths import normalize_relative_path
 
 from .change_impact import ChangeImpactOptions
 from .decision_session import diagnostic_producer
+from .diagnostic_path_locality import diagnostic_path_locality, indexed_diagnostic_rows
 from .diagnostic_source_revision import (
     EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA,
     diagnostic_identity,
@@ -1162,18 +1163,8 @@ class RepositoryDeltaMixin:
     ) -> dict[str, object]:
         """Compare diagnostic identities; counts alone are never delta authority."""
 
-        def indexed(packet: Mapping[str, object]) -> dict[str, Mapping[str, object]]:
-            rows = packet.get("diagnostics")
-            if not isinstance(rows, list):
-                return {}
-            return {
-                str(row["identity"]): row
-                for row in rows
-                if isinstance(row, Mapping) and row.get("identity")
-            }
-
-        old = indexed(before)
-        new = indexed(after)
+        old = indexed_diagnostic_rows(before)
+        new = indexed_diagnostic_rows(after)
         old_ids = set(old)
         new_ids = set(new)
         added_ids = sorted(new_ids - old_ids)
@@ -1203,6 +1194,15 @@ class RepositoryDeltaMixin:
             else None
         )
 
+        qualification = RepositoryDeltaMixin._diagnostic_claim_qualification(
+            before, after, added, removed
+        )
+        locality = diagnostic_path_locality(
+            added=added,
+            removed=removed,
+            changed_paths=changed_paths,
+            qualification=qualification,
+        )
         return {
             "schema": DIAGNOSTIC_DELTA_SCHEMA,
             "producer": after.get("producer"),
@@ -1232,11 +1232,10 @@ class RepositoryDeltaMixin:
                 "removed": removed,
                 "unchanged_count": len(old_ids & new_ids),
                 "added_in_changed_scope": added_in_changed_scope,
+                "path_locality": locality,
                 "possible_relocations": possible_relocations,
                 "source_correspondence": source_correspondence,
-                "qualification": RepositoryDeltaMixin._diagnostic_claim_qualification(
-                    before, after, added, removed
-                ),
+                "qualification": qualification,
             },
             "authority": "observation-only",
             "execution_effect": "none",
