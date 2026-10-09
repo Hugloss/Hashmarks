@@ -41,11 +41,7 @@ def _packet() -> dict[str, Any]:
 
 def _rows(packet: dict[str, Any], *, format: str = "compact") -> list[dict[str, Any]]:
     projection = present_repository_evidence(packet, format=format)
-    return [
-        row
-        for group in projection["groups"]
-        for row in group["findings"]
-    ]
+    return [row for group in projection["groups"] for row in group["findings"]]
 
 
 def test_current_resolved_complete_owner_keeps_native_paths_and_source() -> None:
@@ -119,9 +115,7 @@ def assert_unqualified(packet: dict[str, Any]) -> None:
         result = present_repository_evidence(packet, format=format)
         rows = [row for group in result["groups"] for row in group["findings"]]
         owner = next(row for row in rows if row["kind"] == "unqualified_owner")
-        source = next(
-            row for row in rows if row["kind"] == "unqualified_owner_source"
-        )
+        source = next(row for row in rows if row["kind"] == "unqualified_owner_source")
         assert "qualified_owner" not in {row["kind"] for row in rows}
         assert "owner_source_evidence" not in {row["kind"] for row in rows}
         assert owner["assertion"] == "producer_claim"
@@ -137,7 +131,9 @@ def assert_unqualified(packet: dict[str, Any]) -> None:
     assert packet == original
 
 
-def test_unqualified_owner_does_not_relabel_independent_candidates_and_verifiers() -> None:
+def test_unqualified_owner_does_not_relabel_independent_candidates_and_verifiers() -> (
+    None
+):
     packet = _packet()
     packet["ownership"]["status"] = "ambiguous"
     packet["ownership"]["proof_scope_complete"] = False
