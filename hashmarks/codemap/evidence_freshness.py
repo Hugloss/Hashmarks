@@ -300,15 +300,23 @@ class EvidenceFreshnessMixin:
         ]
 
     def _fresh_native_definitions_for_path(
-        self, path: str, *, limit: int = 129
-    ) -> list[dict]:
+        self, path: str, *, name: str, line: int, limit: int = 129
+    ) -> tuple[list[dict], bool]:
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
-        return [
-            row
-            for row in self.store.native_definitions_for_path(path, limit=limit)
-            if self._evidence_fresh("scip", str(row.get("producer") or ""))[0]
-        ]
+        # Test source bounds before filtering freshness; stale producers must
+        # not silently conceal truncation of fresh producer records.
+        rows = self.store.native_definitions_for_path(
+            path, name=name, line=line, limit=limit
+        )
+        return (
+            [
+                row
+                for row in rows
+                if self._evidence_fresh("scip", str(row.get("producer") or ""))[0]
+            ],
+            len(rows) >= limit,
+        )
 
     def _fresh_native_refs(self, query: str, *, limit: int = 200) -> list[dict]:
         if TYPE_CHECKING:
