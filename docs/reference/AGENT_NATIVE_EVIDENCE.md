@@ -179,9 +179,20 @@ generated from the same source bytes: `source_equivalence` and
 `negative_evidence_admissible: false`. Repository freshness is carried
 separately (`current` or `unknown`); a stale task packet is not enriched.
 
-No direct SCIP flags, no admitted owner, no unique current indexed symbol,
-a deny policy, or invalidated SCIP generation means this optional record is
-absent. **Absence of the record does not prove absence of relationships.**
+A current SCIP definition with zero direct flags is now explicitly reported
+as `observation_state: definition-observed-no-direct-claims`, with a zero
+observed count and the original producer binding. A definition with positive
+flags reports `direct-claims-observed`. Both remain producer observations,
+not proof of exhaustive indexing or missing relationships. No SCIP definition,
+no admitted owner, no unique current indexed symbol, a deny policy, or an
+invalidated SCIP generation means the optional record is absent.
+
+`repository_revision_observation` distinguishes whether Hashmarks' current
+indexed file digest matches the source bytes Hashmarks observed when it imported
+SCIP (`same-as-import-observation`, `differs-from-import-observation`, or
+`unknown`). That is **not** the SCIP producer's claimed source revision and
+cannot upgrade `source_equivalence: unknown` into a proof. **Neither zero
+claims nor an absent record proves that no relationships exist.**
 If the consumer needs individual target resolutions, it can query the
 unchanged `structural_locality` surface with that exact subject.
 
