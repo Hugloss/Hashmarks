@@ -206,9 +206,9 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "task_evidence",
         (
-            "Semantic first choice for unknown-path behavior; prefer before exploratory "
-            "grep/read. Separates ownership, source, verification and freshness, and "
-            "signals bounded SCIP relationship evidence when observed."
+            "Semantic first choice for unknown-path behavior before exploratory "
+            "grep/read. Separates retrieval from ownership; resolves owner/ambiguity, "
+            "returns source/next-read, verification, freshness and bounded SCIP evidence."
         ),
         "task_evidence",
     ),
