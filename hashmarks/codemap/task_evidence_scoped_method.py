@@ -128,6 +128,5 @@ class TaskEvidenceScopedMethodMixin:
         if current is None:
             return
         discovery = self._scip_compact_discovery(current)
-        related = packet.get("related")
-        if discovery is not None and isinstance(related, dict):
-            related["semantic_relationships"] = discovery
+        if discovery is not None:
+            packet["semantic_relationships"] = discovery
