@@ -1391,10 +1391,14 @@ class TaskEvidencePacketMixin(
         limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: Sequence[Mapping[str, object]] | None = None,
     ) -> dict[str, object]:
         """Return role-separated repository evidence for an external consumer."""
         if TYPE_CHECKING:
             self = cast("CodeMap", self)
+        from .lsp_relationship_adapter import normalize_lsp_captures
+
+        captures = normalize_lsp_captures(supplied_observations)
         if token_budget < 1:
             raise ValueError("token_budget must be >= 1")
         reconciled_task_paths = set(self._reconcile_cached_task_paths(task, limit))
@@ -1464,7 +1468,9 @@ class TaskEvidencePacketMixin(
             selection_generation=selection_generation,
             verification_stale=verification_stale,
         )
-        self._task_evidence_attach_scip_discovery(result)
+        self._task_evidence_attach_scip_discovery(
+            result, captures, selection_generation=selection_generation
+        )
         result["evidence_packet_identity"] = "sha256:" + self._packet_digest(
             operation_schema("task_evidence"),
             result,

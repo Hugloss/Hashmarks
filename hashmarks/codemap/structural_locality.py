@@ -9,7 +9,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from hashmarks._version import __version__
-from hashmarks.operation_contract import operation_response, operation_schema
+from hashmarks.operation_contract import (
+    operation_response,
+    operation_schema,
+    validate_operation_response,
+)
 from hashmarks.paths import normalize_relative_path
 from hashmarks.producer_identity import native_producer_implementation_identity
 from hashmarks.python_ast_cache import read_python_ast
@@ -794,8 +798,7 @@ class StructuralLocalityMixin:
         ordered_nodes = sorted(nodes.values(), key=_locality_node_sort_key)
         return ordered_nodes, edges, unresolved_calls, external_calls
 
-    @operation_response("structural_locality")
-    def structural_locality(
+    def structural_locality(  # noqa: PLR0913 - retain traversal bounds alongside explicit observation inputs
         self,
         target: str,
         *,
@@ -803,20 +806,51 @@ class StructuralLocalityMixin:
         call_limit_per_symbol: int = 64,
         ref_limit_per_symbol: int = 256,
         refresh: bool = True,
+        result_mode: str = "default",
+        supplied_observations: Sequence[Mapping[str, object]] | None = None,
     ) -> dict[str, object]:
         """Return one generation-scoped structural-locality observation."""
+        from .lsp_relationship_adapter import normalize_lsp_captures
+        from .semantic_relationship_observation import semantic_relationship_observation
+
+        captures = normalize_lsp_captures(supplied_observations)
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if result_mode not in ("default", "relationships"):
+            raise ValueError("result_mode must be default or relationships")
         self._validate_locality_bounds(
             max_depth, call_limit_per_symbol, ref_limit_per_symbol
         )
         if refresh:
             self.sync()
         with self.decision_session():
-            return self._structural_locality_impl(
-                target,
-                max_depth=max_depth,
-                call_limit_per_symbol=call_limit_per_symbol,
-                ref_limit_per_symbol=ref_limit_per_symbol,
-                refresh=refresh,
+            if result_mode == "relationships":
+                result = semantic_relationship_observation(
+                    self, self._exact_locality_target(target), captures
+                )
+            else:
+                result = self._structural_locality_impl(
+                    target,
+                    max_depth=max_depth,
+                    call_limit_per_symbol=call_limit_per_symbol,
+                    ref_limit_per_symbol=ref_limit_per_symbol,
+                    refresh=refresh,
+                )
+                if captures:
+                    result["supplied_relationship_observation"] = (
+                        semantic_relationship_observation(
+                            self, self._exact_locality_target(target), captures
+                        )
+                    )
+                    result["evidence_identity"] = _identity(
+                        {
+                            key: value
+                            for key, value in result.items()
+                            if key != "evidence_identity"
+                        }
+                    )
+            return validate_operation_response(
+                "structural_locality", result, mode=result_mode
             )
 
     @staticmethod
@@ -839,11 +873,14 @@ class StructuralLocalityMixin:
         return relationships, revision if isinstance(revision, str) else None
 
     def _scip_target_resolution(
-        self, producer: str, target_symbol: str
+        self, producer: str, target_symbol: str, source_path: str
     ) -> dict[str, object]:
         fresh, _reason = self._evidence_fresh("scip", producer)
         candidates = self.store.native_definitions_for_symbol(
-            target_symbol, producer=producer, limit=65
+            target_symbol,
+            producer=producer,
+            limit=65,
+            document_path=source_path if target_symbol.startswith("local ") else None,
         )
         truncated = len(candidates) >= 65
         current = candidates[:64] if fresh else []
@@ -954,8 +991,11 @@ class StructuralLocalityMixin:
         for producer, targets in by_producer.items():
             ordered = sorted(targets)
             for target in ordered[:128]:
+                source_path = next(
+                    str(row["path"]) for row in rows if str(row["producer"]) == producer
+                )
                 projected[(producer, target)] = self._scip_target_resolution(
-                    producer, target
+                    producer, target, source_path
                 )
             for target in ordered[128:]:
                 truncated = True

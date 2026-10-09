@@ -18,6 +18,14 @@ from .codemap.diagnostic_source_revision import (
     validated_diagnostic_source_revision_evidence,
 )
 from .codemap.repository_delta import EXTERNAL_DIAGNOSTIC_OBSERVATION_SCHEMA
+from .codemap.semantic_relationship_delta import validate_relationship_delta
+from .codemap.semantic_relationship_model import (
+    DELTA_SCHEMA as RELATIONSHIP_DELTA_SCHEMA,
+)
+from .codemap.semantic_relationship_model import (
+    OBSERVATION_SCHEMA as RELATIONSHIP_OBSERVATION_SCHEMA,
+)
+from .codemap.semantic_relationship_model import validate_relationship_observation
 from .freshness import FRESHNESS_STATES
 from .operation_contract import operation_schema
 from .producer_identity import native_producer_implementation_identity
@@ -33,6 +41,8 @@ _OWNERSHIP_RELATION_SCHEMA = operation_schema("ownership_relation_graph")
 _TASK_ACTION_MAP_SCHEMA = operation_schema("task_action_map")
 
 _CURRENT_EVIDENCE_KINDS: dict[str, str] = {
+    RELATIONSHIP_OBSERVATION_SCHEMA: "semantic-relationship-observation",
+    RELATIONSHIP_DELTA_SCHEMA: "semantic-relationship-delta",
     _DECISION_PACKET_SCHEMA: "decision",
     _DECISION_BRIEF_SCHEMA: "decision",
     "hashmarks.task-context-plan.v1": "context",
@@ -430,7 +440,37 @@ def _observation_freshness(
     }
 
 
+def _semantic_relationship_evidence(
+    payload: Mapping[str, object], reasons: list[str]
+) -> dict[str, object]:
+    try:
+        if payload.get("schema") == RELATIONSHIP_DELTA_SCHEMA:
+            value = validate_relationship_delta(payload)
+            return {
+                "stale": None,
+                "semantic_relationship_deltas": value["producer_deltas"],
+                "semantic_relationship_endpoints": {
+                    "before": value["before"],
+                    "after": value["after"],
+                },
+            }
+        value = validate_relationship_observation(payload)
+        return {
+            "repository_identity": value["repository"]["content_identity"],
+            "codemap_generation": value["repository"]["generation"],
+            "freshness_state": value["repository"]["freshness"],
+            "stale": None,
+            "semantic_relationship_observations": value["observations"],
+            "semantic_relationship_coverage": value["coverage"],
+        }
+    except (KeyError, TypeError, ValueError):
+        reasons.append("invalid-semantic-relationship-evidence")
+        return {}
+
+
 _VALIDATORS = {
+    RELATIONSHIP_OBSERVATION_SCHEMA: _semantic_relationship_evidence,
+    RELATIONSHIP_DELTA_SCHEMA: _semantic_relationship_evidence,
     _DECISION_PACKET_SCHEMA: _decision_packet,
     _DECISION_BRIEF_SCHEMA: _decision_brief,
     "hashmarks.task-context-plan.v1": _context_plan,
@@ -530,6 +570,10 @@ def validate_repository_intelligence_evidence(
                     "source_revision_coverage",
                     "change_set_completeness",
                     "freshness_reason",
+                    "semantic_relationship_observations",
+                    "semantic_relationship_coverage",
+                    "semantic_relationship_deltas",
+                    "semantic_relationship_endpoints",
                 )
                 if field in projection
             },

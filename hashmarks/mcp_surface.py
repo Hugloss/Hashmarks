@@ -271,6 +271,7 @@ class HashmarksMcpSurface:
         limit: int = TASK_EVIDENCE_DEFAULT_OPTIONS.limit,
         per_role: int = TASK_EVIDENCE_DEFAULT_OPTIONS.per_role,
         token_budget: int = TASK_EVIDENCE_DEFAULT_OPTIONS.token_budget,
+        supplied_observations: list[dict[str, Any]] | None = None,
     ) -> dict[str, object]:
         task = _bounded_text(task, name="task", maximum=_MAX_TASK_CHARS)
         limit = _bounded_int(limit, name="limit", minimum=1, maximum=_MAX_LIMIT)
@@ -280,7 +281,11 @@ class HashmarksMcpSurface:
         )
         return self._read(
             lambda: self._map.task_evidence(
-                task, limit=limit, per_role=per_role, token_budget=token_budget
+                task,
+                limit=limit,
+                per_role=per_role,
+                token_budget=token_budget,
+                supplied_observations=supplied_observations,
             )
         )
 
@@ -612,6 +617,10 @@ class HashmarksMcpSurface:
             from .codemap.structural_locality import structural_locality_delta
 
             return structural_locality_delta(before, after)
+        if result_mode == "relationships":
+            from .codemap.semantic_relationship_delta import semantic_relationship_delta
+
+            return semantic_relationship_delta(before, after)
         if result_mode == "bindings":
             self._map.sync()
             return self._map.repository_evidence_binding_delta(before, after)
@@ -630,9 +639,14 @@ class HashmarksMcpSurface:
         relationship_evidence: dict[str, Any] | None = None,
     ) -> dict[str, object]:
         """Transport two explicit packets to their existing native comparison owner."""
-        if result_mode not in ("structural", "bindings", "diagnostics"):
+        if result_mode not in (
+            "structural",
+            "bindings",
+            "diagnostics",
+            "relationships",
+        ):
             raise McpSurfaceError(
-                "result_mode must be one of: structural, bindings, diagnostics"
+                "result_mode must be one of: structural, bindings, diagnostics, relationships"
             )
         before = _bounded_json(
             before, name="before", maximum=524_288, expected_type=dict
@@ -677,14 +691,24 @@ class HashmarksMcpSurface:
         return self._read(project)
 
     def structural_locality(
-        self, target: str, *, max_depth: int = 2
+        self,
+        target: str,
+        *,
+        max_depth: int = 2,
+        result_mode: str = "default",
+        supplied_observations: list[dict[str, Any]] | None = None,
     ) -> dict[str, object]:
         target = _bounded_text(target, name="target", maximum=_MAX_QUERY_CHARS)
         max_depth = _bounded_int(max_depth, name="max_depth", minimum=1, maximum=6)
 
         def project() -> dict[str, object]:
             try:
-                return self._map.structural_locality(target, max_depth=max_depth)
+                return self._map.structural_locality(
+                    target,
+                    max_depth=max_depth,
+                    result_mode=result_mode,
+                    supplied_observations=supplied_observations,
+                )
             except ValueError as exc:
                 raise _surface_value_error(exc) from exc
 

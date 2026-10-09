@@ -129,20 +129,71 @@ class TaskEvidenceScopedMethodMixin:
             return None
         return self.store.symbol_at(path, qualname)
 
-    def _task_evidence_attach_scip_discovery(self, packet: dict[str, object]) -> None:
+    def _task_evidence_attach_scip_discovery(
+        self,
+        packet: dict[str, object],
+        supplied_observations: Sequence[Mapping[str, object]] = (),
+        *,
+        selection_generation: int | None = None,
+    ) -> None:
         """Expose retained SCIP observations without changing task ownership."""
+        if TYPE_CHECKING:
+            self = cast("CodeMap", self)
+        if supplied_observations:
+            packet["supplied_observation_accounting"] = {
+                "received": len(supplied_observations),
+                "retained": 0,
+                "omitted": len(supplied_observations),
+                "capture_identities": [
+                    row["capture_identity"] for row in supplied_observations
+                ],
+                "reason": "task-owner-or-freshness-not-qualified",
+            }
         owner = self._task_evidence_scip_owner_claim(packet)
         freshness = packet.get("freshness")
         if owner is None or not isinstance(freshness, Mapping):
             return
         if freshness.get("state") not in {"current", "unknown"}:
             return
-        current = self._task_evidence_current_scip_symbol(owner)
-        if current is None:
-            return
-        discovery = self._scip_compact_discovery(current)
-        if discovery is not None:
+        from .semantic_relationship_model import compact_relationships
+        from .semantic_relationship_observation import semantic_relationship_observation
+
+        with self.decision_session(expected_generation=selection_generation):
+            current = self._task_evidence_current_scip_symbol(owner)
+            if current is None:
+                return
+            observation = semantic_relationship_observation(
+                self, current, supplied_observations
+            )
+            compact = compact_relationships(observation)
+            discovery = self._scip_compact_discovery(current)
+        if supplied_observations:
+            retained = sum(
+                "method" in row["scope"] for row in observation["observations"]
+            )
+            packet["supplied_observation_accounting"] = {
+                "received": len(supplied_observations),
+                "retained": retained,
+                "omitted": len(supplied_observations) - retained,
+                "capture_identities": [
+                    row["capture_identity"] for row in supplied_observations
+                ],
+                "reason": "observation-bounds"
+                if retained < len(supplied_observations)
+                else "current-request-projection",
+            }
+        if (
+            discovery is not None
+            or supplied_observations
+            or compact["observed_relationship_count"]
+        ):
             packet["semantic_relationships"] = {
-                **discovery,
+                **(discovery or compact),
                 "repository_freshness": freshness["state"],
+                "evidence": compact,
+                "evidence_refs": {
+                    "ownership": "/ownership",
+                    "source": "/ownership/source_evidence",
+                    "verification": "/verification",
+                },
             }

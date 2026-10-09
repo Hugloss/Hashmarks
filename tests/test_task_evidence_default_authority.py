@@ -79,7 +79,9 @@ def test_task_evidence_defaults_have_one_owner(
             limit: int,
             per_role: int,
             token_budget: int,
+            supplied_observations: object = None,
         ) -> dict[str, object]:
+            assert supplied_observations is None
             captured.update(
                 task=task,
                 options=TaskEvidenceOptions(

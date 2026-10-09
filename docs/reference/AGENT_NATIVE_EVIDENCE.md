@@ -165,13 +165,18 @@ paths, and native source reads when the full implementation matters.
 
 `task_evidence` optionally emits `semantic_relationships` only when the
 canonical ownership result has a resolved, complete, admitted owner and
-Hashmarks can observe producer-current SCIP relationship flags at that exact
-indexed symbol definition. This is a **separate repository evidence claim**,
+Hashmarks can observe SCIP relationship flags or explicitly supplied LSP
+captures mentioning that exact indexed symbol. This is a **separate repository evidence claim**,
 not a different ownership selector or a reason to choose an action.
 
 The compact record reports an exact `path::qualname` subject, direct observed
-relationship count and kinds, SCIP producer bindings, truncation, and the
-existing `structural_locality` detail surface. It never includes the full
+relationship count and kinds, producer bindings, truncation, and the
+existing `structural_locality` detail surface. Its `evidence` field adds up to
+eight direct claims, provider capability/collection/freshness qualifications,
+source correspondence and unresolved candidates, plus explicit presentation
+omission counts. `evidence_refs` point to the packet's admitted ownership,
+source evidence, and verifier evidence without changing their selection.
+It never includes the full
 relationship graph, callers, source bodies, or a second semantic index.
 A provider-current import is not proof that the external SCIP index was
 generated from the same source bytes: `source_equivalence` and
@@ -179,11 +184,19 @@ generated from the same source bytes: `source_equivalence` and
 `negative_evidence_admissible: false`. Repository freshness is carried
 separately (`current` or `unknown`); a stale task packet is not enriched.
 
-No direct SCIP flags, no admitted owner, no unique current indexed symbol,
-a deny policy, or invalidated SCIP generation means this optional record is
-absent. **Absence of the record does not prove absence of relationships.**
-If the consumer needs individual target resolutions, it can query the
-unchanged `structural_locality` surface with that exact subject.
+No admitted owner, no unique current indexed symbol, or a deny policy means
+this optional record is absent. **Absence of the record does not prove absence
+of relationships.** Retained stale SCIP claims keep their explicit stale
+qualification; supplied empty/error captures keep collection/source evidence.
+For individual resolutions, full source bindings, and qualified deltas, query
+`structural_locality` with that exact subject and `result_mode="relationships"`.
+The optional `supplied_observations` argument (CLI `--supplied-observations`)
+uses the [captured LSP contract](STRUCTURAL_LOCALITY.md#supplied-lsp-captures)
+and remains request-local.
+`supplied_observation_accounting` retains capture identities and received,
+retained, and omitted counts when captures are supplied. An unqualified owner
+or stale task keeps explicit exclusion accounting rather than silently
+discarding those inputs.
 
 The structured evidence presentation exposes
 `/semantic_relationships` as `scip_semantic_discovery` with

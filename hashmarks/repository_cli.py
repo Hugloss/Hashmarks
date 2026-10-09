@@ -194,9 +194,14 @@ def _map_projects(args) -> int:
 
 
 def _map_import_scip(args) -> int:
+    provenance = (
+        _read_json_object(args.provenance, option="--provenance")
+        if args.provenance
+        else None
+    )
     value = _call_codemap(
         args,
-        lambda codemap: codemap.import_scip(args.path),
+        lambda codemap: codemap.import_scip(args.path, provenance=provenance),
         extra_errors=(RuntimeError,),
     )
     _print(value)
@@ -289,6 +294,7 @@ def _tests_code(args) -> int:
 
 
 def _structural_locality_code(args) -> int:
+    supplied = _supplied_relationship_observations(args)
     value = _call_codemap(
         args,
         lambda codemap: codemap.structural_locality(
@@ -296,9 +302,11 @@ def _structural_locality_code(args) -> int:
             max_depth=args.max_depth,
             call_limit_per_symbol=args.call_limit,
             ref_limit_per_symbol=args.ref_limit,
+            result_mode=args.result_mode,
+            supplied_observations=supplied,
         ),
     )
-    _print_operation("structural_locality", value)
+    _print_operation("structural_locality", value, mode=args.result_mode)
     return 0
 
 
@@ -307,9 +315,16 @@ def _structural_locality_delta_code(args) -> int:
 
     before = _read_json_object(args.before, option="--before")
     after = _read_json_object(args.after, option="--after")
+    if args.result_mode == "relationships":
+        from .codemap.semantic_relationship_delta import semantic_relationship_delta
+
+        value = semantic_relationship_delta(before, after)
+    else:
+        value = structural_locality_delta(before, after)
     _print_operation(
         "structural_locality_delta",
-        structural_locality_delta(before, after),
+        value,
+        mode=args.result_mode,
     )
     return 0
 
@@ -329,6 +344,7 @@ def _context_code(args) -> int:
 
 
 def _task_evidence_code(args) -> int:
+    supplied = _supplied_relationship_observations(args)
     value = _call_codemap(
         args,
         lambda codemap: codemap.task_evidence(
@@ -336,10 +352,24 @@ def _task_evidence_code(args) -> int:
             token_budget=args.budget,
             limit=args.limit,
             per_role=args.per_role,
+            supplied_observations=supplied,
         ),
     )
     _print_operation("task_evidence", value)
     return 0
+
+
+def _supplied_relationship_observations(args):
+    if not args.supplied_observations:
+        return None
+    value = _read_json_object(
+        args.supplied_observations, option="--supplied-observations"
+    )
+    if set(value) != {"observations"} or not isinstance(value["observations"], list):
+        raise ValueError(
+            "--supplied-observations requires an object containing observations"
+        )
+    return value["observations"]
 
 
 def _verification_relevance_code(args) -> int:
@@ -538,6 +568,10 @@ def _add_map_enrichment_cli(
     )
     add_common_arguments(map_scip, inherited=True)
     map_scip.add_argument("path")
+    map_scip.add_argument(
+        "--provenance",
+        help="JSON file containing producer-owned source, capability and collection claims",
+    )
     map_scip.set_defaults(func=_map_import_scip, automatic_update_check=True)
     map_clean = map_sub.add_parser("clean", help="clear workspace CodeMap state")
     add_common_arguments(map_clean, inherited=True)
@@ -638,6 +672,12 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     locality.add_argument("--max-depth", type=int, default=2)
     locality.add_argument("--call-limit", type=int, default=64)
     locality.add_argument("--ref-limit", type=int, default=256)
+    locality.add_argument(
+        "--result-mode", choices=("default", "relationships"), default="default"
+    )
+    locality.add_argument(
+        "--supplied-observations", help="JSON file containing captured LSP observations"
+    )
     locality.set_defaults(func=_structural_locality_code, automatic_update_check=True)
 
     locality_delta = sub.add_parser(
@@ -647,6 +687,9 @@ def _add_graph_cli(sub, *, add_common_arguments: Callable[..., None]) -> None:
     add_common_arguments(locality_delta, inherited=True)
     locality_delta.add_argument("--before", required=True)
     locality_delta.add_argument("--after", required=True)
+    locality_delta.add_argument(
+        "--result-mode", choices=("default", "relationships"), default="default"
+    )
     locality_delta.set_defaults(
         func=_structural_locality_delta_code, automatic_update_check=True
     )
@@ -684,6 +727,9 @@ def _add_task_evidence_cli(sub, *, add_common_arguments: Callable[..., None]) ->
     )
     add_common_arguments(task_evidence, inherited=True)
     task_evidence.add_argument("task")
+    task_evidence.add_argument(
+        "--supplied-observations", help="JSON file containing captured LSP observations"
+    )
     task_evidence.add_argument(
         "--budget",
         type=int,
