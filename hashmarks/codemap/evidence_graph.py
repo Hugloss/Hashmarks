@@ -265,6 +265,15 @@ class EvidenceGraphMixin:
                         "display_name": occurrence.display_name,
                         "line": occurrence.line,
                         "end_line": occurrence.end_line,
+                        "relationships_json": json.dumps(
+                            [
+                                {"kind": row.kind, "target_symbol": row.target_symbol}
+                                for row in occurrence.relationships
+                            ],
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ),
+                        "relationships_truncated": occurrence.relationships_truncated,
                     }
                 )
                 continue
