@@ -130,11 +130,10 @@ DIAGNOSTIC_DELTA_SCHEMA = operation_schema("evidence_comparison", "diagnostics")
 class RepositoryDeltaMixin:
     """Bounded semantic snapshots and deltas over repository intelligence.
 
-    F3 owns no historical repository store.  A caller retains the earlier
-    producer snapshot and supplies it back after a later repository state has
-    been admitted.  Hashmarks derives the current snapshot from existing
-    ownership/impact/verification/freshness authority and emits only changed
-    facts plus compact semantic summaries.
+    Callers retain earlier producer snapshots and supply them after later
+    repository state is admitted. Existing ownership, impact, verification, and
+    freshness authority yields changed facts and compact summaries without
+    a historical repository store.
     """
 
     def _repository_observer_packet(self) -> dict[str, object]:
@@ -990,33 +989,34 @@ class RepositoryDeltaMixin:
         current_generation: int,
         changed_paths: Sequence[str] = (),
         dependency_paths: Sequence[str] = (),
+        change_set_complete: bool = False,
     ) -> dict[str, object]:
-        """Evaluate scoped freshness without making every generation globally stale."""
-        observed_repository = str(observation.get("repository_identity") or "")
-        observed_generation = observation.get("codemap_generation")
+        """Scoped external freshness; disjoint partial changes prove no absence."""
+        if not isinstance(change_set_complete, bool):
+            raise ValueError("change_set_complete must be a boolean")
         raw_scope = observation.get("scope_paths")
-        scope = (
-            {str(path) for path in raw_scope} if isinstance(raw_scope, list) else set()
-        )
-        relevant = scope | {str(path) for path in dependency_paths}
-        changed = {str(path) for path in changed_paths}
-        intersection = sorted(relevant & changed)
-        repository_changed = observed_repository != current_repository_identity
-        generation_changed = observed_generation != current_generation
-
+        scope = set(map(str, raw_scope)) if isinstance(raw_scope, list) else set()
+        dependencies = set(map(str, dependency_paths))
+        changed = set(map(str, changed_paths))
+        intersection = sorted(changed & (scope | dependencies))
+        observed_repo = observation.get("repository_identity")
+        repository_changed = observed_repo != current_repository_identity
+        generation_changed = observation.get("codemap_generation") != current_generation
         if not repository_changed and not generation_changed:
-            state = "current"
-            reason = "repository-and-generation-unchanged"
-        elif not relevant:
+            state, reason = "current", "repository-and-generation-unchanged"
+        elif not (scope or dependencies):
             state = "stale"
             reason = "repository-changed-without-declared-observation-scope"
         elif intersection:
-            state = "stale"
-            reason = "relevant-repository-evidence-changed"
+            state, reason = "stale", "relevant-repository-evidence-changed"
+        elif not change_set_complete:
+            state, reason = "unknown", "change-set-completeness-unproven"
+        elif not changed:
+            state, reason = "unknown", "changed-endpoint-without-path-change-evidence"
         else:
             state = "current"
-            reason = "changed-paths-proven-outside-observation-scope"
-
+            reason = "declared-complete-change-set-outside-observation-scope"
+        completeness = "caller-claimed-complete" if change_set_complete else "unknown"
         return {
             "schema": "hashmarks.external-observation-freshness.v1",
             "state": state,
@@ -1024,8 +1024,9 @@ class RepositoryDeltaMixin:
             "repository_changed": repository_changed,
             "generation_changed": generation_changed,
             "observation_scope": sorted(scope),
-            "dependency_scope": sorted({str(path) for path in dependency_paths}),
+            "dependency_scope": sorted(dependencies),
             "changed_paths": sorted(changed),
+            "change_set_completeness": completeness,
             "intersection": intersection,
             "authority": "observation-freshness-only",
             "execution_effect": "none",
