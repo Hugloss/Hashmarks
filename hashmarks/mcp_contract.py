@@ -266,7 +266,8 @@ MCP_TOOL_CONTRACTS = (
         (
             "After localization, observe exact case-sensitive literals (not regex) "
             "in one member or up to 32 known paths. Return line/column, revisions, "
-            "coverage and scoped absence; never infer repository-wide absence."
+            "coverage and scoped absence; optional bounded context excerpts. "
+            "Never infer repository-wide absence."
         ),
         "source_observation",
     ),
