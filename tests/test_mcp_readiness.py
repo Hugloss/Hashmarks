@@ -225,9 +225,9 @@ def test_mcp_readiness_qualifies_query_surface_projection(
     assert projection["repository_intelligence_query_surfaces"] == [
         "verification-explanation"
     ]
-    assert projection[
-        "observed_repository_intelligence_query_surfaces"
-    ] == ["verification-explanation"]
+    assert projection["observed_repository_intelligence_query_surfaces"] == [
+        "verification-explanation"
+    ]
     assert result["launch"]["args"][-5:] == [
         "mcp",
         "--tool",
@@ -282,9 +282,9 @@ def test_mcp_readiness_fails_closed_on_query_surface_observation_drift(
     )
 
     assert result["ready"] is False
-    assert result["projection"][
-        "observed_repository_intelligence_query_surfaces"
-    ] == ["freshness"]
+    assert result["projection"]["observed_repository_intelligence_query_surfaces"] == [
+        "freshness"
+    ]
 
 
 def test_doctor_parser_exposes_mcp_projection_tools() -> None:
