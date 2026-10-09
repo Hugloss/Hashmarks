@@ -159,6 +159,7 @@ def test_scip_discovery_does_not_promote_unresolved_or_denied_owners(
         packet = codemap.task_evidence(_TASK)
         assert "semantic_relationships" not in packet
 
+
 def test_scip_observed_zero_claims_is_not_missing_provider_evidence(
     tmp_path: Path,
 ) -> None:
@@ -221,4 +222,3 @@ def test_scip_empty_observation_invalidated_after_source_edit(
         )
         codemap.sync(["src/engine.py"])
         assert "semantic_relationships" not in codemap.task_evidence(_TASK)
-
